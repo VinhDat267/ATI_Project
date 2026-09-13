@@ -6,6 +6,8 @@ Người dùng chọn cách làm: Codex khảo sát/thiết kế/viết plan và
 
 Workspace: `D:\Môn học\ATI\ATI_Project`.
 
+Trước khi stage/commit, tuân thủ [GIT-POLICY.md](../GIT-POLICY.md): chọn từng file thuộc task, kiểm nội dung staged diff, không tự stage toàn bộ workspace. Log mới mặc định ignore; chỉ thêm đúng file đã review. Không xóa hoặc ghi đè evidence lịch sử để làm sạch git status.
+
 Git đã được thiết lập trên nhánh `main` từ checkpoint TH-02. Các ghi chú “chưa có Git” trong baseline/spec cũ mô tả thời điểm khảo sát. Trước task mới kiểm tra `git status`; giữ thay đổi hiện có và chỉ commit checkpoint đã được review. Không tự push hoặc force-push nếu chưa được giao. `.gitattributes` giữ nguyên bytes để không đổi checksum migration và evidence khi checkout.
 
 1. Đọc [spec đợt 1](../superpowers/specs/2026-09-13-task-hub-completion-design.md).
