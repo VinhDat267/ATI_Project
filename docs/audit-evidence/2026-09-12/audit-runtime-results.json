@@ -1,0 +1,227 @@
+{
+  "observedAt": "2026-09-12T16:32:59.820Z",
+  "node": "v24.19.0",
+  "method": "Unmodified package sources copied to a temporary workspace; synthetic inputs only; no LLM or MCP calls.",
+  "findings": [
+    {
+      "id": "control_valid_plan",
+      "result": {
+        "ok": true,
+        "issues": [],
+        "layers": [
+          [
+            "s1"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "control_cycle_rejected",
+      "result": {
+        "ok": false,
+        "issues": [
+          {
+            "path": [
+              "steps"
+            ],
+            "message": "đồ thị phụ thuộc có chu trình: s1 → s2 → s1"
+          }
+        ],
+        "layers": []
+      }
+    },
+    {
+      "id": "control_condition",
+      "result": true
+    },
+    {
+      "id": "control_arbitrary_call_rejected",
+      "threw": "ConditionSyntaxError",
+      "message": "từ khoá không hợp lệ: \"process\" (vị trí 0) trong: process.exit()"
+    },
+    {
+      "id": "refusal_vs_both_schemas",
+      "result": [
+        {
+          "success": false,
+          "issues": [
+            {
+              "origin": "array",
+              "code": "too_small",
+              "minimum": 1,
+              "inclusive": true,
+              "path": [
+                "steps"
+              ],
+              "message": "Too small: expected array to have >=1 items"
+            }
+          ]
+        },
+        {
+          "success": false,
+          "issues": [
+            {
+              "origin": "array",
+              "code": "too_small",
+              "minimum": 1,
+              "inclusive": true,
+              "path": [
+                "steps"
+              ],
+              "message": "Too small: expected array to have >=1 items"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "write_mislabeled_read",
+      "result": {
+        "schemaAccepted": true,
+        "graph": {
+          "ok": true,
+          "issues": [],
+          "layers": [
+            [
+              "s1"
+            ]
+          ]
+        },
+        "toolWasInvoked": false
+      }
+    },
+    {
+      "id": "idempotency_dangling_reference",
+      "result": {
+        "ok": true,
+        "issues": [],
+        "layers": [
+          [
+            "s1"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "invalid_namespace_in_args",
+      "threw": "ReferenceError_",
+      "message": "namespace không hợp lệ: \"unknown\" (hợp lệ: inputs, steps, runtime)"
+    },
+    {
+      "id": "malformed_reference_treated_as_literal",
+      "result": {
+        "graph": {
+          "ok": true,
+          "issues": [],
+          "layers": [
+            [
+              "s1"
+            ]
+          ]
+        },
+        "resolved": "${steps.s1.output.cards[0].title}"
+      }
+    },
+    {
+      "id": "structured_data_string_interpolation",
+      "result": "Report: [object Object],[object Object]"
+    },
+    {
+      "id": "runtime_vietnam_monday_at_0100",
+      "result": {
+        "now": "2026-09-13T18:00:00.000Z",
+        "today": "2026-09-13",
+        "week_start": "2026-09-07",
+        "week_end": "2026-09-13",
+        "month_start": "2026-09-01",
+        "month_end": "2026-09-30",
+        "run_id": "fixture",
+        "user_id": "fixture"
+      }
+    },
+    {
+      "id": "dryrun_reference_to_unexecuted_write",
+      "threw": "ReferenceError_",
+      "message": "bước \"s2\" chưa chạy hoặc không có output"
+    },
+    {
+      "id": "workflow_id_doc_field",
+      "result": {
+        "success": false,
+        "issues": [
+          {
+            "code": "unrecognized_keys",
+            "keys": [
+              "workflow_id"
+            ],
+            "path": [],
+            "message": "Unrecognized key: \"workflow_id\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "event_accepts_non_plan",
+      "result": true
+    },
+    {
+      "id": "finished_event_accepts_running",
+      "result": true
+    },
+    {
+      "id": "schema_text_retains_fence",
+      "result": {
+        "closingFenceCount": 2
+      }
+    },
+    {
+      "id": "generated_json_schema_definitions",
+      "result": [
+        {
+          "file": "workflow-plan",
+          "definitions": {
+            "WorkflowPlan": {}
+          }
+        },
+        {
+          "file": "llm-plan-draft",
+          "definitions": {
+            "LlmPlanDraft": {}
+          }
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "command": "npm run build -w @wap/dsl",
+      "exitCode": 0,
+      "stdout": "\n> @wap/dsl@0.1.0 build\n> tsc\n\n",
+      "stderr": ""
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 1,
+      "stdout": "\n> typecheck\n> tsc --build\n\nerror TS5083: Cannot read file 'C:/Users/VinhDat/AppData/Local/Temp/ati-project-audit-a89f313f8d5247a996594e0f51a0cbd6/tsconfig.json'.\r\n",
+      "stderr": ""
+    },
+    {
+      "command": "npm run test",
+      "exitCode": 1,
+      "stdout": "\n> test\n> npm run test --workspaces --if-present\n\n\n> @wap/dsl@0.1.0 test\n> vitest run\n\n\n RUN  v2.1.9 C:/Users/VinhDat/AppData/Local/Temp/ati-project-audit-a89f313f8d5247a996594e0f51a0cbd6/packages/dsl\n\n",
+      "stderr": "include: **/*.{test,spec}.?(c|m)[jt]s?(x)\nexclude:  **/node_modules/**, **/dist/**, **/cypress/**, **/.{idea,git,cache,output,temp}/**, **/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*\n\nNo test files found, exiting with code 1\nnpm error Lifecycle script `test` failed with error:\nnpm error code 1\nnpm error path C:\\Users\\VinhDat\\AppData\\Local\\Temp\\ati-project-audit-a89f313f8d5247a996594e0f51a0cbd6\\packages\\dsl\nnpm error workspace @wap/dsl@0.1.0\nnpm error location C:\\Users\\VinhDat\\AppData\\Local\\Temp\\ati-project-audit-a89f313f8d5247a996594e0f51a0cbd6\\packages\\dsl\nnpm error command failed\nnpm error command C:\\WINDOWS\\system32\\cmd.exe /d /s /c vitest run\n"
+    },
+    {
+      "command": "npm run schema:json -w @wap/dsl",
+      "exitCode": 0,
+      "stdout": "\n> @wap/dsl@0.1.0 schema:json\n> tsx scripts/emit-json-schema.ts\n\nĐã sinh JSON Schema vào generated/\n",
+      "stderr": ""
+    },
+    {
+      "command": "npm ls --depth=0",
+      "exitCode": 0,
+      "stdout": "wap@ C:\\Users\\VinhDat\\AppData\\Local\\Temp\\ati-project-audit-a89f313f8d5247a996594e0f51a0cbd6\n├─┬ @wap/dsl@0.1.0 -> .\\packages\\dsl\n│ ├── tsx@4.23.13\n│ ├── typescript@5.9.3 deduped\n│ ├── vitest@2.1.9 deduped\n│ ├── zod-to-json-schema@3.25.2\n│ └── zod@4.6.2\n├── eslint@9.39.5\n├── prettier@3.9.6\n├── typescript@5.9.3\n└── vitest@2.1.9\n\n",
+      "stderr": ""
+    }
+  ]
+}

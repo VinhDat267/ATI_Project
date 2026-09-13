@@ -1,0 +1,205 @@
+{
+  "source_file_count": 40,
+  "source_hashes": {
+    ".env.example": "4f43594bf40a99d5451dc197adbf3e0994576d4f8f1fdd19cecabdee5fc0114a",
+    ".gitignore": "97eff68acab3283ce58dc2148bc1b4809ec0a135f299700ddbc9c6c4265f3b9b",
+    "00-BAT-DAU (BẢN CŨ - xoá được).md": "86fd2230ba83393a2c89278404979069e0a124932114ff7f7a49b15d2557508c",
+    "00-BAT-DAU.md": "55f23cf696aef452c4e12a4cb3c3c1671e3163ba273b80f47f38f2a161c6f9b2",
+    "AUDIT.md": "bbefdb152e8e33f0d1a02b265b4b056b6f35f7399c89c3f67c67bed31d421957",
+    "CONTRIBUTING.md": "88528aaa680ee8fbca85ac5b7bc9b5a1da4ede16e3ec2d57e17fa31d2a05228e",
+    "docker-compose.yml": "3fb4595e88891240eeba85c3a48115957630c4ccd7df6ebaec1c94370d90f3d0",
+    "package.json": "edf45aa1cbeb3c0962dc8f24fc0f1b6695c2707146d2270cc67d107cb04c7405",
+    "QUYET-DINH.md": "a065c3d1fdbb112b03a123934f70742c757c878f2875a11e75e8c369e9d22f24",
+    "README.md": "145825dc2dc2f3667347ee59f9d0b1a27b79ab44c8bf922baea81cee6a1e74ea",
+    "db\\DATABASE.md": "4e5f18247dfe9881c8da16d0eea1a984f9bd26e77796b0435c62e39aaee3eb1a",
+    "docs\\00-BAT-DAU.md": "55f23cf696aef452c4e12a4cb3c3c1671e3163ba273b80f47f38f2a161c6f9b2",
+    "docs\\API.md": "382246e1a1528c92a3bbe6dbd92304473fb4bb1509d9c8c7dac0fef4c5d86000",
+    "docs\\AUDIT-vong-1.md": "7102faeead8c4c6ecdc5f29739f480df8cdbc6a327986d6e327e84f1a9188596",
+    "docs\\AUDIT.md": "cfe376bfee01ebd5d87be176625bac6a6593702ed8ddf1e41d37ec2478dfb789",
+    "docs\\functional-requirements.md": "72d06565c2c30ee4ba0286a54d0531a899ace24f55ac7780cc0a1ebf362e7a8c",
+    "docs\\KE-HOACH-6-TUAN.md": "cf2b023fbdad937b1c6b90813621be9383974f1a542bf88b27033a5aa9f74569",
+    "docs\\LO-TRINH-DAY-DU.md": "314b2ad92c39afd334c8e9fb1986cab841e6d0c26177676aa25bd6ee4e693c67",
+    "docs\\mo-ta-du-an.md": "58bf2732f2c353a0e0e8707def16821d2c26f46ce4cf8e48e812eb5a52f4e2c4",
+    "docs\\openapi.yaml": "d2600e840d93ddbed1992368f80b1e01f910e4229f32dae7d3d26fa3ff823375",
+    "docs\\QUYET-DINH.md": "a065c3d1fdbb112b03a123934f70742c757c878f2875a11e75e8c369e9d22f24",
+    "docs\\wireframes.html": "b75d4ae4d060988a62672ebb1c9b7d6ba8c2af6166f7ef27cfe1312019a51341",
+    "testdata\\test-cases.json": "6fc29ee8f79872616fdbba3cbb8fd1833a083268b09dfc90f13752ad0ca089e6",
+    "testdata\\TESTDATA.md": "bb7c0355396672a3d0fec188d40ff455ba75b8296f5fabd83761741397b5c481",
+    "testdata\\tools.json": "23c34b5ce966cf421afbddbf5521f25f985b17b48e697c3724d1fc3bf7a08b89",
+    "apps\\api\\README.md": "b3db4aca299b10674bfca9245d52147d6f04fe9f1063cbd742652b6cf7f1f279",
+    "apps\\mcp-task-hub\\README.md": "306a198f0c5d89ad9d93d7ecbef89b74116f47683d6d5a46a81148d116ab804c",
+    "apps\\web\\README.md": "67a8a014f335fdc6b45d4a1943a7eabc23b0ac402981fe72a85435528f4049f0",
+    "db\\migrations\\0001_init.sql": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8",
+    "packages\\dsl\\package.json": "dcec0153953c1261edf8dbc301ca67d1973beaf68f97fb471c31116535be9b0a",
+    "packages\\dsl\\PROMPTS.md": "4005ecde06f27b34f385086bf546acb9b7a15c8ee8da9173670779644bdff1ee",
+    "packages\\dsl\\tsconfig.json": "9cb95687d8ac77a9be167b4b3201e6d38cd90a9554b1a48de0c7d2649bf546db",
+    "packages\\dsl\\scripts\\emit-json-schema.ts": "f6e4fcd184ef6db5dc61270a33e3a757890a6b6fb883866fc75746ab8c9d9d8d",
+    "packages\\dsl\\src\\condition.ts": "e84402ec262714d6f680fc6d32c56dda9532d0751ee692450c207ffb616c3b32",
+    "packages\\dsl\\src\\events.ts": "a919c8d662f3841440205ee340451025071dbd8c46d53e27dbdc517146ae52f6",
+    "packages\\dsl\\src\\graph.ts": "b93fc7b677964f136402f4e3551e1741ca3859e1897f45cda6d4e6dc352398b7",
+    "packages\\dsl\\src\\index.ts": "aa31dd2421c04fdcc08b9a534bba3c4af432c0d5ebff90704a7c9839ea14aef3",
+    "packages\\dsl\\src\\prompts.ts": "3bf63141b0884238918dcf3ec00a49139a7c136e0c488e583fff8b7e96129b88",
+    "packages\\dsl\\src\\reference.ts": "716d85b39007db386d9437276911e6364cc44b67787a69f4e7969b514b0817ff",
+    "packages\\dsl\\src\\schema.ts": "09d0ab0ca502cf4d7f61c1889150547af20591033791779dab4397242b49a234"
+  },
+  "copied_sources_identical": true,
+  "tools_per_server": {
+    "task_hub": 16,
+    "github": 7,
+    "filesystem": 4
+  },
+  "tools_count": 27,
+  "test_cases_count": 30,
+  "case_complexity": {
+    "simple": 10,
+    "medium": 12,
+    "complex": 8
+  },
+  "test_cases_using_github": [
+    "s04",
+    "m03",
+    "m05",
+    "m06",
+    "m08",
+    "m12",
+    "c02",
+    "c03",
+    "c04",
+    "c06"
+  ],
+  "cases_nonempty_without_github": [
+    "s01",
+    "s02",
+    "s03",
+    "s05",
+    "s06",
+    "s07",
+    "s08",
+    "s09",
+    "m01",
+    "m02",
+    "m04",
+    "m07",
+    "m09",
+    "m10",
+    "m11",
+    "c01",
+    "c05",
+    "c07"
+  ],
+  "referenced_tool_count_per_server": {
+    "task_hub": 12,
+    "github": 6,
+    "filesystem": 3
+  },
+  "missing_expected_tools": [],
+  "cases_with_expected_plan": 0,
+  "fr_count": 78,
+  "fr_priority": {
+    "M": 51,
+    "S": 20,
+    "C": 7
+  },
+  "mvp_enumerated_count": 50,
+  "mvp_per_module": {
+    "CON": 7,
+    "PLN": 9,
+    "VAL": 8,
+    "APR": 5,
+    "EXE": 10,
+    "TRC": 6,
+    "WFM": 2,
+    "USR": 3
+  },
+  "sql_table_count": 14,
+  "openapi_schema_count": 15,
+  "openapi_operation_count": 20,
+  "broken_openapi_refs": [],
+  "enum_checks": {
+    "run_status": {
+      "sql": [
+        "planning",
+        "validating",
+        "dry_running",
+        "awaiting_approval",
+        "running",
+        "replanning",
+        "succeeded",
+        "failed",
+        "rejected",
+        "cancelled",
+        "expired"
+      ],
+      "zod": [
+        "planning",
+        "validating",
+        "dry_running",
+        "awaiting_approval",
+        "running",
+        "replanning",
+        "succeeded",
+        "failed",
+        "rejected",
+        "cancelled",
+        "expired"
+      ],
+      "matches": true
+    },
+    "step_status": {
+      "sql": [
+        "pending",
+        "ready",
+        "running",
+        "succeeded",
+        "failed",
+        "skipped",
+        "deduplicated"
+      ],
+      "zod": [
+        "pending",
+        "ready",
+        "running",
+        "succeeded",
+        "failed",
+        "skipped",
+        "deduplicated"
+      ],
+      "matches": true
+    },
+    "error_class": {
+      "sql": [
+        "transient",
+        "bad_args",
+        "bad_tool",
+        "bad_assumption",
+        "fatal"
+      ],
+      "zod": [
+        "transient",
+        "bad_args",
+        "bad_tool",
+        "bad_assumption",
+        "fatal"
+      ],
+      "matches": true
+    }
+  },
+  "event_names_match": true,
+  "source_tests": [],
+  "rubric_search": [
+    {
+      "file": "Final project registration  (Responses).xlsx",
+      "sheets": [
+        "Form Responses 1"
+      ],
+      "relevant_hits": []
+    },
+    {
+      "file": "Final project.xlsx",
+      "sheets": [
+        "List of Final project teams "
+      ],
+      "relevant_hits": []
+    }
+  ]
+}

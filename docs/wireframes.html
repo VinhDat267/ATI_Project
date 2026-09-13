@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Wireframe B/local</title><style>
+  :root {
+    --bg: #faf9f7; --surface: #fff; --surface-2: #f4f2ee;
+    --text: #1a1a18; --text-2: #5f5e5a; --text-3: #8a8983;
+    --border: #e3e0d9;
+    --accent-bg: #e6f1fb; --accent-br: #85b7eb; --accent-tx: #0c447c;
+    --warn-bg: #faeeda; --warn-br: #ef9f27; --warn-tx: #854f0b;
+    --ok-tx: #0f6e56; --danger-tx: #a32d2d;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 20px; background:var(--bg); color:var(--text);
+         font:400 15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size:22px; font-weight:500; margin:0 0 4px; }
+  h2 { font-size:18px; font-weight:500; margin:40px 0 4px; }
+  .sub { color:var(--text-2); font-size:14px; margin:0 0 16px; }
+  .screen { background:var(--surface-2); border-radius:12px; padding:20px; margin-bottom:8px; }
+  .card { background:var(--surface); border:0.5px solid var(--border); border-radius:8px; padding:12px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .spacer { flex:1; }
+  button { font:inherit; font-size:13px; padding:6px 12px; border:0.5px solid var(--border);
+           background:transparent; border-radius:8px; color:var(--text); cursor:pointer; }
+  button.primary { border-color:var(--accent-br); color:var(--accent-tx); }
+  button.danger { border-color:#f09595; color:var(--danger-tx); }
+  .pill { font-size:11px; padding:2px 8px; border-radius:8px; }
+  .pill.read { background:var(--accent-bg); color:var(--accent-tx); }
+  .pill.write { background:var(--warn-bg); color:var(--warn-tx); }
+  .mono { font-family:var(--mono); font-size:11px; }
+  .muted { color:var(--text-3); font-size:12px; }
+  .sec { color:var(--text-2); font-size:13px; }
+  .node { border-radius:8px; padding:10px; }
+  .node.read { background:var(--accent-bg); border:0.5px solid var(--accent-br); color:var(--accent-tx); }
+  .node.write { background:var(--warn-bg); border:0.5px solid var(--warn-br); color:var(--warn-tx); }
+  .node .t { font-size:13px; font-weight:500; margin-bottom:3px; }
+  .tl { display:flex; gap:12px; }
+  .tl .gut { display:flex; flex-direction:column; align-items:center; width:18px; }
+  .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+  .line { flex:1; width:1px; background:var(--border); min-height:24px; }
+  .note { background:#fff; border-left:3px solid var(--accent-br); border-radius:0;
+          padding:10px 14px; margin:12px 0 0; font-size:13px; color:var(--text-2); }
+  .note b { color:var(--text); font-weight:500; }
+  hr { border:0; border-top:0.5px solid var(--border); margin:14px 0; }
+</style></head><body><main class="wrap">
+<h1>Hai màn hình — B/local</h1><p class="sub">Wireframe tĩnh để thống nhất luồng; chưa phải ứng dụng. <a href="BASELINE.md">Baseline</a> · <a href="API.md">API</a></p>
+<h2>1. Yêu cầu → kế hoạch → duyệt</h2><section class="screen"><div class="card"><p class="sec">Dữ liệu local · task_hub · mọi thông báo chỉ ghi vào kho demo</p><label for="request">Yêu cầu</label><textarea id="request" rows="3" style="width:100%;box-sizing:border-box">Chép các dòng Progress!A1:B2 từ source sang Report của dest, rồi báo số dòng vào #team.</textarea><p><button class="primary" type="button" disabled>Tạo run</button> POST /runs → planning</p></div>
+<p class="sec">Sau khi tạo: hệ thống tự lập plan, validate và chuẩn bị preview. Trạng thái cập nhật qua polling 2 giây.</p><div class="card"><h3>Preview phiên bản 1</h3><p>Đọc source / Progress!A1:B2: 2 dòng. Dữ liệu đọc được giữ cố định trong lần duyệt này.</p><ol><li>append_sheet_rows → dest / Report: [["API","Done"],["UI","Doing"]]</li><li>send_slack_message → #team: “Đã chép 2 dòng.”</li></ol><p class="muted">UI lấy preview đầy đủ bằng GET RunDetail sau event dryrun.ready. Hiển thị giờ hết hạn do server cấp.</p><button disabled class="primary">Duyệt đúng phiên bản này</button> <button disabled class="danger">Từ chối</button><p class="muted">Request gắn approval id, version và snapshot hash. Hết hạn hoặc snapshot đổi: nạp preview mới và duyệt lại.</p></div></section>
+<h2>2. Chi tiết run và lịch sử</h2><section class="screen"><div class="card"><p><strong>Đang chờ duyệt</strong> · 3 bước · dữ liệu local</p><ol><li>Đọc bảng — đã có output 2 dòng</li><li>Chép bảng — chưa chạy</li><li>Thông báo — chưa chạy</li></ol><button disabled>Yêu cầu hủy</button><p class="muted">Trace hiển thị version, tool, args, output và lỗi từng attempt; không chứa credential. Lịch sử ở cùng màn hình.</p></div><div class="note"><b>Các nhánh cần hiển thị:</b> refused (không có capability); needs_input (cần định danh); expired/rejected; failed; reconciliation_required (write chưa rõ kết quả, không bấm chạy lại mù). Replan hiển thị preview/version mới và đưa về duyệt.</div></section>
+<p class="muted">Các nút bị vô hiệu hóa vì đây là tài liệu luồng. Không có nút dry-run riêng, WebSocket hoặc resume trong B.</p></main></body></html>

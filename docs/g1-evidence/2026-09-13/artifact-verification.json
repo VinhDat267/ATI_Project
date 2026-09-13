@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-13T06:28:51.944Z",
+  "node": "v24.19.0",
+  "schema_count": 11,
+  "openapi_local_refs_checked": 36,
+  "operations": 9,
+  "sql_zod_run_statuses": 14,
+  "current_markdown_local_links_checked": 127,
+  "requirements": 78,
+  "requirements_by_profile": {
+    "M": 59,
+    "S": 1,
+    "OUT": 18
+  },
+  "cases": 10,
+  "package_lock_sha256": "830a69502851a4a266c1fef73eb7ba91e4a92f191e37abde3f57b11317d0a92d",
+  "limitations": [
+    "JSON Schema structural checks do not replace Zod refinements or runtime authorization",
+    "This script checks static artifacts only; PostgreSQL and 3 MCP tools are verified separately in check-g1.log/runtime-snapshot.json; controller/HTTP/engine/LLM/browser E2E remain NOT_RUN"
+  ],
+  "failures": []
+}

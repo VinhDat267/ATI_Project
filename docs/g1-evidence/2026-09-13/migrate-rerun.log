@@ -1,0 +1,12 @@
+
+> db:migrate:g1
+> npm run build -w @wap/db && node packages/db/dist/cli.js migrate
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+{
+  "applied": [],
+  "total": 3
+}

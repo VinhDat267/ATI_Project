@@ -1,0 +1,20 @@
+{
+  "original_files_checked": 40,
+  "original_files_changed": [],
+  "invalid_local_citations": [],
+  "p1_findings": 8,
+  "p2_findings": 6,
+  "runtime_observations": 17,
+  "all_enum_checks_match": true,
+  "new_files": [
+    "docs\\AUDIT-DOCS-2026-09-12.md",
+    "docs\\audit-evidence\\2026-09-12\\audit-document-results.json",
+    "docs\\audit-evidence\\2026-09-12\\audit-runtime-results.json",
+    "docs\\audit-evidence\\2026-09-12\\inspect_documents.py",
+    "docs\\audit-evidence\\2026-09-12\\llm-plan-draft.schema.json",
+    "docs\\audit-evidence\\2026-09-12\\package-lock.json",
+    "docs\\audit-evidence\\2026-09-12\\README.md",
+    "docs\\audit-evidence\\2026-09-12\\reproduce.mjs",
+    "docs\\audit-evidence\\2026-09-12\\workflow-plan.schema.json"
+  ]
+}

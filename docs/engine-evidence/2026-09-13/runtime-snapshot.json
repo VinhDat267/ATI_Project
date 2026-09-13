@@ -1,0 +1,304 @@
+{
+  "recorded_at": "2026-09-13T07:12:45.476Z",
+  "scope": "READ_ONLY_DEMO_SNAPSHOT; engine/controller integration is recorded separately; no HTTP/UI/LLM verification",
+  "node": "v24.19.0",
+  "launch": {
+    "command": "C:\\Program Files\\nodejs\\node.exe",
+    "args": [
+      "D:\\Môn học\\ATI\\ATI_Project\\apps\\mcp-task-hub\\dist\\server.js"
+    ],
+    "cwd": "D:\\Môn học\\ATI\\ATI_Project\\",
+    "principal": "00000000-0000-4000-8000-000000000001",
+    "db_host": "127.0.0.1",
+    "db_port": 55432,
+    "db_name": "wap_g1"
+  },
+  "containers": [
+    {
+      "name": "/ati-g1-postgres-1",
+      "image": "pgvector/pgvector:pg16",
+      "image_id": "sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+      "status": "running",
+      "health": "healthy",
+      "ports": {
+        "5432/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "55432"
+          }
+        ]
+      }
+    },
+    {
+      "name": "/ati-g1-redis-1",
+      "image": "redis:7-alpine",
+      "image_id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "status": "running",
+      "health": "healthy",
+      "ports": {
+        "6379/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "56379"
+          }
+        ]
+      }
+    }
+  ],
+  "redis_ping": "PONG",
+  "postgres": [
+    {
+      "version": "16.15 (Debian 16.15-1.pgdg12+2)",
+      "vector_version": "0.8.6"
+    }
+  ],
+  "migrations": [
+    {
+      "name": "0001_init.sql",
+      "checksum": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8"
+    },
+    {
+      "name": "0002_audit_contracts.sql",
+      "checksum": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689"
+    },
+    {
+      "name": "0003_task_hub_local.sql",
+      "checksum": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3"
+    }
+  ],
+  "demo_sheets": [
+    {
+      "workbook_id": "dest",
+      "sheet_name": "Report",
+      "cells": []
+    },
+    {
+      "workbook_id": "source",
+      "sheet_name": "Progress",
+      "cells": [
+        [
+          "API",
+          "Done"
+        ],
+        [
+          "UI",
+          "Doing"
+        ]
+      ]
+    }
+  ],
+  "demo_counts": [
+    {
+      "messages": 0,
+      "receipts": 0
+    }
+  ],
+  "tools": [
+    {
+      "name": "read_sheet_range",
+      "description": "Đọc vùng A1 hữu hạn trong bảng local của tài khoản cấu hình; tối đa 1000 dòng × 100 cột.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "range"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "values",
+          "row_count"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "append_sheet_rows",
+      "description": "Thêm nguyên các dòng vào bảng local đã tồn tại. Chỉ controller có approval/operation hợp lệ được gọi.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sheet_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "rows": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "sheet_name",
+          "rows"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "appended_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "appended_count"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "send_slack_message",
+      "description": "Ghi thông báo vào kênh local đã tồn tại; không gửi tới Slack thật. thread_ts là UUID thông báo local.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "thread_ts": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "channel",
+          "text"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "text"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  ],
+  "actual_demo_read": {
+    "values": [
+      [
+        "API",
+        "Done"
+      ],
+      [
+        "UI",
+        "Doing"
+      ]
+    ],
+    "row_count": 2
+  },
+  "sha256": {
+    "package-lock.json": "7fdac6fd3a303b2add6f41564bfba86b4d79a2fdb8aa7134b302b3e6a990d05e",
+    "compose.g1.yaml": "36b71f0b37fbb6d770315fb3917faf28a279898b80a52495cfefb57e8b715f67",
+    "testdata/tools.json": "6ed7a3a6d297b00b81425765709375e9e998a4313b46b9b5c5dda249fe57c17f",
+    "apps/mcp-task-hub/dist/server.js": "162742e403f36931921d8241fc9ff4b8badc2215b23d8972ae2119451150f2ca",
+    "apps/mcp-task-hub/dist/contracts.js": "164a4562474447fd2ad59348170128becd39d69dc7f8fc0d0d04c81630383c7c",
+    "apps/mcp-task-hub/dist/service.js": "521c31d154f501b818ddefdf3a0718931930a116a40a3b43c2adb314841e8099",
+    "apps/mcp-task-hub/dist/fingerprint.js": "05b44dbbfcbbd11d94262f809d72635cdf93b11f24f0cfa8bc220a690fa96ae6",
+    "packages/db/dist/connection.js": "94d0cb06bc3d162c1322fc172f036798850d488e9cbd062ccfef687032df193f",
+    "packages/engine/dist/cli.js": "57a46a2254272c50c525f47e0c598ec396c74b1bf5711e5388f6a6f000a2141e",
+    "packages/engine/dist/store.js": "7721490d750fe16bc6a936181c188e3588e0c2feb436f3af2beaaaf9f821a29c",
+    "packages/engine/dist/prepare.js": "e8e1892ebe9c59888b8e9cbaba64568ef624b205ae48f6c1bddbdfe3f1bb56a8",
+    "packages/engine/dist/approval.js": "247d0b6b0b755959fba232c7439ee91d6d1cbca697f666a2cc45de883297026a",
+    "packages/engine/dist/execute.js": "e00516d3bfbbafa6cca2dc78a0d983cf0745ed56c3c9ea0c75c7dc4dd6505e55",
+    "packages/engine/dist/attempts.js": "fdca06780ae922a294506dfb7feef9bd20521f9098baf13dda34ef44a7f7d59e",
+    "packages/engine/dist/recovery.js": "c8d264a38aacb2eb862e967bc232cb8ca89d90338cdd6faa8b23ba41a187ec35",
+    "packages/engine/dist/gateway.js": "789ba3c023509478978c9737752c700e4390e39a036dcad995d61a114f039af5",
+    "packages/engine/dist/snapshot.js": "69de87c441456d13d513536992507c8b9ea7e8987cb88669fba56a397af8cfd1"
+  }
+}

@@ -1,0 +1,278 @@
+{
+  "recorded_at": "2026-09-13T07:41:21.7150506Z",
+  "workspace": "D:\\Môn học\\ATI\\ATI_Project",
+  "status": "PLAN_ONLY_NOT_IMPLEMENTED",
+  "scope": "Remaining five task_hub tools; future batches roadmap only",
+  "runtime_tests_this_planning_turn": "NOT_RUN",
+  "prior_verified_tests": {
+    "source": "docs/engine-evidence/2026-09-13/check-engine.log",
+    "dsl": 39,
+    "db_mcp": 15,
+    "total": 78,
+    "engine": 24
+  },
+  "source_drift_since_prior_verification": [],
+  "files_sha256": {
+    "apps/mcp-task-hub/src/contracts.ts": "957d1f382ca6f574deb0dc6887180beaf553800e483b8df3d4e62e9c05f13c91",
+    "apps/mcp-task-hub/src/fingerprint.ts": "5574d34878c0c3e3624185059271151913973c4b60a286c82a481dc075c44234",
+    "apps/mcp-task-hub/src/server.ts": "000eb7fd3557691acced4eca1fa3ddf2092aabea30935e33f5c0735500e3b85c",
+    "apps/mcp-task-hub/src/service.ts": "f14773708b674b174fc616354bb2d0e18ae90738889eba9ac026205cd34dbea8",
+    "apps/mcp-task-hub/tests/database.integration.test.ts": "24f383e983129528152a2d7eb1191cef2cf48ab45d99b3ba8b4952e709eb71dc",
+    "apps/mcp-task-hub/tests/tools.integration.test.ts": "b805a043c8bbaad8d5522660d590cae15aba22615e5c6962c33a2cb353586014",
+    "CONTRIBUTING.md": "6e84c5593cf8b3a3f717a4195013923f9d286ca67e5c46a942391096fdf21377",
+    "db/migrations/0001_init.sql": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8",
+    "db/migrations/0002_audit_contracts.sql": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689",
+    "db/migrations/0003_task_hub_local.sql": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3",
+    "docs/BASELINE.md": "26a654ba0cc591ee50bc54057786c36d0389c0213917cf1845cbe3c3c4e404bb",
+    "docs/ENGINE-STATUS-2026-09-13.md": "cc441d1c18408866df264d8a19abbd174721b5451dc16f40d22b8aeb4303cd08",
+    "docs/EXECUTION-CONTRACT.md": "491fe57b67d04dc598385955618e8e2a9a2eea90675bb26d4d20fa4f56f8204a",
+    "package-lock.json": "7fdac6fd3a303b2add6f41564bfba86b4d79a2fdb8aa7134b302b3e6a990d05e",
+    "package.json": "6f6db1a69d8277eef4c2bad83eb502c232345d8035f6e8c2c636f95c01ede65e",
+    "packages/db/src/cli.ts": "c9c251e412b2cbabf05eafa4bbe0a540aafc7af5ee6c82eba92ba37f1e26c84e",
+    "packages/db/src/connection.ts": "942e776b94069242000573242675824ba2d37609abe2b596856310aa66a0b5e3",
+    "packages/db/src/index.ts": "99fdef08e06f3dfb7b28bcbd19927f2b7df93bfc93cd2815f15f82f96a90bfe2",
+    "packages/db/src/migrate.ts": "e43074f0e4a10a39b48b0f1878a6b3c05ee13aa8620c6b678280039fd8d3fbef",
+    "packages/db/src/schema.ts": "6acd6c4cf318ab459ad4c8bb4e339c2f7784e6dbf421b859a608e88b491a3155",
+    "packages/db/src/seed.ts": "2c33545046778a6ab68e54fcc649cd2f13fe6c37da368401872bd52932eeb8c8",
+    "packages/engine/dist/approval.d.ts": "f7eb519e662af8d177e7a30ded85fc952378e83d9489cd965eedc99ba1b92908",
+    "packages/engine/dist/approval.js": "247d0b6b0b755959fba232c7439ee91d6d1cbca697f666a2cc45de883297026a",
+    "packages/engine/dist/attempts.d.ts": "56a62c88227af5b226c31f41206b8aa0c61b8e60a4c1475b6a53dbbfab5cff18",
+    "packages/engine/dist/attempts.js": "fdca06780ae922a294506dfb7feef9bd20521f9098baf13dda34ef44a7f7d59e",
+    "packages/engine/dist/cli.d.ts": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/engine/dist/cli.js": "57a46a2254272c50c525f47e0c598ec396c74b1bf5711e5388f6a6f000a2141e",
+    "packages/engine/dist/engine.d.ts": "adf7911057a129442831f4ea33a9ef9b2eea510665ffe1f3aeb4d27ea069d549",
+    "packages/engine/dist/engine.js": "559b2a115ba94923202d94506b26d696f7751fb9d08b3a521cd9a198a921a5db",
+    "packages/engine/dist/execute.d.ts": "4a0ee14975fd0d74ed65ef9c28002aaa624046ec376cda585969dcc1404d3a1a",
+    "packages/engine/dist/execute.js": "e00516d3bfbbafa6cca2dc78a0d983cf0745ed56c3c9ea0c75c7dc4dd6505e55",
+    "packages/engine/dist/gateway.d.ts": "e4291ee86e2f2ce1fb1fb2fc37bd2cb4d1c2d436e19c557b49aa5fa82c782fff",
+    "packages/engine/dist/gateway.js": "789ba3c023509478978c9737752c700e4390e39a036dcad995d61a114f039af5",
+    "packages/engine/dist/index.d.ts": "9468ab23b153697ce2a93d3461a766e89f60667227202667bea583883b510139",
+    "packages/engine/dist/index.js": "7ad943a0b18c9f6d143977353b55e2689112273c8a0f519b47795c9fbb631628",
+    "packages/engine/dist/prepare.d.ts": "21f6172b47d67f34121ca17112d881e401cf68e3277dafc1a81b1d61a0ba20dd",
+    "packages/engine/dist/prepare.js": "e8e1892ebe9c59888b8e9cbaba64568ef624b205ae48f6c1bddbdfe3f1bb56a8",
+    "packages/engine/dist/recovery.d.ts": "f5071e31cf0d71069cd05ed7f3a965b4ad82ad069330d479ddfe54eaaeaa3da8",
+    "packages/engine/dist/recovery.js": "c8d264a38aacb2eb862e967bc232cb8ca89d90338cdd6faa8b23ba41a187ec35",
+    "packages/engine/dist/snapshot.d.ts": "29a0e1c630d7307249b6db74f91fcdb6b0c540b75de494e4bc32da2e733b3730",
+    "packages/engine/dist/snapshot.js": "69de87c441456d13d513536992507c8b9ea7e8987cb88669fba56a397af8cfd1",
+    "packages/engine/dist/store.d.ts": "7efbd568832f2a78ea6c50741c33c365654b4c858f19a9a266bd7242e776ac88",
+    "packages/engine/dist/store.js": "7721490d750fe16bc6a936181c188e3588e0c2feb436f3af2beaaaf9f821a29c",
+    "packages/engine/src/approval.ts": "8f4d52c58836dab5c030edabb2a9e047d881a05fae0a07553854a64a68697962",
+    "packages/engine/src/attempts.ts": "01ca030aa12881a81515035ad4e84398af0ef4a7bce529e1392e3ce0e890efe9",
+    "packages/engine/src/cli.ts": "f45b6c876c9c97e87332ef498e41771a1cc2de9d956ec348a21968adda9bc71b",
+    "packages/engine/src/engine.ts": "1f8ddbcff4816585e1ef440fffb4b5ad105a3d1b4c0fa70c9eaaee5b201d6d98",
+    "packages/engine/src/execute.ts": "aeb2ebbbcf2ce2d434f64b6c868556409811b14f67a3393e17428caebba822e9",
+    "packages/engine/src/gateway.ts": "c39bc9c43cbf92eaa62995345d276d5fa9515c0fe13563320005e8704d8d96db",
+    "packages/engine/src/index.ts": "5a111caac065d243899296b57dcb9c71e041d0f7d5a42215feeed2ad12f8d31e",
+    "packages/engine/src/prepare.ts": "81ba6ce2e619cf44dab4cf445c0d6436f77eedbb5381e1d89c0931e57ea7db84",
+    "packages/engine/src/recovery.ts": "b2d3a657c9bf8f3c78fd9deb13928479ad7a669d1d0958df57cb4a780e2e5054",
+    "packages/engine/src/snapshot.ts": "eecaa29be0f19ca5eca41d6438c66c137a945194149c57bc8b383289c2cdadda",
+    "packages/engine/src/store.ts": "b8f354b66618597ac2d848d27b1d88012b53389b3976b38ff594978882895ea0",
+    "packages/engine/tests/controller.integration.test.ts": "242441132ea9f661c5c196af00278506026786b61ea5638589f88e157b0e8791",
+    "packages/engine/tests/crash-worker.mjs": "598058e9e9faa9f2a71e1d5b368d955b75b9e337277f1a588eeb05ae879d719b",
+    "scripts/check-engine.mjs": "45c98c6a271d5fb375fdf115de69b481ca7f6891a45ba70c618ee7e3adbc00a8",
+    "scripts/g1-status.mjs": "92a20cf71239d882278b988df042134bcdba1bc7acda6e8310b951c0b9912815",
+    "testdata/experiment-manifest.json": "957b160c2204e432de8c8fc8fa4404018eb550c17170499c289d517f5625c00c",
+    "testdata/test-cases.json": "8e506e984399799a0f0b31e43a655b2bfcd9f85beed74aee035d96625df91b25",
+    "testdata/tools.json": "6ed7a3a6d297b00b81425765709375e9e998a4313b46b9b5c5dda249fe57c17f",
+    "tsconfig.json": "cae6b941dd3717c109cd936683fd0da5b06cd74127f3c0226df46a812f1e246c"
+  },
+  "historical_evidence_sha256": {
+    "docs/engine-evidence/2026-09-13/artifact-verification.json": "01b370839b89cc2fce93d837fbd1fa8d97bb0d758d70653aa817de3cfefc3e14",
+    "docs/engine-evidence/2026-09-13/check-engine.log": "e8db4c053c7d2c800938e93494521eb12b1a6be7a949d7874896e1896bc5cc6f",
+    "docs/engine-evidence/2026-09-13/controller-observations.json": "6a829c18e6e56d3b20ab66d777cdfba2a541627664a9532759465bae7dc11152",
+    "docs/engine-evidence/2026-09-13/mcp-observations.json": "0f1a9fc5a5824190d3c813194c3c9789b348846b4c6c39b5821b363e9321acee",
+    "docs/engine-evidence/2026-09-13/npm-ci.log": "8a110e9dce84f0cc83ff280419b4d0cddf4ce7cd91fc652b95ca73aa3676cf8b",
+    "docs/engine-evidence/2026-09-13/README.md": "0a274821b63e6f4968eb4966b81dfbcd4f1a7041c472a693998528ef15d6ec10",
+    "docs/engine-evidence/2026-09-13/review.md": "f4f89e6f732acdb32aa9d3943cd5f34f72330941411709b68807ec18762be357",
+    "docs/engine-evidence/2026-09-13/runtime-check.log": "d2c2ca1c6dcd90e59dd522e2e36f89d18b7010ba19106f4634a8b40d27a8f754",
+    "docs/engine-evidence/2026-09-13/runtime-snapshot.json": "6307aeeb1809f7cebaecda706459f647e00c6e7cf15fc058124e97e6c39e8727",
+    "docs/engine-evidence/2026-09-13/verify-artifacts.mjs": "124deb77559682323f41a0ab8bb75b0aae3b74eeaf0d37b7aab642acfec8b982",
+    "docs/g1-evidence/2026-09-13/artifact-verification.json": "05bb6e0765fa71a2ab9b2a901ee12e5568c21a21a3340219c38ea4e6b85b4821",
+    "docs/g1-evidence/2026-09-13/check-g1.log": "5cd8b62fd5d787321ebb97e96c3f8b69209ff295e43a6949b7765b5a6697ab05",
+    "docs/g1-evidence/2026-09-13/mcp-observations.json": "a631a0c31692bfa042a9e80c2376b0e1c9c87a6dcec6421c417c4bb8197e8997",
+    "docs/g1-evidence/2026-09-13/migrate-rerun.log": "74b1acbdb833e77db90ba9a834e4d410fb9024de56b4fbea6dedde86ec616839",
+    "docs/g1-evidence/2026-09-13/npm-ci.log": "8b12f7267939ef451b3a06df139569b414f09ef7c69798cef7bfc22697814a1c",
+    "docs/g1-evidence/2026-09-13/README.md": "0b72eed3fa3d6a2d16c95d93852a9c4ea2bf8ca653a8c9c4f71a08b6a617e12e",
+    "docs/g1-evidence/2026-09-13/review.md": "779ccb44c1afe853198f5319047f689f08a63f12291ba5500bce15a14076d8de",
+    "docs/g1-evidence/2026-09-13/runtime-check.log": "d2c2ca1c6dcd90e59dd522e2e36f89d18b7010ba19106f4634a8b40d27a8f754",
+    "docs/g1-evidence/2026-09-13/runtime-snapshot.json": "dedc00e532ae798607942838aa995326353c3d2556054e6dc7fec5666aaab79a",
+    "docs/g1-evidence/2026-09-13/verify-artifacts.mjs": "eb0f1ee6b55f136aceb9d0631a67e38a8f56ff1f2c3fd99c48a57d58953d3526",
+    "docs/fix-evidence/2026-09-13/archive-verification.json": "22794fca7e6b56c42e983e4dbe6cd770a4b27f229db9265b3be75ae482615186",
+    "docs/fix-evidence/2026-09-13/artifact-verification.json": "84bc0bbcbffb8a2c84eef9014da8aed70ac0c603b76be9d1ea09d709c0f5dba4",
+    "docs/fix-evidence/2026-09-13/npm-check.log": "5aab5505a1771eb1d968f6b5a4ed21e6df9b8475307194e4f6ad4333330b9bb5",
+    "docs/fix-evidence/2026-09-13/npm-ci.log": "2de0a39fd912e80ea15fc82df69be3c4744aa6ab9e4adb2988fcc2c855bbc8a6",
+    "docs/fix-evidence/2026-09-13/README.md": "d5003b21098f4072044a534fea6b99cc46a36fd2f9ecae471a2f8ca2533cd1f3",
+    "docs/fix-evidence/2026-09-13/verify-artifacts.mjs": "64cacef9f143e50220c06c588f1d579352fbcc1f65ebdb920e40a11aab9351c3"
+  },
+  "old_three_tool_contracts": [
+    {
+      "name": "send_slack_message",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "thread_ts": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "channel",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffect": "write",
+      "policyVersion": "b-local-1"
+    },
+    {
+      "name": "read_sheet_range",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "range"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "values": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "values",
+          "row_count"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffect": "read",
+      "policyVersion": "b-local-1"
+    },
+    {
+      "name": "append_sheet_rows",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sheet_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "rows": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "sheet_name",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "appended_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "appended_count"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffect": "write",
+      "policyVersion": "b-local-1"
+    }
+  ],
+  "planned_new_migration": "db/migrations/0004_task_hub_cards.sql",
+  "plans": [
+    "docs/antigravity/README.md",
+    "docs/superpowers/specs/2026-09-13-task-hub-completion-design.md",
+    "docs/superpowers/plans/2026-09-13-task-hub-completion.md",
+    "docs/antigravity/TASK-REPORT-TEMPLATE.md"
+  ]
+}

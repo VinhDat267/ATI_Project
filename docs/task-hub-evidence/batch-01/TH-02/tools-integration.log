@@ -1,0 +1,26 @@
+﻿
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32mΓ£ô[39m tests/tools.integration.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 13912[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m discovers exactly the implemented tools with output schemas, then reads an A1 range [33m754[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m denies missing/pending/expired/stale approvals and performs no mutation [33m727[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m prevents another principal from using an approved operation or reading owner data [33m801[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m writes a local message once under concurrent duplicate calls and rejects changed args [33m857[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m appends different operations concurrently without losing rows [33m1509[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m returns no receipt when the requested destination is missing [33m801[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m rolls back appended rows when receipt persistence fails after the mutation [33m729[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m denies an append whose approval expires while waiting for the destination lock [33m2863[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m replays a committed receipt after restarting the MCP process [33m1773[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m moves the b02 hand-plan data through real MCP and verifies resulting rows and message [33m1062[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m [TH-02] contracts define strict schemas for the five future tools [33m722[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m [TH-02] create_card without authorization cannot mutate hub_cards or add receipts [33m743[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m   Start at [22m 15:13:53
+[2m   Duration [22m 14.94s[2m (transform 113ms, setup 0ms, collect 781ms, tests 13.91s, environment 0ms, prepare 74ms)[22m
+

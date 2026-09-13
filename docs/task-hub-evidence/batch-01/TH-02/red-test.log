@@ -1,0 +1,17 @@
+﻿
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-02
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31mΓ¥»[39m tests/tools.integration.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m10 skipped[39m[2m)[22m[33m 2317[2mms[22m[39m
+[31m   [31m├ù[31m [TH-02] contracts define strict schemas for the five future tools[33m 782[2mms[22m[31m[39m
+[31m     ΓåÆ Cannot read properties of undefined (reading 'safeParse')[39m
+   [33m[2mΓ£ô[22m[39m [TH-02] create_card without authorization cannot mutate hub_cards or add receipts [33m732[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[2m | [22m[33m10 skipped[39m[90m (12)[39m
+[2m   Start at [22m 15:12:39
+[2m   Duration [22m 3.74s[2m (transform 157ms, setup 0ms, collect 1.07s, tests 2.32s, environment 0ms, prepare 133ms)[22m
+

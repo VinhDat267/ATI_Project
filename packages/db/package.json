@@ -1,0 +1,6 @@
+{
+  "name": "@wap/db", "version": "0.1.0", "private": true, "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": { "drizzle-orm": "0.45.2", "postgres": "3.4.9", "zod": "^4.0.0" }
+}

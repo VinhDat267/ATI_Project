@@ -1,0 +1,5 @@
+{
+  "status": "UNCONFIGURED_DENY_ALL",
+  "note": "Developer must fill and review exact launch artifact/package/version/args/root; empty approved_presets authorizes no launch. See BASELINE G1.",
+  "approved_presets": []
+}

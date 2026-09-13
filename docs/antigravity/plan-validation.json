@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-09-13T07:43:14.475Z",
+  "scope": "PLANNING_DOCUMENTS_ONLY",
+  "task_ids": [
+    "TH-01",
+    "TH-02",
+    "TH-03",
+    "TH-04",
+    "TH-05",
+    "TH-06",
+    "TH-07"
+  ],
+  "unchecked_steps": 55,
+  "local_links_checked": 7,
+  "example_plans": [
+    {
+      "name": "Move local card and notify",
+      "steps": 3,
+      "graph_ok": true,
+      "tools_ok": true
+    }
+  ],
+  "baseline_files_verified": 62,
+  "historical_evidence_files_verified": 26,
+  "application_implementation": "NOT_PERFORMED",
+  "runtime_tests_this_turn": "NOT_RUN",
+  "limitations": [
+    "Code and SQL fragments are proposed implementation instructions, not runtime-verified code",
+    "Executor must run task tests and capture fresh evidence"
+  ],
+  "failures": []
+}

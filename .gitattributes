@@ -1,0 +1,2 @@
+# Keep source, migration checksums and evidence hashes stable across checkouts.
+* -text

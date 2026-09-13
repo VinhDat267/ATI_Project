@@ -1,0 +1,1461 @@
+{
+  "scope": "REAL_CONTROLLER_POSTGRESQL_MCP_NO_HTTP_UI_LLM",
+  "b02": {
+    "run": {
+      "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+      "status": "succeeded",
+      "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+      "plan": {
+        "version": "1.0",
+        "name": "Local demo",
+        "source_prompt": "Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
+        "inputs": {},
+        "steps": [
+          {
+            "id": "read",
+            "description": "read_sheet_range",
+            "tool": {
+              "server": "task_hub",
+              "name": "read_sheet_range",
+              "args": {
+                "range": "Progress!A1:B2",
+                "spreadsheet_id": "source"
+              }
+            },
+            "depends_on": [],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": null,
+            "side_effect": "read",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          },
+          {
+            "id": "append",
+            "description": "append_sheet_rows",
+            "tool": {
+              "server": "task_hub",
+              "name": "append_sheet_rows",
+              "args": {
+                "rows": "${steps.read.output.values}",
+                "sheet_name": "Report",
+                "spreadsheet_id": "dest"
+              }
+            },
+            "depends_on": [
+              "read"
+            ],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": "${runtime.run_id}_append",
+            "side_effect": "write",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          },
+          {
+            "id": "notify",
+            "description": "send_slack_message",
+            "tool": {
+              "server": "task_hub",
+              "name": "send_slack_message",
+              "args": {
+                "text": "Đã chép ${steps.read.output.row_count} dòng.",
+                "channel": "#team"
+              }
+            },
+            "depends_on": [
+              "append"
+            ],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": "${runtime.run_id}_notify",
+            "side_effect": "write",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          }
+        ],
+        "outputs": {}
+      },
+      "planner_result": null,
+      "approval": {
+        "id": "d0cfc66b-51d7-4f66-920d-c61b005f54e5",
+        "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+        "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+        "snapshot_hash": "7c7517c33e5a6fe32a4806a4c1af1b92e88680dd0ff089cd2a5b4a1a45e07098",
+        "decision": "approved",
+        "expires_at": "2026-09-13T08:25:04.051Z",
+        "actions": [
+          {
+            "step_id": "append",
+            "operation_id": "7bfb7439-d7de-484f-9a95-61e644a4013d",
+            "server": "task_hub",
+            "tool": "append_sheet_rows",
+            "policy_version": "b-local-1",
+            "resolved_args": {
+              "rows": [
+                [
+                  "API",
+                  "Done"
+                ],
+                [
+                  "UI",
+                  "Doing"
+                ]
+              ],
+              "sheet_name": "Report",
+              "spreadsheet_id": "dest"
+            },
+            "payload_hash": "763ecd990ac32139ffec1db6b4082c5bd73d2d16ef3d8eaceb1ee9bfaaea75c9"
+          },
+          {
+            "step_id": "notify",
+            "operation_id": "90798bae-f5da-42b3-a0a1-83e51aff7c78",
+            "server": "task_hub",
+            "tool": "send_slack_message",
+            "policy_version": "b-local-1",
+            "resolved_args": {
+              "text": "Đã chép 2 dòng.",
+              "channel": "#team"
+            },
+            "payload_hash": "d8230c2424e4888add74635b9bffa55326133d09299ad402c71e55efc5f6bff0"
+          }
+        ]
+      },
+      "time_zone": "Asia/Ho_Chi_Minh",
+      "runtime": {
+        "now": "2026-09-13T08:15:03.745Z",
+        "today": "2026-09-13",
+        "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+        "user_id": "00000000-0000-4000-8000-000000000001",
+        "week_end": "2026-09-13",
+        "month_end": "2026-09-30",
+        "week_start": "2026-09-07",
+        "month_start": "2026-09-01"
+      },
+      "last_seq": 18
+    },
+    "preview": {
+      "format": "b-local-preview-1",
+      "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+      "user_id": "00000000-0000-4000-8000-000000000001",
+      "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+      "plan": {
+        "version": "1.0",
+        "name": "Local demo",
+        "source_prompt": "Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
+        "inputs": {},
+        "steps": [
+          {
+            "id": "read",
+            "description": "read_sheet_range",
+            "tool": {
+              "server": "task_hub",
+              "name": "read_sheet_range",
+              "args": {
+                "range": "Progress!A1:B2",
+                "spreadsheet_id": "source"
+              }
+            },
+            "depends_on": [],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": null,
+            "side_effect": "read",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          },
+          {
+            "id": "append",
+            "description": "append_sheet_rows",
+            "tool": {
+              "server": "task_hub",
+              "name": "append_sheet_rows",
+              "args": {
+                "rows": "${steps.read.output.values}",
+                "sheet_name": "Report",
+                "spreadsheet_id": "dest"
+              }
+            },
+            "depends_on": [
+              "read"
+            ],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": "${runtime.run_id}_append",
+            "side_effect": "write",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          },
+          {
+            "id": "notify",
+            "description": "send_slack_message",
+            "tool": {
+              "server": "task_hub",
+              "name": "send_slack_message",
+              "args": {
+                "text": "Đã chép ${steps.read.output.row_count} dòng.",
+                "channel": "#team"
+              }
+            },
+            "depends_on": [
+              "append"
+            ],
+            "condition": null,
+            "retry": {
+              "max_attempts": 3,
+              "backoff": "exponential",
+              "initial_delay_ms": 500
+            },
+            "idempotency_key": "${runtime.run_id}_notify",
+            "side_effect": "write",
+            "on_error": "fail",
+            "timeout_ms": 30000
+          }
+        ],
+        "outputs": {}
+      },
+      "inputs": {},
+      "runtime": {
+        "now": "2026-09-13T08:15:03.745Z",
+        "today": "2026-09-13",
+        "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+        "user_id": "00000000-0000-4000-8000-000000000001",
+        "week_end": "2026-09-13",
+        "month_end": "2026-09-30",
+        "week_start": "2026-09-07",
+        "month_start": "2026-09-01"
+      },
+      "time_zone": "Asia/Ho_Chi_Minh",
+      "tools": [
+        {
+          "server": "task_hub",
+          "name": "read_sheet_range",
+          "sideEffect": "read",
+          "policyVersion": "b-local-1",
+          "inputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "spreadsheet_id",
+              "range"
+            ],
+            "properties": {
+              "range": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              "spreadsheet_id": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "values",
+              "row_count"
+            ],
+            "properties": {
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 8192
+                  },
+                  "maxItems": 100
+                },
+                "maxItems": 1000
+              },
+              "row_count": {
+                "type": "integer",
+                "maximum": 9007199254740991,
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "artifactHash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65"
+        },
+        {
+          "server": "task_hub",
+          "name": "append_sheet_rows",
+          "sideEffect": "write",
+          "policyVersion": "b-local-1",
+          "inputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "spreadsheet_id",
+              "sheet_name",
+              "rows"
+            ],
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 8192
+                  },
+                  "maxItems": 100
+                },
+                "maxItems": 1000
+              },
+              "sheet_name": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              "spreadsheet_id": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "appended_count"
+            ],
+            "properties": {
+              "appended_count": {
+                "type": "integer",
+                "maximum": 9007199254740991,
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "artifactHash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65"
+        },
+        {
+          "server": "task_hub",
+          "name": "send_slack_message",
+          "sideEffect": "write",
+          "policyVersion": "b-local-1",
+          "inputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "channel",
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 16000,
+                "minLength": 1
+              },
+              "channel": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              "thread_ts": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "required": [
+              "id",
+              "channel",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "text": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "artifactHash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65"
+        }
+      ],
+      "read_outputs": {
+        "read": {
+          "values": [
+            [
+              "API",
+              "Done"
+            ],
+            [
+              "UI",
+              "Doing"
+            ]
+          ],
+          "row_count": 2
+        }
+      },
+      "actions": [
+        {
+          "step_id": "append",
+          "operation_id": "7bfb7439-d7de-484f-9a95-61e644a4013d",
+          "server": "task_hub",
+          "tool": "append_sheet_rows",
+          "policy_version": "b-local-1",
+          "resolved_args": {
+            "rows": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "sheet_name": "Report",
+            "spreadsheet_id": "dest"
+          },
+          "payload_hash": "763ecd990ac32139ffec1db6b4082c5bd73d2d16ef3d8eaceb1ee9bfaaea75c9"
+        },
+        {
+          "step_id": "notify",
+          "operation_id": "90798bae-f5da-42b3-a0a1-83e51aff7c78",
+          "server": "task_hub",
+          "tool": "send_slack_message",
+          "policy_version": "b-local-1",
+          "resolved_args": {
+            "text": "Đã chép 2 dòng.",
+            "channel": "#team"
+          },
+          "payload_hash": "d8230c2424e4888add74635b9bffa55326133d09299ad402c71e55efc5f6bff0"
+        }
+      ]
+    },
+    "trace": {
+      "run_id": "e9295413-272a-43d3-8894-fb13047c7f16",
+      "attempts": [
+        {
+          "attempt_id": "d46f02ae-2e62-473f-a787-2c849e74c3b8",
+          "step_id": "read",
+          "attempt_no": 1,
+          "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "read_sheet_range",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "range"
+              ],
+              "properties": {
+                "range": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "values",
+                "row_count"
+              ],
+              "properties": {
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "row_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": null,
+          "resolved_args": {
+            "range": "Progress!A1:B2",
+            "spreadsheet_id": "source"
+          },
+          "result": {
+            "values": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "row_count": 2
+          },
+          "outcome_certainty": "confirmed",
+          "error_class": null,
+          "error_message": null,
+          "started_at": "2026-09-13T08:15:03.876Z",
+          "ended_at": "2026-09-13T08:15:03.961Z"
+        },
+        {
+          "attempt_id": "6f3c38cb-8c16-48c8-b112-8353a4ae94cd",
+          "step_id": "append",
+          "attempt_no": 1,
+          "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "append_sheet_rows",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "sheet_name",
+                "rows"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "sheet_name": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "appended_count"
+              ],
+              "properties": {
+                "appended_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": "7bfb7439-d7de-484f-9a95-61e644a4013d",
+          "resolved_args": {
+            "rows": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "sheet_name": "Report",
+            "spreadsheet_id": "dest"
+          },
+          "result": {
+            "appended_count": 2
+          },
+          "outcome_certainty": "confirmed",
+          "error_class": null,
+          "error_message": null,
+          "started_at": "2026-09-13T08:15:04.304Z",
+          "ended_at": "2026-09-13T08:15:04.385Z"
+        },
+        {
+          "attempt_id": "633820f5-dce9-4fbd-878e-f1f95f11224f",
+          "step_id": "notify",
+          "attempt_no": 1,
+          "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "send_slack_message",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "channel",
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "maxLength": 16000,
+                  "minLength": 1
+                },
+                "channel": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "thread_ts": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "id",
+                "channel",
+                "text"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "channel": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": "90798bae-f5da-42b3-a0a1-83e51aff7c78",
+          "resolved_args": {
+            "text": "Đã chép 2 dòng.",
+            "channel": "#team"
+          },
+          "result": {
+            "id": "699e0a47-0fce-42a4-8c95-af64e7534805",
+            "text": "Đã chép 2 dòng.",
+            "channel": "#team"
+          },
+          "outcome_certainty": "confirmed",
+          "error_class": null,
+          "error_message": null,
+          "started_at": "2026-09-13T08:15:04.458Z",
+          "ended_at": "2026-09-13T08:15:04.527Z"
+        }
+      ],
+      "next_cursor": null
+    },
+    "events": {
+      "events": [
+        {
+          "seq": 1,
+          "created_at": "2026-09-13T08:15:03.792Z",
+          "type": "run.status",
+          "payload": {
+            "status": "planning",
+            "previous": null
+          }
+        },
+        {
+          "seq": 2,
+          "created_at": "2026-09-13T08:15:03.799Z",
+          "type": "run.status",
+          "payload": {
+            "status": "validating",
+            "previous": "planning"
+          }
+        },
+        {
+          "seq": 3,
+          "created_at": "2026-09-13T08:15:03.811Z",
+          "type": "plan.ready",
+          "payload": {
+            "workflow_version_id": "a3c8c595-c25c-4c77-a70f-5fdab13224ce",
+            "version_no": 1,
+            "plan": {
+              "version": "1.0",
+              "name": "Local demo",
+              "source_prompt": "Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
+              "inputs": {},
+              "steps": [
+                {
+                  "id": "read",
+                  "description": "read_sheet_range",
+                  "tool": {
+                    "server": "task_hub",
+                    "name": "read_sheet_range",
+                    "args": {
+                      "range": "Progress!A1:B2",
+                      "spreadsheet_id": "source"
+                    }
+                  },
+                  "depends_on": [],
+                  "condition": null,
+                  "retry": {
+                    "max_attempts": 3,
+                    "backoff": "exponential",
+                    "initial_delay_ms": 500
+                  },
+                  "idempotency_key": null,
+                  "side_effect": "read",
+                  "on_error": "fail",
+                  "timeout_ms": 30000
+                },
+                {
+                  "id": "append",
+                  "description": "append_sheet_rows",
+                  "tool": {
+                    "server": "task_hub",
+                    "name": "append_sheet_rows",
+                    "args": {
+                      "rows": "${steps.read.output.values}",
+                      "sheet_name": "Report",
+                      "spreadsheet_id": "dest"
+                    }
+                  },
+                  "depends_on": [
+                    "read"
+                  ],
+                  "condition": null,
+                  "retry": {
+                    "max_attempts": 3,
+                    "backoff": "exponential",
+                    "initial_delay_ms": 500
+                  },
+                  "idempotency_key": "${runtime.run_id}_append",
+                  "side_effect": "write",
+                  "on_error": "fail",
+                  "timeout_ms": 30000
+                },
+                {
+                  "id": "notify",
+                  "description": "send_slack_message",
+                  "tool": {
+                    "server": "task_hub",
+                    "name": "send_slack_message",
+                    "args": {
+                      "text": "Đã chép ${steps.read.output.row_count} dòng.",
+                      "channel": "#team"
+                    }
+                  },
+                  "depends_on": [
+                    "append"
+                  ],
+                  "condition": null,
+                  "retry": {
+                    "max_attempts": 3,
+                    "backoff": "exponential",
+                    "initial_delay_ms": 500
+                  },
+                  "idempotency_key": "${runtime.run_id}_notify",
+                  "side_effect": "write",
+                  "on_error": "fail",
+                  "timeout_ms": 30000
+                }
+              ],
+              "outputs": {}
+            },
+            "layers": [
+              [
+                "read"
+              ],
+              [
+                "append"
+              ],
+              [
+                "notify"
+              ]
+            ],
+            "attempts": 0
+          }
+        },
+        {
+          "seq": 4,
+          "created_at": "2026-09-13T08:15:03.818Z",
+          "type": "run.status",
+          "payload": {
+            "status": "dry_running",
+            "previous": "validating"
+          }
+        },
+        {
+          "seq": 5,
+          "created_at": "2026-09-13T08:15:03.885Z",
+          "type": "step.started",
+          "payload": {
+            "step_id": "read",
+            "description": "read_sheet_range",
+            "tool": {
+              "server": "task_hub",
+              "name": "read_sheet_range"
+            },
+            "side_effect": "read",
+            "attempt_no": 1
+          }
+        },
+        {
+          "seq": 6,
+          "created_at": "2026-09-13T08:15:03.890Z",
+          "type": "step.attempt",
+          "payload": {
+            "step_id": "read",
+            "attempt_no": 1,
+            "resolved_args": {
+              "range": "Progress!A1:B2",
+              "spreadsheet_id": "source"
+            }
+          }
+        },
+        {
+          "seq": 7,
+          "created_at": "2026-09-13T08:15:03.970Z",
+          "type": "step.succeeded",
+          "payload": {
+            "step_id": "read",
+            "attempts": 1,
+            "duration_ms": 93,
+            "deduplicated": false
+          }
+        },
+        {
+          "seq": 8,
+          "created_at": "2026-09-13T08:15:04.076Z",
+          "type": "run.status",
+          "payload": {
+            "status": "awaiting_approval",
+            "previous": "dry_running"
+          }
+        },
+        {
+          "seq": 9,
+          "created_at": "2026-09-13T08:15:04.084Z",
+          "type": "dryrun.ready",
+          "payload": {
+            "approval_id": "d0cfc66b-51d7-4f66-920d-c61b005f54e5",
+            "expires_at": "2026-09-13T08:25:04.051Z",
+            "read_count": 1,
+            "write_count": 2
+          }
+        },
+        {
+          "seq": 10,
+          "created_at": "2026-09-13T08:15:04.172Z",
+          "type": "run.status",
+          "payload": {
+            "status": "running",
+            "previous": "awaiting_approval"
+          }
+        },
+        {
+          "seq": 11,
+          "created_at": "2026-09-13T08:15:04.312Z",
+          "type": "step.started",
+          "payload": {
+            "step_id": "append",
+            "description": "append_sheet_rows",
+            "tool": {
+              "server": "task_hub",
+              "name": "append_sheet_rows"
+            },
+            "side_effect": "write",
+            "attempt_no": 1
+          }
+        },
+        {
+          "seq": 12,
+          "created_at": "2026-09-13T08:15:04.316Z",
+          "type": "step.attempt",
+          "payload": {
+            "step_id": "append",
+            "attempt_no": 1,
+            "resolved_args": {
+              "rows": [
+                [
+                  "API",
+                  "Done"
+                ],
+                [
+                  "UI",
+                  "Doing"
+                ]
+              ],
+              "sheet_name": "Report",
+              "spreadsheet_id": "dest"
+            }
+          }
+        },
+        {
+          "seq": 13,
+          "created_at": "2026-09-13T08:15:04.393Z",
+          "type": "step.succeeded",
+          "payload": {
+            "step_id": "append",
+            "attempts": 1,
+            "duration_ms": 87,
+            "deduplicated": false
+          }
+        },
+        {
+          "seq": 14,
+          "created_at": "2026-09-13T08:15:04.470Z",
+          "type": "step.started",
+          "payload": {
+            "step_id": "notify",
+            "description": "send_slack_message",
+            "tool": {
+              "server": "task_hub",
+              "name": "send_slack_message"
+            },
+            "side_effect": "write",
+            "attempt_no": 1
+          }
+        },
+        {
+          "seq": 15,
+          "created_at": "2026-09-13T08:15:04.475Z",
+          "type": "step.attempt",
+          "payload": {
+            "step_id": "notify",
+            "attempt_no": 1,
+            "resolved_args": {
+              "text": "Đã chép 2 dòng.",
+              "channel": "#team"
+            }
+          }
+        },
+        {
+          "seq": 16,
+          "created_at": "2026-09-13T08:15:04.536Z",
+          "type": "step.succeeded",
+          "payload": {
+            "step_id": "notify",
+            "attempts": 1,
+            "duration_ms": 79,
+            "deduplicated": false
+          }
+        },
+        {
+          "seq": 17,
+          "created_at": "2026-09-13T08:15:04.545Z",
+          "type": "run.status",
+          "payload": {
+            "status": "succeeded",
+            "previous": "running"
+          }
+        },
+        {
+          "seq": 18,
+          "created_at": "2026-09-13T08:15:04.549Z",
+          "type": "run.finished",
+          "payload": {
+            "status": "succeeded",
+            "duration_ms": 765,
+            "error_message": null,
+            "outputs": {}
+          }
+        }
+      ],
+      "next_seq": 18
+    },
+    "actual_rows": [
+      [
+        "API",
+        "Done"
+      ],
+      [
+        "UI",
+        "Doing"
+      ]
+    ],
+    "actual_messages": [
+      {
+        "channel": "#team",
+        "text": "Đã chép 2 dòng."
+      }
+    ],
+    "approvals": 1,
+    "receipts": 2
+  },
+  "response_loss": {
+    "run_id": "77055362-c058-4e5d-98b5-ae4de6e5f01c",
+    "write_calls": 1,
+    "reconciliation": {
+      "run_id": "77055362-c058-4e5d-98b5-ae4de6e5f01c",
+      "read_only": true,
+      "operations": [
+        {
+          "operation_id": "fde07779-b146-461f-b427-32b44b1da62f",
+          "step_id": "append",
+          "state": "unknown",
+          "receipt": "confirmed",
+          "result": {
+            "appended_count": 2
+          }
+        },
+        {
+          "operation_id": "f3a81a95-17da-42c2-b597-7257878b1623",
+          "step_id": "notify",
+          "state": "reserved",
+          "receipt": "not_observed",
+          "result": null
+        }
+      ]
+    },
+    "trace": {
+      "run_id": "77055362-c058-4e5d-98b5-ae4de6e5f01c",
+      "attempts": [
+        {
+          "attempt_id": "89df4522-0f63-4552-8d61-07de6ec18676",
+          "step_id": "read",
+          "attempt_no": 1,
+          "workflow_version_id": "bb8f9a74-197d-4b3d-95de-8f1140303548",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "read_sheet_range",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "range"
+              ],
+              "properties": {
+                "range": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "values",
+                "row_count"
+              ],
+              "properties": {
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "row_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": null,
+          "resolved_args": {
+            "range": "Progress!A1:B2",
+            "spreadsheet_id": "source"
+          },
+          "result": {
+            "values": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "row_count": 2
+          },
+          "outcome_certainty": "confirmed",
+          "error_class": null,
+          "error_message": null,
+          "started_at": "2026-09-13T08:15:21.289Z",
+          "ended_at": "2026-09-13T08:15:21.375Z"
+        },
+        {
+          "attempt_id": "4e0cd202-56fe-4603-a8ac-6f8a773d18e6",
+          "step_id": "append",
+          "attempt_no": 1,
+          "workflow_version_id": "bb8f9a74-197d-4b3d-95de-8f1140303548",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "append_sheet_rows",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "sheet_name",
+                "rows"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "sheet_name": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "appended_count"
+              ],
+              "properties": {
+                "appended_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": "fde07779-b146-461f-b427-32b44b1da62f",
+          "resolved_args": {
+            "rows": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "sheet_name": "Report",
+            "spreadsheet_id": "dest"
+          },
+          "result": null,
+          "outcome_certainty": "unknown",
+          "error_class": "fatal",
+          "error_message": "MCP call failed or timed out",
+          "started_at": "2026-09-13T08:15:21.664Z",
+          "ended_at": "2026-09-13T08:15:21.759Z"
+        }
+      ],
+      "next_cursor": null
+    }
+  },
+  "process_crash": {
+    "exit_code": 86,
+    "recovered": [
+      {
+        "run_id": "74431f59-4c3a-45f1-b44f-6c6fae64e87e",
+        "status": "reconciliation_required"
+      }
+    ],
+    "inspection": {
+      "run_id": "74431f59-4c3a-45f1-b44f-6c6fae64e87e",
+      "read_only": true,
+      "operations": [
+        {
+          "operation_id": "08a958f8-e29a-47ba-ad81-383153acb19e",
+          "step_id": "append",
+          "state": "unknown",
+          "receipt": "confirmed",
+          "result": {
+            "appended_count": 2
+          }
+        },
+        {
+          "operation_id": "06933b51-53ac-4bd8-bd79-b1f1a90f8434",
+          "step_id": "notify",
+          "state": "reserved",
+          "receipt": "not_observed",
+          "result": null
+        }
+      ]
+    },
+    "trace": {
+      "run_id": "74431f59-4c3a-45f1-b44f-6c6fae64e87e",
+      "attempts": [
+        {
+          "attempt_id": "1fd6d702-024a-4c55-a24a-e65bfb15b20e",
+          "step_id": "read",
+          "attempt_no": 1,
+          "workflow_version_id": "123f6f94-a05a-4903-8f7a-963b610820c8",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "read_sheet_range",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "range"
+              ],
+              "properties": {
+                "range": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "values",
+                "row_count"
+              ],
+              "properties": {
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "row_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": null,
+          "resolved_args": {
+            "range": "Progress!A1:B2",
+            "spreadsheet_id": "source"
+          },
+          "result": {
+            "values": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "row_count": 2
+          },
+          "outcome_certainty": "confirmed",
+          "error_class": null,
+          "error_message": null,
+          "started_at": "2026-09-13T08:15:36.645Z",
+          "ended_at": "2026-09-13T08:15:36.728Z"
+        },
+        {
+          "attempt_id": "d6210c5a-6f84-4317-8b23-6bb5a24eca01",
+          "step_id": "append",
+          "attempt_no": 1,
+          "workflow_version_id": "123f6f94-a05a-4903-8f7a-963b610820c8",
+          "evidence": "complete",
+          "tool_snapshot": {
+            "server": "task_hub",
+            "name": "append_sheet_rows",
+            "policy_version": "b-local-1",
+            "artifact_hash": "51c1fd38ed65526152572865ec850e49ec27c974beff26432b77ad4243eacf65",
+            "input_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "spreadsheet_id",
+                "sheet_name",
+                "rows"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "maxItems": 100
+                  },
+                  "maxItems": 1000
+                },
+                "sheet_name": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "spreadsheet_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "required": [
+                "appended_count"
+              ],
+              "properties": {
+                "appended_count": {
+                  "type": "integer",
+                  "maximum": 9007199254740991,
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "operation_id": "08a958f8-e29a-47ba-ad81-383153acb19e",
+          "resolved_args": {
+            "rows": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "sheet_name": "Report",
+            "spreadsheet_id": "dest"
+          },
+          "result": null,
+          "outcome_certainty": "unknown",
+          "error_class": "fatal",
+          "error_message": "Worker stopped before recording outcome",
+          "started_at": "2026-09-13T08:15:39.125Z",
+          "ended_at": "2026-09-13T08:15:39.391Z"
+        }
+      ],
+      "next_cursor": null
+    }
+  },
+  "recorded_at": "2026-09-13T08:16:03.998Z"
+}

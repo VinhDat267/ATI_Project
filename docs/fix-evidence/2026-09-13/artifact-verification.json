@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-13T05:55:26.732Z",
+  "node": "v24.19.0",
+  "schema_count": 11,
+  "openapi_local_refs_checked": 36,
+  "operations": 9,
+  "sql_zod_run_statuses": 14,
+  "current_markdown_local_links_checked": 101,
+  "requirements": 78,
+  "requirements_by_profile": {
+    "M": 59,
+    "S": 1,
+    "OUT": 18
+  },
+  "cases": 10,
+  "package_lock_sha256": "ecb53c786403593d0bb589fcbd18fa5fa177a735d86e2193510d5b75ea790052",
+  "limitations": [
+    "JSON Schema structural checks do not replace Zod refinements or runtime authorization",
+    "PostgreSQL migration, HTTP, live MCP, LLM and browser E2E NOT_RUN"
+  ],
+  "failures": []
+}

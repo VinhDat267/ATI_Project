@@ -1,0 +1,134 @@
+﻿
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/engine@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/packages/dsl[39m
+
+ [32mΓ£ô[39m tests/contracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/policy.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 445[2mms[22m[39m
+ [32mΓ£ô[39m tests/fixtures.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 902[2mms[22m[39m
+ [32mΓ£ô[39m tests/regressions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 1040[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m planner and event boundaries[2m > [22memits JSON Schema with constraints for executable plans [33m1003[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m   Start at [22m 14:58:36
+[2m   Duration [22m 5.64s[2m (transform 3.11s, setup 0ms, collect 12.38s, tests 2.40s, environment 1ms, prepare 3.03s)[22m
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+─É├ú sinh JSON Schema v├áo generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+Γ£¿ openapi-typescript 7.13.0
+≡ƒÜÇ docs/openapi.yaml ΓåÆ packages/dsl/generated/api.d.ts [150.7ms]
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32mΓ£ô[39m tests/tools.integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 15944[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m discovers exactly the implemented tools with output schemas, then reads an A1 range [33m1067[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m denies missing/pending/expired/stale approvals and performs no mutation [33m949[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m prevents another principal from using an approved operation or reading owner data [33m981[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m writes a local message once under concurrent duplicate calls and rejects changed args [33m1069[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m appends different operations concurrently without losing rows [33m1852[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m returns no receipt when the requested destination is missing [33m1321[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m rolls back appended rows when receipt persistence fails after the mutation [33m1086[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m denies an append whose approval expires while waiting for the destination lock [33m3394[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m replays a committed receipt after restarting the MCP process [33m2042[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m moves the b02 hand-plan data through real MCP and verifies resulting rows and message [33m1022[2mms[22m[39m
+ [32mΓ£ô[39m tests/database.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1185[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m applies SQL migrations exactly once and detects checksum drift [33m573[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m15 passed[39m[22m[90m (15)[39m
+[2m   Start at [22m 14:58:53
+[2m   Duration [22m 22.81s[2m (transform 191ms, setup 0ms, collect 5.13s, tests 17.13s, environment 0ms, prepare 184ms)[22m
+
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/packages/engine[39m
+
+ [32mΓ£ô[39m tests/controller.integration.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 62878[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m prepares one immutable approval for both writes without making any mutation [33m1816[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m runs b02 after one approval, preserving previewed source rows and complete trace [33m1901[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m rejects wrong owner, hash, version and duplicate approval decisions [33m2758[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m expires or rejects pending approval without dispatching writes [33m2219[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m denies preview tampering and a forged read label before any write [33m1721[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m completes a read-only plan and skips a false write condition [33m1705[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m rejects reads downstream of writes because a single preview cannot preserve their ordering [33m1220[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m claims an approved run only once under concurrent separate workers [33m2993[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m claims an approved run only once under concurrent shared workers [33m2246[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m stops on a lost write response, then inspects the committed receipt without replaying [33m2668[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m bounds transient read retries and records each attempt before eventually succeeding [33m2027[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m honors cancellation after the current write without dispatching the next write [33m2362[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m blocks changed tool policy after preview and after approval [33m2409[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m rolls back decision and status if durable execute-job insertion fails [33m2412[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m closes the trace if a read completion transaction fails after the MCP reply [33m2280[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m closes the trace if a write completion transaction fails after the MCP reply [33m2363[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m recovers an actual engine process exit after receiver commit without resuming the workflow [33m6218[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m exposes prepare, exact approval, execution and trace through separate CLI processes [33m8332[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m keeps one terminal event when cancel races after a known_failed attempt [33m2064[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m keeps one terminal event when cancel races after a unknown attempt [33m2016[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m records known before-dispatch cancellation without inventing an uncertain write [33m1710[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m reports a conflict when operation and receipt policy drift away from the approved snapshot [33m2107[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m does not append a skipped event when cancel wins after the unlocked preview status read [33m1878[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m fences an old worker after its advisory-lock backend disconnects [33m2744[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m24 passed[39m[22m[90m (24)[39m
+[2m   Start at [22m 14:59:17
+[2m   Duration [22m 64.63s[2m (transform 242ms, setup 0ms, collect 1.37s, tests 62.88s, environment 0ms, prepare 169ms)[22m
+

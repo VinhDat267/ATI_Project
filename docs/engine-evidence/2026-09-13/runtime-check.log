@@ -1,0 +1,32 @@
+{
+  "migrations": 3,
+  "tools": [
+    "read_sheet_range",
+    "append_sheet_rows",
+    "send_slack_message"
+  ],
+  "redis": "PONG",
+  "health": [
+    [
+      "/ati-g1-postgres-1",
+      "healthy"
+    ],
+    [
+      "/ati-g1-redis-1",
+      "healthy"
+    ]
+  ],
+  "demo_read": {
+    "values": [
+      [
+        "API",
+        "Done"
+      ],
+      [
+        "UI",
+        "Doing"
+      ]
+    ],
+    "row_count": 2
+  }
+}

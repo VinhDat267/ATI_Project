@@ -1,0 +1,54 @@
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/dsl
+
+ ✓ tests/contracts.test.ts (2 tests) 11ms
+ ✓ tests/policy.test.ts (8 tests) 240ms
+ ✓ tests/fixtures.test.ts (13 tests) 591ms
+ ✓ tests/regressions.test.ts (15 tests) 759ms
+   ✓ planner and event boundaries > emits JSON Schema with constraints for executable plans 734ms
+
+ Test Files  4 passed (4)
+      Tests  38 passed (38)
+   Start at  00:29:10
+   Duration  3.64s (transform 2.48s, setup 0ms, collect 7.56s, tests 1.60s, environment 1ms, prepare 2.21s)
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [176.5ms]

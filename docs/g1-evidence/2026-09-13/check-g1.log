@@ -1,0 +1,92 @@
+
+> check:g1
+> npm run check && npm run test:integration -w @wap/mcp-task-hub
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/dsl
+
+ ✓ tests/contracts.test.ts (2 tests) 10ms
+ ✓ tests/policy.test.ts (9 tests) 239ms
+ ✓ tests/fixtures.test.ts (13 tests) 521ms
+ ✓ tests/regressions.test.ts (15 tests) 647ms
+   ✓ planner and event boundaries > emits JSON Schema with constraints for executable plans 626ms
+
+ Test Files  4 passed (4)
+      Tests  39 passed (39)
+   Start at  13:24:55
+   Duration  3.62s (transform 2.65s, setup 0ms, collect 8.28s, tests 1.42s, environment 1ms, prepare 2.07s)
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [148.2ms]
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/apps/mcp-task-hub
+
+ ✓ tests/tools.integration.test.ts (10 tests) 11453ms
+   ✓ discovers exactly the implemented tools with output schemas, then reads an A1 range 752ms
+   ✓ denies missing/pending/expired/stale approvals and performs no mutation 737ms
+   ✓ prevents another principal from using an approved operation or reading owner data 732ms
+   ✓ writes a local message once under concurrent duplicate calls and rejects changed args 770ms
+   ✓ appends different operations concurrently without losing rows 1416ms
+   ✓ returns no receipt when the requested destination is missing 690ms
+   ✓ rolls back appended rows when receipt persistence fails after the mutation 695ms
+   ✓ denies an append whose approval expires while waiting for the destination lock 2854ms
+   ✓ replays a committed receipt after restarting the MCP process 1357ms
+   ✓ moves the b02 hand-plan data through real MCP and verifies resulting rows and message 783ms
+ ✓ tests/database.integration.test.ts (4 tests) 629ms
+   ✓ applies SQL migrations exactly once and detects checksum drift 402ms
+
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  13:25:07
+   Duration  15.30s (transform 135ms, setup 0ms, collect 2.81s, tests 12.08s, environment 0ms, prepare 128ms)
+

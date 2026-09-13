@@ -1,0 +1,7 @@
+{
+  "$ref": "#/definitions/WorkflowPlan",
+  "definitions": {
+    "WorkflowPlan": {}
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

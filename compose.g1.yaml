@@ -1,0 +1,25 @@
+name: ati-g1
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: wap
+      POSTGRES_PASSWORD: wap
+      POSTGRES_DB: wap_g1
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["g1_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wap -d wap_g1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:56379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  g1_pgdata:

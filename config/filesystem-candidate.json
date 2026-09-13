@@ -1,0 +1,15 @@
+{
+  "status": "PINNED_CANDIDATE_NOT_APPROVED_OR_CALLED",
+  "package": "@modelcontextprotocol/server-filesystem",
+  "version": "2026.8.31",
+  "dist_integrity": "sha512-kKaFkyAh6oipvc9+EAbJ552JafnMnOq5nzmzWkp1jJdBhTAAGpmIpWihUG1+rfNhmEFM98gUZDdCHCDD4v6a7Q==",
+  "provenance": "npm view @modelcontextprotocol/server-filesystem version dist.integrity --json; 2026-09-13 Asia/Ho_Chi_Minh",
+  "required_before_enable": [
+    "verify installed artifact and dependency lock",
+    "review exact executable/args and local allowed root",
+    "implement read_file/write_file output normalization against live outputs",
+    "path confinement tests",
+    "record tools/list and one read-only call"
+  ],
+  "note": "This file grants no execution permission. approved_presets remains empty."
+}

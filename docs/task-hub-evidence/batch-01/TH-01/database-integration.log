@@ -1,0 +1,15 @@
+﻿
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/database.integration.test.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/M├┤n hß╗ìc/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32mΓ£ô[39m tests/database.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1295[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m applies SQL migrations exactly once and detects checksum drift [33m616[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 15:08:19
+[2m   Duration [22m 2.35s[2m (transform 86ms, setup 0ms, collect 743ms, tests 1.29s, environment 0ms, prepare 99ms)[22m
+

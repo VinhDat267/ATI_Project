@@ -1,0 +1,62 @@
+{
+  "status": "NOT_RUN",
+  "profile": "B-local-v1",
+  "catalog_file": "tools.json",
+  "cases_file": "test-cases.json",
+  "split": {
+    "dev": [
+      "b01",
+      "b02",
+      "b03",
+      "b04",
+      "b05",
+      "b06"
+    ],
+    "holdout": [
+      "b07",
+      "b08",
+      "b09",
+      "b10"
+    ]
+  },
+  "variants": [
+    "all_tools",
+    "semantic",
+    "semantic_qe"
+  ],
+  "top_k": [
+    3,
+    5,
+    10
+  ],
+  "repetitions_per_case_variant": 3,
+  "required_before_run": [
+    "model_id_and_version",
+    "provider",
+    "temperature_and_seed_if_supported",
+    "embedding_model_and_dimension",
+    "prompt_hash",
+    "catalog_sha256",
+    "dataset_sha256",
+    "tool_artifact_versions",
+    "pricing_snapshot",
+    "rubric_source"
+  ],
+  "metrics": [
+    "plan_validity",
+    "semantic_task_correctness",
+    "refusal_accuracy",
+    "clarification_accuracy",
+    "retrieval_recall_nonempty",
+    "recovery_correctness",
+    "total_cost_all_calls",
+    "end_to_end_latency"
+  ],
+  "thresholds": {
+    "extra_or_unapproved_writes": 0,
+    "dry_run_writes": 0,
+    "unknown_write_blind_retries": 0,
+    "dev_hand_plan_fixture_success": 1
+  },
+  "acceptance_note": "AI thresholds exploratory until rubric/user requirements are confirmed; publish observed values and uncertainty, no posthoc success claims."
+}

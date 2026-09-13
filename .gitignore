@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+*.log
+coverage/
+generated/
+.DS_Store
+
+.env.*
+!.env.example
+
+# Giữ log nghiệm thu trong lịch sử Git
+!docs/*-evidence/**/*.log

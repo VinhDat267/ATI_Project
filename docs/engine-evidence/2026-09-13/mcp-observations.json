@@ -1,0 +1,201 @@
+{
+  "kind": "REAL_MCP_STDIO_AND_POSTGRESQL",
+  "approval_controller": "SYNTHETIC_TEST_FIXTURE",
+  "tools": [
+    {
+      "name": "read_sheet_range",
+      "description": "Đọc vùng A1 hữu hạn trong bảng local của tài khoản cấu hình; tối đa 1000 dòng × 100 cột.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "range"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "values",
+          "row_count"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "append_sheet_rows",
+      "description": "Thêm nguyên các dòng vào bảng local đã tồn tại. Chỉ controller có approval/operation hợp lệ được gọi.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sheet_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "rows": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "sheet_name",
+          "rows"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "appended_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "appended_count"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "send_slack_message",
+      "description": "Ghi thông báo vào kênh local đã tồn tại; không gửi tới Slack thật. thread_ts là UUID thông báo local.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "thread_ts": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "channel",
+          "text"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "text"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "case": "b02",
+      "actual_rows": [
+        [
+          "API",
+          "Done"
+        ],
+        [
+          "UI",
+          "Doing"
+        ]
+      ],
+      "actual_message": {
+        "channel": "#team",
+        "text": "Đã chép 2 dòng."
+      },
+      "controller": "synthetic per-step approval fixtures; not a production workflow engine"
+    }
+  ],
+  "recorded_at": "2026-09-13T07:09:44.080Z"
+}

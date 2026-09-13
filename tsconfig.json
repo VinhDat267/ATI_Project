@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@wap/db": [
+        "packages/db/src/index.ts"
+      ],
+      "@wap/dsl": [
+        "packages/dsl/src/index.ts"
+      ],
+      "@wap/engine": [
+        "packages/engine/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "packages/dsl/src/**/*.ts",
+    "packages/dsl/scripts/**/*.ts",
+    "packages/dsl/tests/**/*.ts",
+    "packages/db/src/**/*.ts",
+    "apps/mcp-task-hub/src/**/*.ts",
+    "apps/mcp-task-hub/tests/**/*.ts",
+    "apps/mcp-task-hub/vitest.integration.config.ts",
+    "packages/engine/src/**/*.ts",
+    "packages/engine/tests/**/*.ts",
+    "packages/engine/vitest.integration.config.ts"
+  ]
+}

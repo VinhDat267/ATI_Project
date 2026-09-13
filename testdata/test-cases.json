@@ -1,0 +1,550 @@
+{
+  "profile": "B-local-v1",
+  "evidence": "HAND_AUTHORED_EXECUTABILITY_FIXTURES_NOT_MODEL_RESULTS",
+  "runtime": {
+    "now": "2026-09-13T18:00:00Z",
+    "time_zone": "Asia/Ho_Chi_Minh",
+    "run_id": "fixture-run",
+    "user_id": "fixture-user"
+  },
+  "cases": [
+    {
+      "id": "b01",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Liệt kê task Done của board board_a trong tuần này theo giờ Việt Nam.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Liệt kê task Done của board board_a trong tuần này theo giờ Việt Nam.",
+          "steps": [
+            {
+              "id": "read",
+              "description": "list_cards",
+              "tool": {
+                "server": "task_hub",
+                "name": "list_cards",
+                "args": {
+                  "board_id": "board_a",
+                  "list_name": "Done",
+                  "since": "${runtime.week_start}",
+                  "until": "${runtime.week_end}"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "read"
+            }
+          ],
+          "outputs": {
+            "cards": "${steps.read.output.cards}"
+          }
+        }
+      },
+      "read_fixture": [
+        {
+          "server": "task_hub",
+          "name": "list_cards",
+          "args": {
+            "board_id": "board_a",
+            "list_name": "Done",
+            "since": "2026-09-14",
+            "until": "2026-09-20"
+          },
+          "output": {
+            "cards": [
+              {
+                "id": "c1",
+                "board_id": "board_a",
+                "title": "API",
+                "list_name": "Done"
+              }
+            ],
+            "count": 1
+          }
+        }
+      ],
+      "expected_writes": [],
+      "expected_outputs": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "API",
+            "list_name": "Done"
+          }
+        ]
+      },
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b02",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
+          "steps": [
+            {
+              "id": "read",
+              "description": "read_sheet_range",
+              "tool": {
+                "server": "task_hub",
+                "name": "read_sheet_range",
+                "args": {
+                  "spreadsheet_id": "source",
+                  "range": "Progress!A1:B2"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "read"
+            },
+            {
+              "id": "append",
+              "description": "append_sheet_rows",
+              "tool": {
+                "server": "task_hub",
+                "name": "append_sheet_rows",
+                "args": {
+                  "spreadsheet_id": "dest",
+                  "sheet_name": "Report",
+                  "rows": "${steps.read.output.values}"
+                }
+              },
+              "depends_on": [
+                "read"
+              ],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_append"
+            },
+            {
+              "id": "notify",
+              "description": "send_slack_message",
+              "tool": {
+                "server": "task_hub",
+                "name": "send_slack_message",
+                "args": {
+                  "channel": "#team",
+                  "text": "Đã chép ${steps.read.output.row_count} dòng."
+                }
+              },
+              "depends_on": [
+                "append"
+              ],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_notify"
+            }
+          ],
+          "outputs": {}
+        }
+      },
+      "read_fixture": [
+        {
+          "server": "task_hub",
+          "name": "read_sheet_range",
+          "args": {
+            "spreadsheet_id": "source",
+            "range": "Progress!A1:B2"
+          },
+          "output": {
+            "values": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ],
+            "row_count": 2
+          }
+        }
+      ],
+      "expected_writes": [
+        {
+          "server": "task_hub",
+          "name": "append_sheet_rows",
+          "args": {
+            "spreadsheet_id": "dest",
+            "sheet_name": "Report",
+            "rows": [
+              [
+                "API",
+                "Done"
+              ],
+              [
+                "UI",
+                "Doing"
+              ]
+            ]
+          }
+        },
+        {
+          "server": "task_hub",
+          "name": "send_slack_message",
+          "args": {
+            "channel": "#team",
+            "text": "Đã chép 2 dòng."
+          }
+        }
+      ],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b03",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Đọc task c1 và gửi tiêu đề vào #team dưới dạng Task: <tiêu đề>.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Đọc task c1 và gửi tiêu đề vào #team dưới dạng Task: <tiêu đề>.",
+          "steps": [
+            {
+              "id": "read",
+              "description": "get_card",
+              "tool": {
+                "server": "task_hub",
+                "name": "get_card",
+                "args": {
+                  "card_id": "c1"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "read"
+            },
+            {
+              "id": "notify",
+              "description": "send_slack_message",
+              "tool": {
+                "server": "task_hub",
+                "name": "send_slack_message",
+                "args": {
+                  "channel": "#team",
+                  "text": "Task: ${steps.read.output.title}"
+                }
+              },
+              "depends_on": [
+                "read"
+              ],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_notify"
+            }
+          ],
+          "outputs": {}
+        }
+      },
+      "read_fixture": [
+        {
+          "server": "task_hub",
+          "name": "get_card",
+          "args": {
+            "card_id": "c1"
+          },
+          "output": {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          }
+        }
+      ],
+      "expected_writes": [
+        {
+          "server": "task_hub",
+          "name": "send_slack_message",
+          "args": {
+            "channel": "#team",
+            "text": "Task: Viết API"
+          }
+        }
+      ],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b04",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Tạo task Viết tài liệu API trong Backlog của board_a.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Tạo task Viết tài liệu API trong Backlog của board_a.",
+          "steps": [
+            {
+              "id": "create",
+              "description": "create_card",
+              "tool": {
+                "server": "task_hub",
+                "name": "create_card",
+                "args": {
+                  "board_id": "board_a",
+                  "list_name": "Backlog",
+                  "title": "Viết tài liệu API"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_create"
+            }
+          ],
+          "outputs": {}
+        }
+      },
+      "read_fixture": [],
+      "expected_writes": [
+        {
+          "server": "task_hub",
+          "name": "create_card",
+          "args": {
+            "board_id": "board_a",
+            "list_name": "Backlog",
+            "title": "Viết tài liệu API"
+          }
+        }
+      ],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b05",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Chuyển task đó sang Done.",
+      "expected_result": {
+        "kind": "clarification",
+        "question": "Task nào (card_id)?"
+      },
+      "read_fixture": [],
+      "expected_writes": [],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b06",
+      "split": "dev",
+      "profile": "B-local-v1",
+      "prompt": "Dịch tài liệu sang tiếng Nhật.",
+      "expected_result": {
+        "kind": "refusal",
+        "reason": "Không có tool dịch trong profile B/local."
+      },
+      "read_fixture": [],
+      "expected_writes": [],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b07",
+      "split": "holdout",
+      "profile": "B-local-v1",
+      "prompt": "Copy the rows in Status!A1:B1 from workbook source_b to Archive in dest_b, then tell #ops how many rows were copied.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Copy the rows in Status!A1:B1 from workbook source_b to Archive in dest_b, then tell #ops how many rows were copied.",
+          "steps": [
+            {
+              "id": "read",
+              "description": "read_sheet_range",
+              "tool": {
+                "server": "task_hub",
+                "name": "read_sheet_range",
+                "args": {
+                  "spreadsheet_id": "source_b",
+                  "range": "Status!A1:B1"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "read"
+            },
+            {
+              "id": "append",
+              "description": "append_sheet_rows",
+              "tool": {
+                "server": "task_hub",
+                "name": "append_sheet_rows",
+                "args": {
+                  "spreadsheet_id": "dest_b",
+                  "sheet_name": "Archive",
+                  "rows": "${steps.read.output.values}"
+                }
+              },
+              "depends_on": [
+                "read"
+              ],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_append"
+            },
+            {
+              "id": "notify",
+              "description": "send_slack_message",
+              "tool": {
+                "server": "task_hub",
+                "name": "send_slack_message",
+                "args": {
+                  "channel": "#ops",
+                  "text": "Copied ${steps.read.output.row_count} rows."
+                }
+              },
+              "depends_on": [
+                "append"
+              ],
+              "side_effect": "write",
+              "idempotency_key": "${runtime.run_id}_notify"
+            }
+          ],
+          "outputs": {}
+        }
+      },
+      "read_fixture": [
+        {
+          "server": "task_hub",
+          "name": "read_sheet_range",
+          "args": {
+            "spreadsheet_id": "source_b",
+            "range": "Status!A1:B1"
+          },
+          "output": {
+            "values": [
+              [
+                "Release",
+                "Ready"
+              ]
+            ],
+            "row_count": 1
+          }
+        }
+      ],
+      "expected_writes": [
+        {
+          "server": "task_hub",
+          "name": "append_sheet_rows",
+          "args": {
+            "spreadsheet_id": "dest_b",
+            "sheet_name": "Archive",
+            "rows": [
+              [
+                "Release",
+                "Ready"
+              ]
+            ]
+          }
+        },
+        {
+          "server": "task_hub",
+          "name": "send_slack_message",
+          "args": {
+            "channel": "#ops",
+            "text": "Copied 1 rows."
+          }
+        }
+      ],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b08",
+      "split": "holdout",
+      "profile": "B-local-v1",
+      "prompt": "Cho xem thành viên board_b.",
+      "expected_result": {
+        "kind": "plan",
+        "plan": {
+          "version": "1.0",
+          "name": "Local demo",
+          "source_prompt": "Cho xem thành viên board_b.",
+          "steps": [
+            {
+              "id": "read",
+              "description": "list_members",
+              "tool": {
+                "server": "task_hub",
+                "name": "list_members",
+                "args": {
+                  "board_id": "board_b"
+                }
+              },
+              "depends_on": [],
+              "side_effect": "read"
+            }
+          ],
+          "outputs": {
+            "members": "${steps.read.output.members}"
+          }
+        }
+      },
+      "read_fixture": [
+        {
+          "server": "task_hub",
+          "name": "list_members",
+          "args": {
+            "board_id": "board_b"
+          },
+          "output": {
+            "members": [
+              {
+                "id": "u1",
+                "name": "Lan",
+                "task_count": 2
+              }
+            ]
+          }
+        }
+      ],
+      "expected_writes": [],
+      "expected_outputs": {
+        "members": [
+          {
+            "id": "u1",
+            "name": "Lan",
+            "task_count": 2
+          }
+        ]
+      },
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b09",
+      "split": "holdout",
+      "profile": "B-local-v1",
+      "prompt": "Chọn người ít task nhất rồi tạo task mới giao cho họ.",
+      "expected_result": {
+        "kind": "refusal",
+        "reason": "DSL không có min và catalog không có tool chọn người ít task."
+      },
+      "read_fixture": [],
+      "expected_writes": [],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    },
+    {
+      "id": "b10",
+      "split": "holdout",
+      "profile": "B-local-v1",
+      "prompt": "Copy the progress sheet to the report workbook.",
+      "expected_result": {
+        "kind": "clarification",
+        "question": "Which source workbook/range and destination workbook/sheet?"
+      },
+      "read_fixture": [],
+      "expected_writes": [],
+      "expected_outputs": {},
+      "forbid_extra_writes": true
+    }
+  ]
+}
