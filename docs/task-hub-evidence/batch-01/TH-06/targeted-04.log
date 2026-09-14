@@ -1,0 +1,115 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [31m❯[39m tests/controller.integration.test.ts [2m([22m[2m40 tests[22m[2m | [22m[31m4 failed[39m[2m | [22m[33m24 skipped[39m[2m)[22m[33m 32827[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m2212[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview [33m1662[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution [33m1430[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts[33m 1359[2mms[22m[31m[39m
+[31m     → Cannot read properties of undefined (reading 'members')[39m
+   [33m[2m✓[22m[39m [TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt [33m1631[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside[33m 1423[2mms[22m[31m[39m
+[31m     → Cannot read properties of undefined (reading 'cards')[39m
+   [33m[2m✓[22m[39m [TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch [33m1148[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule [33m1153[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state [33m2467[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E10] [move] prevents duplicate execution races on same approved card move run[33m 1395[2mms[22m[31m[39m
+[31m     → expected EngineError: This worker is already active { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+[31m   [31m×[31m [TH-06] [E10] [create] prevents duplicate execution races on same approved card create run[33m 1380[2mms[22m[31m[39m
+[31m     → expected EngineError: This worker is already active { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [create] simulates lost response after real create commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1348[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [move] simulates lost response after real move commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1334[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [create] recovers real process crash (exit code 86) after create receiver commit [33m2729[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [move] recovers real process crash (exit code 86) after move receiver commit [33m2770[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes [33m6308[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 4 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'members')[39m
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m914:25[22m[39m
+    [90m912| [39m
+    [90m913| [39m  [35mconst[39m detail [33m=[39m [35mawait[39m engine[33m.[39m[34mdetail[39m(run[33m.[39mrun_id)[33m;[39m
+    [90m914| [39m  [34mexpect[39m(detail[33m.[39moutputs[33m.[39mmembers)[33m.[39m[34mtoEqual[39m([
+    [90m   | [39m                        [31m^[39m
+    [90m915| [39m    { id[33m:[39m [32m"m1"[39m[33m,[39m name[33m:[39m [32m"An"[39m[33m,[39m task_count[33m:[39m [34m1[39m }[33m,[39m
+    [90m916| [39m    { id[33m:[39m [32m"m2"[39m[33m,[39m name[33m:[39m [32m"Bình"[39m[33m,[39m task_count[33m:[39m [34m0[39m }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'cards')[39m
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m959:25[22m[39m
+    [90m957| [39m
+    [90m958| [39m  [35mconst[39m detail [33m=[39m [35mawait[39m engine[33m.[39m[34mdetail[39m(run[33m.[39mrun_id)[33m;[39m
+    [90m959| [39m  [34mexpect[39m(detail[33m.[39moutputs[33m.[39mcards)[33m.[39m[34mtoEqual[39m([
+    [90m   | [39m                        [31m^[39m
+    [90m960| [39m    { id[33m:[39m [32m"c1"[39m[33m,[39m board_id[33m:[39m [32m"board_a"[39m[33m,[39m title[33m:[39m [32m"API"[39m[33m,[39m list_name[33m:[39m [32m"Done"[39m }[33m,[39m
+    [90m961| [39m  ])[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E10] [move] prevents duplicate execution races on same approved card move run
+[31m[1mAssertionError[22m: expected EngineError: This worker is already active { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Object {[39m
+[32m-   "code": "CONFLICT",[39m
+[31m+ EngineError {[39m
+[31m+   "code": "BUSY",[39m
+[2m  }[22m
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m1121:31[22m[39m
+    [90m1119| [39m  [34mexpect[39m(rejected)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+    [90m1120| [39m  [34mexpect[39m(fulfilled[[34m0[39m][33m![39m[33m.[39mvalue[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m1121| [39m  [34mexpect[39m(rejected[[34m0[39m][33m![39m[33m.[39mreason)[33m.[39m[34mtoMatchObject[39m({ code[33m:[39m [32m"CONFLICT"[39m })[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m1122| [39m  [34mexpect[39m(
+    [90m1123| [39m    ([35mawait[39m raw[32m`SELECT list_name FROM hub_cards WHERE user_id=[39m[36m${[39m[33mDEMO_US[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E10] [create] prevents duplicate execution races on same approved card create run
+[31m[1mAssertionError[22m: expected EngineError: This worker is already active { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Object {[39m
+[32m-   "code": "CONFLICT",[39m
+[31m+ EngineError {[39m
+[31m+   "code": "BUSY",[39m
+[2m  }[22m
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m1146:31[22m[39m
+    [90m1144| [39m  [34mexpect[39m(rejected)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+    [90m1145| [39m  [34mexpect[39m(fulfilled[[34m0[39m][33m![39m[33m.[39mvalue[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m1146| [39m  [34mexpect[39m(rejected[[34m0[39m][33m![39m[33m.[39mreason)[33m.[39m[34mtoMatchObject[39m({ code[33m:[39m [32m"CONFLICT"[39m })[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m1147| [39m  [35mconst[39m docsCards [33m=[39m [35mawait[39m raw[32m`SELECT * FROM hub_cards WHERE user_id=[39m[36m${[39m…
+    [90m1148| [39m  [34mexpect[39m(docsCards)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[2m | [22m[33m24 skipped[39m[90m (40)[39m
+[2m   Start at [22m 20:41:03
+[2m   Duration [22m 34.03s[2m (transform 206ms, setup 0ms, collect 969ms, tests 32.83s, environment 0ms, prepare 78ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\packages\engine
+npm error workspace @wap/engine@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\packages\engine
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06

@@ -1,0 +1,222 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-04
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31m❯[39m tests/tools.integration.test.ts [2m([22m[2m41 tests[22m[2m | [22m[31m12 failed[39m[2m | [22m[33m27 skipped[39m[2m)[22m[33m 14948[2mms[22m[39m
+[31m   [31m×[31m [TH-04] creates card with all optional fields, verifies DB storage and receipt[33m 916[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] creates card with omitted optional fields, storing empty description and nulls[33m 832[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt[33m 826[2mms[22m[31m[39m
+[31m     → expected 'BAD_ARGS' to be 'NOT_FOUND' // Object.is equality[39m
+[31m   [31m×[31m [TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift[33m 806[2mms[22m[31m[39m
+[31m     → expected 'BAD_ARGS' to be 'NOT_AUTHORIZED' // Object.is equality[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card with BAD_ARGS on extra args, whitespace title, length violations [33m947[2mms[22m[39m
+[31m   [31m×[31m [TH-04-due-date] create_card due_date schema rejects year 0000 and invalid dates across Zod and JSON Schema validator[33m 810[2mms[22m[31m[39m
+[31m     → expected true to be false // Object.is equality[39m
+[31m   [31m×[31m [TH-04-due-date] live MCP create_card rejects year 0000 and invalid dates with BAD_ARGS, accepts 0001 and 9999[33m 929[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] concurrent same-operation replay produces identical ID and exactly 1 card + 1 receipt[33m 933[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] replay survives MCP process restart, returning original card ID with zero extra card[33m 902[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] same operation with changed payload is denied and leaves original state intact[33m 851[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-04] distinct operations with same title create two distinct cards with two receipts[33m 854[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+   [33m[2m✓[22m[39m [TH-04] rolls back card insert when receipt persistence fails after mutation [33m929[2mms[22m[39m
+[31m   [31m×[31m [TH-04] denies create_card when destination list lock causes waiting past approval expiry[33m 2326[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m [TH-04] live discovery exposes exactly the seven active tools matching toolDefinitions[33m 1002[2mms[22m[31m[39m
+[31m     → expected [ 'append_sheet_rows', …(5) ] to deeply equal [ 'append_sheet_rows', …(6) ][39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 12 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] creates card with all optional fields, verifies DB storage and receipt
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m957:32[22m[39m
+    [90m955| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args)[33m;[39m
+    [90m956| [39m  [35mconst[39m response [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m957| [39m  [34mexpect[39m(response[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m958| [39m  [35mconst[39m output [33m=[39m outputs[33m.[39mcreate_card[33m.[39m[34mparse[39m(response[33m.[39mstructuredContent)[33m;[39m
+    [90m959| [39m  [34mexpect[39m(output[33m.[39mid)[33m.[39m[34mtoMatch[39m([36m/^[a-f0-9-]{36}$/[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] creates card with omitted optional fields, storing empty description and nulls
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m975:32[22m[39m
+    [90m973| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args)[33m;[39m
+    [90m974| [39m  [35mconst[39m response [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m975| [39m  [34mexpect[39m(response[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m976| [39m  [35mconst[39m output [33m=[39m outputs[33m.[39mcreate_card[33m.[39m[34mparse[39m(response[33m.[39mstructuredContent)[33m;[39m
+    [90m977| [39m  [34mexpect[39m(output[33m.[39mid)[33m.[39m[34mtoMatch[39m([36m/^[a-f0-9-]{36}$/[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt
+[31m[1mAssertionError[22m: expected 'BAD_ARGS' to be 'NOT_FOUND' // Object.is equality[39m
+
+Expected: [32m"NOT_FOUND"[39m
+Received: [31m"BAD_ARGS"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1001:27[22m[39m
+    [90m999| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m badBoardArgs[33m,[39m auth1)[33m;[39m
+    [90m1000| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1001| [39m  [34mexpect[39m([34merrorCode[39m(res1))[33m.[39m[34mtoBe[39m([32m"NOT_FOUND"[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1002| [39m
+    [90m1003| [39m  [90m// 2. Board belonging only to another user[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift
+[31m[1mAssertionError[22m: expected 'BAD_ARGS' to be 'NOT_AUTHORIZED' // Object.is equality[39m
+
+Expected: [32m"NOT_AUTHORIZED"[39m
+Received: [31m"BAD_ARGS"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1057:27[22m[39m
+    [90m1055| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args)[33m;[39m
+    [90m1056| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1057| [39m  [34mexpect[39m([34merrorCode[39m(res1))[33m.[39m[34mtoBe[39m([32m"NOT_AUTHORIZED"[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1058| [39m
+    [90m1059| [39m  [90m// 2. Pending approval[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04-due-date] create_card due_date schema rejects year 0000 and invalid dates across Zod and JSON Schema validator
+[31m[1mAssertionError[22m: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1134:131[22m[39m
+    [90m1132| [39m[34mit[39m([32m"[TH-04-due-date] create_card due_date schema rejects year 0000 and[39m…
+    [90m1133| [39m  [90m// 1. Zod input schema validation[39m
+    [90m1134| [39m  [34mexpect[39m(inputs[33m.[39mcreate_card[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m list_name…
+    [90m   | [39m                                                                                                                                  [31m^[39m
+    [90m1135| [39m  [34mexpect[39m(inputs[33m.[39mcreate_card[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m list_name…
+    [90m1136| [39m  [34mexpect[39m(inputs[33m.[39mcreate_card[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m list_name…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04-due-date] live MCP create_card rejects year 0000 and invalid dates with BAD_ARGS, accepts 0001 and 9999
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1179:28[22m[39m
+    [90m1177| [39m  [35mconst[39m auth1 [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m minYearArgs)[33m;[39m
+    [90m1178| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m minYearArgs[33m,[39m auth1)[33m;[39m
+    [90m1179| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m1180| [39m
+    [90m1181| [39m  [35mconst[39m maxYearArgs [33m=[39m { board_id[33m:[39m [32m"board_a"[39m[33m,[39m list_name[33m:[39m [32m"Backlog"[39m[33m,[39m tit…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] concurrent same-operation replay produces identical ID and exactly 1 card + 1 receipt
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1197:28[22m[39m
+    [90m1195| [39m    [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m auth)[33m,[39m
+    [90m1196| [39m  ])[33m;[39m
+    [90m1197| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m1198| [39m  [34mexpect[39m(res2[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1199| [39m  [34mexpect[39m(res1[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m(res2[33m.[39mstructuredContent)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] replay survives MCP process restart, returning original card ID with zero extra card
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1211:29[22m[39m
+    [90m1209| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args)[33m;[39m
+    [90m1210| [39m  [35mconst[39m first [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1211| [39m  [34mexpect[39m(first[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m1212| [39m  [35mconst[39m originalId [33m=[39m (first[33m.[39mstructuredContent [35mas[39m any)[33m.[39mid[33m;[39m
+    [90m1213| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] same operation with changed payload is denied and leaves original state intact
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1231:29[22m[39m
+    [90m1229| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args)[33m;[39m
+    [90m1230| [39m  [35mconst[39m first [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1231| [39m  [34mexpect[39m(first[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m1232| [39m  [35mconst[39m originalId [33m=[39m (first[33m.[39mstructuredContent [35mas[39m any)[33m.[39mid[33m;[39m
+    [90m1233| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] distinct operations with same title create two distinct cards with two receipts
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1249:28[22m[39m
+    [90m1247| [39m  [35mconst[39m auth1 [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args1)[33m;[39m
+    [90m1248| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args1[33m,[39m auth1)[33m;[39m
+    [90m1249| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m1250| [39m
+    [90m1251| [39m  [35mconst[39m args2 [33m=[39m { board_id[33m:[39m [32m"board_a"[39m[33m,[39m list_name[33m:[39m [32m"Backlog"[39m[33m,[39m title[33m:[39m [32m"D[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] denies create_card when destination list lock causes waiting past approval expiry
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m vi.waitFor.timeout tests/tools.integration.test.ts:[2m1307:28[22m[39m
+    [90m1305| [39m        [35mconst[39m [waiting] [33m=[39m
+    [90m1306| [39m          [35mawait[39m raw[32m`SELECT count(*)::int AS n FROM pg_stat_activity WH[39m…
+    [90m1307| [39m        [34mexpect[39m(waiting[33m![39m[33m.[39mn)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m1308| [39m      }[33m,[39m
+    [90m1309| [39m      { timeout[33m:[39m [34m1500[39m[33m,[39m interval[33m:[39m [34m25[39m }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] live discovery exposes exactly the seven active tools matching toolDefinitions
+[31m[1mAssertionError[22m: expected [ 'append_sheet_rows', …(5) ] to deeply equal [ 'append_sheet_rows', …(6) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Array [[22m
+[2m    "append_sheet_rows",[22m
+[32m-   "create_card",[39m
+[2m    "get_card",[22m
+[2m    "list_cards",[22m
+[2m    "list_members",[22m
+[2m    "read_sheet_range",[22m
+[2m    "send_slack_message",[22m
+[2m  ][22m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1326:17[22m[39m
+    [90m1324| [39m  [35mconst[39m tools [33m=[39m [35mawait[39m client[33m![39m[33m.[39m[34mlistTools[39m()[33m;[39m
+    [90m1325| [39m  [35mconst[39m names [33m=[39m tools[33m.[39mtools[33m.[39m[34mmap[39m((t) [33m=>[39m t[33m.[39mname)[33m.[39m[34msort[39m()[33m;[39m
+    [90m1326| [39m  [34mexpect[39m(names)[33m.[39m[34mtoEqual[39m([
+    [90m   | [39m                [31m^[39m
+    [90m1327| [39m    [32m"append_sheet_rows"[39m[33m,[39m
+    [90m1328| [39m    [32m"create_card"[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m12 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[2m | [22m[33m27 skipped[39m[90m (41)[39m
+[2m   Start at [22m 17:41:03
+[2m   Duration [22m 16.57s[2m (transform 294ms, setup 0ms, collect 1.30s, tests 14.95s, environment 0ms, prepare 155ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-04

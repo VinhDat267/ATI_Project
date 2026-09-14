@@ -1,0 +1,196 @@
+
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/engine@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/dsl[39m
+
+ [32m✓[39m tests/contracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+ [32m✓[39m tests/policy.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 355[2mms[22m[39m
+ [32m✓[39m tests/fixtures.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 686[2mms[22m[39m
+ [32m✓[39m tests/regressions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 616[2mms[22m[39m
+   [33m[2m✓[22m[39m planner and event boundaries[2m > [22memits JSON Schema with constraints for executable plans [33m586[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m   Start at [22m 20:50:44
+[2m   Duration [22m 1.45s[2m (transform 322ms, setup 0ms, collect 1.47s, tests 1.67s, environment 1ms, prepare 551ms)[22m
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [125.8ms]
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32m✓[39m tests/tools.integration.test.ts [2m([22m[2m56 tests[22m[2m)[22m[33m 62826[2mms[22m[39m
+   [33m[2m✓[22m[39m discovers exactly the active tools with output schemas, then reads an A1 range [33m1242[2mms[22m[39m
+   [33m[2m✓[22m[39m denies missing/pending/expired/stale approvals and performs no mutation [33m906[2mms[22m[39m
+   [33m[2m✓[22m[39m prevents another principal from using an approved operation or reading owner data [33m821[2mms[22m[39m
+   [33m[2m✓[22m[39m writes a local message once under concurrent duplicate calls and rejects changed args [33m1003[2mms[22m[39m
+   [33m[2m✓[22m[39m appends different operations concurrently without losing rows [33m1611[2mms[22m[39m
+   [33m[2m✓[22m[39m returns no receipt when the requested destination is missing [33m905[2mms[22m[39m
+   [33m[2m✓[22m[39m rolls back appended rows when receipt persistence fails after the mutation [33m918[2mms[22m[39m
+   [33m[2m✓[22m[39m denies an append whose approval expires while waiting for the destination lock [33m3015[2mms[22m[39m
+   [33m[2m✓[22m[39m replays a committed receipt after restarting the MCP process [33m1676[2mms[22m[39m
+   [33m[2m✓[22m[39m moves the b02 hand-plan data through real MCP and verifies resulting rows and message [33m959[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-02] contracts define strict schemas for the five future tools [33m787[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-02] create_card without authorization cannot mutate hub_cards or add receipts [33m774[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R01] seeds and reads get_card, list_cards and list_members over live MCP with zero mutation or receipts [33m949[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R02] list_cards returns empty cards array and count 0 when no cards match filter [33m889[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R03] rejects absent or other owner board and cards with NOT_FOUND [33m967[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R04] rejects list or assignee existing only in another board with NOT_FOUND [33m1063[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R05] rejects invalid dates, since > until, and extra args with BAD_ARGS and no DB mutation [33m860[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R06] filters cards exactly on Asia/Ho_Chi_Minh local day boundaries [33m828[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R07] filters cards exactly on America/New_York DST 23-hour day boundaries [33m838[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R08] rejects malformed or unsupported time zone with BAD_ARGS [33m954[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R09] list_members calculates task_count only for active assigned cards in the same board [33m824[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R10] list_cards and list_members throw LIMIT_EXCEEDED when matching > 1000 items [33m2353[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R11] list_cards tie-breaks on card_id COLLATE C; reads produce zero receipts or messages [33m972[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] maps schema-invalid stored card data to INTERNAL_ERROR and restores table constraints in finally [33m869[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] live discovery exposes active tools matching toolDefinitions [33m879[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m791[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] live MCP list_cards rejects year 0000 with BAD_ARGS and accepts 0001 and 9999 [33m913[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with all optional fields, verifies DB storage and receipt [33m849[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with omitted optional fields, storing empty description and nulls [33m968[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt [33m1039[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift [33m911[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card with BAD_ARGS on extra args, whitespace title, length violations [33m926[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] create_card due_date schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m785[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] live MCP create_card rejects year 0000 and invalid dates with BAD_ARGS, accepts 0001 and 9999 [33m944[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] concurrent same-operation replay produces identical ID and exactly 1 card + 1 receipt [33m937[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] replay survives MCP process restart, returning original card ID with zero extra card [33m1627[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] same operation with changed payload is denied and leaves original state intact [33m827[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] distinct operations with same title create two distinct cards with two receipts [33m995[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rolls back card insert when receipt persistence fails after mutation [33m819[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] denies create_card when destination list lock causes waiting past approval expiry [33m1930[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated [33m905[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] live discovery exposes active tools matching toolDefinitions [33m739[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Doing to Done, updating list_name and updated_at, reducing m1 workload to 0 [33m884[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Done to Doing, restoring m1 workload to 1 [33m876[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when authorization is missing, pending, expired, stale hash, version drift, or wrong owner [33m861[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] returns NOT_FOUND for missing card, foreign card, missing target list, cross-board list, and other-owner list [33m924[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] schema validation rejects extra args, empty card_id, empty target_list, and null with BAD_ARGS [33m850[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] same-op replay across restart preserves exact timestamp and produces identical result with 1 mutation and 1 receipt [33m1615[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] concurrent identical move_card calls produce identical output with exactly 1 mutation and 1 receipt [33m950[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt [33m879[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies replay when payload is changed for same operation_id, leaving original data and receipt intact [33m910[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] serializes two distinct operations on same card with different targets, verifying barrier overlap via pg_blocking_pids [33m1095[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when destination card lock causes waiting past approval expiry [33m4880[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] rolls back card update and restores original list_name and updated_at when receipt persistence fails [33m832[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated [33m984[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] live discovery exposes active tools matching toolDefinitions [33m818[2mms[22m[39m
+ [32m✓[39m tests/database.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2190[2mms[22m[39m
+   [33m[2m✓[22m[39m applies SQL migrations exactly once and detects checksum drift [33m1180[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m63 passed[39m[22m[90m (63)[39m
+[2m   Start at [22m 20:50:50
+[2m   Duration [22m 67.01s[2m (transform 210ms, setup 0ms, collect 1.51s, tests 65.02s, environment 0ms, prepare 152ms)[22m
+
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [32m✓[39m tests/controller.integration.test.ts [2m([22m[2m40 tests[22m[2m)[22m[33m 86818[2mms[22m[39m
+   [33m[2m✓[22m[39m prepares one immutable approval for both writes without making any mutation [33m2001[2mms[22m[39m
+   [33m[2m✓[22m[39m runs b02 after one approval, preserving previewed source rows and complete trace [33m3017[2mms[22m[39m
+   [33m[2m✓[22m[39m rejects wrong owner, hash, version and duplicate approval decisions [33m2709[2mms[22m[39m
+   [33m[2m✓[22m[39m expires or rejects pending approval without dispatching writes [33m1712[2mms[22m[39m
+   [33m[2m✓[22m[39m denies preview tampering and a forged read label before any write [33m1490[2mms[22m[39m
+   [33m[2m✓[22m[39m completes a read-only plan and skips a false write condition [33m1526[2mms[22m[39m
+   [33m[2m✓[22m[39m rejects reads downstream of writes because a single preview cannot preserve their ordering [33m1344[2mms[22m[39m
+   [33m[2m✓[22m[39m claims an approved run only once under concurrent separate workers [33m2594[2mms[22m[39m
+   [33m[2m✓[22m[39m claims an approved run only once under concurrent shared workers [33m1698[2mms[22m[39m
+   [33m[2m✓[22m[39m stops on a lost write response, then inspects the committed receipt without replaying [33m1669[2mms[22m[39m
+   [33m[2m✓[22m[39m bounds transient read retries and records each attempt before eventually succeeding [33m1361[2mms[22m[39m
+   [33m[2m✓[22m[39m honors cancellation after the current write without dispatching the next write [33m1678[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks changed tool policy after preview and after approval [33m1748[2mms[22m[39m
+   [33m[2m✓[22m[39m rolls back decision and status if durable execute-job insertion fails [33m1554[2mms[22m[39m
+   [33m[2m✓[22m[39m closes the trace if a read completion transaction fails after the MCP reply [33m1390[2mms[22m[39m
+   [33m[2m✓[22m[39m closes the trace if a write completion transaction fails after the MCP reply [33m1830[2mms[22m[39m
+   [33m[2m✓[22m[39m recovers an actual engine process exit after receiver commit without resuming the workflow [33m3304[2mms[22m[39m
+   [33m[2m✓[22m[39m exposes prepare, exact approval, execution and trace through separate CLI processes [33m6706[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps one terminal event when cancel races after a known_failed attempt [33m1735[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps one terminal event when cancel races after a unknown attempt [33m1573[2mms[22m[39m
+   [33m[2m✓[22m[39m records known before-dispatch cancellation without inventing an uncertain write [33m1941[2mms[22m[39m
+   [33m[2m✓[22m[39m reports a conflict when operation and receipt policy drift away from the approved snapshot [33m1619[2mms[22m[39m
+   [33m[2m✓[22m[39m does not append a skipped event when cancel wins after the unlocked preview status read [33m1384[2mms[22m[39m
+   [33m[2m✓[22m[39m fences an old worker after its advisory-lock backend disconnects [33m2511[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m1953[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview [33m1918[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution [33m1740[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts [33m1320[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt [33m1590[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside [33m1402[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch [33m1124[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule [33m1185[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state [33m2757[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E10] [move] prevents duplicate execution races on same approved card move run [33m1643[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E10] [create] prevents duplicate execution races on same approved card create run [33m1725[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [create] simulates lost response after real create commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1497[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [move] simulates lost response after real move commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1589[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [create] recovers real process crash (exit code 86) after create receiver commit [33m3345[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [move] recovers real process crash (exit code 86) after move receiver commit [33m3393[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes [33m7759[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m40 passed[39m[22m[90m (40)[39m
+[2m   Start at [22m 20:51:58
+[2m   Duration [22m 88.46s[2m (transform 272ms, setup 0ms, collect 1.32s, tests 86.82s, environment 0ms, prepare 121ms)[22m
+

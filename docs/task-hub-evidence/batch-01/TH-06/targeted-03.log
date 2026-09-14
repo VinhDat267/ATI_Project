@@ -1,0 +1,7 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+

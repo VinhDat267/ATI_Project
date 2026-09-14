@@ -1,0 +1,14 @@
+{
+  "mode": "missing-structured",
+  "scope": "REVIEW FAULT INJECTION ONLY, no installed source modified",
+  "probe_exit": 1,
+  "probe_verdict": "FAIL",
+  "expected_error": "structuredContent",
+  "observed_error": "Missing or invalid structuredContent.content from read_text_file",
+  "cleanup": {
+    "temp_root_removed": true,
+    "close_error": null,
+    "cleanup_error": null
+  },
+  "status": "PASS"
+}

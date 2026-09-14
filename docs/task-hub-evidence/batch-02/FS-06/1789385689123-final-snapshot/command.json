@@ -1,0 +1,13 @@
+{
+  "executable": "node",
+  "args": [
+    "scripts/fs06-final-snapshot.mjs"
+  ],
+  "started_at": "2026-09-14T11:34:49.126Z",
+  "finished_at": "2026-09-14T11:34:58.538Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-06\\1789385689123-final-snapshot",
+  "scope": "final-snapshot"
+}

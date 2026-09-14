@@ -1,0 +1,13 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "args": [
+    "scripts/probe-filesystem-candidate.mjs"
+  ],
+  "started_at": "2026-09-14T05:03:51.169Z",
+  "finished_at": "2026-09-14T05:03:59.386Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-01\\1789362231168-review-probe",
+  "scope": "review-probe"
+}

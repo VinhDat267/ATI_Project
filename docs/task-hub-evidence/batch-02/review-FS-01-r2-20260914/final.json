@@ -1,0 +1,26 @@
+{
+  "recorded_at": "2026-09-14T05:25:33.624Z",
+  "code_verdict": "REVIEWED_FIXES_VERIFIED",
+  "fs01_gate": "PARTIAL_NATIVE_FILE_SYMLINK_EPERM",
+  "source_drift": [
+    "packages/engine/src/filesystem-paths.ts",
+    "packages/engine/tests/filesystem-paths.test.ts",
+    "scripts/probe-filesystem-candidate.mjs"
+  ],
+  "historical_evidence_drift": [
+    "docs/task-hub-evidence/batch-02/FS-01/FS-01.md"
+  ],
+  "protected": {
+    "count": 180,
+    "mismatches": []
+  },
+  "candidate_hashes_match": true,
+  "source_sha256": {
+    "packages/engine/src/filesystem-paths.ts": "da05d2193069567691fe0cfab2d00199f67a84b599f71bb4a61f3679c9a6e380",
+    "packages/engine/src/launch-policy.ts": "a20e133cfb0b4ad5b198a27ee94b19ff502461ec6bd696dde6e7b601969c2b6e",
+    "packages/engine/tests/filesystem-paths.test.ts": "f14d0547875df1b15b223d89f58f650040229f893b656075ea2d8452b0be5cc0",
+    "packages/engine/tests/artifact-validation.test.ts": "809b46b1fe7265a2371180b23eb592fdd0dc824a1b847acaf9cc5e76e459b6f4",
+    "scripts/probe-filesystem-candidate.mjs": "21901f4fbbb856d6b1bdecddbbd2b585c48c72a20d843d8ce85b647e5f888b7c",
+    "scripts/emit-candidate-artifact.mjs": "f0f5c7e246f6a2b47d15bb870d22d4a03fbd983577c61a59e502a871f80a3db8"
+  }
+}

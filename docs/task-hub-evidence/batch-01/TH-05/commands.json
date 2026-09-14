@@ -1,0 +1,57 @@
+[
+  {
+    "name": "red-01",
+    "command": "cmd /c \"set ATI_EVIDENCE_DIR=docs/task-hub-evidence/batch-01/TH-05&& npm run test:integration -w @wap/mcp-task-hub -- tests/tools.integration.test.ts -t TH-05 > docs\\task-hub-evidence\\batch-01\\TH-05\\red-01.log 2>&1\"",
+    "exit_code": 1,
+    "started_at": "2026-09-13T10:58:53Z",
+    "finished_at": "2026-09-13T10:59:16Z",
+    "log": "docs/task-hub-evidence/batch-01/TH-05/red-01.log"
+  },
+  {
+    "name": "targeted-01",
+    "command": "cmd /c \"set ATI_EVIDENCE_DIR=docs/task-hub-evidence/batch-01/TH-05&& npm run test:integration -w @wap/mcp-task-hub -- tests/tools.integration.test.ts -t TH-05 > docs\\task-hub-evidence\\batch-01\\TH-05\\targeted-01.log 2>&1\"",
+    "exit_code": 1,
+    "started_at": "2026-09-13T11:00:36Z",
+    "finished_at": "2026-09-13T11:00:55Z",
+    "log": "docs/task-hub-evidence/batch-01/TH-05/targeted-01.log"
+  },
+  {
+    "name": "targeted-02",
+    "command": "cmd /c \"set ATI_EVIDENCE_DIR=docs/task-hub-evidence/batch-01/TH-05&& npm run test:integration -w @wap/mcp-task-hub -- tests/tools.integration.test.ts -t TH-05 > docs\\task-hub-evidence\\batch-01\\TH-05\\targeted-02.log 2>&1\"",
+    "exit_code": 0,
+    "started_at": "2026-09-13T11:01:50Z",
+    "finished_at": "2026-09-13T11:02:12Z",
+    "log": "docs/task-hub-evidence/batch-01/TH-05/targeted-02.log"
+  },
+  {
+    "name": "targeted-03",
+    "command": "cmd /c \"set ATI_EVIDENCE_DIR=docs/task-hub-evidence/batch-01/TH-05&& npm run test:integration -w @wap/mcp-task-hub -- tests/tools.integration.test.ts -t TH-05 > docs\\task-hub-evidence\\batch-01\\TH-05\\targeted-03.log 2>&1\"",
+    "exit_code": 0,
+    "started_at": "2026-09-13T11:03:31Z",
+    "finished_at": "2026-09-13T11:03:52Z",
+    "log": "docs/task-hub-evidence/batch-01/TH-05/targeted-03.log"
+  },
+  {
+    "name": "sync-catalog",
+    "command": "node apps/mcp-task-hub/scripts/sync-catalog.mjs",
+    "exit_code": 0,
+    "started_at": "2026-09-13T11:04:01Z",
+    "finished_at": "2026-09-13T11:04:02Z"
+  },
+  {
+    "name": "check-01",
+    "command": "cmd /c \"set ATI_EVIDENCE_DIR=docs/task-hub-evidence/batch-01/TH-05&& npm run check:engine > docs\\task-hub-evidence\\batch-01\\TH-05\\check-01.log 2>&1\"",
+    "exit_code": 0,
+    "started_at": "2026-09-13T11:04:11Z",
+    "finished_at": "2026-09-13T11:06:29Z",
+    "log": "docs/task-hub-evidence/batch-01/TH-05/check-01.log"
+  },
+  {
+    "name": "probe-codex",
+    "command": "node docs/task-hub-evidence/batch-01/review-TH-05-20260913/probe.mjs",
+    "exit_code": 0,
+    "started_at": "2026-09-13T11:06:50Z",
+    "finished_at": "2026-09-13T11:06:55Z",
+    "log": "docs/task-hub-evidence/batch-01/review-TH-05-20260913/probe-1789297615294.json"
+  }
+]

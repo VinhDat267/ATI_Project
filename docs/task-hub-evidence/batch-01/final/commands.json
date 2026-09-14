@@ -1,0 +1,45 @@
+[
+  {
+    "name": "npm-ci",
+    "command": "npm ci --ignore-scripts --no-audit --no-fund",
+    "exit_code": 0,
+    "started_at": "2026-09-13T15:33:32.474Z",
+    "finished_at": "2026-09-13T15:33:41.803Z",
+    "log": "docs/task-hub-evidence/batch-01/final/npm-ci.log"
+  },
+  {
+    "name": "check",
+    "command": "npm run check:engine",
+    "exit_code": 0,
+    "started_at": "2026-09-13T15:33:48.263Z",
+    "finished_at": "2026-09-13T15:36:54.742Z",
+    "log": "docs/task-hub-evidence/batch-01/final/check.log"
+  },
+  {
+    "name": "capture-runtime",
+    "command": "node docs/task-hub-evidence/batch-01/final/capture-runtime.mjs",
+    "exit_code": 1,
+    "started_at": "2026-09-13T15:37:19.674Z",
+    "finished_at": "2026-09-13T15:37:22.178Z",
+    "log": "docs/task-hub-evidence/batch-01/final/capture-runtime.log"
+  },
+  {
+    "name": "capture-runtime-02",
+    "command": "node docs/task-hub-evidence/batch-01/final/capture-runtime.mjs",
+    "exit_code": 0,
+    "started_at": "2026-09-13T15:38:05.626Z",
+    "finished_at": "2026-09-13T15:38:08.342Z",
+    "log": "docs/task-hub-evidence/batch-01/final/capture-runtime-02.log"
+  },
+  {
+    "name": "verify-links",
+    "command": "node docs/task-hub-evidence/batch-01/final/verify-links.mjs",
+    "exit_code": 0,
+    "started_at": null,
+    "finished_at": null,
+    "log": "docs/task-hub-evidence/batch-01/final/link-check.log",
+    "reported_started_at": "2026-09-13T15:48:15.000Z",
+    "reported_finished_at": "2026-09-13T15:48:16.000Z",
+    "timing_provenance": "Added retrospectively by Antigravity; precise timestamps not process-captured. Preserved as reported values, not verified timing. Fresh Codex documentation check is stored in the TH07 review directory."
+  }
+]

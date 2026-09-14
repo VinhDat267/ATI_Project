@@ -1,0 +1,14 @@
+{
+  "mode": "connect-error",
+  "scope": "REVIEW FAULT INJECTION ONLY, no installed source modified",
+  "probe_exit": 1,
+  "probe_verdict": "FAIL",
+  "expected_error": "REVIEW_CONNECT_FAILURE",
+  "observed_error": "REVIEW_CONNECT_FAILURE",
+  "cleanup": {
+    "temp_root_removed": true,
+    "close_error": null,
+    "cleanup_error": null
+  },
+  "status": "PASS"
+}

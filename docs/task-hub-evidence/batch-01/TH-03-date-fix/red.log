@@ -1,0 +1,62 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-03-date-domain
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31m❯[39m tests/tools.integration.test.ts [2m([22m[2m27 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m25 skipped[39m[2m)[22m[33m 3678[2mms[22m[39m
+[31m   [31m×[31m [TH-03-date-domain] schema rejects year 0000 and invalid dates across Zod and JSON Schema validator[33m 1248[2mms[22m[31m[39m
+[31m     → expected true to be false // Object.is equality[39m
+[31m   [31m×[31m [TH-03-date-domain] live MCP list_cards rejects year 0000 with BAD_ARGS and accepts 0001 and 9999[33m 1359[2mms[22m[31m[39m
+[31m     → expected 'INTERNAL_ERROR' to be 'BAD_ARGS' // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-03-date-domain] schema rejects year 0000 and invalid dates across Zod and JSON Schema validator
+[31m[1mAssertionError[22m: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m904:93[22m[39m
+    [90m902| [39m[34mit[39m([32m"[TH-03-date-domain] schema rejects year 0000 and invalid dates acr[39m…
+    [90m903| [39m  [90m// 1. Zod input schema validation[39m
+    [90m904| [39m  [34mexpect[39m(inputs[33m.[39mlist_cards[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m since[33m:[39m [32m"00[39m…
+    [90m   | [39m                                                                                            [31m^[39m
+    [90m905| [39m  [34mexpect[39m(inputs[33m.[39mlist_cards[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m until[33m:[39m [32m"00[39m…
+    [90m906| [39m  [34mexpect[39m(inputs[33m.[39mlist_cards[33m.[39m[34msafeParse[39m({ board_id[33m:[39m [32m"board_a"[39m[33m,[39m since[33m:[39m [32m"00[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-03-date-domain] live MCP list_cards rejects year 0000 with BAD_ARGS and accepts 0001 and 9999
+[31m[1mAssertionError[22m: expected 'INTERNAL_ERROR' to be 'BAD_ARGS' // Object.is equality[39m
+
+Expected: [32m"BAD_ARGS"[39m
+Received: [31m"INTERNAL_ERROR"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m933:32[22m[39m
+    [90m931| [39m  [35mconst[39m sinceZero [33m=[39m [35mawait[39m [34mcall[39m([32m"list_cards"[39m[33m,[39m { board_id[33m:[39m [32m"board_a"[39m[33m,[39m si…
+    [90m932| [39m  [34mexpect[39m(sinceZero[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m933| [39m  [34mexpect[39m([34merrorCode[39m(sinceZero))[33m.[39m[34mtoBe[39m([32m"BAD_ARGS"[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m934| [39m
+    [90m935| [39m  [35mconst[39m untilZero [33m=[39m [35mawait[39m [34mcall[39m([32m"list_cards"[39m[33m,[39m { board_id[33m:[39m [32m"board_a"[39m[33m,[39m un…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[33m25 skipped[39m[90m (27)[39m
+[2m   Start at [22m 17:27:51
+[2m   Duration [22m 9.58s[2m (transform 494ms, setup 0ms, collect 4.66s, tests 3.68s, environment 0ms, prepare 836ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-03-date-domain

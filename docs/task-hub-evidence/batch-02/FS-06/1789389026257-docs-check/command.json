@@ -1,0 +1,13 @@
+{
+  "executable": "node",
+  "args": [
+    "scripts/fs06-docs-check.mjs"
+  ],
+  "started_at": "2026-09-14T12:30:26.258Z",
+  "finished_at": "2026-09-14T12:30:26.671Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-06\\1789389026257-docs-check",
+  "scope": "docs-check"
+}

@@ -1,0 +1,90 @@
+{
+  "recorded_at": "2026-09-14T05:31:12.503Z",
+  "task": "FS-01",
+  "package": "@modelcontextprotocol/server-filesystem",
+  "version": "2026.8.31",
+  "entryPath": "D:/Môn học/ATI/ATI_Project/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+  "nodePath": "C:/Program Files/nodejs/node.exe",
+  "nodeVersion": "v24.19.0",
+  "files_audit": {
+    "total_files": 7,
+    "all_matched_baseline": true,
+    "files": [
+      {
+        "file": "dist/index.js",
+        "sha256": "729dc8511e779e5cd6640851a74b25283e3af1ca3a7106722f993e864a1d9935",
+        "expected_baseline_sha256": "729dc8511e779e5cd6640851a74b25283e3af1ca3a7106722f993e864a1d9935",
+        "matches": true
+      },
+      {
+        "file": "dist/lib.js",
+        "sha256": "e8713c8cfa0c4f49623fc38d61696fb607ec73e1966d51462b470a7717ca7948",
+        "expected_baseline_sha256": "e8713c8cfa0c4f49623fc38d61696fb607ec73e1966d51462b470a7717ca7948",
+        "matches": true
+      },
+      {
+        "file": "dist/path-utils.js",
+        "sha256": "2129214ece0aa7ee51a0e7d615bfdd9266c7284d8d5ecf02aff07d0a2c3dacd1",
+        "expected_baseline_sha256": "2129214ece0aa7ee51a0e7d615bfdd9266c7284d8d5ecf02aff07d0a2c3dacd1",
+        "matches": true
+      },
+      {
+        "file": "dist/path-validation.js",
+        "sha256": "c2d5481e236814c3a4f32c74580f03fb19b25ff7d0b743cf9d51555c9399d9b6",
+        "expected_baseline_sha256": "c2d5481e236814c3a4f32c74580f03fb19b25ff7d0b743cf9d51555c9399d9b6",
+        "matches": true
+      },
+      {
+        "file": "dist/roots-utils.js",
+        "sha256": "4074f48adb2a22d9d07792cbe0d8b8f59c63e499ef7b9722066fbb8d3d4d74b0",
+        "expected_baseline_sha256": "4074f48adb2a22d9d07792cbe0d8b8f59c63e499ef7b9722066fbb8d3d4d74b0",
+        "matches": true
+      },
+      {
+        "file": "package.json",
+        "sha256": "8703cc2371e856cf0609b56a7e9dd79988512649f939ef6dcbfdc206d8b29cf1",
+        "expected_baseline_sha256": "8703cc2371e856cf0609b56a7e9dd79988512649f939ef6dcbfdc206d8b29cf1",
+        "matches": true
+      },
+      {
+        "file": "README.md",
+        "sha256": "df276d57efc04b85fa1e8163fe1aa3d5b11d5b2a7de5ec51ba083e5cb04019cd",
+        "expected_baseline_sha256": "df276d57efc04b85fa1e8163fe1aa3d5b11d5b2a7de5ec51ba083e5cb04019cd",
+        "matches": true
+      }
+    ]
+  },
+  "resolved_dependencies": [
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.30.0",
+      "root": "node_modules/@modelcontextprotocol/sdk"
+    },
+    {
+      "name": "diff",
+      "version": "8.0.4",
+      "root": "node_modules/diff"
+    },
+    {
+      "name": "glob",
+      "version": "13.0.6",
+      "root": "node_modules/glob"
+    },
+    {
+      "name": "minimatch",
+      "version": "10.2.6",
+      "root": "node_modules/minimatch"
+    }
+  ],
+  "raw_schema_hashes": {
+    "read_file": "e228f9d6a4dafd8ff96c934b48f7dac8bf8b2e45b5322c1c68c7cadabaf95b43",
+    "read_text_file": "43b32688d94d454f2fb5f78a5c7eb39c094ae3c83310abb83338924e9cda64dd",
+    "write_file": "89e81fde6ab24c1679be5be6d1ffc47627608e4d54ded0d097926468cff8b76e"
+  },
+  "provenance": {
+    "generated_in_dir": "D:/Môn học/ATI/ATI_Project/docs/task-hub-evidence/batch-02/FS-01/1789363872414-codex-direct-artifact",
+    "probe_source": "D:/Môn học/ATI/ATI_Project/docs/task-hub-evidence/batch-02/FS-01/1789363870921-codex-direct-live-probe/filesystem-candidate-probe.json",
+    "baseline_ref": "docs/antigravity/filesystem-handoff-baseline.json",
+    "generator": "scripts/emit-candidate-artifact.mjs"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "args": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "check:engine"
+  ],
+  "started_at": "2026-09-14T05:01:57.217Z",
+  "finished_at": "2026-09-14T05:02:44.067Z",
+  "exit_code": 1,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-01\\1789362117217-review-check",
+  "scope": "review-check"
+}

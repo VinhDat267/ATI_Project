@@ -1,0 +1,7 @@
+{
+  "command": "npm run check:engine",
+  "evidence_dir": "docs/task-hub-evidence/batch-01/review-TH-03-20260913",
+  "started_at": "2026-09-13T09:31:05.0986904Z",
+  "finished_at": "2026-09-13T09:32:50.4290496Z",
+  "exit_code": 0
+}

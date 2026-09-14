@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-09-13T10:30:23.806Z",
+  "reproduction_hashes": {
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/check.log": "2b5645223d1bd3af55ff2e9c94031bb30aa859c73c34522b4716ab1edca01169",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/command-result.json": "edd17e985aa8bfb36fbd779ba0b4705dda0606e1e98344d480cb30030ad4e7ae",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/controller-observations.json": "e4b3f6cc341b473d94155d26e268e188f53248388882f93352ba70c402b1f1db",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/date-domain-probe.mjs": "de3a7aeffce038a621d49c1e24ca4989a9ea7e00f0b1bfa1281a35e3c3b1a9e3",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/date-domain-results.json": "6066556a7af8344185b8e25c759c1f94e1a00612fc64dc018ae37ca054cf13fe",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/mcp-observations.json": "7d70f34ad203148a495b95a6ca1f130a2965d8dadf3bee1ad248db65c5e4f34f",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/preservation.json": "8c8ac1f501c4965ab13bfdd995a20829a234fb27a7378fb3afcd52388b3a464c",
+    "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/README.md": "c670537b4d824d914438caf5e9157315f4bb796fb30541045eab31afa9e81646"
+  },
+  "unchanged_source_hashes": {
+    "apps/mcp-task-hub/src/cards.ts": "9e0ec56c5862c72b8337cdd3bdf209f9ad9a574ee532f573977707d12f815676",
+    "apps/mcp-task-hub/src/server.ts": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+    "apps/mcp-task-hub/src/service.ts": "e0fc4c13ebc25ca6e918b4ca3f0f44f6a5344927edc0c21b8a0ab70d023037a5",
+    "packages/engine/src/attempts.ts": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+    "packages/engine/src/gateway.ts": "8eccf4ba99a857b10e586792ef75aff8cc70ba46a1326057f5ed3c5c76df1e8a",
+    "packages/engine/tests/controller.integration.test.ts": "0badcf5dc6686a1e8800f6a41a6f5a53d3f7caa30628ffbcff48dbcd2b62f29e",
+    "db/migrations/0004_task_hub_cards.sql": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e",
+    "package-lock.json": "7fdac6fd3a303b2add6f41564bfba86b4d79a2fdb8aa7134b302b3e6a990d05e"
+  }
+}

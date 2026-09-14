@@ -1,0 +1,152 @@
+
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/engine@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/dsl[39m
+
+ [32m✓[39m tests/contracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+ [32m✓[39m tests/policy.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 325[2mms[22m[39m
+ [32m✓[39m tests/fixtures.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 653[2mms[22m[39m
+ [32m✓[39m tests/regressions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 781[2mms[22m[39m
+   [33m[2m✓[22m[39m planner and event boundaries[2m > [22memits JSON Schema with constraints for executable plans [33m752[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m   Start at [22m 17:29:26
+[2m   Duration [22m 1.65s[2m (transform 334ms, setup 0ms, collect 1.57s, tests 1.77s, environment 1ms, prepare 584ms)[22m
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [116.5ms]
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32m✓[39m tests/tools.integration.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 29016[2mms[22m[39m
+   [33m[2m✓[22m[39m discovers exactly the implemented tools with output schemas, then reads an A1 range [33m885[2mms[22m[39m
+   [33m[2m✓[22m[39m denies missing/pending/expired/stale approvals and performs no mutation [33m822[2mms[22m[39m
+   [33m[2m✓[22m[39m prevents another principal from using an approved operation or reading owner data [33m878[2mms[22m[39m
+   [33m[2m✓[22m[39m writes a local message once under concurrent duplicate calls and rejects changed args [33m903[2mms[22m[39m
+   [33m[2m✓[22m[39m appends different operations concurrently without losing rows [33m1591[2mms[22m[39m
+   [33m[2m✓[22m[39m returns no receipt when the requested destination is missing [33m999[2mms[22m[39m
+   [33m[2m✓[22m[39m rolls back appended rows when receipt persistence fails after the mutation [33m866[2mms[22m[39m
+   [33m[2m✓[22m[39m denies an append whose approval expires while waiting for the destination lock [33m2918[2mms[22m[39m
+   [33m[2m✓[22m[39m replays a committed receipt after restarting the MCP process [33m1517[2mms[22m[39m
+   [33m[2m✓[22m[39m moves the b02 hand-plan data through real MCP and verifies resulting rows and message [33m977[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-02] contracts define strict schemas for the five future tools [33m740[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-02] create_card without authorization cannot mutate hub_cards or add receipts [33m729[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R01] seeds and reads get_card, list_cards and list_members over live MCP with zero mutation or receipts [33m927[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R02] list_cards returns empty cards array and count 0 when no cards match filter [33m854[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R03] rejects absent or other owner board and cards with NOT_FOUND [33m916[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R04] rejects list or assignee existing only in another board with NOT_FOUND [33m1017[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R05] rejects invalid dates, since > until, and extra args with BAD_ARGS and no DB mutation [33m778[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R06] filters cards exactly on Asia/Ho_Chi_Minh local day boundaries [33m822[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R07] filters cards exactly on America/New_York DST 23-hour day boundaries [33m824[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R08] rejects malformed or unsupported time zone with BAD_ARGS [33m892[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R09] list_members calculates task_count only for active assigned cards in the same board [33m856[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R10] list_cards and list_members throw LIMIT_EXCEEDED when matching > 1000 items [33m2554[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R11] list_cards tie-breaks on card_id COLLATE C; reads produce zero receipts or messages [33m841[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] maps schema-invalid stored card data to INTERNAL_ERROR and restores table constraints in finally [33m841[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] live discovery exposes exactly the six active tools matching toolDefinitions [33m797[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m799[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] live MCP list_cards rejects year 0000 with BAD_ARGS and accepts 0001 and 9999 [33m845[2mms[22m[39m
+ [32m✓[39m tests/database.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1138[2mms[22m[39m
+   [33m[2m✓[22m[39m applies SQL migrations exactly once and detects checksum drift [33m531[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m34 passed[39m[22m[90m (34)[39m
+[2m   Start at [22m 17:29:37
+[2m   Duration [22m 31.92s[2m (transform 180ms, setup 0ms, collect 1.34s, tests 30.15s, environment 0ms, prepare 141ms)[22m
+
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [32m✓[39m tests/controller.integration.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 49089[2mms[22m[39m
+   [33m[2m✓[22m[39m prepares one immutable approval for both writes without making any mutation [33m1433[2mms[22m[39m
+   [33m[2m✓[22m[39m runs b02 after one approval, preserving previewed source rows and complete trace [33m1776[2mms[22m[39m
+   [33m[2m✓[22m[39m rejects wrong owner, hash, version and duplicate approval decisions [33m2029[2mms[22m[39m
+   [33m[2m✓[22m[39m expires or rejects pending approval without dispatching writes [33m1717[2mms[22m[39m
+   [33m[2m✓[22m[39m denies preview tampering and a forged read label before any write [33m1555[2mms[22m[39m
+   [33m[2m✓[22m[39m completes a read-only plan and skips a false write condition [33m1714[2mms[22m[39m
+   [33m[2m✓[22m[39m rejects reads downstream of writes because a single preview cannot preserve their ordering [33m1262[2mms[22m[39m
+   [33m[2m✓[22m[39m claims an approved run only once under concurrent separate workers [33m2439[2mms[22m[39m
+   [33m[2m✓[22m[39m claims an approved run only once under concurrent shared workers [33m1581[2mms[22m[39m
+   [33m[2m✓[22m[39m stops on a lost write response, then inspects the committed receipt without replaying [33m1420[2mms[22m[39m
+   [33m[2m✓[22m[39m bounds transient read retries and records each attempt before eventually succeeding [33m1354[2mms[22m[39m
+   [33m[2m✓[22m[39m honors cancellation after the current write without dispatching the next write [33m1430[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks changed tool policy after preview and after approval [33m1302[2mms[22m[39m
+   [33m[2m✓[22m[39m rolls back decision and status if durable execute-job insertion fails [33m1333[2mms[22m[39m
+   [33m[2m✓[22m[39m closes the trace if a read completion transaction fails after the MCP reply [33m1193[2mms[22m[39m
+   [33m[2m✓[22m[39m closes the trace if a write completion transaction fails after the MCP reply [33m1676[2mms[22m[39m
+   [33m[2m✓[22m[39m recovers an actual engine process exit after receiver commit without resuming the workflow [33m3159[2mms[22m[39m
+   [33m[2m✓[22m[39m exposes prepare, exact approval, execution and trace through separate CLI processes [33m6518[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps one terminal event when cancel races after a known_failed attempt [33m1507[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps one terminal event when cancel races after a unknown attempt [33m1406[2mms[22m[39m
+   [33m[2m✓[22m[39m records known before-dispatch cancellation without inventing an uncertain write [33m1886[2mms[22m[39m
+   [33m[2m✓[22m[39m reports a conflict when operation and receipt policy drift away from the approved snapshot [33m1853[2mms[22m[39m
+   [33m[2m✓[22m[39m does not append a skipped event when cancel wins after the unlocked preview status read [33m1660[2mms[22m[39m
+   [33m[2m✓[22m[39m fences an old worker after its advisory-lock backend disconnects [33m2828[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m2334[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
+[2m   Start at [22m 17:30:10
+[2m   Duration [22m 50.29s[2m (transform 187ms, setup 0ms, collect 930ms, tests 49.09s, environment 0ms, prepare 75ms)[22m
+

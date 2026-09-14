@@ -1,0 +1,14 @@
+{
+  "apps/mcp-task-hub/src/cards.ts": "9e0ec56c5862c72b8337cdd3bdf209f9ad9a574ee532f573977707d12f815676",
+  "apps/mcp-task-hub/src/contracts.ts": "4ea4d1b11015fca7ea046bea70a10178b7e978f1890364eb3973423d06227e96",
+  "apps/mcp-task-hub/src/server.ts": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+  "apps/mcp-task-hub/src/service.ts": "e0fc4c13ebc25ca6e918b4ca3f0f44f6a5344927edc0c21b8a0ab70d023037a5",
+  "apps/mcp-task-hub/scripts/sync-catalog.mjs": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394",
+  "apps/mcp-task-hub/tests/tools.integration.test.ts": "239c65ecaf0e0cf0802c706402c494607fae3728dafb890c394f93f08cb69b08",
+  "packages/engine/src/gateway.ts": "8eccf4ba99a857b10e586792ef75aff8cc70ba46a1326057f5ed3c5c76df1e8a",
+  "packages/engine/src/attempts.ts": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+  "packages/engine/tests/controller.integration.test.ts": "0badcf5dc6686a1e8800f6a41a6f5a53d3f7caa30628ffbcff48dbcd2b62f29e",
+  "testdata/tools.json": "3d537b1baaa5e66875fb72d98b19b25bdbe6a75070c92fd3a32258caa978deca",
+  "package-lock.json": "7fdac6fd3a303b2add6f41564bfba86b4d79a2fdb8aa7134b302b3e6a990d05e",
+  "db/migrations/0004_task_hub_cards.sql": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e"
+}

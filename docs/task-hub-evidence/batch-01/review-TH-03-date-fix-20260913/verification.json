@@ -1,0 +1,402 @@
+{
+  "status": "PASS",
+  "recorded_at": "2026-09-13T10:31:47.845Z",
+  "case_count": 24,
+  "database": "g1_it_a8ca89c0f97146f4bcee365ad2a9c4dc",
+  "database_dropped": true,
+  "protected_baseline_hashes": 29,
+  "reproduction_preserved": true,
+  "unchanged_source_files": 8,
+  "old_tool_schemas_preserved": 3,
+  "live_schema_equality": 6,
+  "results": [
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "0000-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "0000-12-31"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "0001-01-01"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "9999-12-31"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [],
+        "count": 0
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2024-02-29"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2000-02-29"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "1900-02-29"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2025-02-29"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2026-02-30"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "10000-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "-0001-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2026-13-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "0000-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "0000-12-31"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "0001-01-01"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [],
+        "count": 0
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "9999-12-31"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "2024-02-29"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [],
+        "count": 0
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "2000-02-29"
+      },
+      "expected_valid": true,
+      "zod_accepted": true,
+      "exported_accepted": true,
+      "catalog_accepted": true,
+      "result": {
+        "cards": [],
+        "count": 0
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "1900-02-29"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "2025-02-29"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "2026-02-30"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "10000-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "-0001-01-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "2026-13-01"
+      },
+      "expected_valid": false,
+      "zod_accepted": false,
+      "exported_accepted": false,
+      "catalog_accepted": false,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "until: Invalid calendar date (YYYY-MM-DD, year 0001-9999)"
+      }
+    }
+  ]
+}

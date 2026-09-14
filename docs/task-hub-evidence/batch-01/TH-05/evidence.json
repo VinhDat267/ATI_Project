@@ -1,0 +1,87 @@
+{
+  "th05_actual_evidence": {
+    "card_id": "c1",
+    "board_id": "board_a",
+    "original_timestamp": "2026-09-14 02:00:00+00",
+    "moved_timestamp_done": "2026-09-13 11:10:10.110151+00",
+    "same_target_preserved_timestamp": "2026-09-13 11:10:10.110151+00",
+    "workload_initial": {
+      "m1": 1,
+      "m2": 0
+    },
+    "workload_after_move_done": {
+      "m1": 0,
+      "m2": 0
+    },
+    "workload_after_move_doing": {
+      "m1": 1,
+      "m2": 0
+    },
+    "concurrency_barrier_serialization": {
+      "advisory_key": 197612,
+      "barrier_backend_pid": 13317,
+      "waiting_operation_a": {
+        "pid": 13315,
+        "blocked_by": [
+          13317
+        ]
+      },
+      "waiting_operation_b": {
+        "pid": 13316,
+        "blocked_by": [
+          13315
+        ]
+      },
+      "receipts_generated": 2,
+      "final_state": "Doing",
+      "receipts": [
+        {
+          "operation_id": "2b4911c8-b050-4832-97f4-5b30e371c0e4",
+          "result": {
+            "id": "c1",
+            "list_name": "Doing"
+          }
+        },
+        {
+          "operation_id": "9d5215a1-8c02-4974-ad8c-922a6e7ebbdb",
+          "result": {
+            "id": "c1",
+            "list_name": "Done"
+          }
+        }
+      ]
+    },
+    "receipt_failure_rollback": {
+      "expected_code": "INTERNAL_ERROR",
+      "state_preserved": true,
+      "receipts_created": 0
+    },
+    "lock_expiry": {
+      "expected_code": "NOT_AUTHORIZED",
+      "ttl_seconds": 4,
+      "db_clock_verified_expired_before_unlock": true,
+      "state_preserved": true,
+      "receipts_created": 0
+    },
+    "discovery": {
+      "total_tools": 8,
+      "active_tools": [
+        "append_sheet_rows",
+        "create_card",
+        "get_card",
+        "list_cards",
+        "list_members",
+        "move_card",
+        "read_sheet_range",
+        "send_slack_message"
+      ]
+    }
+  },
+  "provenance": {
+    "receiver_probe": "../review-TH-05-20260913/probe-1789297811651.json",
+    "recorded_at": "2026-09-13T11:10:11.651Z",
+    "approval_controller": "SYNTHETIC_RECEIVER_FIXTURE",
+    "lock_expiry": "check-01.log: TH-05 lock-expiry test passed; no actual expiry PID/timestamps persisted",
+    "correction": "Original report mixed probe PIDs with suite target/key. Corrected from raw probe JSON."
+  }
+}

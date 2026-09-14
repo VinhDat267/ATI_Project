@@ -1,0 +1,28 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-05
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32m✓[39m tests/tools.integration.test.ts [2m([22m[2m56 tests[22m[2m | [22m[33m42 skipped[39m[2m)[22m[33m 18575[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Doing to Done, updating list_name and updated_at, reducing m1 workload to 0 [33m1066[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Done to Doing, restoring m1 workload to 1 [33m886[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when authorization is missing, pending, expired, stale hash, version drift, or wrong owner [33m1005[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] returns NOT_FOUND for missing card, foreign card, missing target list, cross-board list, and other-owner list [33m1004[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] schema validation rejects extra args, empty card_id, empty target_list, and null with BAD_ARGS [33m914[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] same-op replay across restart preserves exact timestamp and produces identical result with 1 mutation and 1 receipt [33m1809[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] concurrent identical move_card calls produce identical output with exactly 1 mutation and 1 receipt [33m942[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt [33m844[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies replay when payload is changed for same operation_id, leaving original data and receipt intact [33m983[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] serializes two distinct operations on same card with different targets, verifying barrier overlap via pg_blocking_pids [33m1169[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when destination card lock causes waiting past approval expiry [33m4849[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] rolls back card update and restores original list_name and updated_at when receipt persistence fails [33m790[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated [33m786[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] live discovery exposes active tools matching toolDefinitions [33m861[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m14 passed[39m[22m[2m | [22m[33m42 skipped[39m[90m (56)[39m
+[2m   Start at [22m 18:03:32
+[2m   Duration [22m 19.71s[2m (transform 177ms, setup 0ms, collect 877ms, tests 18.58s, environment 0ms, prepare 81ms)[22m
+

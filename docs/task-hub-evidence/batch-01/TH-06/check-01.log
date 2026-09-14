@@ -1,0 +1,18 @@
+
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+packages/engine/tests/controller.integration.test.ts(1211,41): error TS18048: 'card' is possibly 'undefined'.
+packages/engine/tests/controller.integration.test.ts(1227,36): error TS18048: 'card' is possibly 'undefined'.
+packages/engine/tests/controller.integration.test.ts(1359,41): error TS18048: 'card' is possibly 'undefined'.
+packages/engine/tests/controller.integration.test.ts(1380,36): error TS18048: 'card' is possibly 'undefined'.
+packages/engine/tests/controller.integration.test.ts(1395,30): error TS7006: Parameter 'r' implicitly has an 'any' type.
+packages/engine/tests/controller.integration.test.ts(1480,30): error TS7006: Parameter 'r' implicitly has an 'any' type.

@@ -1,0 +1,150 @@
+
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/engine@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/dsl
+
+ ✓ tests/contracts.test.ts (2 tests) 14ms
+ ✓ tests/policy.test.ts (9 tests) 317ms
+ ✓ tests/regressions.test.ts (15 tests) 560ms
+   ✓ planner and event boundaries > emits JSON Schema with constraints for executable plans 528ms
+ ✓ tests/fixtures.test.ts (13 tests) 682ms
+
+ Test Files  4 passed (4)
+      Tests  39 passed (39)
+   Start at  16:31:21
+   Duration  1.71s (transform 515ms, setup 0ms, collect 1.76s, tests 1.57s, environment 1ms, prepare 965ms)
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [121.7ms]
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/apps/mcp-task-hub
+
+ ✓ tests/tools.integration.test.ts (25 tests) 28170ms
+   ✓ discovers exactly the implemented tools with output schemas, then reads an A1 range 1007ms
+   ✓ denies missing/pending/expired/stale approvals and performs no mutation 1001ms
+   ✓ prevents another principal from using an approved operation or reading owner data 861ms
+   ✓ writes a local message once under concurrent duplicate calls and rejects changed args 900ms
+   ✓ appends different operations concurrently without losing rows 1694ms
+   ✓ returns no receipt when the requested destination is missing 838ms
+   ✓ rolls back appended rows when receipt persistence fails after the mutation 836ms
+   ✓ denies an append whose approval expires while waiting for the destination lock 3010ms
+   ✓ replays a committed receipt after restarting the MCP process 1841ms
+   ✓ moves the b02 hand-plan data through real MCP and verifies resulting rows and message 917ms
+   ✓ [TH-02] contracts define strict schemas for the five future tools 837ms
+   ✓ [TH-02] create_card without authorization cannot mutate hub_cards or add receipts 792ms
+   ✓ [TH-03] [R01] seeds and reads get_card, list_cards and list_members over live MCP with zero mutation or receipts 886ms
+   ✓ [TH-03] [R02] list_cards returns empty cards array and count 0 when no cards match filter 910ms
+   ✓ [TH-03] [R03] rejects absent or other owner board and cards with NOT_FOUND 962ms
+   ✓ [TH-03] [R04] rejects list or assignee existing only in another board with NOT_FOUND 1012ms
+   ✓ [TH-03] [R05] rejects invalid dates, since > until, and extra args with BAD_ARGS and no DB mutation 758ms
+   ✓ [TH-03] [R06] filters cards exactly on Asia/Ho_Chi_Minh local day boundaries 932ms
+   ✓ [TH-03] [R07] filters cards exactly on America/New_York DST 23-hour day boundaries 947ms
+   ✓ [TH-03] [R08] rejects malformed or unsupported time zone with BAD_ARGS 842ms
+   ✓ [TH-03] [R09] list_members calculates task_count only for active assigned cards in the same board 926ms
+   ✓ [TH-03] [R10] list_cards and list_members throw LIMIT_EXCEEDED when matching > 1000 items 2099ms
+   ✓ [TH-03] [R11] list_cards tie-breaks on card_id COLLATE C; reads produce zero receipts or messages 932ms
+   ✓ [TH-03] maps schema-invalid stored card data to INTERNAL_ERROR and restores table constraints in finally 882ms
+   ✓ [TH-03] live discovery exposes exactly the six active tools matching toolDefinitions 786ms
+ ✓ tests/database.integration.test.ts (7 tests) 1146ms
+   ✓ applies SQL migrations exactly once and detects checksum drift 518ms
+
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+   Start at  16:31:27
+   Duration  31.23s (transform 198ms, setup 0ms, collect 1.43s, tests 29.32s, environment 0ms, prepare 161ms)
+
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/engine
+
+ ✓ tests/controller.integration.test.ts (25 tests) 49104ms
+   ✓ prepares one immutable approval for both writes without making any mutation 1486ms
+   ✓ runs b02 after one approval, preserving previewed source rows and complete trace 1956ms
+   ✓ rejects wrong owner, hash, version and duplicate approval decisions 2125ms
+   ✓ expires or rejects pending approval without dispatching writes 1570ms
+   ✓ denies preview tampering and a forged read label before any write 1367ms
+   ✓ completes a read-only plan and skips a false write condition 1448ms
+   ✓ rejects reads downstream of writes because a single preview cannot preserve their ordering 1072ms
+   ✓ claims an approved run only once under concurrent separate workers 2522ms
+   ✓ claims an approved run only once under concurrent shared workers 1709ms
+   ✓ stops on a lost write response, then inspects the committed receipt without replaying 1521ms
+   ✓ bounds transient read retries and records each attempt before eventually succeeding 1390ms
+   ✓ honors cancellation after the current write without dispatching the next write 1547ms
+   ✓ blocks changed tool policy after preview and after approval 1478ms
+   ✓ rolls back decision and status if durable execute-job insertion fails 1492ms
+   ✓ closes the trace if a read completion transaction fails after the MCP reply 1316ms
+   ✓ closes the trace if a write completion transaction fails after the MCP reply 1596ms
+   ✓ recovers an actual engine process exit after receiver commit without resuming the workflow 3387ms
+   ✓ exposes prepare, exact approval, execution and trace through separate CLI processes 6869ms
+   ✓ keeps one terminal event when cancel races after a known_failed attempt 1723ms
+   ✓ keeps one terminal event when cancel races after a unknown attempt 1745ms
+   ✓ records known before-dispatch cancellation without inventing an uncertain write 1452ms
+   ✓ reports a conflict when operation and receipt policy drift away from the approved snapshot 1624ms
+   ✓ does not append a skipped event when cancel wins after the unlocked preview status read 1275ms
+   ✓ fences an old worker after its advisory-lock backend disconnects 2718ms
+   ✓ [TH-03] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata 2068ms
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  16:31:59
+   Duration  50.52s (transform 235ms, setup 0ms, collect 1.12s, tests 49.10s, environment 0ms, prepare 111ms)
+

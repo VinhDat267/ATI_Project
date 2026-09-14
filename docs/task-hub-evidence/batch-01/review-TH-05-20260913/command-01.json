@@ -1,0 +1,6 @@
+{
+  "command": "node docs/task-hub-evidence/batch-01/review-TH-05-20260913/probe.mjs",
+  "finished_at": "2026-09-13T11:10:11.6861091Z",
+  "started_at": "2026-09-13T11:10:07.3833884Z",
+  "exit_code": 0
+}

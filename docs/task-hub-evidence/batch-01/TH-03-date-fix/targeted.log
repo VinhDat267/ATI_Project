@@ -1,0 +1,29 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-03
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32m✓[39m tests/tools.integration.test.ts [2m([22m[2m27 tests[22m[2m | [22m[33m12 skipped[39m[2m)[22m[33m 18829[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R01] seeds and reads get_card, list_cards and list_members over live MCP with zero mutation or receipts [33m1176[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R02] list_cards returns empty cards array and count 0 when no cards match filter [33m1167[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R03] rejects absent or other owner board and cards with NOT_FOUND [33m1242[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R04] rejects list or assignee existing only in another board with NOT_FOUND [33m1379[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R05] rejects invalid dates, since > until, and extra args with BAD_ARGS and no DB mutation [33m1005[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R06] filters cards exactly on Asia/Ho_Chi_Minh local day boundaries [33m1131[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R07] filters cards exactly on America/New_York DST 23-hour day boundaries [33m1190[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R08] rejects malformed or unsupported time zone with BAD_ARGS [33m1038[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R09] list_members calculates task_count only for active assigned cards in the same board [33m1023[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R10] list_cards and list_members throw LIMIT_EXCEEDED when matching > 1000 items [33m2482[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [R11] list_cards tie-breaks on card_id COLLATE C; reads produce zero receipts or messages [33m1068[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] maps schema-invalid stored card data to INTERNAL_ERROR and restores table constraints in finally [33m1152[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] live discovery exposes exactly the six active tools matching toolDefinitions [33m905[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m1022[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03-date-domain] live MCP list_cards rejects year 0000 with BAD_ARGS and accepts 0001 and 9999 [33m1109[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m15 passed[39m[22m[2m | [22m[33m12 skipped[39m[90m (27)[39m
+[2m   Start at [22m 17:28:28
+[2m   Duration [22m 20.25s[2m (transform 185ms, setup 0ms, collect 1.10s, tests 18.83s, environment 0ms, prepare 122ms)[22m
+

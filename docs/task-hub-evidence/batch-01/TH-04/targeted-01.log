@@ -1,0 +1,75 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-04
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31m❯[39m tests/tools.integration.test.ts [2m([22m[2m41 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m27 skipped[39m[2m)[22m[33m 15901[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with all optional fields, verifies DB storage and receipt [33m965[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with omitted optional fields, storing empty description and nulls [33m902[2mms[22m[39m
+[31m   [31m×[31m [TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt[33m 902[2mms[22m[31m[39m
+[31m     → null value in column "password_hash" of relation "users" violates not-null constraint[39m
+[31m   [31m×[31m [TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift[33m 850[2mms[22m[31m[39m
+[31m     → null value in column "password_hash" of relation "users" violates not-null constraint[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card with BAD_ARGS on extra args, whitespace title, length violations [33m908[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] create_card due_date schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m850[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] live MCP create_card rejects year 0000 and invalid dates with BAD_ARGS, accepts 0001 and 9999 [33m911[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] concurrent same-operation replay produces identical ID and exactly 1 card + 1 receipt [33m1149[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] replay survives MCP process restart, returning original card ID with zero extra card [33m1575[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] same operation with changed payload is denied and leaves original state intact [33m808[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] distinct operations with same title create two distinct cards with two receipts [33m898[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rolls back card insert when receipt persistence fails after mutation [33m803[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] denies create_card when destination list lock causes waiting past approval expiry [33m2926[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] live discovery exposes exactly the seven active tools matching toolDefinitions [33m783[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt
+[31m[1mPostgresError[22m: null value in column "password_hash" of relation "users" violates not-null constraint[39m
+[90m [2m❯[22m ErrorResponse ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m815:30[22m[39m
+[90m [2m❯[22m handle ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m489:6[22m[39m
+[90m [2m❯[22m Socket.data ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m324:9[22m[39m
+[90m [2m❯[22m cachedError ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/query.js:[2m170:23[22m[39m
+[90m [2m❯[22m new Query ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/query.js:[2m36:24[22m[39m
+[90m [2m❯[22m sql ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/index.js:[2m112:11[22m[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1007:9[22m[39m
+    [90m1005| [39m  [90m// 2. Board belonging only to another user[39m
+    [90m1006| [39m  [35mconst[39m otherUser [33m=[39m [34mrandomUUID[39m()[33m;[39m
+    [90m1007| [39m  [35mawait[39m raw[32m`INSERT INTO users(id, email) VALUES ([39m[36m${[39motherUser[36m}[39m[32m, [39m[36m${[39m[32m'othe[39m…
+    [90m   | [39m        [31m^[39m
+    [90m1008| [39m  [35mawait[39m raw[32m`INSERT INTO hub_boards(user_id, board_id, name) VALUES ([39m[36m${[39m…
+    [90m1009| [39m  [35mawait[39m raw[32m`INSERT INTO hub_lists(user_id, board_id, list_name) VALUES[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift
+[31m[1mPostgresError[22m: null value in column "password_hash" of relation "users" violates not-null constraint[39m
+[90m [2m❯[22m ErrorResponse ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m815:30[22m[39m
+[90m [2m❯[22m handle ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m489:6[22m[39m
+[90m [2m❯[22m Socket.data ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/connection.js:[2m324:9[22m[39m
+[90m [2m❯[22m cachedError ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/query.js:[2m170:23[22m[39m
+[90m [2m❯[22m new Query ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/query.js:[2m36:24[22m[39m
+[90m [2m❯[22m sql ../../../../../M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/node_modules/postgres/src/index.js:[2m112:11[22m[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1088:9[22m[39m
+    [90m1086| [39m  [90m// 6. Wrong owner (approval belongs to another user)[39m
+    [90m1087| [39m  [35mconst[39m otherUser [33m=[39m [34mrandomUUID[39m()[33m;[39m
+    [90m1088| [39m  [35mawait[39m raw[32m`INSERT INTO users(id, email) VALUES ([39m[36m${[39motherUser[36m}[39m[32m, [39m[36m${[39m[32m'othe[39m…
+    [90m   | [39m        [31m^[39m
+    [90m1089| [39m  [35mconst[39m otherAuth [33m=[39m [35mawait[39m [34mgrant[39m([32m"create_card"[39m[33m,[39m args[33m,[39m { userId[33m:[39m otherUs…
+    [90m1090| [39m  [35mconst[39m res6 [33m=[39m [35mawait[39m [34mcall[39m([32m"create_card"[39m[33m,[39m args[33m,[39m otherAuth)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[2m | [22m[33m27 skipped[39m[90m (41)[39m
+[2m   Start at [22m 17:42:49
+[2m   Duration [22m 17.03s[2m (transform 163ms, setup 0ms, collect 882ms, tests 15.90s, environment 0ms, prepare 82ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-04

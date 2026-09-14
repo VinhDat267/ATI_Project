@@ -1,0 +1,47 @@
+{
+  "recorded_at": "2026-09-14T05:06:17.601Z",
+  "verdict": "REQUEST_CHANGES",
+  "files_sha256": {
+    "packages/engine/src/filesystem-paths.ts": "f83a18641aa96466795c6a8c7e71726bfd759e14bd63951dda1ba27ff5000c11",
+    "packages/engine/src/launch-policy.ts": "a20e133cfb0b4ad5b198a27ee94b19ff502461ec6bd696dde6e7b601969c2b6e",
+    "packages/engine/tests/filesystem-paths.test.ts": "706f7ebb22323a60469c120b870601009206be830ffcb223daf781403ec2b76d",
+    "packages/engine/vitest.unit.config.ts": "7bd4d2151113223d75d0a6d3369ae014816758aef38d21d254f7a964e51e3afe",
+    "packages/engine/package.json": "20f10d4474b49c4ebc914e09b3637968af4129fd4e68f888b7eb247b5bdd957f",
+    "scripts/check-engine.mjs": "57fd4cf668eca625d3559c52292607f3059e62ffb57c98719e1a03aa4d75b078",
+    "scripts/capture-command.mjs": "2a20a48609d230146dde889679e22397f33bc374c590cb68f7170a69e3372a22",
+    "scripts/probe-filesystem-candidate.mjs": "ffc7c67c61f3bd8f5e36ca761b06ad494dfdcfbdfd496d24f9ce46248833ef25",
+    "package-lock.json": "a3ece75957e5129cf6ccbe52a0ea743ee923aefa1e04cf13517cd908a202085f",
+    "tsconfig.json": "0981304864280d8534aa185bdca43ea2d8c2ec8ae4a211e83d2de33cee8f202e",
+    "docs/task-hub-evidence/batch-02/FS-01/FS-01.md": "ca4d6bbab8424cd953eacd70733fae6f8bf674a22d74e2af9a361248325f8a02",
+    "docs/task-hub-evidence/batch-02/review-FS-01-20260914/README.md": "dd47a0fd4267b95e6953d084be9baa60612c3f7f1e971d5f4ce8900f74e4bb1c",
+    "docs/task-hub-evidence/batch-02/review-FS-01-20260914/reproduce.mjs": "ff8c6f00d7d604ef9c1b1254abbdccb82e448d5966c7c4e5de3431cfc54c1599",
+    "docs/task-hub-evidence/batch-02/review-FS-01-20260914/reproduction.json": "e51093262d77fbba13465a4ee0e56d09b52b6b7e3502c5f7dced11efab897ce2"
+  },
+  "resolved_versions": {
+    "@modelcontextprotocol/server-filesystem": "2026.8.31",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "diff": "8.0.4",
+    "glob": "13.0.6",
+    "minimatch": "10.2.6",
+    "brace-expansion": "5.0.9",
+    "brace-expansion/node_modules/balanced-match": "4.0.4",
+    "minipass": "7.1.3",
+    "path-scurry": "2.0.2",
+    "lru-cache": "11.5.2"
+  },
+  "preservation": {
+    "protected_sha256": {
+      "count": 180,
+      "mismatches": []
+    },
+    "source_sha256": {
+      "count": 56,
+      "mismatches": [
+        "package-lock.json",
+        "packages/engine/package.json",
+        "scripts/check-engine.mjs",
+        "tsconfig.json"
+      ]
+    }
+  }
+}

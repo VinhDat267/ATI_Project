@@ -1,0 +1,9 @@
+file:///D:/M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/docs/task-hub-evidence/batch-01/final/capture-runtime.mjs:67
+    throw new Error('get_card output does not match seeded card c1');
+          ^
+
+Error: get_card output does not match seeded card c1
+    at file:///D:/M%C3%B4n%20h%E1%BB%8Dc/ATI/ATI_Project/docs/task-hub-evidence/batch-01/final/capture-runtime.mjs:67:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.19.0

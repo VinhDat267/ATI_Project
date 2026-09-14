@@ -1,0 +1,117 @@
+
+> check:engine
+> node scripts/check-engine.mjs
+
+
+> check
+> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate
+
+
+> typecheck
+> tsc -p tsconfig.json
+
+
+> build
+> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine
+
+
+> @wap/dsl@0.1.0 build
+> tsc
+
+
+> @wap/db@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/mcp-task-hub@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @wap/engine@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> test
+> npm run test -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/dsl
+
+ ✓ tests/contracts.test.ts (2 tests) 12ms
+ ✓ tests/policy.test.ts (9 tests) 282ms
+ ✓ tests/fixtures.test.ts (13 tests) 678ms
+ ✓ tests/regressions.test.ts (15 tests) 832ms
+   ✓ planner and event boundaries > emits JSON Schema with constraints for executable plans 808ms
+
+ Test Files  4 passed (4)
+      Tests  39 passed (39)
+   Start at  12:02:21
+   Duration  4.68s (transform 3.16s, setup 0ms, collect 10.55s, tests 1.80s, environment 1ms, prepare 2.75s)
+
+
+> schema:json
+> npm run schema:json -w @wap/dsl
+
+
+> @wap/dsl@0.1.0 schema:json
+> tsx scripts/emit-json-schema.ts
+
+Đã sinh JSON Schema vào generated/
+
+> api:generate
+> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts
+
+Generated docs/openapi.yaml
+✨ openapi-typescript 7.13.0
+🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [164.7ms]
+
+> @wap/engine@0.1.0 test:unit
+> vitest run --config vitest.unit.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/engine
+
+ ✓ tests/filesystem-paths.test.ts (42 tests) 286ms
+
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+   Start at  12:02:37
+   Duration  632ms (transform 69ms, setup 0ms, collect 83ms, tests 286ms, environment 0ms, prepare 92ms)
+
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/apps/mcp-task-hub
+
+ ❯ tests/tools.integration.test.ts (56 tests | 56 skipped)
+ ❯ tests/tools.integration.test.ts (56 tests | 56 skipped) 42ms
+ ❯ tests/database.integration.test.ts (7 tests | 7 skipped)
+ ❯ tests/database.integration.test.ts (7 tests | 7 skipped) 45ms
+
+ Test Files  2 failed (2)
+      Tests  63 skipped (63)
+   Start at  12:02:39
+   Duration  4.87s (transform 238ms, setup 0ms, collect 4.26s, tests 88ms, environment 0ms, prepare 178ms)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/database.integration.test.ts [ tests/database.integration.test.ts ]
+ FAIL  tests/database.integration.test.ts [ tests/database.integration.test.ts ]
+ FAIL  tests/tools.integration.test.ts [ tests/tools.integration.test.ts ]
+ FAIL  tests/tools.integration.test.ts [ tests/tools.integration.test.ts ]
+Error: connect ECONNREFUSED 127.0.0.1:55432
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts

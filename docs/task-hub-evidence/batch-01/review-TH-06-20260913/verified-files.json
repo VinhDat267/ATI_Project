@@ -1,0 +1,153 @@
+{
+  "verified_at": "2026-09-13T15:19:31.429Z",
+  "protected_count": 126,
+  "protected_mismatches": [],
+  "sources": [
+    {
+      "path": "apps/mcp-task-hub/src/cards.ts",
+      "sha256": "51eb4a26019e194bd4c1dbb44e96f32bb420b06e2fe7ce7069fb397d8648417c",
+      "sha256_before": "51eb4a26019e194bd4c1dbb44e96f32bb420b06e2fe7ce7069fb397d8648417c",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/src/contracts.ts",
+      "sha256": "741bf82797c5b72e63fdf57309050d2720f0e84cdb04447469f09be1c5d9b66c",
+      "sha256_before": "741bf82797c5b72e63fdf57309050d2720f0e84cdb04447469f09be1c5d9b66c",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/src/service.ts",
+      "sha256": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a",
+      "sha256_before": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/src/server.ts",
+      "sha256": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+      "sha256_before": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/tests/tools.integration.test.ts",
+      "sha256": "6fd0bc2ee80cf68bf2c42f4ae989c294798662a55407d24a0bc4debd8f36310b",
+      "sha256_before": "6fd0bc2ee80cf68bf2c42f4ae989c294798662a55407d24a0bc4debd8f36310b",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/scripts/sync-catalog.mjs",
+      "sha256": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394",
+      "sha256_before": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/gateway.ts",
+      "sha256": "3c9d9432951f346e93dc8f3732697fdb8f183bf8d44f88addec1c00d7130837c",
+      "sha256_before": "3c9d9432951f346e93dc8f3732697fdb8f183bf8d44f88addec1c00d7130837c",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/attempts.ts",
+      "sha256": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+      "sha256_before": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/tests/controller.integration.test.ts",
+      "sha256": "6fc9f27007a5e657c8dce89277cf79f37736a99ef07da7d2de043d61e0a9ead6",
+      "sha256_before": "0badcf5dc6686a1e8800f6a41a6f5a53d3f7caa30628ffbcff48dbcd2b62f29e",
+      "changed": true
+    },
+    {
+      "path": "packages/engine/src/approval.ts",
+      "sha256": "8f4d52c58836dab5c030edabb2a9e047d881a05fae0a07553854a64a68697962",
+      "sha256_before": "8f4d52c58836dab5c030edabb2a9e047d881a05fae0a07553854a64a68697962",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/cli.ts",
+      "sha256": "f45b6c876c9c97e87332ef498e41771a1cc2de9d956ec348a21968adda9bc71b",
+      "sha256_before": "f45b6c876c9c97e87332ef498e41771a1cc2de9d956ec348a21968adda9bc71b",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/engine.ts",
+      "sha256": "1f8ddbcff4816585e1ef440fffb4b5ad105a3d1b4c0fa70c9eaaee5b201d6d98",
+      "sha256_before": "1f8ddbcff4816585e1ef440fffb4b5ad105a3d1b4c0fa70c9eaaee5b201d6d98",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/execute.ts",
+      "sha256": "aeb2ebbbcf2ce2d434f64b6c868556409811b14f67a3393e17428caebba822e9",
+      "sha256_before": "aeb2ebbbcf2ce2d434f64b6c868556409811b14f67a3393e17428caebba822e9",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/index.ts",
+      "sha256": "5a111caac065d243899296b57dcb9c71e041d0f7d5a42215feeed2ad12f8d31e",
+      "sha256_before": "5a111caac065d243899296b57dcb9c71e041d0f7d5a42215feeed2ad12f8d31e",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/prepare.ts",
+      "sha256": "81ba6ce2e619cf44dab4cf445c0d6436f77eedbb5381e1d89c0931e57ea7db84",
+      "sha256_before": "81ba6ce2e619cf44dab4cf445c0d6436f77eedbb5381e1d89c0931e57ea7db84",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/recovery.ts",
+      "sha256": "b2d3a657c9bf8f3c78fd9deb13928479ad7a669d1d0958df57cb4a780e2e5054",
+      "sha256_before": "b2d3a657c9bf8f3c78fd9deb13928479ad7a669d1d0958df57cb4a780e2e5054",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/snapshot.ts",
+      "sha256": "eecaa29be0f19ca5eca41d6438c66c137a945194149c57bc8b383289c2cdadda",
+      "sha256_before": "eecaa29be0f19ca5eca41d6438c66c137a945194149c57bc8b383289c2cdadda",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/store.ts",
+      "sha256": "b8f354b66618597ac2d848d27b1d88012b53389b3976b38ff594978882895ea0",
+      "sha256_before": "b8f354b66618597ac2d848d27b1d88012b53389b3976b38ff594978882895ea0",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/tests/crash-worker.mjs",
+      "sha256": "598058e9e9faa9f2a71e1d5b368d955b75b9e337277f1a588eeb05ae879d719b",
+      "sha256_before": "598058e9e9faa9f2a71e1d5b368d955b75b9e337277f1a588eeb05ae879d719b",
+      "changed": false
+    },
+    {
+      "path": "testdata/test-cases.json",
+      "sha256": "8e506e984399799a0f0b31e43a655b2bfcd9f85beed74aee035d96625df91b25",
+      "sha256_before": "8e506e984399799a0f0b31e43a655b2bfcd9f85beed74aee035d96625df91b25",
+      "changed": false
+    },
+    {
+      "path": "testdata/tools.json",
+      "sha256": "17ec827f6cb4cb273bdfb931efa4b9e88309f73871963039986bb25c71f25c27",
+      "sha256_before": "17ec827f6cb4cb273bdfb931efa4b9e88309f73871963039986bb25c71f25c27",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/tests/task-hub-plans.ts",
+      "sha256": "5975e29ff80e08d65a02d4644630a49f99cc074b55a1b05158ecd59152c6b069",
+      "sha256_before": null,
+      "changed": true
+    },
+    {
+      "path": "testdata/dev-hand-plans/th-move.json",
+      "sha256": "484286b5854c6ec61c29cf88ce12d1f689cd930b714a941efb13188d8498bed8",
+      "sha256_before": null,
+      "changed": true
+    }
+  ],
+  "final_gate": "docs/task-hub-evidence/batch-01/TH-06/check-03.log",
+  "post_probe_test_only_delta": [
+    {
+      "path": "packages/engine/tests/controller.integration.test.ts",
+      "hash_at_probe": "8ac4b9f9d96a0d9b8b1543f1e0933c29cb3f909e736cd52e52051e4f1b3ebdac",
+      "hash_final": "6fc9f27007a5e657c8dce89277cf79f37736a99ef07da7d2de043d61e0a9ead6"
+    }
+  ]
+}

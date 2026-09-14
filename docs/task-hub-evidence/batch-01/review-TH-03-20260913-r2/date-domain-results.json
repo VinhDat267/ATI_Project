@@ -1,0 +1,123 @@
+{
+  "recorded_at": "2026-09-13T10:20:09.588Z",
+  "status": "REPRODUCED",
+  "description": "Year zero passes the input schema but PostgreSQL date casts fail and MCP reports INTERNAL_ERROR",
+  "database": "g1_it_f20df7f25a074016ae1cc3c59dbe1b67",
+  "database_dropped": true,
+  "results": [
+    {
+      "args": {
+        "board_id": "board_a"
+      },
+      "schemaAccepted": true,
+      "isError": false,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "0001-01-01"
+      },
+      "schemaAccepted": true,
+      "isError": false,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "0000-01-01"
+      },
+      "schemaAccepted": true,
+      "isError": true,
+      "result": {
+        "code": "INTERNAL_ERROR",
+        "message": "Local tool failed; inspect the server error code"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "0000-12-31"
+      },
+      "schemaAccepted": true,
+      "isError": true,
+      "result": {
+        "code": "INTERNAL_ERROR",
+        "message": "Local tool failed; inspect the server error code"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "since": "2026-02-30"
+      },
+      "schemaAccepted": false,
+      "isError": true,
+      "result": {
+        "code": "BAD_ARGS",
+        "message": "since: Invalid ISO date"
+      }
+    },
+    {
+      "args": {
+        "board_id": "board_a",
+        "until": "9999-12-31"
+      },
+      "schemaAccepted": true,
+      "isError": false,
+      "result": {
+        "cards": [
+          {
+            "id": "c1",
+            "board_id": "board_a",
+            "title": "Viết API",
+            "list_name": "Doing"
+          },
+          {
+            "id": "c2",
+            "board_id": "board_a",
+            "title": "Kiểm thử",
+            "list_name": "Done"
+          }
+        ],
+        "count": 2
+      }
+    }
+  ],
+  "pgDateError": {
+    "code": "22008",
+    "message": "date/time field value out of range: \"0000-01-01T00:00:00.000Z\""
+  }
+}

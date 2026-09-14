@@ -1,0 +1,54 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-05
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31m❯[39m tests/tools.integration.test.ts [2m([22m[2m56 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m42 skipped[39m[2m)[22m[33m 16180[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Doing to Done, updating list_name and updated_at, reducing m1 workload to 0 [33m1072[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] moves card from Done to Doing, restoring m1 workload to 1 [33m863[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when authorization is missing, pending, expired, stale hash, version drift, or wrong owner [33m932[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] returns NOT_FOUND for missing card, foreign card, missing target list, cross-board list, and other-owner list [33m1045[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] schema validation rejects extra args, empty card_id, empty target_list, and null with BAD_ARGS [33m835[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] same-op replay across restart preserves exact timestamp and produces identical result with 1 mutation and 1 receipt [33m1928[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] concurrent identical move_card calls produce identical output with exactly 1 mutation and 1 receipt [33m904[2mms[22m[39m
+[31m   [31m×[31m [TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt[33m 825[2mms[22m[31m[39m
+[31m     → expected 'Doing' to be 'Backlog' // Object.is equality[39m
+   [33m[2m✓[22m[39m [TH-05] denies replay when payload is changed for same operation_id, leaving original data and receipt intact [33m864[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] serializes two distinct operations on same card with different targets, verifying barrier overlap via pg_blocking_pids [33m1132[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] denies move_card when destination card lock causes waiting past approval expiry [33m1861[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] rolls back card update and restores original list_name and updated_at when receipt persistence fails [33m1248[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated [33m987[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-05] live discovery exposes active tools matching toolDefinitions [33m960[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt
+[31m[1mAssertionError[22m: expected 'Doing' to be 'Backlog' // Object.is equality[39m
+
+Expected: [32m"[7mBacklo[27mg"[39m
+Received: [31m"[7mDoin[27mg"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1788:33[22m[39m
+    [90m1786| [39m    SELECT list_name, updated_at::text FROM hub_cards WHERE user_id=[39m[36m${[0m…
+    [90m1787| [39m  `[39m[33m;[39m
+    [90m1788| [39m  [34mexpect[39m(beforeCard[33m![39m[33m.[39mlist_name)[33m.[39m[34mtoBe[39m([32m"Backlog"[39m)[33m;[39m
+    [90m   | [39m                                [31m^[39m
+    [90m1789| [39m  [35mconst[39m timestampBefore [33m=[39m beforeCard[33m![39m[33m.[39mupdated_at[33m;[39m
+    [90m1790| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m13 passed[39m[22m[2m | [22m[33m42 skipped[39m[90m (56)[39m
+[2m   Start at [22m 18:00:37
+[2m   Duration [22m 17.36s[2m (transform 176ms, setup 0ms, collect 897ms, tests 16.18s, environment 0ms, prepare 95ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-05

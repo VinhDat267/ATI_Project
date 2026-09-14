@@ -1,0 +1,29 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [31m❯[39m tests/controller.integration.test.ts [2m([22m[2m37 tests[22m[2m | [22m[33m37 skipped[39m[2m)[22m
+ [31m❯[39m tests/controller.integration.test.ts [2m([22m[2m37 tests[22m[2m | [22m[33m37 skipped[39m[2m)[22m[90m 43[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Suites 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m [ tests/controller.integration.test.ts ][22m
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m [ tests/controller.integration.test.ts ][22m
+[31m[1mError[22m: connect ECONNREFUSED 127.0.0.1:55432[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [33m37 skipped[39m[90m (37)[39m
+[2m   Start at [22m 20:36:43
+[2m   Duration [22m 1.61s[2m (transform 254ms, setup 0ms, collect 1.29s, tests 43ms, environment 0ms, prepare 110ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\packages\engine
+npm error workspace @wap/engine@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\packages\engine
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06

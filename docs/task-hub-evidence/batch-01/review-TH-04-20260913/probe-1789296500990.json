@@ -1,0 +1,92 @@
+{
+  "status": "PASS",
+  "recorded_at": "2026-09-13T10:48:20.990Z",
+  "database": "g1_it_f45d5c54d0394114a343bb430aee3d35",
+  "database_dropped": true,
+  "approval_controller": "SYNTHETIC_RECEIVER_FIXTURE",
+  "protected_hashes": 91,
+  "results": [
+    {
+      "name": "Seven live tools match built/catalog; old three schemas preserved",
+      "evidence": [
+        "read_sheet_range",
+        "append_sheet_rows",
+        "send_slack_message",
+        "list_cards",
+        "get_card",
+        "list_members",
+        "create_card"
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "Missing approval leaves no mutation",
+      "evidence": "NOT_AUTHORIZED",
+      "status": "PASS"
+    },
+    {
+      "name": "Due-date domain agrees with reviewed schema and rejects invalid dates without writes",
+      "evidence": {
+        "valid": 4,
+        "invalid": 5
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "Concurrent same-operation create and replay across restart produce one exact card/receipt",
+      "evidence": {
+        "id": "e316a9b6-acea-494d-8b87-25ed413c2763",
+        "stored": {
+          "board_id": "board_a",
+          "list_name": "Backlog",
+          "title": "Independent TH04",
+          "description": "Preserve exact text",
+          "due_date": "0001-01-01",
+          "assignee_id": "m2"
+        },
+        "counts": {
+          "cards": 3,
+          "receipts": 1
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "Changed payload cannot reuse receipt",
+      "evidence": "NOT_AUTHORIZED",
+      "status": "PASS"
+    },
+    {
+      "name": "Same payload with a distinct operation is a distinct intent",
+      "evidence": {
+        "first": "e316a9b6-acea-494d-8b87-25ed413c2763",
+        "second": "3a3b6c94-5de0-4a35-be51-9acd815573b3"
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "Omitted args retain valid approval and map to storage defaults",
+      "evidence": {
+        "description": "",
+        "due_date": null,
+        "assignee_id": null
+      },
+      "status": "PASS"
+    },
+    {
+      "name": "Upper date boundary round-trips through PostgreSQL",
+      "evidence": "9999-12-31",
+      "status": "PASS"
+    },
+    {
+      "name": "Receipt insertion failure rolls back inserted card",
+      "evidence": "INTERNAL_ERROR",
+      "status": "PASS"
+    },
+    {
+      "name": "Schema-invalid stored receipt maps to INTERNAL_ERROR",
+      "evidence": "INTERNAL_ERROR",
+      "status": "PASS"
+    }
+  ]
+}

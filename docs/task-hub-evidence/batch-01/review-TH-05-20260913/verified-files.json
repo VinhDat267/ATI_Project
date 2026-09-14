@@ -1,0 +1,67 @@
+{
+  "verified_at": "2026-09-13T11:10:54.142Z",
+  "protected_count": 107,
+  "protected_mismatches": [],
+  "sources": [
+    {
+      "path": "apps/mcp-task-hub/src/cards.ts",
+      "sha256_before": "2504a73b91f86b7113ec330341f479b20bf935d55a820b0de7e493d4d05f0f30",
+      "sha256": "51eb4a26019e194bd4c1dbb44e96f32bb420b06e2fe7ce7069fb397d8648417c",
+      "changed": true
+    },
+    {
+      "path": "apps/mcp-task-hub/src/contracts.ts",
+      "sha256_before": "b75bbbae654bff8eccee5eb33789955b0c1ef96350d54a2620e536c1a7cce5eb",
+      "sha256": "741bf82797c5b72e63fdf57309050d2720f0e84cdb04447469f09be1c5d9b66c",
+      "changed": true
+    },
+    {
+      "path": "apps/mcp-task-hub/src/service.ts",
+      "sha256_before": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a",
+      "sha256": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/src/server.ts",
+      "sha256_before": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+      "sha256": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5",
+      "changed": false
+    },
+    {
+      "path": "apps/mcp-task-hub/tests/tools.integration.test.ts",
+      "sha256_before": "37cf1b0c913c1a4fac1084c3bbaf64cdcc52c75383010a6f96e1e27e06bb216b",
+      "sha256": "6fd0bc2ee80cf68bf2c42f4ae989c294798662a55407d24a0bc4debd8f36310b",
+      "changed": true
+    },
+    {
+      "path": "apps/mcp-task-hub/scripts/sync-catalog.mjs",
+      "sha256_before": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394",
+      "sha256": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/src/gateway.ts",
+      "sha256_before": "c6edd4e8395b9aab6a8f9e9e8af7417ee49f0cd7cc04dd8eb44869b241845d29",
+      "sha256": "3c9d9432951f346e93dc8f3732697fdb8f183bf8d44f88addec1c00d7130837c",
+      "changed": true
+    },
+    {
+      "path": "packages/engine/src/attempts.ts",
+      "sha256_before": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+      "sha256": "48488a8365b39091545ae991505d876d64838f3c7440ed4408fd75036301216a",
+      "changed": false
+    },
+    {
+      "path": "packages/engine/tests/controller.integration.test.ts",
+      "sha256_before": "0badcf5dc6686a1e8800f6a41a6f5a53d3f7caa30628ffbcff48dbcd2b62f29e",
+      "sha256": "0badcf5dc6686a1e8800f6a41a6f5a53d3f7caa30628ffbcff48dbcd2b62f29e",
+      "changed": false
+    },
+    {
+      "path": "testdata/tools.json",
+      "sha256_before": "2356e6659bb19f227d0919e8205658d9dff6189e3374ab5a281bac1e98975e04",
+      "sha256": "17ec827f6cb4cb273bdfb931efa4b9e88309f73871963039986bb25c71f25c27",
+      "changed": true
+    }
+  ]
+}

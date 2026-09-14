@@ -1,0 +1,89 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [31m❯[39m tests/controller.integration.test.ts [2m([22m[2m40 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m24 skipped[39m[2m)[22m[33m 41198[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m3006[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview [33m2424[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution [33m2536[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts [33m1647[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt [33m2121[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside [33m1715[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch [33m1470[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule [33m1291[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state [33m2799[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E10] [move] prevents duplicate execution races on same approved card move run[33m 1835[2mms[22m[31m[39m
+[31m     → expected EngineError: The local worker is already … { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+[31m   [31m×[31m [TH-06] [E10] [create] prevents duplicate execution races on same approved card create run[33m 1655[2mms[22m[31m[39m
+[31m     → expected EngineError: The local worker is already … { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [create] simulates lost response after real create commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1603[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [move] simulates lost response after real move commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1647[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [create] recovers real process crash (exit code 86) after create receiver commit [33m3306[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [move] recovers real process crash (exit code 86) after move receiver commit [33m3288[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes [33m7473[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E10] [move] prevents duplicate execution races on same approved card move run
+[31m[1mAssertionError[22m: expected EngineError: The local worker is already … { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Object {[39m
+[32m-   "code": "CONFLICT",[39m
+[31m+ EngineError {[39m
+[31m+   "code": "BUSY",[39m
+[2m  }[22m
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m1141:31[22m[39m
+    [90m1139| [39m  [34mexpect[39m(rejected)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+    [90m1140| [39m  [34mexpect[39m(fulfilled[[34m0[39m][33m![39m[33m.[39mvalue[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m1141| [39m  [34mexpect[39m(rejected[[34m0[39m][33m![39m[33m.[39mreason)[33m.[39m[34mtoMatchObject[39m({ code[33m:[39m [32m"CONFLICT"[39m })[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m1142| [39m  [34mexpect[39m(
+    [90m1143| [39m    ([35mawait[39m raw[32m`SELECT list_name FROM hub_cards WHERE user_id=[39m[36m${[39m[33mDEMO_US[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E10] [create] prevents duplicate execution races on same approved card create run
+[31m[1mAssertionError[22m: expected EngineError: The local worker is already … { code: '…' } to match object { code: 'CONFLICT' }
+(1 matching property omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Object {[39m
+[32m-   "code": "CONFLICT",[39m
+[31m+ EngineError {[39m
+[31m+   "code": "BUSY",[39m
+[2m  }[22m
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m1170:31[22m[39m
+    [90m1168| [39m  [34mexpect[39m(rejected)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+    [90m1169| [39m  [34mexpect[39m(fulfilled[[34m0[39m][33m![39m[33m.[39mvalue[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m1170| [39m  [34mexpect[39m(rejected[[34m0[39m][33m![39m[33m.[39mreason)[33m.[39m[34mtoMatchObject[39m({ code[33m:[39m [32m"CONFLICT"[39m })[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m1171| [39m  [35mconst[39m docsCards [33m=[39m [35mawait[39m raw[32m`SELECT * FROM hub_cards WHERE user_id=[39m[36m${[39m…
+    [90m1172| [39m  [34mexpect[39m(docsCards)[33m.[39m[34mtoHaveLength[39m([34m1[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[2m | [22m[33m24 skipped[39m[90m (40)[39m
+[2m   Start at [22m 20:46:54
+[2m   Duration [22m 43.99s[2m (transform 314ms, setup 0ms, collect 2.50s, tests 41.20s, environment 0ms, prepare 123ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\packages\engine
+npm error workspace @wap/engine@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\packages\engine
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06

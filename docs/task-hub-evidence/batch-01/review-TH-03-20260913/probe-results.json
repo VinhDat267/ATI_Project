@@ -1,0 +1,41 @@
+{
+  "recorded_at": "2026-09-13T09:33:29.314Z",
+  "status": "PASS",
+  "live_tools": [
+    "append_sheet_rows",
+    "get_card",
+    "list_cards",
+    "list_members",
+    "read_sheet_range",
+    "send_slack_message"
+  ],
+  "live_schemas_match_built_and_catalog": true,
+  "old_three_schemas_unchanged": true,
+  "preserved_hashes": 29,
+  "disabled_calls": [
+    {
+      "name": "create_card",
+      "authorization": "absent",
+      "code": "BAD_ARGS"
+    },
+    {
+      "name": "create_card",
+      "authorization": "nonexistent",
+      "code": "BAD_ARGS"
+    },
+    {
+      "name": "move_card",
+      "authorization": "absent",
+      "code": "BAD_ARGS"
+    },
+    {
+      "name": "move_card",
+      "authorization": "nonexistent",
+      "code": "BAD_ARGS"
+    }
+  ],
+  "malformed_runtime_rejections": 3,
+  "business_rows_unchanged": true,
+  "isolated_database": "g1_it_a578d922fe2f47b5a601c2e685001325",
+  "database_dropped": true
+}

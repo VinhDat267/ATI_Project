@@ -1,0 +1,30 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [32m✓[39m tests/controller.integration.test.ts [2m([22m[2m40 tests[22m[2m | [22m[33m24 skipped[39m[2m)[22m[33m 35813[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m2150[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview [33m1757[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution [33m1473[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts [33m1287[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt [33m1522[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside [33m1606[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch [33m1070[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule [33m1160[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state [33m2669[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E10] [move] prevents duplicate execution races on same approved card move run [33m1656[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E10] [create] prevents duplicate execution races on same approved card create run [33m1625[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [create] simulates lost response after real create commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1548[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] [move] simulates lost response after real move commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace [33m1601[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [create] recovers real process crash (exit code 86) after create receiver commit [33m3193[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] [move] recovers real process crash (exit code 86) after move receiver commit [33m3302[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes [33m7607[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m16 passed[39m[22m[2m | [22m[33m24 skipped[39m[90m (40)[39m
+[2m   Start at [22m 20:55:42
+[2m   Duration [22m 37.19s[2m (transform 228ms, setup 0ms, collect 1.10s, tests 35.81s, environment 0ms, prepare 100ms)[22m
+

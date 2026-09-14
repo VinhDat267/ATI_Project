@@ -1,0 +1,29 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-04
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [32m✓[39m tests/tools.integration.test.ts [2m([22m[2m42 tests[22m[2m | [22m[33m27 skipped[39m[2m)[22m[33m 16734[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with all optional fields, verifies DB storage and receipt [33m1036[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] creates card with omitted optional fields, storing empty description and nulls [33m898[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card for missing or other-owner board/list/assignee with NOT_FOUND and zero mutation/receipt [33m1074[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] denies create_card with missing/pending/expired/stale approvals or payload/version drift [33m1020[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rejects create_card with BAD_ARGS on extra args, whitespace title, length violations [33m853[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] create_card due_date schema rejects year 0000 and invalid dates across Zod and JSON Schema validator [33m836[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04-due-date] live MCP create_card rejects year 0000 and invalid dates with BAD_ARGS, accepts 0001 and 9999 [33m954[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] concurrent same-operation replay produces identical ID and exactly 1 card + 1 receipt [33m965[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] replay survives MCP process restart, returning original card ID with zero extra card [33m1745[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] same operation with changed payload is denied and leaves original state intact [33m1038[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] distinct operations with same title create two distinct cards with two receipts [33m995[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] rolls back card insert when receipt persistence fails after mutation [33m993[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] denies create_card when destination list lock causes waiting past approval expiry [33m1920[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated [33m913[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-04] live discovery exposes exactly the seven active tools matching toolDefinitions [33m855[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m15 passed[39m[22m[2m | [22m[33m27 skipped[39m[90m (42)[39m
+[2m   Start at [22m 17:44:23
+[2m   Duration [22m 17.90s[2m (transform 176ms, setup 0ms, collect 929ms, tests 16.73s, environment 0ms, prepare 81ms)[22m
+

@@ -1,0 +1,1199 @@
+{
+  "status": "PASS",
+  "recorded_at": "2026-09-14T12:30:26.656Z",
+  "markdown_files": {
+    "count": 15,
+    "local_links_checked": 96,
+    "external_http_links_ignored": 0,
+    "files": [
+      {
+        "path": "README.md",
+        "local_links_checked": 11,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 1
+      },
+      {
+        "path": "apps/mcp-task-hub/README.md",
+        "local_links_checked": 5,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 1
+      },
+      {
+        "path": "db/DATABASE.md",
+        "local_links_checked": 4,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/00-BAT-DAU.md",
+        "local_links_checked": 15,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/BASELINE.md",
+        "local_links_checked": 2,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/EVALUATION.md",
+        "local_links_checked": 1,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/EXECUTION-CONTRACT.md",
+        "local_links_checked": 2,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "local_links_checked": 5,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 2
+      },
+      {
+        "path": "docs/G1-RUBRIC-MAP.md",
+        "local_links_checked": 13,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/KE-HOACH-6-TUAN.md",
+        "local_links_checked": 3,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "local_links_checked": 3,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 21
+      },
+      {
+        "path": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "local_links_checked": 0,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 5
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/FS-06.md",
+        "local_links_checked": 28,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      },
+      {
+        "path": "packages/engine/README.md",
+        "local_links_checked": 4,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 6
+      },
+      {
+        "path": "testdata/TESTDATA.md",
+        "local_links_checked": 0,
+        "external_http_links_ignored": 0,
+        "fenced_blocks": 0
+      }
+    ]
+  },
+  "broken_local_links": [],
+  "fenced_link_exclusions": {
+    "blocks": 36,
+    "link_syntax_occurrences": 0
+  },
+  "powerShell_commands": {
+    "blocks": 18,
+    "locations": [
+      {
+        "file": "README.md",
+        "block": 1
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 2
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 4
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 7
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 20
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "block": 1
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "block": 2
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "block": 3
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "block": 4
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-14-fs-06-finalization.md",
+        "block": 5
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 1
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 2
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 3
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 5
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 6
+      }
+    ]
+  },
+  "npm_script_checks": {
+    "checked": 31,
+    "valid": 31,
+    "unknown": [],
+    "checks": [
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 1,
+        "script": "build",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 2,
+        "script": "db:up:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 3,
+        "script": "db:migrate:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 4,
+        "script": "db:seed:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 5,
+        "script": "fs:demo:setup",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 6,
+        "script": "check:engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 7,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 2,
+        "script": "build",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 3,
+        "script": "db:up:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 4,
+        "script": "db:migrate:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 5,
+        "script": "db:seed:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 6,
+        "script": "fs:demo:setup",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 2,
+        "script": "build",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 3,
+        "script": "db:up:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 4,
+        "script": "db:migrate:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 5,
+        "script": "db:seed:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 6,
+        "script": "fs:demo:setup",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 1,
+        "line": 2,
+        "script": "build",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 1,
+        "line": 3,
+        "script": "db:up:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 1,
+        "line": 4,
+        "script": "db:migrate:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 1,
+        "line": 5,
+        "script": "db:seed:g1",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 3,
+        "line": 1,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 1,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 2,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 3,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 4,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 5,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 6,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 5,
+        "line": 1,
+        "script": "fs:demo:setup",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 5,
+        "line": 3,
+        "script": "engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 6,
+        "line": 1,
+        "script": "check:engine",
+        "workspace": null,
+        "package_file": "package.json",
+        "ok": true
+      }
+    ],
+    "negative_fixture": {
+      "expected": false,
+      "observed": false,
+      "ok": true
+    }
+  },
+  "cli_argument_checks": {
+    "available_commands": {
+      "approve": [
+        4,
+        4
+      ],
+      "cancel": [
+        1,
+        1
+      ],
+      "detail": [
+        1,
+        1
+      ],
+      "events": [
+        1,
+        2
+      ],
+      "execute": [
+        1,
+        1
+      ],
+      "prepare": [
+        1,
+        2
+      ],
+      "prepare-b02": [
+        0,
+        0
+      ],
+      "preview": [
+        1,
+        1
+      ],
+      "reconcile": [
+        1,
+        1
+      ],
+      "recover": [
+        0,
+        0
+      ],
+      "reject": [
+        4,
+        4
+      ],
+      "trace": [
+        1,
+        1
+      ]
+    },
+    "checked": 22,
+    "valid": 22,
+    "invalid": [],
+    "checks": [
+      {
+        "file": "README.md",
+        "block": 1,
+        "line": 7,
+        "command": "prepare",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 11,
+        "command": "prepare",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 19,
+        "command": "preview",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 24,
+        "command": "approve",
+        "argument_count": 4,
+        "expected_min": 4,
+        "expected_max": 4,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 26,
+        "command": "execute",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 28,
+        "command": "trace",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "block": 1,
+        "line": 29,
+        "command": "reconcile",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 8,
+        "command": "prepare",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 15,
+        "command": "preview",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 18,
+        "command": "approve",
+        "argument_count": 4,
+        "expected_min": 4,
+        "expected_max": 4,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 19,
+        "command": "execute",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 20,
+        "command": "trace",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "docs/superpowers/plans/2026-09-13-filesystem-g1-completion.md",
+        "block": 21,
+        "line": 21,
+        "command": "reconcile",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 2,
+        "line": 2,
+        "command": "prepare",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 3,
+        "line": 1,
+        "command": "preview",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 1,
+        "command": "approve",
+        "argument_count": 4,
+        "expected_min": 4,
+        "expected_max": 4,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 2,
+        "command": "execute",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 3,
+        "command": "detail",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 4,
+        "command": "trace",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 5,
+        "command": "events",
+        "argument_count": 2,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 4,
+        "line": 6,
+        "command": "reconcile",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 1,
+        "ok": true
+      },
+      {
+        "file": "packages/engine/README.md",
+        "block": 5,
+        "line": 3,
+        "command": "prepare",
+        "argument_count": 1,
+        "expected_min": 1,
+        "expected_max": 2,
+        "ok": true
+      }
+    ],
+    "negative_fixture": {
+      "expected": false,
+      "observed": false,
+      "ok": true
+    }
+  },
+  "plan_validation": {
+    "trusted_tool_count": 10,
+    "plans_checked": 3,
+    "valid": 3,
+    "failures": [],
+    "plans": [
+      {
+        "path": "testdata/dev-hand-plans/fs-card-export.json",
+        "schema_ok": true,
+        "policy_ok": true,
+        "ok": true,
+        "issues": [],
+        "deferred_step_ids": [
+          "save",
+          "notify"
+        ]
+      },
+      {
+        "path": "testdata/dev-hand-plans/fs-copy-notify.json",
+        "schema_ok": true,
+        "policy_ok": true,
+        "ok": true,
+        "issues": [],
+        "deferred_step_ids": [
+          "save"
+        ]
+      },
+      {
+        "path": "testdata/dev-hand-plans/th-move.json",
+        "schema_ok": true,
+        "policy_ok": true,
+        "ok": true,
+        "issues": [],
+        "deferred_step_ids": [
+          "move",
+          "notify"
+        ]
+      }
+    ],
+    "negative_fixture": {
+      "expected": false,
+      "observed": false,
+      "issues": [
+        {
+          "path": [
+            "steps",
+            0,
+            "tool"
+          ],
+          "message": "tool missing reviewed policy"
+        }
+      ],
+      "ok": true
+    }
+  },
+  "manifest_links": {
+    "checked": 94,
+    "resolved": 94,
+    "missing": [],
+    "checks": [
+      {
+        "path": ".superpowers/sdd/2026-09-14-fs-06-finalization/task-1-report.md",
+        "ok": true
+      },
+      {
+        "path": ".superpowers/sdd/2026-09-14-fs-06-finalization/task-2-report.md",
+        "ok": true
+      },
+      {
+        "path": ".superpowers/sdd/2026-09-14-fs-06-finalization/task-3-report.md",
+        "ok": true
+      },
+      {
+        "path": ".superpowers/sdd/2026-09-14-fs-06-finalization/task-4-brief.md",
+        "ok": true
+      },
+      {
+        "path": "apps/mcp-task-hub/dist/cards.js",
+        "ok": true
+      },
+      {
+        "path": "apps/mcp-task-hub/dist/contracts.js",
+        "ok": true
+      },
+      {
+        "path": "apps/mcp-task-hub/dist/server.js",
+        "ok": true
+      },
+      {
+        "path": "apps/mcp-task-hub/dist/service.js",
+        "ok": true
+      },
+      {
+        "path": "apps/mcp-task-hub/tests/database.integration.test.ts",
+        "ok": true
+      },
+      {
+        "path": "config/filesystem-reviewed.json",
+        "ok": true
+      },
+      {
+        "path": "config/mcp-presets.json",
+        "ok": true
+      },
+      {
+        "path": "db/migrations/0005_filesystem_dispatches.sql",
+        "ok": true
+      },
+      {
+        "path": "docs/G1-FILESYSTEM-STATUS-2026-09-13.md",
+        "ok": true
+      },
+      {
+        "path": "docs/G1-RUBRIC-MAP.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-01/1789363493939-codex-final-unit/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-01/1789363870921-codex-direct-live-probe/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-01/1789363872414-codex-direct-artifact/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-01/FS-01.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-02/FS-02.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-03/FS-03.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-04/FS-04.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-05/1789377464018-gap-closure-controller/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/controller-observations.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/filesystem-controller-observations.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-05/FS-05.md",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789383831828-scope-audit-fixed6/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789383831828-scope-audit-fixed6/migration-apply.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789383831828-scope-audit-fixed6/scope-audit.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789384080436-npm-ci/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/output.log",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789385689123-final-snapshot/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789385689123-final-snapshot/final-snapshot.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789386912283-manifest/command.json",
+        "ok": true
+      },
+      {
+        "path": "docs/task-hub-evidence/batch-02/FS-06/1789386912283-manifest/manifest.json",
+        "ok": true
+      },
+      {
+        "path": "package-lock.json",
+        "ok": true
+      },
+      {
+        "path": "package.json",
+        "ok": true
+      },
+      {
+        "path": "packages/db/dist/connection.js",
+        "ok": true
+      },
+      {
+        "path": "packages/db/dist/migrate.js",
+        "ok": true
+      },
+      {
+        "path": "packages/db/dist/seed.js",
+        "ok": true
+      },
+      {
+        "path": "packages/db/src/schema.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/dist/gateway-filesystem.js",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/dist/gateway-task-hub.js",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/dist/gateway.js",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/dist/index.js",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/dist/launch-policy.js",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/package.json",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/attempts.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/cli.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/execute.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/filesystem-authorization.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/filesystem-paths.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/gateway-filesystem.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/gateway-task-hub.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/gateway-types.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/gateway.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/index.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/launch-policy.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/prepare.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/receiver-policy.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/recovery.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/src/snapshot.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/artifact-validation.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-adapter.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-controller.integration.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-crash-worker.mjs",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-fixture.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-launch-policy.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-marker-crash-worker.mjs",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-paths.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-raw-fault-worker.mjs",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-read.integration.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/filesystem-write.integration.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/gateway-routing.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/receiver-policy.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/tests/snapshot-compatibility.test.ts",
+        "ok": true
+      },
+      {
+        "path": "packages/engine/vitest.unit.config.ts",
+        "ok": true
+      },
+      {
+        "path": "scripts/capture-command.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/check-engine.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/emit-candidate-artifact.d.mts",
+        "ok": true
+      },
+      {
+        "path": "scripts/emit-candidate-artifact.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/fs06-final-snapshot.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/fs06-manifest.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/fs06-scope-audit.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/prepare-filesystem-demo.mjs",
+        "ok": true
+      },
+      {
+        "path": "scripts/probe-filesystem-candidate.mjs",
+        "ok": true
+      },
+      {
+        "path": "testdata/dev-hand-plans/fs-card-export.json",
+        "ok": true
+      },
+      {
+        "path": "testdata/dev-hand-plans/fs-copy-notify.json",
+        "ok": true
+      },
+      {
+        "path": "testdata/tools.json",
+        "ok": true
+      },
+      {
+        "path": "tsconfig.json",
+        "ok": true
+      }
+    ],
+    "negative_fixture": {
+      "expected": "LOCAL_TARGET_NOT_FOUND",
+      "observed": "LOCAL_TARGET_NOT_FOUND",
+      "ok": true
+    }
+  }
+}

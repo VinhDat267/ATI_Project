@@ -1,0 +1,1010 @@
+{
+  "recorded_at": "2026-09-13T13:54:10.486Z",
+  "status": "PASS",
+  "database": "engine_it_d0a16a33d5bb4855b4a7d93d74edefc7",
+  "database_dropped": true,
+  "scope": "REAL_CONTROLLER_POSTGRESQL_MCP_AND_CLI",
+  "results": [
+    {
+      "name": "Separate CLI processes preserve the previewed title and exact two-write approval",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "71543d7e-01b5-4a0c-b3e3-5d99ffb20dbe",
+        "cli_calls": [
+          {
+            "command": "prepare",
+            "started_at": "2026-09-13T13:53:51.493Z",
+            "finished_at": "2026-09-13T13:53:53.864Z",
+            "exit_code": 0
+          },
+          {
+            "command": "preview",
+            "started_at": "2026-09-13T13:53:53.898Z",
+            "finished_at": "2026-09-13T13:53:54.761Z",
+            "exit_code": 0
+          },
+          {
+            "command": "approve",
+            "started_at": "2026-09-13T13:53:54.767Z",
+            "finished_at": "2026-09-13T13:53:56.715Z",
+            "exit_code": 0
+          },
+          {
+            "command": "execute",
+            "started_at": "2026-09-13T13:53:56.715Z",
+            "finished_at": "2026-09-13T13:53:58.845Z",
+            "exit_code": 0
+          },
+          {
+            "command": "trace",
+            "started_at": "2026-09-13T13:53:58.845Z",
+            "finished_at": "2026-09-13T13:53:59.798Z",
+            "exit_code": 0
+          }
+        ],
+        "card": {
+          "card_id": "c1",
+          "list_name": "Done",
+          "title": "Changed after CLI preview",
+          "updated_at": "2026-09-13 13:53:58.579391+00"
+        },
+        "receipts": [
+          {
+            "operation_id": "40042576-57d0-470e-be0e-fa1af24df7ed",
+            "tool_name": "move_card",
+            "result": {
+              "id": "c1",
+              "list_name": "Done"
+            }
+          },
+          {
+            "operation_id": "a590f6e8-1175-47f5-8303-d8b7c078e868",
+            "tool_name": "send_slack_message",
+            "result": {
+              "id": "14266c80-9c72-468c-a142-aeb509749dc0",
+              "text": "Đã chuyển Viết API sang Done.",
+              "channel": "#team"
+            }
+          }
+        ],
+        "trace": {
+          "run_id": "71543d7e-01b5-4a0c-b3e3-5d99ffb20dbe",
+          "attempts": [
+            {
+              "attempt_id": "ac2d7894-b404-45ca-a5c7-ca177470c889",
+              "step_id": "read",
+              "attempt_no": 1,
+              "workflow_version_id": "c351f2a0-c3a7-4362-90cb-3193512470fb",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "get_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "board_id",
+                    "title",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    "board_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": null,
+              "resolved_args": {
+                "card_id": "c1"
+              },
+              "result": {
+                "id": "c1",
+                "title": "Viết API",
+                "board_id": "board_a",
+                "list_name": "Doing"
+              },
+              "outcome_certainty": "confirmed",
+              "error_class": null,
+              "error_message": null,
+              "started_at": "2026-09-13T13:53:53.341Z",
+              "ended_at": "2026-09-13T13:53:53.581Z"
+            },
+            {
+              "attempt_id": "cb4b6289-7f1f-41d5-afb6-5c5e9a6bc4ef",
+              "step_id": "move",
+              "attempt_no": 1,
+              "workflow_version_id": "c351f2a0-c3a7-4362-90cb-3193512470fb",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "move_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id",
+                    "target_list"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "target_list": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "40042576-57d0-470e-be0e-fa1af24df7ed",
+              "resolved_args": {
+                "card_id": "c1",
+                "target_list": "Done"
+              },
+              "result": {
+                "id": "c1",
+                "list_name": "Done"
+              },
+              "outcome_certainty": "confirmed",
+              "error_class": null,
+              "error_message": null,
+              "started_at": "2026-09-13T13:53:58.494Z",
+              "ended_at": "2026-09-13T13:53:58.607Z"
+            },
+            {
+              "attempt_id": "e7deba91-5b8a-4ae3-8dfa-64dbc085bbfe",
+              "step_id": "notify",
+              "attempt_no": 1,
+              "workflow_version_id": "c351f2a0-c3a7-4362-90cb-3193512470fb",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "send_slack_message",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "channel",
+                    "text"
+                  ],
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "maxLength": 16000,
+                      "minLength": 1
+                    },
+                    "channel": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "thread_ts": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "channel",
+                    "text"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "channel": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "a590f6e8-1175-47f5-8303-d8b7c078e868",
+              "resolved_args": {
+                "text": "Đã chuyển Viết API sang Done.",
+                "channel": "#team"
+              },
+              "result": {
+                "id": "14266c80-9c72-468c-a142-aeb509749dc0",
+                "text": "Đã chuyển Viết API sang Done.",
+                "channel": "#team"
+              },
+              "outcome_certainty": "confirmed",
+              "error_class": null,
+              "error_message": null,
+              "started_at": "2026-09-13T13:53:58.670Z",
+              "ended_at": "2026-09-13T13:53:58.729Z"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "create response_loss: committed receipt survives; inspection/recovery never resumes",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "368d5ab8-2eef-49c8-b004-95f88aa51719",
+        "exit_code": null,
+        "calls": [
+          {
+            "name": "create_card",
+            "authorized": true,
+            "isError": false
+          }
+        ],
+        "recovery": null,
+        "inspection": {
+          "run_id": "368d5ab8-2eef-49c8-b004-95f88aa51719",
+          "read_only": true,
+          "operations": [
+            {
+              "operation_id": "1cdf2e7b-9af7-4fe1-a56c-64ff5727fa3c",
+              "step_id": "create",
+              "state": "unknown",
+              "receipt": "confirmed",
+              "result": {
+                "id": "d833d941-c5bb-4237-9277-aff02404a1ec"
+              }
+            },
+            {
+              "operation_id": "000f2a7a-f826-41d1-82a9-4f48cdd83eeb",
+              "step_id": "notify",
+              "state": "reserved",
+              "receipt": "not_observed",
+              "result": null
+            }
+          ]
+        },
+        "counts": {
+          "cards": 3,
+          "messages": 0,
+          "receipts": 1
+        },
+        "trace": {
+          "run_id": "368d5ab8-2eef-49c8-b004-95f88aa51719",
+          "attempts": [
+            {
+              "attempt_id": "3a7be18e-da85-4faa-b475-b959c0b8df54",
+              "step_id": "create",
+              "attempt_no": 1,
+              "workflow_version_id": "c89726bb-c025-429e-93a7-42276080f882",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "create_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "board_id",
+                    "list_name",
+                    "title"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "pattern": "\\S",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    "board_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "due_date": {
+                      "type": "string",
+                      "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "assignee_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 16000
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "1cdf2e7b-9af7-4fe1-a56c-64ff5727fa3c",
+              "resolved_args": {
+                "title": "Independent TH06",
+                "board_id": "board_a",
+                "list_name": "Backlog"
+              },
+              "result": null,
+              "outcome_certainty": "unknown",
+              "error_class": "fatal",
+              "error_message": "MCP call failed or timed out",
+              "started_at": "2026-09-13T13:54:00.610Z",
+              "ended_at": "2026-09-13T13:54:00.700Z"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "create process_crash: committed receipt survives; inspection/recovery never resumes",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "5b60d8f4-553d-4db5-94ff-dcd4ff47d179",
+        "exit_code": 86,
+        "calls": [],
+        "recovery": [
+          {
+            "run_id": "5b60d8f4-553d-4db5-94ff-dcd4ff47d179",
+            "status": "reconciliation_required"
+          }
+        ],
+        "inspection": {
+          "run_id": "5b60d8f4-553d-4db5-94ff-dcd4ff47d179",
+          "read_only": true,
+          "operations": [
+            {
+              "operation_id": "68e7a0ae-1c3b-4dce-b149-aad1a9e958f2",
+              "step_id": "create",
+              "state": "unknown",
+              "receipt": "confirmed",
+              "result": {
+                "id": "f4076950-5af4-4ef3-9b86-17421ae8af6e"
+              }
+            },
+            {
+              "operation_id": "5f68e76b-fff6-4637-a0a3-0d109762af90",
+              "step_id": "notify",
+              "state": "reserved",
+              "receipt": "not_observed",
+              "result": null
+            }
+          ]
+        },
+        "counts": {
+          "cards": 3,
+          "messages": 0,
+          "receipts": 1
+        },
+        "trace": {
+          "run_id": "5b60d8f4-553d-4db5-94ff-dcd4ff47d179",
+          "attempts": [
+            {
+              "attempt_id": "3215709f-acc8-4306-850d-c7df644fa559",
+              "step_id": "create",
+              "attempt_no": 1,
+              "workflow_version_id": "df3251a1-104e-45dc-bb62-9279afd223b0",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "create_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "board_id",
+                    "list_name",
+                    "title"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "pattern": "\\S",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    "board_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "due_date": {
+                      "type": "string",
+                      "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "assignee_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 16000
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "68e7a0ae-1c3b-4dce-b149-aad1a9e958f2",
+              "resolved_args": {
+                "title": "Independent TH06",
+                "board_id": "board_a",
+                "list_name": "Backlog"
+              },
+              "result": null,
+              "outcome_certainty": "unknown",
+              "error_class": "fatal",
+              "error_message": "Worker stopped before recording outcome",
+              "started_at": "2026-09-13T13:54:03.004Z",
+              "ended_at": "2026-09-13T13:54:03.211Z"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "move response_loss: committed receipt survives; inspection/recovery never resumes",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "8d75de16-aa03-4bfc-a764-ec1b69877c83",
+        "exit_code": null,
+        "calls": [
+          {
+            "name": "get_card",
+            "authorized": false,
+            "isError": false
+          },
+          {
+            "name": "move_card",
+            "authorized": true,
+            "isError": false
+          }
+        ],
+        "recovery": null,
+        "inspection": {
+          "run_id": "8d75de16-aa03-4bfc-a764-ec1b69877c83",
+          "read_only": true,
+          "operations": [
+            {
+              "operation_id": "510de613-ba24-42a6-a4b9-faa99c1f3b1c",
+              "step_id": "move",
+              "state": "unknown",
+              "receipt": "confirmed",
+              "result": {
+                "id": "c1",
+                "list_name": "Done"
+              }
+            },
+            {
+              "operation_id": "31feb97b-baa5-407a-a14e-6684d437c34c",
+              "step_id": "notify",
+              "state": "reserved",
+              "receipt": "not_observed",
+              "result": null
+            }
+          ]
+        },
+        "counts": {
+          "cards": 2,
+          "messages": 0,
+          "receipts": 1
+        },
+        "trace": {
+          "run_id": "8d75de16-aa03-4bfc-a764-ec1b69877c83",
+          "attempts": [
+            {
+              "attempt_id": "98bbe3b9-2858-411b-ad5a-367f7a208f64",
+              "step_id": "read",
+              "attempt_no": 1,
+              "workflow_version_id": "fdbd49c0-06d7-4833-bcd3-746285c04e7d",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "get_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "board_id",
+                    "title",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    "board_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": null,
+              "resolved_args": {
+                "card_id": "c1"
+              },
+              "result": {
+                "id": "c1",
+                "title": "Viết API",
+                "board_id": "board_a",
+                "list_name": "Doing"
+              },
+              "outcome_certainty": "confirmed",
+              "error_class": null,
+              "error_message": null,
+              "started_at": "2026-09-13T13:54:03.875Z",
+              "ended_at": "2026-09-13T13:54:03.931Z"
+            },
+            {
+              "attempt_id": "a3b0969e-0f05-4fbc-b0ca-db8678fd0c0e",
+              "step_id": "move",
+              "attempt_no": 1,
+              "workflow_version_id": "fdbd49c0-06d7-4833-bcd3-746285c04e7d",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "move_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id",
+                    "target_list"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "target_list": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "510de613-ba24-42a6-a4b9-faa99c1f3b1c",
+              "resolved_args": {
+                "card_id": "c1",
+                "target_list": "Done"
+              },
+              "result": null,
+              "outcome_certainty": "unknown",
+              "error_class": "fatal",
+              "error_message": "MCP call failed or timed out",
+              "started_at": "2026-09-13T13:54:04.180Z",
+              "ended_at": "2026-09-13T13:54:04.235Z"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "move process_crash: committed receipt survives; inspection/recovery never resumes",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "a8ae993d-f9f2-4b46-a18d-83a46f97fe7a",
+        "exit_code": 86,
+        "calls": [],
+        "recovery": [
+          {
+            "run_id": "a8ae993d-f9f2-4b46-a18d-83a46f97fe7a",
+            "status": "reconciliation_required"
+          }
+        ],
+        "inspection": {
+          "run_id": "a8ae993d-f9f2-4b46-a18d-83a46f97fe7a",
+          "read_only": true,
+          "operations": [
+            {
+              "operation_id": "4052aae7-ae3e-4b91-977d-3eff4dccc156",
+              "step_id": "move",
+              "state": "unknown",
+              "receipt": "confirmed",
+              "result": {
+                "id": "c1",
+                "list_name": "Done"
+              }
+            },
+            {
+              "operation_id": "9e08e8dc-de66-4e57-8971-ce5bb01af660",
+              "step_id": "notify",
+              "state": "reserved",
+              "receipt": "not_observed",
+              "result": null
+            }
+          ]
+        },
+        "counts": {
+          "cards": 2,
+          "messages": 0,
+          "receipts": 1
+        },
+        "trace": {
+          "run_id": "a8ae993d-f9f2-4b46-a18d-83a46f97fe7a",
+          "attempts": [
+            {
+              "attempt_id": "1de93e07-fd38-4a9c-98db-f7f3a36c1aaf",
+              "step_id": "read",
+              "attempt_no": 1,
+              "workflow_version_id": "c286b63d-0525-4f59-8449-ae1783d4df63",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "get_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "board_id",
+                    "title",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    "board_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": null,
+              "resolved_args": {
+                "card_id": "c1"
+              },
+              "result": {
+                "id": "c1",
+                "title": "Viết API",
+                "board_id": "board_a",
+                "list_name": "Doing"
+              },
+              "outcome_certainty": "confirmed",
+              "error_class": null,
+              "error_message": null,
+              "started_at": "2026-09-13T13:54:04.787Z",
+              "ended_at": "2026-09-13T13:54:04.827Z"
+            },
+            {
+              "attempt_id": "f2363779-2de2-4e62-aeed-047346e9619b",
+              "step_id": "move",
+              "attempt_no": 1,
+              "workflow_version_id": "c286b63d-0525-4f59-8449-ae1783d4df63",
+              "evidence": "complete",
+              "tool_snapshot": {
+                "server": "task_hub",
+                "name": "move_card",
+                "policy_version": "b-local-1",
+                "artifact_hash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae",
+                "input_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "card_id",
+                    "target_list"
+                  ],
+                  "properties": {
+                    "card_id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "target_list": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "output_schema": {
+                  "type": "object",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "required": [
+                    "id",
+                    "list_name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    },
+                    "list_name": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "operation_id": "4052aae7-ae3e-4b91-977d-3eff4dccc156",
+              "resolved_args": {
+                "card_id": "c1",
+                "target_list": "Done"
+              },
+              "result": null,
+              "outcome_certainty": "unknown",
+              "error_class": "fatal",
+              "error_message": "Worker stopped before recording outcome",
+              "started_at": "2026-09-13T13:54:06.856Z",
+              "ended_at": "2026-09-13T13:54:06.997Z"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "create concurrent claims through separate real gateways execute once",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "21669978-c40e-4016-8da8-fe91a62a16e7",
+        "receipts": [
+          {
+            "operation_id": "aa51c2c1-74db-46f6-a49d-ea8299a66ea8",
+            "tool_name": "send_slack_message",
+            "result": {
+              "id": "44d8f3c5-c550-4b11-abe8-7d9b4752c617",
+              "text": "Created independent card",
+              "channel": "#team"
+            }
+          },
+          {
+            "operation_id": "c8e60cc7-dbdc-4fde-8bd0-05dd24af856f",
+            "tool_name": "create_card",
+            "result": {
+              "id": "40312ed2-26f7-4a87-811e-e24efe079372"
+            }
+          }
+        ],
+        "counts": {
+          "cards": 3,
+          "messages": 1,
+          "receipts": 2
+        }
+      }
+    },
+    {
+      "name": "move concurrent claims through separate real gateways execute once",
+      "status": "PASS",
+      "evidence": {
+        "run_id": "160186ae-47c8-4a9f-8289-c9b412171a86",
+        "receipts": [
+          {
+            "operation_id": "423f0471-fb00-4e7c-8633-075948089141",
+            "tool_name": "send_slack_message",
+            "result": {
+              "id": "7124a567-b50c-4034-b1ed-a3d39a44853b",
+              "text": "Đã chuyển Viết API sang Done.",
+              "channel": "#team"
+            }
+          },
+          {
+            "operation_id": "89a1e1c3-bd40-4e52-99d3-f1b0000e9018",
+            "tool_name": "move_card",
+            "result": {
+              "id": "c1",
+              "list_name": "Done"
+            }
+          }
+        ],
+        "counts": {
+          "cards": 2,
+          "messages": 1,
+          "receipts": 2
+        }
+      }
+    }
+  ],
+  "protected_files": 126
+}

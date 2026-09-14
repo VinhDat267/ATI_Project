@@ -1,0 +1,237 @@
+
+> @wap/mcp-task-hub@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-05
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/apps/mcp-task-hub[39m
+
+ [31m❯[39m tests/tools.integration.test.ts [2m([22m[2m56 tests[22m[2m | [22m[31m13 failed[39m[2m | [22m[33m42 skipped[39m[2m)[22m[33m 17996[2mms[22m[39m
+[31m   [31m×[31m [TH-05] moves card from Doing to Done, updating list_name and updated_at, reducing m1 workload to 0[33m 1078[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] moves card from Done to Doing, restoring m1 workload to 1[33m 902[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] denies move_card when authorization is missing, pending, expired, stale hash, version drift, or wrong owner[33m 820[2mms[22m[31m[39m
+[31m     → expected 'BAD_ARGS' to be 'NOT_AUTHORIZED' // Object.is equality[39m
+[31m   [31m×[31m [TH-05] returns NOT_FOUND for missing card, foreign card, missing target list, cross-board list, and other-owner list[33m 811[2mms[22m[31m[39m
+[31m     → expected 'BAD_ARGS' to be 'NOT_FOUND' // Object.is equality[39m
+   [33m[2m✓[22m[39m [TH-05] schema validation rejects extra args, empty card_id, empty target_list, and null with BAD_ARGS [33m837[2mms[22m[39m
+[31m   [31m×[31m [TH-05] same-op replay across restart preserves exact timestamp and produces identical result with 1 mutation and 1 receipt[33m 874[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] concurrent identical move_card calls produce identical output with exactly 1 mutation and 1 receipt[33m 851[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt[33m 853[2mms[22m[31m[39m
+[31m     → expected 'Doing' to be 'Backlog' // Object.is equality[39m
+[31m   [31m×[31m [TH-05] denies replay when payload is changed for same operation_id, leaving original data and receipt intact[33m 871[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] serializes two distinct operations on same card with different targets, verifying barrier overlap via pg_blocking_pids[33m 4007[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m [TH-05] denies move_card when destination card lock causes waiting past approval expiry[33m 2763[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m [TH-05] rolls back card update and restores original list_name and updated_at when receipt persistence fails[33m 724[2mms[22m[31m[39m
+[31m     → expected 'BAD_ARGS' to be 'INTERNAL_ERROR' // Object.is equality[39m
+[31m   [31m×[31m [TH-05] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated[33m 743[2mms[22m[31m[39m
+[31m     → expected true not to be true // Object.is equality[39m
+[31m   [31m×[31m [TH-05] live discovery exposes active tools matching toolDefinitions[33m 811[2mms[22m[31m[39m
+[31m     → expected [ 'append_sheet_rows', …(6) ] to deeply equal [ 'append_sheet_rows', …(7) ][39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 13 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] moves card from Doing to Done, updating list_name and updated_at, reducing m1 workload to 0
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1516:27[22m[39m
+    [90m1514| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"move_card"[39m[33m,[39m args)[33m;[39m
+    [90m1515| [39m  [35mconst[39m res [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1516| [39m  [34mexpect[39m(res[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1517| [39m  [34mexpect[39m(res[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m({ id[33m:[39m [32m"c1"[39m[33m,[39m list_name[33m:[39m [32m"Done"[39m …
+    [90m1518| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] moves card from Done to Doing, restoring m1 workload to 1
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1544:27[22m[39m
+    [90m1542| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"move_card"[39m[33m,[39m args)[33m;[39m
+    [90m1543| [39m  [35mconst[39m res [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1544| [39m  [34mexpect[39m(res[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1545| [39m  [34mexpect[39m(res[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m({ id[33m:[39m [32m"c1"[39m[33m,[39m list_name[33m:[39m [32m"Doing"[39m…
+    [90m1546| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] denies move_card when authorization is missing, pending, expired, stale hash, version drift, or wrong owner
+[31m[1mAssertionError[22m: expected 'BAD_ARGS' to be 'NOT_AUTHORIZED' // Object.is equality[39m
+
+Expected: [32m"NOT_AUTHORIZED"[39m
+Received: [31m"BAD_ARGS"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1570:27[22m[39m
+    [90m1568| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m undefined)[33m;[39m
+    [90m1569| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1570| [39m  [34mexpect[39m([34merrorCode[39m(res1))[33m.[39m[34mtoBe[39m([32m"NOT_AUTHORIZED"[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1571| [39m
+    [90m1572| [39m  [90m// 2. Pending approval[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] returns NOT_FOUND for missing card, foreign card, missing target list, cross-board list, and other-owner list
+[31m[1mAssertionError[22m: expected 'BAD_ARGS' to be 'NOT_FOUND' // Object.is equality[39m
+
+Expected: [32m"NOT_FOUND"[39m
+Received: [31m"BAD_ARGS"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1644:27[22m[39m
+    [90m1642| [39m  [35mconst[39m res1 [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args1[33m,[39m auth1)[33m;[39m
+    [90m1643| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1644| [39m  [34mexpect[39m([34merrorCode[39m(res1))[33m.[39m[34mtoBe[39m([32m"NOT_FOUND"[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1645| [39m
+    [90m1646| [39m  [90m// 2. Foreign card (belongs to other owner)[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] same-op replay across restart preserves exact timestamp and produces identical result with 1 mutation and 1 receipt
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1725:29[22m[39m
+    [90m1723| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"move_card"[39m[33m,[39m args)[33m;[39m
+    [90m1724| [39m  [35mconst[39m first [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1725| [39m  [34mexpect[39m(first[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m1726| [39m  [34mexpect[39m(first[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m({ id[33m:[39m [32m"c1"[39m[33m,[39m list_name[33m:[39m [32m"Done[39m…
+    [90m1727| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] concurrent identical move_card calls produce identical output with exactly 1 mutation and 1 receipt
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1764:28[22m[39m
+    [90m1762| [39m    [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m,[39m
+    [90m1763| [39m  ])[33m;[39m
+    [90m1764| [39m  [34mexpect[39m(res1[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m1765| [39m  [34mexpect[39m(res2[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1766| [39m  [34mexpect[39m(res1[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m({ id[33m:[39m [32m"c1"[39m[33m,[39m list_name[33m:[39m [32m"Backl[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] same-target NEW operation requires approval, preserves timestamp, and records exactly one new receipt
+[31m[1mAssertionError[22m: expected 'Doing' to be 'Backlog' // Object.is equality[39m
+
+Expected: [32m"[7mBacklo[27mg"[39m
+Received: [31m"[7mDoin[27mg"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1785:33[22m[39m
+    [90m1783| [39m    SELECT list_name, updated_at::text FROM hub_cards WHERE user_id=[39m[36m${[0m…
+    [90m1784| [39m  `[39m[33m;[39m
+    [90m1785| [39m  [34mexpect[39m(beforeCard[33m![39m[33m.[39mlist_name)[33m.[39m[34mtoBe[39m([32m"Backlog"[39m)[33m;[39m
+    [90m   | [39m                                [31m^[39m
+    [90m1786| [39m  [35mconst[39m timestampBefore [33m=[39m beforeCard[33m![39m[33m.[39mupdated_at[33m;[39m
+    [90m1787| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] denies replay when payload is changed for same operation_id, leaving original data and receipt intact
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m1813:27[22m[39m
+    [90m1811| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"move_card"[39m[33m,[39m args)[33m;[39m
+    [90m1812| [39m  [35mconst[39m res [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m1813| [39m  [34mexpect[39m(res[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m1814| [39m  [34mexpect[39m(res[33m.[39mstructuredContent)[33m.[39m[34mtoEqual[39m({ id[33m:[39m [32m"c1"[39m[33m,[39m list_name[33m:[39m [32m"Done"[39m …
+    [90m1815| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] serializes two distinct operations on same card with different targets, verifying barrier overlap via pg_blocking_pids
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m vi.waitFor.timeout tests/tools.integration.test.ts:[2m1881:29[22m[39m
+    [90m1879| [39m          SELECT pid FROM pg_locks WHERE locktype = 'advisory' AND NOT…
+    [90m1880| [39m        `[39m[33m;[39m
+    [90m1881| [39m        [34mexpect[39m(rows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m1882| [39m        blockerPid [33m=[39m rows[[34m0[39m][33m![39m[33m.[39mpid[33m;[39m
+    [90m1883| [39m      }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] denies move_card when destination card lock causes waiting past approval expiry
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m vi.waitFor.timeout tests/tools.integration.test.ts:[2m1975:29[22m[39m
+    [90m1973| [39m          WHERE datname=[39m[36m${[39mdbName[36m}[39m[32m AND cardinality(pg_blocking_pids(pid[0m…
+    [90m1974| [39m        `[39m[33m;[39m
+    [90m1975| [39m        [34mexpect[39m(rows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m1976| [39m      }[33m,[39m
+    [90m1977| [39m      { timeout[33m:[39m [34m2000[39m[33m,[39m interval[33m:[39m [34m25[39m }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] rolls back card update and restores original list_name and updated_at when receipt persistence fails
+[31m[1mAssertionError[22m: expected 'BAD_ARGS' to be 'INTERNAL_ERROR' // Object.is equality[39m
+
+Expected: [32m"INTERNAL_ERROR"[39m
+Received: [31m"BAD_ARGS"[39m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m2030:28[22m[39m
+    [90m2028| [39m    [35mconst[39m res [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m2029| [39m    [34mexpect[39m(res[33m.[39misError)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m2030| [39m    [34mexpect[39m([34merrorCode[39m(res))[33m.[39m[34mtoBe[39m([32m"INTERNAL_ERROR"[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m2031| [39m
+    [90m2032| [39m    [90m// Exact list_name and updated_at::text must match initial snapshot[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] maps corrupt stored receipt on replay to INTERNAL_ERROR and leaves database unmutated
+[31m[1mAssertionError[22m: expected true not to be true // Object.is equality[39m
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m2051:29[22m[39m
+    [90m2049| [39m  [35mconst[39m auth [33m=[39m [35mawait[39m [34mgrant[39m([32m"move_card"[39m[33m,[39m args)[33m;[39m
+    [90m2050| [39m  [35mconst[39m first [33m=[39m [35mawait[39m [34mcall[39m([32m"move_card"[39m[33m,[39m args[33m,[39m auth)[33m;[39m
+    [90m2051| [39m  [34mexpect[39m(first[33m.[39misError)[33m.[39mnot[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m2052| [39m
+    [90m2053| [39m  [35mconst[39m [originalReceipt] [33m=[39m [35mawait[39m raw[33m<[39m{ result[33m:[39m unknown }[][33m>[39m[32m`
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/tools.integration.test.ts[2m > [22m[TH-05] live discovery exposes active tools matching toolDefinitions
+[31m[1mAssertionError[22m: expected [ 'append_sheet_rows', …(6) ] to deeply equal [ 'append_sheet_rows', …(7) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Array [[22m
+[2m    "append_sheet_rows",[22m
+[2m    "create_card",[22m
+[2m    "get_card",[22m
+[2m    "list_cards",[22m
+[2m    "list_members",[22m
+[32m-   "move_card",[39m
+[2m    "read_sheet_range",[22m
+[2m    "send_slack_message",[22m
+[2m  ][22m
+
+[36m [2m❯[22m tests/tools.integration.test.ts:[2m2095:17[22m[39m
+    [90m2093| [39m  [35mconst[39m tools [33m=[39m [35mawait[39m client[33m![39m[33m.[39m[34mlistTools[39m()[33m;[39m
+    [90m2094| [39m  [35mconst[39m names [33m=[39m tools[33m.[39mtools[33m.[39m[34mmap[39m((t) [33m=>[39m t[33m.[39mname)[33m.[39m[34msort[39m()[33m;[39m
+    [90m2095| [39m  [34mexpect[39m(names)[33m.[39m[34mtoEqual[39m([
+    [90m   | [39m                [31m^[39m
+    [90m2096| [39m    [32m"append_sheet_rows"[39m[33m,[39m
+    [90m2097| [39m    [32m"create_card"[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m13 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[2m | [22m[33m42 skipped[39m[90m (56)[39m
+[2m   Start at [22m 17:58:56
+[2m   Duration [22m 19.57s[2m (transform 258ms, setup 0ms, collect 1.26s, tests 18.00s, environment 0ms, prepare 126ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error workspace @wap/mcp-task-hub@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\apps\mcp-task-hub
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/tools.integration.test.ts -t TH-05

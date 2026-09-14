@@ -1,0 +1,14 @@
+{
+  "mode": "close-error",
+  "scope": "REVIEW FAULT INJECTION ONLY, no installed source modified",
+  "probe_exit": 1,
+  "probe_verdict": "FAIL",
+  "expected_error": "REVIEW_CLOSE_FAILURE_AFTER_REAL_CLOSE",
+  "observed_error": "REVIEW_CLOSE_FAILURE_AFTER_REAL_CLOSE",
+  "cleanup": {
+    "temp_root_removed": true,
+    "close_error": "REVIEW_CLOSE_FAILURE_AFTER_REAL_CLOSE",
+    "cleanup_error": null
+  },
+  "status": "PASS"
+}

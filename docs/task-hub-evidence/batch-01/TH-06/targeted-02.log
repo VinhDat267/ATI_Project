@@ -1,0 +1,76 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Môn học/ATI/ATI_Project/packages/engine[39m
+
+ [31m❯[39m tests/controller.integration.test.ts [2m([22m[2m37 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m24 skipped[39m[2m)[22m[33m 32517[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata [33m2365[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview [33m1796[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution [33m1430[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts[33m 1483[2mms[22m[31m[39m
+[31m     → expected null to be undefined[39m
+   [33m[2m✓[22m[39m [TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt [33m1521[2mms[22m[39m
+[31m   [31m×[31m [TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside[33m 1423[2mms[22m[31m[39m
+[31m     → expected null to be undefined[39m
+   [33m[2m✓[22m[39m [TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch [33m1073[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule [33m1236[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state [33m2445[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E10] prevents duplicate execution races on same approved card run for both create and move [33m2148[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E11] simulates lost response after real commit for create and move: run reconciliation_required, receipt confirmed, trace unknown [33m1807[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E12] recovers real process crash (exit code 86) after receiver commit for both create and move [33m5599[2mms[22m[39m
+   [33m[2m✓[22m[39m [TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes [33m7338[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts
+[31m[1mAssertionError[22m: expected null to be undefined[39m
+
+[32m- Expected:[39m 
+undefined
+
+[31m+ Received:[39m 
+null
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m905:24[22m[39m
+    [90m903| [39m  [35mconst[39m run [33m=[39m [35mawait[39m engine[33m.[39m[34mprepare[39m([34mmakeMembersPlan[39m())[33m;[39m
+    [90m904| [39m  [34mexpect[39m(run[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m905| [39m  [34mexpect[39m(run[33m.[39mapproval)[33m.[39m[34mtoBeUndefined[39m()[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m906| [39m  [34mexpect[39m([35mawait[39m [34mcount[39m([32m"hub_receipts"[39m))[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m907| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/controller.integration.test.ts[2m > [22m[TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside
+[31m[1mAssertionError[22m: expected null to be undefined[39m
+
+[32m- Expected:[39m 
+undefined
+
+[31m+ Received:[39m 
+null
+
+[36m [2m❯[22m tests/controller.integration.test.ts:[2m954:24[22m[39m
+    [90m952| [39m  [35mconst[39m run [33m=[39m [35mawait[39m engine[33m.[39m[34mprepare[39m(b01FixedPlan)[33m;[39m
+    [90m953| [39m  [34mexpect[39m(run[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"succeeded"[39m)[33m;[39m
+    [90m954| [39m  [34mexpect[39m(run[33m.[39mapproval)[33m.[39m[34mtoBeUndefined[39m()[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m955| [39m  [34mexpect[39m([35mawait[39m [34mcount[39m([32m"hub_receipts"[39m))[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m956| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m11 passed[39m[22m[2m | [22m[33m24 skipped[39m[90m (37)[39m
+[2m   Start at [22m 20:38:06
+[2m   Duration [22m 34.08s[2m (transform 258ms, setup 0ms, collect 1.27s, tests 32.52s, environment 0ms, prepare 117ms)[22m
+
+npm error Lifecycle script `test:integration` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\packages\engine
+npm error workspace @wap/engine@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\packages\engine
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.integration.config.ts tests/controller.integration.test.ts -t TH-06

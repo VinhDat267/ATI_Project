@@ -1,0 +1,134 @@
+{
+  "started_at": "2026-09-14T05:03:11.447Z",
+  "finished_at": "2026-09-14T05:03:11.837Z",
+  "source_sha256": "f83a18641aa96466795c6a8c7e71726bfd759e14bd63951dda1ba27ff5000c11",
+  "results": [
+    {
+      "id": "root-junction",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": "REVIEW_SENTINEL"
+    },
+    {
+      "id": "ancestor-junction",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": "ANCESTOR_SENTINEL"
+    },
+    {
+      "id": "native-dangling-junction",
+      "existsSync": false,
+      "lstat_isSymbolicLink": true
+    },
+    {
+      "id": "dangling-junction-write",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": null
+    },
+    {
+      "id": "empty-root-id",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": "REVIEW_SENTINEL"
+    },
+    {
+      "id": "extra-marker-field",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": "REVIEW_SENTINEL"
+    },
+    {
+      "id": "hardlink-marker",
+      "expected": "REJECT",
+      "actual": "ACCEPT",
+      "returned_text": "REVIEW_SENTINEL"
+    },
+    {
+      "id": "native-capability-file",
+      "status": "UNAVAILABLE",
+      "code": "EPERM"
+    },
+    {
+      "id": "native-capability-junction",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "native-capability-hardlink",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "legal-short-read",
+      "scope": "fault injection: actual OS file, handle.read limited to 3 bytes",
+      "expected": "abcdef",
+      "actual": "abc"
+    }
+  ],
+  "hashes": [
+    {
+      "file": "dist/index.js",
+      "baseline": "729dc8511e779e5cd6640851a74b25283e3af1ca3a7106722f993e864a1d9935",
+      "installed": "729dc8511e779e5cd6640851a74b25283e3af1ca3a7106722f993e864a1d9935",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "dist/lib.js",
+      "baseline": "e8713c8cfa0c4f49623fc38d61696fb607ec73e1966d51462b470a7717ca7948",
+      "installed": "e8713c8cfa0c4f49623fc38d61696fb607ec73e1966d51462b470a7717ca7948",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "dist/path-utils.js",
+      "baseline": "2129214ece0aa7ee51a0e7d615bfdd9266c7284d8d5ecf02aff07d0a2c3dacd1",
+      "installed": "2129214ece0aa7ee51a0e7d615bfdd9266c7284d8d5ecf02aff07d0a2c3dacd1",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "dist/path-validation.js",
+      "baseline": "c2d5481e236814c3a4f32c74580f03fb19b25ff7d0b743cf9d51555c9399d9b6",
+      "installed": "c2d5481e236814c3a4f32c74580f03fb19b25ff7d0b743cf9d51555c9399d9b6",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "dist/roots-utils.js",
+      "baseline": "4074f48adb2a22d9d07792cbe0d8b8f59c63e499ef7b9722066fbb8d3d4d74b0",
+      "installed": "4074f48adb2a22d9d07792cbe0d8b8f59c63e499ef7b9722066fbb8d3d4d74b0",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "package.json",
+      "baseline": "8703cc2371e856cf0609b56a7e9dd79988512649f939ef6dcbfdc206d8b29cf1",
+      "installed": "8703cc2371e856cf0609b56a7e9dd79988512649f939ef6dcbfdc206d8b29cf1",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    },
+    {
+      "file": "README.md",
+      "baseline": "df276d57efc04b85fa1e8163fe1aa3d5b11d5b2a7de5ec51ba083e5cb04019cd",
+      "installed": "df276d57efc04b85fa1e8163fe1aa3d5b11d5b2a7de5ec51ba083e5cb04019cd",
+      "installed_matches_baseline": true,
+      "report_contains_actual": false
+    }
+  ],
+  "preservation": {
+    "protected_sha256": {
+      "count": 180,
+      "mismatches": []
+    },
+    "source_sha256": {
+      "count": 56,
+      "mismatches": [
+        "package-lock.json",
+        "packages/engine/package.json",
+        "scripts/check-engine.mjs",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "cleanup": true
+}
