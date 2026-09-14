@@ -70,7 +70,7 @@ Seed giữ b02 sheets/channels như cũ. Nó không tự “sửa” c1 nếu ng
 
 Giữ tên/shape trong catalog, chỉ bổ sung giới hạn/format cho 5 schema chưa triển khai. Không đổi input/output của 3 tool đang chạy. Policy_version giữ b-local-1; artifact hash thay đổi sẽ làm snapshot cũ stale, không sửa preview để cứu run cũ.
 
-Schema Zod phải strict; cấm extra fields. ID/list: string 1–200 ký tự, không trim/normalize ngầm. title: string 1–500 và chứa ít nhất một ký tự không-whitespace. description: tối đa 16000. since/until/due_date: ISO calendar date YYYY-MM-DD hợp lệ, không datetime, không null. Arrays trả tối đa 1000, không âm với count/task_count. date range since>until trả BAD_ARGS. Không thêm default vào input schema gây lệch payload hash giữa controller và receiver.
+Schema Zod phải strict; cấm extra fields. ID/list: string 1–200 ký tự, không trim/normalize ngầm. title: string 1–500 và chứa ít nhất một ký tự không-whitespace. description: tối đa 16000. since/until/due_date: ISO calendar date YYYY-MM-DD hợp lệ, không datetime, không null, có miền năm 0001–9999 (PostgreSQL không chấp nhận năm 0000). Arrays trả tối đa 1000, không âm với count/task_count. date range since>until trả BAD_ARGS. Không thêm default vào input schema gây lệch payload hash giữa controller và receiver.
 
 | Tool | Input | Output | Side effect |
 |---|---|---|---|

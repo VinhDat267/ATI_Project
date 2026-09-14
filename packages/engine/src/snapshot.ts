@@ -27,7 +27,7 @@ export class BeforeDispatchError extends EngineError {
 }
 export const ToolSchema = z
   .object({
-    server: z.literal("task_hub"),
+    server: z.enum(["task_hub", "filesystem"]),
     name: z.string(),
     sideEffect: z.enum(["read", "write"]),
     policyVersion: z.string(),

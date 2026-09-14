@@ -53,6 +53,17 @@ export const receipts = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.operationId] })],
 );
+export const filesystemDispatches = pgTable("filesystem_dispatches", {
+  operationId: uuid("operation_id").primaryKey(),
+  userId: uuid("user_id").notNull(),
+  runId: uuid("run_id").notNull(),
+  relativePath: text("relative_path").notNull(),
+  contentSha256: text("content_sha256").notNull(),
+  launchHash: text("launch_hash").notNull(),
+  dispatchedAt: timestamp("dispatched_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 
 export const boards = pgTable(
   "hub_boards",
@@ -107,4 +118,3 @@ export const cards = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.cardId] })],
 );
-

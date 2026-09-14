@@ -33,6 +33,7 @@
     "apps/mcp-task-hub/vitest.integration.config.ts",
     "packages/engine/src/**/*.ts",
     "packages/engine/tests/**/*.ts",
+    "packages/engine/vitest.unit.config.ts",
     "packages/engine/vitest.integration.config.ts"
   ]
 }

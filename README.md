@@ -7,10 +7,11 @@ Prototype nghiên cứu lập kế hoạch tool MCP có kiểm soát. **Cấu h�
 ## Trạng thái thực tế
 
 - Có mã thư viện DSL, parser, validation, policy helpers, schema planner/API/event và kiểm thử hồi quy.
-- Có DB package với runner 3 SQL migrations, Drizzle và seed thêm dữ liệu thiếu, không reset dữ liệu.
-- MCP stdio task_hub chạy được 3 tool local: read_sheet_range, append_sheet_rows, send_slack_message. Writes kiểm approval/owner/version/payload trong DB; mutation và receipt cùng transaction.
-- Có controller/engine CLI nhận plan tay: đọc → preview bất biến → một approval → write tuần tự → trace. Có cancel, recovery đánh dấu orphan và đối chiếu receipt chỉ đọc; xem [cách chạy](packages/engine/README.md) và [trạng thái engine](docs/ENGINE-STATUS-2026-09-13.md).
-- apps/api, apps/web còn skeleton. HTTP/session/UI/polling, 5 task_hub tool còn lại, filesystem adapter và LLM/replan chưa triển khai. Bài kiểm tra receiver G1 dùng fixture; suite engine dùng controller thật.
+- Có DB package với runner 5 SQL migrations (qua `0005_filesystem_dispatches.sql`), Drizzle và seed thêm dữ liệu thiếu với `ON CONFLICT DO NOTHING`, không reset dữ liệu.
+- MCP stdio `task_hub` chạy đủ 8 tool local: `read_sheet_range`, `append_sheet_rows`, `send_slack_message`, `list_cards`, `get_card`, `list_members`, `create_card`, `move_card`. Writes kiểm approval/owner/version/payload trong DB; mutation và receipt cùng transaction; destination lock và approval expiry được bảo toàn.
+- Có controller/engine CLI nhận plan tay: đọc → preview bất biến → một approval → write tuần tự → trace. Có cancel, recovery đánh dấu orphan và đối chiếu receipt chỉ đọc; xem [cách chạy](packages/engine/README.md) và [trạng thái task_hub & engine](docs/TASK-HUB-STATUS-2026-09-13.md).
+- FS-05 đạt **TECHNICAL PASS** cho controller hai server MCP thật. Catalog công khai có 10 tool: 8 `task_hub` và 2 `filesystem` (`read_file`, `write_file`); filesystem mặc định tắt và chỉ bật qua launch policy đã duyệt. Fresh FS-06 gate đạt **258 passed, 1 skipped** (P11 native file-symlink phụ thuộc capability host). Xem [filesystem status và manual guide](docs/G1-FILESYSTEM-STATUS-2026-09-13.md).
+- G1 tổng thể vẫn **PARTIAL** (`TECHNICAL_PASS_OVERALL_PARTIAL`): rubric chính thức và công việc nhóm đại diện còn `OPEN`; HTTP/session/UI, polling 2 giây và đánh giá AI còn `NOT_RUN`. `apps/api`, `apps/web` vẫn là skeleton; không có bằng chứng HTTP/browser/LLM runtime.
 - Không có kết quả thí nghiệm AI hoặc bằng chứng nhu cầu người dùng/rubric. Không coi SUCCEEDED là đúng nghiệp vụ.
 
 ## Lệnh dùng được
@@ -20,13 +21,15 @@ Node >=22. `npm ci` rồi `npm run check` kiểm typecheck, build bốn package,
 Để chạy phần G1 với Docker đang bật:
 
 ```powershell
+npm run build
 npm run db:up:g1
 npm run db:migrate:g1
 npm run db:seed:g1
+npm run fs:demo:setup
 npm run check:engine
-npm run engine -- prepare-b02
+npm run engine -- prepare testdata/dev-hand-plans/th-move.json
 ```
 
-PostgreSQL dùng `127.0.0.1:55432/wap_g1`, Redis dùng `127.0.0.1:56379`; compose project/volume riêng. Integration tests tạo và dọn database `g1_it_*`/`engine_it_*` riêng, không reset database demo. `check:engine` kiểm cả DSL, DB/MCP và controller; `check:g1` chỉ kiểm đến receiver. `prepare-b02` chưa thực hiện write: xem và duyệt snapshot theo [hướng dẫn CLI](packages/engine/README.md). Chưa có `npm run dev` hoặc UI.
+PostgreSQL dùng `127.0.0.1:55432/wap_g1`, Redis dùng `127.0.0.1:56379`; compose project/volume riêng. Integration tests tạo và dọn database `g1_it_*`/`engine_it_*` riêng, không reset database demo. Fresh FS-06 `check:engine` kiểm 39 DSL, 92 engine unit pass + 1 skip, 64 MCP/DB integration và 63 engine integration — tổng **258 passed, 1 skipped**. `prepare testdata/dev-hand-plans/th-move.json` chuẩn bị preview chuyển card c1 sang Done: gán các biến định danh từ JSON trả về của prepare rồi duyệt bằng `npm run engine -- approve $runId $approvalId $versionId $snapshotHash` theo [hướng dẫn CLI](packages/engine/README.md). Demo filesystem write phải theo [manual guide có bước dừng trước approval](docs/G1-FILESYSTEM-STATUS-2026-09-13.md). Seed không ghi đè dữ liệu sửa đổi trước đó và không đặt lại card đã move về Doing. Chưa có `npm run dev` hoặc UI.
 
-Bản gốc 40 file trước sửa nằm trong [archive](docs/archive/pre-fix-2026-09-13.zip). Audit ngày 12/09 là ảnh chụp lịch sử; đọc báo cáo sửa ngày 13/09 để biết trạng thái mới.
+Bản gốc 40 file trước sửa nằm trong [archive](docs/archive/pre-fix-2026-09-13.zip). Audit ngày 12/09 là ảnh chụp lịch sử; đọc báo cáo sửa ngày 13/09 và [trạng thái task_hub](docs/TASK-HUB-STATUS-2026-09-13.md) để biết trạng thái mới.

@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-09-14T05:33:04.023Z",
+  "executor": "Codex direct; no Antigravity dispatch",
+  "code_status": "VERIFIED",
+  "fs01_gate": "PARTIAL_NATIVE_FILE_SYMLINK_EPERM",
+  "unit": {
+    "passed": 68,
+    "skipped": 1,
+    "failed": 0
+  },
+  "typecheck": "PASS",
+  "live_probe": "PASS",
+  "artifact": "PASS",
+  "files_sha256": {
+    "scripts/emit-candidate-artifact.mjs": "69ecfc9c2dfc8faa967da1cdc9444f0701baf34814b35c08b42ae7b5ac3a7e8d",
+    "scripts/emit-candidate-artifact.d.mts": "d4258d9a69c03c6c6c6876b8f9a229b083d715623e6035ea4c8c9898c19d5e9e",
+    "packages/engine/tests/artifact-validation.test.ts": "bdd68fb3ffb49463cb6e941615205a33fabcfa882f2c757761bc270dc288988b",
+    "docs/antigravity/FILESYSTEM-G1-HANDOFF.md": "91fe2f05c1e87cd1b4a1554a1ccc9785051673f8dabccec9d2f8b1b369962e6f",
+    "docs/task-hub-evidence/batch-02/FS-01/FS-01.md": "7d35992cf116f3cec36c90bc8036ab332aa8b04cdb37e5fa612b066f7d06c734"
+  },
+  "preservation": {
+    "protected_sha256": {
+      "count": 180,
+      "mismatches": []
+    },
+    "source_sha256": {
+      "count": 56,
+      "mismatches": [
+        "package-lock.json",
+        "packages/engine/package.json",
+        "scripts/check-engine.mjs",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "candidate_files_match": true,
+  "probe_source": "D:/Môn học/ATI/ATI_Project/docs/task-hub-evidence/batch-02/FS-01/1789363870921-codex-direct-live-probe/filesystem-candidate-probe.json"
+}

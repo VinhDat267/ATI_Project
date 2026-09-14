@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "name": "Export captured card title and notify",
+  "source_prompt": "Đọc card c1, ghi tiêu đề vào reports/card-title.txt và báo #team.",
+  "steps": [
+    {
+      "id": "card",
+      "description": "Read local card",
+      "tool": {
+        "server": "task_hub",
+        "name": "get_card",
+        "args": { "card_id": "c1" }
+      },
+      "side_effect": "read",
+      "depends_on": []
+    },
+    {
+      "id": "save",
+      "description": "Export approved title",
+      "tool": {
+        "server": "filesystem",
+        "name": "write_file",
+        "args": {
+          "path": "reports/card-title.txt",
+          "content": "${steps.card.output.title}"
+        }
+      },
+      "side_effect": "write",
+      "depends_on": ["card"],
+      "idempotency_key": "${runtime.run_id}_save"
+    },
+    {
+      "id": "notify",
+      "description": "Report captured title",
+      "tool": {
+        "server": "task_hub",
+        "name": "send_slack_message",
+        "args": {
+          "channel": "#team",
+          "text": "Đã xuất: ${steps.card.output.title}"
+        }
+      },
+      "side_effect": "write",
+      "depends_on": ["save"],
+      "idempotency_key": "${runtime.run_id}_notify"
+    }
+  ],
+  "outputs": {}
+}

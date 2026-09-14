@@ -1,0 +1,28 @@
+
+> @wap/engine@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts --run tests/filesystem-controller.integration.test.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/engine
+
+ ✓ tests/filesystem-controller.integration.test.ts (14 tests) 78377ms
+   ✓ FS-05 filesystem controller and CLI > E01 copies exact UTF-8 bytes, notifies only after the file write, and records certainty 5361ms
+   ✓ FS-05 filesystem controller and CLI > E02 exports a task_hub card title through the same approved FS write boundary 3842ms
+   ✓ FS-05 filesystem controller and CLI > E03 uses the saved read output when the source changes after preview 4035ms
+   ✓ FS-05 filesystem controller and CLI > E04 rejects a changed filesystem root before reserving or dispatching the first write 3026ms
+   ✓ FS-05 filesystem controller and CLI > E05 lets exactly one concurrent controller claim the approved run 5351ms
+   ✓ FS-05 filesystem controller and CLI > E06 marks a lost filesystem response unknown without dispatching notification 3698ms
+   ✓ FS-05 filesystem controller and CLI > E07 recovers a real child-process exit after the filesystem bytes commit 5861ms
+   ✓ FS-05 filesystem controller and CLI > E08 recovers a crash after durable filesystem reservation and before write dispatch 5893ms
+   ✓ FS-05 filesystem controller and CLI > E10 treats post-dispatch raw is_error filesystem write output as unknown and does not notify or retry 6030ms
+   ✓ FS-05 filesystem controller and CLI > E10 treats post-dispatch raw malformed_ack filesystem write output as unknown and does not notify or retry 5976ms
+   ✓ FS-05 filesystem controller and CLI > E09 expires the approval after the file commit and stops before notification 3969ms
+   ✓ FS-05 filesystem controller and CLI > E11 and E12 keep read-only runs mutation-free and allow an intentional new run 7512ms
+   ✓ FS-05 filesystem controller and CLI > E14 reads persisted task_hub snapshots without filesystem and rejects a stale in-memory catalog before writing 2757ms
+   ✓ FS-05 filesystem controller and CLI > E13 drives the real built CLI through prepare, approve, execute, trace, and reconcile 13945ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  16:17:45
+   Duration  79.99s (transform 287ms, setup 0ms, collect 1.28s, tests 78.38s, environment 0ms, prepare 145ms)
+

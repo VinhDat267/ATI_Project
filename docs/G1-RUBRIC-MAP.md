@@ -1,0 +1,25 @@
+# G1 rubric and evidence map
+
+Tài liệu này tách nguồn tiêu chí khỏi bằng chứng kỹ thuật. Repository hiện
+không chứa rubric G1 chính thức và chưa có xác nhận một công việc nhóm đại diện;
+vì vậy không có điểm số, trọng số hoặc câu chữ rubric nào được tự tạo. Các cổng
+FS bên dưới là checklist kỹ thuật của repository, không thay thế rubric môn học.
+
+| source | source_status | criterion_quote_or_paraphrase | G1_applicability | evidence | status | gap/next_batch |
+|---|---|---|---|---|---|---|
+| Official G1 rubric | OPEN | Không có file, URL, trang hoặc nội dung rubric chính thức để trích dẫn hay diễn giải. | Chưa xác định tiêu chí nào của rubric áp dụng cho G1. | Không có nguồn authoritative được cung cấp hoặc tìm thấy trong repository. | OPEN | Cung cấp rubric chính thức kèm file/URL và số trang; sau đó map từng tiêu chí mà không tự đặt điểm hoặc trọng số. |
+| User-selected B/local baseline | USER_PROVIDED | Người dùng chọn B/local: `task_hub` local, filesystem adapter đã duyệt, và các mục AI/polling thuộc phạm vi kế hoạch. | Xác định phạm vi G1 hiện hành; không tự chứng minh đạt rubric. | [Baseline B/local](BASELINE.md) | CONFIRMED_SCOPE | Giữ scope cho tới khi người dùng hoặc rubric chính thức yêu cầu thay đổi. |
+| FS-01 artifact and confinement gate | INSPECTED_REPO | Pin và kiểm artifact filesystem, raw discovery, path/UTF-8/root confinement; P11 native file-symlink phụ thuộc capability host. | Bằng chứng kỹ thuật hỗ trợ filesystem local. | [FS-01 report](task-hub-evidence/batch-02/FS-01/FS-01.md) | PARTIAL_P11_CAPABILITY_NOT_RUN | Chạy lại P11 trên host có quyền tạo native file symlink nếu rubric yêu cầu case đó; không ẩn skip hiện tại. |
+| FS-02 server-qualified gateway gate | INSPECTED_REPO | Route theo `{server,name}`, policy receiver đóng và bảo toàn snapshot task_hub-only. | Bằng chứng kỹ thuật cho hai receiver mode và compatibility. | [FS-02 report](task-hub-evidence/batch-02/FS-02/FS-02.md) | PASS | Không có gap bắt buộc trong gate FS-02; đối chiếu với rubric khi có nguồn. |
+| FS-03 filesystem read gate | INSPECTED_REPO | Launch artifact/preset đã duyệt, root theo principal và public `filesystem.read_file`. | Bằng chứng kỹ thuật cho read adapter và two-server discovery. | [FS-03 report](task-hub-evidence/batch-02/FS-03/FS-03.md) | PASS_READ_CHECKPOINT | Không có gap bắt buộc trong checkpoint FS-03; đối chiếu với rubric khi có nguồn. |
+| FS-04 filesystem write gate | INSPECTED_REPO | Approval guard, durable dispatch reservation và public `filesystem.write_file`; marker không phải receipt. | Bằng chứng kỹ thuật cho write adapter non-idempotent. | [FS-04 report](task-hub-evidence/batch-02/FS-04/FS-04.md) | PASS_WRITE_CHECKPOINT | Không suy rộng thành rollback hoặc exactly-once; đối chiếu với rubric khi có nguồn. |
+| FS-05 two-server controller/fault gate | INSPECTED_REPO | E01–E14 chạy qua controller/CLI thật; filesystem marker và task_hub receipt được ghi nhận riêng. | Technical gate của G1 B/local. | [FS-05 report](task-hub-evidence/batch-02/FS-05/FS-05.md) | TECHNICAL_PASS | Giữ giới hạn fixture local; không dùng kết quả này làm bằng chứng HTTP/UI/polling hoặc AI. |
+| FS-06 clean gate, snapshot and manifest | INSPECTED_REPO | Fresh gate 258 passed/1 skipped; snapshot hai server có 10 public tools và cleanup DB/root; manifest dẫn xuất verdict có điều kiện. | Tổng hợp bằng chứng kỹ thuật hiện hành. | [FS-06 manifest](task-hub-evidence/batch-02/FS-06/1789386912283-manifest/manifest.json), [filesystem status and manual guide](G1-FILESYSTEM-STATUS-2026-09-13.md) | TECHNICAL_PASS_OVERALL_PARTIAL | Giữ overall `PARTIAL` cho tới khi rubric và representative work được xác nhận. |
+| Representative group work | OPEN | Chưa có input thật, expected output, quy trình làm tay hiện tại hoặc xác nhận của nhóm; mô tả trong baseline chỉ là giả thuyết. | Cần để chứng minh G1 phù hợp công việc đại diện. | [Baseline hypothesis](BASELINE.md) | OPEN | Thu một ví dụ do nhóm xác nhận; không tự tạo phỏng vấn, thời gian tiết kiệm hoặc kết quả người dùng. |
+| HTTP/session/UI and 2-second polling | USER_PROVIDED | Hai màn hình, session/owner flow và polling 2 giây thuộc phạm vi B/local kế hoạch. | Có thể là tiêu chí G1 hoặc batch sau, tùy rubric chính thức. | [Baseline B/local](BASELINE.md), [six-week plan](KE-HOACH-6-TUAN.md) | NOT_RUN | Triển khai và kiểm HTTP/browser/polling ở batch kế tiếp; hiện không có runtime evidence. |
+| AI retrieval/planning/replan evaluation | USER_PROVIDED | Semantic retrieval, query expansion, planner và local replan thuộc phạm vi B/local; thí nghiệm AI chưa chạy. | Có thể là tiêu chí G1 hoặc các gate sau, tùy rubric chính thức. | [Evaluation design](EVALUATION.md), [dataset notes](../testdata/TESTDATA.md) | NOT_RUN | Freeze model/prompt/provider manifests rồi chạy dev/holdout theo thiết kế; không suy điểm từ hand-plan tests. |
+
+Verdict hiện hành là `TECHNICAL_PASS_OVERALL_PARTIAL`, overall `PARTIAL`.
+Rubric chính thức và representative group work là `OPEN`; HTTP/session/UI,
+polling và AI evaluation là `NOT_RUN`. Chỉ được đổi verdict sau khi bổ sung
+nguồn và bằng chứng tương ứng.

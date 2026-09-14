@@ -70,7 +70,7 @@ export async function reconcile(store: Store, id: string) {
     ? unpackPreview(approval.preview, approval.snapshot_hash)
     : undefined;
   const operations = await store.db
-    .client`SELECT o.*,r.tool_name AS receipt_tool,r.policy_version AS receipt_policy,r.payload_hash AS receipt_hash,r.result AS receipt_result FROM tool_operations o LEFT JOIN hub_receipts r ON r.user_id=o.user_id AND r.operation_id=o.operation_id WHERE o.run_id=${id} AND o.user_id=${store.userId} ORDER BY o.created_at,o.step_id`;
+    .client`SELECT o.*,r.tool_name AS receipt_tool,r.policy_version AS receipt_policy,r.payload_hash AS receipt_hash,r.result AS receipt_result,fd.operation_id AS dispatch_operation_id FROM tool_operations o LEFT JOIN hub_receipts r ON r.user_id=o.user_id AND r.operation_id=o.operation_id AND o.tool_server='task_hub' AND o.receiver_mode='local_transaction' LEFT JOIN filesystem_dispatches fd ON fd.user_id=o.user_id AND fd.operation_id=o.operation_id AND o.tool_server='filesystem' AND o.receiver_mode='non_idempotent' WHERE o.run_id=${id} AND o.user_id=${store.userId} ORDER BY o.created_at,o.step_id`;
   return {
     run_id: id,
     read_only: true,
@@ -82,6 +82,8 @@ export async function reconcile(store: Store, id: string) {
         (t) => t.name === op.tool_name && t.server === op.tool_server,
       );
       const matched =
+        op.tool_server === "task_hub" &&
+        op.receiver_mode === "local_transaction" &&
         !!action &&
         !!tool &&
         op.run_id === snapshot!.run_id &&
@@ -100,17 +102,28 @@ export async function reconcile(store: Store, id: string) {
         op.receipt_policy === op.policy_version &&
         op.receipt_hash === op.payload_hash &&
         normalizeToolResult(tool, { structuredContent: op.receipt_result }).ok;
-      return {
+      const receipt =
+        op.tool_server === "filesystem" && op.receiver_mode === "non_idempotent"
+          ? "not_supported"
+          : op.tool_server === "task_hub" &&
+              op.receiver_mode === "local_transaction"
+            ? matched
+              ? "confirmed"
+              : op.receipt_hash
+                ? "conflict"
+                : "not_observed"
+            : "conflict";
+      const result = {
         operation_id: op.operation_id,
         step_id: op.step_id,
         state: op.state,
-        receipt: matched
-          ? "confirmed"
-          : op.receipt_hash
-            ? "conflict"
-            : "not_observed",
-        result: matched ? op.receipt_result : null,
+        receiver_mode: op.receiver_mode,
+        receipt,
+        result: receipt === "confirmed" ? op.receipt_result : null,
       };
+      if (op.tool_server === "filesystem" && op.receiver_mode === "non_idempotent")
+        return { ...result, dispatch_marker: op.dispatch_operation_id ? "present" : "absent" };
+      return result;
     }),
   };
 }

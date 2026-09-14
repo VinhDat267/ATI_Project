@@ -42,12 +42,33 @@ it("applies SQL migrations exactly once and detects checksum drift", async () =>
     "0002_audit_contracts.sql",
     "0003_task_hub_local.sql",
     "0004_task_hub_cards.sql",
+    "0005_filesystem_dispatches.sql",
   ]);
   expect((await implementation.migrate(url)).applied).toEqual([]);
   const dir = mkdtempSync(path.join(tmpdir(), "ati-migration-test-"));
   cpSync(path.join(root, "db/migrations"), dir, { recursive: true });
   appendFileSync(path.join(dir, "0001_init.sql"), "\n-- unexpected edit");
   await expect(implementation.migrate(url, dir)).rejects.toThrow(/checksum/i);
+});
+
+it("creates the filesystem dispatch reservation with the intended boundary contract", async () => {
+  const columns = await raw`
+    SELECT column_name,data_type
+    FROM information_schema.columns
+    WHERE table_name='filesystem_dispatches'
+    ORDER BY ordinal_position`;
+  expect(columns.map((row) => row.column_name)).toEqual([
+    "operation_id",
+    "user_id",
+    "run_id",
+    "relative_path",
+    "content_sha256",
+    "launch_hash",
+    "dispatched_at",
+  ]);
+  const [comment] = await raw`
+    SELECT obj_description('filesystem_dispatches'::regclass) AS comment`;
+  expect(comment!.comment).toMatch(/NOT proof a filesystem write happened/);
 });
 
 it("seed is repeatable without resetting sheets or messages", async () => {

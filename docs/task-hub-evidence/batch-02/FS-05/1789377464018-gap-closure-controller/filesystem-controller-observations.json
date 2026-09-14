@@ -1,0 +1,123 @@
+{
+  "scope": "REAL_TWO_SERVER_CONTROLLER_POSTGRESQL_MCP_NO_HTTP_UI_LLM",
+  "matrix": [
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E05",
+    "E06",
+    "E07",
+    "E08",
+    "E09",
+    "E10",
+    "E11",
+    "E12",
+    "E13",
+    "E14"
+  ],
+  "E01": {
+    "run_id": "76faca7d-58b2-43f3-b4e0-d7706a222664",
+    "target_sha256": "a353aebe142ac82ae7e447641cae07dfe90b7350c82fbeca33d6c5fc2f162691",
+    "marker_count": 1,
+    "local_receipt_count": 1,
+    "notifications": [
+      "Đã lưu bản sao notes.txt."
+    ],
+    "certainty": [
+      "confirmed",
+      "confirmed",
+      "confirmed"
+    ]
+  },
+  "E06": {
+    "run_id": "afc3ac1b-0129-4684-bee5-e5178ba78d8e",
+    "status": "reconciliation_required",
+    "target_sha256": "a353aebe142ac82ae7e447641cae07dfe90b7350c82fbeca33d6c5fc2f162691",
+    "marker_count": 1,
+    "notifications": [],
+    "certainty": [
+      "confirmed",
+      "unknown"
+    ],
+    "reconciliation_receipt": "not_supported"
+  },
+  "E07": {
+    "run_id": "5a296654-5300-499a-8d74-2f0f92aa7742",
+    "child_exit_code": 86,
+    "target_sha256": "a353aebe142ac82ae7e447641cae07dfe90b7350c82fbeca33d6c5fc2f162691",
+    "marker_count": 1,
+    "notifications": [],
+    "reconciliation_receipt": "not_supported"
+  },
+  "E08": {
+    "run_id": "9341f8be-7695-48f5-af39-9415fcb5ace9",
+    "child_exit_code": 87,
+    "marker_count": 1,
+    "notifications": [],
+    "certainty": [
+      "confirmed",
+      "unknown"
+    ],
+    "reconciliation_receipt": "not_supported"
+  },
+  "E10": [
+    {
+      "mode": "is_error",
+      "run_id": "339e66f3-c566-4a6e-8002-ff7e36f9915f",
+      "child_status": "reconciliation_required",
+      "injected_write_calls": 1,
+      "marker_count": 1,
+      "notifications": [],
+      "certainty": [
+        "confirmed",
+        "unknown"
+      ],
+      "reconciliation_receipt": "not_supported"
+    },
+    {
+      "mode": "malformed_ack",
+      "run_id": "fb7d1b6c-8a76-4cfc-bdfb-8df60ebece21",
+      "child_status": "reconciliation_required",
+      "injected_write_calls": 1,
+      "marker_count": 1,
+      "notifications": [],
+      "certainty": [
+        "confirmed",
+        "unknown"
+      ],
+      "reconciliation_receipt": "not_supported"
+    }
+  ],
+  "E14": {
+    "completed_run_id": "7012dba2-d117-4aa5-a7b7-22ae26255a62",
+    "pending_run_id": "6b081e1d-9d3f-4b4b-a6c7-1a78e2bfa249",
+    "task_hub_tool_count": 8,
+    "completed_attempt_certainty": [
+      "confirmed",
+      "confirmed",
+      "confirmed"
+    ],
+    "completed_receipts": [
+      "confirmed",
+      "confirmed"
+    ],
+    "stale_execute": "CONFLICT",
+    "snapshot_hash_preserved": "8d800c5402a325d679ce2a345cd5abb7846862d7a661f849ba6a0d66c27fabfe",
+    "hub_receipts_before_and_after": 8
+  },
+  "E13": {
+    "run_id": "93d1ec03-f50d-4104-a628-914786255803",
+    "principal": "8445e98a-2327-4f6e-b165-4bb12595fc30",
+    "target_sha256": "a353aebe142ac82ae7e447641cae07dfe90b7350c82fbeca33d6c5fc2f162691",
+    "commands": [
+      "prepare",
+      "approve",
+      "execute",
+      "trace",
+      "reconcile"
+    ]
+  },
+  "recorded_at": "2026-09-14T09:19:05.795Z",
+  "cleanup": "fixture closed"
+}

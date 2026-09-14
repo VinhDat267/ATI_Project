@@ -1,0 +1,15 @@
+
+> @wap/engine@0.1.0 test:unit
+> vitest run --config vitest.unit.config.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/engine
+
+ ✓ tests/filesystem-paths.test.ts (53 tests | 1 skipped) 219ms
+ ✓ tests/artifact-validation.test.ts (16 tests) 272ms
+
+ Test Files  2 passed (2)
+      Tests  68 passed | 1 skipped (69)
+   Start at  12:30:29
+   Duration  1.09s (transform 99ms, setup 0ms, collect 125ms, tests 492ms, environment 0ms, prepare 184ms)
+

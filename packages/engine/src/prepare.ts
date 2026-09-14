@@ -22,6 +22,7 @@ import {
   json,
   payloadHash,
 } from "./snapshot.js";
+import { receiverModeFor } from "./receiver-policy.js";
 
 export async function prepare(
   store: Store,
@@ -146,12 +147,16 @@ export async function prepare(
           }
           for (const action of actions) {
             const step = plan.steps.find((s) => s.id === action.step_id)!;
+            const tool = gateway.tools.find(
+              (t) => t.server === action.server && t.name === action.tool,
+            )!;
             const intent = resolveValue(
               step.idempotency_key!,
               context,
             ) as string;
+            const receiverMode = receiverModeFor(tool);
             await tx`INSERT INTO tool_operations(operation_id,user_id,run_id,workflow_version_id,step_id,tool_server,tool_name,policy_version,intent_key,payload_hash,resolved_args,state,receiver_mode)
-            VALUES (${action.operation_id},${store.userId},${id},${versionId},${action.step_id},${action.server},${action.tool},${action.policy_version},${intent},${action.payload_hash},${tx.json(json(action.resolved_args))},'reserved','local_transaction')`;
+            VALUES (${action.operation_id},${store.userId},${id},${versionId},${action.step_id},${action.server},${action.tool},${action.policy_version},${intent},${action.payload_hash},${tx.json(json(action.resolved_args))},'reserved',${receiverMode})`;
             await tx`UPDATE step_states SET status='ready' WHERE run_id=${id} AND step_id=${action.step_id}`;
           }
           const [approval] =

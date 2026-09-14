@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "name": "Copy approved notes and notify",
+  "source_prompt": "Đọc notes.txt, ghi nguyên nội dung vào reports/notes-copy.txt và báo #team.",
+  "steps": [
+    {
+      "id": "read",
+      "description": "Read approved demo notes",
+      "tool": {
+        "server": "filesystem",
+        "name": "read_file",
+        "args": { "path": "notes.txt" }
+      },
+      "side_effect": "read",
+      "depends_on": []
+    },
+    {
+      "id": "save",
+      "description": "Write exact captured text",
+      "tool": {
+        "server": "filesystem",
+        "name": "write_file",
+        "args": {
+          "path": "reports/notes-copy.txt",
+          "content": "${steps.read.output.text}"
+        }
+      },
+      "side_effect": "write",
+      "depends_on": ["read"],
+      "idempotency_key": "${runtime.run_id}_save"
+    },
+    {
+      "id": "notify",
+      "description": "Notify after file write",
+      "tool": {
+        "server": "task_hub",
+        "name": "send_slack_message",
+        "args": {
+          "channel": "#team",
+          "text": "Đã lưu bản sao notes.txt."
+        }
+      },
+      "side_effect": "write",
+      "depends_on": ["save"],
+      "idempotency_key": "${runtime.run_id}_notify"
+    }
+  ],
+  "outputs": {}
+}

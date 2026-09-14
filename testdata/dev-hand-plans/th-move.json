@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "name": "Move local card and notify",
+  "source_prompt": "Đọc c1, chuyển c1 sang Done và thông báo tiêu đề đã xem vào #team.",
+  "steps": [
+    {
+      "id": "read",
+      "description": "Read existing local card",
+      "tool": {
+        "server": "task_hub",
+        "name": "get_card",
+        "args": {
+          "card_id": "c1"
+        }
+      },
+      "side_effect": "read",
+      "depends_on": []
+    },
+    {
+      "id": "move",
+      "description": "Move existing card",
+      "tool": {
+        "server": "task_hub",
+        "name": "move_card",
+        "args": {
+          "card_id": "${steps.read.output.id}",
+          "target_list": "Done"
+        }
+      },
+      "side_effect": "write",
+      "depends_on": [
+        "read"
+      ],
+      "idempotency_key": "${runtime.run_id}_move"
+    },
+    {
+      "id": "notify",
+      "description": "Report approved title",
+      "tool": {
+        "server": "task_hub",
+        "name": "send_slack_message",
+        "args": {
+          "channel": "#team",
+          "text": "Đã chuyển ${steps.read.output.title} sang Done."
+        }
+      },
+      "side_effect": "write",
+      "depends_on": [
+        "move"
+      ],
+      "idempotency_key": "${runtime.run_id}_notify"
+    }
+  ],
+  "outputs": {}
+}

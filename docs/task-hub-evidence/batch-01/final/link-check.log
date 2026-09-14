@@ -1,0 +1,29 @@
+﻿================================================================
+ATI Platform Documentation & Link Integrity Checker
+Root directory: D:\M├┤n hß╗ìc\ATI\ATI_Project
+Checking 12 documentation files...
+================================================================
+
+[OK] docs/TASK-HUB-STATUS-2026-09-13.md (6 internal markdown links verified)
+[OK] README.md (9 internal markdown links verified)
+[OK] docs/BASELINE.md (1 internal markdown links verified)
+[OK] docs/00-BAT-DAU.md (12 internal markdown links verified)
+[OK] docs/KE-HOACH-6-TUAN.md (2 internal markdown links verified)
+[OK] docs/EXECUTION-CONTRACT.md (1 internal markdown links verified)
+[OK] db/DATABASE.md (3 internal markdown links verified)
+[OK] testdata/TESTDATA.md (0 internal markdown links verified)
+[OK] apps/mcp-task-hub/README.md (4 internal markdown links verified)
+[OK] packages/engine/README.md (2 internal markdown links verified)
+[OK] docs/task-hub-evidence/batch-01/TH-07.md (8 internal markdown links verified)
+[OK] docs/task-hub-evidence/batch-01/final/README.md (19 internal markdown links verified)
+
+================================================================
+Integrity Verification Summary:
+- Documentation files checked: 12
+- Missing documentation files: 0
+- Internal markdown links checked: 67
+- Broken links detected: 0
+- Planned bare paths distinguished: apps/api, apps/web
+================================================================
+
+[PASS] All documentation files and internal links are intact.

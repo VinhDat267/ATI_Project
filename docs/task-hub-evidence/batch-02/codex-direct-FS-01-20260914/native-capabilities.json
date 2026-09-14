@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-09-14T05:32:27.282Z",
+  "finished_at": "2026-09-14T05:32:27.288Z",
+  "capabilities": {
+    "file": {
+      "status": "UNAVAILABLE",
+      "error_code": "EPERM"
+    },
+    "junction": {
+      "status": "AVAILABLE"
+    },
+    "hardlink": {
+      "status": "AVAILABLE"
+    }
+  },
+  "cleanup": true
+}

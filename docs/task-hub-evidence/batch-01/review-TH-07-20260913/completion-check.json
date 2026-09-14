@@ -1,0 +1,48 @@
+{
+  "recorded_at": "2026-09-13T15:52:56.321Z",
+  "documentation_command": {
+    "command": "node docs/task-hub-evidence/batch-01/final/verify-links.mjs",
+    "started_at": "2026-09-13T15:52:56.026Z",
+    "finished_at": "2026-09-13T15:52:56.102Z",
+    "exit_code": 0,
+    "log": "docs/task-hub-evidence/batch-01/review-TH-07-20260913/docs-final.log",
+    "scope": "12 documents; local Markdown file targets outside fences; external URLs and anchors not verified"
+  },
+  "preservation": {
+    "protected_sha256": {
+      "files": 162,
+      "mismatches": []
+    },
+    "source_sha256": {
+      "files": 23,
+      "mismatches": []
+    }
+  },
+  "manifest_hashes": {
+    "files": 40,
+    "mismatches": []
+  },
+  "document_sha256": {
+    "README.md": "2eef38e847efea57ab8151a8e4cfb4eebc6ad4cd25aba725d8e7d16ab01dc4dd",
+    "apps/mcp-task-hub/README.md": "cdc1272158a816fbed89439b6255f7ae98b8d7e508ee042779a0e2b165a0492a",
+    "packages/engine/README.md": "66e6b1a8ff1a04dbfb7a19b0ad1d7cbec2b0385115ce7748415b29ae6a5e7ccd",
+    "db/DATABASE.md": "32a9a9892a9b3c4053235812126cedc92f6671d7509820db1e8aa1a1991212b8",
+    "docs/BASELINE.md": "b35ed01d563d1dab5525a848a6166e3799ffba34845609271911f8aef217ae0c",
+    "docs/00-BAT-DAU.md": "df14c4c822c3240d6103d786f18181f5cc43afb04a63dc3130e240f3e34712fc",
+    "docs/KE-HOACH-6-TUAN.md": "ff466ab2a6bbcd414e1f38e5aaddf313be59830ede19df86d367b1f148c47bde",
+    "docs/EXECUTION-CONTRACT.md": "f1ac18161729d5d604d7db8e972eb1d7de79ac0f9c16dc650bb27049e166ed36",
+    "testdata/TESTDATA.md": "f0b8dd1ce030640b099459b0742f519a9e257601a9466ef7e66cd90512d4a92e",
+    "docs/TASK-HUB-STATUS-2026-09-13.md": "f10e98cb835b8f46e4fbc0ec47de756d535344793395f193177f2b6e8c92116e",
+    "docs/task-hub-evidence/batch-01/TH-07.md": "99660d75ce3d565239fbe8dee74331acdcd29be89f1b65682a5b2bee792aa40f",
+    "docs/task-hub-evidence/batch-01/final/README.md": "d5b8c81b123979b1b94acb0108a75ac0349af0e55fe9e9c32dbb88ca1926394e"
+  },
+  "git_index": {
+    "exit_code": 0,
+    "staged_paths": []
+  },
+  "tracked_doc_whitespace": {
+    "exit_code": 0,
+    "output": ""
+  },
+  "status": "PASS"
+}

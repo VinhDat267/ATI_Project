@@ -9,6 +9,11 @@ import postgres from "postgres";
 import { migrate, openDatabase, seedDemo, DEMO_USER_ID } from "@wap/db";
 import { RunDetailSchema, TraceSchema, EventPageSchema } from "@wap/dsl";
 import * as implementation from "../src/index.js";
+import {
+  makeMovePlan,
+  makeCreatePlan,
+  makeMembersPlan,
+} from "./task-hub-plans.js";
 const api = implementation as Record<string, any>;
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const plan = JSON.parse(
@@ -45,12 +50,13 @@ afterAll(async () => {
   await db?.close();
   await admin.unsafe(`DROP DATABASE "${dbName}" WITH (FORCE)`);
   await admin.end();
-  if (evidence.b02) {
-    const existingDefaultDir = path.join(root, "docs/engine-evidence/2026-09-13");
+  if (evidence.b02 || evidence.card_move) {
+    // Dated evidence carries baseline SHA-256 hashes; unattended runs must not rewrite it.
+    const defaultDir = path.join(root, "runtime/test-evidence");
     const requestedEvidence = process.env.ATI_EVIDENCE_DIR;
     const dir = requestedEvidence
       ? path.resolve(root, requestedEvidence)
-      : existingDefaultDir;
+      : defaultDir;
     if (requestedEvidence) {
       const evidenceRoot = path.resolve(root, "docs/task-hub-evidence");
       const relative = path.relative(evidenceRoot, dir);
@@ -717,3 +723,833 @@ it("fences an old worker after its advisory-lock backend disconnects", async () 
   expect(await count("hub_receipts")).toBe(0);
   expect(await count("hub_messages")).toBe(0);
 });
+
+it("[TH-03] [TH-06] [E06] propagates run timeZone America/New_York across MCP wire to filter R07 boundaries and preserves authorization metadata", async () => {
+  ({ gateway, engine } = await start());
+
+  await raw`UPDATE hub_cards SET updated_at = '2026-01-01T00:00:00Z' WHERE user_id=${DEMO_USER_ID}`;
+  await raw`INSERT INTO hub_cards (user_id, card_id, board_id, list_name, title, updated_at) VALUES
+    (${DEMO_USER_ID}, 'ny_below', 'board_a', 'Doing', 'NY Below', '2026-03-08T04:59:59.999Z'),
+    (${DEMO_USER_ID}, 'ny_lower', 'board_a', 'Doing', 'NY Lower', '2026-03-08T05:00:00.000Z'),
+    (${DEMO_USER_ID}, 'ny_upper_minus_1', 'board_a', 'Doing', 'NY Upper - 1', '2026-03-09T03:59:59.999Z'),
+    (${DEMO_USER_ID}, 'ny_above', 'board_a', 'Doing', 'NY Above', '2026-03-09T04:00:00.000Z')`;
+
+  const readPlan = {
+    version: "1.0",
+    name: "NY Boundary Read",
+    source_prompt: "List cards on 2026-03-08 in America/New_York timezone",
+    steps: [
+      {
+        id: "read_ny",
+        description: "list_cards for NY DST day",
+        tool: {
+          server: "task_hub",
+          name: "list_cards",
+          args: {
+            board_id: "board_a",
+            list_name: "Doing",
+            since: "2026-03-08",
+            until: "2026-03-08",
+          },
+        },
+        depends_on: [],
+        side_effect: "read",
+      },
+    ],
+    outputs: {
+      cards: "${steps.read_ny.output.cards}",
+    },
+  };
+
+  const run = await engine.prepare(readPlan, { timeZone: "America/New_York" });
+  expect(run.status).toBe("succeeded");
+  expect(run.time_zone).toBe("America/New_York");
+
+  const [persistedRun] =
+    await raw`SELECT time_zone FROM runs WHERE id=${run.run_id}`;
+  expect(persistedRun!.time_zone).toBe("America/New_York");
+
+  const trace = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(trace.attempts).toHaveLength(1);
+  const result = trace.attempts[0]!.result as {
+    cards: Array<{
+      id: string;
+      board_id: string;
+      title: string;
+      list_name: string;
+    }>;
+    count: number;
+  };
+  expect(result.cards.map((c) => c.id)).toEqual([
+    "ny_lower",
+    "ny_upper_minus_1",
+  ]);
+  expect(result.count).toBe(2);
+
+  evidence.card_timezone = {
+    run_id: run.run_id,
+    time_zone: "America/New_York",
+    target_date: "2026-03-08",
+    cards_returned: result.cards.map((c) => c.id),
+    count: result.count,
+    boundary_fixtures: [
+      { id: "ny_below", updated_at: "2026-03-08T04:59:59.999Z", in_window: false },
+      { id: "ny_lower", updated_at: "2026-03-08T05:00:00.000Z", in_window: true },
+      { id: "ny_upper_minus_1", updated_at: "2026-03-09T03:59:59.999Z", in_window: true },
+      { id: "ny_above", updated_at: "2026-03-09T04:00:00.000Z", in_window: false },
+    ],
+    trace,
+  };
+
+  const writePlan = structuredClone(plan);
+  const writeRun = await engine.prepare(writePlan, {
+    timeZone: "America/New_York",
+  });
+  expect(writeRun.status).toBe("awaiting_approval");
+  await engine.decide(writeRun.run_id, decision(writeRun));
+  const executed = await engine.execute(writeRun.run_id);
+  expect(executed.status).toBe("succeeded");
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await count("hub_messages")).toBe(1);
+});
+
+it("[TH-06] [E01] runs makeMovePlan, preserving original source title in notification even if card title changes after preview", async () => {
+  ({ gateway, engine } = await start());
+  const run = await engine.prepare(makeMovePlan());
+  expect(run.status).toBe("awaiting_approval");
+  expect(run.approval.actions).toHaveLength(2);
+  expect(
+    (await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`)[0]!.list_name,
+  ).toBe("Doing");
+  expect(await count("hub_receipts")).toBe(0);
+
+  await raw`UPDATE hub_cards SET title='Changed after preview' WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+  await engine.decide(run.run_id, decision(run));
+  const finished = await engine.execute(run.run_id);
+  expect(finished.status).toBe("succeeded");
+  expect(
+    (await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`)[0]!.list_name,
+  ).toBe("Done");
+  const msgs = await raw`SELECT text FROM hub_messages WHERE user_id=${DEMO_USER_ID}`;
+  expect(msgs).toHaveLength(1);
+  expect(msgs[0]!.text).toBe("Đã chuyển Viết API sang Done.");
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await raw`SELECT id FROM approvals WHERE run_id=${run.run_id}`).toHaveLength(1);
+
+  const trace = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(trace.attempts).toHaveLength(3);
+  expect(trace.attempts.every((a: any) => a.ended_at && a.outcome_certainty === "confirmed")).toBe(true);
+
+  const rawReceipts = await raw`SELECT * FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  evidence.card_move = {
+    run_id: run.run_id,
+    card_id: "c1",
+    initial_list: "Doing",
+    final_list: "Done",
+    notification_text: msgs[0]!.text,
+    approvals_count: 1,
+    receipts: rawReceipts,
+    observed_messages: msgs,
+    trace,
+    status: finished.status,
+    operations: run.approval.actions.map((a: any) => ({
+      step_id: a.step_id,
+      operation_id: a.operation_id,
+      tool: a.tool,
+    })),
+  };
+});
+
+it("[TH-06] [E02] prepares makeCreatePlan(false) with no mutations, and creates exactly one extra card and receipt upon execution", async () => {
+  ({ gateway, engine } = await start());
+  const initialCards = await raw`SELECT card_id FROM hub_cards WHERE user_id=${DEMO_USER_ID}`;
+  expect(initialCards).toHaveLength(2);
+  const run = await engine.prepare(makeCreatePlan(false));
+  expect(run.status).toBe("awaiting_approval");
+  expect(run.approval.actions).toHaveLength(1);
+  expect(await raw`SELECT card_id FROM hub_cards WHERE user_id=${DEMO_USER_ID}`).toHaveLength(2);
+  expect(await count("hub_receipts")).toBe(0);
+
+  await engine.decide(run.run_id, decision(run));
+  const executed = await engine.execute(run.run_id);
+  expect(executed.status).toBe("succeeded");
+
+  const currentCards = await raw`SELECT card_id, title, list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID}`;
+  expect(currentCards).toHaveLength(3);
+  const newCard = currentCards.find((c: any) => !["c1", "c2"].includes(c.card_id));
+  expect(newCard).toBeDefined();
+  expect(newCard!.title).toBe("Docs");
+  expect(newCard!.list_name).toBe("Backlog");
+  expect(await count("hub_receipts")).toBe(1);
+
+  const [receipt] = await raw`SELECT operation_id, result FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  expect(receipt!.operation_id).toBe(run.approval.actions[0].operation_id);
+  expect(receipt!.result).toEqual({ id: newCard!.card_id });
+
+  const trace = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(trace.attempts).toHaveLength(1);
+  expect(trace.attempts[0]!.outcome_certainty).toBe("confirmed");
+
+  evidence.card_create = {
+    run_id: run.run_id,
+    created_card: newCard,
+    receipt,
+    trace,
+    status: executed.status,
+    operation_id: run.approval.actions[0].operation_id,
+  };
+});
+
+it("[TH-06] [E03] runs makeMembersPlan to completion without approval, confirming active task counts", async () => {
+  ({ gateway, engine } = await start());
+  const run = await engine.prepare(makeMembersPlan());
+  expect(run.status).toBe("succeeded");
+  expect(run.approval).toBeNull();
+  expect(await count("hub_receipts")).toBe(0);
+
+  const trace = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(trace.attempts).toHaveLength(1);
+  expect(trace.attempts[0]!.outcome_certainty).toBe("confirmed");
+
+  expect(trace.attempts[0]!.result).toEqual({
+    members: [
+      { id: "m1", name: "An", task_count: 1 },
+      { id: "m2", name: "Bình", task_count: 0 },
+    ],
+  });
+  const finishedEvent = (await engine.events(run.run_id)).events.find(
+    (e: any) => e.type === "run.finished",
+  );
+  expect(finishedEvent?.payload?.outputs?.members).toEqual([
+    { id: "m1", name: "An", task_count: 1 },
+    { id: "m2", name: "Bình", task_count: 0 },
+  ]);
+});
+
+it("[TH-06] [E04] runs dev b03 with seeded c1 to notify Task: Viết API with one receipt", async () => {
+  ({ gateway, engine } = await start());
+  const b03Plan = JSON.parse(
+    readFileSync(path.join(root, "testdata/test-cases.json"), "utf8"),
+  ).cases.find((x: any) => x.id === "b03" && x.split === "dev").expected_result.plan;
+  const run = await engine.prepare(b03Plan);
+  expect(run.status).toBe("awaiting_approval");
+  expect(run.approval.actions).toHaveLength(1);
+
+  await engine.decide(run.run_id, decision(run));
+  const executed = await engine.execute(run.run_id);
+  expect(executed.status).toBe("succeeded");
+
+  const msgs = await raw`SELECT channel, text FROM hub_messages WHERE user_id=${DEMO_USER_ID}`;
+  expect(msgs).toHaveLength(1);
+  expect(msgs[0]!.text).toBe("Task: Viết API");
+  expect(await count("hub_receipts")).toBe(1);
+});
+
+it("[TH-06] [E05] runs dev b01 adapted to fixed dates (b01-fixed-window) with c1 in-window and c2 outside", async () => {
+  ({ gateway, engine } = await start());
+  const b01PlanRaw = JSON.parse(
+    readFileSync(path.join(root, "testdata/test-cases.json"), "utf8"),
+  ).cases.find((x: any) => x.id === "b01" && x.split === "dev").expected_result.plan;
+
+  await raw`UPDATE hub_cards SET title='API', list_name='Done', updated_at='2026-09-14T02:00:00Z' WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+  await raw`UPDATE hub_cards SET updated_at='2026-09-25T00:00:00Z' WHERE user_id=${DEMO_USER_ID} AND card_id='c2'`;
+
+  const b01FixedPlan = structuredClone(b01PlanRaw);
+  b01FixedPlan.name = "b01-fixed-window";
+  b01FixedPlan.steps[0].tool.args.since = "2026-09-14";
+  b01FixedPlan.steps[0].tool.args.until = "2026-09-20";
+
+  const run = await engine.prepare(b01FixedPlan);
+  expect(run.status).toBe("succeeded");
+  expect(run.approval).toBeNull();
+  expect(await count("hub_receipts")).toBe(0);
+
+  const trace = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(trace.attempts).toHaveLength(1);
+  expect(trace.attempts[0]!.outcome_certainty).toBe("confirmed");
+  expect(trace.attempts[0]!.result).toEqual({
+    cards: [
+      { id: "c1", board_id: "board_a", title: "API", list_name: "Done" },
+    ],
+    count: 1,
+  });
+  const finishedEvent = (await engine.events(run.run_id)).events.find(
+    (e: any) => e.type === "run.finished",
+  );
+  expect(finishedEvent?.payload?.outputs?.cards).toEqual([
+    { id: "c1", board_id: "board_a", title: "API", list_name: "Done" },
+  ]);
+});
+
+it("[TH-06] [E07] rejects forged plans relabelling create_card or move_card as read before dispatch", async () => {
+  ({ gateway, engine } = await start());
+  const forgedCreate = {
+    version: "1.0",
+    name: "Forged Create",
+    source_prompt: "Forged create as read",
+    steps: [
+      {
+        id: "create",
+        description: "Forged create",
+        tool: {
+          server: "task_hub",
+          name: "create_card",
+          args: { board_id: "board_a", list_name: "Backlog", title: "Docs" },
+        },
+        side_effect: "read",
+        depends_on: [],
+      },
+    ],
+    outputs: {},
+  };
+  await expect(engine.prepare(forgedCreate)).rejects.toMatchObject({
+    code: "INVALID_PLAN",
+  });
+
+  const forgedMove = {
+    version: "1.0",
+    name: "Forged Move",
+    source_prompt: "Forged move as read",
+    steps: [
+      {
+        id: "move",
+        description: "Forged move",
+        tool: {
+          server: "task_hub",
+          name: "move_card",
+          args: { card_id: "c1", target_list: "Done" },
+        },
+        side_effect: "read",
+        depends_on: [],
+      },
+    ],
+    outputs: {},
+  };
+  await expect(engine.prepare(forgedMove)).rejects.toMatchObject({
+    code: "INVALID_PLAN",
+  });
+
+  expect(await count("hub_receipts")).toBe(0);
+  expect(
+    (await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`)[0]!.list_name,
+  ).toBe("Doing");
+  expect(await raw`SELECT card_id FROM hub_cards WHERE user_id=${DEMO_USER_ID}`).toHaveLength(2);
+});
+
+it("[TH-06] [E08] rejects plans referencing create_card output in downstream move args under write-output-reference rule", async () => {
+  ({ gateway, engine } = await start());
+  const planWithWriteRef = {
+    version: "1.0",
+    name: "Create and move",
+    source_prompt: "Create then move",
+    steps: [
+      {
+        id: "create",
+        description: "Create card",
+        tool: {
+          server: "task_hub",
+          name: "create_card",
+          args: { board_id: "board_a", list_name: "Backlog", title: "Docs" },
+        },
+        side_effect: "write",
+        depends_on: [],
+        idempotency_key: "${runtime.run_id}_create",
+      },
+      {
+        id: "move",
+        description: "Move card",
+        tool: {
+          server: "task_hub",
+          name: "move_card",
+          args: { card_id: "${steps.create.output.id}", target_list: "Done" },
+        },
+        side_effect: "write",
+        depends_on: ["create"],
+        idempotency_key: "${runtime.run_id}_move",
+      },
+    ],
+    outputs: {},
+  };
+  await expect(engine.prepare(planWithWriteRef)).rejects.toMatchObject({
+    code: "INVALID_PLAN",
+  });
+  expect(await count("hub_receipts")).toBe(0);
+  expect(await raw`SELECT card_id FROM hub_cards WHERE user_id=${DEMO_USER_ID}`).toHaveLength(2);
+});
+
+it("[TH-06] [E09] enforces owner, hash, version, rejection, and expiry for card workflows without mutating state", async () => {
+  ({ gateway, engine } = await start());
+  const run = await engine.prepare(makeMovePlan());
+  const other = randomUUID();
+  await seedDemo(db, other);
+  const foreign = (await start(other)).engine;
+  await expect(foreign.detail(run.run_id)).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+  await expect(foreign.decide(run.run_id, decision(run))).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+  await expect(
+    engine.decide(run.run_id, {
+      ...decision(run),
+      snapshot_hash: "0".repeat(64),
+    }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    engine.decide(run.run_id, {
+      ...decision(run),
+      workflow_version_id: randomUUID(),
+    }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+
+  const rejectRun = await engine.prepare(makeMovePlan());
+  await engine.decide(rejectRun.run_id, decision(rejectRun, "rejected"));
+  expect((await engine.detail(rejectRun.run_id)).status).toBe("rejected");
+  await expect(engine.execute(rejectRun.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+
+  const expireRun = await engine.prepare(makeMovePlan());
+  await raw`UPDATE approvals SET expires_at=clock_timestamp()-interval '1 second' WHERE id=${expireRun.approval.id}`;
+  await expect(
+    engine.decide(expireRun.run_id, decision(expireRun)),
+  ).rejects.toMatchObject({ code: "EXPIRED" });
+
+  expect(
+    (await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`)[0]!.list_name,
+  ).toBe("Doing");
+  expect(await count("hub_receipts")).toBe(0);
+});
+
+it("[TH-06] [E10] [move] prevents duplicate execution races on same approved card move run", async () => {
+  ({ gateway, engine } = await start());
+  const engine2 = new api.WorkflowEngine(db, gateway, DEMO_USER_ID);
+  const runMove = await engine.prepare(makeMovePlan());
+  await engine.decide(runMove.run_id, decision(runMove));
+  const resultsMove = await Promise.allSettled([
+    engine.execute(runMove.run_id),
+    engine2.execute(runMove.run_id),
+  ]);
+  const fulfilled = resultsMove.filter(
+    (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled",
+  );
+  const rejected = resultsMove.filter(
+    (r): r is PromiseRejectedResult => r.status === "rejected",
+  );
+  expect(fulfilled).toHaveLength(1);
+  expect(rejected).toHaveLength(1);
+  expect(fulfilled[0]!.value.status).toBe("succeeded");
+  expect(["CONFLICT", "BUSY"]).toContain(rejected[0]!.reason.code);
+  expect(
+    (await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`)[0]!.list_name,
+  ).toBe("Done");
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await count("hub_messages")).toBe(1);
+  await expect(engine.execute(runMove.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await count("hub_messages")).toBe(1);
+});
+
+it("[TH-06] [E10] [create] prevents duplicate execution races on same approved card create run", async () => {
+  ({ gateway, engine } = await start());
+  const engine2 = new api.WorkflowEngine(db, gateway, DEMO_USER_ID);
+  const runCreate = await engine.prepare(makeCreatePlan(true));
+  await engine.decide(runCreate.run_id, decision(runCreate));
+  const resultsCreate = await Promise.allSettled([
+    engine.execute(runCreate.run_id),
+    engine2.execute(runCreate.run_id),
+  ]);
+  const fulfilled = resultsCreate.filter(
+    (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled",
+  );
+  const rejected = resultsCreate.filter(
+    (r): r is PromiseRejectedResult => r.status === "rejected",
+  );
+  expect(fulfilled).toHaveLength(1);
+  expect(rejected).toHaveLength(1);
+  expect(fulfilled[0]!.value.status).toBe("succeeded");
+  expect(["CONFLICT", "BUSY"]).toContain(rejected[0]!.reason.code);
+  const docsCards = await raw`SELECT * FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND title='Docs'`;
+  expect(docsCards).toHaveLength(1);
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await count("hub_messages")).toBe(1);
+  await expect(engine.execute(runCreate.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  expect(await count("hub_receipts")).toBe(2);
+  expect(await count("hub_messages")).toBe(1);
+  expect(await raw`SELECT * FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND title='Docs'`).toHaveLength(1);
+});
+
+it("[TH-06] [E11] [create] simulates lost response after real create commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace", async () => {
+  ({ gateway } = await start());
+  let authorizedCalls = 0;
+  let lost = false;
+  const lossy = {
+    ...gateway,
+    async call(...args: Parameters<typeof gateway.call>) {
+      if (args[2]) authorizedCalls++;
+      const response = await gateway.call(...args);
+      if (args[2] && !response.isError && !lost) {
+        lost = true;
+        throw new Error("Injected response loss after commit");
+      }
+      return response;
+    },
+  };
+  const worker = new api.WorkflowEngine(db, lossy, DEMO_USER_ID);
+  const run = await worker.prepare(makeCreatePlan(true));
+  await worker.decide(run.run_id, decision(run));
+  const result = await worker.execute(run.run_id);
+  expect(result.status).toBe("reconciliation_required");
+  expect(authorizedCalls).toBe(1);
+
+  // Verify DB state: card Docs was actually created by real receiver!
+  const [card] = await raw`SELECT * FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND title='Docs'`;
+  expect(card).toBeDefined();
+  expect(await count("hub_receipts")).toBe(1);
+  expect(await count("hub_messages")).toBe(0);
+
+  const [receipt] = await raw`SELECT * FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  expect(receipt!.operation_id).toBe(run.approval.actions[0].operation_id);
+  expect(receipt!.result).toEqual({ id: card!.card_id });
+
+  // Snapshot entire trace before reconcile
+  const traceBefore = TraceSchema.parse(await worker.trace(run.run_id));
+  expect(traceBefore.attempts).toHaveLength(1);
+  const attemptBefore = traceBefore.attempts[0]!;
+  expect(typeof attemptBefore.ended_at).toBe("string");
+  expect(attemptBefore.ended_at).toBeTruthy();
+  expect(attemptBefore.outcome_certainty).toBe("unknown");
+
+  // Reconcile via inspector engine
+  const inspector = new api.WorkflowEngine(db, undefined, DEMO_USER_ID);
+  const rec = await inspector.reconcile(run.run_id);
+  const op = rec.operations.find((o: any) => o.step_id === "create");
+  expect(op).toBeDefined();
+  expect(op!.receipt).toBe("confirmed");
+  expect(op!.result).toEqual({ id: card!.card_id });
+
+  // Deep equality of trace before and after reconcile
+  const traceAfter = TraceSchema.parse(await inspector.trace(run.run_id));
+  expect(traceAfter).toEqual(traceBefore);
+
+  // Re-execution must reject with CONFLICT, no new notify/receipt, and trace unchanged
+  await expect(worker.execute(run.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  expect(await count("hub_messages")).toBe(0);
+  expect(await count("hub_receipts")).toBe(1);
+  const traceAfterReExecute = TraceSchema.parse(await worker.trace(run.run_id));
+  expect(traceAfterReExecute).toEqual(traceBefore);
+
+  if (!evidence.card_response_loss) evidence.card_response_loss = {};
+  (evidence.card_response_loss as any).create = {
+    fault: "Injected response loss after commit on gateway.call for authorized write",
+    run_id: run.run_id,
+    status: result.status,
+    authorized_calls: authorizedCalls,
+    created_card: card,
+    receipt,
+    reconciled_operation: op,
+    trace: traceAfter,
+  };
+});
+
+it("[TH-06] [E11] [move] simulates lost response after real move commit: run reconciliation_required, receipt confirmed, trace unknown, reconcile preserves trace", async () => {
+  ({ gateway } = await start());
+  let authorizedCalls = 0;
+  let lost = false;
+  const lossy = {
+    ...gateway,
+    async call(...args: Parameters<typeof gateway.call>) {
+      if (args[2]) authorizedCalls++;
+      const response = await gateway.call(...args);
+      if (args[2] && !response.isError && !lost) {
+        lost = true;
+        throw new Error("Injected response loss after commit");
+      }
+      return response;
+    },
+  };
+  const worker = new api.WorkflowEngine(db, lossy, DEMO_USER_ID);
+  const run = await worker.prepare(makeMovePlan());
+  await worker.decide(run.run_id, decision(run));
+  const result = await worker.execute(run.run_id);
+  expect(result.status).toBe("reconciliation_required");
+  expect(authorizedCalls).toBe(1);
+
+  // Verify DB state: card c1 was actually moved to Done by real receiver!
+  const [card] = await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+  expect(card!.list_name).toBe("Done");
+  expect(await count("hub_receipts")).toBe(1);
+  expect(await count("hub_messages")).toBe(0);
+
+  const moveAction = run.approval.actions.find((a: any) => a.step_id === "move")!;
+  const [receipt] = await raw`SELECT * FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  expect(receipt!.operation_id).toBe(moveAction.operation_id);
+  expect(receipt!.result).toEqual({ id: "c1", list_name: "Done" });
+
+  // Snapshot entire trace before reconcile
+  const traceBefore = TraceSchema.parse(await worker.trace(run.run_id));
+  const moveAttempt = traceBefore.attempts.find(
+    (a: any) => a.operation_id === moveAction.operation_id,
+  );
+  expect(moveAttempt).toBeDefined();
+  expect(typeof moveAttempt!.ended_at).toBe("string");
+  expect(moveAttempt!.ended_at).toBeTruthy();
+  expect(moveAttempt!.outcome_certainty).toBe("unknown");
+
+  // Reconcile via inspector engine
+  const inspector = new api.WorkflowEngine(db, undefined, DEMO_USER_ID);
+  const rec = await inspector.reconcile(run.run_id);
+  const op = rec.operations.find((o: any) => o.step_id === "move");
+  expect(op).toBeDefined();
+  expect(op!.receipt).toBe("confirmed");
+  expect(op!.result).toEqual({ id: "c1", list_name: "Done" });
+
+  // Deep equality of trace before and after reconcile
+  const traceAfter = TraceSchema.parse(await inspector.trace(run.run_id));
+  expect(traceAfter).toEqual(traceBefore);
+
+  // Re-execution must reject with CONFLICT, no new notify/receipt, and trace unchanged
+  await expect(worker.execute(run.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  expect(await count("hub_messages")).toBe(0);
+  expect(await count("hub_receipts")).toBe(1);
+  const traceAfterReExecute = TraceSchema.parse(await worker.trace(run.run_id));
+  expect(traceAfterReExecute).toEqual(traceBefore);
+
+  if (!evidence.card_response_loss) evidence.card_response_loss = {};
+  (evidence.card_response_loss as any).move = {
+    fault: "Injected response loss after commit on gateway.call for authorized write",
+    run_id: run.run_id,
+    status: result.status,
+    authorized_calls: authorizedCalls,
+    card_final_list: card!.list_name,
+    receipt,
+    reconciled_operation: op,
+    trace: traceAfter,
+  };
+});
+
+it("[TH-06] [E12] [create] recovers real process crash (exit code 86) after create receiver commit", async () => {
+  ({ gateway, engine } = await start());
+  const run = await engine.prepare(makeCreatePlan(true));
+  await engine.decide(run.run_id, decision(run));
+  const result = await promisify(execFile)(
+    process.execPath,
+    [
+      path.join(root, "packages/engine/tests/crash-worker.mjs"),
+      url,
+      DEMO_USER_ID,
+      run.run_id,
+      root,
+    ],
+    { windowsHide: true, timeout: 15000 },
+  ).then(
+    () => ({ code: 0 }),
+    (error: { code: number }) => ({ code: error.code }),
+  );
+  expect(result.code).toBe(86);
+  expect(await count("hub_receipts")).toBe(1);
+  expect(await count("hub_messages")).toBe(0);
+
+  const [card] = await raw`SELECT * FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND title='Docs'`;
+  expect(card).toBeDefined();
+  const [receipt] = await raw`SELECT * FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  expect(receipt!.operation_id).toBe(run.approval.actions[0].operation_id);
+  expect(receipt!.result).toEqual({ id: card!.card_id });
+
+  expect((await engine.detail(run.run_id)).status).toBe("running");
+
+  const recovered = await engine.recoverOrphans();
+  expect(recovered).toContainEqual({
+    run_id: run.run_id,
+    status: "reconciliation_required",
+  });
+
+  // Snapshot trace after recover
+  const traceAfterRecover = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(traceAfterRecover.attempts).toHaveLength(1);
+  const attempt = traceAfterRecover.attempts[0]!;
+  expect(typeof attempt.ended_at).toBe("string");
+  expect(attempt.ended_at).toBeTruthy();
+  expect(attempt.outcome_certainty).toBe("unknown");
+
+  const rec = await engine.reconcile(run.run_id);
+  const op = rec.operations.find((o: any) => o.step_id === "create");
+  expect(op!.receipt).toBe("confirmed");
+  expect(op!.result).toEqual({ id: card!.card_id });
+
+  // Trace stays identical through reconcile
+  const traceAfterReconcile = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(traceAfterReconcile).toEqual(traceAfterRecover);
+
+  // Execute again rejects with CONFLICT, and trace stays identical
+  await expect(engine.execute(run.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  const traceAfterReExecute = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(traceAfterReExecute).toEqual(traceAfterRecover);
+
+  // Second recoverOrphans does nothing
+  const secondRecover = await engine.recoverOrphans();
+  expect(secondRecover.find((r: any) => r.run_id === run.run_id)).toBeUndefined();
+
+  // Zero notify messages and receipts remain 1
+  expect(await count("hub_messages")).toBe(0);
+  expect(await count("hub_receipts")).toBe(1);
+
+  if (!evidence.card_process_crash) evidence.card_process_crash = {};
+  (evidence.card_process_crash as any).create = {
+    fault: "Process crashed with exit code 86 after receiver commit",
+    exit_code: 86,
+    run_id: run.run_id,
+    card,
+    receipt,
+    recovered_status: "reconciliation_required",
+    reconciled_operation: op,
+    trace: traceAfterReconcile,
+  };
+});
+
+it("[TH-06] [E12] [move] recovers real process crash (exit code 86) after move receiver commit", async () => {
+  ({ gateway, engine } = await start());
+  const run = await engine.prepare(makeMovePlan());
+  await engine.decide(run.run_id, decision(run));
+  const result = await promisify(execFile)(
+    process.execPath,
+    [
+      path.join(root, "packages/engine/tests/crash-worker.mjs"),
+      url,
+      DEMO_USER_ID,
+      run.run_id,
+      root,
+    ],
+    { windowsHide: true, timeout: 15000 },
+  ).then(
+    () => ({ code: 0 }),
+    (error: { code: number }) => ({ code: error.code }),
+  );
+  expect(result.code).toBe(86);
+  expect(await count("hub_receipts")).toBe(1);
+  expect(await count("hub_messages")).toBe(0);
+
+  const [card] = await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+  expect(card!.list_name).toBe("Done");
+
+  const moveAction = run.approval.actions.find((a: any) => a.step_id === "move")!;
+  const [receipt] = await raw`SELECT * FROM hub_receipts WHERE user_id=${DEMO_USER_ID}`;
+  expect(receipt!.operation_id).toBe(moveAction.operation_id);
+  expect(receipt!.result).toEqual({ id: "c1", list_name: "Done" });
+
+  expect((await engine.detail(run.run_id)).status).toBe("running");
+
+  const recovered = await engine.recoverOrphans();
+  expect(recovered).toContainEqual({
+    run_id: run.run_id,
+    status: "reconciliation_required",
+  });
+
+  // Snapshot trace after recover
+  const traceAfterRecover = TraceSchema.parse(await engine.trace(run.run_id));
+  const moveAttempt = traceAfterRecover.attempts.find(
+    (a: any) => a.operation_id === moveAction.operation_id,
+  );
+  expect(moveAttempt).toBeDefined();
+  expect(typeof moveAttempt!.ended_at).toBe("string");
+  expect(moveAttempt!.ended_at).toBeTruthy();
+  expect(moveAttempt!.outcome_certainty).toBe("unknown");
+
+  const rec = await engine.reconcile(run.run_id);
+  const op = rec.operations.find((o: any) => o.step_id === "move");
+  expect(op!.receipt).toBe("confirmed");
+  expect(op!.result).toEqual({ id: "c1", list_name: "Done" });
+
+  // Trace stays identical through reconcile
+  const traceAfterReconcile = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(traceAfterReconcile).toEqual(traceAfterRecover);
+
+  // Execute again rejects with CONFLICT, and trace stays identical
+  await expect(engine.execute(run.run_id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  const traceAfterReExecute = TraceSchema.parse(await engine.trace(run.run_id));
+  expect(traceAfterReExecute).toEqual(traceAfterRecover);
+
+  // Second recoverOrphans does nothing
+  const secondRecover = await engine.recoverOrphans();
+  expect(secondRecover.find((r: any) => r.run_id === run.run_id)).toBeUndefined();
+
+  // Zero notify messages and receipts remain 1
+  expect(await count("hub_messages")).toBe(0);
+  expect(await count("hub_receipts")).toBe(1);
+
+  if (!evidence.card_process_crash) evidence.card_process_crash = {};
+  (evidence.card_process_crash as any).move = {
+    fault: "Process crashed with exit code 86 after receiver commit",
+    exit_code: 86,
+    run_id: run.run_id,
+    card_id: "c1",
+    final_list: "Done",
+    receipt,
+    recovered_status: "reconciliation_required",
+    reconciled_operation: op,
+    trace: traceAfterReconcile,
+  };
+});
+
+it("[TH-06] [E13] exposes prepare th-move, exact approval, execution and trace through separate CLI processes", async () => {
+  const cli = async (command: string, ...args: string[]) => {
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [path.join(root, "packages/engine/dist/cli.js"), command, ...args],
+      {
+        cwd: root,
+        windowsHide: true,
+        timeout: 15000,
+        env: { ...process.env, G1_DATABASE_URL: url, G1_USER_ID: DEMO_USER_ID },
+      },
+    );
+    return JSON.parse(stdout);
+  };
+  const movePlanPath = path.join(root, "testdata/dev-hand-plans/th-move.json");
+  const run = await cli("prepare", movePlanPath);
+  expect(run.status).toBe("awaiting_approval");
+  expect(run.approval.actions).toHaveLength(2);
+
+  const preview = await cli("preview", run.run_id);
+  expect(preview.actions).toHaveLength(2);
+
+  // Mutate card title after preview to verify CLI execution uses immutable previewed title
+  await raw`UPDATE hub_cards SET title='Changed after CLI preview' WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+
+  const approval = run.approval;
+  await cli(
+    "approve",
+    run.run_id,
+    approval.id,
+    run.workflow_version_id,
+    approval.snapshot_hash,
+  );
+  expect((await cli("execute", run.run_id)).status).toBe("succeeded");
+  const trace = TraceSchema.parse(await cli("trace", run.run_id));
+  expect(trace.attempts).toHaveLength(3);
+  expect(
+    trace.attempts.every((a: any) => a.ended_at && a.outcome_certainty === "confirmed"),
+  ).toBe(true);
+
+  // Real database outputs match E01; no fabricated approval row
+  const [card] = await raw`SELECT list_name FROM hub_cards WHERE user_id=${DEMO_USER_ID} AND card_id='c1'`;
+  expect(card!.list_name).toBe("Done");
+  const msgs = await raw`SELECT text FROM hub_messages WHERE user_id=${DEMO_USER_ID}`;
+  expect(msgs).toHaveLength(1);
+  expect(msgs[0]!.text).toBe("Đã chuyển Viết API sang Done.");
+  expect(await count("hub_receipts")).toBe(2);
+});
+
+

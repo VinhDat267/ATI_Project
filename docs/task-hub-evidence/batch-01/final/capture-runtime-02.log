@@ -1,0 +1,1 @@
+{"tools":["read_sheet_range","append_sheet_rows","send_slack_message","list_cards","get_card","list_members","create_card","move_card"],"migrations":["0001_init.sql","0002_audit_contracts.sql","0003_task_hub_local.sql","0004_task_hub_cards.sql"],"read_assertions_verified":true,"database_dropped":true}

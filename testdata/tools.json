@@ -1,37 +1,44 @@
 {
   "profile": "B-local-v1",
   "evidence": "MIXED_IMPLEMENTED_AND_PLANNED_CONTRACTS",
-  "note": "3 task_hub schemas implemented and checked against real MCP stdio discovery; remaining 5 task_hub + 2 filesystem contracts are SPEC_ONLY. All data and messages stay local.",
+  "note": "8 task_hub tools implemented and verified through live MCP; filesystem remains SPEC_ONLY. All data stays local.",
   "servers": [
     {
       "slug": "task_hub",
       "transport": "stdio",
       "mode": "local",
-      "status": "PARTIAL_3_OF_8_IMPLEMENTED",
+      "status": "IMPLEMENTED_8_OF_8",
       "receiver_mode": "local_transaction",
       "tools": [
         {
           "name": "list_cards",
           "description": "LOCAL DATA ONLY. Lấy danh sách card (task) trong một board. Lọc được theo cột, người phụ trách, và mốc thời gian cập nhật.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "board_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "list_name": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "assignee_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "since": {
                 "type": "string",
-                "description": "ISO date"
+                "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
               },
               "until": {
                 "type": "string",
-                "description": "ISO date"
+                "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
               }
             },
             "required": [
@@ -40,24 +47,34 @@
             "additionalProperties": false
           },
           "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "cards": {
+                "maxItems": 1000,
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     },
                     "board_id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     },
                     "title": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
                     },
                     "list_name": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     }
                   },
                   "required": [
@@ -71,7 +88,8 @@
               },
               "count": {
                 "type": "integer",
-                "minimum": 0
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -82,16 +100,19 @@
           },
           "sideEffect": "read",
           "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "get_card",
-          "description": "LOCAL DATA ONLY. Lấy chi tiết một card: tiêu đề, mô tả, hạn, người phụ trách, nhãn.",
+          "description": "LOCAL DATA ONLY. Lấy thông tin tóm tắt một card: id, board_id, title, list_name.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "card_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -100,19 +121,28 @@
             "additionalProperties": false
           },
           "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "board_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
               },
               "list_name": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -125,31 +155,43 @@
           },
           "sideEffect": "read",
           "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "create_card",
           "description": "LOCAL DATA ONLY. Tạo card mới trong một cột của board.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "board_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "list_name": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500,
+                "pattern": "\\S"
               },
               "description": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 16000
               },
               "due_date": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
               },
               "assignee_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -160,10 +202,13 @@
             "additionalProperties": false
           },
           "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -173,19 +218,24 @@
           },
           "sideEffect": "write",
           "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "move_card",
           "description": "LOCAL DATA ONLY. Chuyển card sang cột khác, ví dụ từ Doing sang Done.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "card_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "target_list": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -195,13 +245,18 @@
             "additionalProperties": false
           },
           "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               },
               "list_name": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -212,16 +267,19 @@
           },
           "sideEffect": "write",
           "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "list_members",
-          "description": "LOCAL DATA ONLY. Danh sách thành viên của board kèm số task đang phụ trách.",
+          "description": "LOCAL DATA ONLY. Danh sách thành viên của board kèm số task đang phụ trách (chỉ tính card trong cột chưa hoàn thành).",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "board_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
               }
             },
             "required": [
@@ -230,22 +288,29 @@
             "additionalProperties": false
           },
           "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "members": {
+                "maxItems": 1000,
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     },
                     "task_count": {
                       "type": "integer",
-                      "minimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -264,7 +329,7 @@
           },
           "sideEffect": "read",
           "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "send_slack_message",
@@ -440,7 +505,7 @@
       "slug": "filesystem",
       "transport": "stdio",
       "mode": "local",
-      "status": "SPEC_ONLY",
+      "status": "IMPLEMENTED_2_OF_2",
       "receiver_mode": "non_idempotent",
       "tools": [
         {
@@ -471,8 +536,8 @@
             ],
             "additionalProperties": false
           },
-          "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "policyVersion": "b-local-fs-1",
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         },
         {
           "name": "write_file",
@@ -506,8 +571,8 @@
             ],
             "additionalProperties": false
           },
-          "policyVersion": "b-local-1",
-          "evidence": "SPEC_ONLY"
+          "policyVersion": "b-local-fs-1",
+          "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
         }
       ]
     }

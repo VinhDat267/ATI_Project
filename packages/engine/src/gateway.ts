@@ -1,178 +1,183 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import { BeforeDispatchError, EngineError } from "./snapshot.js";
+import { openTaskHubConnection } from "./gateway-task-hub.js";
+import { openFilesystemConnection } from "./gateway-filesystem.js";
+import { openDatabase } from "@wap/db";
+import { Store } from "./store.js";
 import {
-  EngineError,
-  ToolSchema,
-  canonicalJson,
-  hash,
-  type EngineTool,
-} from "./snapshot.js";
+  reserveFilesystemDispatch,
+  recheckFilesystemDispatch,
+} from "./filesystem-authorization.js";
+import type {
+  Gateway,
+  GatewayResult,
+  CallContext,
+  ToolTarget,
+  ServerConnection,
+  LocalGatewayConfig,
+  FilesystemWriteRequest,
+} from "./gateway-types.js";
 
-export interface GatewayResult {
-  isError?: boolean;
-  content?: unknown[];
-  structuredContent?: unknown;
-}
-export interface Gateway {
-  readonly userId: string;
-  readonly tools: readonly EngineTool[];
-  assertCurrent(): Promise<void>;
-  call(
-    name: string,
-    args: Record<string, unknown>,
-    authorization: Record<string, string> | undefined,
-    timeoutMs: number,
-  ): Promise<GatewayResult>;
-  close(): Promise<void>;
-}
-export async function openLocalGateway(config: {
-  root: string;
-  databaseUrl: string;
-  userId: string;
-}): Promise<Gateway> {
-  const root = path.resolve(config.root),
-    userId = z.uuid().parse(config.userId);
-  const address = new URL(config.databaseUrl);
-  if (!["127.0.0.1", "localhost"].includes(address.hostname))
-    throw new EngineError(
-      "CONFIG",
-      "This launcher only supports a loopback PostgreSQL database",
-    );
-  const serverPath = path.join(root, "apps/mcp-task-hub/dist/server.js");
-  const policy = {
-    read_sheet_range: "read",
-    append_sheet_rows: "write",
-    send_slack_message: "write",
-  } as const;
-  const artifact = () => {
-    const files = ["package-lock.json", "testdata/tools.json"];
-    for (const directory of [
-      "apps/mcp-task-hub/dist",
-      "packages/db/dist",
-      "packages/dsl/dist",
-    ]) {
-      for (const file of readdirSync(path.join(root, directory), {
-        recursive: true,
-      }))
-        if (typeof file === "string" && file.endsWith(".js"))
-          files.push(path.join(directory, file));
-    }
-    return hash({
-      command: process.execPath,
-      args: [serverPath],
-      files: files.sort().map((p) => [
-        p,
-        createHash("sha256")
-          .update(readFileSync(path.join(root, p)))
-          .digest("hex"),
-      ]),
-    });
-  };
-  const artifactHash = artifact();
-  const catalog = JSON.parse(
-    readFileSync(path.join(root, "testdata/tools.json"), "utf8"),
+export type {
+  Gateway,
+  GatewayResult,
+  CallContext,
+  ToolTarget,
+  ServerConnection,
+  LocalGatewayConfig,
+  FilesystemLaunch,
+  FilesystemWriteHooks,
+  FilesystemWriteRequest,
+  FilesystemDispatchContext,
+} from "./gateway-types.js";
+
+const targetKey = (target: ToolTarget) => `${target.server}\u0000${target.name}`;
+
+/** Compose reviewed server connections behind an exact server-qualified target. */
+export function composeGateway(
+  userId: string,
+  connections: readonly ServerConnection[],
+): Gateway {
+  const parsedUserId = z.uuid().parse(userId);
+  const byServer = new Map(
+    connections.map((connection) => [connection.server, connection]),
   );
-  const listed =
-    catalog.servers.find((s: { slug: string }) => s.slug === "task_hub")
-      ?.tools ?? [];
-  const tools = Object.entries(policy).map(([name, sideEffect]) => {
-    const item = listed.find((t: { name: string }) => t.name === name);
-    if (
-      !item ||
-      item.sideEffect !== sideEffect ||
-      item.policyVersion !== "b-local-1" ||
-      item.evidence !== "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
-    )
+  if (byServer.size !== connections.length)
+    throw new EngineError("REGISTRY_CHANGED", "Duplicate gateway server");
+  for (const connection of connections)
+    if (connection.userId !== parsedUserId)
       throw new EngineError(
-        "REGISTRY_CHANGED",
-        "Reviewed local tool policy is missing or inconsistent",
+        "CONFIG",
+        "Gateway connection principal must match controller principal",
       );
-    return ToolSchema.parse({
-      server: "task_hub",
-      name,
-      sideEffect,
-      policyVersion: item.policyVersion,
-      inputSchema: item.inputSchema,
-      outputSchema: item.outputSchema,
-      artifactHash,
-    });
-  });
-  const client = new Client({ name: "ati-local-engine", version: "0.1.0" });
-  try {
-    await client.connect(
-      new StdioClientTransport({
-        command: process.execPath,
-        args: [serverPath],
-        cwd: root,
-        env: { G1_DATABASE_URL: config.databaseUrl, G1_USER_ID: userId },
-        stderr: "pipe",
-      }),
-    );
-    const discovered = await client.listTools();
-    if (
-      discovered.tools.length !== tools.length ||
-      client.getServerVersion()?.name !== "ati-task-hub-local" ||
-      client.getServerVersion()?.version !== "0.1.0"
-    )
-      throw new EngineError(
-        "REGISTRY_CHANGED",
-        "Unexpected MCP server identity/catalog",
-      );
-    for (const tool of tools) {
-      const actual = discovered.tools.find((t) => t.name === tool.name);
-      if (
-        !actual ||
-        canonicalJson(actual.inputSchema) !== canonicalJson(tool.inputSchema) ||
-        canonicalJson(actual.outputSchema) !== canonicalJson(tool.outputSchema)
-      )
+
+  const toolMap = new Map<string, ServerConnection["tools"][number]>();
+  for (const connection of connections)
+    for (const tool of connection.tools) {
+      if (tool.server !== connection.server)
         throw new EngineError(
           "REGISTRY_CHANGED",
-          "Live MCP schemas differ from reviewed catalog",
+          "Tool server does not match its gateway connection",
         );
+      const key = targetKey(tool);
+      if (toolMap.has(key))
+        throw new EngineError(
+          "REGISTRY_CHANGED",
+          "Duplicate gateway tool identity",
+        );
+      toolMap.set(key, tool);
     }
-    const assertCurrent = async () => {
-      if (artifact() !== artifactHash)
-        throw new EngineError(
-          "REGISTRY_CHANGED",
-          "Tool artifact or reviewed catalog changed; prepare a new run",
+
+  return {
+    userId: parsedUserId,
+    get tools() {
+      return structuredClone([...toolMap.values()]);
+    },
+    async assertCurrent() {
+      const results = await Promise.allSettled(
+        connections.map((connection) => connection.assertCurrent()),
+      );
+      const failures = results
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) => result.reason);
+      if (failures.length)
+        throw new AggregateError(failures, "Gateway registry changed");
+    },
+    async call(
+      target: ToolTarget,
+      args: Record<string, unknown>,
+      authorization: Record<string, string> | undefined,
+      timeoutMs: number,
+      context?: CallContext,
+    ): Promise<GatewayResult> {
+      const connection = byServer.get(target.server);
+      if (!connection || !toolMap.has(targetKey(target)))
+        throw new BeforeDispatchError(
+          `Tool is not in the reviewed gateway: ${target.server}.${target.name}`,
         );
-    };
+      try {
+        await connection.assertCurrent();
+      } catch (error) {
+        throw new BeforeDispatchError(
+          error instanceof Error ? error.message : "Gateway validation failed",
+        );
+      }
+      return connection.call(target.name, args, authorization, timeoutMs, context);
+    },
+    async close() {
+      const results = await Promise.allSettled(
+        connections.map((connection) => connection.close()),
+      );
+      const failures = results
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) => result.reason);
+      if (failures.length)
+        throw new AggregateError(failures, "Gateway close failed");
+    },
+  };
+}
+
+export async function openLocalGateway(
+  config: LocalGatewayConfig,
+): Promise<Gateway> {
+  const opened: ServerConnection[] = [];
+  let guardDb: ReturnType<typeof openDatabase> | undefined;
+  let guardStore: Store | undefined;
+  let composite: Gateway | undefined;
+  try {
+    opened.push(await openTaskHubConnection(config));
+    if (config.filesystem) {
+      guardDb = openDatabase(config.databaseUrl);
+      guardStore = new Store(guardDb, config.userId);
+      const hooks = {
+        reserve: (request: FilesystemWriteRequest) => {
+          if (!composite || !guardStore)
+            throw new BeforeDispatchError("Filesystem gateway is not fully initialized");
+          return reserveFilesystemDispatch({
+            ...request,
+            store: guardStore,
+            gateway: composite,
+          });
+        },
+        recheck: (request: FilesystemWriteRequest) => {
+          if (!composite || !guardStore)
+            throw new BeforeDispatchError("Filesystem gateway is not fully initialized");
+          return recheckFilesystemDispatch({
+            ...request,
+            store: guardStore,
+            gateway: composite,
+          });
+        },
+      };
+      opened.push(await openFilesystemConnection(config, config.filesystem, hooks));
+    }
+    composite = composeGateway(config.userId, opened);
+    if (!guardDb) return composite;
+    const base = composite;
     return {
-      userId,
+      userId: base.userId,
       get tools() {
-        return structuredClone(tools);
+        return base.tools;
       },
-      assertCurrent,
-      async call(name, args, authorization, timeoutMs) {
-        await assertCurrent();
-        if (!tools.some((t) => t.name === name))
-          throw new EngineError(
-            "INVALID_PLAN",
-            "Tool is not in this local launch",
-          );
-        return CallToolResultSchema.parse(
-          await client.callTool(
-            {
-              name,
-              arguments: args,
-              ...(authorization
-                ? { _meta: { "ati/authorization": authorization } }
-                : {}),
-            },
-            undefined,
-            { timeout: timeoutMs },
-          ),
-        );
+      assertCurrent: () => base.assertCurrent(),
+      call: (...args) => base.call(...args),
+      async close() {
+        try {
+          await base.close();
+        } finally {
+          await guardDb!.close();
+        }
       },
-      close: () => client.close(),
     };
   } catch (error) {
-    await client.close();
+    await Promise.allSettled(opened.map((connection) => connection.close()));
+    await guardDb?.close();
     throw error;
   }
 }

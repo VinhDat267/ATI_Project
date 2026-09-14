@@ -1,5 +1,26 @@
 {
-  "status": "UNCONFIGURED_DENY_ALL",
-  "note": "Developer must fill and review exact launch artifact/package/version/args/root; empty approved_presets authorizes no launch. See BASELINE G1.",
-  "approved_presets": []
+  "status": "REVIEWED_LOCAL_PRESET",
+  "note": "Only the pinned local filesystem read adapter is enabled. The launcher derives the principal root at runtime; write_file remains unadvertised until FS-04.",
+  "approved_presets": [
+    {
+      "id": "filesystem-local-v1",
+      "server": "filesystem",
+      "package": "@modelcontextprotocol/server-filesystem",
+      "version": "2026.8.31",
+      "integrity": "sha512-kKaFkyAh6oipvc9+EAbJ552JafnMnOq5nzmzWkp1jJdBhTAAGpmIpWihUG1+rfNhmEFM98gUZDdCHCDD4v6a7Q==",
+      "entry": "dist/index.js",
+      "server_identity": {
+        "name": "secure-filesystem-server",
+        "version": "0.2.0"
+      },
+      "policy_version": "b-local-fs-1",
+      "root_strategy": "project-runtime-principal",
+      "enabled_tools": [
+        "read_file",
+        "write_file"
+      ],
+      "max_bytes": 65536,
+      "review_file": "config/filesystem-reviewed.json"
+    }
+  ]
 }

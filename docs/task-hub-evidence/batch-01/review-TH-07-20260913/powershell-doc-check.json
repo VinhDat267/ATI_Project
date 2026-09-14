@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-09-13T15:51:44.9868131Z",
+  "docs": [
+    {
+      "file": "packages/engine/README.md",
+      "blocks": 5,
+      "parse_errors": []
+    },
+    {
+      "file": "docs/TASK-HUB-STATUS-2026-09-13.md",
+      "blocks": 1,
+      "parse_errors": []
+    },
+    {
+      "file": "docs/task-hub-evidence/batch-01/TH-07.md",
+      "blocks": 10,
+      "parse_errors": []
+    }
+  ],
+  "cli_json_exit_code": 0,
+  "cli_json_parse_ok": true,
+  "demo_mutations_run": false
+}

@@ -1,0 +1,113 @@
+
+> @wap/engine@0.1.0 test:unit
+> vitest run --config vitest.unit.config.ts tests/artifact-validation.test.ts
+
+
+ RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/engine
+
+ ❯ tests/artifact-validation.test.ts (16 tests | 6 failed) 329ms
+   × emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects duplicate tool identities instead of hashing the last entry 6ms
+     → expected [Function] to throw an error
+   × emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema "object" 1ms
+     → expected [Function] to throw an error
+   × emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema %j 1ms
+     → expected [Function] to throw an error
+   × emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema true 0ms
+     → expected [Function] to throw an error
+   × artifact emitter CLI with isolated package fixtures (no installed package changes) > requires an explicit probe even when historical passing evidence exists 120ms
+     → expected +0 to be 1 // Object.is equality
+   × artifact emitter CLI with isolated package fixtures (no installed package changes) > emits an explicit probe once and preserves an existing evidence artifact 196ms
+     → expected +0 to be 1 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 10 passed (16)
+   Start at  12:29:39
+   Duration  645ms (transform 65ms, setup 0ms, collect 62ms, tests 329ms, environment 0ms, prepare 105ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/artifact-validation.test.ts > emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects duplicate tool identities instead of hashing the last entry
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ tests/artifact-validation.test.ts:122:11
+    120|         ...validProbeData,
+    121|         discovered_tools: [...validProbeData.discovered_tools, validPr…
+    122|       })).toThrow(/DUPLICATE_TOOL/);
+       |           ^
+    123|     });
+    124| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/artifact-validation.test.ts > emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema "object"
+ FAIL  tests/artifact-validation.test.ts > emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema %j
+ FAIL  tests/artifact-validation.test.ts > emit-candidate-artifact validation logic with mock fixtures/doubles > extractRawSchemaHashes probe verification > rejects non-object schema true
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ tests/artifact-validation.test.ts:130:11
+    128|         discovered_tools: validProbeData.discovered_tools.map(t =>
+    129|           t.name === "write_file" ? { ...t, outputSchema: schema } : t…
+    130|       })).toThrow(/INVALID_TOOL_SCHEMA/);
+       |           ^
+    131|     });
+    132| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tests/artifact-validation.test.ts > artifact emitter CLI with isolated package fixtures (no installed package changes) > requires an explicit probe even when historical passing evidence exists
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/artifact-validation.test.ts:208:29
+    206|     try {
+    207|       const result = f.run([]);
+    208|       expect(result.status).toBe(1);
+       |                             ^
+    209|       expect(result.stderr).toContain("PROBE_PATH_REQUIRED");
+    210|       expect(fs.readFileSync(f.pointer, "utf8")).toBe("PRESERVE_CURREN…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/artifact-validation.test.ts > artifact emitter CLI with isolated package fixtures (no installed package changes) > emits an explicit probe once and preserves an existing evidence artifact
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/artifact-validation.test.ts:222:39
+    220|       expect(JSON.parse(artifact).provenance.probe_source).toBe(f.prob…
+    221|       fs.writeFileSync(f.pointer, "NEWER_CURRENT_POINTER");
+    222|       expect(f.run([f.probe]).status).toBe(1);
+       |                                       ^
+    223|       expect(fs.readFileSync(artifactPath, "utf8")).toBe(artifact);
+    224|       expect(fs.readFileSync(f.pointer, "utf8")).toBe("NEWER_CURRENT_P…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+npm error Lifecycle script `test:unit` failed with error:
+npm error code 1
+npm error path D:\Môn học\ATI\ATI_Project\packages\engine
+npm error workspace @wap/engine@0.1.0
+npm error location D:\Môn học\ATI\ATI_Project\packages\engine
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.unit.config.ts tests/artifact-validation.test.ts

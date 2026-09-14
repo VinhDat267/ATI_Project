@@ -6,6 +6,7 @@ import {
   WorkflowEngine,
   openLocalGateway,
   EngineError,
+  loadFilesystemLaunch,
   type Gateway,
 } from "./index.js";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
@@ -59,8 +60,15 @@ else {
         ["prepare-b02", "prepare", "approve", "reject", "execute"].includes(
           command,
         )
-      )
-        gateway = await openLocalGateway({ root, databaseUrl, userId });
+      ) {
+        const filesystem = await loadFilesystemLaunch(root, userId);
+        gateway = await openLocalGateway({
+          root,
+          databaseUrl,
+          userId,
+          ...(filesystem ? { filesystem } : {}),
+        });
+      }
       const engine = new WorkflowEngine(db, gateway, userId),
         id = args[0]!;
       let result: unknown;

@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "evidence_dir": "docs/task-hub-evidence/batch-02/FS-06/1789389026257-docs-check",
+  "markdown_files": 15,
+  "local_links_checked": 96,
+  "npm_scripts_checked": 31,
+  "cli_commands_checked": 22,
+  "plans_checked": 3,
+  "manifest_links_checked": 94,
+  "failures": 0
+}

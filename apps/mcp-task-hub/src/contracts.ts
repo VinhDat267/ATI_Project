@@ -18,6 +18,11 @@ export const ENABLED_TOOL_NAMES = [
   "read_sheet_range",
   "append_sheet_rows",
   "send_slack_message",
+  "list_cards",
+  "get_card",
+  "list_members",
+  "create_card",
+  "move_card",
 ] as const;
 export const EnabledToolNameSchema = z.enum(ENABLED_TOOL_NAMES);
 export type EnabledToolName = z.infer<typeof EnabledToolNameSchema>;
@@ -33,6 +38,13 @@ const cardSummary = z
     list_name: id,
   })
   .strict();
+
+const calendarDate = z
+  .string()
+  .regex(
+    /^(?!0000)(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$/,
+    "Invalid calendar date (YYYY-MM-DD, year 0001-9999)",
+  );
 
 export const inputs = {
   read_sheet_range: z
@@ -53,8 +65,8 @@ export const inputs = {
       board_id: id,
       list_name: id.optional(),
       assignee_id: id.optional(),
-      since: z.iso.date().optional(),
-      until: z.iso.date().optional(),
+      since: calendarDate.optional(),
+      until: calendarDate.optional(),
     })
     .strict(),
   get_card: z.object({ card_id: id }).strict(),
@@ -65,7 +77,7 @@ export const inputs = {
       list_name: id,
       title: z.string().min(1).max(500).regex(/\S/),
       description: z.string().max(16000).optional(),
-      due_date: z.iso.date().optional(),
+      due_date: calendarDate.optional(),
       assignee_id: id.optional(),
     })
     .strict(),

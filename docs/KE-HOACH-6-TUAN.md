@@ -17,7 +17,9 @@ Giả định 14h/người/tuần, tổng 168h. Trần xây dựng 135h gồm **
 
 Các sửa thư viện trong FIX-REPORT đã có thể tái sử dụng, nhưng không bỏ G1/G2 chỉ vì unit tests qua. Hoạt động tuần 1 nằm trong quỹ chứ không tính là đã hoàn tất ứng dụng.
 
-**Tiến độ 13/09:** [G1 đợt đầu](G1-STATUS-2026-09-13.md) đã đưa DB + read/append/send qua MCP thật. [Controller/engine CLI](ENGINE-STATUS-2026-09-13.md) tiếp tục chạy plan tay qua một preview/approval, write, trace, cancel, fault injection và recovery không resume; các kiểm engine dùng controller thật. G1 tổng thể chưa đạt: còn 5 task_hub tool, filesystem và rubric. G2 có bằng chứng ở luồng ba tool này, chưa phải nghiệm thu toàn catalog/HTTP. Bước kế tiếp là đóng các phần G1/G2 còn thiếu rồi HTTP/session/UI/polling tuần 3; chưa chuyển sang LLM.
+**Ảnh chụp tiến độ 13/09 (lịch sử):** Đợt 1 đã hoàn thành toàn bộ 8 tool local của server `task_hub` và migration `0004_task_hub_cards.sql`; [trạng thái task_hub](TASK-HUB-STATUS-2026-09-13.md) ghi nhận 142/142 tests pass trên DB và MCP thật. [Controller/engine CLI](ENGINE-STATUS-2026-09-13.md) chạy plan tay qua một preview/approval, write, trace, cancel, fault injection (crash 86, lost response, concurrency) và recovery không resume. Tại mốc đó, G1 tổng thể là PARTIAL vì filesystem và rubric chưa hoàn tất.
+
+**Trạng thái hiện hành 14/09:** FS-05 đạt **TECHNICAL PASS** cho E01–E14 với 8 public `task_hub` tools và 2 public `filesystem` tools; fresh FS-06 gate đạt **258 passed, 1 skipped**. G1 overall vẫn **PARTIAL** vì rubric chính thức và công việc nhóm đại diện `OPEN`; HTTP/session/UI, polling 2 giây và AI evaluation `NOT_RUN`. [Filesystem status và manual guide](G1-FILESYSTEM-STATUS-2026-09-13.md) ghi bằng chứng và giới hạn. Công việc kế tiếp phụ thuộc rubric là tiếp nhận nguồn/representative work; các lớp runtime kế tiếp là HTTP/session/UI/polling rồi AI theo kế hoạch, chưa được xem là đã triển khai.
 
 ## Cổng cắt phạm vi
 

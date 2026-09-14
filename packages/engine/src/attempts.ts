@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { normalizeToolResult, validateToolCall, type Step } from "@wap/dsl";
 import { Store } from "./store.js";
-import type { Gateway, GatewayResult } from "./gateway.js";
+import type { Gateway, GatewayResult, CallContext } from "./gateway.js";
 import {
   EngineError,
   BeforeDispatchError,
@@ -11,6 +11,7 @@ import {
   toolTrace,
   type EngineTool,
 } from "./snapshot.js";
+import { receiverModeFor } from "./receiver-policy.js";
 type Certainty =
   "confirmed" | "known_not_applied" | "before_dispatch" | "unknown";
 export interface AttemptOutcome {
@@ -19,7 +20,8 @@ export interface AttemptOutcome {
   certainty: Certainty;
   message: string | null;
 }
-function knownToolError(result: GatewayResult) {
+function knownToolError(tool: EngineTool, result: GatewayResult) {
+  if (tool.server !== "task_hub") return false;
   if (!result.isError) return false;
   try {
     const item = result.content?.[0] as
@@ -53,12 +55,14 @@ export async function callStep(
     throw new BeforeDispatchError(
       checked.issues.map((i) => i.message).join("; "),
     );
+  const receiverMode = isWrite ? receiverModeFor(tool) : undefined;
   const maximum = isWrite ? 1 : step.retry.max_attempts;
   for (let attempt = 1; attempt <= maximum; attempt++) {
     const attemptId = randomUUID(),
       started = Date.now();
+    let context: CallContext | undefined;
     try {
-      await store.db.client.begin(async (tx) => {
+      context = await store.db.client.begin(async (tx) => {
         await store.assertWorker(tx);
         const run = await store.run(tx, runId, true);
         if (
@@ -87,6 +91,7 @@ export async function callStep(
           attempt_no: attempt,
           resolved_args: args,
         });
+        return { timeZone: run.time_zone };
       });
     } catch (error) {
       throw new BeforeDispatchError(
@@ -102,12 +107,27 @@ export async function callStep(
       message: "MCP call failed or timed out",
     };
     try {
-      await store.assertWorker();
+      try {
+        await store.assertWorker();
+      } catch (error) {
+        throw new BeforeDispatchError(
+          error instanceof EngineError
+            ? error.message
+            : "Worker lease is no longer active",
+        );
+      }
       const response = await gateway.call(
-        tool.name,
+        { server: tool.server, name: tool.name },
         args,
         auth,
         step.timeout_ms,
+        {
+          timeZone: context!.timeZone,
+          worker: {
+            id: store.workerId,
+            assertActive: () => store.assertWorker(),
+          },
+        },
       );
       const result = normalizeToolResult(tool, response);
       if (result.ok)
@@ -122,7 +142,7 @@ export async function callStep(
           ok: false,
           output: null,
           certainty:
-            !isWrite || knownToolError(response)
+            !isWrite || knownToolError(tool, response)
               ? "known_not_applied"
               : "unknown",
           message: response.isError
@@ -130,7 +150,7 @@ export async function callStep(
             : "MCP output failed its reviewed schema",
         };
     } catch (error) {
-      if (error instanceof EngineError)
+      if (error instanceof BeforeDispatchError)
         outcome = {
           ok: false,
           output: null,
@@ -139,7 +159,7 @@ export async function callStep(
         };
     }
     // A valid reply alone is insufficient evidence that a local write committed.
-    if (isWrite && outcome.ok) {
+    if (isWrite && outcome.ok && receiverMode === "local_transaction") {
       const [receipt] = await store.db
         .client`SELECT * FROM hub_receipts WHERE user_id=${store.userId} AND operation_id=${auth!.operation_id!}`;
       const [op] = await store.db

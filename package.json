@@ -20,6 +20,7 @@
     "db:up:g1": "docker compose -f compose.g1.yaml up -d --wait",
     "db:migrate:g1": "npm run build -w @wap/db && node packages/db/dist/cli.js migrate",
     "db:seed:g1": "npm run build -w @wap/db && node packages/db/dist/cli.js seed",
+    "fs:demo:setup": "node scripts/prepare-filesystem-demo.mjs",
     "mcp:task-hub": "node apps/mcp-task-hub/dist/server.js",
     "test:integration": "npm run build && npm run test:integration -w @wap/mcp-task-hub && npm run test:integration -w @wap/engine",
     "check:g1": "npm run check && npm run test:integration -w @wap/mcp-task-hub",

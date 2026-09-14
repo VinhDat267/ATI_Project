@@ -19,6 +19,12 @@ import {
 } from "./contracts.js";
 import { writeFingerprint } from "./fingerprint.js";
 import { ToolError } from "./errors.js";
+import {
+  isCardReadName,
+  readCardTool,
+  isCardWriteName,
+  writeCardTool,
+} from "./cards.js";
 
 export { ToolError };
 const deny = (message = "Approval, operation or payload is not valid") =>
@@ -65,7 +71,18 @@ export class TaskHub {
     name: ToolName,
     args: unknown,
     metadata: unknown,
+    runtimeMetadata?: unknown,
   ): Promise<{ output: Record<string, unknown>; replayed: boolean }> {
+    if (isCardReadName(name)) {
+      const output = await readCardTool(
+        this.connection,
+        this.userId,
+        name,
+        args,
+        runtimeMetadata,
+      );
+      return { output, replayed: false };
+    }
     if (name === "read_sheet_range") {
       const input = inputs.read_sheet_range.parse(args),
         range = parseRange(input.range);
@@ -192,7 +209,14 @@ export class TaskHub {
           receipt.policyVersion !== POLICY_VERSION
         )
           throw deny("Operation payload conflicts with its receipt");
-        return { output: outputs[name].parse(receipt.result), replayed: true };
+        const parsed = outputs[name].safeParse(receipt.result);
+        if (!parsed.success) {
+          throw new ToolError(
+            "INTERNAL_ERROR",
+            "Stored receipt result failed the output contract",
+          );
+        }
+        return { output: parsed.data, replayed: true };
       }
       if (operation.state !== "in_flight")
         throw deny(
@@ -273,11 +297,20 @@ export class TaskHub {
           channel: created!.channel,
           text: created!.text,
         };
+      } else if (isCardWriteName(name)) {
+        output = await writeCardTool(tx, this.userId, name, input, assertLive);
       } else {
         throw new ToolError("BAD_ARGS", "Tool is not enabled");
       }
       // Validation and receipt insert belong to the same transaction as the mutation.
-      const checked = outputs[name].parse(output);
+      const checkedResult = outputs[name].safeParse(output);
+      if (!checkedResult.success) {
+        throw new ToolError(
+          "INTERNAL_ERROR",
+          "Write output failed the output contract",
+        );
+      }
+      const checked = checkedResult.data;
       await tx.insert(receipts).values({
         userId: this.userId,
         operationId: auth.data.operation_id,

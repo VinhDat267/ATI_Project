@@ -14,6 +14,7 @@ import {
   canonicalJson,
   payloadHash,
 } from "./snapshot.js";
+import { receiverModeFor } from "./receiver-policy.js";
 
 export async function execute(store: Store, gateway: Gateway, id: string) {
   return store.withWorker(
@@ -102,6 +103,7 @@ export async function execute(store: Store, gateway: Gateway, id: string) {
               op.tool_server !== tool.server ||
               op.tool_name !== tool.name ||
               op.policy_version !== tool.policyVersion ||
+              op.receiver_mode !== receiverModeFor(tool) ||
               op.state !== "reserved" ||
               op.payload_hash !== action.payload_hash ||
               canonicalJson(op.resolved_args) !== canonicalJson(resolved)

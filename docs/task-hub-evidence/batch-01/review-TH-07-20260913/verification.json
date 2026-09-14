@@ -1,0 +1,77 @@
+{
+  "recorded_at": "2026-09-13T15:45:32.017Z",
+  "scope": "INDEPENDENT_READ_ONLY_REVIEW_OF_TH07",
+  "checks": {
+    "protected_sha256": {
+      "files": 162,
+      "mismatches": []
+    },
+    "source_sha256": {
+      "files": 23,
+      "mismatches": []
+    },
+    "manifest": {
+      "matched_hashes": 40,
+      "missing_required": []
+    },
+    "runtime": {
+      "eight_tools": [
+        "read_sheet_range",
+        "append_sheet_rows",
+        "send_slack_message",
+        "list_cards",
+        "get_card",
+        "list_members",
+        "create_card",
+        "move_card"
+      ],
+      "exact_seed_outputs_match": true,
+      "old_three_contracts_identical": true,
+      "migration_checksums_match": 4,
+      "node": "v24.19.0",
+      "sdk": "1.30.0",
+      "postgres": [
+        {
+          "version": "16.15 (Debian 16.15-1.pgdg12+2)"
+        }
+      ],
+      "database": "engine_it_7b587ed8413c408ab450fc7886c37a82",
+      "independently_confirmed_database_absent": true
+    },
+    "commands": {
+      "full_gate": {
+        "dsl_unit": 39,
+        "mcp_db_integration": 63,
+        "engine_integration": 40,
+        "total": 142,
+        "failed": 0,
+        "skipped": 0
+      },
+      "snapshot_attempts": [
+        {
+          "name": "capture-runtime",
+          "exit_code": 1
+        },
+        {
+          "name": "capture-runtime-02",
+          "exit_code": 0
+        }
+      ],
+      "timing_source": "Antigravity process-captured commands.json; independently checked ordering and logs"
+    },
+    "cli_help": {
+      "exit_code": 0,
+      "help": {
+        "prepare-b02": "Prepare the checked-in dev hand plan; reads only, returns pending approval",
+        "prepare <plan.json> [inputs.json]": "Prepare a hand-written plan",
+        "preview|detail|trace|cancel|reconcile <run_id>": "Inspect a run, request cancel, or inspect receipts",
+        "approve|reject <run_id> <approval_id> <version_id> <snapshot_hash>": "Decide the exact saved preview",
+        "execute <run_id>": "Claim and run a fresh approved job once",
+        "events <run_id> [since_seq]": "Read at most 100 persisted events",
+        "recover": "Mark orphaned claimed runs; never resume or dispatch tools"
+      }
+    },
+    "plan_checkboxes": 9
+  },
+  "status": "PASS"
+}

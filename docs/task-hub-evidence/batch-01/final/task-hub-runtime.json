@@ -1,0 +1,577 @@
+{
+  "recorded_at": "2026-09-13T15:38:08.222Z",
+  "scope": "ISOLATED_SEEDED_DB_READ_ONLY_MCP_CALLS",
+  "node": "v24.19.0",
+  "sdk": "1.30.0",
+  "database": "engine_it_7b587ed8413c408ab450fc7886c37a82",
+  "database_dropped": true,
+  "principal": "00000000-0000-4000-8000-000000000001",
+  "live_discovery_validated": true,
+  "read_assertions_verified": true,
+  "tools": [
+    {
+      "server": "task_hub",
+      "name": "read_sheet_range",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "range"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "values": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "values",
+          "row_count"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "append_sheet_rows",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sheet_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "rows": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 8192
+              }
+            }
+          }
+        },
+        "required": [
+          "spreadsheet_id",
+          "sheet_name",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "appended_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "appended_count"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "send_slack_message",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "thread_ts": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "channel",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "list_cards",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "assignee_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "since": {
+            "type": "string",
+            "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "until": {
+            "type": "string",
+            "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "board_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cards": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "board_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "list_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "id",
+                "board_id",
+                "title",
+                "list_name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "cards",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "get_card",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "card_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "board_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "board_id",
+          "title",
+          "list_name"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "list_members",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "board_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "members": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "task_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "task_count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "create_card",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "due_date": {
+            "type": "string",
+            "pattern": "^(?!0000)(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "assignee_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "board_id",
+          "list_name",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    },
+    {
+      "server": "task_hub",
+      "name": "move_card",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "target_list": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "card_id",
+          "target_list"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "list_name"
+        ],
+        "additionalProperties": false
+      },
+      "artifactHash": "c22f0f3cfa5691fc9c4d13691739525c49e71361b7a2d02e112d293758e722ae"
+    }
+  ],
+  "outputs": {
+    "read_sheet_range": {
+      "values": [
+        [
+          "API",
+          "Done"
+        ],
+        [
+          "UI",
+          "Doing"
+        ]
+      ],
+      "row_count": 2
+    },
+    "get_card": {
+      "id": "c1",
+      "board_id": "board_a",
+      "title": "Viết API",
+      "list_name": "Doing"
+    },
+    "list_cards": {
+      "cards": [
+        {
+          "id": "c1",
+          "board_id": "board_a",
+          "title": "Viết API",
+          "list_name": "Doing"
+        },
+        {
+          "id": "c2",
+          "board_id": "board_a",
+          "title": "Kiểm thử",
+          "list_name": "Done"
+        }
+      ],
+      "count": 2
+    },
+    "list_members": {
+      "members": [
+        {
+          "id": "m1",
+          "name": "An",
+          "task_count": 1
+        },
+        {
+          "id": "m2",
+          "name": "Bình",
+          "task_count": 0
+        }
+      ]
+    }
+  },
+  "postgres": [
+    {
+      "version": "16.15 (Debian 16.15-1.pgdg12+2)"
+    }
+  ],
+  "migrations": [
+    {
+      "name": "0001_init.sql",
+      "checksum": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8"
+    },
+    {
+      "name": "0002_audit_contracts.sql",
+      "checksum": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689"
+    },
+    {
+      "name": "0003_task_hub_local.sql",
+      "checksum": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3"
+    },
+    {
+      "name": "0004_task_hub_cards.sql",
+      "checksum": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e"
+    }
+  ]
+}

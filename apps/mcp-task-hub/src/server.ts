@@ -26,6 +26,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       name,
       request.params.arguments ?? {},
       request.params._meta?.["ati/authorization"],
+      request.params._meta?.["ati/runtime"],
     );
     return {
       content: [{ type: "text", text: JSON.stringify(result.output) }],

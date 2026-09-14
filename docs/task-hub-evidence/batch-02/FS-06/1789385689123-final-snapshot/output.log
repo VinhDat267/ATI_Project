@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "database": "fs06_it_80f6387ff158454fbc8636e3ae4f69f6",
+  "migrations": 5,
+  "raw_task_hub": 8,
+  "raw_filesystem": 14,
+  "normalized": 10,
+  "oracles": 5,
+  "cleanup": {
+    "db_dropped": true,
+    "root_removed": true
+  },
+  "evidence": "D:/Môn học/ATI/ATI_Project/docs/task-hub-evidence/batch-02/FS-06/1789385689123-final-snapshot/final-snapshot.json"
+}
