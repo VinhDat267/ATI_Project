@@ -18,6 +18,8 @@ export interface RunRow extends postgres.Row {
   user_id: string;
   workflow_id: string;
   workflow_version_id: string | null;
+  source_prompt: string;
+  planner_result: unknown | null;
   status: RunStatus;
   inputs: Record<string, string | number | boolean>;
   runtime: Record<string, string>;
@@ -209,7 +211,7 @@ export class Store {
         status: run.status,
         workflow_version_id: run.workflow_version_id,
         plan: version?.plan ?? null,
-        planner_result: null,
+        planner_result: run.planner_result ?? null,
         time_zone: run.time_zone,
         runtime: run.runtime,
         last_seq: run.next_event_seq - 1,
@@ -225,6 +227,62 @@ export class Store {
             }
           : null,
       });
+    });
+  }
+
+  async claimPrepare(id: string) {
+    return this.db.client.begin(async (tx) => {
+      const run = await this.run(tx, id, true);
+      if (run.status !== "planning" || run.workflow_version_id !== null)
+        throw new EngineError(
+          "CONFLICT",
+          "Run is no longer awaiting preparation",
+        );
+      const jobs = await tx`SELECT id FROM run_outbox
+        WHERE run_id=${id} AND job_kind='prepare' AND delivered_at IS NULL
+        ORDER BY id LIMIT 1 FOR UPDATE`;
+      if (!jobs.length)
+        throw new EngineError("CONFLICT", "Prepare job is no longer pending");
+      await tx`UPDATE runs SET claimed_by=${this.workerId},claimed_at=now(),heartbeat_at=now() WHERE id=${id}`;
+      return run;
+    });
+  }
+
+  async markPrepareDelivered(id: string) {
+    await this.db.client`
+      UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now())
+      WHERE run_id=${id} AND job_kind='prepare' AND delivered_at IS NULL`;
+  }
+
+  async recordPlannerResult(
+    id: string,
+    result: unknown,
+    terminal?: "refused" | "needs_input",
+  ) {
+    await this.db.client.begin(async (tx) => {
+      const run = await this.run(tx, id, true);
+      if (run.status !== "planning")
+        throw new EngineError("CONFLICT", "Run is no longer planning");
+      await tx`UPDATE runs SET planner_result=${tx.json(json(result))} WHERE id=${id}`;
+      if (terminal) {
+        await tx`UPDATE runs SET claimed_by=NULL,claimed_at=NULL,heartbeat_at=NULL WHERE id=${id}`;
+        await this.transition(tx, run, terminal, {
+          error:
+            terminal === "refused"
+              ? "Planner refused this request"
+              : "Planner needs clarification",
+        });
+        await tx`UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now()) WHERE run_id=${id} AND job_kind='prepare'`;
+      }
+    });
+  }
+
+  async failPlanning(id: string, message: string) {
+    await this.db.client.begin(async (tx) => {
+      const run = await this.run(tx, id, true);
+      if (TERMINAL_STATUSES.includes(run.status)) return;
+      await this.transition(tx, run, "failed", { error: message });
+      await tx`UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now()) WHERE run_id=${id} AND job_kind='prepare'`;
     });
   }
   async preview(id: string) {

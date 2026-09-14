@@ -7,15 +7,19 @@ import {
 } from "node:http";
 import type { Database } from "@wap/db";
 import { z } from "zod";
+import { EngineError, type WorkflowEngine } from "@wap/engine";
 import {
   ApiErrorSchema,
+  CreateRunSchema,
   LoginRequestSchema,
   LoginResponseSchema,
+  RunAcceptedSchema,
   ServerSummaryListSchema,
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore } from "./auth.js";
 import { HttpError, readJson, writeJson } from "./http.js";
+import type { WorkerControl } from "./worker.js";
 
 export interface ApiRuntime {
   server: Server;
@@ -27,6 +31,8 @@ export function createApi(options: {
   db: Database;
   config: ApiConfig;
   principalExists?: () => Promise<boolean>;
+  engine?: WorkflowEngine;
+  worker?: WorkerControl;
 }): ApiRuntime {
   const { config } = options;
   const principalExists =
@@ -133,13 +139,43 @@ export function createApi(options: {
         writeJson(response, 200, servers, requestId);
         return;
       }
-      if (path === "/runs" || path.startsWith("/runs/")) {
+      if (path === "/runs") {
+        if (request.method !== "POST") {
+          response.setHeader("allow", "POST");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        const userId = sessions.authenticate(request.headers.authorization);
+        if (!options.engine || config.plannerMode === "disabled")
+          throw new HttpError(
+            503,
+            "PLANNER_UNAVAILABLE",
+            "Planner is not enabled",
+          );
+        const body = CreateRunSchema.parse(await readJson(request));
+        const accepted = await options.engine.accept(body);
+        options.worker?.wake();
+        if (userId !== config.userId)
+          throw new HttpError(403, "FORBIDDEN", "Principal mismatch");
+        writeJson(response, 202, RunAcceptedSchema.parse(accepted), requestId);
+        return;
+      }
+      if (path.startsWith("/runs/")) {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
         sessions.authenticate(request.headers.authorization);
-        throw new HttpError(
-          501,
-          "NOT_IMPLEMENTED",
-          "Run routes are not implemented in API-01",
-        );
+        if (!options.engine)
+          throw new HttpError(
+            501,
+            "NOT_IMPLEMENTED",
+            "Run detail is not enabled",
+          );
+        const id = path.slice("/runs/".length);
+        if (!id || id.includes("/"))
+          throw new HttpError(404, "NOT_FOUND", "Route not found");
+        writeJson(response, 200, await options.engine.detail(id), requestId);
+        return;
       }
       throw new HttpError(404, "NOT_FOUND", "Route not found");
     } catch (error) {
@@ -163,6 +199,19 @@ export function createApi(options: {
 
   function mapError(error: unknown): HttpError {
     if (error instanceof HttpError) return error;
+    if (error instanceof EngineError) {
+      const status =
+        error.code === "NOT_FOUND"
+          ? 404
+          : error.code === "ACTIVE_RUN" || error.code === "CONFLICT"
+            ? 409
+            : error.code === "INVALID_INPUT" || error.code === "INVALID_PLAN"
+              ? 400
+              : error.code === "BUSY" || error.code === "CONFIG"
+                ? 503
+                : 500;
+      return new HttpError(status, error.code, error.message);
+    }
     if (error instanceof AuthError)
       return new HttpError(
         error.code === "RATE_LIMITED" ? 429 : 401,
@@ -207,8 +256,13 @@ export function createApi(options: {
     close: () =>
       new Promise<void>((resolve, reject) => {
         closing = true;
-        if (!server.listening) return resolve();
-        server.close((error) => (error ? reject(error) : resolve()));
+        const workerStop = options.worker?.stop() ?? Promise.resolve();
+        void workerStop.finally(() => {
+          server.closeIdleConnections();
+          server.closeAllConnections();
+          if (!server.listening) return resolve();
+          server.close((error) => (error ? reject(error) : resolve()));
+        });
       }),
   };
 }

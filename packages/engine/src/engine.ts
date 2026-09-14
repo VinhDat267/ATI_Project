@@ -2,7 +2,9 @@ import type { Database } from "@wap/db";
 import type { Gateway } from "./gateway.js";
 import { Store } from "./store.js";
 import { EngineError } from "./snapshot.js";
-import { prepare } from "./prepare.js";
+import { prepare, prepareAccepted } from "./prepare.js";
+import { accept } from "./accept.js";
+import type { PlannerPort } from "./planner-port.js";
 import { decide } from "./approval.js";
 import { execute } from "./execute.js";
 import { cancel, recoverOrphans, reconcile } from "./recovery.js";
@@ -27,6 +29,12 @@ export class WorkflowEngine {
         "This action requires the reviewed MCP gateway",
       );
     return this.gateway;
+  }
+  accept(request: unknown) {
+    return accept(this.store, request);
+  }
+  prepareAccepted(id: string, planner: PlannerPort) {
+    return prepareAccepted(this.store, this.executionGateway(), id, planner);
   }
   prepare(
     plan: unknown,

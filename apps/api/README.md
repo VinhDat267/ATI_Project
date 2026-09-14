@@ -1,6 +1,6 @@
 # `@wap/api`
 
-API HTTP local của MVP B. API-01 cung cấp một boundary chạy trên `127.0.0.1`, đăng nhập một tài khoản demo duy nhất, bearer session trong bộ nhớ và `GET /api/v1/servers`. Các route run vẫn trả `501 NOT_IMPLEMENTED` cho tới khi API-02 nối queue/engine.
+API HTTP local của MVP B. API-01 cung cấp boundary chạy trên `127.0.0.1`, đăng nhập một tài khoản demo duy nhất, bearer session trong bộ nhớ và `GET /api/v1/servers`. API-02 nối `POST /api/v1/runs` (durable `202`) và `GET /api/v1/runs/:id`; worker planner chạy bất đồng bộ qua PostgreSQL outbox. Execute/approval vẫn chờ các task sau.
 
 ## Cấu hình bắt buộc
 
@@ -24,4 +24,4 @@ npm run test:integration -w @wap/api
 npm run api:dev
 ```
 
-Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`.
+Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`. `API_PLANNER_MODE=disabled` giữ `POST /runs` ở trạng thái `503 PLANNER_UNAVAILABLE`; `dev_fixture` chỉ nhận đúng các prompt server-owned trong `testdata` và không phải AI evaluation.

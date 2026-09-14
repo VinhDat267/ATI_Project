@@ -1,4 +1,10 @@
 export { WorkflowEngine } from "./engine.js";
+export { accept } from "./accept.js";
+export {
+  parsePlannerResult,
+  type PlannerPort,
+  type CreateRun,
+} from "./planner-port.js";
 export {
   openLocalGateway,
   composeGateway,
@@ -14,7 +20,11 @@ export {
 } from "./gateway.js";
 export { BeforeDispatchError, EngineError } from "./snapshot.js";
 export { receiverModeFor, type ReceiverMode } from "./receiver-policy.js";
-export { loadFilesystemLaunch, captureFilesystemArtifact, captureFilesystemArtifactDeep } from "./launch-policy.js";
+export {
+  loadFilesystemLaunch,
+  captureFilesystemArtifact,
+  captureFilesystemArtifactDeep,
+} from "./launch-policy.js";
 export {
   openFilesystemConnection,
   normalizeFilesystemReadResult,

@@ -10,6 +10,11 @@ import {
 import { createApi, type ApiRuntime } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import type { ApiConfig } from "../src/config.js";
+import { loadDevPlanner } from "../src/dev-planner.js";
+import { createPrepareWorker, type WorkerControl } from "../src/worker.js";
+import { WorkflowEngine, openLocalGateway, type Gateway } from "@wap/engine";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 const adminUrl =
   process.env.API_TEST_ADMIN_URL ??
@@ -22,11 +27,19 @@ export interface ApiFixture {
   userId: string;
   email: string;
   password: string;
+  b02Prompt: string;
+  login(): Promise<string>;
   call(path: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
 }
 
-export async function makeApiFixture(): Promise<ApiFixture> {
+export async function makeApiFixture(
+  options: {
+    workerEnabled?: boolean;
+    plannerMode?: "disabled" | "dev_fixture";
+    filesystemEnabled?: boolean;
+  } = {},
+): Promise<ApiFixture> {
   const dbName = `api_it_${randomUUID().replaceAll("-", "")}`;
   const address = new URL(adminUrl);
   address.pathname = `/${dbName}`;
@@ -49,10 +62,24 @@ export async function makeApiFixture(): Promise<ApiFixture> {
     passwordHash,
     sessionTtlMs: 60_000,
     cursorKey: Buffer.alloc(32, 7),
-    plannerMode: "disabled",
+    plannerMode: options.plannerMode ?? "disabled",
   };
-  const api = createApi({ db, config });
+  const root = path.resolve(
+    fileURLToPath(new URL("../../../", import.meta.url)),
+  );
+  const planner =
+    config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined;
+  let gateway: Gateway | undefined;
+  let worker: WorkerControl | undefined;
+  if (options.workerEnabled) {
+    gateway = await openLocalGateway({ root, databaseUrl, userId });
+  }
+  const engine = new WorkflowEngine(db, gateway, userId);
+  if (options.workerEnabled && planner)
+    worker = createPrepareWorker({ db, userId, engine, planner });
+  const api = createApi({ db, config, engine, worker });
   const baseUrl = await api.listen();
+  worker?.start();
   let closed = false;
   return {
     baseUrl,
@@ -61,6 +88,20 @@ export async function makeApiFixture(): Promise<ApiFixture> {
     userId,
     email,
     password,
+    b02Prompt: planner?.b02Prompt ?? "",
+    async login() {
+      const response = await fetch(`${baseUrl}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (response.status !== 200)
+        throw new Error(`Login failed: ${response.status}`);
+      const body = (await response.json()) as { token?: string };
+      if (!body.token)
+        throw new Error("Login response did not contain a token");
+      return body.token;
+    },
     call(path, init = {}) {
       return fetch(`${baseUrl}${path}`, init);
     },
@@ -68,6 +109,7 @@ export async function makeApiFixture(): Promise<ApiFixture> {
       if (closed) return;
       closed = true;
       await api.close();
+      await gateway?.close();
       await db.close();
       await admin.unsafe(`DROP DATABASE "${dbName}" WITH (FORCE)`);
       await admin.end();
