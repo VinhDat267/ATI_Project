@@ -183,7 +183,7 @@ paths:
     post:
       operationId: decideApproval
       description: Atomically compare owner, pending decision, run status, version, snapshot and expiry. Duplicate/stale
-        decision returns 409. Reject yields rejected; approve yields running.
+        decision returns 409. Reject yields rejected; approve yields running and queues one execute job.
       requestBody:
         required: true
         content:
@@ -206,7 +206,7 @@ paths:
     post:
       operationId: cancelRun
       description: Cooperative cancellation. Never claim rollback of an in-flight tool call. Unknown writes terminate as
-        reconciliation_required.
+        reconciliation_required; terminal cancellation returns 409.
       responses:
         "202":
           description: Cancellation requested
@@ -2148,10 +2148,12 @@ components:
       properties:
         approval_id:
           type: string
-          minLength: 1
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         workflow_version_id:
           type: string
-          minLength: 1
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         snapshot_hash:
           type: string
           pattern: ^[a-f0-9]{64}$

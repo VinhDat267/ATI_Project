@@ -6,6 +6,7 @@ import { createApi } from "./app.js";
 import { loadConfig } from "./config.js";
 import { loadDevPlanner } from "./dev-planner.js";
 import { createPrepareWorker } from "./worker.js";
+import { createExpiryMaintenance } from "./maintenance.js";
 
 const config = loadConfig();
 const databaseUrl = process.env.G1_DATABASE_URL;
@@ -24,9 +25,12 @@ const worker =
   planner && gateway
     ? createPrepareWorker({ db, userId: config.userId, engine, planner })
     : undefined;
-const api = createApi({ db, config, engine, worker });
+if (!worker) await engine.recoverOrphans().catch(() => undefined);
+const maintenance = createExpiryMaintenance({ engine });
+const api = createApi({ db, config, engine, worker, maintenance });
 const url = await api.listen();
 worker?.start();
+maintenance.start();
 console.log(
   JSON.stringify({
     event: "api_listening",

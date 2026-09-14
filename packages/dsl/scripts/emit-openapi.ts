@@ -190,7 +190,7 @@ const spec = {
       post: {
         operationId: "decideApproval",
         description:
-          "Atomically compare owner, pending decision, run status, version, snapshot and expiry. Duplicate/stale decision returns 409. Reject yields rejected; approve yields running.",
+          "Atomically compare owner, pending decision, run status, version, snapshot and expiry. Duplicate/stale decision returns 409. Reject yields rejected; approve yields running and queues one execute job.",
         requestBody: { required: true, content: json(ref("ApprovalDecision")) },
         responses: {
           "200": response("RunDetail"),
@@ -204,7 +204,7 @@ const spec = {
       post: {
         operationId: "cancelRun",
         description:
-          "Cooperative cancellation. Never claim rollback of an in-flight tool call. Unknown writes terminate as reconciliation_required.",
+          "Cooperative cancellation. Never claim rollback of an in-flight tool call. Unknown writes terminate as reconciliation_required; terminal cancellation returns 409.",
         responses: {
           "202": { description: "Cancellation requested" },
           "409": { description: "Already terminal" },

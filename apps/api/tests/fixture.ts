@@ -12,6 +12,7 @@ import { hashPassword } from "../src/auth.js";
 import type { ApiConfig } from "../src/config.js";
 import { loadDevPlanner } from "../src/dev-planner.js";
 import { createPrepareWorker, type WorkerControl } from "../src/worker.js";
+import { createExpiryMaintenance } from "../src/maintenance.js";
 import { WorkflowEngine, openLocalGateway, type Gateway } from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -77,9 +78,11 @@ export async function makeApiFixture(
   const engine = new WorkflowEngine(db, gateway, userId);
   if (options.workerEnabled && planner)
     worker = createPrepareWorker({ db, userId, engine, planner });
-  const api = createApi({ db, config, engine, worker });
+  const maintenance = createExpiryMaintenance({ engine });
+  const api = createApi({ db, config, engine, worker, maintenance });
   const baseUrl = await api.listen();
   worker?.start();
+  maintenance.start();
   let closed = false;
   return {
     baseUrl,

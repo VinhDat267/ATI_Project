@@ -318,6 +318,40 @@ export class Store {
       await tx`UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now()) WHERE run_id=${id} AND job_kind='prepare'`;
     });
   }
+
+  async expireApprovals() {
+    return this.db.client.begin(async (tx) => {
+      const candidates = await tx`
+        SELECT r.id FROM runs r
+        JOIN approvals a ON a.run_id=r.id
+        WHERE r.user_id=${this.userId} AND r.status='awaiting_approval'
+          AND a.decision='pending' AND a.expires_at<=clock_timestamp()
+        ORDER BY r.created_at,r.id`;
+      let expired = 0;
+      for (const candidate of candidates) {
+        const run = await this.run(tx, candidate.id, true);
+        const approval = await this.approval(tx, candidate.id, true);
+        const expiredRow = approval
+          ? (
+              await tx`SELECT expires_at<=clock_timestamp() AS expired FROM approvals WHERE id=${approval.id}`
+            )[0]
+          : undefined;
+        if (
+          run.status !== "awaiting_approval" ||
+          !approval ||
+          approval.decision !== "pending" ||
+          !expiredRow?.expired
+        )
+          continue;
+        await tx`UPDATE approvals SET decision='expired',decided_at=now() WHERE id=${approval.id} AND decision='pending'`;
+        await this.transition(tx, run, "expired", {
+          error: "Approval expired before decision",
+        });
+        expired++;
+      }
+      return expired;
+    });
+  }
   async preview(id: string) {
     await this.run(this.db.client, id);
     const a = await this.approval(this.db.client, id);

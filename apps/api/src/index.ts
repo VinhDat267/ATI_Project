@@ -6,3 +6,7 @@ export { createPrepareWorker, type WorkerControl } from "./worker.js";
 export * from "./contracts.js";
 export { encodeTraceCursor, decodeTraceCursor } from "./cursors.js";
 export { redact } from "./redaction.js";
+export {
+  createExpiryMaintenance,
+  type MaintenanceControl,
+} from "./maintenance.js";

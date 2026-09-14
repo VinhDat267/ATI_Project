@@ -1,5 +1,6 @@
 export {
   ApiErrorSchema,
+  ApprovalDecisionSchema,
   CreateRunSchema,
   LoginRequestSchema,
   LoginResponseSchema,

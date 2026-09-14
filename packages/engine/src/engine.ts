@@ -63,11 +63,14 @@ export class WorkflowEngine {
   tracePage(id: string, cursor?: { snapshotId: string; offset: number }) {
     return this.store.tracePage(id, cursor);
   }
+  expireApprovals() {
+    return this.store.expireApprovals();
+  }
   events(id: string, sinceSeq = 0, limit = 100) {
     return this.store.events(id, sinceSeq, limit);
   }
-  cancel(id: string) {
-    return cancel(this.store, id);
+  cancel(id: string, options: { strictTerminal?: boolean } = {}) {
+    return cancel(this.store, id, options);
   }
   recoverOrphans() {
     return recoverOrphans(this.store);

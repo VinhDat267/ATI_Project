@@ -11,6 +11,7 @@ import { EngineError, type WorkflowEngine } from "@wap/engine";
 import {
   ApiErrorSchema,
   CreateRunSchema,
+  ApprovalDecisionSchema,
   LoginRequestSchema,
   LoginResponseSchema,
   RunAcceptedSchema,
@@ -21,6 +22,7 @@ import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore } from "./auth.js";
 import { HttpError, readJson, writeJson } from "./http.js";
 import type { WorkerControl } from "./worker.js";
+import type { MaintenanceControl } from "./maintenance.js";
 import { decodeTraceCursor, encodeTraceCursor } from "./cursors.js";
 import { redact } from "./redaction.js";
 
@@ -36,6 +38,7 @@ export function createApi(options: {
   principalExists?: () => Promise<boolean>;
   engine?: WorkflowEngine;
   worker?: WorkerControl;
+  maintenance?: MaintenanceControl;
 }): ApiRuntime {
   const { config } = options;
   const principalExists =
@@ -179,11 +182,6 @@ export function createApi(options: {
         return;
       }
       if (path.startsWith("/runs/")) {
-        if (request.method !== "GET") {
-          response.setHeader("allow", "GET");
-          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
-        }
-        sessions.authenticate(request.headers.authorization);
         if (!options.engine)
           throw new HttpError(
             501,
@@ -195,6 +193,12 @@ export function createApi(options: {
         const subpath = segments.join("/");
         if (!id || id.includes("/"))
           throw new HttpError(404, "NOT_FOUND", "Route not found");
+        const writeRoute = subpath === "approval" || subpath === "cancel";
+        if (request.method !== (writeRoute ? "POST" : "GET")) {
+          response.setHeader("allow", writeRoute ? "POST" : "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        const userId = sessions.authenticate(request.headers.authorization);
         if (!subpath) {
           writeJson(
             response,
@@ -202,6 +206,23 @@ export function createApi(options: {
             redact(await options.engine.detail(id)),
             requestId,
           );
+          return;
+        }
+        if (subpath === "approval") {
+          const body = ApprovalDecisionSchema.parse(await readJson(request));
+          const detail = await options.engine.decide(id, body);
+          options.worker?.wake();
+          writeJson(response, 200, redact(detail), requestId);
+          return;
+        }
+        if (subpath === "cancel") {
+          await options.engine.cancel(id, { strictTerminal: true });
+          options.worker?.wake();
+          response.statusCode = 202;
+          response.setHeader("cache-control", "no-store");
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("x-request-id", requestId);
+          response.end();
           return;
         }
         if (subpath === "events") {
@@ -226,7 +247,6 @@ export function createApi(options: {
           const values = parsed.searchParams.getAll("cursor");
           if (values.length > 1 || parsed.search.length > 2048)
             throw new HttpError(400, "INVALID_REQUEST", "Invalid trace cursor");
-          const userId = sessions.authenticate(request.headers.authorization);
           let cursor: { snapshotId: string; offset: number } | undefined;
           if (values[0] !== undefined) {
             try {
@@ -366,7 +386,9 @@ export function createApi(options: {
       new Promise<void>((resolve, reject) => {
         closing = true;
         const workerStop = options.worker?.stop() ?? Promise.resolve();
-        void workerStop.finally(() => {
+        const maintenanceStop =
+          options.maintenance?.stop() ?? Promise.resolve();
+        void Promise.all([workerStop, maintenanceStop]).finally(() => {
           server.closeIdleConnections();
           server.closeAllConnections();
           if (!server.listening) return resolve();

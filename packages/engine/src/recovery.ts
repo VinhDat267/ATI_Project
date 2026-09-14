@@ -1,10 +1,23 @@
 import { TERMINAL_STATUSES, normalizeToolResult } from "@wap/dsl";
 import { Store } from "./store.js";
-import { canonicalJson, unpackPreview, payloadHash } from "./snapshot.js";
-export async function cancel(store: Store, id: string) {
+import {
+  EngineError,
+  canonicalJson,
+  unpackPreview,
+  payloadHash,
+} from "./snapshot.js";
+export async function cancel(
+  store: Store,
+  id: string,
+  options: { strictTerminal?: boolean } = {},
+) {
   await store.db.client.begin(async (tx) => {
     const run = await store.run(tx, id, true);
-    if (TERMINAL_STATUSES.includes(run.status)) return;
+    if (TERMINAL_STATUSES.includes(run.status)) {
+      if (options.strictTerminal)
+        throw new EngineError("CONFLICT", "Terminal runs cannot be cancelled");
+      return;
+    }
     await tx`UPDATE runs SET cancel_requested_at=COALESCE(cancel_requested_at,now()) WHERE id=${id}`;
     const active =
       await tx`SELECT id FROM step_states WHERE run_id=${id} AND status='running'`;
@@ -121,8 +134,14 @@ export async function reconcile(store: Store, id: string) {
         receipt,
         result: receipt === "confirmed" ? op.receipt_result : null,
       };
-      if (op.tool_server === "filesystem" && op.receiver_mode === "non_idempotent")
-        return { ...result, dispatch_marker: op.dispatch_operation_id ? "present" : "absent" };
+      if (
+        op.tool_server === "filesystem" &&
+        op.receiver_mode === "non_idempotent"
+      )
+        return {
+          ...result,
+          dispatch_marker: op.dispatch_operation_id ? "present" : "absent",
+        };
       return result;
     }),
   };

@@ -1,6 +1,6 @@
 # `@wap/api`
 
-API HTTP local của MVP B. API-01 cung cấp boundary chạy trên `127.0.0.1`, đăng nhập một tài khoản demo duy nhất, bearer session trong bộ nhớ và `GET /api/v1/servers`. API-02 nối `POST /api/v1/runs` (durable `202`) và worker planner bất đồng bộ qua PostgreSQL outbox. API-03 bổ sung `GET /api/v1/runs`, detail read model, polling events (tối đa 200), trace cursor HMAC trên snapshot REPEATABLE READ (100 attempt/trang, tối đa 10.000) và reconciliation projection chỉ đọc.
+API HTTP local của MVP B. API-01 cung cấp boundary chạy trên `127.0.0.1`, đăng nhập một tài khoản demo duy nhất, bearer session trong bộ nhớ và `GET /api/v1/servers`. API-02 nối `POST /api/v1/runs` (durable `202`) và worker planner bất đồng bộ qua PostgreSQL outbox. API-03 bổ sung `GET /api/v1/runs`, detail read model, polling events (tối đa 200), trace cursor HMAC trên snapshot REPEATABLE READ (100 attempt/trang, tối đa 10.000) và reconciliation projection chỉ đọc. API-04 nối approval/cancel qua HTTP, dispatcher execute outbox, startup orphan recovery và expiry maintenance theo đồng hồ PostgreSQL.
 
 ## Cấu hình bắt buộc
 

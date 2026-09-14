@@ -107,8 +107,8 @@ export const RunAcceptedSchema = z
   .strict();
 export const ApprovalDecisionSchema = z
   .object({
-    approval_id: z.string().min(1),
-    workflow_version_id: z.string().min(1),
+    approval_id: z.uuid(),
+    workflow_version_id: z.uuid(),
     snapshot_hash: z.string().regex(/^[a-f0-9]{64}$/),
     decision: z.enum(["approved", "rejected"]),
   })

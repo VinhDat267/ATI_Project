@@ -2,7 +2,7 @@
 
 [OpenAPI 3.1](openapi.yaml) là artifact sinh từ packages/dsl/scripts/emit-openapi.ts và schema Zod dùng chung. Chạy npm run api:generate. File type sinh ở packages/dsl/generated/api.d.ts. Không dùng đường dẫn api/openapi.yaml.
 
-Đây là hợp đồng thiết kế; chưa có HTTP server. Routes hiện hành: POST /auth/login; GET /servers; GET/POST /runs; GET /runs/{runId}; GET /runs/{runId}/events?since_seq=; POST /runs/{runId}/approval; POST /runs/{runId}/cancel. Mọi route trừ login cần authentication; mọi run cần owner check.
+Đây là hợp đồng wire-format của HTTP local đã nối đến API-04. Routes hiện hành: POST /auth/login; GET /servers; GET/POST /runs; GET /runs/{runId}; GET /runs/{runId}/events?since_seq=; GET /runs/{runId}/trace; GET /runs/{runId}/reconciliation; POST /runs/{runId}/approval; POST /runs/{runId}/cancel. Mọi route trừ login cần authentication; mọi run cần owner check.
 
 Client tạo run nhận 202 planning. Lúc này version/plan có thể null. Poll events mỗi 2 giây, tối đa 200 event/trang theo seq tăng dần. Dùng next_seq để lấy tiếp, bỏ duplicate seq; khi mất kết nối tiếp tục từ seq cuối. HTTP retry không được tạo lại POST /runs tự động vì endpoint này chưa có client idempotency contract.
 
