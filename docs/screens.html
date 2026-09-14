@@ -1,0 +1,501 @@
+<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bố cục hai màn hình — B/local</title><style>
+  :root {
+    --bg: #faf9f7; --surface: #fff; --surface-2: #f4f2ee;
+    --text: #1a1a18; --text-2: #5f5e5a; --text-3: #8a8983;
+    --border: #e3e0d9;
+    --accent-bg: #e6f1fb; --accent-br: #85b7eb; --accent-tx: #0c447c;
+    --warn-bg: #faeeda; --warn-br: #ef9f27; --warn-tx: #854f0b;
+    --ok-bg: #e4f2ec; --ok-tx: #0f6e56; --danger-tx: #a32d2d;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 20px; background:var(--bg); color:var(--text);
+         font:400 15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; }
+  h1 { font-size:22px; font-weight:500; margin:0 0 4px; }
+  h2 { font-size:18px; font-weight:500; margin:46px 0 2px; }
+  h3 { font-size:14px; font-weight:500; margin:26px 0 2px; }
+  .sub { color:var(--text-2); font-size:14px; margin:0 0 16px; }
+  .lead { color:var(--text-2); font-size:13.5px; margin:0 0 14px; max-width:74ch; }
+  .mono { font-family:var(--mono); font-size:11px; overflow-wrap:anywhere; }
+  .muted { color:var(--text-3); font-size:12px; }
+  .sec { color:var(--text-2); font-size:13px; }
+  hr { border:0; border-top:0.5px solid var(--border); margin:12px 0; }
+  .note { background:var(--surface); border-left:3px solid var(--accent-br);
+          padding:10px 14px; margin:18px 0 0; font-size:13px; color:var(--text-2); }
+  .note b { color:var(--text); font-weight:500; }
+  .anno { font-size:12px; color:var(--text-2); margin:10px 0 0; line-height:1.55; max-width:86ch; }
+  .anno b { color:var(--text); font-weight:500; }
+  .anno code { font-family:var(--mono); font-size:11px; color:var(--text); }
+
+  /* Khung mô phỏng cửa sổ trình duyệt, để thấy bố cục ở kích thước thật */
+  .frame { border:0.5px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); margin-top:12px; }
+  .chrome { display:flex; align-items:center; gap:10px; padding:8px 12px;
+            background:var(--surface-2); border-bottom:0.5px solid var(--border); font-size:12px; color:var(--text-2); }
+  .dots { display:flex; gap:4px; }
+  .dots i { width:8px; height:8px; border-radius:50%; background:var(--border); display:block; }
+  /* Khung mô phỏng một màn hình rộng cố định, nên bố cục bên trong phải bám bề rộng
+     của chính khung chứ không bám viewport — nếu không, đọc tài liệu trên laptop hẹp
+     sẽ thấy khung "1280px" gộp về một cột và vẽ sai thiết kế đang đề xuất. */
+  .app { background:var(--bg); padding:20px; container-type:inline-size; }
+
+  /* Vỏ ứng dụng dùng chung cho cả hai màn hình */
+  .topbar { display:flex; align-items:center; gap:16px; padding-bottom:12px;
+            border-bottom:0.5px solid var(--border); margin-bottom:18px; font-size:13px; }
+  .brand { font-weight:500; }
+  .nav { display:flex; gap:14px; color:var(--text-3); }
+  .nav .on { color:var(--text); box-shadow:inset 0 -2px 0 var(--accent-br); padding-bottom:3px; }
+  .spacer { flex:1; }
+
+  .one { max-width:720px; margin:0 auto; }
+  .card { background:var(--surface); border:0.5px solid var(--border); border-radius:10px; padding:14px; }
+  .row { display:flex; gap:10px; align-items:center; }
+  button { font:inherit; font-size:13px; padding:7px 14px; border:0.5px solid var(--border);
+           background:var(--surface); border-radius:8px; color:var(--text); cursor:not-allowed; }
+  button.primary { border-color:var(--accent-br); background:var(--accent-bg); color:var(--accent-tx); font-weight:500; }
+  button.danger { border-color:#f09595; color:var(--danger-tx); }
+
+  /* Dải tiến trình: làm cho polling 2 giây nhìn thấy được */
+  .prog { display:flex; gap:6px; margin:16px 0 18px; font-size:12px; }
+  .prog span { flex:1; text-align:center; padding:7px 4px; border-radius:7px;
+               background:var(--surface-2); color:var(--text-3); }
+  .prog span.done { color:var(--ok-tx); background:var(--ok-bg); }
+  .prog span.now { background:var(--accent-bg); color:var(--accent-tx); font-weight:500; }
+
+  /* Pill trạng thái */
+  .pill { font-size:11px; padding:2px 9px; border-radius:20px; white-space:nowrap; }
+  .pill.read { background:var(--accent-bg); color:var(--accent-tx); }
+  .pill.write { background:var(--warn-bg); color:var(--warn-tx); }
+  .pill.ok { background:var(--ok-bg); color:var(--ok-tx); }
+  .pill.warn { background:var(--warn-bg); color:var(--warn-tx); }
+  .pill.bad { background:#f7e7e7; color:var(--danger-tx); }
+  .pill.idle { background:var(--surface-2); color:var(--text-2); }
+
+  /* Thẻ hành động ghi */
+  .act { border:0.5px solid var(--warn-br); background:var(--warn-bg); border-radius:9px; padding:12px; margin-top:10px; }
+  .act .h { font-size:14px; font-weight:500; color:var(--warn-tx); margin-bottom:5px; }
+  .act .args { font-family:var(--mono); font-size:11px; color:var(--warn-tx); overflow-wrap:anywhere; }
+
+  /* Dải chi tiết kỹ thuật — mẫu dùng lại ở mọi nơi */
+  details.tech { margin-top:9px; border-top:0.5px dashed var(--border); padding-top:8px; }
+  details.tech > summary { cursor:pointer; font-size:12px; color:var(--text-2); list-style:none; }
+  details.tech > summary::-webkit-details-marker { display:none; }
+  details.tech > summary::before { content:"▸ "; }
+  details.tech[open] > summary::before { content:"▾ "; }
+  details.tech .body { margin-top:8px; font-family:var(--mono); font-size:11px;
+                       color:var(--text-2); line-height:1.9; overflow-wrap:anywhere; }
+
+  /* Màn hình 2: master–detail */
+  .two { display:grid; grid-template-columns:270px minmax(0,1fr); gap:20px; align-items:start; }
+  @container (max-width:860px) { .two { grid-template-columns:1fr; } .rail { border-right:0; padding-right:0; } }
+  .rail { border-right:0.5px solid var(--border); padding-right:16px; }
+  .runrow { padding:9px 10px; border-radius:8px; font-size:12.5px; }
+  .runrow.on { background:var(--surface-2); }
+  .runrow .t { display:flex; gap:8px; align-items:center; margin-bottom:3px; }
+
+  .banner { border-radius:9px; padding:13px 15px; margin-bottom:16px; }
+  .banner.run { background:var(--accent-bg); border:0.5px solid var(--accent-br); color:var(--accent-tx); }
+  .banner.warn { background:var(--warn-bg); border:0.5px solid var(--warn-br); color:var(--warn-tx); }
+  .banner .h { font-weight:500; }
+
+  .tlrow { display:flex; gap:11px; padding:11px 0; border-bottom:0.5px solid var(--border); font-size:13px; }
+  .tlrow:last-child { border-bottom:0; }
+  .ic { width:16px; flex:none; text-align:center; font-size:12px; color:var(--text-3); line-height:1.6; }
+  .ok { color:var(--ok-tx); } .bad { color:var(--danger-tx); } .warn { color:var(--warn-tx); }
+  .grow { flex:1; min-width:0; }
+
+  /* Bảng kê component */
+  .kit { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr)); margin-top:14px; }
+  .kitcard { background:var(--surface-2); border-radius:10px; padding:13px; }
+  .kitcard .n { font-family:var(--mono); font-size:11px; color:var(--text); margin-bottom:8px; }
+  .kitcard .d { font-size:12px; color:var(--text-2); margin-top:9px; line-height:1.5; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; min-width:560px; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:0.5px solid var(--border); vertical-align:top; }
+  th { color:var(--text-2); font-weight:500; }
+  td code { font-family:var(--mono); font-size:11px; }
+  tbody tr:last-child td { border-bottom:0; }
+</style></head><body><main class="wrap">
+
+<h1>Bố cục hai màn hình — B/local</h1>
+<p class="sub">Tài liệu bố cục tĩnh, <strong>chưa phải ứng dụng</strong>: nút vô hiệu hoá, số liệu là ví dụ.
+<a href="wireframes.html">Danh mục trạng thái</a> · <a href="BASELINE.md">Baseline</a> · <a href="API.md">API</a> · <a href="functional-requirements.md">FR</a></p>
+<p class="lead"><a href="wireframes.html">wireframes.html</a> trả lời <em>có những trạng thái nào</em>. File này trả lời câu khác:
+<em>một màn hình trông ra sao, cái gì quan trọng nhất trên đó</em>. Khổ mục tiêu là laptop 1280–1440, co về một cột ở khổ hẹp.
+Các dải <span class="mono">Chi tiết kỹ thuật</span> bên dưới bấm mở được thật — đó chính là mẫu tương tác đang đề xuất.</p>
+
+<h2>Nguyên tắc: gọn trước, chứng cứ mở được</h2>
+<p class="lead">Người dùng cần màn hình gọn; người chấm đồ án cần thấy cơ chế kiểm soát đang thật sự chạy. Thay vì chọn một bên,
+mọi nơi có thông tin kỹ thuật đều dùng chung một dải bấm mở. Mặc định đóng nên bề mặt vẫn sạch; lúc bảo vệ thì mở ngay tại chỗ
+đang nói, không phải chuyển màn hình để chứng minh.</p>
+
+<h2>Bộ phận dùng lại</h2>
+<p class="lead">Năm bộ phận dưới đây lặp lại khắp hai màn hình. Tuần 3 dựng theo đúng tên này.</p>
+<div class="kit">
+
+  <div class="kitcard">
+    <div class="n">StatusPill</div>
+    <div class="row" style="flex-wrap:wrap">
+      <span class="pill idle">đang xử lý</span><span class="pill ok">hoàn tất</span>
+      <span class="pill bad">thất bại</span><span class="pill warn">cần đối chiếu</span>
+    </div>
+    <p class="d">Bốn nhóm màu, không phải 14 màu. Trạng thái kỹ thuật chính xác nằm ở chữ, màu chỉ để quét nhanh.</p>
+  </div>
+
+  <div class="kitcard">
+    <div class="n">TechDisclosure</div>
+    <details class="tech" style="border-top:0;padding-top:0">
+      <summary>Chi tiết kỹ thuật</summary>
+      <div class="body">
+        version_id: 98dd328c…<br>snapshot_hash: 01500166f0167a8c…<br>policy_version: b-local-1
+      </div>
+    </details>
+    <p class="d">Một component duy nhất cho mọi bằng chứng. Mặc định đóng. Đây là bản lề của toàn bộ thiết kế.</p>
+  </div>
+
+  <div class="kitcard">
+    <div class="n">ProgressStrip</div>
+    <div class="prog" style="margin:0">
+      <span class="done">lập KH</span><span class="done">kiểm</span><span class="now">đọc thử</span><span>chờ duyệt</span>
+    </div>
+    <p class="d">Làm cho polling 2 giây nhìn thấy được. Không dùng vòng xoay vô nghĩa: người dùng luôn biết đang ở chặng nào.</p>
+  </div>
+
+  <div class="kitcard">
+    <div class="n">ActionCard</div>
+    <div class="act" style="margin:0">
+      <div class="h">Thêm 2 dòng vào dest / Report</div>
+      <div class="args">rows: [["API","Done"],["UI","Doing"]]</div>
+    </div>
+    <p class="d">Câu tiếng Việt trước, args đã resolve sau. Chỉ dùng cho bước ghi, luôn nền hổ phách.</p>
+  </div>
+
+  <div class="kitcard">
+    <div class="n">TimelineRow</div>
+    <div class="tlrow" style="border-bottom:0;padding:0">
+      <span class="ic ok">✓</span>
+      <span class="grow"><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — 2 dòng</span>
+      <span class="muted">120ms</span>
+    </div>
+    <p class="d">Một dòng cho một bước. Bấm vào mở attempt detail ngay tại chỗ, không nhảy trang.</p>
+  </div>
+
+</div>
+
+<h2>Màn hình 1 — Yêu cầu và duyệt</h2>
+<p class="lead">Một cột, rộng tối đa 720px, căn giữa. Cố ý không làm dashboard: đây là màn hình ra quyết định cho phép ghi,
+nên mọi thứ không phục vụ quyết định đó đều phải lùi lại.</p>
+
+<h3>Trạng thái chính — <span class="mono">awaiting_approval</span></h3>
+<div class="frame">
+  <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span>Màn hình 1 · chờ duyệt · 1280px</span></div>
+  <div class="app"><div class="one">
+
+    <div class="topbar">
+      <span class="brand">ATI</span>
+      <span class="nav"><span class="on">Yêu cầu</span><span>Run và lịch sử</span></span>
+      <span class="spacer"></span>
+      <span class="muted">demo@local · dữ liệu local</span>
+    </div>
+
+    <div class="card" style="background:var(--surface-2);border-style:dashed">
+      <div class="row">
+        <span class="sec grow">Chép các dòng Progress!A1:B2 từ source sang Report của dest, rồi báo số dòng vào #team.</span>
+        <button disabled>Sửa và tạo run mới</button>
+      </div>
+    </div>
+
+    <div class="prog">
+      <span class="done">lập KH</span><span class="done">kiểm</span><span class="done">đọc thử</span><span class="now">chờ duyệt</span>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <span class="grow"><strong>Sẽ ghi 2 việc sau nếu bạn duyệt</strong></span>
+        <span class="pill warn">còn 9:41</span>
+      </div>
+      <hr>
+      <details class="tech" style="border-top:0;padding-top:0">
+        <summary>Đã đọc: source / Progress!A1:B2 → 2 dòng</summary>
+        <div class="body">[["API","Done"],["UI","Doing"]]</div>
+      </details>
+      <p class="muted" style="margin:8px 0 0">Dữ liệu đọc được giữ cố định cho lần duyệt này. Nếu nguồn đổi sau đó, hệ thống vẫn ghi đúng bản bạn đã xem.</p>
+
+      <div class="act">
+        <div class="h">1 · Thêm 2 dòng vào bảng dest, sheet Report</div>
+        <div class="args">[["API","Done"],["UI","Doing"]]</div>
+        <details class="tech">
+          <summary>Chi tiết kỹ thuật</summary>
+          <div class="body">
+            tool: task_hub / append_sheet_rows · policy b-local-1<br>
+            operation_id: 8f2c1d04… · payload_hash: a3ece759…<br>
+            receiver: local_transaction (ghi và receipt cùng transaction)
+          </div>
+        </details>
+      </div>
+
+      <div class="act">
+        <div class="h">2 · Gửi thông báo vào #team</div>
+        <div class="args">"Đã chép 2 dòng."</div>
+        <details class="tech">
+          <summary>Chi tiết kỹ thuật</summary>
+          <div class="body">
+            tool: task_hub / send_slack_message · policy b-local-1<br>
+            operation_id: 4b71aa92… · payload_hash: 95bb83ff…<br>
+            kênh là kho demo local, không gửi Slack thật
+          </div>
+        </details>
+      </div>
+
+      <hr>
+      <div class="row">
+        <button class="primary" disabled>Duyệt đúng phiên bản này</button>
+        <button class="danger" disabled>Từ chối</button>
+        <span class="spacer"></span>
+        <button disabled>Yêu cầu huỷ</button>
+      </div>
+      <details class="tech">
+        <summary>Chi tiết kỹ thuật của lần duyệt</summary>
+        <div class="body">
+          approval_id: 06464338… · version_id: 98dd328c…<br>
+          snapshot_hash: 01500166f0167a8c11f309f34689e546…<br>
+          hết hạn lúc 21:52:14 theo đồng hồ server
+        </div>
+      </details>
+    </div>
+
+  </div></div>
+</div>
+<p class="anno"><b>Vì sao bố cục thế này:</b> đồng hồ hết hạn đặt cùng hàng với tiêu đề vì nó đổi ý nghĩa của cả thẻ, không phải chú thích phụ.
+Dữ liệu đã đọc nằm trong dải mở được, ngay phía trên phần ghi, để thấy được căn cứ mà không át hành động.
+Thanh quyết định đặt cuối thẻ, sau khi đã xem hết hành động — không đặt trên đầu.
+<b>FR:</b> FR-APR-03, FR-APR-04, FR-APR-06, FR-TRC-07</p>
+
+<h3>Đang xử lý — <span class="mono">planning</span> / <span class="mono">validating</span> / <span class="mono">dry_running</span></h3>
+<div class="frame">
+  <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span>Màn hình 1 · đang kiểm kế hoạch</span></div>
+  <div class="app"><div class="one">
+    <div class="topbar"><span class="brand">ATI</span>
+      <span class="nav"><span class="on">Yêu cầu</span><span>Run và lịch sử</span></span>
+      <span class="spacer"></span><span class="muted">demo@local</span></div>
+
+    <div class="card" style="background:var(--surface-2);border-style:dashed">
+      <span class="sec">Chép các dòng Progress!A1:B2 từ source sang Report của dest, rồi báo số dòng vào #team.</span>
+    </div>
+
+    <div class="prog">
+      <span class="done">lập KH</span><span class="now">kiểm</span><span>đọc thử</span><span>chờ duyệt</span>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="grow"><strong>Đang kiểm kế hoạch</strong> · lượt 2/3</span><span class="pill idle">đang xử lý</span></div>
+      <hr>
+      <div class="tlrow"><span class="ic ok">✓</span><span class="grow">Cấu trúc kế hoạch hợp lệ</span></div>
+      <div class="tlrow"><span class="ic bad">✕</span><span class="grow">Tool chưa có policy đã duyệt — đang sửa lại kế hoạch</span></div>
+      <div class="tlrow"><span class="ic">•</span><span class="grow muted">Đồ thị phụ thuộc</span></div>
+      <details class="tech">
+        <summary>Chi tiết kỹ thuật</summary>
+        <div class="body">layer: tool · steps[1].tool → tool missing reviewed policy<br>attempt 2/3 · hết lượt thì run chuyển failed</div>
+      </details>
+      <p class="muted" style="margin-top:10px">Cập nhật mỗi 2 giây · seq 7</p>
+    </div>
+  </div></div>
+</div>
+<p class="anno"><b>Vì sao bố cục thế này:</b> dùng lại đúng dải tiến trình và đúng thẻ của trạng thái duyệt, chỉ đổi nội dung —
+người dùng không phải học lại bố cục khi run chuyển chặng. Vòng sửa lỗi hiện thành công/thất bại từng tầng thay vì một thanh chạy.
+Bước đọc lúc <code>dry_running</code> có thể retry, và dòng retry hiện ngay trong danh sách này.
+<b>FR:</b> FR-VAL-08, FR-VAL-09, FR-PLN-09, FR-TRC-02, FR-TRC-03</p>
+
+<h3>Kết thúc trước khi chạy hoặc hết hạn — <span class="mono">refused</span> / <span class="mono">needs_input</span> / <span class="mono">rejected</span> / <span class="mono">expired</span></h3>
+<div class="frame">
+  <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span>Màn hình 1 · cần hỏi lại</span></div>
+  <div class="app"><div class="one">
+    <div class="topbar"><span class="brand">ATI</span>
+      <span class="nav"><span class="on">Yêu cầu</span><span>Run và lịch sử</span></span>
+      <span class="spacer"></span><span class="muted">demo@local</span></div>
+
+    <div class="card" style="background:var(--surface-2);border-style:dashed">
+      <span class="sec">Chuyển task đó sang Done</span>
+    </div>
+
+    <div class="prog"><span class="done">lập KH</span><span>kiểm</span><span>đọc thử</span><span>chờ duyệt</span></div>
+
+    <div class="card">
+      <div class="row"><span class="grow"><strong>Cần thêm thông tin</strong></span><span class="pill idle">dừng ở lập KH</span></div>
+      <hr>
+      <p style="margin:0">Task nào? Hãy cho biết mã card cụ thể.</p>
+      <p class="muted" style="margin:10px 0 0">Không có kế hoạch nào được tạo và không bước ghi nào được gọi.
+      Bổ sung thông tin sẽ tạo <em>run mới</em> chứ không chạy tiếp run này.</p>
+      <div class="row" style="margin-top:12px"><button class="primary" disabled>Bổ sung và tạo run mới</button></div>
+    </div>
+  </div></div>
+</div>
+<p class="anno"><b>Vì sao bố cục thế này:</b> các trạng thái không chạy tiếp dùng chung một khuôn — dải tiến trình dừng lại ở đúng chặng đã tới,
+một thẻ kết quả, một hành động tiếp theo duy nhất. Chỉ đổi tiêu đề, phần giải thích và nhãn nút.
+Với <code>expired</code>, nút là “Chuẩn bị lại” sau khi đã xem trace; TTL có thể hết trước quyết định hoặc trước bước ghi kế tiếp, nên run đang chạy cũng có thể kết thúc tại đây. Với <code>rejected</code> là “Tạo run mới”.
+<b>FR:</b> FR-PLN-12, FR-APR-06</p>
+
+<h2>Màn hình 2 — Run và lịch sử</h2>
+<p class="lead">Hai cột. Đây là màn hình duy nhất được lợi từ master–detail: dải trái giữ ngữ cảnh lịch sử,
+vùng chính là timeline của run đang xem. Bấm một bước thì chi tiết mở tại chỗ, không nhảy trang.</p>
+
+<h3>Đang chạy — <span class="mono">running</span></h3>
+<div class="frame">
+  <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span>Màn hình 2 · đang chạy · 1280px</span></div>
+  <div class="app">
+    <div class="topbar"><span class="brand">ATI</span>
+      <span class="nav"><span>Yêu cầu</span><span class="on">Run và lịch sử</span></span>
+      <span class="spacer"></span><span class="muted">demo@local</span></div>
+
+    <div class="two">
+      <div class="rail">
+        <p class="muted" style="margin:0 0 8px">LỊCH SỬ</p>
+        <div class="runrow on">
+          <div class="t"><span class="pill idle">đang chạy</span><span class="muted">21:40</span></div>
+          <div>Chép Progress!A1:B2 sang Report…</div>
+        </div>
+        <div class="runrow">
+          <div class="t"><span class="pill ok">hoàn tất</span><span class="muted">20:12</span></div>
+          <div>Tạo task “Viết tài liệu API”…</div>
+        </div>
+        <div class="runrow">
+          <div class="t"><span class="pill idle">cần hỏi lại</span><span class="muted">19:55</span></div>
+          <div>Chuyển task đó sang Done</div>
+        </div>
+        <div class="runrow">
+          <div class="t"><span class="pill bad">từ chối</span><span class="muted">19:31</span></div>
+          <div>Dịch tài liệu sang tiếng Nhật</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="banner run">
+          <div class="row"><span class="grow"><span class="h">Đang chạy bước 3 trên 3</span></span><button disabled>Yêu cầu huỷ</button></div>
+          <p class="muted" style="color:inherit;margin:6px 0 0">Đã duyệt lúc 21:41 · phiên bản 1 · cập nhật mỗi 2 giây</p>
+        </div>
+
+        <div class="card">
+          <div class="tlrow">
+            <span class="ic ok">✓</span>
+            <span class="grow"><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — đọc 2 dòng từ source
+              <details class="tech"><summary>Chi tiết kỹ thuật</summary><div class="body">
+                args: {"spreadsheet_id":"source","range":"Progress!A1:B2"}<br>
+                outcome_certainty: confirmed · attempt 1/3
+              </div></details>
+            </span>
+            <span class="muted">120ms</span>
+          </div>
+          <div class="tlrow">
+            <span class="ic ok">✓</span>
+            <span class="grow"><span class="pill write">write</span> <span class="mono">append_sheet_rows</span> — đã thêm 2 dòng vào dest / Report
+              <details class="tech"><summary>Chi tiết kỹ thuật</summary><div class="body">
+                operation_id: 8f2c1d04… · payload_hash: a3ece759…<br>
+                outcome_certainty: confirmed · có receipt trong cùng transaction của receiver
+              </div></details>
+            </span>
+            <span class="muted">240ms</span>
+          </div>
+          <div class="tlrow">
+            <span class="ic">•</span>
+            <span class="grow"><span class="pill write">write</span> <span class="mono">send_slack_message</span> — đang gọi…
+              <span class="muted">timeout 30 giây</span></span>
+          </div>
+        </div>
+
+        <p class="muted" style="margin-top:10px">Mất kết nối giữa hai lượt poll thì nối lại từ seq cuối đã nhận, không mất event và không nhảy trạng thái.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="anno"><b>Vì sao bố cục thế này:</b> dải lịch sử luôn hiện nên chuyển giữa các run không mất ngữ cảnh, và bảng lịch sử
+không cần một màn hình thứ ba. Timeline là xương sống; thông tin kỹ thuật của từng bước nằm trong dải mở được của chính dòng đó,
+nên bằng chứng ở sát nơi đang nói. Nút huỷ đặt trong băng trạng thái vì nó tác động lên cả run, không lên một bước. Nếu TTL hết trước lần ghi kế tiếp, run chuyển sang <code>expired</code>; trace vẫn giữ nguyên và UI không tự phát lại.
+<b>FR:</b> FR-EXE-15, FR-TRC-01, FR-TRC-02, FR-TRC-06, FR-WFM-02</p>
+
+<h3>Write chưa rõ kết quả — <span class="mono">reconciliation_required</span></h3>
+<div class="frame">
+  <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><span>Màn hình 2 · cần đối chiếu</span></div>
+  <div class="app">
+    <div class="topbar"><span class="brand">ATI</span>
+      <span class="nav"><span>Yêu cầu</span><span class="on">Run và lịch sử</span></span>
+      <span class="spacer"></span><span class="muted">demo@local</span></div>
+
+    <div class="two">
+      <div class="rail">
+        <p class="muted" style="margin:0 0 8px">LỊCH SỬ</p>
+        <div class="runrow on">
+          <div class="t"><span class="pill warn">cần đối chiếu</span><span class="muted">21:40</span></div>
+          <div>Chép Progress!A1:B2 sang Report…</div>
+        </div>
+        <div class="runrow">
+          <div class="t"><span class="pill ok">hoàn tất</span><span class="muted">20:12</span></div>
+          <div>Tạo task “Viết tài liệu API”…</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="banner warn">
+          <div class="h">Không xác định được kết quả của một bước ghi</div>
+          <p style="margin:6px 0 0">Thông báo vào #team đã được gửi đi nhưng mất phản hồi. Không có bằng chứng nó đã hoàn tất hay chưa.</p>
+          <p style="margin:8px 0 0"><strong>Cố ý không có nút chạy lại.</strong> Chạy lại mù có thể gửi trùng. Hãy mở kho demo kiểm tra rồi quyết định.</p>
+        </div>
+
+        <div class="card">
+          <div class="tlrow">
+            <span class="ic ok">✓</span>
+            <span class="grow"><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — đọc 2 dòng</span>
+          </div>
+          <div class="tlrow">
+            <span class="ic ok">✓</span>
+            <span class="grow"><span class="pill write">write</span> <span class="mono">append_sheet_rows</span> — <strong>chắc chắn đã ghi</strong>, có receipt
+              <details class="tech"><summary>Chi tiết kỹ thuật</summary><div class="body">
+                outcome_certainty: confirmed · operation_id: 8f2c1d04…
+              </div></details>
+            </span>
+          </div>
+          <div class="tlrow" style="background:var(--warn-bg);border-radius:8px;padding:11px 10px">
+            <span class="ic warn">?</span>
+            <span class="grow"><span class="pill write">write</span> <span class="mono">send_slack_message</span> —
+              <strong style="color:var(--warn-tx)">không rõ kết quả, cần người kiểm tra</strong>
+              <details class="tech" style="border-color:var(--warn-br)"><summary>Chi tiết kỹ thuật</summary><div class="body">
+                outcome_certainty: unknown · operation_id: 4b71aa92…<br>
+                task_hub: chưa thấy receipt cho operation này<br>
+                không tự retry, không tự replan, không đổi operation id
+              </div></details>
+            </span>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button disabled>Mở kho demo để đối chiếu</button>
+          <button disabled>Xem toàn bộ trace</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="anno"><b>Vì sao bố cục thế này:</b> đây là trạng thái quan trọng nhất của cả đồ án nên nó được phép phá nhịp —
+băng cảnh báo chiếm đầu vùng chính, và bước không rõ kết quả được tô nền ngay trong timeline thay vì chỉ đổi icon.
+Hai nút cuối đều dẫn tới hành động <em>kiểm tra</em>; không có nút nào gây thêm side-effect.
+Với filesystem thì dòng này ghi “marker có, receipt không hỗ trợ” — marker không chứng minh bytes đã ghi.
+<b>FR:</b> FR-EXE-05, FR-EXE-06, NFR-06</p>
+
+<h2>Quy tắc bố cục</h2>
+<div class="card scroll"><table>
+  <thead><tr><th>Hạng mục</th><th>Giá trị</th><th>Lý do</th></tr></thead>
+  <tbody>
+    <tr><td>Cột màn hình 1</td><td><code>max-width: 720px</code>, căn giữa</td><td>Màn hình ra quyết định, cần tập trung chứ không phải dashboard</td></tr>
+    <tr><td>Cột màn hình 2</td><td><code>270px</code> dải + phần còn lại</td><td>Đủ cho thời điểm, pill và một dòng trích yêu cầu</td></tr>
+    <tr><td>Ngưỡng gộp cột</td><td><code>860px</code></td><td>Dưới ngưỡng này dải lịch sử xuống dưới, timeline vẫn đọc được</td></tr>
+    <tr><td>Bước nhịp</td><td>4 · 8 · 12 · 16 · 20</td><td>Giữ đúng nhịp đang dùng trong wireframe, không thêm giá trị lẻ</td></tr>
+    <tr><td>Bo góc</td><td>thẻ <code>10px</code>, phần tử trong <code>8px</code>, pill <code>20px</code></td><td>Phân cấp bằng bo góc thay vì bằng đổ bóng</td></tr>
+    <tr><td>Màu trạng thái</td><td>4 nhóm, không phải 14</td><td>Màu để quét nhanh; trạng thái chính xác luôn nằm ở chữ</td></tr>
+    <tr><td>Nền hổ phách</td><td>chỉ dành cho bước ghi và cảnh báo</td><td>Người dùng học một lần: hổ phách nghĩa là có side-effect</td></tr>
+  </tbody>
+</table></div>
+
+<div class="note"><b>Ranh giới của tài liệu này.</b> Đây là bố cục đề xuất, chưa có HTTP server, chưa có ứng dụng và chưa có bằng chứng browser.
+Số liệu trong màn hình là ví dụ, không phải kết quả đo. Các dải chi tiết bấm mở được chỉ nhằm minh hoạ mẫu tương tác;
+mọi nút hành động đều vô hiệu hoá. Trong profile B không có nút dry-run riêng, không sửa plan trên UI, không WebSocket và không resume tự động.</div>
+
+</main></body></html>
