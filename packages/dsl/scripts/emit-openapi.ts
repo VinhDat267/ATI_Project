@@ -22,6 +22,7 @@ const definitions = {
   ApprovalDecision: dsl.ApprovalDecisionSchema,
   EventPage: dsl.EventPageSchema,
   Trace: dsl.TraceSchema,
+  Reconciliation: dsl.ReconciliationSchema,
 };
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 function component(schema: z.ZodType, name: string): unknown {
@@ -70,9 +71,9 @@ const spec = {
   openapi: "3.1.0",
   info: {
     title: "ATI Workflow Platform — B/local",
-    version: "0.2.0",
+    version: "0.3.0",
     description:
-      "API-01 local HTTP boundary is implemented for login and server discovery. Run lifecycle remains deferred to API-02+. Poll every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
+      "B/local HTTP boundary through API-03: login, server discovery, durable run acceptance, owned run read model, event polling, stable trace cursors, and read-only reconciliation. Poll events every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
   },
   servers: [{ url: "/api/v1" }],
   security: [{ bearerAuth: [] }],
@@ -169,6 +170,19 @@ const spec = {
         description:
           "Ordered seq > since_seq, capped at 200. Poll again from next_seq; dryrun.ready requires GET run for preview.",
         responses: { "200": response("EventPage"), ...errors },
+      },
+    },
+    "/runs/{runId}/reconciliation": {
+      parameters: runParameters,
+      get: {
+        operationId: "getRunReconciliation",
+        description:
+          "Read-only receipt and dispatch-marker projection for uncertain writes. This endpoint never retries or resumes an operation.",
+        responses: {
+          "200": response("Reconciliation"),
+          "409": { description: "History or cursor limit" },
+          ...errors,
+        },
       },
     },
     "/runs/{runId}/approval": {

@@ -51,14 +51,20 @@ export class WorkflowEngine {
   detail(id: string) {
     return this.store.detail(id);
   }
+  list() {
+    return this.store.list();
+  }
   preview(id: string) {
     return this.store.preview(id);
   }
   trace(id: string) {
     return this.store.trace(id);
   }
-  events(id: string, sinceSeq = 0) {
-    return this.store.events(id, sinceSeq);
+  tracePage(id: string, cursor?: { snapshotId: string; offset: number }) {
+    return this.store.tracePage(id, cursor);
+  }
+  events(id: string, sinceSeq = 0, limit = 100) {
+    return this.store.events(id, sinceSeq, limit);
   }
   cancel(id: string) {
     return cancel(this.store, id);

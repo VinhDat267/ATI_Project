@@ -14,12 +14,15 @@ import {
   LoginRequestSchema,
   LoginResponseSchema,
   RunAcceptedSchema,
+  ReconciliationSchema,
   ServerSummaryListSchema,
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore } from "./auth.js";
 import { HttpError, readJson, writeJson } from "./http.js";
 import type { WorkerControl } from "./worker.js";
+import { decodeTraceCursor, encodeTraceCursor } from "./cursors.js";
+import { redact } from "./redaction.js";
 
 export interface ApiRuntime {
   server: Server;
@@ -140,8 +143,24 @@ export function createApi(options: {
         return;
       }
       if (path === "/runs") {
+        if (request.method === "GET") {
+          sessions.authenticate(request.headers.authorization);
+          if (!options.engine)
+            throw new HttpError(
+              501,
+              "NOT_IMPLEMENTED",
+              "Run history is not enabled",
+            );
+          writeJson(
+            response,
+            200,
+            redact(await options.engine.list()),
+            requestId,
+          );
+          return;
+        }
         if (request.method !== "POST") {
-          response.setHeader("allow", "POST");
+          response.setHeader("allow", "GET, POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         const userId = sessions.authenticate(request.headers.authorization);
@@ -171,11 +190,99 @@ export function createApi(options: {
             "NOT_IMPLEMENTED",
             "Run detail is not enabled",
           );
-        const id = path.slice("/runs/".length);
+        const segments = path.slice("/runs/".length).split("/");
+        const id = segments.shift() ?? "";
+        const subpath = segments.join("/");
         if (!id || id.includes("/"))
           throw new HttpError(404, "NOT_FOUND", "Route not found");
-        writeJson(response, 200, await options.engine.detail(id), requestId);
-        return;
+        if (!subpath) {
+          writeJson(
+            response,
+            200,
+            redact(await options.engine.detail(id)),
+            requestId,
+          );
+          return;
+        }
+        if (subpath === "events") {
+          const values = parsed.searchParams.getAll("since_seq");
+          if (values.length > 1 || parsed.search.length > 2048)
+            throw new HttpError(400, "INVALID_REQUEST", "Invalid event cursor");
+          const raw = values[0];
+          if (raw !== undefined && !/^(0|[1-9][0-9]*)$/.test(raw))
+            throw new HttpError(400, "INVALID_REQUEST", "Invalid event cursor");
+          const since = raw === undefined ? 0 : Number(raw);
+          if (!Number.isSafeInteger(since))
+            throw new HttpError(400, "INVALID_REQUEST", "Invalid event cursor");
+          writeJson(
+            response,
+            200,
+            redact(await options.engine.events(id, since, 200)),
+            requestId,
+          );
+          return;
+        }
+        if (subpath === "trace") {
+          const values = parsed.searchParams.getAll("cursor");
+          if (values.length > 1 || parsed.search.length > 2048)
+            throw new HttpError(400, "INVALID_REQUEST", "Invalid trace cursor");
+          const userId = sessions.authenticate(request.headers.authorization);
+          let cursor: { snapshotId: string; offset: number } | undefined;
+          if (values[0] !== undefined) {
+            try {
+              const decoded = decodeTraceCursor(values[0], config.cursorKey, {
+                runId: id,
+                userId,
+              });
+              cursor = {
+                snapshotId: decoded.snapshot_id,
+                offset: decoded.offset,
+              };
+            } catch {
+              throw new HttpError(
+                400,
+                "INVALID_REQUEST",
+                "Invalid trace cursor",
+              );
+            }
+          }
+          const page = await options.engine.tracePage(id, cursor);
+          const nextCursor =
+            page.next_offset === null
+              ? null
+              : encodeTraceCursor(
+                  {
+                    snapshot_id: page.snapshot_id,
+                    run_id: id,
+                    user_id: userId,
+                    offset: page.next_offset,
+                  },
+                  config.cursorKey,
+                );
+          writeJson(
+            response,
+            200,
+            redact({
+              run_id: id,
+              attempts: page.attempts,
+              next_cursor: nextCursor,
+            }),
+            requestId,
+          );
+          return;
+        }
+        if (subpath === "reconciliation") {
+          writeJson(
+            response,
+            200,
+            redact(
+              ReconciliationSchema.parse(await options.engine.reconcile(id)),
+            ),
+            requestId,
+          );
+          return;
+        }
+        throw new HttpError(404, "NOT_FOUND", "Route not found");
       }
       throw new HttpError(404, "NOT_FOUND", "Route not found");
     } catch (error) {
@@ -203,7 +310,9 @@ export function createApi(options: {
       const status =
         error.code === "NOT_FOUND"
           ? 404
-          : error.code === "ACTIVE_RUN" || error.code === "CONFLICT"
+          : error.code === "ACTIVE_RUN" ||
+              error.code === "CONFLICT" ||
+              error.code === "HISTORY_LIMIT"
             ? 409
             : error.code === "INVALID_INPUT" || error.code === "INVALID_PLAN"
               ? 400

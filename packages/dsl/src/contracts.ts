@@ -124,6 +124,11 @@ export const RunDetailSchema = z
     time_zone: z.string(),
     runtime: z.record(z.string(), z.string()),
     last_seq: z.number().int().nonnegative(),
+    // Additive fields used by the HTTP read model. They remain optional so
+    // older CLI clients can continue parsing the historical detail shape.
+    source_prompt: z.string().min(1).max(4000).optional(),
+    created_at: z.iso.datetime({ offset: true }).optional(),
+    read_outputs: z.record(z.string(), ArgValueSchema).optional(),
   })
   .strict()
   .superRefine((run, ctx) => {
@@ -206,5 +211,35 @@ export const EventPageSchema = z
   .object({
     events: z.array(RunEventSchema),
     next_seq: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const ReconciliationOperationSchema = z
+  .object({
+    operation_id: z.string().min(1),
+    step_id: z.string().min(1),
+    state: z.enum([
+      "reserved",
+      "in_flight",
+      "succeeded",
+      "known_failed",
+      "unknown",
+    ]),
+    receiver_mode: z.enum([
+      "local_transaction",
+      "receiver_idempotent",
+      "non_idempotent",
+    ]),
+    receipt: z.enum(["confirmed", "conflict", "not_observed", "not_supported"]),
+    result: ArgValueSchema,
+    dispatch_marker: z.enum(["present", "absent"]).optional(),
+  })
+  .strict();
+
+export const ReconciliationSchema = z
+  .object({
+    run_id: z.string().min(1),
+    read_only: z.literal(true),
+    operations: z.array(ReconciliationOperationSchema),
   })
   .strict();

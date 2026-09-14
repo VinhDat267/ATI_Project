@@ -43,6 +43,7 @@ it("applies SQL migrations exactly once and detects checksum drift", async () =>
     "0003_task_hub_local.sql",
     "0004_task_hub_cards.sql",
     "0005_filesystem_dispatches.sql",
+    "0006_http_trace_snapshots.sql",
   ]);
   expect((await implementation.migrate(url)).applied).toEqual([]);
   const dir = mkdtempSync(path.join(tmpdir(), "ati-migration-test-"));

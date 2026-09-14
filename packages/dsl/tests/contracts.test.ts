@@ -100,3 +100,52 @@ it("exports strict local login and error envelopes for the HTTP adapter", () => 
     }).success,
   ).toBe(true);
 });
+
+it("keeps additive read-model fields optional for legacy CLI detail payloads", () => {
+  const legacy = {
+    run_id: "r",
+    status: "planning",
+    workflow_version_id: null,
+    plan: null,
+    planner_result: null,
+    approval: null,
+    time_zone: "Asia/Ho_Chi_Minh",
+    runtime: {},
+    last_seq: 0,
+  };
+  expect(dsl.RunDetailSchema.safeParse(legacy).success).toBe(true);
+  expect(
+    dsl.RunDetailSchema.safeParse({
+      ...legacy,
+      source_prompt: "copy files",
+      created_at: "2026-09-15T00:00:00.000Z",
+      read_outputs: { read_source: { files: ["a.txt"] } },
+    }).success,
+  ).toBe(true);
+});
+
+it("exposes a strict read-only reconciliation projection", () => {
+  expect(api.ReconciliationSchema).toBeDefined();
+  const reconciliation = {
+    run_id: "r",
+    read_only: true,
+    operations: [
+      {
+        operation_id: "op-1",
+        step_id: "write",
+        state: "unknown",
+        receiver_mode: "non_idempotent",
+        receipt: "not_observed",
+        result: null,
+        dispatch_marker: "absent",
+      },
+    ],
+  };
+  expect(api.ReconciliationSchema.safeParse(reconciliation).success).toBe(true);
+  expect(
+    api.ReconciliationSchema.safeParse({
+      ...reconciliation,
+      read_only: false,
+    }).success,
+  ).toBe(false);
+});

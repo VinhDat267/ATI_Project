@@ -4,3 +4,5 @@ export { hashPassword, SessionStore } from "./auth.js";
 export { loadDevPlanner, type DevPlanner } from "./dev-planner.js";
 export { createPrepareWorker, type WorkerControl } from "./worker.js";
 export * from "./contracts.js";
+export { encodeTraceCursor, decodeTraceCursor } from "./cursors.js";
+export { redact } from "./redaction.js";

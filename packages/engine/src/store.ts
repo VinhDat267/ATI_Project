@@ -206,6 +206,24 @@ export class Store {
             await tx`SELECT plan FROM workflow_versions WHERE id=${run.workflow_version_id}`
           )[0]
         : undefined;
+      const readOutputs: Record<string, unknown> = {};
+      if (approval) {
+        const preview = unpackPreview(approval.preview, approval.snapshot_hash);
+        Object.assign(readOutputs, preview.read_outputs);
+      }
+      // Read results are reconstructed from durable state only. The HTTP
+      // read model never calls an MCP server while rendering history.
+      const readAttempts = await tx`
+        SELECT s.step_id,a.result,a.started_at,a.id
+        FROM step_attempts a
+        JOIN step_states s ON s.id=a.step_state_id
+        WHERE s.run_id=${id} AND s.side_effect='read'
+          AND a.ended_at IS NOT NULL AND a.error_class IS NULL
+        ORDER BY a.started_at,a.id`;
+      for (const attempt of readAttempts) {
+        if (attempt.result !== null && attempt.result !== undefined)
+          readOutputs[attempt.step_id] = attempt.result;
+      }
       return RunDetailSchema.parse({
         run_id: id,
         status: run.status,
@@ -215,6 +233,9 @@ export class Store {
         time_zone: run.time_zone,
         runtime: run.runtime,
         last_seq: run.next_event_seq - 1,
+        source_prompt: run.source_prompt,
+        created_at: stamp(run.created_at),
+        read_outputs: readOutputs,
         approval: approval
           ? {
               id: approval.id,
@@ -228,6 +249,18 @@ export class Store {
           : null,
       });
     });
+  }
+
+  async list() {
+    const rows = await this.db.client<RunRow[]>`
+      SELECT * FROM runs WHERE user_id=${this.userId}
+      ORDER BY created_at DESC,id DESC LIMIT 1001`;
+    if (rows.length > 1000)
+      throw new EngineError(
+        "HISTORY_LIMIT",
+        "Run history is limited to the newest 1000 runs",
+      );
+    return Promise.all(rows.map((row) => this.detail(row.id)));
   }
 
   async claimPrepare(id: string) {
@@ -322,11 +355,89 @@ export class Store {
       })),
     });
   }
-  async events(id: string, since = 0) {
+  async tracePage(
+    id: string,
+    cursor?: { snapshotId: string; offset: number },
+    pageSize = 100,
+  ) {
+    z.number().int().min(1).max(100).parse(pageSize);
+    await this.run(this.db.client, id);
+    let snapshotId = cursor?.snapshotId;
+    let offset = cursor?.offset ?? 0;
+    let attempts: unknown[];
+    if (!snapshotId) {
+      const materialized = await this.db.client.begin(async (tx) => {
+        await tx.unsafe("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+        const rows = await tx`
+          SELECT a.*,s.step_id FROM step_attempts a
+          JOIN step_states s ON s.id=a.step_state_id
+          WHERE s.run_id=${id} ORDER BY a.started_at,a.id LIMIT 10001`;
+        if (rows.length > 10000)
+          throw new EngineError(
+            "HISTORY_LIMIT",
+            "Trace history exceeds 10000 attempts",
+          );
+        const projected = rows.map((a) => ({
+          attempt_id: a.id,
+          step_id: a.step_id,
+          attempt_no: a.attempt_no,
+          workflow_version_id: a.workflow_version_id,
+          evidence:
+            a.workflow_version_id &&
+            a.tool_snapshot &&
+            a.resolved_args &&
+            a.outcome_certainty
+              ? "complete"
+              : "legacy_unknown",
+          tool_snapshot: a.tool_snapshot,
+          operation_id: a.operation_id,
+          resolved_args: a.resolved_args,
+          result: a.result,
+          outcome_certainty: a.outcome_certainty,
+          error_class: a.error_class,
+          error_message: a.error_message,
+          started_at: stamp(a.started_at),
+          ended_at: a.ended_at ? stamp(a.ended_at) : null,
+        }));
+        const [snapshot] = await tx`
+          INSERT INTO http_trace_snapshots(user_id,run_id,attempts,expires_at)
+          VALUES (${this.userId},${id},${tx.json(projected)},now()+interval '15 minutes')
+          RETURNING id`;
+        return { id: snapshot!.id as string, attempts: projected };
+      });
+      snapshotId = materialized.id;
+      attempts = materialized.attempts;
+    } else {
+      z.uuid().parse(snapshotId);
+      if (!Number.isInteger(offset) || offset < 0 || offset % pageSize !== 0)
+        throw new EngineError("INVALID_INPUT", "Invalid trace cursor offset");
+      const rows = await this.db.client`
+        SELECT attempts FROM http_trace_snapshots
+        WHERE id=${snapshotId} AND user_id=${this.userId} AND run_id=${id}
+          AND expires_at>clock_timestamp()`;
+      if (!rows[0])
+        throw new EngineError(
+          "INVALID_INPUT",
+          "Trace cursor expired or invalid",
+        );
+      attempts = rows[0].attempts as unknown[];
+    }
+    const page = attempts.slice(offset, offset + pageSize);
+    const nextOffset =
+      offset + page.length < attempts.length ? offset + page.length : null;
+    return {
+      snapshot_id: snapshotId,
+      offset,
+      attempts: page,
+      next_offset: nextOffset,
+    };
+  }
+  async events(id: string, since = 0, limit = 100) {
     z.number().int().nonnegative().parse(since);
+    z.number().int().min(1).max(200).parse(limit);
     await this.run(this.db.client, id);
     const rows = await this.db
-      .client`SELECT seq,type,payload,created_at FROM run_events WHERE run_id=${id} AND seq>${since} ORDER BY seq LIMIT 100`;
+      .client`SELECT seq,type,payload,created_at FROM run_events WHERE run_id=${id} AND seq>${since} ORDER BY seq LIMIT ${limit}`;
     return EventPageSchema.parse({
       events: rows.map((e) => ({ ...e, created_at: stamp(e.created_at) })),
       next_seq: rows.at(-1)?.seq ?? since,

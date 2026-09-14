@@ -2,10 +2,10 @@
 openapi: 3.1.0
 info:
   title: ATI Workflow Platform — B/local
-  version: 0.2.0
-  description: API-01 local HTTP boundary is implemented for login and server discovery. Run lifecycle remains deferred to
-    API-02+. Poll every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime
-    authorization rule.
+  version: 0.3.0
+  description: "B/local HTTP boundary through API-03: login, server discovery, durable run acceptance, owned run read
+    model, event polling, stable trace cursors, and read-only reconciliation. Poll events every 2 seconds. Shared schema
+    generation does not encode every Zod refinement or runtime authorization rule."
 servers:
   - url: /api/v1
 security:
@@ -161,6 +161,23 @@ paths:
                 $ref: "#/components/schemas/EventPage"
         "401": *a1
         "404": *a2
+  /runs/{runId}/reconciliation:
+    parameters: *a3
+    get:
+      operationId: getRunReconciliation
+      description: Read-only receipt and dispatch-marker projection for uncertain writes. This endpoint never retries or
+        resumes an operation.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+        "401": *a1
+        "404": *a2
+        "409":
+          description: History or cursor limit
   /runs/{runId}/approval:
     parameters: *a3
     post:
@@ -1997,6 +2014,20 @@ components:
           type: integer
           minimum: 0
           maximum: 9007199254740991
+        source_prompt:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        created_at:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        read_outputs:
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties:
+            $ref: "#/components/schemas/RunDetail/$defs/__schema0"
       required:
         - run_id
         - status
@@ -3196,3 +3227,79 @@ components:
                 type: string
               additionalProperties:
                 $ref: "#/components/schemas/Trace/$defs/__schema0"
+    Reconciliation:
+      type: object
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        read_only:
+          type: boolean
+          const: true
+        operations:
+          type: array
+          items:
+            type: object
+            properties:
+              operation_id:
+                type: string
+                minLength: 1
+              step_id:
+                type: string
+                minLength: 1
+              state:
+                type: string
+                enum:
+                  - reserved
+                  - in_flight
+                  - succeeded
+                  - known_failed
+                  - unknown
+              receiver_mode:
+                type: string
+                enum:
+                  - local_transaction
+                  - receiver_idempotent
+                  - non_idempotent
+              receipt:
+                type: string
+                enum:
+                  - confirmed
+                  - conflict
+                  - not_observed
+                  - not_supported
+              result:
+                $ref: "#/components/schemas/Reconciliation/$defs/__schema0"
+              dispatch_marker:
+                type: string
+                enum:
+                  - present
+                  - absent
+            required:
+              - operation_id
+              - step_id
+              - state
+              - receiver_mode
+              - receipt
+              - result
+            additionalProperties: false
+      required:
+        - run_id
+        - read_only
+        - operations
+      additionalProperties: false
+      $defs:
+        __schema0:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+            - type: array
+              items:
+                $ref: "#/components/schemas/Reconciliation/$defs/__schema0"
+            - type: object
+              propertyNames:
+                type: string
+              additionalProperties:
+                $ref: "#/components/schemas/Reconciliation/$defs/__schema0"

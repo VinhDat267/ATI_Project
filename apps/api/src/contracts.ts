@@ -4,6 +4,10 @@ export {
   LoginRequestSchema,
   LoginResponseSchema,
   RunAcceptedSchema,
+  RunDetailSchema,
+  ReconciliationSchema,
+  TraceSchema,
+  EventPageSchema,
   ServerSummaryListSchema,
   ServerSummarySchema,
 } from "@wap/dsl";
