@@ -74,3 +74,29 @@ it("trace exposes full immutable attempt snapshots and distinguishes incomplete 
     }).success,
   ).toBe(true);
 });
+
+it("exports strict local login and error envelopes for the HTTP adapter", () => {
+  expect(
+    dsl.LoginRequestSchema.safeParse({ email: "demo@local", password: "x" })
+      .success,
+  ).toBe(true);
+  expect(
+    dsl.LoginRequestSchema.safeParse({
+      email: "demo@local",
+      password: "x",
+      user_id: "caller",
+    }).success,
+  ).toBe(false);
+  expect(dsl.LoginResponseSchema.safeParse({ token: "opaque" }).success).toBe(
+    true,
+  );
+  expect(
+    dsl.ApiErrorSchema.safeParse({
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "Authentication required",
+        request_id: "00000000-0000-4000-8000-000000000001",
+      },
+    }).success,
+  ).toBe(true);
+});

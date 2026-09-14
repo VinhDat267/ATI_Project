@@ -34,6 +34,10 @@
     "packages/engine/src/**/*.ts",
     "packages/engine/tests/**/*.ts",
     "packages/engine/vitest.unit.config.ts",
-    "packages/engine/vitest.integration.config.ts"
+    "packages/engine/vitest.integration.config.ts",
+    "apps/api/src/**/*.ts",
+    "apps/api/tests/**/*.ts",
+    "apps/api/vitest.unit.config.ts",
+    "apps/api/vitest.integration.config.ts"
   ]
 }

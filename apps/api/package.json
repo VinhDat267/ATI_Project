@@ -1,0 +1,20 @@
+{
+  "name": "@wap/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "tsx src/main.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@wap/db": "0.1.0",
+    "@wap/dsl": "0.1.0",
+    "@wap/engine": "0.1.0",
+    "postgres": "3.4.9",
+    "zod": "^4.0.0"
+  }
+}

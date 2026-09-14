@@ -3,8 +3,9 @@ openapi: 3.1.0
 info:
   title: ATI Workflow Platform — B/local
   version: 0.2.0
-  description: Design contract; HTTP implementation NOT_RUN. Poll every 2 seconds. Shared schema generation does not
-    encode every Zod refinement or runtime authorization rule.
+  description: API-01 local HTTP boundary is implemented for login and server discovery. Run lifecycle remains deferred to
+    API-02+. Poll every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime
+    authorization rule.
 servers:
   - url: /api/v1
 security:
@@ -36,8 +37,16 @@ paths:
                 $ref: "#/components/schemas/Trace"
         "401": &a1
           description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "404": &a2
           description: Not found or owned by another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /auth/login:
     post:
       operationId: login
@@ -48,30 +57,27 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                password:
-                  type: string
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - token
-                properties:
-                  token:
-                    type: string
-                additionalProperties: false
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "401": *a1
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /servers:
     get:
       operationId: listServers
@@ -84,25 +90,7 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  required:
-                    - slug
-                    - status
-                    - policy_version
-                  additionalProperties: false
-                  properties:
-                    slug:
-                      type: string
-                    status:
-                      enum:
-                        - connected
-                        - disconnected
-                        - error
-                        - unreviewed
-                    policy_version:
-                      type:
-                        - string
-                        - "null"
+                  $ref: "#/components/schemas/ServerSummary"
         "401": *a1
         "404": *a2
   /runs:
@@ -1494,6 +1482,76 @@ components:
           minLength: 1
       required:
         - source_prompt
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 320
+        password:
+          type: string
+          minLength: 1
+          maxLength: 4096
+      required:
+        - email
+        - password
+      additionalProperties: false
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+      required:
+        - token
+      additionalProperties: false
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              minLength: 1
+            message:
+              type: string
+              minLength: 1
+            request_id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          required:
+            - code
+            - message
+            - request_id
+          additionalProperties: false
+      required:
+        - error
+      additionalProperties: false
+    ServerSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - connected
+            - disconnected
+            - error
+            - unreviewed
+        policy_version:
+          type:
+            - string
+            - "null"
+      required:
+        - slug
+        - status
+        - policy_version
       additionalProperties: false
     RunAccepted:
       type: object

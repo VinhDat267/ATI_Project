@@ -67,6 +67,41 @@ export const CreateRunSchema = z
     time_zone: z.string().min(1).default("Asia/Ho_Chi_Minh"),
   })
   .strict();
+
+/** Strict HTTP boundary contracts shared by the API and generated OpenAPI. */
+export const LoginRequestSchema = z
+  .object({
+    email: z.string().min(1).max(320),
+    password: z.string().min(1).max(4096),
+  })
+  .strict();
+export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+
+export const LoginResponseSchema = z
+  .object({ token: z.string().min(1) })
+  .strict();
+
+export const ApiErrorSchema = z
+  .object({
+    error: z
+      .object({
+        code: z.string().min(1),
+        message: z.string().min(1),
+        request_id: z.uuid(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const ServerSummarySchema = z
+  .object({
+    slug: z.string().min(1),
+    status: z.enum(["connected", "disconnected", "error", "unreviewed"]),
+    policy_version: z.string().nullable(),
+  })
+  .strict();
+export const ServerSummaryListSchema = z.array(ServerSummarySchema);
+
 export const RunAcceptedSchema = z
   .object({ run_id: z.string().min(1), status: z.literal("planning") })
   .strict();

@@ -12,6 +12,10 @@ const definitions = {
   RunEvent: dsl.RunEventSchema,
   RunStatus: dsl.RunStatusSchema,
   CreateRun: dsl.CreateRunSchema,
+  LoginRequest: dsl.LoginRequestSchema,
+  LoginResponse: dsl.LoginResponseSchema,
+  ApiError: dsl.ApiErrorSchema,
+  ServerSummary: dsl.ServerSummarySchema,
   RunAccepted: dsl.RunAcceptedSchema,
   RunDetail: dsl.RunDetailSchema,
   Approval: dsl.ApprovalSchema,
@@ -45,8 +49,14 @@ const response = (name: string, description = "OK") => ({
   content: json(ref(name)),
 });
 const errors = {
-  "401": { description: "Unauthenticated" },
-  "404": { description: "Not found or owned by another user" },
+  "401": {
+    description: "Unauthenticated",
+    content: json(ref("ApiError")),
+  },
+  "404": {
+    description: "Not found or owned by another user",
+    content: json(ref("ApiError")),
+  },
 };
 const runParameters = [
   {
@@ -62,7 +72,7 @@ const spec = {
     title: "ATI Workflow Platform — B/local",
     version: "0.2.0",
     description:
-      "Design contract; HTTP implementation NOT_RUN. Poll every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
+      "API-01 local HTTP boundary is implemented for login and server discovery. Run lifecycle remains deferred to API-02+. Poll every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
   },
   servers: [{ url: "/api/v1" }],
   security: [{ bearerAuth: [] }],
@@ -86,27 +96,19 @@ const spec = {
         summary: "Login to the single local demo account",
         requestBody: {
           required: true,
-          content: json({
-            type: "object",
-            additionalProperties: false,
-            required: ["email", "password"],
-            properties: {
-              email: { type: "string" },
-              password: { type: "string" },
-            },
-          }),
+          content: json(ref("LoginRequest")),
         },
         responses: {
-          "200": {
-            description: "OK",
-            content: json({
-              type: "object",
-              required: ["token"],
-              properties: { token: { type: "string" } },
-              additionalProperties: false,
-            }),
+          "200": response("LoginResponse"),
+          "400": {
+            description: "Invalid request",
+            content: json(ref("ApiError")),
           },
           "401": errors["401"],
+          "429": {
+            description: "Rate limited",
+            content: json(ref("ApiError")),
+          },
         },
       },
     },
@@ -117,21 +119,7 @@ const spec = {
         responses: {
           "200": {
             description: "OK",
-            content: json({
-              type: "array",
-              items: {
-                type: "object",
-                required: ["slug", "status", "policy_version"],
-                additionalProperties: false,
-                properties: {
-                  slug: { type: "string" },
-                  status: {
-                    enum: ["connected", "disconnected", "error", "unreviewed"],
-                  },
-                  policy_version: { type: ["string", "null"] },
-                },
-              },
-            }),
+            content: json({ type: "array", items: ref("ServerSummary") }),
           },
           ...errors,
         },
