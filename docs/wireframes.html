@@ -11,39 +11,420 @@
   * { box-sizing: border-box; }
   body { margin:0; padding:32px 20px; background:var(--bg); color:var(--text);
          font:400 15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  .wrap { max-width: 820px; margin: 0 auto; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
   h1 { font-size:22px; font-weight:500; margin:0 0 4px; }
-  h2 { font-size:18px; font-weight:500; margin:40px 0 4px; }
+  h2 { font-size:18px; font-weight:500; margin:44px 0 2px; }
+  h3 { font-size:13px; font-weight:500; margin:0 0 6px; }
   .sub { color:var(--text-2); font-size:14px; margin:0 0 16px; }
-  .screen { background:var(--surface-2); border-radius:12px; padding:20px; margin-bottom:8px; }
+  .lead { color:var(--text-2); font-size:13.5px; margin:0 0 16px; max-width:70ch; }
   .card { background:var(--surface); border:0.5px solid var(--border); border-radius:8px; padding:12px; }
   .row { display:flex; gap:8px; align-items:center; }
   .spacer { flex:1; }
   button { font:inherit; font-size:13px; padding:6px 12px; border:0.5px solid var(--border);
-           background:transparent; border-radius:8px; color:var(--text); cursor:pointer; }
+           background:transparent; border-radius:8px; color:var(--text); cursor:not-allowed; }
   button.primary { border-color:var(--accent-br); color:var(--accent-tx); }
   button.danger { border-color:#f09595; color:var(--danger-tx); }
   .pill { font-size:11px; padding:2px 8px; border-radius:8px; }
   .pill.read { background:var(--accent-bg); color:var(--accent-tx); }
   .pill.write { background:var(--warn-bg); color:var(--warn-tx); }
-  .mono { font-family:var(--mono); font-size:11px; }
+  .mono { font-family:var(--mono); font-size:11px; overflow-wrap:anywhere; }
   .muted { color:var(--text-3); font-size:12px; }
   .sec { color:var(--text-2); font-size:13px; }
-  .node { border-radius:8px; padding:10px; }
-  .node.read { background:var(--accent-bg); border:0.5px solid var(--accent-br); color:var(--accent-tx); }
-  .node.write { background:var(--warn-bg); border:0.5px solid var(--warn-br); color:var(--warn-tx); }
-  .node .t { font-size:13px; font-weight:500; margin-bottom:3px; }
-  .tl { display:flex; gap:12px; }
-  .tl .gut { display:flex; flex-direction:column; align-items:center; width:18px; }
-  .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; margin-top:4px; }
-  .line { flex:1; width:1px; background:var(--border); min-height:24px; }
-  .note { background:#fff; border-left:3px solid var(--accent-br); border-radius:0;
-          padding:10px 14px; margin:12px 0 0; font-size:13px; color:var(--text-2); }
+  .note { background:#fff; border-left:3px solid var(--accent-br);
+          padding:10px 14px; margin:14px 0 0; font-size:13px; color:var(--text-2); }
   .note b { color:var(--text); font-weight:500; }
-  hr { border:0; border-top:0.5px solid var(--border); margin:14px 0; }
+  hr { border:0; border-top:0.5px solid var(--border); margin:12px 0; }
+
+  /* Lưới panel trạng thái */
+  /* min() để panel co được dưới 340px trên màn hẹp, tránh tràn ngang cả trang */
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr)); margin-top:14px; }
+  .state { background:var(--surface-2); border-radius:12px; padding:14px; }
+  .state.wide { grid-column:1/-1; }
+  .sh { display:flex; align-items:baseline; gap:8px; margin-bottom:9px; flex-wrap:wrap; }
+  .st { font-family:var(--mono); font-size:11px; background:var(--surface);
+        border:0.5px solid var(--border); border-radius:6px; padding:2px 7px; white-space:nowrap; }
+  .st.term { color:var(--text-2); border-style:dashed; }
+  .sn { font-size:14px; font-weight:500; }
+  .meta { font-size:12px; color:var(--text-2); margin:10px 0 0; line-height:1.55; }
+  .meta b { color:var(--text); font-weight:500; }
+  .meta code { font-family:var(--mono); font-size:11px; color:var(--text); }
+
+  /* Danh sách bước */
+  .steps { list-style:none; padding:0; margin:0; }
+  .steps li { display:flex; gap:8px; align-items:flex-start; padding:4px 0; font-size:13px; }
+  .ic { width:15px; flex:none; text-align:center; font-size:12px; color:var(--text-3); line-height:1.6; }
+  .ok { color:var(--ok-tx); } .bad { color:var(--danger-tx); } .warn { color:var(--warn-tx); }
+  .bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; margin:9px 0 4px; }
+  .bar i { display:block; height:100%; background:var(--accent-br); }
+
+  /* Bảng bản đồ trạng thái */
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; min-width:640px; }
+  th, td { text-align:left; padding:6px 9px; border-bottom:0.5px solid var(--border); vertical-align:top; }
+  th { color:var(--text-2); font-weight:500; }
+  td code, th code { font-family:var(--mono); font-size:11px; }
+  tbody tr:last-child td { border-bottom:0; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-2); margin:10px 0 0; }
 </style></head><body><main class="wrap">
-<h1>Hai màn hình — B/local</h1><p class="sub">Wireframe tĩnh để thống nhất luồng; chưa phải ứng dụng. <a href="BASELINE.md">Baseline</a> · <a href="API.md">API</a></p>
-<h2>1. Yêu cầu → kế hoạch → duyệt</h2><section class="screen"><div class="card"><p class="sec">Dữ liệu local · task_hub · mọi thông báo chỉ ghi vào kho demo</p><label for="request">Yêu cầu</label><textarea id="request" rows="3" style="width:100%;box-sizing:border-box">Chép các dòng Progress!A1:B2 từ source sang Report của dest, rồi báo số dòng vào #team.</textarea><p><button class="primary" type="button" disabled>Tạo run</button> POST /runs → planning</p></div>
-<p class="sec">Sau khi tạo: hệ thống tự lập plan, validate và chuẩn bị preview. Trạng thái cập nhật qua polling 2 giây.</p><div class="card"><h3>Preview phiên bản 1</h3><p>Đọc source / Progress!A1:B2: 2 dòng. Dữ liệu đọc được giữ cố định trong lần duyệt này.</p><ol><li>append_sheet_rows → dest / Report: [["API","Done"],["UI","Doing"]]</li><li>send_slack_message → #team: “Đã chép 2 dòng.”</li></ol><p class="muted">UI lấy preview đầy đủ bằng GET RunDetail sau event dryrun.ready. Hiển thị giờ hết hạn do server cấp.</p><button disabled class="primary">Duyệt đúng phiên bản này</button> <button disabled class="danger">Từ chối</button><p class="muted">Request gắn approval id, version và snapshot hash. Hết hạn hoặc snapshot đổi: nạp preview mới và duyệt lại.</p></div></section>
-<h2>2. Chi tiết run và lịch sử</h2><section class="screen"><div class="card"><p><strong>Đang chờ duyệt</strong> · 3 bước · dữ liệu local</p><ol><li>Đọc bảng — đã có output 2 dòng</li><li>Chép bảng — chưa chạy</li><li>Thông báo — chưa chạy</li></ol><button disabled>Yêu cầu hủy</button><p class="muted">Trace hiển thị version, tool, args, output và lỗi từng attempt; không chứa credential. Lịch sử ở cùng màn hình.</p></div><div class="note"><b>Các nhánh cần hiển thị:</b> refused (không có capability); needs_input (cần định danh); expired/rejected; failed; reconciliation_required (write chưa rõ kết quả, không bấm chạy lại mù). Replan hiển thị preview/version mới và đưa về duyệt.</div></section>
-<p class="muted">Các nút bị vô hiệu hóa vì đây là tài liệu luồng. Không có nút dry-run riêng, WebSocket hoặc resume trong B.</p></main></body></html>
+
+<h1>Hai màn hình B/local — wireframe đầy đủ trạng thái</h1>
+<p class="sub">Tài liệu luồng tĩnh, <strong>chưa phải ứng dụng</strong>: mọi nút đều vô hiệu hoá và mọi dữ liệu là ví dụ.
+<a href="BASELINE.md">Baseline</a> · <a href="API.md">API</a> · <a href="EXECUTION-CONTRACT.md">Execution contract</a> · <a href="functional-requirements.md">FR</a></p>
+<p class="lead">Mỗi panel bên dưới ứng với đúng một giá trị <code class="mono">run_status</code> trong
+<code class="mono">packages/dsl/src/events.ts</code>, kèm event dẫn tới trạng thái đó và mã FR tương ứng, để đối chiếu 1-1 giữa giao diện, enum trong mã và bảng yêu cầu.</p>
+
+<h2>0. Bản đồ trạng thái</h2>
+<p class="lead">14 run status, 8 trong đó là trạng thái cuối (viền nét đứt, không có event nào sau <code class="mono">run.finished</code>).
+UI cập nhật bằng polling 2 giây theo <code class="mono">seq</code> tăng dần, không dùng WebSocket.</p>
+<div class="card scroll"><table>
+<thead><tr><th>Status</th><th>Màn hình</th><th>Vào bằng</th><th>Có thể chuyển tiếp sang</th></tr></thead>
+<tbody>
+<tr><td><code>planning</code></td><td>1</td><td><code>POST /runs</code> → 202</td><td><code>validating</code>, <code>refused</code>, <code>needs_input</code>, <code>failed</code></td></tr>
+<tr><td><code>validating</code></td><td>1</td><td><code>run.status</code> với <code>status: validating</code></td><td><code>dry_running</code> (sau <code>plan.ready</code>), quay lại sửa (<code>validation.failed</code>, tối đa 3 lượt), <code>failed</code></td></tr>
+<tr><td><code>dry_running</code></td><td>1</td><td><code>run.status</code></td><td><code>awaiting_approval</code> (có write), <code>succeeded</code> (run chỉ đọc), <code>cancelled</code>, <code>failed</code></td></tr>
+<tr><td><code>awaiting_approval</code></td><td>1</td><td><code>dryrun.ready</code></td><td><code>running</code>, <code>rejected</code>, <code>expired</code>, <code>cancelled</code></td></tr>
+<tr><td><code>running</code></td><td>2</td><td>duyệt đúng snapshot</td><td><code>succeeded</code>, <code>failed</code>, <code>replanning</code>, <code>cancelled</code>, <code>expired</code>, <code>reconciliation_required</code></td></tr>
+<tr><td><code>replanning</code></td><td>2 → 1</td><td><code>replan.started</code></td><td><code>awaiting_approval</code> (bắt buộc duyệt lại), <code>failed</code></td></tr>
+<tr><td><code class="term">succeeded</code></td><td>2</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">failed</code></td><td>2</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">refused</code></td><td>1</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">needs_input</code></td><td>1</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">rejected</code></td><td>1</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">expired</code></td><td>1</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">cancelled</code></td><td>2</td><td><code>run.finished</code></td><td>— trạng thái cuối</td></tr>
+<tr><td><code class="term">reconciliation_required</code></td><td>2</td><td><code>run.finished</code></td><td>— trạng thái cuối, cần người kiểm tra kết quả write</td></tr>
+</tbody></table>
+<div class="legend"><span><span class="pill read">read</span> bước chỉ đọc, chạy thật trong dry-run</span>
+<span><span class="pill write">write</span> bước có side-effect, chỉ chạy sau khi duyệt</span>
+<span><code class="st term">nét đứt</code> trạng thái cuối</span></div>
+</div>
+
+<h2>1. Màn hình 1 — Yêu cầu → kế hoạch → duyệt</h2>
+<p class="lead">Nơi người dùng nhập việc cần làm và quyết định có cho phép ghi hay không. Mọi nhánh kết thúc trước khi chạy đều nằm ở màn hình này.</p>
+<div class="grid">
+
+  <article class="state">
+    <div class="sh"><code class="st">—</code><span class="sn">Trạng thái rỗng</span></div>
+    <div class="card">
+      <p class="sec">Dữ liệu local · <span class="mono">task_hub</span> + <span class="mono">filesystem</span> · mọi thông báo chỉ ghi vào kho demo</p>
+      <label class="sec" for="req">Yêu cầu</label>
+      <textarea id="req" rows="3" style="width:100%;font:inherit;font-size:13px;padding:8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface-2)" placeholder="Ví dụ: Chép các dòng Progress!A1:B2 từ source sang Report của dest, rồi báo số dòng vào #team." disabled></textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" disabled>Tạo run</button><span class="spacer"></span><span class="muted">Chưa có run nào đang chạy</span></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> mở màn hình. <b>Người dùng:</b> nhập mô tả tiếng Việt hoặc tiếng Anh; chưa có gì để duyệt.
+    <b>FR:</b> FR-PLN-01, FR-USR-01</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">planning</code><span class="sn">Đang lập kế hoạch</span></div>
+    <div class="card">
+      <p><strong>Đang lập kế hoạch…</strong></p>
+      <div class="bar"><i style="width:28%"></i></div>
+      <p class="muted">Chọn tool liên quan rồi sinh plan. Lượt lập kế hoạch 1/3.</p>
+      <hr><p class="muted">Cập nhật mỗi 2 giây · <span class="mono">seq 3</span></p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>POST /runs</code> trả 202, plan và version còn <code>null</code>.
+    <b>Người dùng:</b> chỉ theo dõi. <b>FR:</b> FR-PLN-02, FR-PLN-03, FR-TRC-02</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">validating</code><span class="sn">Đang kiểm kế hoạch</span></div>
+    <div class="card">
+      <p><strong>Đang kiểm kế hoạch</strong> · phiên bản 1</p>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span>Tầng 1 — Schema: đúng cấu trúc DSL</span></li>
+        <li><span class="ic ok">✓</span><span>Tầng 2 — Tool &amp; policy: 3 tool đều có trong registry đã duyệt</span></li>
+        <li><span class="ic">•</span><span>Tầng 3 — Đồ thị phụ thuộc: đang kiểm</span></li>
+      </ul>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.status</code> với <code>status: validating</code>; khi kiểm xong, <code>plan.ready</code> dẫn sang <code>dry_running</code> (kèm <code>version_no</code>, <code>layers</code>).
+    <b>Người dùng:</b> xem plan và sơ đồ bước, chưa duyệt được. <b>FR:</b> FR-VAL-01, FR-VAL-02, FR-VAL-04</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">validating</code><span class="sn">Kiểm thất bại, đang sửa</span></div>
+    <div class="card">
+      <p><strong>Kế hoạch chưa hợp lệ — đang sửa</strong> · lượt 2/3</p>
+      <div class="card" style="background:var(--warn-bg);border-color:var(--warn-br);margin-top:8px">
+        <p class="mono" style="color:var(--warn-tx);margin:0">tầng: tool</p>
+        <p class="mono" style="color:var(--warn-tx);margin:4px 0 0">steps[1].tool → tool missing reviewed policy</p>
+      </div>
+      <p class="muted" style="margin-top:8px">Hết 3 lượt mà vẫn chưa hợp lệ thì run chuyển sang <span class="mono">failed</span>, không ép sinh plan thiếu tool.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>validation.failed</code> (<code>attempt_no</code>, <code>max_attempts</code>, <code>layer</code>, <code>issues[]</code> có <code>path</code>).
+    <b>Người dùng:</b> thấy rõ hệ thống đang tự sửa và còn mấy lượt. <b>FR:</b> FR-VAL-08, FR-VAL-09, FR-PLN-09, FR-PLN-10</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">dry_running</code><span class="sn">Đang chạy thử phần đọc</span></div>
+    <div class="card">
+      <p><strong>Đang chạy các bước đọc</strong></p>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — source / Progress!A1:B2 → 2 dòng</span></li>
+        <li><span class="ic">•</span><span><span class="pill write">write</span> <span class="mono">append_sheet_rows</span> — <em>không chạy trong dry-run</em></span></li>
+        <li><span class="ic">•</span><span><span class="pill write">write</span> <span class="mono">send_slack_message</span> — <em>không chạy trong dry-run</em></span></li>
+      </ul>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.status</code> sau khi validate xong.
+    <b>Người dùng:</b> thấy dữ liệu đọc thật; hệ thống tuyệt đối không thực thi bước write nào ở đây.
+    <b>FR:</b> FR-APR-01, FR-APR-02</p>
+  </article>
+
+  <article class="state wide">
+    <div class="sh"><code class="st">awaiting_approval</code><span class="sn">Chờ duyệt — màn hình quyết định</span></div>
+    <div class="card">
+      <div class="row"><h3 style="margin:0">Preview phiên bản 1</h3><span class="spacer"></span><span class="muted">Hết hạn sau <strong>09:41</strong> · giờ do server cấp</span></div>
+      <hr>
+      <p class="sec">Dữ liệu đã đọc, được giữ cố định cho lần duyệt này:</p>
+      <p class="mono">read_sheet_range → source / Progress!A1:B2 = [["API","Done"],["UI","Doing"]] · 2 dòng</p>
+      <hr>
+      <p class="sec">Sẽ ghi đúng 2 hành động sau nếu bạn duyệt:</p>
+      <ol style="margin:6px 0 0;padding-left:20px;font-size:13px">
+        <li><span class="pill write">write</span> <span class="mono">append_sheet_rows</span> → dest / Report: <span class="mono">[["API","Done"],["UI","Doing"]]</span></li>
+        <li><span class="pill write">write</span> <span class="mono">send_slack_message</span> → #team: <span class="mono">"Đã chép 2 dòng."</span></li>
+      </ol>
+      <div class="row" style="margin-top:12px"><button class="primary" disabled>Duyệt đúng phiên bản này</button><button class="danger" disabled>Từ chối</button><span class="spacer"></span><button disabled>Yêu cầu huỷ</button></div>
+      <p class="muted" style="margin-top:8px">Request gửi kèm <span class="mono">approval_id</span>, <span class="mono">version_id</span> và <span class="mono">snapshot_hash</span>. Nếu snapshot đã đổi, approval đã quyết định hoặc đã hết hạn, server trả 409; UI phải gọi lại <span class="mono">GET /runs/{runId}</span> và hiển thị trạng thái do server trả. Chỉ tạo preview mới khi server trả version/approval mới.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>dryrun.ready</code> (<code>approval_id</code>, <code>expires_at</code>, <code>read_count</code>, <code>write_count</code>), sau đó UI gọi <code>GET /runs/{runId}</code> để lấy preview đầy đủ.
+    <b>Người dùng:</b> đây là nơi duy nhất cho phép ghi. Không có nút dry-run riêng, không sửa được tham số trong profile B.
+    <b>FR:</b> FR-APR-03, FR-APR-04, FR-APR-05, FR-APR-06, FR-USR-02</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">refused</code><span class="sn">Từ chối vì thiếu năng lực</span></div>
+    <div class="card">
+      <p><strong>Không thực hiện được yêu cầu này</strong></p>
+      <p class="sec" style="margin-top:6px">Không có tool dịch trong profile B/local.</p>
+      <hr><p class="muted">Không có kế hoạch nào được tạo và không có bước ghi nào được gọi. Sửa lại mô tả rồi tạo run mới.</p>
+      <div class="row" style="margin-top:8px"><button disabled>Soạn yêu cầu khác</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.finished</code> với <code>status: refused</code>.
+    <b>Người dùng:</b> đọc lý do; không có gì để duyệt. Đây là kết quả riêng của planner, không phải plan rỗng.
+    <b>FR:</b> FR-PLN-05, FR-PLN-12</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">needs_input</code><span class="sn">Cần hỏi lại</span></div>
+    <div class="card">
+      <p><strong>Cần thêm thông tin</strong></p>
+      <p class="sec" style="margin-top:6px">Chép từ bảng nguồn nào, vùng nào, sang bảng và sheet đích nào?</p>
+      <hr><p class="muted">Bổ sung thông tin sẽ tạo <em>run mới</em>, không chạy tiếp run này.</p>
+      <div class="row" style="margin-top:8px"><button disabled>Bổ sung và tạo run mới</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.finished</code> với <code>status: needs_input</code>.
+    <b>Người dùng:</b> trả lời câu hỏi; hệ thống không tự đoán định danh còn thiếu.
+    <b>FR:</b> FR-PLN-12, FR-PLN-13</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">rejected</code><span class="sn">Người dùng từ chối</span></div>
+    <div class="card">
+      <p><strong>Bạn đã từ chối preview phiên bản 1</strong></p>
+      <p class="muted" style="margin-top:6px">Không có bước write nào được gọi. Quyết định đã ghi vào trace kèm thời điểm.</p>
+      <div class="row" style="margin-top:8px"><button disabled>Xem trace</button><button disabled>Tạo run mới</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.finished</code> với <code>status: rejected</code>.
+    <b>Người dùng:</b> xem lại quyết định của mình trong lịch sử. <b>FR:</b> FR-APR-04, FR-TRC-05</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">expired</code><span class="sn">Hết hạn duyệt</span></div>
+    <div class="card">
+      <p><strong>Preview đã hết hạn</strong></p>
+      <p class="sec" style="margin-top:6px">TTL approval do server cấp đã hết trước quyết định hoặc trước bước ghi kế tiếp.</p>
+      <hr><p class="muted">Không dùng lại preview cũ. Nếu đã có bước ghi được xác nhận, giữ nguyên kết quả đó và xem trace trước khi tạo run mới; không tự phát lại bước chưa rõ.</p>
+      <div class="row" style="margin-top:8px"><button disabled>Chuẩn bị lại</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.finished</code> với <code>status: expired</code>.
+    <b>Người dùng:</b> không duyệt được nữa; server quyết định thời gian, không tin đồng hồ máy khách.
+    <b>FR:</b> FR-APR-06</p>
+  </article>
+
+</div>
+
+<h2>2. Màn hình 2 — Chi tiết run và lịch sử</h2>
+<p class="lead">Nơi theo dõi quá trình chạy và xem lại. Mọi thứ hiển thị ở đây đến từ event và attempt snapshot đã lưu, không suy diễn từ plan hiện tại.</p>
+<div class="grid">
+
+  <article class="state wide">
+    <div class="sh"><code class="st">running</code><span class="sn">Đang chạy — timeline theo thời gian</span></div>
+    <div class="card">
+      <div class="row"><p style="margin:0"><strong>Đang chạy</strong> · 3 bước · phiên bản 1</p><span class="spacer"></span><button disabled>Yêu cầu huỷ</button></div>
+      <div class="bar"><i style="width:66%"></i></div>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — 2 dòng · 120ms · <span class="muted">kết quả chắc chắn</span></span></li>
+        <li><span class="ic ok">✓</span><span><span class="pill write">write</span> <span class="mono">append_sheet_rows</span> — đã ghi 2 dòng · có receipt · <span class="muted">operation 8f2c…</span></span></li>
+        <li><span class="ic">•</span><span><span class="pill write">send</span> <span class="mono">send_slack_message</span> — đang gọi… <span class="muted">timeout 30s</span></span></li>
+      </ul>
+      <hr><p class="muted">Cập nhật mỗi 2 giây theo <span class="mono">seq</span> · bấm một bước để xem args đã resolve và output đầy đủ. Nếu bước đang retry, lý do và lần thử hiện ngay trong timeline này.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> duyệt đúng snapshot → <code>run.status: running</code>; từng bước phát <code>step.started</code>, <code>step.attempt</code>, <code>step.succeeded</code>.
+    <b>Người dùng:</b> theo dõi và có thể yêu cầu huỷ; huỷ chỉ chặn lời gọi kế tiếp.
+    <b>FR:</b> FR-EXE-01, FR-EXE-16, FR-TRC-01, FR-TRC-06</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">replanning</code><span class="sn">Đang sửa kế hoạch cục bộ</span></div>
+    <div class="card">
+      <p><strong>Bước lỗi — đang sửa kế hoạch</strong> · lần 1/2</p>
+      <p class="sec" style="margin-top:6px">Bước <span class="mono">notify</span> lỗi <span class="mono">bad_args</span>, chắc chắn chưa gây side-effect.</p>
+      <hr>
+      <p class="muted">Các bước đã thành công được giữ nguyên và không chạy lại. Kế hoạch mới sẽ tạo <strong>phiên bản 2</strong> và preview mới, bắt buộc duyệt lại trước khi ghi tiếp.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>replan.started</code> (<code>failed_step_id</code>, <code>error_class</code>, <code>scope: local</code>, <code>replan_count</code>) rồi <code>replan.applied</code> (<code>changed_step_ids</code>).
+    <b>Người dùng:</b> bị đưa về màn hình 1 để duyệt lại; approval cũ bị thay thế.
+    <b>FR:</b> FR-EXE-12, FR-EXE-13, FR-EXE-14, FR-TRC-04</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">succeeded</code><span class="sn">Hoàn tất</span></div>
+    <div class="card">
+      <p><strong class="ok">Hoàn tất</strong> · 3/3 bước · 4,2s</p>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span>Đọc bảng — 2 dòng</span></li>
+        <li><span class="ic ok">✓</span><span>Chép sang dest / Report — 2 dòng</span></li>
+        <li><span class="ic ok">✓</span><span>Thông báo #team — “Đã chép 2 dòng.”</span></li>
+      </ul>
+      <hr><p class="muted">Trạng thái thành công nghĩa là các lời gọi đã hoàn tất đúng snapshot đã duyệt — không tự nó chứng minh kết quả đúng nghiệp vụ.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>run.finished</code> với <code>status: succeeded</code> và <code>outputs</code>.
+    <b>Người dùng:</b> đối chiếu kết quả với ý định ban đầu. <b>FR:</b> FR-TRC-08, FR-WFM-01</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">failed</code><span class="sn">Thất bại có kết quả rõ ràng</span></div>
+    <div class="card">
+      <p><strong class="bad">Thất bại</strong> · dừng ở bước 2/3</p>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span>Đọc bảng — 2 dòng</span></li>
+        <li><span class="ic bad">✕</span><span>Chép sang dest / Report — <span class="mono">bad_args</span>: sheet "Report" không tồn tại</span></li>
+        <li><span class="ic">–</span><span class="muted">Thông báo #team — không chạy</span></li>
+      </ul>
+      <hr><p class="muted">Chắc chắn chưa có side-effect nào ở bước lỗi, nên trạng thái là <span class="mono">failed</span> chứ không phải cần đối chiếu.</p>
+      <div class="row" style="margin-top:8px"><button disabled>Xem trace</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>step.failed</code> (<code>error_class</code>, <code>on_error</code>) rồi <code>run.finished</code>.
+    <b>Người dùng:</b> đọc lỗi kèm phân loại; hệ thống không tự chạy lại. <b>FR:</b> FR-EXE-05, FR-TRC-01</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st term">cancelled</code><span class="sn">Người dùng huỷ</span></div>
+    <div class="card">
+      <p><strong>Đã huỷ theo yêu cầu</strong> · dừng sau bước 2/3</p>
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span>Đọc bảng — 2 dòng</span></li>
+        <li><span class="ic ok">✓</span><span>Chép sang dest / Report — <strong>đã ghi và giữ nguyên</strong></span></li>
+        <li><span class="ic">–</span><span class="muted">Thông báo #team — không được gọi</span></li>
+      </ul>
+      <hr><p class="muted">Huỷ chỉ ngăn lời gọi kế tiếp. Hệ thống không hứa thu hồi lời gọi đang diễn ra và không hoàn tác dữ liệu đã ghi.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>POST /runs/{runId}/cancel</code> → <code>run.finished</code> với <code>status: cancelled</code>.
+    <b>Người dùng:</b> phải hiểu rõ phần đã ghi vẫn còn đó. <b>FR:</b> FR-EXE-15</p>
+  </article>
+
+  <article class="state wide">
+    <div class="sh"><code class="st term">reconciliation_required</code><span class="sn">Write chưa rõ kết quả — cần người kiểm tra</span></div>
+    <div class="card" style="border-color:var(--warn-br);background:var(--warn-bg)">
+      <p style="color:var(--warn-tx);margin:0"><strong>Không xác định được kết quả của một bước ghi</strong></p>
+      <p class="sec" style="color:var(--warn-tx);margin:6px 0 0">Bước <span class="mono">notify</span> đã được gửi đi nhưng mất phản hồi. Không có bằng chứng nó đã hoàn tất hay chưa.</p>
+      <hr style="border-color:var(--warn-br)">
+      <ul class="steps">
+        <li><span class="ic ok">✓</span><span>Đọc bảng — 2 dòng</span></li>
+        <li><span class="ic ok">✓</span><span>Chép sang dest / Report — có receipt, chắc chắn đã ghi</span></li>
+        <li><span class="ic warn">?</span><span>Thông báo #team — <span class="mono">unknown</span> · operation 4b71… · <strong>cần kiểm tra thủ công</strong></span></li>
+      </ul>
+      <p class="muted" style="color:var(--warn-tx);margin-top:10px"><strong>Cố ý không có nút “chạy lại”.</strong> Chạy lại mù có thể gửi trùng thông báo. Hãy mở kho demo kiểm tra rồi quyết định; tạo run mới là một ý định ghi mới và phải duyệt lại.</p>
+      <div class="row" style="margin-top:10px"><button disabled>Xem trace và receipt</button><button disabled>Mở kho demo để đối chiếu</button></div>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> timeout, mất phản hồi hoặc worker chết sau khi đã gửi lệnh ghi → <code>run.finished</code> với <code>status: reconciliation_required</code>.
+    <b>Người dùng:</b> đây là trạng thái quan trọng nhất của thiết kế — hệ thống thà dừng và nói “không biết” còn hơn đoán.
+    <b>FR:</b> FR-EXE-05, FR-EXE-06, NFR-06</p>
+  </article>
+
+  <article class="state wide">
+    <div class="sh"><code class="st">—</code><span class="sn">Lịch sử các run, cùng màn hình</span></div>
+    <div class="card scroll"><table>
+      <thead><tr><th>Thời điểm</th><th>Yêu cầu</th><th>Trạng thái</th><th>Phiên bản</th><th>Kết quả ghi</th></tr></thead>
+      <tbody>
+        <tr><td>14/09 21:40</td><td>Chép Progress!A1:B2 sang Report…</td><td><code class="term">reconciliation_required</code></td><td>1</td><td>1 chắc chắn · 1 không rõ</td></tr>
+        <tr><td>14/09 20:12</td><td>Tạo task “Viết tài liệu API”…</td><td><code class="term">succeeded</code></td><td>2</td><td>1 chắc chắn</td></tr>
+        <tr><td>14/09 19:55</td><td>Chuyển task đó sang Done</td><td><code class="term">needs_input</code></td><td>—</td><td>0</td></tr>
+        <tr><td>14/09 19:31</td><td>Dịch tài liệu sang tiếng Nhật</td><td><code class="term">refused</code></td><td>—</td><td>0</td></tr>
+      </tbody></table>
+      <p class="muted" style="margin-top:10px">Run chưa tới bước có kế hoạch thì không có số phiên bản. Cột “Kết quả ghi” tách theo receiver: <span class="mono">task_hub</span> chỉ đếm receipt hợp lệ; <span class="mono">filesystem</span> hiển thị confirmed/marker/unknown riêng. Dispatch marker không tự chứng minh bytes đã ghi.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>GET /runs</code>. <b>Người dùng:</b> xem lại mọi run kèm trạng thái và thời điểm, mở chi tiết để đọc trace.
+    <b>FR:</b> FR-WFM-01, FR-WFM-02, FR-TRC-05</p>
+  </article>
+
+</div>
+
+<h2>3. Trạng thái cắt ngang</h2>
+<p class="lead">Không gắn với một <code class="mono">run_status</code> riêng, nhưng phải hiển thị trong màn hình chứa run đó: <code class="mono">dry_running</code> ở Màn hình 1, <code class="mono">running</code> và trace ở Màn hình 2.</p>
+<div class="grid">
+
+  <article class="state">
+    <div class="sh"><code class="st">step.retrying</code><span class="sn">Đang thử lại một bước đọc</span></div>
+    <div class="card">
+      <ul class="steps">
+        <li><span class="ic warn">↻</span><span><span class="pill read">read</span> <span class="mono">read_sheet_range</span> — <strong>đang thử lại lần 2/3</strong></span></li>
+      </ul>
+      <p class="sec" style="margin-top:6px"><span class="mono">transient</span>: server local chưa phản hồi. Thử lại sau 1,0s.</p>
+      <hr><p class="muted">Panel này xuất hiện ở Màn hình 1 khi run đang <code class="mono">dry_running</code> hoặc Màn hình 2 khi run đang <code class="mono">running</code>. Chỉ bước đọc được thử lại theo giới hạn này; bước ghi không tự retry khi chưa rõ side-effect.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>step.retrying</code> (<code>attempt_no</code>, <code>max_attempts</code>, <code>error_class</code>, <code>delay_ms</code>).
+    <b>Người dùng:</b> thấy rõ lý do và đang ở lần thử thứ mấy, thay vì một vòng xoay không giải thích.
+    <b>FR:</b> FR-EXE-04, FR-TRC-03</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">step.skipped</code><span class="sn">Bước bị bỏ qua do điều kiện</span></div>
+    <div class="card">
+      <ul class="steps">
+        <li><span class="ic">–</span><span><span class="mono">notify</span> — <strong>bỏ qua</strong></span></li>
+      </ul>
+      <p class="sec" style="margin-top:6px">Điều kiện <span class="mono">${steps.read.output.row_count} &gt; 0</span> cho kết quả sai.</p>
+      <hr><p class="muted">Bước bị bỏ qua không sinh output. Bước sau nếu cần output đó phải dừng lại, không được coi là <span class="mono">null</span>.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>step.skipped</code> (<code>step_id</code>, <code>condition</code>).
+    <b>Người dùng:</b> hiểu vì sao một bước không chạy. <b>FR:</b> FR-EXE-09</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">polling</code><span class="sn">Mất kết nối rồi nối lại</span></div>
+    <div class="card">
+      <p class="sec"><strong>Mất kết nối tới máy chủ</strong> — đang thử lại…</p>
+      <hr>
+      <p class="muted">Đã nhận tới <span class="mono">seq 24</span>. Khi nối lại, UI gọi
+      <span class="mono">GET /runs/{runId}/events?since_seq=24</span> để lấy đúng phần còn thiếu, bỏ qua seq trùng.</p>
+      <p class="muted">Tối đa 200 event mỗi trang, dùng <span class="mono">next_seq</span> để lấy tiếp. Cùng cơ chế này áp dụng cho cả Màn hình 1 và Màn hình 2.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> lỗi mạng giữa hai lượt poll 2 giây.
+    <b>Người dùng:</b> không mất event và không thấy trạng thái nhảy cóc. Profile B không dùng WebSocket.
+    <b>FR:</b> FR-TRC-02, NFR-03</p>
+  </article>
+
+  <article class="state">
+    <div class="sh"><code class="st">trace</code><span class="sn">Chi tiết một attempt, đã che bí mật</span></div>
+    <div class="card">
+      <p class="sec"><strong>Bước <span class="mono">append</span> · attempt 1</strong></p>
+      <hr>
+      <p class="mono">tool: task_hub / append_sheet_rows · policy b-local-1</p>
+      <p class="mono">args: {"spreadsheet_id":"dest","sheet_name":"Report","rows":[["API","Done"],["UI","Doing"]]}</p>
+      <p class="mono">auth: ●●●●●● (đã che)</p>
+      <p class="mono">outcome_certainty: confirmed · operation 8f2c…</p>
+      <hr><p class="muted">Mỗi attempt lưu snapshot bất biến của version, tool, policy và schema tại thời điểm gọi; không suy diễn lại từ plan hiện tại.</p>
+    </div>
+    <p class="meta"><b>Vào bằng:</b> <code>GET /runs/{runId}/trace</code>, phân trang tối đa 100 attempt.
+    <b>Người dùng:</b> giải thích được vì sao một bước thành công hay thất bại. Credential và token luôn bị che.
+    <b>FR:</b> FR-TRC-01, FR-TRC-05, FR-TRC-07, NFR-10</p>
+  </article>
+
+</div>
+
+<div class="note"><b>Ranh giới của tài liệu này.</b> Đây là wireframe để thống nhất luồng và trạng thái, không phải ứng dụng đang chạy:
+chưa có HTTP server, chưa có UI và chưa có bằng chứng browser. Số liệu trong các panel là ví dụ minh hoạ, không phải kết quả đo.
+Trong profile B không có nút dry-run riêng, không có WebSocket, không có resume tự động và không có màn hình sửa plan.</div>
+
+</main></body></html>
