@@ -30,6 +30,10 @@ export interface ApiFixture {
   userId: string;
   email: string;
   password: string;
+  databaseUrl: string;
+  config: ApiConfig;
+  engine: WorkflowEngine;
+  gateway?: Gateway;
   b02Prompt: string;
   fsCopyPrompt: string;
   allowedRoot?: string;
@@ -118,8 +122,16 @@ export async function makeApiFixture(
         : {}),
     });
   }
-  const engine = new WorkflowEngine(db, gateway, userId);
-  if (options.workerEnabled && planner)
+  const engine = new WorkflowEngine(db, gateway, userId, {
+    secrets: [
+      passwordHash,
+      config.cursorKey.toString("base64"),
+      config.cursorKey.toString("hex"),
+      databaseUrl,
+      decodeURIComponent(address.password),
+    ].filter(Boolean),
+  });
+  if (options.workerEnabled)
     worker = createPrepareWorker({ db, userId, engine, planner });
   const maintenance = createExpiryMaintenance({ engine });
   const api = createApi({ db, config, engine, worker, maintenance });
@@ -134,6 +146,10 @@ export async function makeApiFixture(
     userId,
     email,
     password,
+    databaseUrl,
+    config,
+    engine,
+    gateway,
     allowedRoot,
     b02Prompt: planner?.b02Prompt ?? "",
     fsCopyPrompt:

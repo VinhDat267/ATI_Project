@@ -5,12 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import {
-  EngineError,
-  ToolSchema,
-  canonicalJson,
-  hash,
-} from "./snapshot.js";
+import { EngineError, ToolSchema, canonicalJson, hash } from "./snapshot.js";
 import type {
   CallContext,
   GatewayResult,
@@ -128,6 +123,8 @@ export async function openTaskHubConnection(
         );
     }
     const assertCurrent = async () => {
+      if (!client.transport)
+        throw new EngineError("CONFIG", "MCP transport is disconnected");
       if (artifact() !== artifactHash)
         throw new EngineError(
           "REGISTRY_CHANGED",
@@ -141,6 +138,7 @@ export async function openTaskHubConnection(
         return structuredClone(tools);
       },
       assertCurrent,
+      isConnected: () => Boolean(client.transport),
       async call(
         name: string,
         args: Record<string, unknown>,

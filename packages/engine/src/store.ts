@@ -12,6 +12,7 @@ import {
   type RunEventType,
 } from "@wap/dsl";
 import { EngineError, json, unpackPreview, type Snapshot } from "./snapshot.js";
+import { safeProject } from "./redaction.js";
 export type Tx = postgres.TransactionSql;
 export interface RunRow extends postgres.Row {
   id: string;
@@ -48,6 +49,7 @@ export class Store {
   constructor(
     readonly db: Database,
     readonly userId: string,
+    readonly secrets: readonly string[] = [],
   ) {
     z.uuid().parse(userId);
   }
@@ -266,7 +268,12 @@ export class Store {
   async claimPrepare(id: string) {
     return this.db.client.begin(async (tx) => {
       const run = await this.run(tx, id, true);
-      if (run.status !== "planning" || run.workflow_version_id !== null)
+      await this.assertWorker(tx);
+      if (
+        run.status !== "planning" ||
+        run.workflow_version_id !== null ||
+        run.claimed_by
+      )
         throw new EngineError(
           "CONFLICT",
           "Run is no longer awaiting preparation",
@@ -277,6 +284,7 @@ export class Store {
       if (!jobs.length)
         throw new EngineError("CONFLICT", "Prepare job is no longer pending");
       await tx`UPDATE runs SET claimed_by=${this.workerId},claimed_at=now(),heartbeat_at=now() WHERE id=${id}`;
+      await tx`UPDATE run_outbox SET delivered_at=now() WHERE id=${jobs[0]!.id}`;
       return run;
     });
   }
@@ -411,28 +419,31 @@ export class Store {
             "HISTORY_LIMIT",
             "Trace history exceeds 10000 attempts",
           );
-        const projected = rows.map((a) => ({
-          attempt_id: a.id,
-          step_id: a.step_id,
-          attempt_no: a.attempt_no,
-          workflow_version_id: a.workflow_version_id,
-          evidence:
-            a.workflow_version_id &&
-            a.tool_snapshot &&
-            a.resolved_args &&
-            a.outcome_certainty
-              ? "complete"
-              : "legacy_unknown",
-          tool_snapshot: a.tool_snapshot,
-          operation_id: a.operation_id,
-          resolved_args: a.resolved_args,
-          result: a.result,
-          outcome_certainty: a.outcome_certainty,
-          error_class: a.error_class,
-          error_message: a.error_message,
-          started_at: stamp(a.started_at),
-          ended_at: a.ended_at ? stamp(a.ended_at) : null,
-        }));
+        const projected = safeProject(
+          rows.map((a) => ({
+            attempt_id: a.id,
+            step_id: a.step_id,
+            attempt_no: a.attempt_no,
+            workflow_version_id: a.workflow_version_id,
+            evidence:
+              a.workflow_version_id &&
+              a.tool_snapshot &&
+              a.resolved_args &&
+              a.outcome_certainty
+                ? "complete"
+                : "legacy_unknown",
+            tool_snapshot: a.tool_snapshot,
+            operation_id: a.operation_id,
+            resolved_args: a.resolved_args,
+            result: a.result,
+            outcome_certainty: a.outcome_certainty,
+            error_class: a.error_class,
+            error_message: a.error_message,
+            started_at: stamp(a.started_at),
+            ended_at: a.ended_at ? stamp(a.ended_at) : null,
+          })),
+          this.secrets,
+        );
         const [snapshot] = await tx`
           INSERT INTO http_trace_snapshots(user_id,run_id,attempts,expires_at)
           VALUES (${this.userId},${id},${tx.json(projected)},now()+interval '15 minutes')

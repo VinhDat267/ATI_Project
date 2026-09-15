@@ -59,24 +59,25 @@ describe("API-02 durable acceptance", () => {
       ).toEqual([{ n: 0 }]);
 
       const body = JSON.stringify({ source_prompt: fixture.b02Prompt });
-      const first = await fixture.call("/runs", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body,
-      });
-      const second = await fixture.call("/runs", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body,
-      });
-      expect(first.status).toBe(202);
-      expect(second.status).toBe(409);
+      const [first, second] = await Promise.all([
+        fixture.call("/runs", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body,
+        }),
+        fixture.call("/runs", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body,
+        }),
+      ]);
+      expect([first.status, second.status].sort()).toEqual([202, 409]);
       expect(
         await fixture.db.client`SELECT count(*)::int AS n FROM runs`,
       ).toEqual([{ n: 1 }]);

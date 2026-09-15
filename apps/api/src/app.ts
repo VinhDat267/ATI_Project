@@ -15,7 +15,10 @@ import {
   LoginRequestSchema,
   LoginResponseSchema,
   RunAcceptedSchema,
+  RunDetailSchema,
   ReconciliationSchema,
+  TraceSchema,
+  EventPageSchema,
   ServerSummaryListSchema,
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
@@ -55,6 +58,24 @@ export function createApi(options: {
     ttlMs: config.sessionTtlMs,
     principalExists,
   });
+  const configuredSecrets = [
+    config.passwordHash,
+    config.cursorKey.toString("base64"),
+  ];
+  const projectOutput = <T>(value: T): T =>
+    options.engine
+      ? options.engine.safeProjection(value)
+      : (redact(value, configuredSecrets) as T);
+  const parseInput = <T>(schema: z.ZodType<T>, value: unknown): T => {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success)
+      throw new HttpError(
+        400,
+        "INVALID_REQUEST",
+        "Request does not match the API schema",
+      );
+    return parsed.data;
+  };
   let baseOrigin: string | undefined;
   let closing = false;
 
@@ -110,7 +131,7 @@ export function createApi(options: {
           response.setHeader("allow", "POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const body = LoginRequestSchema.parse(await readJson(request));
+        const body = parseInput(LoginRequestSchema, await readJson(request));
         const token = await sessions.login(
           body.email,
           body.password,
@@ -130,18 +151,24 @@ export function createApi(options: {
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         sessions.authenticate(request.headers.authorization);
-        const servers = ServerSummaryListSchema.parse([
-          {
-            slug: "task_hub",
-            status: "disconnected",
-            policy_version: "b-local-1",
-          },
-          {
-            slug: "filesystem",
-            status: "disconnected",
-            policy_version: "b-local-fs-1",
-          },
-        ]);
+        const servers = ServerSummaryListSchema.parse(
+          projectOutput(
+            options.engine
+              ? await options.engine.serverSummaries()
+              : [
+                  {
+                    slug: "task_hub",
+                    status: "disconnected",
+                    policy_version: "b-local-1",
+                  },
+                  {
+                    slug: "filesystem",
+                    status: "disconnected",
+                    policy_version: "b-local-fs-1",
+                  },
+                ],
+          ),
+        );
         writeJson(response, 200, servers, requestId);
         return;
       }
@@ -157,7 +184,9 @@ export function createApi(options: {
           writeJson(
             response,
             200,
-            redact(await options.engine.list()),
+            z
+              .array(RunDetailSchema)
+              .parse(projectOutput(await options.engine.list())),
             requestId,
           );
           return;
@@ -173,7 +202,7 @@ export function createApi(options: {
             "PLANNER_UNAVAILABLE",
             "Planner is not enabled",
           );
-        const body = CreateRunSchema.parse(await readJson(request));
+        const body = parseInput(CreateRunSchema, await readJson(request));
         const accepted = await options.engine.accept(body);
         options.worker?.wake();
         if (userId !== config.userId)
@@ -199,20 +228,31 @@ export function createApi(options: {
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         const userId = sessions.authenticate(request.headers.authorization);
+        parseInput(z.uuid(), id);
         if (!subpath) {
           writeJson(
             response,
             200,
-            redact(await options.engine.detail(id)),
+            RunDetailSchema.parse(
+              projectOutput(await options.engine.detail(id)),
+            ),
             requestId,
           );
           return;
         }
         if (subpath === "approval") {
-          const body = ApprovalDecisionSchema.parse(await readJson(request));
+          const body = parseInput(
+            ApprovalDecisionSchema,
+            await readJson(request),
+          );
           const detail = await options.engine.decide(id, body);
           options.worker?.wake();
-          writeJson(response, 200, redact(detail), requestId);
+          writeJson(
+            response,
+            200,
+            RunDetailSchema.parse(projectOutput(detail)),
+            requestId,
+          );
           return;
         }
         if (subpath === "cancel") {
@@ -238,7 +278,9 @@ export function createApi(options: {
           writeJson(
             response,
             200,
-            redact(await options.engine.events(id, since, 200)),
+            EventPageSchema.parse(
+              projectOutput(await options.engine.events(id, since, 200)),
+            ),
             requestId,
           );
           return;
@@ -282,11 +324,13 @@ export function createApi(options: {
           writeJson(
             response,
             200,
-            redact({
-              run_id: id,
-              attempts: page.attempts,
-              next_cursor: nextCursor,
-            }),
+            TraceSchema.parse(
+              projectOutput({
+                run_id: id,
+                attempts: page.attempts,
+                next_cursor: nextCursor,
+              }),
+            ),
             requestId,
           );
           return;
@@ -295,8 +339,8 @@ export function createApi(options: {
           writeJson(
             response,
             200,
-            redact(
-              ReconciliationSchema.parse(await options.engine.reconcile(id)),
+            ReconciliationSchema.parse(
+              projectOutput(await options.engine.reconcile(id)),
             ),
             requestId,
           );
@@ -332,26 +376,31 @@ export function createApi(options: {
           ? 404
           : error.code === "ACTIVE_RUN" ||
               error.code === "CONFLICT" ||
-              error.code === "HISTORY_LIMIT"
+              error.code === "HISTORY_LIMIT" ||
+              error.code === "EXPIRED"
             ? 409
             : error.code === "INVALID_INPUT" || error.code === "INVALID_PLAN"
               ? 400
               : error.code === "BUSY" || error.code === "CONFIG"
                 ? 503
                 : 500;
-      return new HttpError(status, error.code, error.message);
+      const message =
+        status === 404
+          ? "Resource not found"
+          : status === 409
+            ? "Request conflicts with current state"
+            : status === 400
+              ? "Request is invalid"
+              : status === 503
+                ? "Service unavailable"
+                : "Internal server error";
+      return new HttpError(status, error.code, message);
     }
     if (error instanceof AuthError)
       return new HttpError(
         error.code === "RATE_LIMITED" ? 429 : 401,
         error.code,
         error.message,
-      );
-    if (error instanceof z.ZodError)
-      return new HttpError(
-        400,
-        "INVALID_REQUEST",
-        "Request does not match the API schema",
       );
     return new HttpError(500, "INTERNAL", "Internal server error");
   }

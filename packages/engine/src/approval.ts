@@ -7,6 +7,7 @@ import {
   unpackPreview,
   validateManualPlan,
 } from "./snapshot.js";
+import { containsConfiguredSecret } from "./redaction.js";
 
 export async function verifyPreview(
   store: Store,
@@ -14,6 +15,7 @@ export async function verifyPreview(
   run: RunRow,
   approval: ApprovalRow,
   gateway: Gateway,
+  options: { allowProtectedWriteForRejection?: boolean } = {},
 ) {
   const snapshot = unpackPreview(approval.preview, approval.snapshot_hash);
   const [version] =
@@ -33,6 +35,16 @@ export async function verifyPreview(
     throw new EngineError(
       "CONFLICT",
       "Run, plan or tool policy differs from the saved preview",
+    );
+  if (
+    !options.allowProtectedWriteForRejection &&
+    snapshot.actions.some((action) =>
+      containsConfiguredSecret(action.resolved_args, store.secrets),
+    )
+  )
+    throw new EngineError(
+      "CONFLICT",
+      "Saved preview contains protected configuration data",
     );
   await gateway.assertCurrent();
   validateManualPlan(snapshot.plan, gateway.tools);
@@ -61,7 +73,9 @@ export async function decide(
         "CONFLICT",
         "Approval decision is stale or already handled",
       );
-    await verifyPreview(store, tx, run, approval, gateway);
+    await verifyPreview(store, tx, run, approval, gateway, {
+      allowProtectedWriteForRejection: decision.decision === "rejected",
+    });
     const [clock] =
       await tx`SELECT expires_at>clock_timestamp() AS live FROM approvals WHERE id=${approval.id}`;
     if (!clock!.live) {

@@ -20,6 +20,8 @@ export interface GatewayResult {
 export interface Gateway {
   readonly userId: string;
   readonly tools: readonly EngineTool[];
+  ensureConnected?(): Promise<void>;
+  isConnected?(): boolean;
   assertCurrent(): Promise<void>;
   call(
     target: ToolTarget,
@@ -35,6 +37,7 @@ export interface ServerConnection {
   readonly server: ToolTarget["server"];
   readonly userId: string;
   readonly tools: readonly EngineTool[];
+  isConnected?(): boolean;
   assertCurrent(): Promise<void>;
   call(
     name: string,

@@ -1,0 +1,1224 @@
+{
+  "task": "API-05",
+  "created_at": "2026-09-15T02:32:47.861Z",
+  "commit": "e71ebf45fda63401b87c4caec552def4968a1083",
+  "git": {
+    "available": true,
+    "dirty": true,
+    "tracked_changes": [
+      "apps/api/src/app.ts",
+      "apps/api/src/main.ts",
+      "apps/api/src/redaction.ts",
+      "apps/api/src/worker.ts",
+      "apps/api/tests/create-run.integration.test.ts",
+      "apps/api/tests/events.integration.test.ts",
+      "apps/api/tests/fixture.ts",
+      "apps/api/tests/http-acceptance.integration.test.ts",
+      "apps/api/tests/trace.integration.test.ts",
+      "docs/00-BAT-DAU.md",
+      "docs/API-STATUS-2026-09-15.md",
+      "docs/BASELINE.md",
+      "docs/FRONTEND-HANDOFF.md",
+      "docs/G1-RUBRIC-MAP.md",
+      "packages/engine/src/approval.ts",
+      "packages/engine/src/engine.ts",
+      "packages/engine/src/gateway-filesystem.ts",
+      "packages/engine/src/gateway-task-hub.ts",
+      "packages/engine/src/gateway-types.ts",
+      "packages/engine/src/gateway.ts",
+      "packages/engine/src/index.ts",
+      "packages/engine/src/prepare.ts",
+      "packages/engine/src/recovery.ts",
+      "packages/engine/src/store.ts",
+      "scripts/check-api.mjs"
+    ],
+    "untracked": [
+      ".superpowers/sdd/2026-09-14-fs-05-gap-closure/.gitignore",
+      ".superpowers/sdd/2026-09-14-fs-06-finalization/.gitignore",
+      "apps/api/src/gateway-manager.ts",
+      "apps/api/tests/audit-acceptance.integration.test.ts",
+      "apps/api/tests/audit-bootstrap.integration.test.ts",
+      "apps/api/tests/audit-http.integration.test.ts",
+      "apps/api/tests/audit-http.test.ts",
+      "apps/api/tests/audit-main.integration.test.ts",
+      "apps/api/tests/audit-ownership.integration.test.ts",
+      "apps/api/tests/audit-saved-secret.integration.test.ts",
+      "apps/api/tests/audit-transport.integration.test.ts",
+      "apps/api/tests/audit-worker.integration.test.ts",
+      "apps/api/tests/audit-worker.test.ts",
+      "apps/api/tests/gateway-manager.test.ts",
+      "docs/AUDIT-API-01-05-2026-09-15.md",
+      "docs/api-evidence/batch-03/API-05/20260914235539-7e4bbc4b-a9f7-45ed-bf93-76c6d6994bdc/check.json",
+      "docs/api-evidence/batch-03/API-05/20260914235539-7e4bbc4b-a9f7-45ed-bf93-76c6d6994bdc/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/check.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/check.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/check.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/engine-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260915022658-1a8a570f-0805-4b1c-946e-c9132f2185b2/runner-unit.json",
+      "docs/api-evidence/batch-03/API-AUDIT-FIX-PROGRESS.md",
+      "docs/task-hub-evidence/batch-01/TH-03-date-fix/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03-date-fix/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-04/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-04/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-05/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-05/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-06/commands.json",
+      "docs/task-hub-evidence/batch-01/TH-06/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-06/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/command-result.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/probe-results.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/review-probe.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/source-verification.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/tracked-before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/preservation.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-date-fix-20260913/verified-files.json",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/final-integrity.json",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/verified-files.json",
+      "docs/task-hub-evidence/batch-01/review-TH-05-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-05-20260913/probe-1789297615294.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/probe-1789312986060.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/probe.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/verify-final.mjs",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319248436-install/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319254500-install/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319467664-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319467664-probe/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319483946-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362723134-repro-before/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362806900-probe-fixed/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362806900-probe-fixed/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362842352-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362890651-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362927729-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362927729-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363211531-codex-r2-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214163-codex-r2-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214989-codex-r2-missing-structured/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214989-codex-r2-missing-structured/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363215719-codex-r2-connect-fail/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363215719-codex-r2-connect-fail/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363216085-codex-r2-close-fail/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363216085-codex-r2-close-fail/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363429705-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363439692-artifact/candidate-artifact.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363439692-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363778502-codex-direct-red/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363800000-repro/reproduce.mjs",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363800000-repro/reproduction.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363827647-codex-direct-green/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363870921-codex-direct-live-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363872414-codex-direct-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/preflight.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365430976-full-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365656830-typecheck/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365657112-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/engine-integration/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367130840-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367131065-fs-read-integration/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368337841-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368688793-final-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/catalog.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/migration-ledger.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369901811-controller-fault-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370466397-controller-fault-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370466397-controller-fault-check-r2/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370821048-controller-fault-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370821048-controller-fault-check-r3/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789381765007-scope-audit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789381765007-scope-audit/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382197418-scope-audit-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382197418-scope-audit-r2/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382825105-scope-audit-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382825105-scope-audit-r3/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382892954-scope-audit-fixed2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382892954-scope-audit-fixed2/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383162088-scope-audit-fixed3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383162088-scope-audit-fixed3/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/migration-apply.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/migration-apply.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384162885-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384162885-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388807207-docs-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388807207-docs-check/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388837658-docs-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388837658-docs-check/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789389511082-docs-check-direct/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789389866533-docs-check-direct/docs-check.json",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/artifact-validation.test.ts.before.txt",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/before.json",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/emit-candidate-artifact.mjs.before.txt",
+      "docs/task-hub-evidence/batch-02/review-FS-01-r2-20260914/before.json",
+      "docs/task-hub-evidence/batch-02/review-FS-01-r2-20260914/helper-under-review.mjs",
+      "packages/engine/src/redaction.ts",
+      "packages/engine/tests/audit-redaction.test.ts",
+      "scripts/check-api-lib.mjs",
+      "scripts/check-api.test.mjs"
+    ],
+    "source_changes": {
+      "tracked": [
+        "apps/api/src/app.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/redaction.ts",
+        "apps/api/src/worker.ts",
+        "apps/api/tests/create-run.integration.test.ts",
+        "apps/api/tests/events.integration.test.ts",
+        "apps/api/tests/fixture.ts",
+        "apps/api/tests/http-acceptance.integration.test.ts",
+        "apps/api/tests/trace.integration.test.ts",
+        "packages/engine/src/approval.ts",
+        "packages/engine/src/engine.ts",
+        "packages/engine/src/gateway-filesystem.ts",
+        "packages/engine/src/gateway-task-hub.ts",
+        "packages/engine/src/gateway-types.ts",
+        "packages/engine/src/gateway.ts",
+        "packages/engine/src/index.ts",
+        "packages/engine/src/prepare.ts",
+        "packages/engine/src/recovery.ts",
+        "packages/engine/src/store.ts",
+        "scripts/check-api.mjs"
+      ],
+      "untracked": [
+        "apps/api/src/gateway-manager.ts",
+        "apps/api/tests/audit-acceptance.integration.test.ts",
+        "apps/api/tests/audit-bootstrap.integration.test.ts",
+        "apps/api/tests/audit-http.integration.test.ts",
+        "apps/api/tests/audit-http.test.ts",
+        "apps/api/tests/audit-main.integration.test.ts",
+        "apps/api/tests/audit-ownership.integration.test.ts",
+        "apps/api/tests/audit-saved-secret.integration.test.ts",
+        "apps/api/tests/audit-transport.integration.test.ts",
+        "apps/api/tests/audit-worker.integration.test.ts",
+        "apps/api/tests/audit-worker.test.ts",
+        "apps/api/tests/gateway-manager.test.ts",
+        "packages/engine/src/redaction.ts",
+        "packages/engine/tests/audit-redaction.test.ts",
+        "scripts/check-api-lib.mjs",
+        "scripts/check-api.test.mjs"
+      ]
+    },
+    "error": null
+  },
+  "runtime": {
+    "node": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64",
+    "root_package": {
+      "name": "wap",
+      "engines": {
+        "node": ">=22"
+      }
+    },
+    "api_package": {
+      "name": "@wap/api",
+      "version": "0.1.0"
+    },
+    "engine_package": {
+      "name": "@wap/engine",
+      "version": "0.1.0"
+    },
+    "task_hub_package": {
+      "name": "@wap/mcp-task-hub",
+      "version": "0.1.0"
+    },
+    "declared_dependencies": {
+      "postgres_client": "3.4.9",
+      "mcp_sdk": "1.30.0",
+      "filesystem_mcp": "2026.8.31"
+    },
+    "postgres_server": {
+      "version": "NOT_CAPTURED",
+      "limitation": "Runner does not read credential-bearing connection configuration or open a separate database session."
+    },
+    "mcp_processes": {
+      "versions": "NOT_CAPTURED_AT_PROCESS_BOUNDARY",
+      "limitation": "Integration suites own MCP child processes; declared package versions and source bytes are fingerprinted instead."
+    }
+  },
+  "commands": [
+    {
+      "id": "runner-unit",
+      "command": "C:\\Program Files\\nodejs\\node.exe --test scripts/check-api.test.mjs",
+      "started_at": "2026-09-15T02:26:58.980Z",
+      "finished_at": "2026-09-15T02:26:59.231Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "check",
+      "command": "npm run check",
+      "started_at": "2026-09-15T02:26:59.233Z",
+      "finished_at": "2026-09-15T02:27:25.873Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "engine-unit",
+      "command": "npm run test:unit -w @wap/engine",
+      "started_at": "2026-09-15T02:27:25.873Z",
+      "finished_at": "2026-09-15T02:27:30.939Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "api-unit",
+      "command": "npm run test:unit -w @wap/api",
+      "started_at": "2026-09-15T02:27:30.939Z",
+      "finished_at": "2026-09-15T02:27:38.561Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "api-integration",
+      "command": "npm run test:integration -w @wap/api",
+      "started_at": "2026-09-15T02:27:38.562Z",
+      "finished_at": "2026-09-15T02:28:59.132Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "db-integration",
+      "command": "npm run test:integration -w @wap/mcp-task-hub",
+      "started_at": "2026-09-15T02:28:59.135Z",
+      "finished_at": "2026-09-15T02:29:58.463Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "engine-integration",
+      "command": "npm run test:integration -w @wap/engine",
+      "started_at": "2026-09-15T02:29:58.465Z",
+      "finished_at": "2026-09-15T02:32:47.158Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    }
+  ],
+  "source_evidence": {
+    "algorithm": "sha256",
+    "file_count": 154,
+    "category_counts": {
+      "config": 22,
+      "lockfile": 1,
+      "migration": 6,
+      "script": 16,
+      "source": 58,
+      "test": 51
+    },
+    "files": {
+      ".env.example": {
+        "bytes": 2585,
+        "category": "config",
+        "sha256": "7006dc379613b6e8492c8d2a8eb156815552ec7730a903df4035761b2b46ce1d"
+      },
+      "apps/api/package.json": {
+        "bytes": 491,
+        "category": "config",
+        "sha256": "4f6cb322bdebd3c2cbd0aac9c353644a2bda7115a3e4819921e5ac29b92c2218"
+      },
+      "apps/api/src/app.ts": {
+        "bytes": 14995,
+        "category": "source",
+        "sha256": "d038dc1327f97e7d937730284ab92bc862ca8520aaf969fdde0df9fe05c0d651"
+      },
+      "apps/api/src/auth.ts": {
+        "bytes": 4877,
+        "category": "source",
+        "sha256": "a23a76ae9f231c7384eb0bd573764546286505931e7fe9b72b54f2358f80f01a"
+      },
+      "apps/api/src/config.ts": {
+        "bytes": 2469,
+        "category": "config",
+        "sha256": "6ec50b0b56681d86e28f7f2468a4fb6dde0ff97e627260a79a4a171a6ca1d591"
+      },
+      "apps/api/src/contracts.ts": {
+        "bytes": 330,
+        "category": "source",
+        "sha256": "7e9c0f3bdd62a84fb7e918826a0d65655b832cc3312579709b87ec590d95c4ff"
+      },
+      "apps/api/src/cursors.ts": {
+        "bytes": 1598,
+        "category": "source",
+        "sha256": "d312e78059633da13b29d35c7dcc1a0a6e34d70b52320ea10e99e6cea0b865d1"
+      },
+      "apps/api/src/dev-planner.ts": {
+        "bytes": 2654,
+        "category": "source",
+        "sha256": "c6a9bd9e008caf58f31708e324f276c580ab500745de02afaeb59b54c5fc1adb"
+      },
+      "apps/api/src/gateway-manager.ts": {
+        "bytes": 1877,
+        "category": "source",
+        "sha256": "4b8defd268e713dc50d07000e75314ad46990e685afbcf367f3f0ce630210595"
+      },
+      "apps/api/src/http.ts": {
+        "bytes": 1986,
+        "category": "source",
+        "sha256": "4e4bd4c3d639c3a9ff9e18fa27d850658565bc6a6458cb295444e5a6c89f323f"
+      },
+      "apps/api/src/index.ts": {
+        "bytes": 540,
+        "category": "source",
+        "sha256": "2c6d927fdf889b145db483618339411734bc07639b0c911dda5916055de92fb3"
+      },
+      "apps/api/src/main.ts": {
+        "bytes": 2251,
+        "category": "source",
+        "sha256": "48304148daaf4c5dc76e18251c29678b2bb54c8ecdb084916b9ac30c8bb97e4d"
+      },
+      "apps/api/src/maintenance.ts": {
+        "bytes": 1163,
+        "category": "source",
+        "sha256": "aa3041503450f62be00a9e4abd919f49769109b4f5e0f7addbc6e835fbc431d7"
+      },
+      "apps/api/src/redaction.ts": {
+        "bytes": 174,
+        "category": "source",
+        "sha256": "f93d1a1eb245433e266cc15ac404653937606fcef3dd2a9fd8c085fd0544f6d9"
+      },
+      "apps/api/src/worker.ts": {
+        "bytes": 2840,
+        "category": "source",
+        "sha256": "72a70c2afb01358cf2e580e592a8992b4531c2685a3d0c01482946aa2be79d08"
+      },
+      "apps/api/tests/approval.integration.test.ts": {
+        "bytes": 3284,
+        "category": "test",
+        "sha256": "52881570fe8741fa988ed7d32d98b0cf4d4c999cf1944389986e0d1aabce5963"
+      },
+      "apps/api/tests/audit-acceptance.integration.test.ts": {
+        "bytes": 3759,
+        "category": "test",
+        "sha256": "9699440528775a259bcb7370ec35c5731dfe6735c9271b1a532346f5cc50c7bb"
+      },
+      "apps/api/tests/audit-bootstrap.integration.test.ts": {
+        "bytes": 2513,
+        "category": "test",
+        "sha256": "673d65a3c2ede63a7f6045e058711a5f26c41eaf2abe684bc08418326015b6f3"
+      },
+      "apps/api/tests/audit-http.integration.test.ts": {
+        "bytes": 5279,
+        "category": "test",
+        "sha256": "d8a771f3f5f4d1e2ac48cc17de10baf471d82eb51fd95502a427a2607f8167a9"
+      },
+      "apps/api/tests/audit-http.test.ts": {
+        "bytes": 6318,
+        "category": "test",
+        "sha256": "97d793c6e227db099ae6f7d84fde066d74227a7b77536f92f9fadd2344ac9dc7"
+      },
+      "apps/api/tests/audit-main.integration.test.ts": {
+        "bytes": 3682,
+        "category": "test",
+        "sha256": "d211b2356675e8d44096be842884098896c0bef15f34e1cc20b44a91dff301b9"
+      },
+      "apps/api/tests/audit-ownership.integration.test.ts": {
+        "bytes": 8762,
+        "category": "test",
+        "sha256": "78aa88e2a3a04790578c3c13fadb9fce070da42bd1c7e5b2ac9e8264eed1020c"
+      },
+      "apps/api/tests/audit-saved-secret.integration.test.ts": {
+        "bytes": 5583,
+        "category": "test",
+        "sha256": "3c5f5ec9225f4690b7fc396b0a407509a1057cc4e63fde2f9a44d4607dc97710"
+      },
+      "apps/api/tests/audit-transport.integration.test.ts": {
+        "bytes": 871,
+        "category": "test",
+        "sha256": "288b8805c95b25988013991f892b3df706fc8480a062ec2abad99670f428bc6c"
+      },
+      "apps/api/tests/audit-worker.integration.test.ts": {
+        "bytes": 7173,
+        "category": "test",
+        "sha256": "a44b5b118b51c92ba4a52a2386d8e7b6b45194494dc504d2730e4c32eb137be6"
+      },
+      "apps/api/tests/audit-worker.test.ts": {
+        "bytes": 1368,
+        "category": "test",
+        "sha256": "60a51c0fc4d740b33a438136242cc3f3b202fed93a0f88dfee0ce80734164133"
+      },
+      "apps/api/tests/auth.integration.test.ts": {
+        "bytes": 1493,
+        "category": "test",
+        "sha256": "d4474f5b9d6badfebeccc0bd2e7e41836267a4180f2e849c68af3bd9ba9242a5"
+      },
+      "apps/api/tests/auth.test.ts": {
+        "bytes": 1428,
+        "category": "test",
+        "sha256": "65897ab02bbde18a73e64d9c9112ded4de3cb546c50396887792c965e23cc9a0"
+      },
+      "apps/api/tests/cancel-expiry.integration.test.ts": {
+        "bytes": 3596,
+        "category": "test",
+        "sha256": "4e9f95788236d73642ab4080a3ccc3751941b173666ac7fd8495f459b8049594"
+      },
+      "apps/api/tests/config.test.ts": {
+        "bytes": 983,
+        "category": "test",
+        "sha256": "b21d4bd45895bffe26172bae1b2641e4d9e2e63fbf947ed2d474b8cd64beb85e"
+      },
+      "apps/api/tests/create-run.integration.test.ts": {
+        "bytes": 2961,
+        "category": "test",
+        "sha256": "8dfedcbef32e8fe4be10af7bf6a5cdc7c2b29c12262e9614d326061178db80a8"
+      },
+      "apps/api/tests/dev-planner.test.ts": {
+        "bytes": 1392,
+        "category": "test",
+        "sha256": "d019364ac464c201b77554a7f1139e06d976839ea34238c402110fbe4bca1ba1"
+      },
+      "apps/api/tests/events.integration.test.ts": {
+        "bytes": 2998,
+        "category": "test",
+        "sha256": "184d5d8acc61b0a9400a1703e91b3d38290e2fba6bf5baa5aa530e5db838d1ea"
+      },
+      "apps/api/tests/fixture.ts": {
+        "bytes": 5731,
+        "category": "test",
+        "sha256": "1b7a6576528d9ef4002b8c9dfdb2a020d0cff3770503b0fa363e88e4048c4285"
+      },
+      "apps/api/tests/gateway-manager.test.ts": {
+        "bytes": 1485,
+        "category": "test",
+        "sha256": "659da767ddd29f7edab825e84f1608929067749d03b4c1720c216f1697a02b7f"
+      },
+      "apps/api/tests/http-acceptance.integration.test.ts": {
+        "bytes": 8956,
+        "category": "test",
+        "sha256": "b9377a4acd06e248d5ae126d0cd87b2ea8b42eddde37e4d3c9a56f3a688e150e"
+      },
+      "apps/api/tests/http.test.ts": {
+        "bytes": 3319,
+        "category": "test",
+        "sha256": "85cc009ca142b5a1fecf4878d5c793e690d683aa0cb7778220fb6d180c84d702"
+      },
+      "apps/api/tests/prepare-worker.integration.test.ts": {
+        "bytes": 1918,
+        "category": "test",
+        "sha256": "b7045167c5a54001668570f266488253c32b99de4e6fde85c340065371a83227"
+      },
+      "apps/api/tests/read-model.integration.test.ts": {
+        "bytes": 1624,
+        "category": "test",
+        "sha256": "0ad7d702979e7fbd6e7c12dcbdbe39f4aec205664f3026e912ad1171a8d3767e"
+      },
+      "apps/api/tests/reconciliation.integration.test.ts": {
+        "bytes": 1377,
+        "category": "test",
+        "sha256": "6bf418db70404f388e0cf9f9992d1dd70d5a53cc0fd89f64f214cf70245656ef"
+      },
+      "apps/api/tests/trace.integration.test.ts": {
+        "bytes": 3924,
+        "category": "test",
+        "sha256": "2ad49415025cdb6206d75cc6d65b98e2ba6e850e073cd00a46b793e260ad6d5e"
+      },
+      "apps/api/tsconfig.json": {
+        "bytes": 174,
+        "category": "config",
+        "sha256": "591c669aa491c0157e1a529a43ccaa3657e393bee8244f8ba2685349911e84b2"
+      },
+      "apps/api/vitest.integration.config.ts": {
+        "bytes": 221,
+        "category": "config",
+        "sha256": "654c84559c1eb0995c16355e6f09fc16e146a8e7ced3ed92b39e2be1a7ee7277"
+      },
+      "apps/api/vitest.unit.config.ts": {
+        "bytes": 258,
+        "category": "config",
+        "sha256": "7bd4d2151113223d75d0a6d3369ae014816758aef38d21d254f7a964e51e3afe"
+      },
+      "apps/mcp-task-hub/package.json": {
+        "bytes": 452,
+        "category": "config",
+        "sha256": "78c795e6ee5cc568349c6c2f4d13d5ae760e202443290c0e9eb16740d5f22672"
+      },
+      "apps/mcp-task-hub/scripts/sync-catalog.mjs": {
+        "bytes": 1483,
+        "category": "script",
+        "sha256": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394"
+      },
+      "apps/mcp-task-hub/src/cards.ts": {
+        "bytes": 9821,
+        "category": "source",
+        "sha256": "51eb4a26019e194bd4c1dbb44e96f32bb420b06e2fe7ce7069fb397d8648417c"
+      },
+      "apps/mcp-task-hub/src/contracts.ts": {
+        "bytes": 5094,
+        "category": "source",
+        "sha256": "741bf82797c5b72e63fdf57309050d2720f0e84cdb04447469f09be1c5d9b66c"
+      },
+      "apps/mcp-task-hub/src/errors.ts": {
+        "bytes": 163,
+        "category": "source",
+        "sha256": "670939c76cc0b85656a117b675d31cbdc8e5de673ad55171d48d31239d7219d7"
+      },
+      "apps/mcp-task-hub/src/fingerprint.ts": {
+        "bytes": 1139,
+        "category": "source",
+        "sha256": "5574d34878c0c3e3624185059271151913973c4b60a286c82a481dc075c44234"
+      },
+      "apps/mcp-task-hub/src/server.ts": {
+        "bytes": 2420,
+        "category": "source",
+        "sha256": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5"
+      },
+      "apps/mcp-task-hub/src/service.ts": {
+        "bytes": 10515,
+        "category": "source",
+        "sha256": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a"
+      },
+      "apps/mcp-task-hub/tests/database.integration.test.ts": {
+        "bytes": 10166,
+        "category": "test",
+        "sha256": "665c4726e1217b9995ff0e01f5396feb7a40e423cf90c555bb57b206e69f2ad8"
+      },
+      "apps/mcp-task-hub/tests/tools.integration.test.ts": {
+        "bytes": 98186,
+        "category": "test",
+        "sha256": "c603937bb9b36d4814fa77831c0a94351c6cad6097cee480579c5af208916f6e"
+      },
+      "apps/mcp-task-hub/tsconfig.json": {
+        "bytes": 139,
+        "category": "config",
+        "sha256": "02db1f0eba501da0c8e91cec2f5b98bc19c2674c89725dcbb8d11acbb5e3f4f6"
+      },
+      "apps/mcp-task-hub/vitest.integration.config.ts": {
+        "bytes": 220,
+        "category": "config",
+        "sha256": "46b12513912275d42b9ac625c0344320485632406053c201d852858a37f6ec57"
+      },
+      "compose.g1.yaml": {
+        "bytes": 589,
+        "category": "config",
+        "sha256": "36b71f0b37fbb6d770315fb3917faf28a279898b80a52495cfefb57e8b715f67"
+      },
+      "db/migrations/0001_init.sql": {
+        "bytes": 15360,
+        "category": "migration",
+        "sha256": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8"
+      },
+      "db/migrations/0002_audit_contracts.sql": {
+        "bytes": 5452,
+        "category": "migration",
+        "sha256": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689"
+      },
+      "db/migrations/0003_task_hub_local.sql": {
+        "bytes": 1136,
+        "category": "migration",
+        "sha256": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3"
+      },
+      "db/migrations/0004_task_hub_cards.sql": {
+        "bytes": 1924,
+        "category": "migration",
+        "sha256": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e"
+      },
+      "db/migrations/0005_filesystem_dispatches.sql": {
+        "bytes": 979,
+        "category": "migration",
+        "sha256": "d7af10defa6c886d73edaf569e9326dae10932e9f8b47e7f7508f25866ba9521"
+      },
+      "db/migrations/0006_http_trace_snapshots.sql": {
+        "bytes": 633,
+        "category": "migration",
+        "sha256": "902eb1a19f663ab5429739483ea96a6d3cf71944930419b9c39e0932e495745c"
+      },
+      "docker-compose.yml": {
+        "bytes": 651,
+        "category": "config",
+        "sha256": "121c760e188d32fea93e19f79cc0aa353d9ebc0f300205c1d395253411fc199c"
+      },
+      "docs/openapi.yaml": {
+        "bytes": 111425,
+        "category": "config",
+        "sha256": "21ba32658da1d83cf9a81dab3d54aa547b85094b5fe62a1dbe27f7594f23b941"
+      },
+      "package-lock.json": {
+        "bytes": 126471,
+        "category": "lockfile",
+        "sha256": "bdc5929c95360e268f5265f859fdd60460ec7acc0b0268de8ba506f807954810"
+      },
+      "package.json": {
+        "bytes": 2057,
+        "category": "config",
+        "sha256": "061587abf73bc24b8a05c663d3ca55523714127a3c7b2971c051c82ad52dbffb"
+      },
+      "packages/db/package.json": {
+        "bytes": 299,
+        "category": "config",
+        "sha256": "e495882e20a008d37bb8ba4a195043f0126e8c919ef8157e5e105e3a45534e6c"
+      },
+      "packages/db/src/cli.ts": {
+        "bytes": 560,
+        "category": "source",
+        "sha256": "c9c251e412b2cbabf05eafa4bbe0a540aafc7af5ee6c82eba92ba37f1e26c84e"
+      },
+      "packages/db/src/connection.ts": {
+        "bytes": 1124,
+        "category": "source",
+        "sha256": "942e776b94069242000573242675824ba2d37609abe2b596856310aa66a0b5e3"
+      },
+      "packages/db/src/index.ts": {
+        "bytes": 163,
+        "category": "source",
+        "sha256": "99fdef08e06f3dfb7b28bcbd19927f2b7df93bfc93cd2815f15f82f96a90bfe2"
+      },
+      "packages/db/src/migrate.ts": {
+        "bytes": 3084,
+        "category": "source",
+        "sha256": "e43074f0e4a10a39b48b0f1878a6b3c05ee13aa8620c6b678280039fd8d3fbef"
+      },
+      "packages/db/src/schema.ts": {
+        "bytes": 3614,
+        "category": "source",
+        "sha256": "ad72eb77aca29eb9b45f9da870b533333ba7eebf979ffa38583046d19a75ef2b"
+      },
+      "packages/db/src/seed.ts": {
+        "bytes": 2708,
+        "category": "source",
+        "sha256": "65db8fba6af3c3f12b1e04af75074f0e74a7f2a8a9bbb04ea6e7191956afd584"
+      },
+      "packages/db/tsconfig.json": {
+        "bytes": 127,
+        "category": "config",
+        "sha256": "9b905cb84737ab12a5b21e4d4110908bf614909b8a57cd83bc60b5b609cbedb2"
+      },
+      "packages/dsl/generated/api.d.ts": {
+        "bytes": 58843,
+        "category": "source",
+        "sha256": "2816f111a6c399f703187c6a794ab09f74061489af1ac6d58d45ece3bd764816"
+      },
+      "packages/dsl/generated/llm-plan-draft.schema.json": {
+        "bytes": 4153,
+        "category": "source",
+        "sha256": "a9777b75c66996992e915cc963cd0b91f13e21e085e68b35f55387bf2cdbe4d7"
+      },
+      "packages/dsl/generated/planner-result.schema.json": {
+        "bytes": 6462,
+        "category": "source",
+        "sha256": "229138c9243dacf7e5e006b28c5c7f82cdaf85de813f086c3186da141e76be00"
+      },
+      "packages/dsl/generated/workflow-plan.schema.json": {
+        "bytes": 5647,
+        "category": "source",
+        "sha256": "98abef5edb619e09fee8bb4bf6ff442fd62e1be3076c21bdd9dec9ae865b08b2"
+      },
+      "packages/dsl/package.json": {
+        "bytes": 651,
+        "category": "config",
+        "sha256": "0f2992c0bb8c0b2ca7a703cf60b68f42fe29b694ec0e41385ef517ac71483e79"
+      },
+      "packages/dsl/scripts/emit-json-schema.ts": {
+        "bytes": 866,
+        "category": "script",
+        "sha256": "91343713d6a417695badf6e604d9ea97cfd8533c069caf905163fab3e06a3d28"
+      },
+      "packages/dsl/scripts/emit-openapi.ts": {
+        "bytes": 7735,
+        "category": "script",
+        "sha256": "7afc20d6a459af47fda9641beda6f075343ebfea64696201e47c71e8bfe9ed4f"
+      },
+      "packages/dsl/src/condition.ts": {
+        "bytes": 12055,
+        "category": "source",
+        "sha256": "33ec1d45ef85bf77596ddab01775b89100a5e5463e9a70d10963172374fa8d6e"
+      },
+      "packages/dsl/src/contracts.ts": {
+        "bytes": 7213,
+        "category": "source",
+        "sha256": "8ae5535f944ac6b28b999f766121f5107499ad5d12675d01c9131aa3bfa56579"
+      },
+      "packages/dsl/src/events.ts": {
+        "bytes": 10189,
+        "category": "source",
+        "sha256": "659bc3494feda5def9b9db5f4171fefd18a0e9cb83c405c2e5424f1afafb2251"
+      },
+      "packages/dsl/src/graph.ts": {
+        "bytes": 10141,
+        "category": "source",
+        "sha256": "00a8ac3c9b29752d72f89b5b1d50d2362653b36a4944d314ddd32d8d8a505db0"
+      },
+      "packages/dsl/src/index.ts": {
+        "bytes": 395,
+        "category": "source",
+        "sha256": "555a79658271f9c2feb3f9d084acc64a66f3135c77485806382fd5f595db163f"
+      },
+      "packages/dsl/src/prompts.ts": {
+        "bytes": 16643,
+        "category": "source",
+        "sha256": "a257192d1ce8481629773d52e976fe797547d83c04d1d124a4063d4940d0d269"
+      },
+      "packages/dsl/src/reference.ts": {
+        "bytes": 10630,
+        "category": "source",
+        "sha256": "620e6fade2f5b4bd54da70a7cf7dc12e104811292e5818ee3b7ab77b79bbe8db"
+      },
+      "packages/dsl/src/schema.ts": {
+        "bytes": 14183,
+        "category": "source",
+        "sha256": "e4f33078f59dde63a90ccd927016a3a39f7c602680d830754ec5d66f32d393db"
+      },
+      "packages/dsl/src/tool-policy.ts": {
+        "bytes": 5680,
+        "category": "source",
+        "sha256": "1164ed68097de7eb22540261713a2b9ce5ee3673df0f5bccceed890cff31f74b"
+      },
+      "packages/dsl/tests/contracts.test.ts": {
+        "bytes": 4038,
+        "category": "test",
+        "sha256": "1146393ebdd39fd29f79614fed30fd4745611e97b3c9fd6ff81913e7151e64bd"
+      },
+      "packages/dsl/tests/fixtures.test.ts": {
+        "bytes": 4015,
+        "category": "test",
+        "sha256": "ca3e0b2ccfd92334ba1d8d180768996a5393a1864f0ebb2ba4212a9601691560"
+      },
+      "packages/dsl/tests/policy.test.ts": {
+        "bytes": 5598,
+        "category": "test",
+        "sha256": "da1a2143eade5bad96415fc80fb59fcf22b3a622fe40e49dfb1d23199bb66d24"
+      },
+      "packages/dsl/tests/regressions.test.ts": {
+        "bytes": 6491,
+        "category": "test",
+        "sha256": "992bdc932838b4a69f270318f9f96e4f60f71c8c428df819f585d652bda3973f"
+      },
+      "packages/dsl/tsconfig.json": {
+        "bytes": 296,
+        "category": "config",
+        "sha256": "9cb95687d8ac77a9be167b4b3201e6d38cd90a9554b1a48de0c7d2649bf546db"
+      },
+      "packages/engine/package.json": {
+        "bytes": 612,
+        "category": "config",
+        "sha256": "20f10d4474b49c4ebc914e09b3637968af4129fd4e68f888b7eb247b5bdd957f"
+      },
+      "packages/engine/src/accept.ts": {
+        "bytes": 1763,
+        "category": "source",
+        "sha256": "b768fd1f83363c422f000e86eed849dc462c671b64a04be30fab850e4e20ccad"
+      },
+      "packages/engine/src/approval.ts": {
+        "bytes": 3514,
+        "category": "source",
+        "sha256": "4d9b6cdcb31398772ffb53bb3039b773f59132ccc3c51b61d6a1c5bd177825b4"
+      },
+      "packages/engine/src/attempts.ts": {
+        "bytes": 8708,
+        "category": "source",
+        "sha256": "b1dce48912454cd936a9130a42a22de5786db7800955ee50178f2f1aa659cda9"
+      },
+      "packages/engine/src/cli.ts": {
+        "bytes": 4868,
+        "category": "source",
+        "sha256": "d5148f9eff6ce358ce1983960fa7740877ec73089b4d7a229636964d35d03e30"
+      },
+      "packages/engine/src/engine.ts": {
+        "bytes": 4238,
+        "category": "source",
+        "sha256": "166ad51b8e29c152651e27f2fd0e89b9a28e8af565badda1f3673e358b3381cb"
+      },
+      "packages/engine/src/execute.ts": {
+        "bytes": 8139,
+        "category": "source",
+        "sha256": "5a9386c01aa60170d2486847c88e7615e9633d19f5137f7d567a7313b735f99f"
+      },
+      "packages/engine/src/filesystem-authorization.ts": {
+        "bytes": 6362,
+        "category": "source",
+        "sha256": "fd4de52a4b9caca970a6870b1637f61444e2f37195b825ac69abcd59127fb831"
+      },
+      "packages/engine/src/filesystem-paths.ts": {
+        "bytes": 10908,
+        "category": "source",
+        "sha256": "da05d2193069567691fe0cfab2d00199f67a84b599f71bb4a61f3679c9a6e380"
+      },
+      "packages/engine/src/gateway-filesystem.ts": {
+        "bytes": 14779,
+        "category": "source",
+        "sha256": "7394c0625078b183e0b152dce37b1e490ba5586e46a5fabe73dbf6b073746eb5"
+      },
+      "packages/engine/src/gateway-task-hub.ts": {
+        "bytes": 5549,
+        "category": "source",
+        "sha256": "e65f996c2b02feadcfda41fd6df996ea79fbf15efac20c1e53b015f383cd6c3a"
+      },
+      "packages/engine/src/gateway-types.ts": {
+        "bytes": 2163,
+        "category": "source",
+        "sha256": "ecf38dddf087b1123292ad318b7771230a50d4d217764e6ffaac7e025ddffbc8"
+      },
+      "packages/engine/src/gateway.ts": {
+        "bytes": 5927,
+        "category": "source",
+        "sha256": "b7962fc4aa3cf617c82c7141fa9c1d46158b0be4149bb9b2816b3de99e59d652"
+      },
+      "packages/engine/src/index.ts": {
+        "bytes": 1116,
+        "category": "source",
+        "sha256": "e5ee59c52cd12ab45f8dfbac21367f95a8dbb9005aeda28e08380e3a2341b585"
+      },
+      "packages/engine/src/launch-policy.ts": {
+        "bytes": 12572,
+        "category": "source",
+        "sha256": "0c1b7e54a90afbe81f96e1718397794963e4c04dfec03543e8c2078e8a26e927"
+      },
+      "packages/engine/src/planner-port.ts": {
+        "bytes": 516,
+        "category": "source",
+        "sha256": "cb07ac8d7bc76f952ef7ffe2d955a5f192b9aca10b4102e755ef8d11f9e3cf2c"
+      },
+      "packages/engine/src/prepare.ts": {
+        "bytes": 12363,
+        "category": "source",
+        "sha256": "1db1e3a015b582f2cd031d2fb1f08807d10bfb95d1886c618957d8b11f8f5dc9"
+      },
+      "packages/engine/src/receiver-policy.ts": {
+        "bytes": 891,
+        "category": "source",
+        "sha256": "9cdfabefc01a4e4ed7531b5fb8b49f05342dd888e0a9eeadfacd0b1254694dca"
+      },
+      "packages/engine/src/recovery.ts": {
+        "bytes": 8766,
+        "category": "source",
+        "sha256": "a337089c7afaf6495d77fef6df4f77b39c0405507ffddede8a5f6863965e2189"
+      },
+      "packages/engine/src/redaction.ts": {
+        "bytes": 2871,
+        "category": "source",
+        "sha256": "abcc7d9036005b61d241da40888a21bfb5143293cb7f92b27676a62266123839"
+      },
+      "packages/engine/src/snapshot.ts": {
+        "bytes": 5361,
+        "category": "source",
+        "sha256": "a1a9ca093d8130f3cba118256ddcb638bb9638679920e4421d1c2c2e5620e413"
+      },
+      "packages/engine/src/store.ts": {
+        "bytes": 18046,
+        "category": "source",
+        "sha256": "6f6d3e038bd2591a48d008c8c8ae42e23ca1e1c854ed180ebb8f331ae4d6c761"
+      },
+      "packages/engine/tests/artifact-validation.test.ts": {
+        "bytes": 9386,
+        "category": "test",
+        "sha256": "bdd68fb3ffb49463cb6e941615205a33fabcfa882f2c757761bc270dc288988b"
+      },
+      "packages/engine/tests/audit-redaction.test.ts": {
+        "bytes": 2277,
+        "category": "test",
+        "sha256": "20259aacf0ec7b577c29fa2e86e66fa4e1d771be1da50122dba4e8ff87402842"
+      },
+      "packages/engine/tests/controller.integration.test.ts": {
+        "bytes": 59690,
+        "category": "test",
+        "sha256": "6cb6a3764a5a1e2ae02af0ef4a3d16ee1341b624dbb3c87943a869ef054a329d"
+      },
+      "packages/engine/tests/crash-worker.mjs": {
+        "bytes": 902,
+        "category": "test",
+        "sha256": "598058e9e9faa9f2a71e1d5b368d955b75b9e337277f1a588eeb05ae879d719b"
+      },
+      "packages/engine/tests/filesystem-adapter.test.ts": {
+        "bytes": 2592,
+        "category": "test",
+        "sha256": "1123a72f849aee41e098a9a42feb4976388a6c4a41aa10c921bbe8148d042aa8"
+      },
+      "packages/engine/tests/filesystem-controller.integration.test.ts": {
+        "bytes": 29066,
+        "category": "test",
+        "sha256": "6b09b355577dbbdf1fcba274a12c70cbe6beaeaaae49594cdd99aebb7c11acfc"
+      },
+      "packages/engine/tests/filesystem-crash-worker.mjs": {
+        "bytes": 1339,
+        "category": "test",
+        "sha256": "eed83ef278840180f5eb53d7f94fa48d869531635e5ad4a3842861ff194fda69"
+      },
+      "packages/engine/tests/filesystem-fixture.ts": {
+        "bytes": 5278,
+        "category": "test",
+        "sha256": "24fbfd82cca5a11d69be41f078750d1429bd3510eeac7282f6754e0ff7755453"
+      },
+      "packages/engine/tests/filesystem-launch-policy.test.ts": {
+        "bytes": 1194,
+        "category": "test",
+        "sha256": "d6c8374988f62edf6c5c1e0e496e002d860d30a56f25f9e4c893cf28965924b2"
+      },
+      "packages/engine/tests/filesystem-marker-crash-worker.mjs": {
+        "bytes": 1723,
+        "category": "test",
+        "sha256": "e0f8c68b6186b7d0263bf2427925a79300a6af328aa5699d936dea26b8509f6a"
+      },
+      "packages/engine/tests/filesystem-paths.test.ts": {
+        "bytes": 18740,
+        "category": "test",
+        "sha256": "f14d0547875df1b15b223d89f58f650040229f893b656075ea2d8452b0be5cc0"
+      },
+      "packages/engine/tests/filesystem-raw-fault-worker.mjs": {
+        "bytes": 2296,
+        "category": "test",
+        "sha256": "6c2ad58cb8a6cc55b34596e501e34e4c9b281ebfe2a2e0f43bd69f05d457aeb0"
+      },
+      "packages/engine/tests/filesystem-read.integration.test.ts": {
+        "bytes": 3372,
+        "category": "test",
+        "sha256": "f5d543551ff007fd856fd00fa261ef53a5052a8d576fa08b572c221783d78219"
+      },
+      "packages/engine/tests/filesystem-write.integration.test.ts": {
+        "bytes": 6398,
+        "category": "test",
+        "sha256": "67ad63ccdea8eabb3a84c8edd71ca4b5c50bbcbbeabde6fee6bc0284a11318be"
+      },
+      "packages/engine/tests/gateway-routing.test.ts": {
+        "bytes": 2817,
+        "category": "test",
+        "sha256": "d5108fd69602ba584ba327d1514b3b694df67aab4a685af8aedf2ba43394bbf3"
+      },
+      "packages/engine/tests/receiver-policy.test.ts": {
+        "bytes": 1500,
+        "category": "test",
+        "sha256": "b7208f90db0256c64123cc4a956c86bb4a7918458197013e68b08aa2f430d398"
+      },
+      "packages/engine/tests/snapshot-compatibility.test.ts": {
+        "bytes": 750,
+        "category": "test",
+        "sha256": "e453723bd43567577e2d179389e1e5adabbb2c032d380607942ec35dd4c30045"
+      },
+      "packages/engine/tests/task-hub-plans.ts": {
+        "bytes": 2197,
+        "category": "test",
+        "sha256": "5975e29ff80e08d65a02d4644630a49f99cc074b55a1b05158ecd59152c6b069"
+      },
+      "packages/engine/tsconfig.json": {
+        "bytes": 113,
+        "category": "config",
+        "sha256": "25296de772f7fd2ca88d5e902fd1b1816ca400f2f232ad5bf3ad2b2b2ca94654"
+      },
+      "packages/engine/vitest.integration.config.ts": {
+        "bytes": 220,
+        "category": "config",
+        "sha256": "f14d3669c2b6cd2b8ec1cc8e8764f640ac97dc8cfa75ed3dc6a2b7cd081c3c33"
+      },
+      "packages/engine/vitest.unit.config.ts": {
+        "bytes": 258,
+        "category": "config",
+        "sha256": "7bd4d2151113223d75d0a6d3369ae014816758aef38d21d254f7a964e51e3afe"
+      },
+      "scripts/capture-command.mjs": {
+        "bytes": 1497,
+        "category": "script",
+        "sha256": "2a20a48609d230146dde889679e22397f33bc374c590cb68f7170a69e3372a22"
+      },
+      "scripts/check-api-lib.mjs": {
+        "bytes": 11703,
+        "category": "script",
+        "sha256": "df6fdc5105da4e27fe6318df9c43b4d9e9d447fa0f739c24da21117cb2884874"
+      },
+      "scripts/check-api.mjs": {
+        "bytes": 6095,
+        "category": "script",
+        "sha256": "07ccc70139f82019ee6f9c3915f9181afce59b53d2576bf38a7c1b593f5e7292"
+      },
+      "scripts/check-api.test.mjs": {
+        "bytes": 8455,
+        "category": "test",
+        "sha256": "2d39ced5c39ac9396de635c3775a857cfa714e022badcc6b9dd4b88e0b4d6d98"
+      },
+      "scripts/check-engine.mjs": {
+        "bytes": 756,
+        "category": "script",
+        "sha256": "57fd4cf668eca625d3559c52292607f3059e62ffb57c98719e1a03aa4d75b078"
+      },
+      "scripts/emit-candidate-artifact.d.mts": {
+        "bytes": 351,
+        "category": "script",
+        "sha256": "d4258d9a69c03c6c6c6876b8f9a229b083d715623e6035ea4c8c9898c19d5e9e"
+      },
+      "scripts/emit-candidate-artifact.mjs": {
+        "bytes": 7251,
+        "category": "script",
+        "sha256": "69ecfc9c2dfc8faa967da1cdc9444f0701baf34814b35c08b42ae7b5ac3a7e8d"
+      },
+      "scripts/fs06-docs-check.mjs": {
+        "bytes": 16074,
+        "category": "script",
+        "sha256": "d2331cf4fde1a0cf0e67ff42106626af9d13300153de31255542cc8558c76abc"
+      },
+      "scripts/fs06-final-snapshot.mjs": {
+        "bytes": 22136,
+        "category": "script",
+        "sha256": "9bfe99c2e5be7993f7b602f7d03017d81ce0496f0b57c41b1c395116dbb81f58"
+      },
+      "scripts/fs06-manifest.mjs": {
+        "bytes": 35594,
+        "category": "script",
+        "sha256": "84556f15d17a5bf5947136cbfc7b20d9c76aab24ec7291302e02110c274d12e2"
+      },
+      "scripts/fs06-scope-audit.mjs": {
+        "bytes": 23410,
+        "category": "script",
+        "sha256": "a1de574f10d291ce1a3d6dd681710152dc88af6e1054995ff4972f34de24bc2f"
+      },
+      "scripts/g1-status.mjs": {
+        "bytes": 4596,
+        "category": "script",
+        "sha256": "1b8745c0049a035a7ceea16a5804dec442a3f4111b710500328d08745ecd03ef"
+      },
+      "scripts/prepare-filesystem-demo.mjs": {
+        "bytes": 2104,
+        "category": "script",
+        "sha256": "9c4aac97c9801d705c5b918cb19a5beef8ad88284f786f883f58908567c5d637"
+      },
+      "scripts/probe-filesystem-candidate.mjs": {
+        "bytes": 7784,
+        "category": "script",
+        "sha256": "21901f4fbbb856d6b1bdecddbbd2b585c48c72a20d843d8ce85b647e5f888b7c"
+      },
+      "tsconfig.json": {
+        "bytes": 1087,
+        "category": "config",
+        "sha256": "2bd7a28be53e166355902d406cc33bb3cb026d863a196ee1a80ad0bc9fc55ea1"
+      }
+    }
+  },
+  "cleanup_evidence": {
+    "status": "NOT_INDEPENDENTLY_VERIFIED",
+    "fixture_ownership": "Each test suite owns its unique database, process, and temporary-root fixtures.",
+    "limitation": "The runner records suite exit codes and output but has no independent database/process/root cleanup oracle.",
+    "observed_failures": []
+  },
+  "coverage": {
+    "required": {
+      "positive_http_lifecycle": "PASS",
+      "required_negative_http_matrix": "NOT_ESTABLISHED_BY_RUNNER"
+    },
+    "planner": "DEV_FIXTURE",
+    "browser_e2e": "NOT_RUN",
+    "ai_evaluation": "NOT_RUN",
+    "rubric": "OPEN"
+  },
+  "assessment": {
+    "command_status": "PASS",
+    "api_verdict": "PARTIAL",
+    "api_technical_pass": false,
+    "process_exit_code": 0,
+    "reasons": [
+      "required_negative_http_matrix=NOT_ESTABLISHED_BY_RUNNER",
+      "cleanup=NOT_INDEPENDENTLY_VERIFIED"
+    ]
+  },
+  "sanitization": {
+    "strategy": "structured-recursive-plus-text-patterns-and-known-runtime-values",
+    "known_values_supplied": 1,
+    "environment_files_read": false
+  }
+}

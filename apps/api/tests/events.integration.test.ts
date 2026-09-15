@@ -23,23 +23,42 @@ describe("API-03 event paging", () => {
           await tx`SELECT next_event_seq FROM runs WHERE id=${run_id}`
         )[0]!;
         const start = Number(row.next_event_seq);
-        for (let i = 0; i < 205; i++) {
+        for (let i = 0; i < 450; i++) {
           const seq = start + i;
           await tx`INSERT INTO run_events(run_id,seq,type,payload,created_at)
             VALUES (${run_id},${seq},'run.status',${tx.json({ status: "planning", previous: "planning" })},now())`;
         }
-        await tx`UPDATE runs SET next_event_seq=${start + 205} WHERE id=${run_id}`;
+        await tx`UPDATE runs SET next_event_seq=${start + 450} WHERE id=${run_id}`;
       });
       const page = await fixture.call(`/runs/${run_id}/events`, {
         headers: { authorization: `Bearer ${token}` },
       });
       expect(page.status).toBe(200);
       const body = (await page.json()) as {
-        events: unknown[];
+        events: Array<{ seq: number }>;
         next_seq: number;
       };
       expect(body.events).toHaveLength(200);
       expect(body.next_seq).toBe(200);
+      const seqs = body.events.map((event) => event.seq);
+      let cursor = body.next_seq;
+      while (true) {
+        const response = await fixture.call(
+          `/runs/${run_id}/events?since_seq=${cursor}`,
+          { headers: { authorization: `Bearer ${token}` } },
+        );
+        expect(response.status).toBe(200);
+        const next = (await response.json()) as typeof body;
+        if (!next.events.length) {
+          expect(next.next_seq).toBe(cursor);
+          break;
+        }
+        seqs.push(...next.events.map((event) => event.seq));
+        cursor = next.next_seq;
+      }
+      expect(seqs).toEqual(
+        Array.from({ length: 451 }, (_, index) => index + 1),
+      );
 
       for (const value of ["1.0", "1e2", "-1", "01", " "]) {
         const invalid = await fixture.call(

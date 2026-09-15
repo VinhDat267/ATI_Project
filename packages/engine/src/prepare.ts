@@ -25,6 +25,7 @@ import {
 } from "./snapshot.js";
 import { receiverModeFor } from "./receiver-policy.js";
 import { callStep } from "./attempts.js";
+import { containsConfiguredSecret } from "./redaction.js";
 
 type Target = {
   id: string;
@@ -252,6 +253,15 @@ async function preparePlanUnderLease(
         });
       }
     }
+    if (
+      actions.some((action) =>
+        containsConfiguredSecret(action.resolved_args, store.secrets),
+      )
+    )
+      throw new EngineError(
+        "SECRET_IN_WRITE",
+        "Write payload contains protected configuration data",
+      );
     const persistedPlan = { ...plan, source_prompt: target.sourcePrompt };
     const snapshot = SnapshotSchema.parse({
       format: "b-local-preview-1",

@@ -1,6 +1,6 @@
 # Frontend handoff — API-05 B/local
 
-Status: `API_TECHNICAL_PASS` for the local DEV_FIXTURE planner path. Browser E2E and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
+Status: `API_PARTIAL` for the local DEV_FIXTURE planner path. Browser E2E and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
 
 The API listens on loopback and uses the `/api/v1` prefix. The frontend keeps the bearer token in memory for the current tab and sends it only as `Authorization: Bearer <token>`. Do not store it in localStorage, cookies, URLs, logs, or HTML.
 
@@ -8,7 +8,7 @@ The API listens on loopback and uses the `/api/v1` prefix. The frontend keeps th
 
 ```json
 POST /api/v1/runs
-{"source_prompt":"Đọc bảng nguồn, chép các dòng hợp lệ sang bảng đích và báo #team.","inputs":{},"time_zone":"Asia/Ho_Chi_Minh"}
+{"source_prompt":"Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.","inputs":{},"time_zone":"Asia/Ho_Chi_Minh"}
 
 202
 {"run_id":"11111111-1111-4111-8111-111111111111","status":"planning"}
@@ -27,7 +27,7 @@ POST /api/v1/runs
   "time_zone":"Asia/Ho_Chi_Minh",
   "runtime":{},
   "last_seq":4,
-  "source_prompt":"Đọc bảng nguồn, chép các dòng hợp lệ sang bảng đích và báo #team.",
+  "source_prompt":"Chép nguyên các dòng Progress!A1:B2 trong bảng source sang sheet Report của bảng dest, rồi gửi vào #team thông báo số dòng đã chép.",
   "created_at":"2026-09-15T08:00:00.000Z",
   "read_outputs":{}
 }
@@ -48,7 +48,7 @@ Poll `GET /api/v1/runs/{run_id}/events?since_seq=<last_seq>` every two seconds. 
 {"events":[],"next_seq":4}
 ```
 
-Trace attempts expose evidence, tool snapshot, resolved args, result, certainty and error metadata. Sensitive keys are redacted in transport projections. Render all tool output as text; never use `innerHTML`.
+Trace attempts expose evidence, tool snapshot, resolved args, result, certainty and error metadata. Sensitive payload keys and configured secret values are redacted in transport and materialized trace projections. Writes containing configured secret values are blocked before approval and checked again against saved previews. Render all tool output as text; never use `innerHTML`.
 
 ## Status mapping
 

@@ -39,6 +39,59 @@ export async function cancel(
   });
   return store.detail(id);
 }
+/** Settle a dispatcher failure only while holding a fresh worker lease. */
+export async function settleDispatchFailure(
+  store: Store,
+  id: string,
+  job: "prepare" | "execute",
+) {
+  return store.withWorker(async () =>
+    store.db.client.begin(async (tx) => {
+      const run = await store.run(tx, id, true);
+      await store.assertWorker(tx);
+      const eligible =
+        job === "prepare"
+          ? ["planning", "validating", "dry_running"].includes(run.status)
+          : ["running", "replanning"].includes(run.status);
+      if (!eligible || TERMINAL_STATUSES.includes(run.status)) {
+        await tx`UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now()) WHERE run_id=${id} AND job_kind=${job}`;
+        return;
+      }
+      await tx`UPDATE tool_operations SET state='unknown',error_message='Worker stopped before recording outcome' WHERE run_id=${id} AND state='in_flight'`;
+      const unknown =
+        await tx`SELECT 1 FROM tool_operations WHERE run_id=${id} AND state='unknown' LIMIT 1`;
+      const approval = await store.approval(tx, id, true);
+      const expired =
+        approval &&
+        !(
+          await tx`SELECT expires_at>clock_timestamp() AS live FROM approvals WHERE id=${approval.id}`
+        )[0]!.live;
+      const status = unknown.length
+        ? "reconciliation_required"
+        : run.cancel_requested_at
+          ? "cancelled"
+          : expired
+            ? "expired"
+            : "failed";
+      await store.closeOpenAttempts(
+        tx,
+        id,
+        "Worker failed before completing the job",
+      );
+      if (approval && ["pending", "approved"].includes(approval.decision)) {
+        await tx`UPDATE approvals SET decision=${status === "expired" ? "expired" : "superseded"},decided_at=now() WHERE id=${approval.id}`;
+      }
+      await tx`UPDATE run_outbox SET delivered_at=COALESCE(delivered_at,now()) WHERE run_id=${id}`;
+      await tx`UPDATE runs SET claimed_by=NULL,claimed_at=NULL,heartbeat_at=NULL WHERE id=${id}`;
+      await store.transition(tx, run, status, {
+        error: unknown.length
+          ? "Worker stopped with an uncertain write; inspect receipts"
+          : "Worker failed before dispatching another tool",
+      });
+    }),
+  );
+}
+
 export async function recoverOrphans(store: Store) {
   return store.withWorker(async () => {
     const candidates = await store.db

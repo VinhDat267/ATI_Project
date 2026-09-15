@@ -39,11 +39,13 @@ const WriteArguments = z
   .object({ path: z.string(), content: z.string() })
   .strict();
 const RawReadContent = z.object({ content: z.string() }).strict();
-const RawTool = z.object({
-  name: z.string(),
-  inputSchema: z.record(z.string(), z.unknown()),
-  outputSchema: z.record(z.string(), z.unknown()),
-}).passthrough();
+const RawTool = z
+  .object({
+    name: z.string(),
+    inputSchema: z.record(z.string(), z.unknown()),
+    outputSchema: z.record(z.string(), z.unknown()),
+  })
+  .passthrough();
 
 type ReviewedFilesystem = {
   package: "@modelcontextprotocol/server-filesystem";
@@ -57,10 +59,22 @@ type ReviewedFilesystem = {
   maxBytes: 65536;
   artifact: DeepArtifactRecord;
   rawDiscovery: { count: number; names: string[] };
-  rawTools: Record<string, { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> }>;
+  rawTools: Record<
+    string,
+    {
+      inputSchema: Record<string, unknown>;
+      outputSchema: Record<string, unknown>;
+    }
+  >;
   publicTools: {
-    read_file: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> };
-    write_file: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> };
+    read_file: {
+      inputSchema: Record<string, unknown>;
+      outputSchema: Record<string, unknown>;
+    };
+    write_file: {
+      inputSchema: Record<string, unknown>;
+      outputSchema: Record<string, unknown>;
+    };
   };
 };
 
@@ -75,7 +89,8 @@ function loadReviewed(policyFile: string): ReviewedFilesystem {
       value?.serverIdentity?.version !== "0.2.0" ||
       value?.policyVersion !== "b-local-fs-1" ||
       value?.rootStrategy !== "project-runtime-principal" ||
-      JSON.stringify(value?.enabledTools) !== JSON.stringify(["read_file", "write_file"]) ||
+      JSON.stringify(value?.enabledTools) !==
+        JSON.stringify(["read_file", "write_file"]) ||
       value?.maxBytes !== 65536
     )
       throw new Error("FILESYSTEM_POLICY_INVALID");
@@ -95,8 +110,7 @@ export function normalizeFilesystemReadResult(
   if (raw.isError) return { isError: true, content: raw.content };
   const body = RawReadContent.parse(raw.structuredContent);
   const firstContent = raw.content?.[0] as
-    | { type?: unknown; text?: unknown }
-    | undefined;
+    { type?: unknown; text?: unknown } | undefined;
   if (
     !Array.isArray(raw.content) ||
     raw.content.length !== 1 ||
@@ -129,8 +143,7 @@ export async function normalizeFilesystemWriteResult(
   if (raw.isError) return { isError: true, content: raw.content };
   const body = RawReadContent.parse(raw.structuredContent);
   const firstContent = raw.content?.[0] as
-    | { type?: unknown; text?: unknown }
-    | undefined;
+    { type?: unknown; text?: unknown } | undefined;
   if (
     !Array.isArray(raw.content) ||
     raw.content.length !== 1 ||
@@ -147,9 +160,17 @@ export async function openFilesystemConnection(
   launch: FilesystemLaunch,
   hooks?: FilesystemWriteHooks,
 ): Promise<ServerConnection> {
-  if (launch.presetId !== "filesystem-local-v1" || !path.isAbsolute(launch.allowedRoot))
-    throw new EngineError("CONFIG", "Filesystem launch preset or root is invalid");
-  const policyFile = launch.policyFile ?? path.join(config.root, "config", "filesystem-reviewed.json");
+  if (
+    launch.presetId !== "filesystem-local-v1" ||
+    !path.isAbsolute(launch.allowedRoot)
+  )
+    throw new EngineError(
+      "CONFIG",
+      "Filesystem launch preset or root is invalid",
+    );
+  const policyFile =
+    launch.policyFile ??
+    path.join(config.root, "config", "filesystem-reviewed.json");
   const review = loadReviewed(policyFile);
   const policyHash = hash(JSON.parse(readFileSync(policyFile, "utf8")));
   const artifact = verifyFilesystemArtifact(config.root, review.artifact);
@@ -195,9 +216,18 @@ export async function openFilesystemConnection(
       serverVersion?.name !== review.serverIdentity.name ||
       serverVersion?.version !== review.serverIdentity.version
     )
-      throw new EngineError("REGISTRY_CHANGED", "Unexpected filesystem server identity");
+      throw new EngineError(
+        "REGISTRY_CHANGED",
+        "Unexpected filesystem server identity",
+      );
 
-    const discovered: Record<string, { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> }> = {};
+    const discovered: Record<
+      string,
+      {
+        inputSchema: Record<string, unknown>;
+        outputSchema: Record<string, unknown>;
+      }
+    > = {};
     const seenCursors = new Set<string>();
     let cursor: string | undefined;
     do {
@@ -205,7 +235,10 @@ export async function openFilesystemConnection(
       for (const raw of page.tools) {
         const parsed = RawTool.parse(raw);
         if (discovered[parsed.name])
-          throw new EngineError("REGISTRY_CHANGED", `Duplicate filesystem tool: ${parsed.name}`);
+          throw new EngineError(
+            "REGISTRY_CHANGED",
+            `Duplicate filesystem tool: ${parsed.name}`,
+          );
         discovered[parsed.name] = {
           inputSchema: parsed.inputSchema,
           outputSchema: parsed.outputSchema,
@@ -214,19 +247,31 @@ export async function openFilesystemConnection(
       cursor = page.nextCursor;
       if (cursor) {
         if (seenCursors.has(cursor))
-          throw new EngineError("REGISTRY_CHANGED", "Filesystem tools/list cursor loop");
+          throw new EngineError(
+            "REGISTRY_CHANGED",
+            "Filesystem tools/list cursor loop",
+          );
         seenCursors.add(cursor);
       }
     } while (cursor);
-    if (Object.keys(discovered).length !== review.rawDiscovery.count ||
-        Object.keys(discovered).sort().join("\n") !== review.rawDiscovery.names.slice().sort().join("\n"))
-      throw new EngineError("REGISTRY_CHANGED", "Filesystem raw discovery changed");
+    if (
+      Object.keys(discovered).length !== review.rawDiscovery.count ||
+      Object.keys(discovered).sort().join("\n") !==
+        review.rawDiscovery.names.slice().sort().join("\n")
+    )
+      throw new EngineError(
+        "REGISTRY_CHANGED",
+        "Filesystem raw discovery changed",
+      );
     for (const name of ["read_text_file", "write_file"])
       if (
         !discovered[name] ||
         canonicalJson(discovered[name]) !== canonicalJson(review.rawTools[name])
       )
-        throw new EngineError("REGISTRY_CHANGED", `Filesystem raw schema changed: ${name}`);
+        throw new EngineError(
+          "REGISTRY_CHANGED",
+          `Filesystem raw schema changed: ${name}`,
+        );
 
     const artifactHash = hash({
       preset: launch.presetId,
@@ -253,9 +298,16 @@ export async function openFilesystemConnection(
       artifactHash,
     });
     const assertCurrent = async () => {
-      const latestPolicyHash = hash(JSON.parse(readFileSync(policyFile, "utf8")));
+      if (!client.transport)
+        throw new EngineError("CONFIG", "MCP transport is disconnected");
+      const latestPolicyHash = hash(
+        JSON.parse(readFileSync(policyFile, "utf8")),
+      );
       if (latestPolicyHash !== policyHash)
-        throw new EngineError("REGISTRY_CHANGED", "Filesystem review policy changed");
+        throw new EngineError(
+          "REGISTRY_CHANGED",
+          "Filesystem review policy changed",
+        );
       verifyFilesystemArtifact(config.root, review.artifact);
     };
     return {
@@ -263,6 +315,7 @@ export async function openFilesystemConnection(
       userId: config.userId,
       tools: [readTool, writeTool],
       assertCurrent,
+      isConnected: () => Boolean(client.transport),
       async call(
         name: string,
         args: Record<string, unknown>,
@@ -273,26 +326,36 @@ export async function openFilesystemConnection(
         const isRead = name === "read_file";
         const isWrite = name === "write_file";
         if (!isRead && !isWrite)
-          throw new BeforeDispatchError("Filesystem tool is not public in the reviewed gateway");
+          throw new BeforeDispatchError(
+            "Filesystem tool is not public in the reviewed gateway",
+          );
         try {
           await context?.worker?.assertActive();
         } catch (error) {
-          throw new BeforeDispatchError(error instanceof Error ? error.message : "Worker is not active");
+          throw new BeforeDispatchError(
+            error instanceof Error ? error.message : "Worker is not active",
+          );
         }
         const pathOnly = z.object({ path: z.string() }).safeParse(args);
         if (!pathOnly.success)
-          throw new BeforeDispatchError("Filesystem arguments do not match reviewed schema");
+          throw new BeforeDispatchError(
+            "Filesystem arguments do not match reviewed schema",
+          );
         let content: string | undefined;
         if (isWrite) {
           const parsedWrite = WriteArguments.safeParse(args);
           if (!parsedWrite.success)
-            throw new BeforeDispatchError("Filesystem write arguments do not match reviewed schema");
+            throw new BeforeDispatchError(
+              "Filesystem write arguments do not match reviewed schema",
+            );
           content = parsedWrite.data.content;
           validateWriteText(content);
         } else {
           const parsedRead = ReadArguments.safeParse(args);
           if (!parsedRead.success)
-            throw new BeforeDispatchError("Filesystem read arguments do not match reviewed schema");
+            throw new BeforeDispatchError(
+              "Filesystem read arguments do not match reviewed schema",
+            );
         }
         const deadline = performance.now() + timeoutMs;
         let checked: Awaited<ReturnType<typeof inspectFilesystemPath>>;
@@ -305,15 +368,20 @@ export async function openFilesystemConnection(
           );
           assertRootIdentity(checked, rootProbe.rootId, rootProbe.rootStat);
         } catch (error) {
-          throw new BeforeDispatchError(error instanceof Error ? error.message : "Filesystem path rejected");
+          throw new BeforeDispatchError(
+            error instanceof Error ? error.message : "Filesystem path rejected",
+          );
         }
         if (isWrite) {
           if (!hooks || !context?.worker || !authorization)
-            throw new BeforeDispatchError("Filesystem write requires the approved dispatch context");
+            throw new BeforeDispatchError(
+              "Filesystem write requires the approved dispatch context",
+            );
           const request: FilesystemWriteRequest = {
             tool: writeTool,
             args: { path: pathOnly.data.path, content: content! },
-            authorization: authorization as FilesystemWriteRequest["authorization"],
+            authorization:
+              authorization as FilesystemWriteRequest["authorization"],
             checkedPath: checked,
             worker: context.worker,
           };
@@ -333,12 +401,18 @@ export async function openFilesystemConnection(
             );
             assertRootIdentity(latest, rootProbe.rootId, rootProbe.rootStat);
           } catch (error) {
-            throw new BeforeDispatchError(error instanceof Error ? error.message : "Filesystem path changed before dispatch");
+            throw new BeforeDispatchError(
+              error instanceof Error
+                ? error.message
+                : "Filesystem path changed before dispatch",
+            );
           }
           await hooks.recheck({ ...request, checkedPath: latest });
           const remainingMs = Math.ceil(deadline - performance.now());
           if (remainingMs <= 0)
-            throw new BeforeDispatchError("Filesystem write deadline expired before dispatch");
+            throw new BeforeDispatchError(
+              "Filesystem write deadline expired before dispatch",
+            );
           const raw = await client.callTool(
             {
               name: "write_file",
@@ -353,7 +427,9 @@ export async function openFilesystemConnection(
             expectedAck,
           );
           if (normalized.isError)
-            throw new Error("Filesystem acknowledgement reported an error after dispatch");
+            throw new Error(
+              "Filesystem acknowledgement reported an error after dispatch",
+            );
           const readBack = await inspectFilesystemPath(
             launch.allowedRoot,
             pathOnly.data.path,
@@ -367,7 +443,10 @@ export async function openFilesystemConnection(
           return { structuredContent: { path: pathOnly.data.path } };
         }
         const remainingMs = Math.ceil(deadline - performance.now());
-        if (remainingMs <= 0) throw new BeforeDispatchError("Filesystem read deadline expired before dispatch");
+        if (remainingMs <= 0)
+          throw new BeforeDispatchError(
+            "Filesystem read deadline expired before dispatch",
+          );
         const raw = await client.callTool(
           { name: "read_text_file", arguments: { path: checked.absolute } },
           undefined,

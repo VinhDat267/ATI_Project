@@ -32,6 +32,7 @@ describe("API-05 loopback acceptance", () => {
       const seen: number[] = [];
       let approval: ApprovalRef | null = null;
       let terminal = "";
+      let terminalEventSeen = false;
       const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const events = await fixture.call(
@@ -40,14 +41,16 @@ describe("API-05 loopback acceptance", () => {
         );
         expect(events.status).toBe(200);
         const page = (await events.json()) as {
-          events: Array<{ seq: number }>;
+          events: Array<{ seq: number; type: string }>;
           next_seq: number;
         };
         for (const event of page.events) {
-          expect(event.seq).toBeGreaterThan(seq);
+          expect(event.seq).toBe(seq + 1);
+          terminalEventSeen ||= event.type === "run.finished";
           seen.push(event.seq);
           seq = event.seq;
         }
+        expect(page.next_seq).toBe(seq);
         const detail = (await fixture
           .call(`/runs/${run_id}`, {
             headers: { authorization: `Bearer ${token}` },
@@ -92,13 +95,18 @@ describe("API-05 loopback acceptance", () => {
             "rejected",
             "refused",
             "needs_input",
-          ].includes(terminal)
+          ].includes(terminal) &&
+          terminalEventSeen
         )
           break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       expect(approval).not.toBeNull();
       expect(terminal).toBe("succeeded");
+      expect(terminalEventSeen).toBe(true);
+      const persistedEvents = await fixture.db
+        .client`SELECT seq FROM run_events WHERE run_id=${run_id} ORDER BY seq`;
+      expect(seen).toEqual(persistedEvents.map((event) => Number(event.seq)));
       expect(seen.length).toBeGreaterThan(0);
       const tracePages: unknown[] = [];
       let cursor = "";
@@ -127,7 +135,22 @@ describe("API-05 loopback acceptance", () => {
       });
       const afterWrites = await fixture.db
         .client`SELECT count(*)::int AS n FROM hub_receipts WHERE user_id=${fixture.userId}`;
-      expect(afterWrites[0]!.n).toBeGreaterThan(beforeWrites[0]!.n);
+      expect(afterWrites[0]!.n - beforeWrites[0]!.n).toBe(2);
+      expect(
+        await fixture.db
+          .client`SELECT cells FROM hub_sheets WHERE user_id=${fixture.userId} AND workbook_id='dest' AND sheet_name='Report'`,
+      ).toEqual([
+        {
+          cells: [
+            ["API", "Done"],
+            ["UI", "Doing"],
+          ],
+        },
+      ]);
+      expect(
+        await fixture.db
+          .client`SELECT channel,text FROM hub_messages WHERE user_id=${fixture.userId}`,
+      ).toEqual([{ channel: "#team", text: "Đã chép 2 dòng." }]);
     } finally {
       await fixture.close();
     }
@@ -178,6 +201,10 @@ describe("API-05 loopback acceptance", () => {
       );
       const fs = await import("node:fs/promises");
       await expect(fs.access(target)).rejects.toThrow();
+      await fs.writeFile(
+        path.join(fixture.allowedRoot!, "notes.txt"),
+        "Changed after the approval snapshot\n",
+      );
       const approval = detail.approval!;
       const decided = await fixture.call(`/runs/${run_id}/approval`, {
         method: "POST",

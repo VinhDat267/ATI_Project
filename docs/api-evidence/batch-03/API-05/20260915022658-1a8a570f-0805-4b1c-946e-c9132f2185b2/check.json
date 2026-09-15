@@ -1,0 +1,16 @@
+{
+  "id": "check",
+  "command": "npm run check",
+  "started_at": "2026-09-15T02:26:59.233Z",
+  "finished_at": "2026-09-15T02:27:25.873Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "error": null,
+  "stdout": "\n> check\n> npm run typecheck && npm run build && npm test && npm run schema:json && npm run api:generate\n\n\n> typecheck\n> tsc -p tsconfig.json\n\n\n> build\n> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine && npm run build -w @wap/api\n\n\n> @wap/dsl@0.1.0 build\n> tsc\n\n\n> @wap/db@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/mcp-task-hub@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/engine@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/api@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> test\n> npm run test -w @wap/dsl\n\n\n> @wap/dsl@0.1.0 test\n> vitest run\n\n\n RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/packages/dsl\n\n ✓ tests/contracts.test.ts (5 tests) 12ms\n ✓ tests/policy.test.ts (9 tests) 211ms\n ✓ tests/fixtures.test.ts (13 tests) 458ms\n ✓ tests/regressions.test.ts (15 tests) 461ms\n   ✓ planner and event boundaries > emits JSON Schema with constraints for executable plans 441ms\n\n Test Files  4 passed (4)\n      Tests  42 passed (42)\n   Start at  09:27:16\n   Duration  1.13s (transform 289ms, setup 0ms, collect 1.09s, tests 1.14s, environment 1ms, prepare 522ms)\n\n\n> schema:json\n> npm run schema:json -w @wap/dsl\n\n\n> @wap/dsl@0.1.0 schema:json\n> tsx scripts/emit-json-schema.ts\n\nĐã sinh JSON Schema vào generated/\n\n> api:generate\n> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts\n\nGenerated docs/openapi.yaml\n✨ openapi-typescript 7.13.0\n🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [144.9ms]\n",
+  "stderr": "",
+  "cleanup_evidence": {
+    "status": "NOT_REPORTED_TO_RUNNER",
+    "independently_verified": false
+  }
+}

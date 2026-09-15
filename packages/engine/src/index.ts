@@ -18,7 +18,12 @@ export {
   type FilesystemWriteHooks,
   type FilesystemDispatchContext,
 } from "./gateway.js";
-export { BeforeDispatchError, EngineError } from "./snapshot.js";
+export {
+  BeforeDispatchError,
+  EngineError,
+  type EngineTool,
+} from "./snapshot.js";
+export { safeProject, containsConfiguredSecret } from "./redaction.js";
 export { receiverModeFor, type ReceiverMode } from "./receiver-policy.js";
 export {
   loadFilesystemLaunch,

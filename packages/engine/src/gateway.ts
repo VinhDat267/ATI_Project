@@ -31,7 +31,8 @@ export type {
   FilesystemDispatchContext,
 } from "./gateway-types.js";
 
-const targetKey = (target: ToolTarget) => `${target.server}\u0000${target.name}`;
+const targetKey = (target: ToolTarget) =>
+  `${target.server}\u0000${target.name}`;
 
 /** Compose reviewed server connections behind an exact server-qualified target. */
 export function composeGateway(
@@ -73,6 +74,8 @@ export function composeGateway(
     get tools() {
       return structuredClone([...toolMap.values()]);
     },
+    isConnected: () =>
+      connections.every((connection) => connection.isConnected?.() ?? true),
     async assertCurrent() {
       const results = await Promise.allSettled(
         connections.map((connection) => connection.assertCurrent()),
@@ -105,7 +108,13 @@ export function composeGateway(
           error instanceof Error ? error.message : "Gateway validation failed",
         );
       }
-      return connection.call(target.name, args, authorization, timeoutMs, context);
+      return connection.call(
+        target.name,
+        args,
+        authorization,
+        timeoutMs,
+        context,
+      );
     },
     async close() {
       const results = await Promise.allSettled(
@@ -138,7 +147,9 @@ export async function openLocalGateway(
       const hooks = {
         reserve: (request: FilesystemWriteRequest) => {
           if (!composite || !guardStore)
-            throw new BeforeDispatchError("Filesystem gateway is not fully initialized");
+            throw new BeforeDispatchError(
+              "Filesystem gateway is not fully initialized",
+            );
           return reserveFilesystemDispatch({
             ...request,
             store: guardStore,
@@ -147,7 +158,9 @@ export async function openLocalGateway(
         },
         recheck: (request: FilesystemWriteRequest) => {
           if (!composite || !guardStore)
-            throw new BeforeDispatchError("Filesystem gateway is not fully initialized");
+            throw new BeforeDispatchError(
+              "Filesystem gateway is not fully initialized",
+            );
           return recheckFilesystemDispatch({
             ...request,
             store: guardStore,
@@ -155,7 +168,9 @@ export async function openLocalGateway(
           });
         },
       };
-      opened.push(await openFilesystemConnection(config, config.filesystem, hooks));
+      opened.push(
+        await openFilesystemConnection(config, config.filesystem, hooks),
+      );
     }
     composite = composeGateway(config.userId, opened);
     if (!guardDb) return composite;
@@ -166,6 +181,7 @@ export async function openLocalGateway(
         return base.tools;
       },
       assertCurrent: () => base.assertCurrent(),
+      isConnected: () => base.isConnected!(),
       call: (...args) => base.call(...args),
       async close() {
         try {

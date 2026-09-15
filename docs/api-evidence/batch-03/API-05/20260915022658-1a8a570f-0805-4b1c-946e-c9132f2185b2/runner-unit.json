@@ -1,0 +1,16 @@
+{
+  "id": "runner-unit",
+  "command": "C:\\Program Files\\nodejs\\node.exe --test scripts/check-api.test.mjs",
+  "started_at": "2026-09-15T02:26:58.980Z",
+  "finished_at": "2026-09-15T02:26:59.231Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "error": null,
+  "stdout": "✔ sanitizer removes quoted fields, multiline values, Bearer [REDACTED], URL userinfo, and known values (8.9075ms)\n✔ recursive sanitizer scrubs every nested artifact field without changing non-string evidence (0.6383ms)\n✔ known-secret discovery does not leave short configured values outside sanitization (0.7935ms)\n✔ source selection covers source, tests, scripts, config, migrations, generated contracts, and lockfiles (0.6252ms)\n✔ source fingerprint evidence is deterministic and assigns meaningful categories (9.1803ms)\n✔ git status evidence distinguishes tracked and untracked source from unrelated files (0.3605ms)\n✔ gate plan includes engine unit and passing commands cannot promote missing negative coverage (0.4065ms)\n✔ a cleanup failure makes the gate fail even when every command exits zero (0.2127ms)\n✔ runner sanitizes real child stdout, stderr, command metadata, and spawn errors (71.8934ms)\nℹ tests 9\nℹ suites 0\nℹ pass 9\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 176.4598\n",
+  "stderr": "",
+  "cleanup_evidence": {
+    "status": "NOT_REPORTED_TO_RUNNER",
+    "independently_verified": false
+  }
+}

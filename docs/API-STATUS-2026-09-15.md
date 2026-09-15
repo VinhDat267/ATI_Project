@@ -1,6 +1,6 @@
 # API status — 2026-09-15
 
-`API_TECHNICAL_PASS` for the B/local loopback lifecycle through API-05. The positive two-receiver lifecycle and implemented approval/cancel/expiry guards are verified; the complete negative HTTP matrix remains `NOT_RUN`.
+`API_PARTIAL` after the API-01–05 adversarial audit. The previous full-pass claim is withdrawn: passing command suites establishes only the scenarios they exercised. Fix verification is tracked in [API audit fix progress](api-evidence/batch-03/API-AUDIT-FIX-PROGRESS.md).
 
 Confirmed on PostgreSQL 16 with real Node HTTP sockets and local MCP connections:
 
@@ -11,4 +11,4 @@ Confirmed on PostgreSQL 16 with real Node HTTP sockets and local MCP connections
 
 The planner in these checks is `DEV_FIXTURE_PLANNER`; this is lifecycle evidence, not AI quality evidence. `AI_EVALUATION=NOT_RUN`, `BROWSER_E2E=NOT_RUN`, and `G3=PARTIAL`. Official rubric and representative group work remain `OPEN`.
 
-The next work package is WEB-01: implement the two-screen frontend against [FRONTEND-HANDOFF.md](FRONTEND-HANDOFF.md), then run browser-level reconnect, keyboard, responsive and readability checks.
+WEB-01 can use [FRONTEND-HANDOFF.md](FRONTEND-HANDOFF.md) for component work. Full API acceptance still requires the remaining negative HTTP/process cases and independent fixture-cleanup evidence; browser-level reconnect, keyboard, responsive and readability checks remain separate.
