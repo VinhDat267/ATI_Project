@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "checkpoint": "WEB-01A",
+  "verdict": "DEPENDENCY_AUDIT_PARTIAL",
+  "recordedAt": "2026-09-15T11:55:00+07:00",
+  "baselineCommit": "1df8543",
+  "summary": "Audit completed with 5 findings originating from root devDependencies at baseline commit 1df8543. No new runtime dependencies from WEB-01A introduce any vulnerabilities. npm audit fix was not run per repository policy.",
+  "findings": [
+    {
+      "id": "GHSA-5xrq-8626-4rwp",
+      "package": "vitest",
+      "severity": "critical",
+      "title": "When Vitest UI server is listening, arbitrary file can be read and executed",
+      "url": "https://github.com/advisories/GHSA-5xrq-8626-4rwp",
+      "cwe": [
+        "CWE-22",
+        "CWE-862"
+      ],
+      "cvss": {
+        "score": 9.8,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+      },
+      "vulnerableRange": "<3.2.6",
+      "introducedIn": "1df8543 (root devDependencies vitest@2.1.9)",
+      "riskAssessment": "Low operational risk in development. Project test scripts strictly execute CLI mode (`vitest run`), never running the vulnerable Vitest UI web server (`vitest --ui`)."
+    },
+    {
+      "id": "GHSA-82fw-gwwq-j7x9",
+      "package": "@vitest/mocker",
+      "severity": "moderate",
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9",
+      "cwe": [
+        "CWE-22"
+      ],
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "vulnerableRange": ">=2.1.0 <4.1.11",
+      "introducedIn": "1df8543 (transitive via vitest@2.1.9)",
+      "riskAssessment": "Low. Redirect mock features of @vitest/mocker are not utilized in repository test suites."
+    },
+    {
+      "id": "GHSA-fx2h-pf6j-xcff",
+      "package": "vite",
+      "severity": "high",
+      "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
+      "url": "https://github.com/advisories/GHSA-fx2h-pf6j-xcff",
+      "cwe": [
+        "CWE-22",
+        "CWE-200"
+      ],
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "vulnerableRange": "<=6.4.2",
+      "introducedIn": "1df8543 (transitive via vitest@2.1.9 / vite@5.4.21)",
+      "riskAssessment": "Mitigated. Vite dev server binds exclusively to 127.0.0.1 and is protected by localProxy Host/Origin guard."
+    },
+    {
+      "id": "GHSA-v6wh-96g9-6wx3",
+      "package": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows",
+      "url": "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
+      "cwe": [
+        "CWE-73",
+        "CWE-522"
+      ],
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "vulnerableRange": "<=6.4.2",
+      "introducedIn": "1df8543 (transitive via vitest@2.1.9 / vite@5.4.21)",
+      "riskAssessment": "Low. The launch-editor functionality is not used or invoked in test/build pipelines."
+    },
+    {
+      "id": "GHSA-4w7w-66w2-5vf9",
+      "package": "vite",
+      "severity": "moderate",
+      "title": "Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling",
+      "url": "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+      "cwe": [
+        "CWE-22",
+        "CWE-200"
+      ],
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "vulnerableRange": "<=6.4.1",
+      "introducedIn": "1df8543 (transitive via vitest@2.1.9 / vite@5.4.21)",
+      "riskAssessment": "Low. Local development optimization only; production builds produce static bundle assets without map leakage."
+    },
+    {
+      "id": "GHSA-67mh-4wv8-2f99",
+      "package": "esbuild",
+      "severity": "moderate",
+      "title": "esbuild enables any website to send any requests to the development server and read the response",
+      "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+      "cwe": [
+        "CWE-346"
+      ],
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"
+      },
+      "vulnerableRange": "<=0.24.2",
+      "introducedIn": "1df8543 (transitive via vite@5.4.21 / esbuild@0.21.5)",
+      "riskAssessment": "Mitigated. esbuild server is not exposed directly; Vite runs with custom local proxy rejecting foreign origins."
+    }
+  ],
+  "auditReportSummary": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 3,
+      "high": 1,
+      "critical": 1,
+      "total": 5
+    },
+    "dependencies": {
+      "prod": 121,
+      "dev": 189,
+      "optional": 102,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 309
+    }
+  },
+  "policyEnforcement": {
+    "npmAuditFixExecuted": false,
+    "vitestViteUpgraded": false,
+    "scopeStrictlyWeb01A": true
+  }
+}

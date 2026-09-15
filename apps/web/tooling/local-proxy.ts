@@ -166,6 +166,80 @@ export function createProxyGuard(options: {
   };
 }
 
+const FORBIDDEN_FORWARD_HEADERS = new Set([
+  "cookie",
+  "sec-fetch",
+  "sec-fetch-site",
+  "sec-fetch-mode",
+  "sec-fetch-dest",
+  "sec-fetch-user",
+]);
+
+export function isForbiddenForwardHeader(headerName: string): boolean {
+  const lower = headerName.toLowerCase();
+  if (FORBIDDEN_FORWARD_HEADERS.has(lower)) {
+    return true;
+  }
+  if (lower.startsWith("sec-fetch-")) {
+    return true;
+  }
+  return false;
+}
+
+export function rewriteForwardHeaders(
+  headers: Record<string, string | string[] | undefined>,
+  targetUrl: URL
+): Record<string, string | string[]>;
+export function rewriteForwardHeaders(
+  proxyReq: any,
+  targetUrl: URL
+): void;
+export function rewriteForwardHeaders(
+  target: any,
+  targetUrl: URL
+): any {
+  if (
+    target &&
+    typeof target.setHeader === "function" &&
+    typeof target.removeHeader === "function"
+  ) {
+    const proxyReq = target;
+    proxyReq.removeHeader("cookie");
+    proxyReq.removeHeader("sec-fetch-site");
+    proxyReq.removeHeader("sec-fetch-mode");
+    proxyReq.removeHeader("sec-fetch-dest");
+    proxyReq.removeHeader("sec-fetch-user");
+    proxyReq.removeHeader("sec-fetch");
+
+    if (typeof proxyReq.getHeaderNames === "function") {
+      for (const name of proxyReq.getHeaderNames()) {
+        if (isForbiddenForwardHeader(name)) {
+          proxyReq.removeHeader(name);
+        }
+      }
+    }
+
+    proxyReq.setHeader("host", targetUrl.host);
+    proxyReq.setHeader("origin", targetUrl.origin);
+    return;
+  }
+
+  const rewritten: Record<string, string | string[]> = {};
+  for (const [key, value] of Object.entries(
+    (target ?? {}) as Record<string, string | string[] | undefined>
+  )) {
+    if (value === undefined) continue;
+    const lower = key.toLowerCase();
+    if (isForbiddenForwardHeader(lower) || lower === "host" || lower === "origin") {
+      continue;
+    }
+    rewritten[lower] = value;
+  }
+  rewritten.host = targetUrl.host;
+  rewritten.origin = targetUrl.origin;
+  return rewritten;
+}
+
 export function createProxyForwarder(options: {
   target: string;
   frontendOrigin: string | (() => string);
@@ -175,9 +249,7 @@ export function createProxyForwarder(options: {
 
   return function proxyForwarder(req: IncomingMessage, res: ServerResponse): void {
     guard(req, res, () => {
-      const headers = { ...req.headers };
-      headers.host = targetUrl.host;
-      headers.origin = targetUrl.origin;
+      const headers = rewriteForwardHeaders(req.headers, targetUrl);
 
       const clientReq = httpRequest(
         {
@@ -254,7 +326,7 @@ export function localProxy(
       ws: false,
       configure(proxy: any) {
         proxy.on("proxyReq", (proxyReq: any) => {
-          proxyReq.setHeader("origin", targetUrl.origin);
+          rewriteForwardHeaders(proxyReq, targetUrl);
         });
       },
     },

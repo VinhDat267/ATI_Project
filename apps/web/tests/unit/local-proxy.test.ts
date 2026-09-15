@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createServer as createHttpServer, request as httpRequest, type Server } from "node:http";
 import path from "node:path";
 import os from "node:os";
@@ -9,6 +9,8 @@ import {
   validateFrontendOrigin,
   createProxyGuard,
   createProxyForwarder,
+  rewriteForwardHeaders,
+  isForbiddenForwardHeader,
   localProxy,
 } from "../../tooling/local-proxy.js";
 
@@ -81,6 +83,89 @@ describe("localProxy configuration validation", () => {
     expect(() => validateFrontendOrigin("https://127.0.0.1:5173")).toThrow();
     expect(() => validateFrontendOrigin("http://localhost:5173")).toThrow();
     expect(() => validateFrontendOrigin("http://127.0.0.1")).toThrow();
+  });
+});
+
+describe("rewriteForwardHeaders helper", () => {
+  const targetUrl = new URL("http://127.0.0.1:3001");
+
+  it("identifies forbidden forward headers case-insensitively", () => {
+    expect(isForbiddenForwardHeader("cookie")).toBe(true);
+    expect(isForbiddenForwardHeader("Cookie")).toBe(true);
+    expect(isForbiddenForwardHeader("COOKIE")).toBe(true);
+    expect(isForbiddenForwardHeader("sec-fetch-site")).toBe(true);
+    expect(isForbiddenForwardHeader("Sec-Fetch-Mode")).toBe(true);
+    expect(isForbiddenForwardHeader("SEC-FETCH-DEST")).toBe(true);
+    expect(isForbiddenForwardHeader("Sec-Fetch-User")).toBe(true);
+    expect(isForbiddenForwardHeader("Sec-Fetch")).toBe(true);
+    expect(isForbiddenForwardHeader("sec-fetch-custom")).toBe(true);
+
+    expect(isForbiddenForwardHeader("authorization")).toBe(false);
+    expect(isForbiddenForwardHeader("content-type")).toBe(false);
+    expect(isForbiddenForwardHeader("content-length")).toBe(false);
+    expect(isForbiddenForwardHeader("accept")).toBe(false);
+  });
+
+  it("strips Cookie, Sec-Fetch-*, replaces Host and Origin, and preserves safe headers", () => {
+    const incoming = {
+      cookie: "sid=secret123; admin=true",
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-user": "?1",
+      "sec-fetch": "1",
+      host: "dev.evil.invalid:5173",
+      origin: "http://dev.evil.invalid:5173",
+      authorization: "Bearer my-api-token",
+      "content-type": "application/json",
+      "content-length": "42",
+      accept: "application/json",
+    };
+
+    const result = rewriteForwardHeaders(incoming, targetUrl);
+
+    expect(result.cookie).toBeUndefined();
+    expect(result["sec-fetch-site"]).toBeUndefined();
+    expect(result["sec-fetch-mode"]).toBeUndefined();
+    expect(result["sec-fetch-dest"]).toBeUndefined();
+    expect(result["sec-fetch-user"]).toBeUndefined();
+    expect(result["sec-fetch"]).toBeUndefined();
+
+    expect(result.host).toBe("127.0.0.1:3001");
+    expect(result.origin).toBe("http://127.0.0.1:3001");
+    expect(result.authorization).toBe("Bearer my-api-token");
+    expect(result["content-type"]).toBe("application/json");
+    expect(result["content-length"]).toBe("42");
+    expect(result.accept).toBe("application/json");
+  });
+
+  it("applies header stripping and target setting to ClientRequest-like objects", () => {
+    const removed: string[] = [];
+    const set: Record<string, string> = {};
+    const mockProxyReq = {
+      getHeaderNames() {
+        return ["cookie", "sec-fetch-site", "sec-fetch-mode", "authorization", "host"];
+      },
+      removeHeader(name: string) {
+        removed.push(name.toLowerCase());
+      },
+      setHeader(name: string, value: string) {
+        set[name.toLowerCase()] = value;
+      },
+    };
+
+    rewriteForwardHeaders(mockProxyReq, targetUrl);
+
+    expect(removed).toContain("cookie");
+    expect(removed).toContain("sec-fetch-site");
+    expect(removed).toContain("sec-fetch-mode");
+    expect(removed).toContain("sec-fetch-dest");
+    expect(removed).toContain("sec-fetch-user");
+    expect(removed).toContain("sec-fetch");
+    expect(removed).not.toContain("authorization");
+
+    expect(set.host).toBe("127.0.0.1:3001");
+    expect(set.origin).toBe("http://127.0.0.1:3001");
   });
 });
 
@@ -180,7 +265,7 @@ describe("localProxy independent dev and preview boundaries", () => {
     ]);
   });
 
-  it("dev server accepts matching dev Host and dev Origin", async () => {
+  it("dev server forwards request with stripped Cookie and Sec-Fetch-*, preserved Authorization/body, and rewritten Host/Origin", async () => {
     const syntheticBody = JSON.stringify({
       email: "synthetic@local.invalid",
       password: "synthetic-password-hash",
@@ -191,6 +276,12 @@ describe("localProxy independent dev and preview boundaries", () => {
       headers: {
         host: new URL(devOrigin).host,
         origin: devOrigin,
+        cookie: "session_token=sensitive-cookie-xyz; refresh=abc",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-user": "?1",
+        "sec-fetch": "1",
         "content-type": "application/json",
         authorization: "Bearer synthetic-token-xyz",
       },
@@ -199,8 +290,24 @@ describe("localProxy independent dev and preview boundaries", () => {
 
     expect(response.status).toBe(200);
     expect(upstreamCalls).toHaveLength(1);
-    expect(upstreamCalls[0]!.headers.origin).toBe(upstreamOrigin);
-    expect(upstreamCalls[0]!.headers.host).toBe(new URL(upstreamOrigin).host);
+    const call = upstreamCalls[0]!;
+
+    // Cookie and Sec-Fetch-* must NOT reach upstream
+    expect(call.headers.cookie).toBeUndefined();
+    expect(call.headers["sec-fetch-site"]).toBeUndefined();
+    expect(call.headers["sec-fetch-mode"]).toBeUndefined();
+    expect(call.headers["sec-fetch-dest"]).toBeUndefined();
+    expect(call.headers["sec-fetch-user"]).toBeUndefined();
+    expect(call.headers["sec-fetch"]).toBeUndefined();
+
+    // Authorization and body must be preserved
+    expect(call.headers.authorization).toBe("Bearer synthetic-token-xyz");
+    expect(call.headers["content-type"]).toBe("application/json");
+    expect(call.body).toBe(syntheticBody);
+
+    // Host and Origin must be rewritten to upstream target
+    expect(call.headers.origin).toBe(upstreamOrigin);
+    expect(call.headers.host).toBe(new URL(upstreamOrigin).host);
   });
 
   it("dev server rejects preview Origin (Host dev + Origin preview)", async () => {
@@ -445,7 +552,7 @@ describe("Vite server integration with localProxy plugin", () => {
     }
   });
 
-  it("forwards requests through real Vite dev server and enforces origin guard", async () => {
+  it("forwards requests through real Vite dev server, strips Cookie and Sec-Fetch-*, preserves Authorization/body, sets Host/Origin, and blocks foreign origin", async () => {
     let viteServer: any;
     try {
       viteServer = await createViteDevServer({
@@ -461,23 +568,46 @@ describe("Vite server integration with localProxy plugin", () => {
       await viteServer.listen();
       const vitePort = viteServer.httpServer.address().port;
       const viteOrigin = `http://127.0.0.1:${vitePort}`;
+      const validBody = JSON.stringify({ email: "real-vite@test.invalid", role: "admin" });
 
-      // 1. Valid request to Vite dev server
+      // 1. Valid request to Vite dev server with browser metadata
       const validRes = await fetch(`${viteOrigin}/api/v1/auth/login`, {
         method: "POST",
         headers: {
           host: `127.0.0.1:${vitePort}`,
           origin: viteOrigin,
+          cookie: "session=sensitive-cookie-val; csrf=token-val",
+          "sec-fetch-site": "same-origin",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-user": "?1",
+          "sec-fetch": "1",
           "content-type": "application/json",
           authorization: "Bearer test-bearer-token",
         },
-        body: JSON.stringify({ email: "real-vite@test.invalid" }),
+        body: validBody,
       });
 
       expect(validRes.status).toBe(200);
       expect(upstreamCalls).toHaveLength(1);
-      expect(upstreamCalls[0]!.headers.origin).toBe(upstreamOrigin);
-      expect(upstreamCalls[0]!.headers.authorization).toBe("Bearer test-bearer-token");
+      const call = upstreamCalls[0]!;
+
+      // Verify browser metadata was stripped by Vite proxyReq configure
+      expect(call.headers.cookie).toBeUndefined();
+      expect(call.headers["sec-fetch-site"]).toBeUndefined();
+      expect(call.headers["sec-fetch-mode"]).toBeUndefined();
+      expect(call.headers["sec-fetch-dest"]).toBeUndefined();
+      expect(call.headers["sec-fetch-user"]).toBeUndefined();
+      expect(call.headers["sec-fetch"]).toBeUndefined();
+
+      // Verify authorization and body preserved
+      expect(call.headers.authorization).toBe("Bearer test-bearer-token");
+      expect(call.headers["content-type"]).toBe("application/json");
+      expect(call.body).toBe(validBody);
+
+      // Verify upstream Host and Origin rewritten to target
+      expect(call.headers.origin).toBe(upstreamOrigin);
+      expect(call.headers.host).toBe(new URL(upstreamOrigin).host);
 
       // 2. Request with foreign Origin to Vite dev server -> 403, upstream NOT called
       const invalidRes = await fetch(`${viteOrigin}/api/v1/auth/login`, {
@@ -486,8 +616,9 @@ describe("Vite server integration with localProxy plugin", () => {
           host: `127.0.0.1:${vitePort}`,
           origin: "https://foreign-attacker.invalid",
           "content-type": "application/json",
+          authorization: "Bearer attacker-token",
         },
-        body: JSON.stringify({ email: "real-vite@test.invalid" }),
+        body: JSON.stringify({ email: "attacker@invalid" }),
       });
 
       expect(invalidRes.status).toBe(403);
