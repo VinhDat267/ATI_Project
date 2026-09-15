@@ -1,6 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { request as httpRequest } from "node:http";
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer, PreviewServer } from "vite";
+
+export interface LocalProxyOptions {
+  target: string;
+  devOrigin?: string | (() => string);
+  previewOrigin?: string | (() => string);
+}
 
 export function validateProxyTarget(target: string): URL {
   const portMatch = target.match(/:(\d+)(?:[/?#]|$)/);
@@ -101,15 +107,9 @@ function sendForbidden(res: ServerResponse): void {
 
 export function createProxyGuard(options: {
   target: string;
-  frontendOrigin: string | string[];
+  frontendOrigin: string | (() => string);
 }): (req: IncomingMessage, res: ServerResponse, next: () => void) => void {
   validateProxyTarget(options.target);
-  const origins = Array.isArray(options.frontendOrigin)
-    ? options.frontendOrigin
-    : [options.frontendOrigin];
-  const allowedUrls = origins.map(validateFrontendOrigin);
-  const allowedHosts = new Set(allowedUrls.map((u) => u.host));
-  const allowedOriginStrings = new Set(allowedUrls.map((u) => u.origin));
 
   return function proxyGuard(
     req: IncomingMessage,
@@ -120,6 +120,15 @@ export function createProxyGuard(options: {
     if (!rawUrl.startsWith("/api/v1")) {
       return next();
     }
+
+    // Resolve expected frontend origin dynamically or statically
+    const originStr =
+      typeof options.frontendOrigin === "function"
+        ? options.frontendOrigin()
+        : options.frontendOrigin;
+    const allowedUrl = validateFrontendOrigin(originStr);
+    const allowedHost = allowedUrl.host;
+    const allowedOrigin = allowedUrl.origin;
 
     // 1. Reject OPTIONS method (no CORS preflight)
     if (req.method === "OPTIONS") {
@@ -137,9 +146,9 @@ export function createProxyGuard(options: {
       return;
     }
 
-    // 3. Verify Host header matches an allowed frontend host
+    // 3. Verify Host header matches the exact frontend host for this server
     const host = req.headers.host;
-    if (!host || !allowedHosts.has(host)) {
+    if (!host || host !== allowedHost) {
       sendForbidden(res);
       return;
     }
@@ -147,7 +156,7 @@ export function createProxyGuard(options: {
     // 4. Verify Origin header if present
     const origin = req.headers.origin;
     if (origin !== undefined) {
-      if (!allowedOriginStrings.has(origin)) {
+      if (origin !== allowedOrigin) {
         sendForbidden(res);
         return;
       }
@@ -159,7 +168,7 @@ export function createProxyGuard(options: {
 
 export function createProxyForwarder(options: {
   target: string;
-  frontendOrigin: string | string[];
+  frontendOrigin: string | (() => string);
 }): (req: IncomingMessage, res: ServerResponse) => void {
   const targetUrl = validateProxyTarget(options.target);
   const guard = createProxyGuard(options);
@@ -205,22 +214,38 @@ export function createProxyForwarder(options: {
   };
 }
 
-export function localProxy(
-  target: string,
-  frontendOrigin: string | string[] = "http://127.0.0.1:5173"
-): Plugin {
-  const targetUrl = validateProxyTarget(target);
-  const origins = Array.isArray(frontendOrigin)
-    ? [...frontendOrigin]
-    : [frontendOrigin];
-  if (!origins.some((o) => o.includes(":4173"))) {
-    origins.push("http://127.0.0.1:4173");
+function resolveServerOrigin(
+  server: ViteDevServer | PreviewServer,
+  explicitOrigin: string | (() => string) | undefined,
+  fallbackPort: number
+): string {
+  if (typeof explicitOrigin === "function") {
+    return explicitOrigin();
   }
+  if (typeof explicitOrigin === "string") {
+    return explicitOrigin;
+  }
+  const address = server.httpServer?.address();
+  if (address && typeof address === "object" && typeof address.port === "number") {
+    return `http://127.0.0.1:${address.port}`;
+  }
+  const configPort =
+    (server as ViteDevServer).config?.server?.port ??
+    (server as PreviewServer).config?.preview?.port ??
+    fallbackPort;
+  return `http://127.0.0.1:${configPort}`;
+}
 
-  const guard = createProxyGuard({
-    target: targetUrl.origin,
-    frontendOrigin: origins,
-  });
+export function localProxy(
+  targetOrOptions: string | LocalProxyOptions,
+  legacyDevOrigin?: string
+): Plugin {
+  const options: LocalProxyOptions =
+    typeof targetOrOptions === "string"
+      ? { target: targetOrOptions, devOrigin: legacyDevOrigin }
+      : targetOrOptions;
+
+  const targetUrl = validateProxyTarget(options.target);
 
   const proxyConfig = {
     "/api/v1": {
@@ -238,10 +263,24 @@ export function localProxy(
   return {
     name: "local-proxy",
     configureServer(server) {
-      server.middlewares.use(guard);
+      const getDevOrigin = () =>
+        resolveServerOrigin(server, options.devOrigin, 5173);
+      server.middlewares.use(
+        createProxyGuard({
+          target: targetUrl.origin,
+          frontendOrigin: getDevOrigin,
+        })
+      );
     },
     configurePreviewServer(server) {
-      server.middlewares.use(guard);
+      const getPreviewOrigin = () =>
+        resolveServerOrigin(server, options.previewOrigin, 4173);
+      server.middlewares.use(
+        createProxyGuard({
+          target: targetUrl.origin,
+          frontendOrigin: getPreviewOrigin,
+        })
+      );
     },
     config() {
       return {

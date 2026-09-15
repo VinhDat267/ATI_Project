@@ -6,7 +6,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine && npm run build -w @wap/api && npm run build -w @wap/web",

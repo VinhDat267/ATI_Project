@@ -19,5 +19,11 @@ export default defineConfig({
     cors: false,
     open: false,
   },
-  plugins: [localProxy(apiTarget, frontendOrigin)],
+  plugins: [
+    localProxy({
+      target: apiTarget,
+      devOrigin: frontendOrigin,
+      previewOrigin: "http://127.0.0.1:4173",
+    }),
+  ],
 });
