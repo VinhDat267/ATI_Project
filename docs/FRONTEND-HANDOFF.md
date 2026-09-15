@@ -2,6 +2,8 @@
 
 Status: `API_PARTIAL` for the local DEV_FIXTURE planner path. Browser E2E and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
 
+Navigation for the next frontend batch: [platform UX](superpowers/specs/2026-09-15-platform-ux-design.md), six views/four navigation items. WEB-00 synchronizes the UI baseline and selects [React + TypeScript + Vite](ADR-001-FRONTEND-STACK.md) for the [WEB-01–03 implementation plan](superpowers/plans/2026-09-15-frontend-platform.md). Workflow editing/reuse remains outside B; no frontend application has been implemented yet.
+
 The API listens on loopback and uses the `/api/v1` prefix. The frontend keeps the bearer token in memory for the current tab and sends it only as `Authorization: Bearer <token>`. Do not store it in localStorage, cookies, URLs, logs, or HTML.
 
 ## Wire examples

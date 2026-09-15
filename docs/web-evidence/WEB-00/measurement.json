@@ -1,0 +1,346 @@
+{
+  "capturedAt": "2026-09-15T03:24:21.341Z",
+  "node": "v24.19.0",
+  "npm": "11.17.0",
+  "probeScriptSha256": "7e6226c8b01eae9a35a7246de93fc9a36dd86a9468923c63d48e46fe3c046f6a",
+  "baselineLockSha256": "bdc5929c95360e268f5265f859fdd60460ec7acc0b0268de8ba506f807954810",
+  "baselineEntries": 258,
+  "baselineUniqueNameVersions": 256,
+  "sourceHashes": {
+    "contracts.ts": "8ae5535f944ac6b28b999f766121f5107499ad5d12675d01c9131aa3bfa56579",
+    "events.ts": "659bc3494feda5def9b9db5f4171fefd18a0e9cb83c405c2e5424f1afafb2251",
+    "schema.ts": "e4f33078f59dde63a90ccd927016a3a39f7c602680d830754ec5d66f32d393db"
+  },
+  "results": {
+    "control": {
+      "entries": 258,
+      "uniqueNameVersions": 256,
+      "deltaEntries": 0,
+      "added": [],
+      "removed": [],
+      "lockSha256": "bdc5929c95360e268f5265f859fdd60460ec7acc0b0268de8ba506f807954810"
+    },
+    "dom": {
+      "entries": 297,
+      "uniqueNameVersions": 295,
+      "deltaEntries": 39,
+      "added": [
+        "@oxc-project/types@0.149.0",
+        "@playwright/test@1.63.0",
+        "@rolldown/binding-android-arm-eabi@1.2.8",
+        "@rolldown/binding-android-arm64@1.2.8",
+        "@rolldown/binding-darwin-arm64@1.2.8",
+        "@rolldown/binding-darwin-x64@1.2.8",
+        "@rolldown/binding-freebsd-x64@1.2.8",
+        "@rolldown/binding-linux-arm-gnueabihf@1.2.8",
+        "@rolldown/binding-linux-arm64-gnu@1.2.8",
+        "@rolldown/binding-linux-arm64-musl@1.2.8",
+        "@rolldown/binding-linux-ppc64-gnu@1.2.8",
+        "@rolldown/binding-linux-s390x-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-musl@1.2.8",
+        "@rolldown/binding-openharmony-arm64@1.2.8",
+        "@rolldown/binding-win32-arm64-msvc@1.2.8",
+        "@rolldown/binding-win32-x64-msvc@1.2.8",
+        "@rolldown/pluginutils@1.0.1",
+        "@wap/web@undefined",
+        "detect-libc@2.1.2",
+        "fdir@6.5.0",
+        "lightningcss-android-arm64@1.33.0",
+        "lightningcss-darwin-arm64@1.33.0",
+        "lightningcss-darwin-x64@1.33.0",
+        "lightningcss-freebsd-x64@1.33.0",
+        "lightningcss-linux-arm-gnueabihf@1.33.0",
+        "lightningcss-linux-arm64-gnu@1.33.0",
+        "lightningcss-linux-arm64-musl@1.33.0",
+        "lightningcss-linux-x64-gnu@1.33.0",
+        "lightningcss-linux-x64-musl@1.33.0",
+        "lightningcss-win32-arm64-msvc@1.33.0",
+        "lightningcss-win32-x64-msvc@1.33.0",
+        "lightningcss@1.33.0",
+        "picomatch@4.0.7",
+        "playwright-core@1.63.0",
+        "playwright@1.63.0",
+        "rolldown@1.2.8",
+        "tinyglobby@0.2.17",
+        "vite@8.3.0"
+      ],
+      "removed": [],
+      "lockSha256": "7cf7e24ddfe51fbf4c3846e48769c410dcdc4ee48adc124201caf9db9d960255",
+      "probeJavaScript": [
+        {
+          "file": "index-Cvi_emwH.js",
+          "bytes": 102547,
+          "gzipBytes": 28809,
+          "sha256": "c661373c0560bdcb0706265f40c67a650cdb3efb11de422fc0d7ab5ded296aa5"
+        }
+      ]
+    },
+    "preact": {
+      "entries": 298,
+      "uniqueNameVersions": 296,
+      "deltaEntries": 40,
+      "added": [
+        "@oxc-project/types@0.149.0",
+        "@playwright/test@1.63.0",
+        "@rolldown/binding-android-arm-eabi@1.2.8",
+        "@rolldown/binding-android-arm64@1.2.8",
+        "@rolldown/binding-darwin-arm64@1.2.8",
+        "@rolldown/binding-darwin-x64@1.2.8",
+        "@rolldown/binding-freebsd-x64@1.2.8",
+        "@rolldown/binding-linux-arm-gnueabihf@1.2.8",
+        "@rolldown/binding-linux-arm64-gnu@1.2.8",
+        "@rolldown/binding-linux-arm64-musl@1.2.8",
+        "@rolldown/binding-linux-ppc64-gnu@1.2.8",
+        "@rolldown/binding-linux-s390x-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-musl@1.2.8",
+        "@rolldown/binding-openharmony-arm64@1.2.8",
+        "@rolldown/binding-win32-arm64-msvc@1.2.8",
+        "@rolldown/binding-win32-x64-msvc@1.2.8",
+        "@rolldown/pluginutils@1.0.1",
+        "@wap/web@undefined",
+        "detect-libc@2.1.2",
+        "fdir@6.5.0",
+        "lightningcss-android-arm64@1.33.0",
+        "lightningcss-darwin-arm64@1.33.0",
+        "lightningcss-darwin-x64@1.33.0",
+        "lightningcss-freebsd-x64@1.33.0",
+        "lightningcss-linux-arm-gnueabihf@1.33.0",
+        "lightningcss-linux-arm64-gnu@1.33.0",
+        "lightningcss-linux-arm64-musl@1.33.0",
+        "lightningcss-linux-x64-gnu@1.33.0",
+        "lightningcss-linux-x64-musl@1.33.0",
+        "lightningcss-win32-arm64-msvc@1.33.0",
+        "lightningcss-win32-x64-msvc@1.33.0",
+        "lightningcss@1.33.0",
+        "picomatch@4.0.7",
+        "playwright-core@1.63.0",
+        "playwright@1.63.0",
+        "preact@10.29.8",
+        "rolldown@1.2.8",
+        "tinyglobby@0.2.17",
+        "vite@8.3.0"
+      ],
+      "removed": [],
+      "lockSha256": "3c608ed10408fd1ade34b7ac231834829c558cc17bddf768fd418fb79986fd70",
+      "probeJavaScript": [
+        {
+          "file": "index-Cl-N2q-o.js",
+          "bytes": 113055,
+          "gzipBytes": 33153,
+          "sha256": "ddc2784794639fb74da599f302e97f7cb6656e99679dfe7014fe663e86764ce2"
+        }
+      ]
+    },
+    "react": {
+      "entries": 303,
+      "uniqueNameVersions": 301,
+      "deltaEntries": 45,
+      "added": [
+        "@oxc-project/types@0.149.0",
+        "@playwright/test@1.63.0",
+        "@rolldown/binding-android-arm-eabi@1.2.8",
+        "@rolldown/binding-android-arm64@1.2.8",
+        "@rolldown/binding-darwin-arm64@1.2.8",
+        "@rolldown/binding-darwin-x64@1.2.8",
+        "@rolldown/binding-freebsd-x64@1.2.8",
+        "@rolldown/binding-linux-arm-gnueabihf@1.2.8",
+        "@rolldown/binding-linux-arm64-gnu@1.2.8",
+        "@rolldown/binding-linux-arm64-musl@1.2.8",
+        "@rolldown/binding-linux-ppc64-gnu@1.2.8",
+        "@rolldown/binding-linux-s390x-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-gnu@1.2.8",
+        "@rolldown/binding-linux-x64-musl@1.2.8",
+        "@rolldown/binding-openharmony-arm64@1.2.8",
+        "@rolldown/binding-win32-arm64-msvc@1.2.8",
+        "@rolldown/binding-win32-x64-msvc@1.2.8",
+        "@rolldown/pluginutils@1.0.1",
+        "@types/react-dom@19.3.0",
+        "@types/react@19.3.0",
+        "@wap/web@undefined",
+        "csstype@3.2.3",
+        "detect-libc@2.1.2",
+        "fdir@6.5.0",
+        "lightningcss-android-arm64@1.33.0",
+        "lightningcss-darwin-arm64@1.33.0",
+        "lightningcss-darwin-x64@1.33.0",
+        "lightningcss-freebsd-x64@1.33.0",
+        "lightningcss-linux-arm-gnueabihf@1.33.0",
+        "lightningcss-linux-arm64-gnu@1.33.0",
+        "lightningcss-linux-arm64-musl@1.33.0",
+        "lightningcss-linux-x64-gnu@1.33.0",
+        "lightningcss-linux-x64-musl@1.33.0",
+        "lightningcss-win32-arm64-msvc@1.33.0",
+        "lightningcss-win32-x64-msvc@1.33.0",
+        "lightningcss@1.33.0",
+        "picomatch@4.0.7",
+        "playwright-core@1.63.0",
+        "playwright@1.63.0",
+        "react-dom@19.3.0",
+        "react@19.3.0",
+        "rolldown@1.2.8",
+        "scheduler@0.28.0",
+        "tinyglobby@0.2.17",
+        "vite@8.3.0"
+      ],
+      "removed": [],
+      "lockSha256": "e5569fff37d46b756e8d2c7fc6292bd18a5a038911c6b389d35d63e53eef15ba",
+      "probeJavaScript": [
+        {
+          "file": "index-B6-W8gcx.js",
+          "bytes": 321437,
+          "gzipBytes": 96099,
+          "sha256": "9bc1e48b9b631f187b40d68a1de8de00c1d8e82052adce9798cb21cb97514a33"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "variant": "control",
+      "cwd": "control",
+      "command": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 1742
+    },
+    {
+      "variant": "dom",
+      "cwd": "dom",
+      "command": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 5169
+    },
+    {
+      "variant": "dom",
+      "cwd": "dom",
+      "command": [
+        "npm",
+        "ci",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 9853
+    },
+    {
+      "variant": "dom",
+      "cwd": "dom/apps/web",
+      "command": [
+        "node",
+        "node_modules/vite/bin/vite.js",
+        "build"
+      ],
+      "exit": 0,
+      "ms": 1219
+    },
+    {
+      "variant": "preact",
+      "cwd": "preact",
+      "command": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 2615
+    },
+    {
+      "variant": "preact",
+      "cwd": "preact",
+      "command": [
+        "npm",
+        "ci",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 7594
+    },
+    {
+      "variant": "preact",
+      "cwd": "preact/apps/web",
+      "command": [
+        "node",
+        "node_modules/vite/bin/vite.js",
+        "build"
+      ],
+      "exit": 0,
+      "ms": 889
+    },
+    {
+      "variant": "react",
+      "cwd": "react",
+      "command": [
+        "npm",
+        "install",
+        "--package-lock-only",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 3042
+    },
+    {
+      "variant": "react",
+      "cwd": "react",
+      "command": [
+        "npm",
+        "ci",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit": 0,
+      "ms": 8089
+    },
+    {
+      "variant": "react",
+      "cwd": "react/apps/web",
+      "command": [
+        "node",
+        "node_modules/vite/bin/vite.js",
+        "build"
+      ],
+      "exit": 0,
+      "ms": 943
+    },
+    {
+      "variant": "workspace-readonly",
+      "cwd": ".",
+      "command": [
+        "npm",
+        "--version"
+      ],
+      "exit": 0,
+      "ms": 178
+    }
+  ],
+  "limitations": [
+    "Minimal renderer plus shared RunDetail parser only; not the completed six-view application.",
+    "No browser behavior, focus, polling, usability or runtime latency measurement.",
+    "Lock entries include optional platform variants; not the installed Windows package count.",
+    "No vulnerability audit or dependency fingerprint approval performed.",
+    "Temporary installations retained for inspection; no recursive deletion."
+  ]
+}

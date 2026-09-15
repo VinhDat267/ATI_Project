@@ -12,7 +12,7 @@ Người dùng giả định là trưởng nhóm dự án môn học. Công vi�
 
 | Thành phần | B/local |
 |---|---|
-| UI | Hai màn hình: nhập yêu cầu + plan/preview/approval; chi tiết run + trace/lịch sử. Poll 2 giây |
+| UI | Sáu view: đăng nhập, tổng quan, tạo yêu cầu, lịch sử lần chạy, chi tiết lần chạy, công cụ & kết nối. Bốn mục điều hướng; poll 2 giây. Plan/preview/approval/trace dùng lại các panel đã thiết kế |
 | AI | Semantic retrieval, query expansion có đối chứng, một planner, tối đa 3 lần planning tính cả lần đầu, local replan tối đa 2 |
 | DSL | DAG tĩnh 1–30 steps; demo tối đa 5. Literal, reference, condition hẹp; không loop/map/min/sort/arithmetic/LLM transform |
 | Engine | Một worker, thực thi tuần tự theo thứ tự topo; retry giới hạn và side-effect gate. Không tự resume run sau crash |
@@ -23,6 +23,8 @@ Người dùng giả định là trưởng nhóm dự án môn học. Công vi�
 | Replan | Chỉ bước chưa hoàn tất, kết quả lần gọi chắc chắn không gây side-effect; validation lại và approval mới trước write |
 
 **Ngoài phạm vi:** hybrid/BM25, WebSocket, resume tự động, parallel execution, partial/full replan, GitHub, tích hợp SaaS thật, lịch chạy định kỳ, sửa plan bằng UI, workflow editor, benchmark 50/100 tool tổng hợp và 10 run đồng thời.
+
+**Điều chỉnh UI 15/09/2026:** sau khi người dùng đồng ý bước UX và giao WEB-00, dùng [sitemap sáu view](superpowers/specs/2026-09-15-platform-ux-design.md) để lập kế hoạch. Đây là tổ chức lại điều hướng, không thêm workflow CRUD/reuse/editor vào B. [ADR frontend](ADR-001-FRONTEND-STACK.md) chọn React + TypeScript + Vite cho kế hoạch; frontend chưa triển khai. API wire-format và dataset nghiệp vụ giữ nguyên; fixture UI tổng hợp thuộc WEB-01. Quỹ giờ được ước lượng lại trong [lịch](KE-HOACH-6-TUAN.md).
 
 Giữ PostgreSQL full-text index từ migration gốc không có nghĩa đã làm BM25. BullMQ Flows hỗ trợ parent/child dependencies; phần tự xây ở đây là DSL, validation, approval và trace.
 

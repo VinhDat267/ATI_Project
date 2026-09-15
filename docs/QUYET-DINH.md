@@ -11,7 +11,8 @@ Nguồn scope: [BASELINE](BASELINE.md). Thay thế các quyết định A/B chư
 | QĐ-05 | Một preview bất biến; không write-output dataflow giữa steps | Tránh preview không resolve được; staged approval là ngoài scope |
 | QĐ-06 | Unknown write → reconciliation; bỏ resume tự động | Không suy ra exactly-once từ bảng key; xem EXECUTION-CONTRACT |
 | QĐ-07 | PlannerResult = plan/refusal/clarification | Version chỉ lưu plan thực thi hợp lệ |
-| QĐ-08 | Hai màn hình, một worker tuần tự; không WS/hybrid/GitHub | Đồng bộ với FR và lịch |
+| QĐ-08 | Sáu view/bốn mục điều hướng, một worker tuần tự; không WS/hybrid/GitHub | UI cập nhật 15/09 theo UX platform; không mở scope editor/reuse |
+| QĐ-09 | React + TypeScript + Vite, CSS thuần; hash routes, runtime Zod validation | [ADR-001](ADR-001-FRONTEND-STACK.md), DECIDED_FOR_PLAN ở WEB-00; chưa cài hoặc triển khai frontend |
 
 Quỹ giờ là giả định khả dụng do kế hoạch trước ghi: khoảng 14h/người/tuần, 2 người. Không dùng các ước lượng 230h/145h cũ làm số đo. Lịch mới phân bổ 112h công việc + 23h dự phòng trong trần xây dựng 135h; cần hiệu chỉnh sau tuần 1. 6×2×14 = 168h, trong đó 28h tuần 6 và 5h đệm chung ngoài trần xây dựng. Không coi trần này là bằng chứng hoàn thành chắc chắn.
 

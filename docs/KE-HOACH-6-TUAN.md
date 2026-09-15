@@ -10,12 +10,14 @@ Giả định 14h/người/tuần, tổng 168h. Trần xây dựng 135h gồm **
 |---|---|---|---|---|
 | 1 | A: DB contract + một plan tay; B: task_hub 8 tool/output fixture, rubric và mẫu việc thật; cả hai: filesystem pin/adapter | 10/10 | 3 | G1: local discovery/call, plan tay đọc→preview→duyệt→write có receipt; nguồn rubric và gaps ghi rõ |
 | 2 | A: operation/approval/outbox/orphan; B: fixtures, fault injection và owner tests | 14/10 | 4 | G2: chặn forged read, double claim, đổi payload, timeout unknown; không blind retry |
-| 3 | A: HTTP lifecycle/polling; B: hai màn hình và trace | 10/14 | 4 | G3: nhập→preview→decision→trace chạy thật, reconnect/expiry/cancel |
+| 3 | A: HTTP lifecycle/polling; B: workspace sáu view và trace theo WEB-01–03 | 10/14 (ước lượng cũ, xem cập nhật dưới) | 4 | G3: nhập→preview→decision→trace chạy thật, reconnect/expiry/cancel |
 | 4 | A: semantic/QE + planner/repair; B: tích hợp UI, local replan + dev evaluation | 12/12 | 4 | G4: provider schema probe, refusal/clarification, đổi plan duyệt lại; cost/latency của mọi call |
 | 5 | A: integration fixes; B: freeze manifests/holdout, chạy thí nghiệm và thống kê; cả hai: cross-review | 10/10 | 8 | G5: npm checks + local E2E/fault suite; kết quả đúng nghiệp vụ, catalog/data/model/prompt hashes |
 | 6 | Hai người: phân tích kết quả, báo cáo, demo rehearsal và dự phòng demo offline | 14/14 | 0 | G6: bảng evidence rõ measured/NOT_RUN; demo từng người tự giải thích |
 
 Các sửa thư viện trong FIX-REPORT đã có thể tái sử dụng, nhưng không bỏ G1/G2 chỉ vì unit tests qua. Hoạt động tuần 1 nằm trong quỹ chứ không tính là đã hoàn tất ứng dụng.
+
+**Ước lượng lại frontend 15/09 — PROPOSED, chưa đo giờ thực:** [WEB-01](superpowers/plans/2026-09-15-frontend-platform.md) 8–12h; WEB-02 12–18h; WEB-03 8–12h, tổng 28–42h gồm review/kiểm browser. Phạm vi đã tính cả phần tích hợp UI ở tuần 4/5, không cộng máy móc lên 14h tuần 3; chưa gồm API-CATALOG, API gate còn thiếu hoặc AI. Quỹ 135h cũ chưa được cân đối lại và không chứng minh kế hoạch mới vừa sáu tuần. Sau WEB-01 dùng giờ thực và việc còn lại để cập nhật lịch; ưu tiên approval/session/reconnect, giảm trang trí/dashboard trước. API hiện API_PARTIAL theo báo cáo 15/09; đoạn tiến độ 14/09 dưới đây là ảnh chụp lịch sử.
 
 **Ảnh chụp tiến độ 13/09 (lịch sử):** Đợt 1 đã hoàn thành toàn bộ 8 tool local của server `task_hub` và migration `0004_task_hub_cards.sql`; [trạng thái task_hub](TASK-HUB-STATUS-2026-09-13.md) ghi nhận 142/142 tests pass trên DB và MCP thật. [Controller/engine CLI](ENGINE-STATUS-2026-09-13.md) chạy plan tay qua một preview/approval, write, trace, cancel, fault injection (crash 86, lost response, concurrency) và recovery không resume. Tại mốc đó, G1 tổng thể là PARTIAL vì filesystem và rubric chưa hoàn tất.
 

@@ -91,7 +91,7 @@ Phân loại: 78 FR = 59 M + 1 S + 18 OUT. Đã bỏ các tổng 45/44 sai. Các
 - Planning: dev/holdout theo EVALUATION; không chỉ kiểm tools có mặt. Query expansion là thí nghiệm có đối chứng.
 - Validation: phản ví dụ schema/policy/reference; input reference deferred được kiểm sau resolve; output isError hoặc sai schema không được tính success.
 - Approval/engine: exact preview, đổi version/hash, duplicate approval, payload conflict, lost response/crash, cooperative cancel và local replan phải có trace quan sát được.
-- UI: hai màn hình, poll/reconnect theo seq, fetch preview, hiển thị refused/needs_input/reconciliation_required.
+- UI: sáu view (đăng nhập, tổng quan, tạo yêu cầu, lịch sử lần chạy, chi tiết lần chạy, công cụ & kết nối), bốn mục điều hướng; poll/reconnect theo seq, fetch preview, hiển thị refused/needs_input/reconciliation_required. [UX platform](superpowers/specs/2026-09-15-platform-ux-design.md) tổ chức lại các FR hiện có; không thêm workflow editor/reuse hoặc CRUD ngoài B. Tool catalog live vẫn cần DTO/API bổ sung trước khi nghiệm thu FR-CON-04.
 
 ## Phi chức năng — mục tiêu, chưa có số đo
 
