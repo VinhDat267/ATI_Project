@@ -16,6 +16,8 @@ import { createExpiryMaintenance } from "../src/maintenance.js";
 import { WorkflowEngine, openLocalGateway, type Gateway } from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const adminUrl =
   process.env.API_TEST_ADMIN_URL ??
@@ -29,6 +31,8 @@ export interface ApiFixture {
   email: string;
   password: string;
   b02Prompt: string;
+  fsCopyPrompt: string;
+  allowedRoot?: string;
   login(): Promise<string>;
   call(path: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
@@ -72,8 +76,47 @@ export async function makeApiFixture(
     config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined;
   let gateway: Gateway | undefined;
   let worker: WorkerControl | undefined;
+  let filesystemBase: string | undefined;
+  let allowedRoot: string | undefined;
   if (options.workerEnabled) {
-    gateway = await openLocalGateway({ root, databaseUrl, userId });
+    if (options.filesystemEnabled) {
+      filesystemBase = mkdtempSync(path.join(tmpdir(), "ati-api-fs-"));
+      allowedRoot = path.join(filesystemBase, userId);
+      mkdirSync(path.join(allowedRoot, "reports"), { recursive: true });
+      writeFileSync(
+        path.join(allowedRoot, ".ati-root.json"),
+        JSON.stringify({
+          format: "ati-filesystem-root-1",
+          root_id: randomUUID(),
+          user_id: userId,
+        }),
+        { flag: "wx" },
+      );
+      writeFileSync(
+        path.join(allowedRoot, "notes.txt"),
+        "Tiến độ ATI\nAPI: Done\n",
+        { flag: "wx" },
+      );
+    }
+    gateway = await openLocalGateway({
+      root,
+      databaseUrl,
+      userId,
+      ...(allowedRoot
+        ? {
+            filesystem: {
+              presetId: "filesystem-local-v1",
+              allowedRoot,
+              policyFile: path.join(root, "config", "filesystem-reviewed.json"),
+              artifactFile: path.join(
+                root,
+                "config",
+                "filesystem-reviewed.json",
+              ),
+            },
+          }
+        : {}),
+    });
   }
   const engine = new WorkflowEngine(db, gateway, userId);
   if (options.workerEnabled && planner)
@@ -91,7 +134,11 @@ export async function makeApiFixture(
     userId,
     email,
     password,
+    allowedRoot,
     b02Prompt: planner?.b02Prompt ?? "",
+    fsCopyPrompt:
+      planner?.entries.find((entry) => entry.id === "fs-copy-notify")?.prompt ??
+      "",
     async login() {
       const response = await fetch(`${baseUrl}/auth/login`, {
         method: "POST",
@@ -116,6 +163,8 @@ export async function makeApiFixture(
       await db.close();
       await admin.unsafe(`DROP DATABASE "${dbName}" WITH (FORCE)`);
       await admin.end();
+      if (filesystemBase)
+        rmSync(filesystemBase, { recursive: true, force: true });
     },
   };
 }

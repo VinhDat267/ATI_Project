@@ -1,5 +1,9 @@
 import { openDatabase } from "@wap/db";
-import { WorkflowEngine, openLocalGateway } from "@wap/engine";
+import {
+  WorkflowEngine,
+  loadFilesystemLaunch,
+  openLocalGateway,
+} from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createApi } from "./app.js";
@@ -14,9 +18,18 @@ if (!databaseUrl)
   throw new Error("Missing required configuration G1_DATABASE_URL");
 const db = openDatabase(databaseUrl);
 const root = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+const filesystem =
+  config.plannerMode === "dev_fixture"
+    ? await loadFilesystemLaunch(root, config.userId)
+    : undefined;
 const gateway =
   config.plannerMode === "dev_fixture"
-    ? await openLocalGateway({ root, databaseUrl, userId: config.userId })
+    ? await openLocalGateway({
+        root,
+        databaseUrl,
+        userId: config.userId,
+        ...(filesystem ? { filesystem } : {}),
+      })
     : undefined;
 const engine = new WorkflowEngine(db, gateway, config.userId);
 const planner =
