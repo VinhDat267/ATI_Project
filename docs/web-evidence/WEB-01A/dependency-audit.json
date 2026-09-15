@@ -2,9 +2,19 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "checkpoint": "WEB-01A",
   "verdict": "DEPENDENCY_AUDIT_PARTIAL",
-  "recordedAt": "2026-09-15T11:55:00+07:00",
+  "recordedAt": "2026-09-15T12:08:21+07:00",
+  "auditCommand": "npm audit --omit=optional --json",
+  "auditExitCode": 1,
   "baselineCommit": "1df8543",
-  "summary": "Audit completed with 5 findings originating from root devDependencies at baseline commit 1df8543. No new runtime dependencies from WEB-01A introduce any vulnerabilities. npm audit fix was not run per repository policy.",
+  "summary": "Audit completed with 5 vulnerable package nodes represented by 6 unique advisory records, originating from root devDependencies at baseline commit 1df8543. No new runtime dependencies from WEB-01A introduce any vulnerabilities. npm audit fix was not run per repository policy.",
+  "aggregation": {
+    "vulnerablePackageNodes": 5,
+    "uniqueAdvisoryRecords": 6,
+    "transitiveOnlyPackages": [
+      "vite-node"
+    ],
+    "note": "npm audit metadata counts vulnerable package nodes; findings lists unique GHSA advisory records. vite-node inherits the Vite advisory transitively and has no separate GHSA record."
+  },
   "findings": [
     {
       "id": "GHSA-5xrq-8626-4rwp",
