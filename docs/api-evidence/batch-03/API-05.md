@@ -30,5 +30,6 @@ The focused acceptance command also passed 2 tests:
 
 ## NOT_RUN / OPEN
 
+- The complete negative matrix from the implementation plan is not yet closed: HTTP refusal/rejection/clarification combinations, wrong-owner checks across every route, token-expiry renewal, MCP-dead trace reads, and API restart/history/session checks need dedicated acceptance cases. Existing API-01–04 tests cover individual validation, ownership, approval race, cancellation and expiry guards.
 - Browser E2E, reconnect behavior in the real frontend, visual/readability checks, and AI planner quality evaluation remain `NOT_RUN`.
 - Official G3 rubric and representative group work remain `OPEN`; `DEV_FIXTURE_PLANNER` proves lifecycle wiring and safety gates, not planner quality.

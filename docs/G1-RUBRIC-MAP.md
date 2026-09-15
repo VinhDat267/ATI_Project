@@ -16,10 +16,11 @@ FS bên dưới là checklist kỹ thuật của repository, không thay thế r
 | FS-05 two-server controller/fault gate | INSPECTED_REPO | E01–E14 chạy qua controller/CLI thật; filesystem marker và task_hub receipt được ghi nhận riêng. | Technical gate của G1 B/local. | [FS-05 report](task-hub-evidence/batch-02/FS-05/FS-05.md) | TECHNICAL_PASS | Giữ giới hạn fixture local; không dùng kết quả này làm bằng chứng HTTP/UI/polling hoặc AI. |
 | FS-06 clean gate, snapshot and manifest | INSPECTED_REPO | Fresh gate 258 passed/1 skipped; snapshot hai server có 10 public tools và cleanup DB/root; manifest dẫn xuất verdict có điều kiện. | Tổng hợp bằng chứng kỹ thuật hiện hành. | [FS-06 manifest](task-hub-evidence/batch-02/FS-06/1789386912283-manifest/manifest.json), [filesystem status and manual guide](G1-FILESYSTEM-STATUS-2026-09-13.md) | TECHNICAL_PASS_OVERALL_PARTIAL | Giữ overall `PARTIAL` cho tới khi rubric và representative work được xác nhận. |
 | Representative group work | OPEN | Chưa có input thật, expected output, quy trình làm tay hiện tại hoặc xác nhận của nhóm; mô tả trong baseline chỉ là giả thuyết. | Cần để chứng minh G1 phù hợp công việc đại diện. | [Baseline hypothesis](BASELINE.md) | OPEN | Thu một ví dụ do nhóm xác nhận; không tự tạo phỏng vấn, thời gian tiết kiệm hoặc kết quả người dùng. |
-| HTTP/session/UI and 2-second polling | USER_PROVIDED | Hai màn hình, session/owner flow và polling 2 giây thuộc phạm vi B/local kế hoạch. | Có thể là tiêu chí G1 hoặc batch sau, tùy rubric chính thức. | [Baseline B/local](BASELINE.md), [six-week plan](KE-HOACH-6-TUAN.md) | NOT_RUN | Triển khai và kiểm HTTP/browser/polling ở batch kế tiếp; hiện không có runtime evidence. |
+| HTTP/session/UI and 2-second polling | USER_PROVIDED | Hai màn hình, session/owner flow và polling 2 giây thuộc phạm vi B/local kế hoạch. | Có thể là tiêu chí G1 hoặc batch sau, tùy rubric chính thức. | [API-05 status](API-STATUS-2026-09-15.md), [frontend handoff](FRONTEND-HANDOFF.md), [six-week plan](KE-HOACH-6-TUAN.md) | API_TECHNICAL_PASS_BROWSER_NOT_RUN | Loopback HTTP/session/lifecycle đã có evidence với planner fixture; triển khai frontend và browser polling ở WEB-01/WEB-03. |
 | AI retrieval/planning/replan evaluation | USER_PROVIDED | Semantic retrieval, query expansion, planner và local replan thuộc phạm vi B/local; thí nghiệm AI chưa chạy. | Có thể là tiêu chí G1 hoặc các gate sau, tùy rubric chính thức. | [Evaluation design](EVALUATION.md), [dataset notes](../testdata/TESTDATA.md) | NOT_RUN | Freeze model/prompt/provider manifests rồi chạy dev/holdout theo thiết kế; không suy điểm từ hand-plan tests. |
 
 Verdict hiện hành là `TECHNICAL_PASS_OVERALL_PARTIAL`, overall `PARTIAL`.
-Rubric chính thức và representative group work là `OPEN`; HTTP/session/UI,
-polling và AI evaluation là `NOT_RUN`. Chỉ được đổi verdict sau khi bổ sung
-nguồn và bằng chứng tương ứng.
+Rubric chính thức và representative group work là `OPEN`; browser UI, frontend
+polling và AI evaluation là `NOT_RUN`, trong khi API loopback có
+`API_TECHNICAL_PASS`. Chỉ được đổi verdict sau khi bổ sung nguồn và bằng chứng
+tương ứng.

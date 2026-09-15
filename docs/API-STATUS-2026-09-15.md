@@ -1,6 +1,6 @@
 # API status — 2026-09-15
 
-`API_TECHNICAL_PASS` for the B/local loopback lifecycle through API-05.
+`API_TECHNICAL_PASS` for the B/local loopback lifecycle through API-05. The positive two-receiver lifecycle and implemented approval/cancel/expiry guards are verified; the complete negative HTTP matrix remains `NOT_RUN`.
 
 Confirmed on PostgreSQL 16 with real Node HTTP sockets and local MCP connections:
 
