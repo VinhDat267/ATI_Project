@@ -7,6 +7,8 @@ generated/
 *.tsbuildinfo
 .cache/
 .turbo/
+apps/web/test-results/
+apps/web/playwright-report/
 
 # Local environment and credentials; only blank/synthetic templates are shared
 .env

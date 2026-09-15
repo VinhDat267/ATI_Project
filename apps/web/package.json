@@ -1,0 +1,28 @@
+{
+  "name": "@wap/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:browser": "playwright test --project=fixture",
+    "test:live": "playwright test --project=live --workers=1"
+  },
+  "dependencies": {
+    "@wap/dsl": "0.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vitest": "2.1.9"
+  }
+}
