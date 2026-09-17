@@ -10,7 +10,7 @@ export interface ApiConfig {
   passwordHash: string;
   sessionTtlMs: number;
   cursorKey: Buffer;
-  plannerMode: "disabled" | "dev_fixture";
+  plannerMode: "disabled" | "dev_fixture" | "ai";
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -58,9 +58,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const email = required(env, "API_DEMO_EMAIL");
   const passwordHash = required(env, "API_DEMO_PASSWORD_HASH");
   parsePasswordHash(passwordHash);
-  const plannerMode = env.API_PLANNER_MODE ?? "disabled";
-  if (plannerMode !== "disabled" && plannerMode !== "dev_fixture")
+  const rawPlannerMode =
+    env.WAP_PLANNER_MODE ?? env.API_PLANNER_MODE ?? "disabled";
+  if (
+    rawPlannerMode !== "disabled" &&
+    rawPlannerMode !== "dev_fixture" &&
+    rawPlannerMode !== "ai"
+  )
     throw new Error("Invalid configuration API_PLANNER_MODE");
+  const plannerMode = rawPlannerMode;
   return {
     host: "127.0.0.1",
     port: integer(env, "API_PORT", 3001),

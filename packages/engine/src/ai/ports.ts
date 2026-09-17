@@ -41,3 +41,25 @@ export interface StructuredModelClient {
     readonly signal?: AbortSignal;
   }): Promise<StructuredModelResponse>;
 }
+
+export interface QueryExpansionUsage {
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
+  readonly totalTokens?: number;
+}
+
+export interface QueryExpansionResult {
+  readonly queries: readonly string[];
+  readonly provider: string;
+  readonly model: string;
+  readonly usage?: QueryExpansionUsage | null;
+  readonly requestId?: string | null;
+  readonly latencyMs?: number;
+}
+
+export interface QueryExpansionPort {
+  expand(input: {
+    readonly query: string;
+    readonly signal?: AbortSignal;
+  }): Promise<QueryExpansionResult>;
+}

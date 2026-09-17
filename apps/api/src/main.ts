@@ -10,6 +10,7 @@ import path from "node:path";
 import { createApi } from "./app.js";
 import { loadConfig } from "./config.js";
 import { loadDevPlanner } from "./dev-planner.js";
+import { loadAiPlanner } from "./ai-planner.js";
 import { createPrepareWorker } from "./worker.js";
 import { createExpiryMaintenance } from "./maintenance.js";
 import { createGatewayManager } from "./gateway-manager.js";
@@ -61,7 +62,11 @@ const engine = new WorkflowEngine(db, gateway, config.userId, {
   ].filter(Boolean),
 });
 const planner =
-  config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined;
+  config.plannerMode === "dev_fixture"
+    ? loadDevPlanner(root)
+    : config.plannerMode === "ai"
+      ? loadAiPlanner({ root })
+      : undefined;
 const worker = createPrepareWorker({
   db,
   userId: config.userId,

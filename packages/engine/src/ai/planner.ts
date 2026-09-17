@@ -17,7 +17,7 @@ import type {
 } from "./ports.js";
 import type { RetrievalVariant, ToolRetriever } from "./retrieval.js";
 
-export type OfflineRetrievalVariant = Exclude<RetrievalVariant, "semantic_qe">;
+export type OfflineRetrievalVariant = RetrievalVariant;
 
 export type PlanValidator = (plan: LlmPlanDraft) => ValidationIssue[];
 
@@ -39,7 +39,7 @@ export class AiPlannerError extends Error {
 export interface AiPlannerAdapterOptions {
   readonly retriever: ToolRetriever;
   readonly model: StructuredModelClient;
-  readonly variant?: OfflineRetrievalVariant;
+  readonly variant?: RetrievalVariant;
   readonly topK?: number;
   readonly maxPlanningCalls?: number;
   readonly validatePlan: PlanValidator;

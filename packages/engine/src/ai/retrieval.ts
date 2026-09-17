@@ -5,7 +5,13 @@ import {
   type ReviewedCatalogSnapshot,
   type ReviewedCatalogTool,
 } from "./catalog.js";
-import type { EmbeddingPort, EmbeddingResult } from "./ports.js";
+import type {
+  EmbeddingPort,
+  EmbeddingResult,
+  QueryExpansionPort,
+  QueryExpansionResult,
+  QueryExpansionUsage,
+} from "./ports.js";
 
 export interface EmbeddingProvenance {
   readonly provider: string;
@@ -47,6 +53,8 @@ export interface RetrievalResult {
   readonly topK: number;
   readonly queryHash: string;
   readonly latencyMs: number;
+  readonly expandedQueries?: readonly string[];
+  readonly expansionUsage?: QueryExpansionUsage | null;
 }
 export interface ToolRetriever {
   retrieve(input: RetrievalRequest): Promise<RetrievalResult>;
@@ -249,15 +257,18 @@ export class InMemoryToolRetriever implements ToolRetriever {
   private readonly catalog: ReviewedCatalogSnapshot;
   private readonly rows: readonly ToolEmbeddingRow[];
   private readonly embeddingPort: EmbeddingPort;
+  private readonly queryExpansionPort?: QueryExpansionPort;
 
   constructor(input: {
     catalog: ReviewedCatalogSnapshot;
     rows: readonly ToolEmbeddingRow[];
     embeddingPort: EmbeddingPort;
+    queryExpansionPort?: QueryExpansionPort;
   }) {
     this.catalog = input.catalog;
     this.rows = input.rows;
     this.embeddingPort = input.embeddingPort;
+    this.queryExpansionPort = input.queryExpansionPort;
   }
 
   async retrieve(request: RetrievalRequest): Promise<RetrievalResult> {
@@ -277,9 +288,115 @@ export class InMemoryToolRetriever implements ToolRetriever {
         latencyMs: Date.now() - started,
       };
     }
+
+    if (request.variant === "semantic_qe") {
+      if (!this.queryExpansionPort) {
+        throw new RetrievalValidationError(
+          "QueryExpansionPort is required for semantic_qe variant",
+          "MISSING_QUERY_EXPANSION_PORT",
+        );
+      }
+      const index = validateIndexRows(this.catalog, this.rows);
+      throwIfAborted(request.signal);
+
+      let expansion: QueryExpansionResult;
+      try {
+        expansion = await this.queryExpansionPort.expand({
+          query: request.query,
+          signal: request.signal,
+        });
+      } catch (error) {
+        if (request.signal?.aborted) throw cancelled();
+        throw error;
+      }
+      throwIfAborted(request.signal);
+
+      if (!expansion || !Array.isArray(expansion.queries)) {
+        throw new RetrievalValidationError(
+          "query expansion result must contain a queries array",
+        );
+      }
+
+      // Max 6 intents from expansion per spec, trimmed and non-empty
+      const candidateIntents = expansion.queries
+        .filter(
+          (q): q is string => typeof q === "string" && q.trim().length > 0,
+        )
+        .map((q) => q.trim())
+        .slice(0, 6);
+
+      const queriesToEmbed = [
+        request.query,
+        ...candidateIntents.filter((q) => q !== request.query),
+      ];
+
+      const embeddings: EmbeddingResult[] = [];
+      for (const queryText of queriesToEmbed) {
+        throwIfAborted(request.signal);
+        let queryEmbedding: EmbeddingResult;
+        try {
+          queryEmbedding = await this.embeddingPort.embed({
+            text: queryText,
+            signal: request.signal,
+          });
+        } catch (error) {
+          if (request.signal?.aborted) throw cancelled();
+          throw error;
+        }
+        throwIfAborted(request.signal);
+        validateQueryEmbedding(queryEmbedding, index.provenance);
+        embeddings.push(queryEmbedding);
+      }
+
+      const byIdentity = new Map(
+        this.catalog.tools.map((tool) => [qualifiedToolIdentity(tool), tool]),
+      );
+
+      const scored = index.rows
+        .map((row) => {
+          const tool = byIdentity.get(row.identity)!;
+          let maxScore = -Infinity;
+          for (const emb of embeddings) {
+            const score = cosine(emb.embedding, row.vector);
+            if (score > maxScore) {
+              maxScore = score;
+            }
+          }
+          return { tool, score: maxScore };
+        })
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            compareIdentity(
+              qualifiedToolIdentity(left.tool),
+              qualifiedToolIdentity(right.tool),
+            ),
+        );
+
+      if (scored.some(({ score }) => !Number.isFinite(score)))
+        throw new RetrievalValidationError("cosine score is non-finite");
+
+      const selected = scored.slice(
+        0,
+        Math.min(request.topK, this.catalog.tools.length),
+      );
+      throwIfAborted(request.signal);
+
+      return {
+        tools: selected.map(({ tool }) => tool),
+        scores: selected,
+        variant: request.variant,
+        topK: request.topK,
+        queryHash: hash(request.query),
+        latencyMs: Date.now() - started,
+        expandedQueries: candidateIntents,
+        expansionUsage: expansion.usage,
+      };
+    }
+
     if (request.variant !== "semantic")
       throw new RetrievalValidationError(
-        `retrieval variant is unsupported in the offline slice: ${String(request.variant)}`,
+        `retrieval variant is unsupported: ${String(request.variant)}`,
         "UNSUPPORTED_VARIANT",
       );
 

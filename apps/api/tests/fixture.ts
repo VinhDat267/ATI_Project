@@ -11,6 +11,7 @@ import { createApi, type ApiRuntime } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import type { ApiConfig } from "../src/config.js";
 import { loadDevPlanner, type DevPlanner } from "../src/dev-planner.js";
+import { loadAiPlanner } from "../src/ai-planner.js";
 import { createPrepareWorker, type WorkerControl } from "../src/worker.js";
 import { createExpiryMaintenance } from "../src/maintenance.js";
 import {
@@ -50,7 +51,7 @@ export interface ApiFixture {
 export async function makeApiFixture(
   options: {
     workerEnabled?: boolean;
-    plannerMode?: "disabled" | "dev_fixture";
+    plannerMode?: "disabled" | "dev_fixture" | "ai";
     filesystemEnabled?: boolean;
     planner?: PlannerPort;
   } = {},
@@ -84,7 +85,11 @@ export async function makeApiFixture(
   );
   const planner =
     options.planner ??
-    (config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined);
+    (config.plannerMode === "dev_fixture"
+      ? loadDevPlanner(root)
+      : config.plannerMode === "ai"
+        ? loadAiPlanner({ root })
+        : undefined);
   const devPlanner = planner as Partial<DevPlanner> | undefined;
   let gateway: Gateway | undefined;
   let worker: WorkerControl | undefined;

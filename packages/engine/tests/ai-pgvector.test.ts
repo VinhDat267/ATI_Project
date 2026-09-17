@@ -95,4 +95,17 @@ describe("pgvector catalog activation", () => {
       ),
     ).toThrow(/finite/i);
   });
+
+  it("rejects semantic_qe when queryExpansionPort is missing", async () => {
+    const catalog = createReviewedCatalogSnapshot([makeTool()]);
+    const { PgvectorToolRetriever } = await import("../src/ai/pgvector-index.js");
+    const retriever = new PgvectorToolRetriever({
+      catalog,
+      index: {} as any,
+      embeddingPort: {} as any,
+    });
+    await expect(
+      retriever.retrieve({ query: "test", variant: "semantic_qe", topK: 1 }),
+    ).rejects.toThrow(/QueryExpansionPort is required/i);
+  });
 });

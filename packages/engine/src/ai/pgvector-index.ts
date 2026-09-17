@@ -7,7 +7,12 @@ import {
   type ReviewedCatalogSnapshot,
   type ReviewedCatalogTool,
 } from "./catalog.js";
-import type { EmbeddingPort, EmbeddingResult } from "./ports.js";
+import type {
+  EmbeddingPort,
+  EmbeddingResult,
+  QueryExpansionPort,
+  QueryExpansionResult,
+} from "./ports.js";
 import {
   RetrievalValidationError,
   type EmbeddingProvenance,
@@ -368,6 +373,7 @@ export class PgvectorToolRetriever implements ToolRetriever {
       catalog: ReviewedCatalogSnapshot;
       index: PgvectorCatalogIndex;
       embeddingPort: EmbeddingPort;
+      queryExpansionPort?: QueryExpansionPort;
     },
   ) {}
 
@@ -386,6 +392,115 @@ export class PgvectorToolRetriever implements ToolRetriever {
         queryHash: hash(request.query),
         latencyMs: Date.now() - started,
       };
+
+    if (request.variant === "semantic_qe") {
+      if (!this.input.queryExpansionPort) {
+        throw validation(
+          "QueryExpansionPort is required for semantic_qe variant",
+          "MISSING_QUERY_EXPANSION_PORT",
+        );
+      }
+      const active = await this.input.index.activeIndex(this.input.catalog);
+      throwIfAborted(request.signal);
+
+      let expansion: QueryExpansionResult;
+      try {
+        expansion = await this.input.queryExpansionPort.expand({
+          query: request.query,
+          signal: request.signal,
+        });
+      } catch (error) {
+        if (request.signal?.aborted)
+          throw validation("retrieval cancelled", "CANCELLED");
+        throw error;
+      }
+      throwIfAborted(request.signal);
+
+      if (!expansion || !Array.isArray(expansion.queries)) {
+        throw validation(
+          "query expansion result must contain a queries array",
+        );
+      }
+
+      const candidateIntents = expansion.queries
+        .filter(
+          (q): q is string => typeof q === "string" && q.trim().length > 0,
+        )
+        .map((q) => q.trim())
+        .slice(0, 6);
+
+      const queriesToEmbed = [
+        request.query,
+        ...candidateIntents.filter((q) => q !== request.query),
+      ];
+
+      const embeddings: EmbeddingResult[] = [];
+      for (const queryText of queriesToEmbed) {
+        throwIfAborted(request.signal);
+        let queryEmbedding: EmbeddingResult;
+        try {
+          queryEmbedding = await this.input.embeddingPort.embed({
+            text: queryText,
+            signal: request.signal,
+          });
+        } catch (error) {
+          if (request.signal?.aborted)
+            throw validation("retrieval cancelled", "CANCELLED");
+          throw error;
+        }
+        throwIfAborted(request.signal);
+        validateQueryEmbedding(queryEmbedding, active.provenance);
+        embeddings.push(queryEmbedding);
+      }
+
+      const toolScores = new Map<
+        string,
+        { tool: ReviewedCatalogTool; score: number }
+      >();
+      for (const emb of embeddings) {
+        throwIfAborted(request.signal);
+        const results = await this.input.index.search({
+          index: active,
+          catalog: this.input.catalog,
+          query: emb.embedding,
+          topK: this.input.catalog.tools.length,
+        });
+        for (const item of results) {
+          const id = qualifiedToolIdentity(item.tool);
+          const existing = toolScores.get(id);
+          if (!existing || item.score > existing.score) {
+            toolScores.set(id, item);
+          }
+        }
+      }
+
+      const sorted = Array.from(toolScores.values()).sort(
+        (left, right) =>
+          right.score - left.score ||
+          compareIdentity(
+            qualifiedToolIdentity(left.tool),
+            qualifiedToolIdentity(right.tool),
+          ),
+      );
+
+      const selected = sorted.slice(
+        0,
+        Math.min(request.topK, this.input.catalog.tools.length),
+      );
+      throwIfAborted(request.signal);
+
+      return {
+        tools: selected.map((entry) => entry.tool),
+        scores: selected,
+        variant: request.variant,
+        topK: request.topK,
+        queryHash: hash(request.query),
+        latencyMs: Date.now() - started,
+        expandedQueries: candidateIntents,
+        expansionUsage: expansion.usage,
+      };
+    }
+
     if (request.variant !== "semantic")
       throw validation(
         `retrieval variant is unsupported in AI-01: ${String(request.variant)}`,

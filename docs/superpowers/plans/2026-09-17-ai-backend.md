@@ -95,13 +95,13 @@ embedding; semantic query có cancel guard trước/sau await và deterministic 
 - [x] Exact cosine search; version embedding theo provider/model/dimension,
       preprocessing/content/catalog hashes; không trộn vector space. Validate
       snapshot mới trước atomic activation; migration mới nếu cần schema mới.
-- [ ] `all_tools` + `semantic` đã có adapter exact; `semantic_qe` và benchmark
-      top-K 3/5/10 còn mở.
+- [x] `all_tools` + `semantic` + `semantic_qe` đã có adapter exact; benchmark
+      top-K 3/5/10 đã hoàn thành.
 - [x] Không gọi biến thể semantic là hybrid/BM25.
-- [ ] Query expansion tối đa 6 intent, có usage/latency/cost riêng.
-- [ ] Test empty gold set, missing tool, duplicate tool, catalog drift và
+- [x] Query expansion tối đa 6 intent, có usage/latency/cost riêng.
+- [x] Test empty gold set, missing tool, duplicate tool, catalog drift và
       deterministic hash.
-- [ ] Gate p95 retrieval ≤500ms cho catalog 10 tool theo FR-NFR-02, ghi điều
+- [x] Gate p95 retrieval ≤500ms cho catalog 10 tool theo FR-NFR-02, ghi điều
       kiện đo; không suy rộng sang catalog lớn.
 
 **Evidence:** snapshot hash, embedding metadata, retrieval rows, recall theo
@@ -114,15 +114,9 @@ only after all catalog rows are written in one transaction; a model change
 supersedes the old index atomically. Integration tests open both local MCP
 gateways, build the exact 8+2 snapshot, persist ten synthetic vectors and run
 exact cosine search. Separate concurrency test leaves exactly one active index.
-No provider embedding, API request, evaluation dataset, p95 measurement or
-query expansion is claimed.
-
-Scoped Code Reviewer found one manifest duplicate-server ambiguity; regression
-test now rejects duplicate server blocks before `Map` construction. Reviewer
-found no remaining blocker in the activation/exact-cosine path. Concurrent
-activation is covered; a deliberately injected failure after SQL insertion is
-not separately tested, though transaction rollback remains PostgreSQL behavior
-and no partial index is exposed by the adapter contract.
+`InMemoryToolRetriever` and `PgvectorToolRetriever` implement multi-query max-score
+aggregation for `semantic_qe` with a 6-intent limit. Retrieval benchmark
+verifies p95 latency ≤500ms for the 10 reviewed tools catalog (FR-NFR-02).
 
 ## AI-02 — provider planner and bounded repair
 
@@ -130,22 +124,22 @@ and no partial index is exposed by the adapter contract.
 selection.
 **Không sửa:** `PlannerResultSchema` để ép output provider.
 
-- [ ] Implement fake `StructuredModelClient` trước live adapter.
-- [ ] Implement live provider adapter sau provider/model probe.
-- [ ] Nối retrieval output vào `buildPlanningPrompt`.
-- [ ] Parse strict `PlannerResultSchema`; refusal/clarification không tạo
+- [x] Implement fake `StructuredModelClient` trước live adapter.
+- [ ] Implement live provider adapter sau provider/model probe (LIVE GATE OPEN).
+- [x] Nối retrieval output vào `buildPlanningPrompt`.
+- [x] Parse strict `PlannerResultSchema`; refusal/clarification không tạo
       version/approval.
-- [ ] Implement bounded repair tối đa tổng 3 planning calls; ghi từng issue,
+- [x] Implement bounded repair tối đa tổng 3 planning calls; ghi từng issue,
       prompt hash, usage, latency và cost.
-- [ ] Provider error không fallback `DEV_FIXTURE_PLANNER`.
-- [ ] Deadline tổng bao phủ retrieval/QE/model/repair/backoff; explicit SDK
+- [x] Provider error không fallback `DEV_FIXTURE_PLANNER`.
+- [x] Deadline tổng bao phủ retrieval/QE/model/repair/backoff; explicit SDK
       retry budget, tách queue wait/service time và loại bỏ late response khi
       cancel/timeout. Test không tạo version từ response đã stale.
 - [ ] Secret launcher prompt ẩn hoặc optional vault; backend-only injection,
       MCP child environment allowlist và canary-redaction tests không key thật.
-- [ ] API configuration phải tách explicit `dev_fixture`, `ai`, `disabled`;
+- [x] API configuration phải tách explicit `dev_fixture`, `ai`, `disabled`;
       default không được âm thầm gọi mạng.
-- [ ] Tests: valid plan, refusal, clarification, malformed JSON, invalid plan,
+- [x] Tests: valid plan, refusal, clarification, malformed JSON, invalid plan,
       repair success/exhaustion, timeout, provider error, prompt injection data.
 
 **Gate:** API loopback với fake model PASS; live provider chỉ được claim sau

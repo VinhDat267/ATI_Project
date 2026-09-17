@@ -24,4 +24,16 @@ describe("API configuration", () => {
       /API_CURSOR_KEY/,
     );
   });
+
+  it("accepts explicit planner modes and rejects invalid ones", async () => {
+    const env = await baseEnv();
+    expect(loadConfig({ ...env, API_PLANNER_MODE: "disabled" }).plannerMode).toBe("disabled");
+    expect(loadConfig({ ...env, API_PLANNER_MODE: "dev_fixture" }).plannerMode).toBe("dev_fixture");
+    expect(loadConfig({ ...env, API_PLANNER_MODE: "ai" }).plannerMode).toBe("ai");
+    expect(loadConfig({ ...env, WAP_PLANNER_MODE: "ai" }).plannerMode).toBe("ai");
+    expect(loadConfig(env).plannerMode).toBe("disabled");
+    expect(() => loadConfig({ ...env, API_PLANNER_MODE: "invalid_mode" })).toThrow(
+      /Invalid configuration API_PLANNER_MODE/,
+    );
+  });
 });
