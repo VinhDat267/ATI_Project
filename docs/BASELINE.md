@@ -18,7 +18,7 @@ Người dùng giả định là trưởng nhóm dự án môn học. Công vi�
 | Engine | Một worker, thực thi tuần tự theo thứ tự topo; retry giới hạn và side-effect gate. Không tự resume run sau crash |
 | Tools | task_hub 8 tool local; filesystem 2 tool local qua adapter được duyệt. Không có GitHub trong MVP |
 | Integrations | Không gọi Trello/Slack/Sheets/Calendar thật. Tên send_slack_message/append_sheet_rows chỉ là hợp đồng local trong demo |
-| Storage | PostgreSQL 16 + pgvector; SQL là nguồn schema. BullMQ/Redis là hàng đợi dự kiến; outbox bảo toàn giao nhận |
+| Storage | PostgreSQL 16 + pgvector; SQL là nguồn schema. PostgreSQL outbox + worker tuần tự là queue MVP; BullMQ/Redis deferred theo quyết định AI-00 ngày 17/09/2026 |
 | Auth | Một tài khoản demo, session và owner check. Không đăng ký/multi-tenant production hoặc kho credential bên thứ ba |
 | Replan | Chỉ bước chưa hoàn tất, kết quả lần gọi chắc chắn không gây side-effect; validation lại và approval mới trước write |
 
@@ -26,7 +26,14 @@ Người dùng giả định là trưởng nhóm dự án môn học. Công vi�
 
 **Điều chỉnh UI 15/09/2026:** sau khi người dùng đồng ý bước UX và giao WEB-00, dùng [sitemap sáu view](superpowers/specs/2026-09-15-platform-ux-design.md) để lập kế hoạch. Đây là tổ chức lại điều hướng, không thêm workflow CRUD/reuse/editor vào B. [ADR frontend](ADR-001-FRONTEND-STACK.md) chọn React + TypeScript + Vite; WEB-01B hiện chỉ là fixture shell tổng hợp và chưa tích hợp live API, session hoặc browser evidence. API wire-format và dataset nghiệp vụ giữ nguyên. Quỹ giờ được ước lượng lại trong [lịch](KE-HOACH-6-TUAN.md).
 
-Giữ PostgreSQL full-text index từ migration gốc không có nghĩa đã làm BM25. BullMQ Flows hỗ trợ parent/child dependencies; phần tự xây ở đây là DSL, validation, approval và trace.
+Giữ PostgreSQL full-text index từ migration gốc không có nghĩa đã làm BM25.
+**Điều chỉnh queue 17/09/2026:** người dùng đồng ý giữ PostgreSQL outbox và một
+worker tuần tự, defer BullMQ/Redis. Redis vẫn có trong compose hiện tại; quyết
+định này không xóa service/volume hay chứng minh BullMQ đã được triển khai.
+Các nhắc tới BullMQ `NOT_RUN` ở báo cáo cũ mô tả thiếu runtime evidence, không
+còn là yêu cầu phải thêm broker để đóng MVP. API wire-format, dataset nghiệp
+vụ, sequential execution và no-auto-resume không thay đổi. Xem
+[AI plan](superpowers/plans/2026-09-17-ai-backend.md) cho lịch và evidence gates.
 
 ## Những ràng buộc bắt buộc
 
@@ -40,7 +47,7 @@ Giữ PostgreSQL full-text index từ migration gốc không có nghĩa đã là
 
 ## Trạng thái và cổng kiểm chứng
 
-CODE_TESTED áp dụng cho thư viện DSL. DB 6 migrations, 8 public `task_hub` tools, 2 public `filesystem` tools và controller/engine hai server đã có kiểm chứng PostgreSQL/MCP thật. FS-05 đạt **TECHNICAL PASS** cho E01–E14; fresh FS-06 gate đạt **258 passed, 1 skipped**. Luồng CLI tạo một preview/approval, write tuần tự, trace, cancel và recovery không resume đã triển khai. API-01–05 đạt **API_TECHNICAL_PASS** cho loopback HTTP/session/lifecycle với planner fixture và hai receiver local; gate 2026-09-17 ghi H01–H20 `PASS`, sáu command exit `0` và cleanup delta `PASS`. API-CATALOG đã nối DTO strict, catalog read no-launch, active reviewed-preset check có rate-limit và bằng chứng loopback/live 8+2. Session vẫn là bộ nhớ tiến trình, còn run/outbox/attempt state bền vững nằm trong PostgreSQL. Browser UI, polling trong frontend, LLM/retrieval/replan và BullMQ vẫn `NOT_RUN`. G1 tổng thể vẫn **PARTIAL** (`TECHNICAL_PASS_OVERALL_PARTIAL`): rubric chính thức và công việc nhóm đại diện còn `OPEN`; chưa có kết quả AI. Xem [API status](API-STATUS-2026-09-15.md), [filesystem status](G1-FILESYSTEM-STATUS-2026-09-13.md) và [rubric map](G1-RUBRIC-MAP.md).
+CODE_TESTED áp dụng cho thư viện DSL. DB có 7 migrations; 8 public `task_hub` tools, 2 public `filesystem` tools và controller/engine hai server đã có kiểm chứng PostgreSQL/MCP thật. FS-05 đạt **TECHNICAL PASS** cho E01–E14; fresh FS-06 gate đạt **258 passed, 1 skipped**. Luồng CLI tạo một preview/approval, write tuần tự, trace, cancel và recovery không resume đã triển khai. API-01–05 đạt **API_TECHNICAL_PASS** cho loopback HTTP/session/lifecycle với planner fixture và hai receiver local; gate 2026-09-17 ghi H01–H20 `PASS`, sáu command exit `0` và cleanup delta `PASS`. API-CATALOG đã nối DTO strict, catalog read no-launch, active reviewed-preset check có rate-limit và bằng chứng loopback/live 8+2. AI-01 có snapshot reviewed 8+2, index pgvector exact/provenance và tests PostgreSQL/MCP cô lập; chưa có embedding provider, query expansion, API wiring, recall hay p95 measurement. Session vẫn là bộ nhớ tiến trình, còn run/outbox/attempt state bền vững nằm trong PostgreSQL. Browser UI, polling trong frontend, LLM/live evaluation/replan và BullMQ vẫn `NOT_RUN`. G1 tổng thể vẫn **PARTIAL** (`TECHNICAL_PASS_OVERALL_PARTIAL`): rubric chính thức và công việc nhóm đại diện còn `OPEN`; chưa có kết quả AI. Xem [API status](API-STATUS-2026-09-15.md), [filesystem status](G1-FILESYSTEM-STATUS-2026-09-13.md) và [rubric map](G1-RUBRIC-MAP.md).
 
 Engine hiện tại từ chối read phụ thuộc vào write vì một preview không bảo toàn thứ tự đó; write vẫn có thể phụ thuộc điều khiển vào write trước nếu không dùng output của nó. Đây là giới hạn của implementation plan tay, chưa mở rộng DSL hoặc thay phạm vi B. Retry đọc tối đa 3, delay tối đa 30 giây; write không tự retry. Rubric và model/provider phải xác nhận bằng nguồn thực tế trước khi dùng trong báo cáo.
 

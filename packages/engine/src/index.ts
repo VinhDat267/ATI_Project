@@ -42,3 +42,21 @@ export {
   recheckFilesystemDispatch,
   FilesystemAlreadyDispatchedError,
 } from "./filesystem-authorization.js";
+export {
+  AiPlannerAdapter,
+  AiPlannerError,
+  type AiPlannerAdapterOptions,
+  type ModelCallEvidence,
+  type OfflineRetrievalVariant,
+  type PlanValidator,
+} from "./ai/planner.js";
+export {
+  createLocalReviewedCatalog,
+  loadLocalReviewedCatalog,
+  PgvectorCatalogIndex,
+  PgvectorToolRetriever,
+  validatePgvectorActivation,
+  PGVECTOR_DIMENSIONS,
+  type ActivePgvectorIndex,
+  type ValidatedPgvectorActivation,
+} from "./ai/index.js";

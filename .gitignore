@@ -57,6 +57,7 @@ Desktop.ini
 .claude/
 .codex/
 .superpowers/
+.impeccable/
 AGENTS.md
 
 # New evidence captures are ignored by default. After content review, add only

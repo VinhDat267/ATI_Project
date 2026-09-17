@@ -1,14 +1,24 @@
 # AI backend design — B/local
 
 Ngày: 17/09/2026
-Trạng thái: **DRAFT_FOR_REVIEW**
+Trạng thái: **OFFLINE_IMPLEMENTATION_APPROVED / LIVE_GATE_OPEN**
 Phạm vi: AI-00, trước khi triển khai provider/retrieval runtime
 
 ## 0. Cổng phát triển
 
-AI-00 chỉ chốt interface, seam, dữ liệu bất biến, failure semantics và bằng
-chứng cần có. Không gọi model thật, không đưa credential vào repo và không
-đổi verdict từ `AI_EVALUATION=NOT_RUN`.
+AI-00 chốt interface, seam, dữ liệu bất biến, failure semantics và bằng
+chứng cần có. Ngày 17/09/2026 người dùng đồng ý tách gate offline/live và sẽ
+bổ sung API key sau. Thiếu credential không khóa công việc offline.
+
+- `OFFLINE_IMPLEMENTATION_APPROVED`: được chuẩn hóa reviewed catalog, xây
+  interfaces/adapters nhận dependency injection, fake model/embedding clients
+  trong tests và unit tests cho retrieval/planner/failure semantics. Không đọc
+  credential, gọi provider/MCP, truy cập DB demo hoặc bật mode AI của API.
+- `LIVE_GATE_OPEN`: account access, schema probe, effective settings và numeric
+  timeout/retry/rate/cost budgets phải được kiểm chứng trước live integration.
+  Live implementation/evaluation không được coi là pass từ fake-client tests.
+
+Không đưa credential vào repo; `AI_EVALUATION=NOT_RUN` giữ nguyên.
 
 Engine hiện đã có seam `PlannerPort`. `DEV_FIXTURE_PLANNER` và adapter AI là
 hai adapter khác nhau của seam đó; fixture không được dùng làm fallback im lặng
@@ -92,10 +102,11 @@ interface ToolRetriever {
 }
 ```
 
-Implementation có thể dùng pgvector, nhưng phải có adapter đồng bộ snapshot
-reviewed vào index. Cột `tools.embedding` hiện có trong migration không phải
-bằng chứng retrieval runtime đã tồn tại. Không dùng full-text index để gọi đó
-là BM25/hybrid.
+AI-01 triển khai adapter pgvector tách riêng: `reviewed_catalog_snapshots`,
+`reviewed_embedding_indexes` và `reviewed_tool_embeddings`. Adapter đồng bộ
+snapshot reviewed, không truy vấn cột `tools.embedding` lịch sử và không dùng
+full-text/BM25/hybrid. Vì catalog B/local tối đa mười tools, không tạo HNSW/
+IVFFlat: truy vấn cosine là exact. API/provider runtime vẫn chưa wire.
 
 ### 2.4 `QueryExpansionPort` — adapter tùy chọn của biến thể `semantic_qe`
 
@@ -185,17 +196,61 @@ engine/gateway hiện có.
 | Replan thay args/tool/read data | Version, snapshot và approval mới; approval cũ mất hiệu lực |
 | Queue duplicate | DB outbox/job state guard quyết định; không dispatch trùng |
 
-## 5. Queue decision — `PROPOSED`
+## 5. Queue decision — `CONFIRMED` (17/09/2026)
 
 AI-00 giữ PostgreSQL outbox và worker hiện đã được kiểm chứng làm authority
 cho MVP. BullMQ/Redis chưa được thêm chỉ để đổi transport. Nếu sau này chọn
 BullMQ, queue chỉ mang `job_id`; worker vẫn đọc state từ PostgreSQL, claim
 compare-and-set và giữ recovery/unknown semantics hiện có.
 
-Quyết định này cần được ghi nhận là approved hoặc thay đổi trước AI-04. Không
-được cập nhật baseline ngầm bằng cách coi BullMQ là đã triển khai.
+Người dùng đã đồng ý giữ PostgreSQL outbox + một worker tuần tự cho B/local;
+BullMQ/Redis được defer, không phải hạng mục đã triển khai. Compose hiện vẫn
+có Redis; biến nó thành profile tùy chọn là công việc riêng, không xóa volume.
+Thêm broker không giải quyết thời gian planner giữ worker lease. Không mở
+parallel execution hoặc automatic resume để né thời gian chờ này.
+
+## 5.1 Bộ quyết định AI-00 đã xác nhận
+
+| Hạng mục | Quyết định | Giới hạn bằng chứng |
+|---|---|---|
+| Provider/model | OpenAI; lựa chọn người dùng: GPT-5.6 Terra | Model ID/API availability, quyền truy cập, schema và settings phải probe; tên trong Codex không chứng minh API backend hỗ trợ |
+| Embedding | `text-embedding-3-large`, explicit `dimensions=1536`, cosine | Baseline ưu tiên chất lượng; chưa chứng minh hơn `small` trên ATI |
+| Search | Exact cosine trên reviewed catalog tối đa 10 tool | Kiểm query thực tế không dùng approximate HNSW; không coi index có sẵn là runtime retrieval |
+| Secret local | Inject vào backend process environment lúc chạy; mặc định prompt ẩn, vault mã hóa tùy chọn | Không bắt buộc SecretStore; launcher/isolated-secret tests chưa triển khai |
+| Queue | PostgreSQL outbox authority, single sequential worker; defer BullMQ | Không cam kết exactly-once arbitrary MCP writes |
+
+Embedding records phải gắn provider/model/dimension, preprocessing version,
+canonical content hash và reviewed catalog hash. Không trộn embedding space
+khi đổi model dù cùng dimension; tạo snapshot/index mới, validate đầy đủ rồi
+activate nguyên tử. Không sửa migration đã áp dụng để thay lịch sử schema.
+
+Key không nằm trong source, prompt, log, evidence, frontend hoặc environment
+của MCP subprocess. Launcher không nhận key qua command-line literal/history;
+dùng environment allowlist cho child và test bằng canary secret giả. Vault chỉ
+bảo vệ khi lưu trữ, không loại bỏ plaintext khỏi memory lúc sử dụng. Không cài
+vault hoặc gọi API tính phí như một bước ngầm của việc cập nhật tài liệu.
+
+Đổi model cùng provider chỉ là config-only khi capability contract tương thích.
+Đổi provider cần adapter và regression/evaluation lại; không hứa portability
+chỉ bằng đổi tên model. Không có kết luận model/embedding nào tối ưu trên ATI
+trước evaluation.
+
+Planning phải có deadline tổng bao gồm retrieval, query expansion, provider,
+repair và backoff. SDK transport retries phải explicit, có giới hạn riêng và
+tính vào tổng deadline/cost; không nhân retry ngầm với 3 planning attempts.
+Đo riêng queue wait và service time. Cancellation/timeout phải abort transport
+khi có thể và loại bỏ late/stale response trước khi tạo version; không thay
+đổi unknown-write/reconciliation semantics của engine.
 
 ## 6. Provider/model gate — `OPEN`
+
+**DOCS_VERIFIED — 17/09/2026, không phải live probe:**
+[OpenAI model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-terra)
+liệt kê `gpt-5.6-terra`, Structured Outputs và reasoning `medium` (default).
+Giá text tiêu chuẩn mỗi 1M token: input $2, cached input $0.20, output $12;
+trên 272K input áp dụng hệ số input 2x/output 1.5x; cache writes 1.25x uncached
+input. Đây là pricing reference có ngày, không phải actual usage/cost evidence.
+Quyền truy cập tài khoản, schema ATI, effective settings và latency chưa probe.
 
 AI-02 không được bắt đầu live run cho tới khi có:
 
@@ -206,8 +261,10 @@ AI-02 không được bắt đầu live run cho tới khi có:
 - timeout, rate limit và pricing snapshot;
 - secret delivery local không ghi vào Git/log/evidence.
 
-Provider có thể được chọn sau khi thiết kế được duyệt; thiết kế này không tự
-đặt một nhà cung cấp hay API key thay người dùng.
+Lựa chọn công nghệ đã được người dùng xác nhận ở mục 5.1, nhưng các probe và
+numeric timeout/rate/cost budgets vẫn OPEN. Không tự thay model nếu ID đã chọn
+không khả dụng: báo bằng chứng và xin quyết định thay thế. Chỉ chạy probe sau
+khi credential được cấp an toàn và phạm vi gọi API tính phí được cho phép.
 
 ## 7. Evidence contract
 
@@ -224,19 +281,40 @@ Mỗi run/evaluation phải lưu được:
 Không dùng test pass, model confidence, hand-plan hoặc fixture result làm AI
 quality evidence.
 
-## 8. AI-00 exit criteria
+Giữ split manifest: b01–b06 development, b07–b10 holdout. Chỉ tune bằng dev;
+freeze cấu hình trước khi chạy holdout, không dùng kết quả holdout để tiếp tục
+chọn model/prompt rồi báo như đánh giá chưa thấy. top-K=10 trên 10 tool là
+all-tools control, không phải thành tựu recall. Ba repetitions đo biến thiên,
+không biến 10 cases thành 30 nhiệm vụ độc lập. Refusal/clarification đúng là
+kết quả hợp lệ, không ép mọi case phải tạo plan.
 
-AI-00 chỉ được chuyển `APPROVED_FOR_IMPLEMENTATION` khi reviewer xác nhận:
+## 8. AI-00 exit criteria — tách offline/live
+
+### Offline design gate — `APPROVED_FOR_OFFLINE_IMPLEMENTATION`
+
+Người dùng đã duyệt tách gate. Review thiết kế offline phải xác nhận:
 
 1. `PlannerPort`, catalog, provider, retrieval, replan và evaluation seams rõ
    owner và không tạo vòng phụ thuộc engine ↔ provider;
 2. queue decision được chấp nhận hoặc ghi rõ lý do defer;
-3. provider/model/embedding inputs và secret delivery được khai báo;
+3. provider/model/embedding targets và secret delivery được khai báo; chưa có
+   key/probe không chặn fake-client implementation;
 4. failure table không cho fallback fixture, blind retry write hoặc bypass
    approval;
 5. test/evidence matrix ở implementation plan phủ đủ refusal, clarification,
    invalid output, repair budget, catalog drift, unknown write và reapproval;
 6. `AI_EVALUATION` vẫn `NOT_RUN` cho tới khi có live evidence.
 
-Sau cổng này mới triển khai AI-01 retrieval, AI-02 provider planner, AI-03
-local replan và AI-04 evaluation theo plan tương ứng.
+### Live integration gate — `OPEN`
+
+Trước live application integration/evaluation, phải hoàn tất mục 6: quyền API,
+exact schema/settings probe, pricing và numeric budgets. Riêng bounded probe
+được chạy sau khi credential được cấp an toàn, probe budgets được chốt và
+phạm vi gọi tính phí được cho phép; probe là bước tạo bằng chứng, không phải
+bằng chứng đã có sẵn. Không tự tìm key từ cấu hình Codex hoặc dùng
+credential của công cụ phát triển làm credential ứng dụng.
+
+AI-01/AI-02 được triển khai phần offline theo plan tương ứng ngay bây giờ.
+AI-03 engine integration vẫn cần test matrix approval/reconciliation riêng;
+gate offline không chứng nhận phần này. AI-04 live evaluation vẫn `NOT_RUN`.
+Chỉ đóng toàn bộ AI-00 khi cả offline design và live readiness gates hoàn tất.
