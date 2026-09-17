@@ -58,6 +58,13 @@ Mục tiêu: vào tài khoản demo và trở lại đúng trang được yêu c
 - Hết phiên ở bất kỳ trang nào: dừng polling, hủy request của phiên cũ, xóa dữ liệu được bảo vệ khỏi view và yêu cầu đăng nhập lại. Chỉ giữ return route chứa ID; không đưa prompt/token vào URL.
 - Reload cần đăng nhập lại. UI có thể có hành động “Thoát phiên trên tab này”; đây là xóa token local, không quảng cáo logout toàn hệ thống vì API chưa có revoke-session endpoint.
 
+**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V01):**
+
+- Không có thanh điều hướng; logo trái, nhãn “Dữ liệu mô phỏng” phải khi là fixture. Desktop hai cột trong 1120px: trái là tiêu đề “Lập kế hoạch tự động, ghi dữ liệu chỉ khi bạn duyệt”, một câu mô tả và 3 bước có icon (mô tả việc → xem trước đích và nội dung ghi → duyệt rồi xem kết quả và chứng cứ); phải là thẻ form 420px bo 14px với mức bóng duy nhất. Mobile: form trước, giới thiệu thu gọn dưới form.
+- Form thật: label luôn hiển thị, `autocomplete="username"`/`"current-password"`, nút hiện/ẩn mật khẩu (`aria-label`, `aria-pressed`), nút “Đăng nhập” 48px, dòng môi trường cuối form (“Chạy cục bộ trên máy này · Kế hoạch mẫu / AI lập kế hoạch”, không có địa chỉ/port/phiên bản).
+- Build fixture điền sẵn email demo, ghi “Tài khoản demo local” và “Bản mô phỏng chấp nhận mật khẩu bất kỳ”; build live để trống, không gợi ý. Mật khẩu không bao giờ hiển thị.
+- Trạng thái: đang gửi (khoá nút giữ nhãn + spinner, ô chỉ đọc); `401` banner danger “Email hoặc mật khẩu không đúng”, xoá mật khẩu, focus lại ô mật khẩu, giữ email; `429` banner danger “Đã thử quá nhiều lần hoặc máy chủ đang bận… thử lại sau ít phút” (API không gửi `Retry-After`, không đoán giây); lỗi mạng “Không kết nối được máy chủ local”; phiên hết hạn banner `neutral` nêu tên trang sẽ quay về (không hiện nội dung prompt), dữ liệu cũ đã xoá khỏi màn hình. Chưa vẽ: lỗi mạng, lỗi ô trống.
+
 ### V02 — Tổng quan
 
 Mục tiêu: “Bây giờ tôi cần làm gì?”

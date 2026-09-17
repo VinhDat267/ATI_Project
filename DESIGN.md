@@ -544,6 +544,12 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **Chi tiết kỹ thuật:** khung `surface-soft` bo 14px thụt theo cột nhãn; ô nhãn `overline`; giá trị kỹ thuật `mono-md`; bảng tham số nền `canvas` bo 8px; nút sao chép `icon-button-circle` 32px có `aria-label`.
 - **Nút kiểm tra bị giới hạn:** nền `surface-strong`, chữ `muted`, dòng đếm ngược `body-sm` tabular kèm icon đồng hồ, `role="status"`.
 
+### Sign-in (V01)
+
+- **Khung:** không top nav; logo trái, badge demo phải; hai cột 1120px (giới thiệu · thẻ form 420px), căn giữa dọc; mobile form trước.
+- **Giới thiệu:** tiêu đề 40/50px đậm 600 tracking -0.03em (ngoại lệ đã ghi trong Do's and Don'ts); đoạn `body-lg` `muted`; 3 bước dạng hàng icon tròn 48px `surface-strong` + tiêu đề `body-lg` 500 + dòng phụ `body-sm` `muted`, không đánh số.
+- **Thẻ form:** `decision-card` style (hairline, bo 14px, mức bóng duy nhất, padding 32px); input 56px; nút hiện/ẩn mật khẩu `icon-button-circle` 40px bên trong ô; helper `caption` `muted`; banner lỗi/hết phiên bo 14px đặt dưới tiêu đề form; dòng môi trường `caption` `muted` sau hairline.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
@@ -562,7 +568,7 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **Do** tự host Be Vietnam Pro; mọi token mới thêm vào DESIGN.md trước khi dùng.
 - **Don't** dùng màu Rausch, font Cereal, logo, ảnh hay bố cục marketing của Airbnb.
 - **Don't** thêm mức bóng thứ hai, blur, gradient hay bóng màu.
-- **Don't** dùng chữ lớn/đậm 700 ngoài đồng hồ thời hạn duyệt.
+- **Don't** dùng chữ lớn/đậm 700 ngoài đồng hồ thời hạn duyệt. Ngoại lệ duy nhất: tiêu đề giới thiệu ở trang Đăng nhập (V01) được 40/50px nhưng đậm 600.
 - **Don't** dùng giá trị tuỳ ý (`bg-[#...]`, `p-[13px]`) trong view/component.
 - **Don't** tự đóng banner chờ duyệt, cần đối chiếu hoặc lỗi; không thêm retry/resume cho ghi chưa rõ.
 - **Don't** hiển thị phần trăm tiến trình hay số liệu trang trí không có ý nghĩa đo.
