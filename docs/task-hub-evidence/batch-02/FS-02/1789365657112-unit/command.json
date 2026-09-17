@@ -1,0 +1,20 @@
+{
+  "executable": "cmd.exe",
+  "args": [
+    "/d",
+    "/s",
+    "/c",
+    "npm",
+    "run",
+    "test:unit",
+    "-w",
+    "@wap/engine"
+  ],
+  "started_at": "2026-09-14T06:00:57.113Z",
+  "finished_at": "2026-09-14T06:01:01.172Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-02\\1789365657112-unit",
+  "scope": "unit"
+}

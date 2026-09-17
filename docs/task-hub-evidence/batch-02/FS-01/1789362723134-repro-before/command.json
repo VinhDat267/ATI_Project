@@ -1,0 +1,13 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "args": [
+    "docs/task-hub-evidence/batch-02/FS-01/1789363800000-repro/reproduce.mjs"
+  ],
+  "started_at": "2026-09-14T05:12:03.134Z",
+  "finished_at": "2026-09-14T05:12:04.219Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-01\\1789362723134-repro-before",
+  "scope": "repro-before"
+}

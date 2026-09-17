@@ -1,8 +1,8 @@
 # Frontend handoff — API-05 B/local
 
-Status: `API_PARTIAL` for the local DEV_FIXTURE planner path. Browser E2E and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
+Status: `API_TECHNICAL_PASS` for the local DEV_FIXTURE planner path (H01–H20 plus independent cleanup delta passed on 2026-09-17). WEB-01B is a **PROVISIONAL_IMPLEMENTATION** (fixture shell only); browser E2E against the real API, polling and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
 
-Navigation for the next frontend batch: [platform UX](superpowers/specs/2026-09-15-platform-ux-design.md), six views/four navigation items. WEB-00 synchronizes the UI baseline and selects [React + TypeScript + Vite](ADR-001-FRONTEND-STACK.md) for the [WEB-01–03 implementation plan](superpowers/plans/2026-09-15-frontend-platform.md). Workflow editing/reuse remains outside B; no frontend application has been implemented yet.
+Navigation for the next frontend batch: [platform UX](superpowers/specs/2026-09-15-platform-ux-design.md), six views/four navigation items. WEB-00 synchronizes the UI baseline and selects [React + TypeScript + Vite](ADR-001-FRONTEND-STACK.md) for the [WEB-01–03 implementation plan](superpowers/plans/2026-09-15-frontend-platform.md). The system design gate is [platform system design](superpowers/specs/2026-09-15-platform-system-design.md); review it and audit WEB-01B before adding views or live controllers. Workflow editing/reuse remains outside B.
 
 The API listens on loopback and uses the `/api/v1` prefix. The frontend keeps the bearer token in memory for the current tab and sends it only as `Authorization: Bearer <token>`. Do not store it in localStorage, cookies, URLs, logs, or HTML.
 

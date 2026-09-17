@@ -1,0 +1,13 @@
+{
+  "executable": "node",
+  "args": [
+    "scripts/fs06-scope-audit.mjs"
+  ],
+  "started_at": "2026-09-14T10:59:13.779Z",
+  "finished_at": "2026-09-14T10:59:15.882Z",
+  "exit_code": 0,
+  "signal": null,
+  "spawn_error": null,
+  "evidence_dir": "D:\\Môn học\\ATI\\ATI_Project\\docs\\task-hub-evidence\\batch-02\\FS-06\\1789383553778-scope-audit-fixed5",
+  "scope": "scope-audit-fixed5"
+}

@@ -1,0 +1,113 @@
+{
+  "preset": {
+    "id": "filesystem-local-v1",
+    "server": "filesystem",
+    "package": "@modelcontextprotocol/server-filesystem",
+    "version": "2026.8.31",
+    "integrity": "sha512-kKaFkyAh6oipvc9+EAbJ552JafnMnOq5nzmzWkp1jJdBhTAAGpmIpWihUG1+rfNhmEFM98gUZDdCHCDD4v6a7Q==",
+    "entry": "dist/index.js",
+    "server_identity": {
+      "name": "secure-filesystem-server",
+      "version": "0.2.0"
+    },
+    "policy_version": "b-local-fs-1",
+    "root_strategy": "project-runtime-principal",
+    "enabled_tools": [
+      "read_file",
+      "write_file"
+    ],
+    "max_bytes": 65536,
+    "review_file": "config/filesystem-reviewed.json"
+  },
+  "publicTools": [
+    {
+      "server": "task_hub",
+      "name": "list_cards",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "get_card",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "create_card",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "move_card",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "list_members",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "send_slack_message",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "read_sheet_range",
+      "sideEffect": "read",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "task_hub",
+      "name": "append_sheet_rows",
+      "sideEffect": "write",
+      "policyVersion": "b-local-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "filesystem",
+      "name": "read_file",
+      "sideEffect": "read",
+      "policyVersion": "b-local-fs-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    },
+    {
+      "server": "filesystem",
+      "name": "write_file",
+      "sideEffect": "write",
+      "policyVersion": "b-local-fs-1",
+      "evidence": "IMPLEMENTED_LIVE_DISCOVERY_CHECKED"
+    }
+  ],
+  "rawDiscovery": {
+    "count": 14,
+    "names": [
+      "read_file",
+      "read_text_file",
+      "read_media_file",
+      "read_multiple_files",
+      "write_file",
+      "edit_file",
+      "create_directory",
+      "list_directory",
+      "list_directory_with_sizes",
+      "directory_tree",
+      "move_file",
+      "search_files",
+      "get_file_info",
+      "list_allowed_directories"
+    ]
+  }
+}

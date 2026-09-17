@@ -10,7 +10,7 @@
 
 **Spec:** [UX platform](../specs/2026-09-15-platform-ux-design.md), [ADR-001](../../ADR-001-FRONTEND-STACK.md), [frontend handoff](../../FRONTEND-HANDOFF.md).
 
-**Trạng thái:** READY_FOR_IMPLEMENTATION cho WEB-01; mọi checkbox code dưới đây chưa thực hiện. WEB-00 chỉ có kiểm lock/build mẫu trong temp; browser/application/AI vẫn NOT_RUN. Đọc toàn bộ repo có chọn lọc trước khi implement: BASELINE, FR, EXECUTION-CONTRACT, API source/contracts, engine lifecycle, policy/fingerprint, báo cáo API audit, screens/wireframes, Git policy. Không đọc secrets hoặc toàn bộ raw capture lịch sử.
+**Trạng thái:** `PROVISIONAL` cho WEB-01B và **BLOCKED_PENDING_SYSTEM_DESIGN_REVIEW** cho WEB-01C/WEB-02/WEB-03. `docs/superpowers/specs/2026-09-15-platform-system-design.md` là cổng kiến trúc mới; phải chuyển sang `APPROVED_FOR_IMPLEMENTATION` và audit commit `23a41d8` trước khi viết thêm frontend. WEB-00 chỉ có kiểm lock/build mẫu trong temp; browser/application/AI vẫn NOT_RUN. Đọc toàn bộ repo có chọn lọc trước khi implement: BASELINE, FR, EXECUTION-CONTRACT, API source/contracts, engine lifecycle, policy/fingerprint, báo cáo API audit, screens/wireframes, Git policy. Không đọc secrets hoặc toàn bộ raw capture lịch sử.
 
 ## Global Constraints
 
@@ -20,7 +20,7 @@
 - Approval dùng đúng `approval_id`, `workflow_version_id`, `snapshot_hash`, `decision`; TTL từ server; không sửa payload.
 - Write chưa rõ kết quả không retry/resume; cancel cooperative không rollback. Không auto retry bất kỳ POST.
 - Không editor, workflow library/reuse, rerun, schedule, SaaS, user/team admin hoặc config arbitrary MCP.
-- `API_PARTIAL` giữ nguyên đến khi gate backend đủ evidence. Fixture không phải AI; browser mock không phải receiver evidence.
+- Backend API-GATE đã đạt `API_TECHNICAL_PASS`. Fixture không phải AI; browser mock không phải receiver evidence và frontend vẫn cần live browser gate riêng.
 - CSS kế thừa screens.html; 1280/390/320px, keyboard, focus, không tràn ngang trang. Text tiếng Việt; thuật ngữ kỹ thuật nằm trong disclosure khi có ích.
 - Cài dependency chỉ khi bắt đầu WEB-01; pin exact, review lock delta và fingerprint trước live MCP. Không ghi đè lịch sử evidence, migrations hoặc data demo.
 - Sau mỗi task: targeted tests, diff review, stage exact files, commit checkpoint; không push. Không gọi npm run check là full integration.
@@ -248,7 +248,7 @@ expect(Object.keys(body).sort()).toEqual(['approval_id','decision','snapshot_has
 - [ ] TTL client về0 khóa action và refresh; server clock quyết định. Unit tests: double-click chỉ1POST, reject/approve đồng thời, response sau logout, timeout sau accepted không POST lần2, stale hash409 chỉ GET, cancel202 empty, expiry boundary. Browser delay response và kiểm trạng thái nút thực tế.
 - [ ] Trace fetch khi mở section; mỗi loadMore một request, cursor opaque qua encodeURIComponent, append chỉ cùng generation/run/snapshot. 400 cursor sai/hết hạn → xóa snapshot cũ và fetch trang đầu một lần có notice; không merge cũ/mới. Lỗi lặp dừng và báo. Refresh chủ động tạo snapshot mới. Legacy null fields hiện “chưa có chứng cứ”, không suy thành known failure.
 - [ ] Reconciliation chỉ GET; unknown/receipt/marker render text, không nút write. Tool output HTML hiện text; có preview ngắn/mở rộng nhưng giữ nguyên payload/hash bên dưới. API chịu redaction; frontend không lưu raw secrets vào artifacts. Kiểm trace100/100/51, restart/wrong run, HTML canary không chạy script.
-- [ ] Gate WEB-02: web unit + browser mock + live lifecycle subset dùng fixture DB riêng, report rõ API_PARTIAL; commit `feat(web): guard run decisions and render trace reconciliation`.
+- [ ] Gate WEB-02: web unit + browser mock + live lifecycle subset dùng fixture DB riêng, report rõ `API_TECHNICAL_PASS` nhưng browser/frontend còn scope riêng; commit `feat(web): guard run decisions and render trace reconciliation`.
 
 ## WEB-03A — Browser gate có receiver evidence và cleanup độc lập
 

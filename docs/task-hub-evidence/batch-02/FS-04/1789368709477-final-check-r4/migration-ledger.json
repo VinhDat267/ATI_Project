@@ -1,0 +1,35 @@
+{
+  "database": "fs04_it_bc7b6e602ead4579b416018186f22262",
+  "applied": {
+    "applied": [
+      "0001_init.sql",
+      "0002_audit_contracts.sql",
+      "0003_task_hub_local.sql",
+      "0004_task_hub_cards.sql",
+      "0005_filesystem_dispatches.sql"
+    ],
+    "total": 5
+  },
+  "ledger": [
+    {
+      "name": "0001_init.sql",
+      "checksum": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8"
+    },
+    {
+      "name": "0002_audit_contracts.sql",
+      "checksum": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689"
+    },
+    {
+      "name": "0003_task_hub_local.sql",
+      "checksum": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3"
+    },
+    {
+      "name": "0004_task_hub_cards.sql",
+      "checksum": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e"
+    },
+    {
+      "name": "0005_filesystem_dispatches.sql",
+      "checksum": "d7af10defa6c886d73edaf569e9326dae10932e9f8b47e7f7508f25866ba9521"
+    }
+  ]
+}

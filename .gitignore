@@ -53,7 +53,15 @@ secrets.local.json
 .DS_Store
 Thumbs.db
 Desktop.ini
+.agents/
+.claude/
+.codex/
+.superpowers/
+AGENTS.md
 
-# New evidence logs are ignored too. After content review, add only the exact
-# approved path with git add -f -- <path>; never force-add a whole directory.
-# See docs/GIT-POLICY.md. Ignore rules do not protect already tracked files.
+# New evidence captures are ignored by default. After content review, add only
+# the exact approved checkpoint files with git add -f -- <path>; never
+# force-add a whole directory. See docs/GIT-POLICY.md. Ignore rules do not
+# protect already tracked files.
+/docs/api-evidence/**/
+/docs/task-hub-evidence/**/

@@ -1,10 +1,10 @@
 # ADR-001 — React + TypeScript + Vite cho frontend B/local
 
-Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00; chưa cài vào workspace, chưa triển khai frontend. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau [thiết kế UX](superpowers/specs/2026-09-15-platform-ux-design.md). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
+Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00. WEB-01B đã tạo fixture shell ở trạng thái **PROVISIONAL_IMPLEMENTATION**; live frontend chưa tích hợp API. System design cấp hệ thống là [tài liệu riêng](superpowers/specs/2026-09-15-platform-system-design.md) và phải được duyệt trước WEB-01C/WEB-02. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau [thiết kế UX](superpowers/specs/2026-09-15-platform-ux-design.md). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
 
 ## Quyết định
 
-Dùng **React 19.3.0 + TypeScript 5.9.3 + Vite 8.3.0**, CSS thuần, browser hash routes và shared Zod contracts. Dùng Vitest 2.1.9 hiện có cho logic thuần; Playwright Test 1.63.0 cho browser. Các version này được đọc từ registry/lock và build thử tại thời điểm quyết định, không phải cam kết luôn là mới nhất.
+Dùng **React 19.3.0 + TypeScript 5.9.3 + Vite 8.3.0**, CSS thuần, browser hash routes và shared Zod contracts. Dùng Vitest 4.1.11 cho logic thuần; Playwright Test 1.63.0 cho browser. Các version này được đọc từ registry/lock và build thử tại thời điểm quyết định hoặc đợt vá bảo mật kế tiếp, không phải cam kết luôn là mới nhất.
 
 Không thêm router library, global state library, query cache library, UI kit hoặc React plugin trong đợt đầu. JSX automatic transform qua Vite đủ cho build; chấp nhận full reload khi chỉnh component thay vì Fast Refresh. Sáu hash routes có parser nhỏ, không xây router tổng quát. React quản lý DOM; state machine/domain/API client không phụ thuộc React. Dùng hook `useSyncExternalStore` cho snapshot có identity ổn định, effect cleanup để dừng poll. Backend vẫn là authority của status và approval.
 
@@ -33,9 +33,9 @@ React có tài liệu chính thức cho [ứng dụng bắt đầu bằng build 
 
 ## Ràng buộc triển khai
 
-1. `apps/web/package.json` khai báo exact versions kể trên; thêm `react-dom@19.3.0`, `@types/react@19.3.0`, `@types/react-dom@19.3.0`, `zod@4.6.2`, `@wap/dsl@0.1.0`. Không nâng Vitest/backend cùng việc thêm frontend. Vite 5.4.21 trong test closure có thể cùng tồn tại Vite 8.3.0 của web.
-2. Vite yêu cầu Node `^20.19.0 || >=22.12.0`; repo vốn >=22 nên nâng floor thành **>=22.12.0**, máy đo là 24.19.0. Không đổi runtime đã kiểm chỉ để dùng tên version mới.
-3. Gate dependency: dự kiến +45 entries, không đổi name@version cũ; mọi chênh khác phải giải thích bằng lock diff. Chạy audit dependency ứng viên, phân biệt finding mới và tồn tại trước; chưa có security approval trong WEB-00. Kiểm package integrity/installed closure và policy fingerprint trước luồng MCP thật; không sửa hash để ép gate xanh.
+1. `apps/web/package.json` khai báo exact versions kể trên; thêm `react-dom@19.3.0`, `@types/react@19.3.0`, `@types/react-dom@19.3.0`, `zod@4.6.2`, `@wap/dsl@0.1.0`. Vitest không được nâng chung với lúc thêm frontend; đợt bảo mật độc lập ngày 16/09/2026 đã đồng bộ ba khai báo trực tiếp lên 4.1.11 và lock chỉ còn một Vite 8.3.0.
+2. Vite yêu cầu Node `^20.19.0 || >=22.12.0`; Vitest 4.1.11 hỗ trợ Node 22 hoặc 24+, không hỗ trợ Node 23. Vì vậy project khai báo **`^22.12.0 || >=24.0.0`**; máy kiểm là 24.19.0.
+3. Gate dependency: số +45 entries là phép đo WEB-00 lịch sử. Mọi lock diff mới phải được giải thích riêng; đợt bảo mật 16/09/2026 đã đạt `npm audit` production và toàn bộ dependency đều 0 vulnerability, đồng thời `check:full` giữ nguyên coverage. Kiểm package integrity/installed closure và policy fingerprint trước luồng MCP thật; không sửa hash để ép gate xanh.
 4. Budget đề xuất cho WEB-01: tổng JS production được tải ban đầu <=160 KiB gzip (gồm parser), không remote fonts/CDN. Đây là ngưỡng review tương lai, chưa phải số đo UI. Vượt ngưỡng thì phân tích module/bundle rồi review, không bỏ runtime validation để giảm size.
 5. TS browser config riêng: ES2022, ESNext/Bundler, `jsx: react-jsx`, DOM libs, strict/noUncheckedIndexedAccess, noEmit. Root NodeNext config giữ riêng; root check phải gọi web typecheck và tests rõ ràng. Vite build không thay typecheck.
 6. Thêm public entry `@wap/dsl/browser` chỉ export schema/events/contracts thuần. Browser không import engine/db/fs/crypto hoặc barrel chứa server-only module. Build probe hiện copy ba source thuần; WEB-01 phải kiểm entry package thật trong bundle.

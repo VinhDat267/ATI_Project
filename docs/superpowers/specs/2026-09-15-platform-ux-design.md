@@ -2,7 +2,7 @@
 
 Ngày: 15/09/2026. Source được đối chiếu: `03efe3e`.
 
-**Trạng thái: ADOPTED_FOR_FRONTEND_PLAN — cập nhật ở WEB-00 ngày 15/09.** Người dùng đồng ý tiếp bước đánh giá stack/lập kế hoạch. Điều hướng sáu view được đồng bộ vào baseline/FR/lịch; [ADR-001](../../ADR-001-FRONTEND-STACK.md) chọn React + TypeScript + Vite cho kế hoạch. Editor, workflow tái sử dụng, SaaS hoặc lịch chạy vẫn ngoài B/local. Chưa có implementation frontend.
+**Trạng thái: ADOPTED_FOR_FRONTEND_PLAN — cập nhật ở WEB-00 ngày 15/09.** Người dùng đồng ý tiếp bước đánh giá stack/lập kế hoạch. Điều hướng sáu view được đồng bộ vào baseline/FR/lịch; [ADR-001](../../ADR-001-FRONTEND-STACK.md) chọn React + TypeScript + Vite cho kế hoạch. [System design cấp hệ thống](2026-09-15-platform-system-design.md) hiện là `DRAFT_FOR_REVIEW`; WEB-01B chỉ là fixture shell provisional cho tới khi system design được duyệt. Editor, workflow tái sử dụng, SaaS hoặc lịch chạy vẫn ngoài B/local.
 
 ## 1. Quyết định đề xuất
 
@@ -25,7 +25,7 @@ Số view phục vụ các việc khác nhau của người dùng, không dùng 
 - **Approval:** quyền ghi gắn với đúng run/version/hash/expiry. Không chuyển sang run mới và không kế thừa khi người dùng đổi yêu cầu.
 - **Trace:** chứng cứ của từng attempt trong lần chạy; khác với biểu đồ plan dự kiến.
 
-Hiện `apps/web` chỉ có README skeleton. API đã có login, nhận run, history/detail, approval/cancel, events, trace, reconciliation và server summaries. `GET /runs` trả tối đa 1.000 run; khi vượt giới hạn, implementation hiện trả `409 HISTORY_LIMIT`, không có cursor history hoặc truy vấn theo workflow.
+`apps/web` hiện có WEB-01B fixture shell ở trạng thái provisional; live transport/polling chưa nối. API đã có login, nhận run, history/detail, approval/cancel, events, trace, reconciliation và server summaries. `GET /runs` trả tối đa 1.000 run; khi vượt giới hạn, implementation hiện trả `409 HISTORY_LIMIT`, không có cursor history hoặc truy vấn theo workflow.
 
 Baseline và FR hiện ghi editor, sửa args trước duyệt, lưu workflow để tái sử dụng, rerun, xóa workflow, cấu hình MCP tùy ý và lịch định kỳ là ngoài B. Thiết kế này phân biệt mở rộng điều hướng với mở rộng nghiệp vụ đó.
 
@@ -179,7 +179,7 @@ Prefix thực tế: `/api/v1`. Endpoint mới dưới đây chỉ là đề xu�
 | Trạng thái công cụ | GET /servers | Chưa có tool detail/live discovery DTO và thao tác kiểm preset từ UI |
 | Workflow library/editor | Chưa có API sản phẩm tương ứng | Ngoài B; không suy từ bảng DB/workflow version rằng đã sẵn sàng |
 
-API verdict vẫn `API_PARTIAL`. Điều đó cho phép dựng component/fixture, nhưng chưa đủ điều kiện tuyên bố nghiệm thu toàn luồng frontend với backend. Các lỗi/process case còn lại và cleanup oracle phải được đóng hoặc ghi rõ trong báo cáo gate; mock/browser test không thay evidence đó.
+API verdict hiện là `API_TECHNICAL_PASS` cho local `DEV_FIXTURE_PLANNER`: H01–H20 và cleanup delta đã pass ở gate 2026-09-17. Điều này đóng backend API-GATE nhưng không tự động nghiệm thu frontend; browser E2E, polling, accessibility và AI evaluation vẫn cần evidence riêng.
 
 ## 7. Mở rộng để thành platform workflow tái sử dụng
 
@@ -251,4 +251,4 @@ File cần tạo ở đợt code sau thuộc `apps/web`: module session, navigat
 - [screens.html](../../screens.html) và [wireframes.html](../../wireframes.html): dùng lại các panel/status/component, không dùng tiêu đề hai màn hình làm sitemap của thiết kế mới.
 - [HTTP plan](../plans/2026-09-15-http-lifecycle.md): API-CATALOG là gap đã được ghi nhận; frontend live acceptance vẫn cần backend gate.
 
-Kiểm tra tài liệu không phải browser QA. Chưa có application frontend, chưa đo usability hoặc chứng minh AI bằng thiết kế này.
+Kiểm tra tài liệu không phải browser QA. WEB-01B fixture shell đã có, nhưng chưa có browser QA với API thật, chưa đo usability hoặc chứng minh AI bằng thiết kế này.

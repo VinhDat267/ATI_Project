@@ -42,7 +42,7 @@ Không phát hiện N nào yêu cầu sửa code hay đổi baseline.
 
 ## Đã dọn trong cùng phiên audit này
 
-Theo yêu cầu người dùng, đã xoá N01 (`00-BAT-DAU (BẢN CŨ - xoá được).md`), N02 (thư mục `scripts/` rỗng), và N04a (`docs/AUDIT.md`, `docs/AUDIT-vong-1.md` — chỉ giữ pointer duy nhất ở root `AUDIT.md`, đã cập nhật để trỏ thêm tới audit này). Hai citation kiểu `[audit cũ](docs/AUDIT.md:36|112)` trong `AUDIT-DOCS-2026-09-12.md` trỏ tới file vừa xoá đã được sửa thành chú thích văn bản kèm link tới [archive](archive/pre-fix-2026-09-13.zip) chứa bản gốc. Đã chạy lại `verify-artifacts.mjs`: `failures: []`, 101 markdown link nội bộ hợp lệ (giảm từ 102 do bớt một pointer trùng).
+Theo yêu cầu người dùng, đã xoá N01 (`00-BAT-DAU (BẢN CŨ - xoá được).md`), N02 (thư mục `scripts/` rỗng), và N04a (`docs/AUDIT.md`, `docs/AUDIT-vong-1.md` — chỉ giữ pointer duy nhất ở root `AUDIT.md`, đã cập nhật để trỏ thêm tới audit này). Hai citation kiểu `docs/AUDIT.md:36|112` trong `AUDIT-DOCS-2026-09-12.md` trỏ tới file vừa xoá đã được sửa thành chú thích văn bản kèm link tới [archive](archive/pre-fix-2026-09-13.zip) chứa bản gốc. Đã chạy lại `verify-artifacts.mjs`: `failures: []`, 101 markdown link nội bộ hợp lệ (giảm từ 102 do bớt một pointer trùng).
 
 N04 (chưa init Git) để mở — cần quyết định của nhóm, không tự sửa. *(Cập nhật 14/09: Git đã được khởi tạo, N04 đã xử lý. N03 đã được đính chính ở bảng trên vì phát hiện gốc là sai.)*
 
