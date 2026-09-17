@@ -4,7 +4,7 @@
 
 **Backend verification: PASS. Repository hygiene: CLEANED_WITH_PRESERVED_HISTORY.**
 
-The current source, tests, package graph and backend integration gates pass. Rebuildable output was removed. The Git working tree is intentionally still dirty because it contains the uncommitted API-GATE/catalog implementation and historical evidence; this audit did not commit, reset, rewrite migrations or erase evidence.
+The current source, tests, package graph and backend integration gates pass. Rebuildable output was removed. The reviewed API-GATE/catalog implementation and selected evidence were subsequently checkpointed in focused commits; no migration history or evidence history was rewritten.
 
 ## Verified
 
@@ -25,6 +25,7 @@ The current source, tests, package graph and backend integration gates pass. Reb
 - Baseline now describes WEB-01B as a provisional fixture shell without live API/session/browser evidence instead of saying the frontend is wholly unimplemented.
 - Two broken FS-04 evidence links now point to `1789368709477-final-check-r4/`.
 - A stale historical Markdown link was converted to a literal path, and current API status/progress/API-05 documentation now points to the fresh gate.
+- Web workspace lifecycle scripts now build `@wap/dsl` before dev, build, typecheck and unit-test entry points. Browser commands also build the matching fixture/live web bundle before preview. This closes a clean-checkout failure that had been masked by a stale `packages/dsl/dist/` directory.
 
 ## Cleanup performed
 
@@ -52,6 +53,5 @@ These files are recoverable by the normal build/schema/test commands. No source,
 
 ## Remaining limits
 
-- The working tree still needs a deliberate checkpoint review and selective commit; a broad `git add .`, `git clean` or history rewrite remains unsafe.
 - Browser E2E against the live API/session, 2-second frontend polling, AI/retrieval/replan evaluation, official rubric and representative user work remain `NOT_RUN`/`OPEN`. They are not backend regressions.
 - Historical absolute `file:///D:/...` citations are not portable. They were left unchanged to avoid rewriting evidence history.

@@ -3,12 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare:dsl": "npm run build -w @wap/dsl",
+    "predev": "npm run prepare:dsl",
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "prebuild": "npm run prepare:dsl",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "pretypecheck": "npm run prepare:dsl",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
+    "pretest:unit": "npm run prepare:dsl",
     "test:unit": "vitest run --config vitest.unit.config.ts",
+    "pretest:browser": "npm run build",
     "test:browser": "playwright test --project=fixture",
+    "pretest:live": "npm run build -- --mode live",
     "test:live": "playwright test --project=live --workers=1"
   },
   "dependencies": {
