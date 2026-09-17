@@ -1,0 +1,16 @@
+{
+  "id": "db-integration",
+  "command": "npm run test:integration -w @wap/mcp-task-hub",
+  "started_at": "2026-09-17T07:23:53.550Z",
+  "finished_at": "2026-09-17T07:24:56.604Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "error": null,
+  "stdout": "\n> @wap/mcp-task-hub@0.1.0 test:integration\n> vitest run --config vitest.integration.config.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/mcp-task-hub\n\n\n Test Files  2 passed (2)\n      Tests  64 passed (64)\n   Start at  14:23:54\n   Duration  62.16s (transform 286ms, setup 0ms, import 1.40s, tests 60.40s, environment 0ms)\n\n",
+  "stderr": "",
+  "cleanup_evidence": {
+    "status": "NOT_REPORTED_TO_RUNNER",
+    "independently_verified": false
+  }
+}

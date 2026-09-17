@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, cpSync, appendFileSync } from "node:fs";
+import { mkdtempSync, cpSync, appendFileSync, rmSync } from "node:fs";
 import * as implementation from "../../../packages/db/src/index.js";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -47,9 +47,13 @@ it("applies SQL migrations exactly once and detects checksum drift", async () =>
   ]);
   expect((await implementation.migrate(url)).applied).toEqual([]);
   const dir = mkdtempSync(path.join(tmpdir(), "ati-migration-test-"));
-  cpSync(path.join(root, "db/migrations"), dir, { recursive: true });
-  appendFileSync(path.join(dir, "0001_init.sql"), "\n-- unexpected edit");
-  await expect(implementation.migrate(url, dir)).rejects.toThrow(/checksum/i);
+  try {
+    cpSync(path.join(root, "db/migrations"), dir, { recursive: true });
+    appendFileSync(path.join(dir, "0001_init.sql"), "\n-- unexpected edit");
+    await expect(implementation.migrate(url, dir)).rejects.toThrow(/checksum/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 it("creates the filesystem dispatch reservation with the intended boundary contract", async () => {

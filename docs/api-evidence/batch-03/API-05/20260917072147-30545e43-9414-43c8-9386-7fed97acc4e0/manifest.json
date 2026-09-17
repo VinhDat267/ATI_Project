@@ -1,0 +1,2946 @@
+{
+  "task": "API-05",
+  "created_at": "2026-09-17T07:27:51.708Z",
+  "commit": "23a41d8123841b3b2080204d82d2521f88919aac",
+  "git": {
+    "available": true,
+    "dirty": true,
+    "tracked_changes": [
+      ".env.example",
+      ".gitignore",
+      "README.md",
+      "apps/api/README.md",
+      "apps/api/src/app.ts",
+      "apps/api/src/contracts.ts",
+      "apps/api/src/gateway-manager.ts",
+      "apps/api/src/main.ts",
+      "apps/api/src/maintenance.ts",
+      "apps/api/tests/approval.integration.test.ts",
+      "apps/api/tests/audit-acceptance.integration.test.ts",
+      "apps/api/tests/audit-ownership.integration.test.ts",
+      "apps/api/tests/audit-worker.integration.test.ts",
+      "apps/api/tests/cancel-expiry.integration.test.ts",
+      "apps/api/tests/create-run.integration.test.ts",
+      "apps/api/tests/events.integration.test.ts",
+      "apps/api/tests/fixture.ts",
+      "apps/api/tests/gateway-manager.test.ts",
+      "apps/api/tests/http.test.ts",
+      "apps/api/tests/prepare-worker.integration.test.ts",
+      "apps/api/tests/trace.integration.test.ts",
+      "apps/mcp-task-hub/tests/database.integration.test.ts",
+      "apps/web/package.json",
+      "db/DATABASE.md",
+      "docs/00-BAT-DAU.md",
+      "docs/ADR-001-FRONTEND-STACK.md",
+      "docs/API-STATUS-2026-09-15.md",
+      "docs/API.md",
+      "docs/BASELINE.md",
+      "docs/FRONTEND-HANDOFF.md",
+      "docs/G1-RUBRIC-MAP.md",
+      "docs/KE-HOACH-6-TUAN.md",
+      "docs/QUYET-DINH.md",
+      "docs/api-evidence/batch-03/API-AUDIT-FIX-PROGRESS.md",
+      "docs/functional-requirements.md",
+      "docs/openapi.yaml",
+      "docs/superpowers/plans/2026-09-15-frontend-platform.md",
+      "docs/superpowers/specs/2026-09-15-platform-ux-design.md",
+      "docs/task-hub-evidence/batch-02/FS-04/FS-04.md",
+      "package-lock.json",
+      "package.json",
+      "packages/dsl/package.json",
+      "packages/dsl/scripts/emit-openapi.ts",
+      "packages/dsl/src/contracts.ts",
+      "packages/dsl/tests/contracts.test.ts",
+      "packages/engine/src/engine.ts",
+      "packages/engine/src/gateway-types.ts",
+      "packages/engine/src/gateway.ts",
+      "packages/engine/src/index.ts",
+      "packages/engine/src/store.ts",
+      "packages/engine/tests/gateway-routing.test.ts",
+      "scripts/check-api-lib.mjs",
+      "scripts/check-api.mjs",
+      "scripts/check-api.test.mjs",
+      "scripts/check-engine.mjs"
+    ],
+    "untracked": [
+      ".superpowers/sdd/2026-09-14-fs-05-gap-closure/.gitignore",
+      ".superpowers/sdd/2026-09-14-fs-06-finalization/.gitignore",
+      "DESIGN.md",
+      "apps/api/tests/catalog-http.test.ts",
+      "apps/api/tests/catalog.integration.test.ts",
+      "apps/api/tests/http-boundary.integration.test.ts",
+      "apps/api/tests/maintenance.test.ts",
+      "apps/api/tests/preclaim-crash-worker.ts",
+      "docs/api-evidence/batch-03/API-05/20260914235539-7e4bbc4b-a9f7-45ed-bf93-76c6d6994bdc/check.json",
+      "docs/api-evidence/batch-03/API-05/20260914235539-7e4bbc4b-a9f7-45ed-bf93-76c6d6994bdc/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/check.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260914235751-9441e880-0a87-48ea-89b3-c6c6a7b5120d/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/check.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260915001127-e4782dbf-513a-4bd2-86b3-af3e50288e08/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917030808-7e0dd61d-2e69-42ca-9271-1212669502d9/runner-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917043443-939702f6-a49b-4bbe-8734-4e7536fb5fd8/runner-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917044257-55087b19-6b2a-470a-9aa2-858134c5c884/runner-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917045637-22e37a34-fd10-46b1-a87e-c3a417b293e8/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917045637-22e37a34-fd10-46b1-a87e-c3a417b293e8/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917045637-22e37a34-fd10-46b1-a87e-c3a417b293e8/runner-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/manifest.json",
+      "docs/api-evidence/batch-03/API-05/20260917045714-a228d85d-639b-4508-9f44-630bc9f268b8/runner-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/api-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/api-unit.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/check.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/db-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/engine-integration.json",
+      "docs/api-evidence/batch-03/API-05/20260917072147-30545e43-9414-43c8-9386-7fed97acc4e0/runner-unit.json",
+      "docs/design/DESIGN-airtable.md",
+      "docs/superpowers/specs/2026-09-15-platform-system-design.md",
+      "docs/task-hub-evidence/batch-01/TH-03-date-fix/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03-date-fix/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-03/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-04/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-04/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-05/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-05/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-06/commands.json",
+      "docs/task-hub-evidence/batch-01/TH-06/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/TH-06/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/command-result.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/probe-results.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/review-probe.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/source-verification.json",
+      "docs/task-hub-evidence/batch-01/review-TH-02-20260913-154039/tracked-before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913-r2/preservation.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913/controller-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-20260913/mcp-observations.json",
+      "docs/task-hub-evidence/batch-01/review-TH-03-date-fix-20260913/verified-files.json",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/final-integrity.json",
+      "docs/task-hub-evidence/batch-01/review-TH-04-20260913/verified-files.json",
+      "docs/task-hub-evidence/batch-01/review-TH-05-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-05-20260913/probe-1789297615294.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/probe-1789312986060.json",
+      "docs/task-hub-evidence/batch-01/review-TH-06-r2-20260913/probe.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/before.json",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/capture-before.mjs",
+      "docs/task-hub-evidence/batch-01/review-TH-07-20260913/verify-final.mjs",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319248436-install/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319254500-install/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319467664-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319467664-probe/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319483946-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789319491600-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362723134-repro-before/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362806900-probe-fixed/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362806900-probe-fixed/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362842352-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362890651-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362927729-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789362927729-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363211531-codex-r2-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214163-codex-r2-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214989-codex-r2-missing-structured/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363214989-codex-r2-missing-structured/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363215719-codex-r2-connect-fail/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363215719-codex-r2-connect-fail/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363216085-codex-r2-close-fail/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363216085-codex-r2-close-fail/filesystem-candidate-probe.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363429705-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363439692-artifact/candidate-artifact.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363439692-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363778502-codex-direct-red/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363800000-repro/reproduce.mjs",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363800000-repro/reproduction.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363827647-codex-direct-green/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363870921-codex-direct-live-probe/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/1789363872414-codex-direct-artifact/command.json",
+      "docs/task-hub-evidence/batch-02/FS-01/preflight.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365430976-full-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365441083-full-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365656830-typecheck/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365657112-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789365754069-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/1789366012289-final-check-2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-02/engine-integration/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367130840-unit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367131065-fs-read-integration/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-03/1789367141918-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368337841-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368368714-final-check-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368688793-final-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/catalog.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/command.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-04/1789368709477-final-check-r4/migration-ledger.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369901811-controller-fault-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789369978947-final-check-r1/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370466397-controller-fault-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370466397-controller-fault-check-r2/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370543061-final-check-r2/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370821048-controller-fault-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370821048-controller-fault-check-r3/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789370886411-final-check-r3/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-05/1789377566640-gap-closure-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789381765007-scope-audit/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789381765007-scope-audit/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382197418-scope-audit-r2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382197418-scope-audit-r2/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382825105-scope-audit-r3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382825105-scope-audit-r3/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382892954-scope-audit-fixed2/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789382892954-scope-audit-fixed2/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383162088-scope-audit-fixed3/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383162088-scope-audit-fixed3/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/migration-apply.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383515286-scope-audit-fixed4/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/migration-apply.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789383553778-scope-audit-fixed5/scope-audit.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384101511-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384162885-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384162885-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/filesystem-controller-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/mcp-observations.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388807207-docs-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388807207-docs-check/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388837658-docs-check/command.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789388837658-docs-check/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789389511082-docs-check-direct/docs-check.json",
+      "docs/task-hub-evidence/batch-02/FS-06/1789389866533-docs-check-direct/docs-check.json",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/artifact-validation.test.ts.before.txt",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/before.json",
+      "docs/task-hub-evidence/batch-02/codex-direct-FS-01-20260914/emit-candidate-artifact.mjs.before.txt",
+      "docs/task-hub-evidence/batch-02/review-FS-01-r2-20260914/before.json",
+      "docs/task-hub-evidence/batch-02/review-FS-01-r2-20260914/helper-under-review.mjs",
+      "packages/engine/tests/server-catalog.test.ts"
+    ],
+    "source_changes": {
+      "tracked": [
+        ".env.example",
+        "apps/api/src/app.ts",
+        "apps/api/src/contracts.ts",
+        "apps/api/src/gateway-manager.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/maintenance.ts",
+        "apps/api/tests/approval.integration.test.ts",
+        "apps/api/tests/audit-acceptance.integration.test.ts",
+        "apps/api/tests/audit-ownership.integration.test.ts",
+        "apps/api/tests/audit-worker.integration.test.ts",
+        "apps/api/tests/cancel-expiry.integration.test.ts",
+        "apps/api/tests/create-run.integration.test.ts",
+        "apps/api/tests/events.integration.test.ts",
+        "apps/api/tests/fixture.ts",
+        "apps/api/tests/gateway-manager.test.ts",
+        "apps/api/tests/http.test.ts",
+        "apps/api/tests/prepare-worker.integration.test.ts",
+        "apps/api/tests/trace.integration.test.ts",
+        "apps/mcp-task-hub/tests/database.integration.test.ts",
+        "apps/web/package.json",
+        "docs/openapi.yaml",
+        "package-lock.json",
+        "package.json",
+        "packages/dsl/package.json",
+        "packages/dsl/scripts/emit-openapi.ts",
+        "packages/dsl/src/contracts.ts",
+        "packages/dsl/tests/contracts.test.ts",
+        "packages/engine/src/engine.ts",
+        "packages/engine/src/gateway-types.ts",
+        "packages/engine/src/gateway.ts",
+        "packages/engine/src/index.ts",
+        "packages/engine/src/store.ts",
+        "packages/engine/tests/gateway-routing.test.ts",
+        "scripts/check-api-lib.mjs",
+        "scripts/check-api.mjs",
+        "scripts/check-api.test.mjs",
+        "scripts/check-engine.mjs"
+      ],
+      "untracked": [
+        "apps/api/tests/catalog-http.test.ts",
+        "apps/api/tests/catalog.integration.test.ts",
+        "apps/api/tests/http-boundary.integration.test.ts",
+        "apps/api/tests/maintenance.test.ts",
+        "apps/api/tests/preclaim-crash-worker.ts",
+        "packages/engine/tests/server-catalog.test.ts"
+      ]
+    },
+    "error": null
+  },
+  "runtime": {
+    "node": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64",
+    "root_package": {
+      "name": "wap",
+      "engines": {
+        "node": "^22.12.0 || >=24.0.0"
+      }
+    },
+    "api_package": {
+      "name": "@wap/api",
+      "version": "0.1.0"
+    },
+    "engine_package": {
+      "name": "@wap/engine",
+      "version": "0.1.0"
+    },
+    "task_hub_package": {
+      "name": "@wap/mcp-task-hub",
+      "version": "0.1.0"
+    },
+    "declared_dependencies": {
+      "postgres_client": "3.4.9",
+      "mcp_sdk": "1.30.0",
+      "filesystem_mcp": "2026.8.31"
+    },
+    "postgres_server": {
+      "version": "NOT_CAPTURED",
+      "limitation": "Cleanup oracle opens separate read-only admin sessions for owned-database discovery but does not persist connection configuration or capture the server version."
+    },
+    "mcp_processes": {
+      "versions": "NOT_CAPTURED_AT_PROCESS_BOUNDARY",
+      "limitation": "Integration suites own MCP child processes; declared package versions and source bytes are fingerprinted instead."
+    }
+  },
+  "commands": [
+    {
+      "id": "runner-unit",
+      "command": "C:\\Program Files\\nodejs\\node.exe --test scripts/check-api.test.mjs",
+      "started_at": "2026-09-17T07:21:48.374Z",
+      "finished_at": "2026-09-17T07:21:48.600Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "check",
+      "command": "npm run check",
+      "started_at": "2026-09-17T07:21:49.095Z",
+      "finished_at": "2026-09-17T07:22:33.576Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "api-unit",
+      "command": "npm run test:unit -w @wap/api -- --reporter=json",
+      "started_at": "2026-09-17T07:22:34.053Z",
+      "finished_at": "2026-09-17T07:22:42.763Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "api-integration",
+      "command": "npm run test:integration -w @wap/api -- --reporter=json",
+      "started_at": "2026-09-17T07:22:43.193Z",
+      "finished_at": "2026-09-17T07:23:53.071Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "db-integration",
+      "command": "npm run test:integration -w @wap/mcp-task-hub",
+      "started_at": "2026-09-17T07:23:53.550Z",
+      "finished_at": "2026-09-17T07:24:56.604Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    },
+    {
+      "id": "engine-integration",
+      "command": "npm run test:integration -w @wap/engine -- --reporter=json",
+      "started_at": "2026-09-17T07:24:57.220Z",
+      "finished_at": "2026-09-17T07:27:51.047Z",
+      "exit_code": 0,
+      "signal": null,
+      "timed_out": false,
+      "error": null,
+      "cleanup_evidence": {
+        "status": "NOT_REPORTED_TO_RUNNER",
+        "independently_verified": false
+      }
+    }
+  ],
+  "source_evidence": {
+    "algorithm": "sha256",
+    "file_count": 182,
+    "category_counts": {
+      "config": 28,
+      "lockfile": 1,
+      "migration": 6,
+      "script": 16,
+      "source": 66,
+      "test": 65
+    },
+    "files": {
+      ".env.example": {
+        "bytes": 1293,
+        "category": "config",
+        "sha256": "09226c8b277b4a04fae22cf909996975b213fbe5a0d35b3fdde6f38b7263d3ca"
+      },
+      "apps/api/package.json": {
+        "bytes": 491,
+        "category": "config",
+        "sha256": "4f6cb322bdebd3c2cbd0aac9c353644a2bda7115a3e4819921e5ac29b92c2218"
+      },
+      "apps/api/src/app.ts": {
+        "bytes": 18617,
+        "category": "source",
+        "sha256": "dac4054132de196fc1e7077abfacc06851afaa440aa04f5e0168f1e223a827d0"
+      },
+      "apps/api/src/auth.ts": {
+        "bytes": 4877,
+        "category": "source",
+        "sha256": "a23a76ae9f231c7384eb0bd573764546286505931e7fe9b72b54f2358f80f01a"
+      },
+      "apps/api/src/config.ts": {
+        "bytes": 2469,
+        "category": "config",
+        "sha256": "6ec50b0b56681d86e28f7f2468a4fb6dde0ff97e627260a79a4a171a6ca1d591"
+      },
+      "apps/api/src/contracts.ts": {
+        "bytes": 408,
+        "category": "source",
+        "sha256": "a730c8472eac94b1634f76164b70ef0db2030465b1e3c624485ab1488a0c3aef"
+      },
+      "apps/api/src/cursors.ts": {
+        "bytes": 1598,
+        "category": "source",
+        "sha256": "d312e78059633da13b29d35c7dcc1a0a6e34d70b52320ea10e99e6cea0b865d1"
+      },
+      "apps/api/src/dev-planner.ts": {
+        "bytes": 2654,
+        "category": "source",
+        "sha256": "c6a9bd9e008caf58f31708e324f276c580ab500745de02afaeb59b54c5fc1adb"
+      },
+      "apps/api/src/gateway-manager.ts": {
+        "bytes": 2096,
+        "category": "source",
+        "sha256": "3ea8374112bb0ab804912ab7479ccc1804caa045ddf8c9ca978926a6be8aec26"
+      },
+      "apps/api/src/http.ts": {
+        "bytes": 1986,
+        "category": "source",
+        "sha256": "4e4bd4c3d639c3a9ff9e18fa27d850658565bc6a6458cb295444e5a6c89f323f"
+      },
+      "apps/api/src/index.ts": {
+        "bytes": 540,
+        "category": "source",
+        "sha256": "2c6d927fdf889b145db483618339411734bc07639b0c911dda5916055de92fb3"
+      },
+      "apps/api/src/main.ts": {
+        "bytes": 3043,
+        "category": "source",
+        "sha256": "40d7bf47d67be932703df6e499af4ca5075de630102ecf90e7cbceb32d28a191"
+      },
+      "apps/api/src/maintenance.ts": {
+        "bytes": 1832,
+        "category": "source",
+        "sha256": "2563860388d7b168e5dfae21b07bee71d45e0634806885622a41190499f2b4c3"
+      },
+      "apps/api/src/redaction.ts": {
+        "bytes": 174,
+        "category": "source",
+        "sha256": "f93d1a1eb245433e266cc15ac404653937606fcef3dd2a9fd8c085fd0544f6d9"
+      },
+      "apps/api/src/worker.ts": {
+        "bytes": 2840,
+        "category": "source",
+        "sha256": "72a70c2afb01358cf2e580e592a8992b4531c2685a3d0c01482946aa2be79d08"
+      },
+      "apps/api/tests/approval.integration.test.ts": {
+        "bytes": 3868,
+        "category": "test",
+        "sha256": "f9d75c994556dcc5332ea9958c6acd231cbf84cacff654f27d25e99253194f9f"
+      },
+      "apps/api/tests/audit-acceptance.integration.test.ts": {
+        "bytes": 5748,
+        "category": "test",
+        "sha256": "56c87eae3dabd70d2aba9f79a770a8f865a67e53a8d25d63e6f939ad476f27ea"
+      },
+      "apps/api/tests/audit-bootstrap.integration.test.ts": {
+        "bytes": 2513,
+        "category": "test",
+        "sha256": "673d65a3c2ede63a7f6045e058711a5f26c41eaf2abe684bc08418326015b6f3"
+      },
+      "apps/api/tests/audit-http.integration.test.ts": {
+        "bytes": 5279,
+        "category": "test",
+        "sha256": "d8a771f3f5f4d1e2ac48cc17de10baf471d82eb51fd95502a427a2607f8167a9"
+      },
+      "apps/api/tests/audit-http.test.ts": {
+        "bytes": 6318,
+        "category": "test",
+        "sha256": "97d793c6e227db099ae6f7d84fde066d74227a7b77536f92f9fadd2344ac9dc7"
+      },
+      "apps/api/tests/audit-main.integration.test.ts": {
+        "bytes": 3682,
+        "category": "test",
+        "sha256": "d211b2356675e8d44096be842884098896c0bef15f34e1cc20b44a91dff301b9"
+      },
+      "apps/api/tests/audit-ownership.integration.test.ts": {
+        "bytes": 9953,
+        "category": "test",
+        "sha256": "8d7684721ad37bdec5477878ac4a1f2bfc26b0afc621ec8db52261909fed907d"
+      },
+      "apps/api/tests/audit-saved-secret.integration.test.ts": {
+        "bytes": 5510,
+        "category": "test",
+        "sha256": "b36041d74984b444ca0a569e7f38b7586fcfdbdefbc095fab40f3c2a9eefe732"
+      },
+      "apps/api/tests/audit-transport.integration.test.ts": {
+        "bytes": 871,
+        "category": "test",
+        "sha256": "288b8805c95b25988013991f892b3df706fc8480a062ec2abad99670f428bc6c"
+      },
+      "apps/api/tests/audit-worker.integration.test.ts": {
+        "bytes": 11427,
+        "category": "test",
+        "sha256": "8fdfa7c943ba692c55d9bbd188dc539f865bd2119c7588fa9c6e78481715b313"
+      },
+      "apps/api/tests/audit-worker.test.ts": {
+        "bytes": 1368,
+        "category": "test",
+        "sha256": "60a51c0fc4d740b33a438136242cc3f3b202fed93a0f88dfee0ce80734164133"
+      },
+      "apps/api/tests/auth.integration.test.ts": {
+        "bytes": 1493,
+        "category": "test",
+        "sha256": "d4474f5b9d6badfebeccc0bd2e7e41836267a4180f2e849c68af3bd9ba9242a5"
+      },
+      "apps/api/tests/auth.test.ts": {
+        "bytes": 1428,
+        "category": "test",
+        "sha256": "65897ab02bbde18a73e64d9c9112ded4de3cb546c50396887792c965e23cc9a0"
+      },
+      "apps/api/tests/cancel-expiry.integration.test.ts": {
+        "bytes": 3770,
+        "category": "test",
+        "sha256": "6b6d23e6159c2b43a41e858a8c21a3421ba7f444cd0cf85064e05ea59aeb55e6"
+      },
+      "apps/api/tests/catalog-http.test.ts": {
+        "bytes": 9041,
+        "category": "test",
+        "sha256": "c034e8a45df8c1c8e7e31517c90ae9896d40a98674901ae7e72921f679e9d44e"
+      },
+      "apps/api/tests/catalog.integration.test.ts": {
+        "bytes": 2270,
+        "category": "test",
+        "sha256": "cfe6df4bb1346ac46f152abbffc887d4285ddd16d44ef24785dea68a64d33fd2"
+      },
+      "apps/api/tests/config.test.ts": {
+        "bytes": 983,
+        "category": "test",
+        "sha256": "b21d4bd45895bffe26172bae1b2641e4d9e2e63fbf947ed2d474b8cd64beb85e"
+      },
+      "apps/api/tests/create-run.integration.test.ts": {
+        "bytes": 3784,
+        "category": "test",
+        "sha256": "3ccc42ae18328983e9effe42980d43bdd43df11cafb00d0cb54b320c81a12b15"
+      },
+      "apps/api/tests/dev-planner.test.ts": {
+        "bytes": 1392,
+        "category": "test",
+        "sha256": "d019364ac464c201b77554a7f1139e06d976839ea34238c402110fbe4bca1ba1"
+      },
+      "apps/api/tests/events.integration.test.ts": {
+        "bytes": 3739,
+        "category": "test",
+        "sha256": "8332dda586169f1006d822a48040328cb04fe1954c56e22d14b529d6dbf3759c"
+      },
+      "apps/api/tests/fixture.ts": {
+        "bytes": 5902,
+        "category": "test",
+        "sha256": "7eafd82e2c703363d96452b46e7f95bbdf2eaa871d2c324f16cc2c0b50e08cab"
+      },
+      "apps/api/tests/gateway-manager.test.ts": {
+        "bytes": 2142,
+        "category": "test",
+        "sha256": "34317dcc934fb4a0b4c102772029d0f536dc827d728aa00e22808dc369533160"
+      },
+      "apps/api/tests/http-acceptance.integration.test.ts": {
+        "bytes": 8956,
+        "category": "test",
+        "sha256": "b9377a4acd06e248d5ae126d0cd87b2ea8b42eddde37e4d3c9a56f3a688e150e"
+      },
+      "apps/api/tests/http-boundary.integration.test.ts": {
+        "bytes": 2010,
+        "category": "test",
+        "sha256": "73b9102be8909e82c905445737845b8c9d54b390be8f3a26e3d11ae57a48b2e2"
+      },
+      "apps/api/tests/http.test.ts": {
+        "bytes": 5254,
+        "category": "test",
+        "sha256": "a270d22be1346b304bafb9fc767040ab48444e7caa17a9963029f802cc673312"
+      },
+      "apps/api/tests/maintenance.test.ts": {
+        "bytes": 3768,
+        "category": "test",
+        "sha256": "449a9955b7fa0aa2702719589cd2f764b9c24ab2b56c3fe26a6e96aa6b7f04ec"
+      },
+      "apps/api/tests/preclaim-crash-worker.ts": {
+        "bytes": 1282,
+        "category": "test",
+        "sha256": "8cb19c6ff6c68ce22cb756efb472a0c5769302936406967ccaa6d65f2dc8de5d"
+      },
+      "apps/api/tests/prepare-worker.integration.test.ts": {
+        "bytes": 2502,
+        "category": "test",
+        "sha256": "7436bb953436f3a25fe702103dd4b6681def3f90df4468cdb1ff66af2d97d672"
+      },
+      "apps/api/tests/read-model.integration.test.ts": {
+        "bytes": 1624,
+        "category": "test",
+        "sha256": "0ad7d702979e7fbd6e7c12dcbdbe39f4aec205664f3026e912ad1171a8d3767e"
+      },
+      "apps/api/tests/reconciliation.integration.test.ts": {
+        "bytes": 1377,
+        "category": "test",
+        "sha256": "6bf418db70404f388e0cf9f9992d1dd70d5a53cc0fd89f64f214cf70245656ef"
+      },
+      "apps/api/tests/trace.integration.test.ts": {
+        "bytes": 7353,
+        "category": "test",
+        "sha256": "4184b7c0212d3b0961cc06b07fdd08e0a9054025c5484bdb4b63502ee6948437"
+      },
+      "apps/api/tsconfig.json": {
+        "bytes": 174,
+        "category": "config",
+        "sha256": "591c669aa491c0157e1a529a43ccaa3657e393bee8244f8ba2685349911e84b2"
+      },
+      "apps/api/vitest.integration.config.ts": {
+        "bytes": 221,
+        "category": "config",
+        "sha256": "654c84559c1eb0995c16355e6f09fc16e146a8e7ced3ed92b39e2be1a7ee7277"
+      },
+      "apps/api/vitest.unit.config.ts": {
+        "bytes": 258,
+        "category": "config",
+        "sha256": "7bd4d2151113223d75d0a6d3369ae014816758aef38d21d254f7a964e51e3afe"
+      },
+      "apps/mcp-task-hub/package.json": {
+        "bytes": 452,
+        "category": "config",
+        "sha256": "78c795e6ee5cc568349c6c2f4d13d5ae760e202443290c0e9eb16740d5f22672"
+      },
+      "apps/mcp-task-hub/scripts/sync-catalog.mjs": {
+        "bytes": 1483,
+        "category": "script",
+        "sha256": "95353d786cc20db5e3b20d50ee7c781ab46eecc4e7c91cd6cbacf8f93d039394"
+      },
+      "apps/mcp-task-hub/src/cards.ts": {
+        "bytes": 9821,
+        "category": "source",
+        "sha256": "51eb4a26019e194bd4c1dbb44e96f32bb420b06e2fe7ce7069fb397d8648417c"
+      },
+      "apps/mcp-task-hub/src/contracts.ts": {
+        "bytes": 5094,
+        "category": "source",
+        "sha256": "741bf82797c5b72e63fdf57309050d2720f0e84cdb04447469f09be1c5d9b66c"
+      },
+      "apps/mcp-task-hub/src/errors.ts": {
+        "bytes": 163,
+        "category": "source",
+        "sha256": "670939c76cc0b85656a117b675d31cbdc8e5de673ad55171d48d31239d7219d7"
+      },
+      "apps/mcp-task-hub/src/fingerprint.ts": {
+        "bytes": 1139,
+        "category": "source",
+        "sha256": "5574d34878c0c3e3624185059271151913973c4b60a286c82a481dc075c44234"
+      },
+      "apps/mcp-task-hub/src/server.ts": {
+        "bytes": 2420,
+        "category": "source",
+        "sha256": "fc517e334e2bb2524058a5df9879087e634cce93d7f22bde6f58e03f06d01ee5"
+      },
+      "apps/mcp-task-hub/src/service.ts": {
+        "bytes": 10515,
+        "category": "source",
+        "sha256": "c92dffbfd49d94f8b8c6a36c1fc7442d6d322c61f5b4e8e8b2c77ffe70ea149a"
+      },
+      "apps/mcp-task-hub/tests/database.integration.test.ts": {
+        "bytes": 10257,
+        "category": "test",
+        "sha256": "0b6d3104d0ae443314bc0266b98a4dd9eab49570b64eea762378172d7660d353"
+      },
+      "apps/mcp-task-hub/tests/tools.integration.test.ts": {
+        "bytes": 98186,
+        "category": "test",
+        "sha256": "c603937bb9b36d4814fa77831c0a94351c6cad6097cee480579c5af208916f6e"
+      },
+      "apps/mcp-task-hub/tsconfig.json": {
+        "bytes": 139,
+        "category": "config",
+        "sha256": "02db1f0eba501da0c8e91cec2f5b98bc19c2674c89725dcbb8d11acbb5e3f4f6"
+      },
+      "apps/mcp-task-hub/vitest.integration.config.ts": {
+        "bytes": 220,
+        "category": "config",
+        "sha256": "46b12513912275d42b9ac625c0344320485632406053c201d852858a37f6ec57"
+      },
+      "apps/web/package.json": {
+        "bytes": 862,
+        "category": "config",
+        "sha256": "965070435d9d2b3caaad678616f33dbe7d04e9b4de0e41026ddfe78da4fc03da"
+      },
+      "apps/web/playwright.config.ts": {
+        "bytes": 676,
+        "category": "config",
+        "sha256": "0f7cc45b84ef9a7d33c8ed61ec1d0d0adb431024603811226d2296a1760bf0c6"
+      },
+      "apps/web/src/app/App.tsx": {
+        "bytes": 10511,
+        "category": "source",
+        "sha256": "11c264eebf6b2c49792a046c1c99e4f5cd2d86f40104dd5413eded74401fcffe"
+      },
+      "apps/web/src/core/contracts.ts": {
+        "bytes": 1730,
+        "category": "source",
+        "sha256": "fc311ebc9c58464fc56b1db8ef70aa367d88f206ad3d22b74872672fa002e922"
+      },
+      "apps/web/src/core/fixtures.ts": {
+        "bytes": 9402,
+        "category": "source",
+        "sha256": "62f6aa255cb6263da800e6b0584ad3135ee4aa6eb35ecf4dad2bef05b5254f42"
+      },
+      "apps/web/src/core/navigation.ts": {
+        "bytes": 1965,
+        "category": "source",
+        "sha256": "b40b253b10a71fa014963189fae515c9d3c1aa0b00055a9c84fe9b3091b92047"
+      },
+      "apps/web/src/core/session.ts": {
+        "bytes": 2004,
+        "category": "source",
+        "sha256": "06cb128ff868f68e905c34d1b749ee548bc49ea38594d9a151316fb37947a9c5"
+      },
+      "apps/web/src/core/store.ts": {
+        "bytes": 789,
+        "category": "source",
+        "sha256": "56a9e9ef5984ab4fd75ee53c085b2ba0e668321f40d35226b79544d709a7784c"
+      },
+      "apps/web/src/core/unavailable-transport.ts": {
+        "bytes": 507,
+        "category": "source",
+        "sha256": "49ee887c9b9b1b1a0deec739aa1eeb7308a5c40e0afbe2767b3593140f8ed7a9"
+      },
+      "apps/web/src/main.entry.tsx": {
+        "bytes": 63,
+        "category": "source",
+        "sha256": "b14213e8be415e5f58cd57c5a4d4f819790192adf0cfb07b5dfa789266f6dae4"
+      },
+      "apps/web/src/main.fixture.tsx": {
+        "bytes": 852,
+        "category": "source",
+        "sha256": "f96db6a197b5efa36f5a39e6642badc6d1148e5f40453b955cd119fee7f7a72c"
+      },
+      "apps/web/src/main.live.tsx": {
+        "bytes": 618,
+        "category": "source",
+        "sha256": "d6d46451d93cf5ca376b99e6c043887b3e7e4b4f2fe71f404aa3206b55976877"
+      },
+      "apps/web/tests/browser/build-smoke.spec.ts": {
+        "bytes": 687,
+        "category": "test",
+        "sha256": "3f4b816f9962396bbeea4a4c066ef15b406d0a3aaa69237a0621868ed28c7b93"
+      },
+      "apps/web/tests/browser/navigation.spec.ts": {
+        "bytes": 2548,
+        "category": "test",
+        "sha256": "56646598d76d38f49a011266b24f1064e8689a8052ae14026ce8b0d16b2b2f33"
+      },
+      "apps/web/tests/unit/browser-contracts.test.ts": {
+        "bytes": 2895,
+        "category": "test",
+        "sha256": "abaf5f6f5a463adb3a4455d7752f460fe73a8dcd991e80189c9d9ecaf14b45d9"
+      },
+      "apps/web/tests/unit/fixtures.test.ts": {
+        "bytes": 2004,
+        "category": "test",
+        "sha256": "86144ec302ea2575a0eb3b0f9bd18e7399b699407cc018ab03f531b8a24aeb97"
+      },
+      "apps/web/tests/unit/local-proxy.test.ts": {
+        "bytes": 21436,
+        "category": "test",
+        "sha256": "ae6e7c9b8d4e6155cf09cc4483143e30c8abd0b0b8ad96b76ae63e119911c20e"
+      },
+      "apps/web/tests/unit/navigation.test.ts": {
+        "bytes": 1654,
+        "category": "test",
+        "sha256": "500a6d16f337226ba7120bfafac1880900ab1a1328ed8fea8a52ef87c87601e9"
+      },
+      "apps/web/tests/unit/session.test.ts": {
+        "bytes": 1207,
+        "category": "test",
+        "sha256": "a329ac1001d521523795711cba15cc1ae0ec6644613e1248ab5f174178af9593"
+      },
+      "apps/web/tests/unit/store.test.ts": {
+        "bytes": 1042,
+        "category": "test",
+        "sha256": "455e74e95f1c690e612537644373fb16d6d67e4f27da61433f6cce400b14de88"
+      },
+      "apps/web/tooling/local-proxy.ts": {
+        "bytes": 10717,
+        "category": "source",
+        "sha256": "03d73ac0ee5208e5f9feeb1aa9eb4b126800999fa5e9e8d9fe918012a4eba1e1"
+      },
+      "apps/web/tsconfig.json": {
+        "bytes": 417,
+        "category": "config",
+        "sha256": "f5eac0a80805483b9720268bbc94aad53b6da6ca77d8c2ea65339a1f0e9abd9f"
+      },
+      "apps/web/tsconfig.tools.json": {
+        "bytes": 394,
+        "category": "config",
+        "sha256": "0a70340d24a50674e00b4780f675f2c1f0e832569c96f86a74d0fead434f82a4"
+      },
+      "apps/web/vite.config.ts": {
+        "bytes": 940,
+        "category": "config",
+        "sha256": "12b5e5946db50bccbd85d6c806471ff1e29a2c4f26bd6c511942caaa6088250d"
+      },
+      "apps/web/vitest.unit.config.ts": {
+        "bytes": 163,
+        "category": "config",
+        "sha256": "a84eb8f2e4107ee5d9137375a03e54d44bf31c1510903e0d92893b4ae563487f"
+      },
+      "compose.g1.yaml": {
+        "bytes": 589,
+        "category": "config",
+        "sha256": "36b71f0b37fbb6d770315fb3917faf28a279898b80a52495cfefb57e8b715f67"
+      },
+      "db/migrations/0001_init.sql": {
+        "bytes": 15360,
+        "category": "migration",
+        "sha256": "ed6a450a1ccc22e71679b952f7ae2ee5aa5cacb48aa9a6dc32bae3e96e4de5f8"
+      },
+      "db/migrations/0002_audit_contracts.sql": {
+        "bytes": 5452,
+        "category": "migration",
+        "sha256": "ab2ab84660539f1d559ae68c8d542202203c3d098dbd162c88311b9173641689"
+      },
+      "db/migrations/0003_task_hub_local.sql": {
+        "bytes": 1136,
+        "category": "migration",
+        "sha256": "18e1edc97a2a18b245a85b7814b3b65f4b42c04ca54f3b10fbb8fecf0cb8ebc3"
+      },
+      "db/migrations/0004_task_hub_cards.sql": {
+        "bytes": 1924,
+        "category": "migration",
+        "sha256": "7c566bedb2cb8e886bd9a2c116955af288ec3cd483bdbf4e39ac29166197ca4e"
+      },
+      "db/migrations/0005_filesystem_dispatches.sql": {
+        "bytes": 979,
+        "category": "migration",
+        "sha256": "d7af10defa6c886d73edaf569e9326dae10932e9f8b47e7f7508f25866ba9521"
+      },
+      "db/migrations/0006_http_trace_snapshots.sql": {
+        "bytes": 633,
+        "category": "migration",
+        "sha256": "902eb1a19f663ab5429739483ea96a6d3cf71944930419b9c39e0932e495745c"
+      },
+      "docker-compose.yml": {
+        "bytes": 651,
+        "category": "config",
+        "sha256": "121c760e188d32fea93e19f79cc0aa353d9ebc0f300205c1d395253411fc199c"
+      },
+      "docs/openapi.yaml": {
+        "bytes": 121064,
+        "category": "config",
+        "sha256": "4e2d69bae4d17feada84574313d848c8ae32fcaba78916bc913f389eb7500f25"
+      },
+      "package-lock.json": {
+        "bytes": 123419,
+        "category": "lockfile",
+        "sha256": "7ebf014ee34047417b0dfc2d73398388a671c37c9d712d4392bc90f1c3f16021"
+      },
+      "package.json": {
+        "bytes": 2533,
+        "category": "config",
+        "sha256": "a4e8b477fa3619a77fc730ed80de51ff4e4fd06f7565a2b87f0afa53de834a79"
+      },
+      "packages/db/package.json": {
+        "bytes": 299,
+        "category": "config",
+        "sha256": "e495882e20a008d37bb8ba4a195043f0126e8c919ef8157e5e105e3a45534e6c"
+      },
+      "packages/db/src/cli.ts": {
+        "bytes": 560,
+        "category": "source",
+        "sha256": "c9c251e412b2cbabf05eafa4bbe0a540aafc7af5ee6c82eba92ba37f1e26c84e"
+      },
+      "packages/db/src/connection.ts": {
+        "bytes": 1124,
+        "category": "source",
+        "sha256": "942e776b94069242000573242675824ba2d37609abe2b596856310aa66a0b5e3"
+      },
+      "packages/db/src/index.ts": {
+        "bytes": 163,
+        "category": "source",
+        "sha256": "99fdef08e06f3dfb7b28bcbd19927f2b7df93bfc93cd2815f15f82f96a90bfe2"
+      },
+      "packages/db/src/migrate.ts": {
+        "bytes": 3084,
+        "category": "source",
+        "sha256": "e43074f0e4a10a39b48b0f1878a6b3c05ee13aa8620c6b678280039fd8d3fbef"
+      },
+      "packages/db/src/schema.ts": {
+        "bytes": 3614,
+        "category": "source",
+        "sha256": "ad72eb77aca29eb9b45f9da870b533333ba7eebf979ffa38583046d19a75ef2b"
+      },
+      "packages/db/src/seed.ts": {
+        "bytes": 2708,
+        "category": "source",
+        "sha256": "65db8fba6af3c3f12b1e04af75074f0e74a7f2a8a9bbb04ea6e7191956afd584"
+      },
+      "packages/db/tsconfig.json": {
+        "bytes": 127,
+        "category": "config",
+        "sha256": "9b905cb84737ab12a5b21e4d4110908bf614909b8a57cd83bc60b5b609cbedb2"
+      },
+      "packages/dsl/package.json": {
+        "bytes": 751,
+        "category": "config",
+        "sha256": "a03ce611e0e385411ddad325b365c757fdebf435bcf850bae445d8c67e8efc62"
+      },
+      "packages/dsl/scripts/emit-json-schema.ts": {
+        "bytes": 866,
+        "category": "script",
+        "sha256": "91343713d6a417695badf6e604d9ea97cfd8533c069caf905163fab3e06a3d28"
+      },
+      "packages/dsl/scripts/emit-openapi.ts": {
+        "bytes": 9868,
+        "category": "script",
+        "sha256": "ae81dc103e2e19357cd3091af6d079e226a9f663572df987ed977ed7683e2f28"
+      },
+      "packages/dsl/src/browser.ts": {
+        "bytes": 90,
+        "category": "source",
+        "sha256": "a5f821842fafd0dd06f321f1fa272c897ad367b1bceb404be67d574363092f91"
+      },
+      "packages/dsl/src/condition.ts": {
+        "bytes": 12055,
+        "category": "source",
+        "sha256": "33ec1d45ef85bf77596ddab01775b89100a5e5463e9a70d10963172374fa8d6e"
+      },
+      "packages/dsl/src/contracts.ts": {
+        "bytes": 9956,
+        "category": "source",
+        "sha256": "61995b5f9fd39c7a9f467896365c1df809a5ec56f70b594a5df84900cd677f05"
+      },
+      "packages/dsl/src/events.ts": {
+        "bytes": 10189,
+        "category": "source",
+        "sha256": "659bc3494feda5def9b9db5f4171fefd18a0e9cb83c405c2e5424f1afafb2251"
+      },
+      "packages/dsl/src/graph.ts": {
+        "bytes": 10141,
+        "category": "source",
+        "sha256": "00a8ac3c9b29752d72f89b5b1d50d2362653b36a4944d314ddd32d8d8a505db0"
+      },
+      "packages/dsl/src/index.ts": {
+        "bytes": 395,
+        "category": "source",
+        "sha256": "555a79658271f9c2feb3f9d084acc64a66f3135c77485806382fd5f595db163f"
+      },
+      "packages/dsl/src/prompts.ts": {
+        "bytes": 16643,
+        "category": "source",
+        "sha256": "a257192d1ce8481629773d52e976fe797547d83c04d1d124a4063d4940d0d269"
+      },
+      "packages/dsl/src/reference.ts": {
+        "bytes": 10630,
+        "category": "source",
+        "sha256": "620e6fade2f5b4bd54da70a7cf7dc12e104811292e5818ee3b7ab77b79bbe8db"
+      },
+      "packages/dsl/src/schema.ts": {
+        "bytes": 14183,
+        "category": "source",
+        "sha256": "e4f33078f59dde63a90ccd927016a3a39f7c602680d830754ec5d66f32d393db"
+      },
+      "packages/dsl/src/tool-policy.ts": {
+        "bytes": 5680,
+        "category": "source",
+        "sha256": "1164ed68097de7eb22540261713a2b9ce5ee3673df0f5bccceed890cff31f74b"
+      },
+      "packages/dsl/tests/contracts.test.ts": {
+        "bytes": 6304,
+        "category": "test",
+        "sha256": "f1d211e4edc75d81681fe41b2a3d3a19dd128945d7560d287cb37d349701aabe"
+      },
+      "packages/dsl/tests/fixtures.test.ts": {
+        "bytes": 4015,
+        "category": "test",
+        "sha256": "ca3e0b2ccfd92334ba1d8d180768996a5393a1864f0ebb2ba4212a9601691560"
+      },
+      "packages/dsl/tests/policy.test.ts": {
+        "bytes": 5598,
+        "category": "test",
+        "sha256": "da1a2143eade5bad96415fc80fb59fcf22b3a622fe40e49dfb1d23199bb66d24"
+      },
+      "packages/dsl/tests/regressions.test.ts": {
+        "bytes": 6491,
+        "category": "test",
+        "sha256": "992bdc932838b4a69f270318f9f96e4f60f71c8c428df819f585d652bda3973f"
+      },
+      "packages/dsl/tsconfig.json": {
+        "bytes": 296,
+        "category": "config",
+        "sha256": "9cb95687d8ac77a9be167b4b3201e6d38cd90a9554b1a48de0c7d2649bf546db"
+      },
+      "packages/engine/package.json": {
+        "bytes": 612,
+        "category": "config",
+        "sha256": "20f10d4474b49c4ebc914e09b3637968af4129fd4e68f888b7eb247b5bdd957f"
+      },
+      "packages/engine/src/accept.ts": {
+        "bytes": 1763,
+        "category": "source",
+        "sha256": "b768fd1f83363c422f000e86eed849dc462c671b64a04be30fab850e4e20ccad"
+      },
+      "packages/engine/src/approval.ts": {
+        "bytes": 3514,
+        "category": "source",
+        "sha256": "4d9b6cdcb31398772ffb53bb3039b773f59132ccc3c51b61d6a1c5bd177825b4"
+      },
+      "packages/engine/src/attempts.ts": {
+        "bytes": 8708,
+        "category": "source",
+        "sha256": "b1dce48912454cd936a9130a42a22de5786db7800955ee50178f2f1aa659cda9"
+      },
+      "packages/engine/src/cli.ts": {
+        "bytes": 4868,
+        "category": "source",
+        "sha256": "d5148f9eff6ce358ce1983960fa7740877ec73089b4d7a229636964d35d03e30"
+      },
+      "packages/engine/src/engine.ts": {
+        "bytes": 9518,
+        "category": "source",
+        "sha256": "82c35c7b82e01f45f4a0fddc4e6496925f208c7d5a934a678ed2ce9a2147b186"
+      },
+      "packages/engine/src/execute.ts": {
+        "bytes": 8139,
+        "category": "source",
+        "sha256": "5a9386c01aa60170d2486847c88e7615e9633d19f5137f7d567a7313b735f99f"
+      },
+      "packages/engine/src/filesystem-authorization.ts": {
+        "bytes": 6362,
+        "category": "source",
+        "sha256": "fd4de52a4b9caca970a6870b1637f61444e2f37195b825ac69abcd59127fb831"
+      },
+      "packages/engine/src/filesystem-paths.ts": {
+        "bytes": 10908,
+        "category": "source",
+        "sha256": "da05d2193069567691fe0cfab2d00199f67a84b599f71bb4a61f3679c9a6e380"
+      },
+      "packages/engine/src/gateway-filesystem.ts": {
+        "bytes": 15508,
+        "category": "source",
+        "sha256": "00fed3115e1c0fd37d26a40ae5e2ad265c4211c1f2bc91347d97b80addc14034"
+      },
+      "packages/engine/src/gateway-task-hub.ts": {
+        "bytes": 5540,
+        "category": "source",
+        "sha256": "03301a56a3389a9bebcf0fba21d58a113226307c71ac87871f44fe3b50427268"
+      },
+      "packages/engine/src/gateway-types.ts": {
+        "bytes": 2790,
+        "category": "source",
+        "sha256": "d0c7d401b43d7cba871c1c51d81421523ffee0d29b87601f58be8a8d19513cfd"
+      },
+      "packages/engine/src/gateway.ts": {
+        "bytes": 10322,
+        "category": "source",
+        "sha256": "21aad345e3296d714f1396fb2c6a26402c58b37a239c63262cba514a183f2100"
+      },
+      "packages/engine/src/index.ts": {
+        "bytes": 1198,
+        "category": "source",
+        "sha256": "e3f4fd89d6f6a288eca2bafd36832a6c8c3e27e276a6efe00f935d9c2977977c"
+      },
+      "packages/engine/src/launch-policy.ts": {
+        "bytes": 12572,
+        "category": "source",
+        "sha256": "0c1b7e54a90afbe81f96e1718397794963e4c04dfec03543e8c2078e8a26e927"
+      },
+      "packages/engine/src/planner-port.ts": {
+        "bytes": 516,
+        "category": "source",
+        "sha256": "cb07ac8d7bc76f952ef7ffe2d955a5f192b9aca10b4102e755ef8d11f9e3cf2c"
+      },
+      "packages/engine/src/prepare.ts": {
+        "bytes": 12363,
+        "category": "source",
+        "sha256": "1db1e3a015b582f2cd031d2fb1f08807d10bfb95d1886c618957d8b11f8f5dc9"
+      },
+      "packages/engine/src/receiver-policy.ts": {
+        "bytes": 891,
+        "category": "source",
+        "sha256": "9cdfabefc01a4e4ed7531b5fb8b49f05342dd888e0a9eeadfacd0b1254694dca"
+      },
+      "packages/engine/src/recovery.ts": {
+        "bytes": 8766,
+        "category": "source",
+        "sha256": "a337089c7afaf6495d77fef6df4f77b39c0405507ffddede8a5f6863965e2189"
+      },
+      "packages/engine/src/redaction.ts": {
+        "bytes": 2871,
+        "category": "source",
+        "sha256": "abcc7d9036005b61d241da40888a21bfb5143293cb7f92b27676a62266123839"
+      },
+      "packages/engine/src/snapshot.ts": {
+        "bytes": 5361,
+        "category": "source",
+        "sha256": "a1a9ca093d8130f3cba118256ddcb638bb9638679920e4421d1c2c2e5620e413"
+      },
+      "packages/engine/src/store.ts": {
+        "bytes": 18674,
+        "category": "source",
+        "sha256": "e9fd974c660f57d9d1482629008a09c964c26961891277a63ac030d800fe81de"
+      },
+      "packages/engine/tests/artifact-validation.test.ts": {
+        "bytes": 9386,
+        "category": "test",
+        "sha256": "bdd68fb3ffb49463cb6e941615205a33fabcfa882f2c757761bc270dc288988b"
+      },
+      "packages/engine/tests/audit-redaction.test.ts": {
+        "bytes": 2277,
+        "category": "test",
+        "sha256": "20259aacf0ec7b577c29fa2e86e66fa4e1d771be1da50122dba4e8ff87402842"
+      },
+      "packages/engine/tests/controller.integration.test.ts": {
+        "bytes": 59690,
+        "category": "test",
+        "sha256": "6cb6a3764a5a1e2ae02af0ef4a3d16ee1341b624dbb3c87943a869ef054a329d"
+      },
+      "packages/engine/tests/crash-worker.mjs": {
+        "bytes": 902,
+        "category": "test",
+        "sha256": "598058e9e9faa9f2a71e1d5b368d955b75b9e337277f1a588eeb05ae879d719b"
+      },
+      "packages/engine/tests/filesystem-adapter.test.ts": {
+        "bytes": 2592,
+        "category": "test",
+        "sha256": "1123a72f849aee41e098a9a42feb4976388a6c4a41aa10c921bbe8148d042aa8"
+      },
+      "packages/engine/tests/filesystem-controller.integration.test.ts": {
+        "bytes": 29066,
+        "category": "test",
+        "sha256": "6b09b355577dbbdf1fcba274a12c70cbe6beaeaaae49594cdd99aebb7c11acfc"
+      },
+      "packages/engine/tests/filesystem-crash-worker.mjs": {
+        "bytes": 1339,
+        "category": "test",
+        "sha256": "eed83ef278840180f5eb53d7f94fa48d869531635e5ad4a3842861ff194fda69"
+      },
+      "packages/engine/tests/filesystem-fixture.ts": {
+        "bytes": 5278,
+        "category": "test",
+        "sha256": "24fbfd82cca5a11d69be41f078750d1429bd3510eeac7282f6754e0ff7755453"
+      },
+      "packages/engine/tests/filesystem-launch-policy.test.ts": {
+        "bytes": 1194,
+        "category": "test",
+        "sha256": "d6c8374988f62edf6c5c1e0e496e002d860d30a56f25f9e4c893cf28965924b2"
+      },
+      "packages/engine/tests/filesystem-marker-crash-worker.mjs": {
+        "bytes": 1723,
+        "category": "test",
+        "sha256": "e0f8c68b6186b7d0263bf2427925a79300a6af328aa5699d936dea26b8509f6a"
+      },
+      "packages/engine/tests/filesystem-paths.test.ts": {
+        "bytes": 18740,
+        "category": "test",
+        "sha256": "f14d0547875df1b15b223d89f58f650040229f893b656075ea2d8452b0be5cc0"
+      },
+      "packages/engine/tests/filesystem-raw-fault-worker.mjs": {
+        "bytes": 2296,
+        "category": "test",
+        "sha256": "6c2ad58cb8a6cc55b34596e501e34e4c9b281ebfe2a2e0f43bd69f05d457aeb0"
+      },
+      "packages/engine/tests/filesystem-read.integration.test.ts": {
+        "bytes": 3372,
+        "category": "test",
+        "sha256": "f5d543551ff007fd856fd00fa261ef53a5052a8d576fa08b572c221783d78219"
+      },
+      "packages/engine/tests/filesystem-write.integration.test.ts": {
+        "bytes": 6398,
+        "category": "test",
+        "sha256": "67ad63ccdea8eabb3a84c8edd71ca4b5c50bbcbbeabde6fee6bc0284a11318be"
+      },
+      "packages/engine/tests/gateway-routing.test.ts": {
+        "bytes": 3582,
+        "category": "test",
+        "sha256": "9c1d27a91614c1fb7951fc195443d1d73aec66f30695bc37c2c579057c14ade6"
+      },
+      "packages/engine/tests/receiver-policy.test.ts": {
+        "bytes": 1500,
+        "category": "test",
+        "sha256": "b7208f90db0256c64123cc4a956c86bb4a7918458197013e68b08aa2f430d398"
+      },
+      "packages/engine/tests/server-catalog.test.ts": {
+        "bytes": 8613,
+        "category": "test",
+        "sha256": "04b81b7af103cec35d0b79ff3f35b1b9b1b9da301fbe0cc603f04558d5953e5b"
+      },
+      "packages/engine/tests/snapshot-compatibility.test.ts": {
+        "bytes": 750,
+        "category": "test",
+        "sha256": "e453723bd43567577e2d179389e1e5adabbb2c032d380607942ec35dd4c30045"
+      },
+      "packages/engine/tests/task-hub-plans.ts": {
+        "bytes": 2197,
+        "category": "test",
+        "sha256": "5975e29ff80e08d65a02d4644630a49f99cc074b55a1b05158ecd59152c6b069"
+      },
+      "packages/engine/tsconfig.json": {
+        "bytes": 113,
+        "category": "config",
+        "sha256": "25296de772f7fd2ca88d5e902fd1b1816ca400f2f232ad5bf3ad2b2b2ca94654"
+      },
+      "packages/engine/vitest.integration.config.ts": {
+        "bytes": 220,
+        "category": "config",
+        "sha256": "f14d3669c2b6cd2b8ec1cc8e8764f640ac97dc8cfa75ed3dc6a2b7cd081c3c33"
+      },
+      "packages/engine/vitest.unit.config.ts": {
+        "bytes": 258,
+        "category": "config",
+        "sha256": "7bd4d2151113223d75d0a6d3369ae014816758aef38d21d254f7a964e51e3afe"
+      },
+      "scripts/capture-command.mjs": {
+        "bytes": 1497,
+        "category": "script",
+        "sha256": "2a20a48609d230146dde889679e22397f33bc374c590cb68f7170a69e3372a22"
+      },
+      "scripts/check-api-lib.mjs": {
+        "bytes": 25906,
+        "category": "script",
+        "sha256": "f24060a31d84b1e5f44fe9a945f85b439b494abcdb6f3083939b51c71847f584"
+      },
+      "scripts/check-api.mjs": {
+        "bytes": 10133,
+        "category": "script",
+        "sha256": "e8e5d3ccb40adcf4eacd6a8d649ea8c2d3785ece338032ed25390dff8c050446"
+      },
+      "scripts/check-api.test.mjs": {
+        "bytes": 13802,
+        "category": "test",
+        "sha256": "a0cd41d835f7cd71c49e552f28f5c60e9728ebc257c7323a8e321c0b200b5e0e"
+      },
+      "scripts/check-engine.mjs": {
+        "bytes": 717,
+        "category": "script",
+        "sha256": "45c98c6a271d5fb375fdf115de69b481ca7f6891a45ba70c618ee7e3adbc00a8"
+      },
+      "scripts/emit-candidate-artifact.d.mts": {
+        "bytes": 351,
+        "category": "script",
+        "sha256": "d4258d9a69c03c6c6c6876b8f9a229b083d715623e6035ea4c8c9898c19d5e9e"
+      },
+      "scripts/emit-candidate-artifact.mjs": {
+        "bytes": 7251,
+        "category": "script",
+        "sha256": "69ecfc9c2dfc8faa967da1cdc9444f0701baf34814b35c08b42ae7b5ac3a7e8d"
+      },
+      "scripts/fs06-docs-check.mjs": {
+        "bytes": 16074,
+        "category": "script",
+        "sha256": "d2331cf4fde1a0cf0e67ff42106626af9d13300153de31255542cc8558c76abc"
+      },
+      "scripts/fs06-final-snapshot.mjs": {
+        "bytes": 22136,
+        "category": "script",
+        "sha256": "9bfe99c2e5be7993f7b602f7d03017d81ce0496f0b57c41b1c395116dbb81f58"
+      },
+      "scripts/fs06-manifest.mjs": {
+        "bytes": 35594,
+        "category": "script",
+        "sha256": "84556f15d17a5bf5947136cbfc7b20d9c76aab24ec7291302e02110c274d12e2"
+      },
+      "scripts/fs06-scope-audit.mjs": {
+        "bytes": 23410,
+        "category": "script",
+        "sha256": "a1de574f10d291ce1a3d6dd681710152dc88af6e1054995ff4972f34de24bc2f"
+      },
+      "scripts/g1-status.mjs": {
+        "bytes": 4596,
+        "category": "script",
+        "sha256": "1b8745c0049a035a7ceea16a5804dec442a3f4111b710500328d08745ecd03ef"
+      },
+      "scripts/prepare-filesystem-demo.mjs": {
+        "bytes": 2104,
+        "category": "script",
+        "sha256": "9c4aac97c9801d705c5b918cb19a5beef8ad88284f786f883f58908567c5d637"
+      },
+      "scripts/probe-filesystem-candidate.mjs": {
+        "bytes": 7784,
+        "category": "script",
+        "sha256": "21901f4fbbb856d6b1bdecddbbd2b585c48c72a20d843d8ce85b647e5f888b7c"
+      },
+      "tsconfig.json": {
+        "bytes": 1087,
+        "category": "config",
+        "sha256": "2bd7a28be53e166355902d406cc33bb3cb026d863a196ee1a80ad0bc9fc55ea1"
+      }
+    }
+  },
+  "cleanup_evidence": {
+    "status": "PASS",
+    "independently_verified": true,
+    "scope": "no new project-owned database, temp-root, or process after each gate command",
+    "baseline": {
+      "status": "PASS",
+      "databases": [
+        "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+        "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+        "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+        "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+        "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+        "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+        "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+        "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+      ],
+      "temp_roots": [
+        "ati-fs-it-XqAolF",
+        "ati-fs-outside-2kFbPl",
+        "ati-fs-outside-3Bp1Cp",
+        "ati-fs-outside-3wRo1C",
+        "ati-fs-outside-43nmad",
+        "ati-fs-outside-5Dl0k6",
+        "ati-fs-outside-75lCpU",
+        "ati-fs-outside-9o3QjV",
+        "ati-fs-outside-EYpIdC",
+        "ati-fs-outside-GVIFeo",
+        "ati-fs-outside-JZX7ud",
+        "ati-fs-outside-JlHAPi",
+        "ati-fs-outside-JpEwEk",
+        "ati-fs-outside-LNrvP0",
+        "ati-fs-outside-MCOyQa",
+        "ati-fs-outside-PsxNGs",
+        "ati-fs-outside-Q8b3RG",
+        "ati-fs-outside-Qe7Axn",
+        "ati-fs-outside-RrApHZ",
+        "ati-fs-outside-SB2ojk",
+        "ati-fs-outside-SO6kUS",
+        "ati-fs-outside-Tsv7rR",
+        "ati-fs-outside-YtdQsK",
+        "ati-fs-outside-bZtCw3",
+        "ati-fs-outside-ccUkAJ",
+        "ati-fs-outside-d6UCq7",
+        "ati-fs-outside-dWFJtG",
+        "ati-fs-outside-dg8iPg",
+        "ati-fs-outside-dqXthD",
+        "ati-fs-outside-e9EXWn",
+        "ati-fs-outside-eM02D9",
+        "ati-fs-outside-gNRmKF",
+        "ati-fs-outside-iqHUjI",
+        "ati-fs-outside-khWKR4",
+        "ati-fs-outside-ogTQ2e",
+        "ati-fs-outside-op9H9T",
+        "ati-fs-outside-pbQ6Yi",
+        "ati-fs-outside-qNAPwi",
+        "ati-fs-outside-silReA",
+        "ati-fs-outside-szNxzn",
+        "ati-fs-outside-wWEDB2",
+        "ati-fs-outside-yq1w2P",
+        "ati-fs-test-0QgIED",
+        "ati-fs-test-0SiVX7",
+        "ati-fs-test-1ZOoDm",
+        "ati-fs-test-1rS834",
+        "ati-fs-test-5X9GRB",
+        "ati-fs-test-5vhLP9",
+        "ati-fs-test-EEf9xF",
+        "ati-fs-test-ID3RD7",
+        "ati-fs-test-Ki9O59",
+        "ati-fs-test-M8NR7u",
+        "ati-fs-test-Nvbvrk",
+        "ati-fs-test-OPP8Pc",
+        "ati-fs-test-ROPnGs",
+        "ati-fs-test-Twolys",
+        "ati-fs-test-U62uiT",
+        "ati-fs-test-UP2FsT",
+        "ati-fs-test-VKJ4Ut",
+        "ati-fs-test-VXZKmN",
+        "ati-fs-test-YkELhv",
+        "ati-fs-test-ZgYV6D",
+        "ati-fs-test-aH3xqL",
+        "ati-fs-test-aRDtpT",
+        "ati-fs-test-bVymXZ",
+        "ati-fs-test-eJ90Xf",
+        "ati-fs-test-eKGqKr",
+        "ati-fs-test-gYXnv1",
+        "ati-fs-test-kAFa3I",
+        "ati-fs-test-kSCn4N",
+        "ati-fs-test-lais8q",
+        "ati-fs-test-mFn70P",
+        "ati-fs-test-o7BExK",
+        "ati-fs-test-oWplxC",
+        "ati-fs-test-ppikwm",
+        "ati-fs-test-qSKW1Z",
+        "ati-fs-test-rEnNsz",
+        "ati-fs-test-vAftnA",
+        "ati-fs-test-vyM5KV",
+        "ati-fs-test-wIB3B1",
+        "ati-fs-test-xHr6TW",
+        "ati-fs-test-yfX1CV",
+        "ati-fs-test-z4chmr",
+        "ati-migration-test-1G9pcb",
+        "ati-migration-test-1TDAyN",
+        "ati-migration-test-2DVwmF",
+        "ati-migration-test-84cIFI",
+        "ati-migration-test-8eqiw8",
+        "ati-migration-test-9qmGzT",
+        "ati-migration-test-AJL03y",
+        "ati-migration-test-Ax2REB",
+        "ati-migration-test-BC9JVC",
+        "ati-migration-test-CPfdbF",
+        "ati-migration-test-GMAtvo",
+        "ati-migration-test-GYZfbW",
+        "ati-migration-test-GjZp2D",
+        "ati-migration-test-JD0Gi2",
+        "ati-migration-test-JlPsSd",
+        "ati-migration-test-KOHOGo",
+        "ati-migration-test-L7fe0R",
+        "ati-migration-test-LjHZ12",
+        "ati-migration-test-LlCVxs",
+        "ati-migration-test-Llnc3v",
+        "ati-migration-test-NUQfdc",
+        "ati-migration-test-NY6IQZ",
+        "ati-migration-test-P9vZ6C",
+        "ati-migration-test-PIJfc1",
+        "ati-migration-test-QNlYd4",
+        "ati-migration-test-QVancu",
+        "ati-migration-test-RyDw0Y",
+        "ati-migration-test-SG0BOS",
+        "ati-migration-test-SKE0YG",
+        "ati-migration-test-SNnPg0",
+        "ati-migration-test-TibKWW",
+        "ati-migration-test-UopKVp",
+        "ati-migration-test-VBq5VG",
+        "ati-migration-test-VMGULr",
+        "ati-migration-test-Vmwp28",
+        "ati-migration-test-VvFgt8",
+        "ati-migration-test-XJGxOa",
+        "ati-migration-test-XXVGDs",
+        "ati-migration-test-Xvef9K",
+        "ati-migration-test-YPE5rt",
+        "ati-migration-test-Yyh2lC",
+        "ati-migration-test-ZDJJem",
+        "ati-migration-test-c0C1Fj",
+        "ati-migration-test-dDKqCU",
+        "ati-migration-test-dZTI4S",
+        "ati-migration-test-fHlIuA",
+        "ati-migration-test-gUCanp",
+        "ati-migration-test-guejev",
+        "ati-migration-test-hjotN8",
+        "ati-migration-test-iG6rVu",
+        "ati-migration-test-j4EICl",
+        "ati-migration-test-lb9MnV",
+        "ati-migration-test-qOa6yG",
+        "ati-migration-test-qn0cW3",
+        "ati-migration-test-sGB1HL",
+        "ati-migration-test-taWTiU",
+        "ati-migration-test-tvW903",
+        "ati-migration-test-tz9WY0",
+        "ati-migration-test-zLHeiA",
+        "ati-migration-test-zf1a1v",
+        "ati-migration-test-zlE3lb"
+      ],
+      "processes": [],
+      "errors": []
+    },
+    "observations": [
+      {
+        "after_command": "runner-unit",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      },
+      {
+        "after_command": "check",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      },
+      {
+        "after_command": "api-unit",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      },
+      {
+        "after_command": "api-integration",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      },
+      {
+        "after_command": "db-integration",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      },
+      {
+        "after_command": "engine-integration",
+        "snapshot": {
+          "status": "PASS",
+          "databases": [
+            "cluster_1:api_it_65c76078d8cd4d8daab31d72106ca2f1",
+            "cluster_1:api_it_694a4786aaab498a8f687f7c44e67c3e",
+            "cluster_1:api_it_898d9212a0a146fc848f6ed85dcc1301",
+            "cluster_1:api_it_aa5757132d03475a9608cd49a7ee0ca1",
+            "cluster_1:api_it_ac24d00e896c4f668bc8fc094ed42e1e",
+            "cluster_1:api_it_b6b85a1a23054b4b9dc8d96c194dab10",
+            "cluster_1:engine_it_214389aa065443dbbf364799227a52bc",
+            "cluster_1:engine_it_f9469ef411fa4d4bb18474b2d9e3e07d"
+          ],
+          "temp_roots": [
+            "ati-fs-it-XqAolF",
+            "ati-fs-outside-2kFbPl",
+            "ati-fs-outside-3Bp1Cp",
+            "ati-fs-outside-3wRo1C",
+            "ati-fs-outside-43nmad",
+            "ati-fs-outside-5Dl0k6",
+            "ati-fs-outside-75lCpU",
+            "ati-fs-outside-9o3QjV",
+            "ati-fs-outside-EYpIdC",
+            "ati-fs-outside-GVIFeo",
+            "ati-fs-outside-JZX7ud",
+            "ati-fs-outside-JlHAPi",
+            "ati-fs-outside-JpEwEk",
+            "ati-fs-outside-LNrvP0",
+            "ati-fs-outside-MCOyQa",
+            "ati-fs-outside-PsxNGs",
+            "ati-fs-outside-Q8b3RG",
+            "ati-fs-outside-Qe7Axn",
+            "ati-fs-outside-RrApHZ",
+            "ati-fs-outside-SB2ojk",
+            "ati-fs-outside-SO6kUS",
+            "ati-fs-outside-Tsv7rR",
+            "ati-fs-outside-YtdQsK",
+            "ati-fs-outside-bZtCw3",
+            "ati-fs-outside-ccUkAJ",
+            "ati-fs-outside-d6UCq7",
+            "ati-fs-outside-dWFJtG",
+            "ati-fs-outside-dg8iPg",
+            "ati-fs-outside-dqXthD",
+            "ati-fs-outside-e9EXWn",
+            "ati-fs-outside-eM02D9",
+            "ati-fs-outside-gNRmKF",
+            "ati-fs-outside-iqHUjI",
+            "ati-fs-outside-khWKR4",
+            "ati-fs-outside-ogTQ2e",
+            "ati-fs-outside-op9H9T",
+            "ati-fs-outside-pbQ6Yi",
+            "ati-fs-outside-qNAPwi",
+            "ati-fs-outside-silReA",
+            "ati-fs-outside-szNxzn",
+            "ati-fs-outside-wWEDB2",
+            "ati-fs-outside-yq1w2P",
+            "ati-fs-test-0QgIED",
+            "ati-fs-test-0SiVX7",
+            "ati-fs-test-1ZOoDm",
+            "ati-fs-test-1rS834",
+            "ati-fs-test-5X9GRB",
+            "ati-fs-test-5vhLP9",
+            "ati-fs-test-EEf9xF",
+            "ati-fs-test-ID3RD7",
+            "ati-fs-test-Ki9O59",
+            "ati-fs-test-M8NR7u",
+            "ati-fs-test-Nvbvrk",
+            "ati-fs-test-OPP8Pc",
+            "ati-fs-test-ROPnGs",
+            "ati-fs-test-Twolys",
+            "ati-fs-test-U62uiT",
+            "ati-fs-test-UP2FsT",
+            "ati-fs-test-VKJ4Ut",
+            "ati-fs-test-VXZKmN",
+            "ati-fs-test-YkELhv",
+            "ati-fs-test-ZgYV6D",
+            "ati-fs-test-aH3xqL",
+            "ati-fs-test-aRDtpT",
+            "ati-fs-test-bVymXZ",
+            "ati-fs-test-eJ90Xf",
+            "ati-fs-test-eKGqKr",
+            "ati-fs-test-gYXnv1",
+            "ati-fs-test-kAFa3I",
+            "ati-fs-test-kSCn4N",
+            "ati-fs-test-lais8q",
+            "ati-fs-test-mFn70P",
+            "ati-fs-test-o7BExK",
+            "ati-fs-test-oWplxC",
+            "ati-fs-test-ppikwm",
+            "ati-fs-test-qSKW1Z",
+            "ati-fs-test-rEnNsz",
+            "ati-fs-test-vAftnA",
+            "ati-fs-test-vyM5KV",
+            "ati-fs-test-wIB3B1",
+            "ati-fs-test-xHr6TW",
+            "ati-fs-test-yfX1CV",
+            "ati-fs-test-z4chmr",
+            "ati-migration-test-1G9pcb",
+            "ati-migration-test-1TDAyN",
+            "ati-migration-test-2DVwmF",
+            "ati-migration-test-84cIFI",
+            "ati-migration-test-8eqiw8",
+            "ati-migration-test-9qmGzT",
+            "ati-migration-test-AJL03y",
+            "ati-migration-test-Ax2REB",
+            "ati-migration-test-BC9JVC",
+            "ati-migration-test-CPfdbF",
+            "ati-migration-test-GMAtvo",
+            "ati-migration-test-GYZfbW",
+            "ati-migration-test-GjZp2D",
+            "ati-migration-test-JD0Gi2",
+            "ati-migration-test-JlPsSd",
+            "ati-migration-test-KOHOGo",
+            "ati-migration-test-L7fe0R",
+            "ati-migration-test-LjHZ12",
+            "ati-migration-test-LlCVxs",
+            "ati-migration-test-Llnc3v",
+            "ati-migration-test-NUQfdc",
+            "ati-migration-test-NY6IQZ",
+            "ati-migration-test-P9vZ6C",
+            "ati-migration-test-PIJfc1",
+            "ati-migration-test-QNlYd4",
+            "ati-migration-test-QVancu",
+            "ati-migration-test-RyDw0Y",
+            "ati-migration-test-SG0BOS",
+            "ati-migration-test-SKE0YG",
+            "ati-migration-test-SNnPg0",
+            "ati-migration-test-TibKWW",
+            "ati-migration-test-UopKVp",
+            "ati-migration-test-VBq5VG",
+            "ati-migration-test-VMGULr",
+            "ati-migration-test-Vmwp28",
+            "ati-migration-test-VvFgt8",
+            "ati-migration-test-XJGxOa",
+            "ati-migration-test-XXVGDs",
+            "ati-migration-test-Xvef9K",
+            "ati-migration-test-YPE5rt",
+            "ati-migration-test-Yyh2lC",
+            "ati-migration-test-ZDJJem",
+            "ati-migration-test-c0C1Fj",
+            "ati-migration-test-dDKqCU",
+            "ati-migration-test-dZTI4S",
+            "ati-migration-test-fHlIuA",
+            "ati-migration-test-gUCanp",
+            "ati-migration-test-guejev",
+            "ati-migration-test-hjotN8",
+            "ati-migration-test-iG6rVu",
+            "ati-migration-test-j4EICl",
+            "ati-migration-test-lb9MnV",
+            "ati-migration-test-qOa6yG",
+            "ati-migration-test-qn0cW3",
+            "ati-migration-test-sGB1HL",
+            "ati-migration-test-taWTiU",
+            "ati-migration-test-tvW903",
+            "ati-migration-test-tz9WY0",
+            "ati-migration-test-zLHeiA",
+            "ati-migration-test-zf1a1v",
+            "ati-migration-test-zlE3lb"
+          ],
+          "processes": [],
+          "errors": []
+        },
+        "comparison": {
+          "status": "PASS",
+          "added": {
+            "databases": [],
+            "temp_roots": [],
+            "processes": []
+          },
+          "errors": []
+        }
+      }
+    ],
+    "fixture_ownership": "Each test suite owns its unique database, process, and temporary-root fixtures.",
+    "limitation": "Delta oracle preserves pre-existing resources and does not claim the host was globally clean before the gate."
+  },
+  "acceptance_matrix": {
+    "status": "PASS",
+    "scenarios": [
+      {
+        "id": "H01",
+        "title": "authentication, session expiry, restart invalidation, and owned history",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "authenticates the seeded demo principal over a real HTTP socket",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "expires sessions, invalidates them on restart, and keeps owned history readable without MCP",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H02",
+        "title": "strict content type, body shape, malformed JSON, and size bounds",
+        "tests": [
+          {
+            "command_id": "api-unit",
+            "title": "returns 415 for a non-JSON login request without mutating state",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-unit",
+            "title": "rejects unknown login fields and authenticates the protected servers route",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-unit",
+            "title": "rejects malformed and oversized chunked JSON before principal lookup",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "rejects malformed and oversized chunked run bodies without database mutation",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H03",
+        "title": "accepted run is durably committed before asynchronous preparation",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "commits an accepted planning run before preparation starts",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H04",
+        "title": "one active run and no client-supplied plan fields",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "rejects a second active run and never accepts client-supplied plan fields",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H05",
+        "title": "admission rollback is atomic when durable outbox insertion fails",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "rolls back every admission record when durable outbox insert fails",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H06",
+        "title": "planner refusal, needs-input, and rejection remain mutation-free",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "finishes an explicit planner refusal without creating a version or write",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "finishes unknown demo input as needs_input and rejects a prepared plan without writes",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H07",
+        "title": "preparation uses real PostgreSQL and MCP reads",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "prepares the accepted b02 run through real PostgreSQL and MCP read",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H08",
+        "title": "every run route enforces ownership without mutation",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "returns no foreign run data from every run route and does not mutate the run",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H09",
+        "title": "event paging is bounded and rejects unsafe sequence values",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "caps a page at 200 and rejects unsafe since_seq values",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H10",
+        "title": "trace cursor pages an immutable 251-attempt snapshot",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "pages an immutable snapshot and redacts sensitive fields",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H11",
+        "title": "trace cursors reject tampering, expiry, cross-run reuse, and foreign access",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "pages an immutable snapshot and redacts sensitive fields",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "returns no foreign run data from every run route and does not mutate the run",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H12",
+        "title": "configured secrets are blocked before write and redacted from trace",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "blocks configured secrets before write reservation and persists a safe trace projection",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "blocks approval after a preview value becomes protected but still permits rejection",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H13",
+        "title": "production API degrades safely when MCP is unavailable",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "boots the production HTTP entry point with unavailable MCP and settles an accepted job without losing reads",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "expires sessions, invalidates them on restart, and keeps owned history readable without MCP",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "does not report a closed real MCP transport as connected",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-unit",
+            "title": "reports gateway validation failure as server error state",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H14",
+        "title": "stale and concurrent approvals cannot duplicate execution",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "accepts exactly one concurrent approval and executes through the outbox",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H15",
+        "title": "approval expiry uses the database clock and wins races safely",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "expires pending approvals using the database clock",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "returns 409 EXPIRED when approval wins the race with maintenance",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "E09 expires the approval after the file commit and stops before notification",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H16",
+        "title": "cancellation is idempotent and stops later writes",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "cancels queued planning runs and rejects a second terminal cancel",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "honors cancellation after the current write without dispatching the next write",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "keeps one terminal event when cancel races after a unknown attempt",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H17",
+        "title": "orphan and process-crash recovery never silently replays committed work",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "waits for successful recovery and never replans an already claimed orphan",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "survives a worker process killed before claim and executes the durable job once",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "recovers an actual engine process exit after receiver commit without resuming the workflow",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H18",
+        "title": "lost task-hub response reconciles from the committed receipt without replay",
+        "tests": [
+          {
+            "command_id": "engine-integration",
+            "title": "stops on a lost write response, then inspects the committed receipt without replaying",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H19",
+        "title": "lost filesystem response becomes unknown and suppresses notification",
+        "tests": [
+          {
+            "command_id": "engine-integration",
+            "title": "E06 marks a lost filesystem response unknown without dispatching notification",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "E08 recovers a crash after durable filesystem reservation and before write dispatch",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "H20",
+        "title": "both reviewed HTTP acceptance lifecycles execute end to end",
+        "tests": [
+          {
+            "command_id": "api-integration",
+            "title": "runs the b02 lifecycle over HTTP, drains events, trace and reconciliation",
+            "status": "PASS"
+          },
+          {
+            "command_id": "api-integration",
+            "title": "runs the two-server filesystem fixture only after HTTP approval",
+            "status": "PASS"
+          },
+          {
+            "command_id": "engine-integration",
+            "title": "E13 drives the real built CLI through prepare, approve, execute, trace, and reconcile",
+            "status": "PASS"
+          }
+        ],
+        "status": "PASS"
+      }
+    ]
+  },
+  "coverage": {
+    "required": {
+      "positive_http_lifecycle": "PASS",
+      "required_negative_http_matrix": "PASS"
+    },
+    "planner": "DEV_FIXTURE",
+    "browser_e2e": "NOT_RUN",
+    "ai_evaluation": "NOT_RUN",
+    "rubric": "OPEN"
+  },
+  "assessment": {
+    "command_status": "PASS",
+    "api_verdict": "API_TECHNICAL_PASS",
+    "api_technical_pass": true,
+    "process_exit_code": 0,
+    "reasons": []
+  },
+  "sanitization": {
+    "strategy": "structured-recursive-plus-text-patterns-and-known-runtime-values",
+    "known_values_supplied": 1,
+    "environment_files_read": false
+  }
+}

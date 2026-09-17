@@ -1,0 +1,11 @@
+{
+  "id": "api-unit",
+  "command": "npm run test:unit -w @wap/api",
+  "started_at": "2026-09-15T00:11:51.064Z",
+  "finished_at": "2026-09-15T00:11:54.925Z",
+  "exit_code": 0,
+  "timed_out": false,
+  "error": null,
+  "stdout": "\n> @wap/api@0.1.0 test:unit\n> vitest run --config vitest.unit.config.ts\n\n\n RUN  v2.1.9 D:/Môn học/ATI/ATI_Project/apps/api\n\n ✓ tests/http.test.ts (3 tests) 213ms\n ✓ tests/auth.test.ts (2 tests) 173ms\n ✓ tests/dev-planner.test.ts (1 test) 10ms\n ✓ tests/config.test.ts (2 tests) 73ms\n\n Test Files  4 passed (4)\n      Tests  8 passed (8)\n   Start at  07:11:51\n   Duration  2.99s (transform 217ms, setup 0ms, collect 1.72s, tests 468ms, environment 1ms, prepare 267ms)\n\n",
+  "stderr": ""
+}

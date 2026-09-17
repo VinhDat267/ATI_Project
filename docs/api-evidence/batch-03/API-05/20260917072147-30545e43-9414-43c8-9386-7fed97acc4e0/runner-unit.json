@@ -1,0 +1,16 @@
+{
+  "id": "runner-unit",
+  "command": "C:\\Program Files\\nodejs\\node.exe --test scripts/check-api.test.mjs",
+  "started_at": "2026-09-17T07:21:48.374Z",
+  "finished_at": "2026-09-17T07:21:48.600Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "error": null,
+  "stdout": "✔ sanitizer removes quoted fields, multiline values, Bearer [REDACTED], URL userinfo, and known values (8.4599ms)\n✔ recursive sanitizer scrubs every nested artifact field without changing non-string evidence (0.6172ms)\n✔ known-secret discovery does not leave short configured values outside sanitization (0.7875ms)\n✔ source selection covers source, tests, scripts, config, migrations, generated contracts, and lockfiles (0.6224ms)\n✔ source fingerprint evidence is deterministic and assigns meaningful categories (9.4476ms)\n✔ git status evidence distinguishes tracked and untracked source from unrelated files (0.4795ms)\n✔ gate plan reuses the offline check and passing commands cannot promote missing negative coverage (0.4268ms)\n✔ acceptance matrix only passes a scenario when every exact test title passed (0.6514ms)\n✔ the default acceptance matrix names every H01 through H20 scenario exactly once (0.4001ms)\n✔ cleanup comparison detects newly leaked databases, temp roots, and project processes (0.5949ms)\n✔ cleanup ownership filters ignore unrelated resources and keep only project-owned candidates (1.2441ms)\n✔ a cleanup failure makes the gate fail even when every command exits zero (0.2295ms)\n✔ runner sanitizes real child stdout, stderr, command metadata, and spawn errors (64.2233ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 162.8981\n",
+  "stderr": "",
+  "cleanup_evidence": {
+    "status": "NOT_REPORTED_TO_RUNNER",
+    "independently_verified": false
+  }
+}

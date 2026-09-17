@@ -1,6 +1,61 @@
 import { expect, it } from "vitest";
 import { makeApiFixture } from "./fixture.js";
 
+it("finishes an explicit planner refusal without creating a version or write", async () => {
+  const f = await makeApiFixture({
+    plannerMode: "dev_fixture",
+    workerEnabled: true,
+    planner: {
+      mode: "dev_fixture",
+      async produce() {
+        return { kind: "refusal", reason: "No reviewed tool supports this request" };
+      },
+    },
+  });
+  try {
+    const token = await f.login();
+    const created = await f.call("/runs", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ source_prompt: "unsupported reviewed request" }),
+    });
+    expect(created.status).toBe(202);
+    const { run_id } = (await created.json()) as { run_id: string };
+    const deadline = Date.now() + 15_000;
+    let detail: Record<string, unknown> = {};
+    while (Date.now() < deadline) {
+      const response = await f.call(`/runs/${run_id}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      detail = (await response.json()) as Record<string, unknown>;
+      if (detail.status === "refused") break;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    expect(detail).toMatchObject({
+      status: "refused",
+      workflow_version_id: null,
+      approval: null,
+      planner_result: { kind: "refusal" },
+    });
+    expect(
+      await f.db.client`
+        SELECT
+          (SELECT count(*)::int
+             FROM workflow_versions v
+             JOIN runs r ON r.workflow_id=v.workflow_id
+            WHERE r.id=${run_id}) AS versions,
+          (SELECT count(*)::int FROM approvals WHERE run_id=${run_id}) AS approvals,
+          (SELECT count(*)::int FROM tool_operations WHERE run_id=${run_id}) AS operations,
+          (SELECT count(*)::int FROM hub_receipts WHERE user_id=${f.userId}) AS receipts`,
+    ).toEqual([{ versions: 0, approvals: 0, operations: 0, receipts: 0 }]);
+  } finally {
+    await f.close();
+  }
+}, 30_000);
+
 it("rolls back every admission record when durable outbox insert fails", async () => {
   const f = await makeApiFixture({ plannerMode: "dev_fixture" });
   try {

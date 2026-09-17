@@ -1,4 +1,4 @@
-export { WorkflowEngine } from "./engine.js";
+export { WorkflowEngine, type ServerCatalogOptions } from "./engine.js";
 export { accept } from "./accept.js";
 export {
   parsePlannerResult,
@@ -7,12 +7,14 @@ export {
 } from "./planner-port.js";
 export {
   openLocalGateway,
+  inspectLocalGateway,
   composeGateway,
   type Gateway,
   type GatewayResult,
   type CallContext,
   type ToolTarget,
   type ServerConnection,
+  type GatewayServerInspection,
   type LocalGatewayConfig,
   type FilesystemWriteRequest,
   type FilesystemWriteHooks,

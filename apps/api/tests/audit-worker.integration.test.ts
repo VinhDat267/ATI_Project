@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { fork, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { describe, expect, it } from "vitest";
 import {
   EngineError,
@@ -35,6 +37,126 @@ function inert(userId: string): Gateway {
 }
 
 describe("audit worker invariants", () => {
+  it("survives a worker process killed before claim and executes the durable job once", async () => {
+    const f = await makeApiFixture();
+    const engine = new WorkflowEngine(f.db, inert(f.userId), f.userId);
+    const accepted = await engine.accept({ source_prompt: "crash before claim" });
+    let child: ChildProcess | undefined;
+    let produced = 0;
+    const replacement = createPrepareWorker({
+      db: f.db,
+      userId: f.userId,
+      engine,
+      intervalMs: 20,
+      planner: {
+        mode: "dev_fixture",
+        produce: async () => {
+          produced++;
+          return { kind: "clarification", question: "Need exact inputs" };
+        },
+      },
+    });
+    try {
+      child = fork(path.join(root, "apps/api/tests/preclaim-crash-worker.ts"), {
+        cwd: root,
+        silent: true,
+        execArgv: ["--import", "tsx"],
+        env: {
+          ...process.env,
+          API_RESTART_TEST_DATABASE_URL: f.databaseUrl,
+          API_RESTART_TEST_USER_ID: f.userId,
+          API_RESTART_TEST_RUN_ID: accepted.run_id,
+        },
+      });
+      const ready = await Promise.race([
+        once(child, "message").then(([message]) => message),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("preclaim child timeout")), 10_000),
+        ),
+      ]);
+      expect(ready).toEqual({ type: "ready-before-claim" });
+      const exited = once(child, "exit");
+      expect(child.kill("SIGKILL")).toBe(true);
+      const [code, signal] = await exited;
+      expect(code !== 0 || signal).toBeTruthy();
+      expect(
+        await f.db.client`
+          SELECT r.claimed_by,o.delivered_at
+          FROM runs r JOIN run_outbox o ON o.run_id=r.id
+          WHERE r.id=${accepted.run_id} AND o.job_kind='prepare'`,
+      ).toEqual([{ claimed_by: null, delivered_at: null }]);
+
+      replacement.start();
+      await until(
+        async () => (await engine.detail(accepted.run_id)).status === "needs_input",
+      );
+      await pause(100);
+      expect(produced).toBe(1);
+      expect(
+        await f.db.client`
+          SELECT count(*)::int AS n FROM run_outbox
+          WHERE run_id=${accepted.run_id} AND job_kind='prepare' AND delivered_at IS NOT NULL`,
+      ).toEqual([{ n: 1 }]);
+      expect(
+        (await engine.events(accepted.run_id)).events.filter(
+          (event) => event.type === "run.finished",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      if (child && child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      await replacement.stop();
+      await f.close();
+    }
+  }, 30_000);
+
+  it("executes a durable unclaimed prepare job exactly once after restart", async () => {
+    const f = await makeApiFixture();
+    const engine = new WorkflowEngine(f.db, inert(f.userId), f.userId);
+    const accepted = await engine.accept({ source_prompt: "restart before claim" });
+    let produced = 0;
+    const worker = createPrepareWorker({
+      db: f.db,
+      userId: f.userId,
+      engine,
+      intervalMs: 20,
+      planner: {
+        mode: "dev_fixture",
+        produce: async () => {
+          produced++;
+          return { kind: "clarification", question: "Need exact inputs" };
+        },
+      },
+    });
+    try {
+      expect(
+        await f.db.client`
+          SELECT r.claimed_by,o.delivered_at
+          FROM runs r JOIN run_outbox o ON o.run_id=r.id
+          WHERE r.id=${accepted.run_id} AND o.job_kind='prepare'`,
+      ).toEqual([{ claimed_by: null, delivered_at: null }]);
+      worker.start();
+      await until(
+        async () => (await engine.detail(accepted.run_id)).status === "needs_input",
+      );
+      await pause(100);
+      expect(produced).toBe(1);
+      expect(
+        await f.db.client`
+          SELECT count(*)::int AS n FROM run_outbox
+          WHERE run_id=${accepted.run_id} AND job_kind='prepare' AND delivered_at IS NOT NULL`,
+      ).toEqual([{ n: 1 }]);
+      expect(
+        (await engine.events(accepted.run_id)).events.filter(
+          (event) => event.type === "run.finished",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await worker.stop();
+      await f.close();
+    }
+  });
+
   it("waits for successful recovery and never replans an already claimed orphan", async () => {
     const f = await makeApiFixture({ plannerMode: "dev_fixture" });
     const gateway = inert(f.userId);

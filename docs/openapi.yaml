@@ -3,9 +3,11 @@ openapi: 3.1.0
 info:
   title: ATI Workflow Platform — B/local
   version: 0.3.0
-  description: "B/local HTTP boundary through API-03: login, server discovery, durable run acceptance, owned run read
-    model, event polling, stable trace cursors, and read-only reconciliation. Poll events every 2 seconds. Shared schema
-    generation does not encode every Zod refinement or runtime authorization rule."
+  description: "B/local HTTP boundary through API-CATALOG: login, stable server summaries, a no-launch reviewed catalog
+    read, and a rate-limited active reviewed-preset check, plus durable run lifecycle, polling, trace cursors, and
+    read-only reconciliation. GET /servers/catalog never launches MCP; POST /servers/check is the explicit active check.
+    Session state remains in memory, and LLM/retrieval/replan, BullMQ, and browser integration remain outside this
+    technical boundary. Shared schema generation does not encode every Zod refinement or runtime authorization rule."
 servers:
   - url: /api/v1
 security:
@@ -26,8 +28,8 @@ paths:
           in: query
           schema:
             type: string
-      description: Full immutable attempt snapshots, up to 100 per page. Opaque next_cursor binds a snapshot watermark and
-        (started_at,id) position. Restart without cursor to see newer attempts. Legacy unknown metadata is explicit.
+      description: Full immutable attempt snapshots, up to 100 per page. Opaque HMAC-signed next_cursor binds user/run,
+        snapshot_id, and offset. Restart without cursor to see newer attempts. Legacy unknown metadata is explicit.
       responses:
         "200":
           description: OK
@@ -93,6 +95,66 @@ paths:
                   $ref: "#/components/schemas/ServerSummary"
         "401": *a1
         "404": *a2
+  /servers/catalog:
+    get:
+      operationId: getServerCatalog
+      summary: Read the reviewed server catalog without launching connections
+      description: Authenticated read-only catalog. The engine calls serverCatalog({connect:false}); it must not launch or
+        ensure MCP connections.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerCatalog"
+        "401": *a1
+        "404": *a2
+        "501":
+          description: Server catalog is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /servers/check:
+    post:
+      operationId: checkServerCatalog
+      summary: Actively inspect the fixed reviewed server presets
+      description: Authenticated active check. The request has no launch parameters; the server invokes
+        serverCatalog({connect:true}) against fixed reviewed presets only. Calls are rate limited per principal.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerCatalog"
+        "401": *a1
+        "404": *a2
+        "429":
+          description: Active check rate limited
+          headers:
+            Retry-After:
+              description: Integer seconds until another active check is allowed
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "501":
+          description: Server catalog is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Reviewed connection or configuration unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /runs:
     post:
       operationId: createRun
@@ -1570,6 +1632,248 @@ components:
         - status
         - policy_version
       additionalProperties: false
+    ServerCatalogTool:
+      type: object
+      properties:
+        server:
+          type: string
+          enum:
+            - task_hub
+            - filesystem
+        name:
+          type: string
+          minLength: 1
+        side_effect:
+          type: string
+          enum:
+            - read
+            - write
+        policy_version:
+          type: string
+          minLength: 1
+        artifact_hash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        input_schema:
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties:
+            $ref: "#/components/schemas/ServerCatalogTool/$defs/__schema0"
+        output_schema:
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties:
+            $ref: "#/components/schemas/ServerCatalogTool/$defs/__schema0"
+      required:
+        - server
+        - name
+        - side_effect
+        - policy_version
+        - artifact_hash
+        - input_schema
+        - output_schema
+      additionalProperties: false
+      $defs:
+        __schema0:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+            - type: array
+              items:
+                $ref: "#/components/schemas/ServerCatalogTool/$defs/__schema0"
+            - type: object
+              propertyNames:
+                type: string
+              additionalProperties:
+                $ref: "#/components/schemas/ServerCatalogTool/$defs/__schema0"
+    ServerCatalogEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+          enum:
+            - task_hub
+            - filesystem
+        status:
+          type: string
+          enum:
+            - connected
+            - disconnected
+            - error
+            - unreviewed
+        policy_version:
+          type:
+            - string
+            - "null"
+        observed_at:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        tools:
+          type: array
+          items:
+            type: object
+            properties:
+              server:
+                type: string
+                enum:
+                  - task_hub
+                  - filesystem
+              name:
+                type: string
+                minLength: 1
+              side_effect:
+                type: string
+                enum:
+                  - read
+                  - write
+              policy_version:
+                type: string
+                minLength: 1
+              artifact_hash:
+                type: string
+                pattern: ^[a-f0-9]{64}$
+              input_schema:
+                type: object
+                propertyNames:
+                  type: string
+                additionalProperties:
+                  $ref: "#/components/schemas/ServerCatalogEntry/$defs/__schema0"
+              output_schema:
+                type: object
+                propertyNames:
+                  type: string
+                additionalProperties:
+                  $ref: "#/components/schemas/ServerCatalogEntry/$defs/__schema0"
+            required:
+              - server
+              - name
+              - side_effect
+              - policy_version
+              - artifact_hash
+              - input_schema
+              - output_schema
+            additionalProperties: false
+      required:
+        - slug
+        - status
+        - policy_version
+        - observed_at
+        - tools
+      additionalProperties: false
+      $defs:
+        __schema0:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+            - type: array
+              items:
+                $ref: "#/components/schemas/ServerCatalogEntry/$defs/__schema0"
+            - type: object
+              propertyNames:
+                type: string
+              additionalProperties:
+                $ref: "#/components/schemas/ServerCatalogEntry/$defs/__schema0"
+    ServerCatalog:
+      minItems: 2
+      maxItems: 2
+      type: array
+      items:
+        type: object
+        properties:
+          slug:
+            type: string
+            enum:
+              - task_hub
+              - filesystem
+          status:
+            type: string
+            enum:
+              - connected
+              - disconnected
+              - error
+              - unreviewed
+          policy_version:
+            type:
+              - string
+              - "null"
+          observed_at:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+          tools:
+            type: array
+            items:
+              type: object
+              properties:
+                server:
+                  type: string
+                  enum:
+                    - task_hub
+                    - filesystem
+                name:
+                  type: string
+                  minLength: 1
+                side_effect:
+                  type: string
+                  enum:
+                    - read
+                    - write
+                policy_version:
+                  type: string
+                  minLength: 1
+                artifact_hash:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                input_schema:
+                  type: object
+                  propertyNames:
+                    type: string
+                  additionalProperties:
+                    $ref: "#/components/schemas/ServerCatalog/$defs/__schema0"
+                output_schema:
+                  type: object
+                  propertyNames:
+                    type: string
+                  additionalProperties:
+                    $ref: "#/components/schemas/ServerCatalog/$defs/__schema0"
+              required:
+                - server
+                - name
+                - side_effect
+                - policy_version
+                - artifact_hash
+                - input_schema
+                - output_schema
+              additionalProperties: false
+        required:
+          - slug
+          - status
+          - policy_version
+          - observed_at
+          - tools
+        additionalProperties: false
+      $defs:
+        __schema0:
+          anyOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+            - type: array
+              items:
+                $ref: "#/components/schemas/ServerCatalog/$defs/__schema0"
+            - type: object
+              propertyNames:
+                type: string
+              additionalProperties:
+                $ref: "#/components/schemas/ServerCatalog/$defs/__schema0"
     RunAccepted:
       type: object
       properties:

@@ -88,4 +88,32 @@ describe("server-qualified gateway routing", () => {
     await expect(gateway.close()).rejects.toThrow();
     expect(closed).toEqual(["task_hub", "filesystem"]);
   });
+
+  it("isolates per-server inspection failures and suppresses stale tools", async () => {
+    const gateway = composeGateway(
+      "00000000-0000-4000-8000-000000000001",
+      [
+        connection("task_hub", []),
+        {
+          ...connection("filesystem", []),
+          assertCurrent: async () => {
+            throw new Error("filesystem registry drift");
+          },
+        },
+      ],
+    );
+
+    await expect(gateway.inspectServers!()).resolves.toEqual([
+      expect.objectContaining({
+        server: "task_hub",
+        status: "connected",
+        tools: [expect.objectContaining({ server: "task_hub" })],
+      }),
+      expect.objectContaining({
+        server: "filesystem",
+        status: "error",
+        tools: [],
+      }),
+    ]);
+  });
 });

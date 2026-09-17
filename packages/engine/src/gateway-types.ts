@@ -6,6 +6,16 @@ export type ToolTarget = {
   name: string;
 };
 
+export type GatewayServerStatus =
+  "connected" | "disconnected" | "error" | "unreviewed";
+
+export type GatewayServerInspection = {
+  server: ToolTarget["server"];
+  status: GatewayServerStatus;
+  policyVersion: string | null;
+  tools: readonly EngineTool[];
+};
+
 export interface CallContext {
   timeZone: string;
   worker?: { id: string; assertActive: () => Promise<void> };
@@ -21,6 +31,13 @@ export interface Gateway {
   readonly userId: string;
   readonly tools: readonly EngineTool[];
   ensureConnected?(): Promise<void>;
+  inspectServers?(): Promise<readonly GatewayServerInspection[]>;
+  /**
+   * Optional active catalog check. Implementations may inspect reviewed
+   * presets independently without installing a partial gateway for workflow
+   * execution. The engine still applies the strict catalog projection.
+   */
+  catalogCheck?(): Promise<readonly GatewayServerInspection[]>;
   isConnected?(): boolean;
   assertCurrent(): Promise<void>;
   call(

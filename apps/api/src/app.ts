@@ -20,6 +20,7 @@ import {
   TraceSchema,
   EventPageSchema,
   ServerSummaryListSchema,
+  ServerCatalogSchema,
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore } from "./auth.js";
@@ -35,15 +36,31 @@ export interface ApiRuntime {
   close(): Promise<void>;
 }
 
-export function createApi(options: {
+export interface CatalogCheckOptions {
+  /** Clock injection for deterministic active-check rate-limit tests. */
+  now?: () => number;
+  /** Minimum interval between active checks for one authenticated principal. */
+  cooldownMs?: number;
+}
+
+export interface CreateApiOptions {
   db: Database;
   config: ApiConfig;
   principalExists?: () => Promise<boolean>;
   engine?: WorkflowEngine;
   worker?: WorkerControl;
   maintenance?: MaintenanceControl;
-}): ApiRuntime {
+  /** Shared clock injection; also used by the in-memory session store. */
+  now?: () => number;
+  catalogCheck?: CatalogCheckOptions;
+}
+
+export function createApi(options: CreateApiOptions): ApiRuntime {
   const { config } = options;
+  const catalogCheckNow = options.catalogCheck?.now ?? options.now ?? Date.now;
+  const catalogCooldownMs = options.catalogCheck?.cooldownMs ?? 5_000;
+  if (!Number.isSafeInteger(catalogCooldownMs) || catalogCooldownMs < 0)
+    throw new Error("Invalid catalog check cooldown");
   const principalExists =
     options.principalExists ??
     (async () => {
@@ -57,6 +74,7 @@ export function createApi(options: {
     passwordHash: config.passwordHash,
     ttlMs: config.sessionTtlMs,
     principalExists,
+    now: options.now,
   });
   const configuredSecrets = [
     config.passwordHash,
@@ -78,6 +96,43 @@ export function createApi(options: {
   };
   let baseOrigin: string | undefined;
   let closing = false;
+  const nextCatalogCheck = new Map<string, number>();
+
+  function claimCatalogCheck(userId: string): number | null {
+    const now = catalogCheckNow();
+    const nextAllowed = nextCatalogCheck.get(userId) ?? 0;
+    if (now < nextAllowed)
+      return Math.max(1, Math.ceil((nextAllowed - now) / 1_000));
+    // Claim synchronously before any await so concurrent requests cannot both
+    // launch or inspect the reviewed presets.
+    nextCatalogCheck.set(userId, now + catalogCooldownMs);
+    return null;
+  }
+
+  function requestHasBody(request: IncomingMessage): boolean {
+    const contentLength = request.headers["content-length"];
+    return (
+      (contentLength !== undefined && contentLength !== "0") ||
+      request.headers["transfer-encoding"] !== undefined
+    );
+  }
+
+  async function readServerCatalog(connect: boolean) {
+    if (!options.engine)
+      throw new HttpError(
+        501,
+        "NOT_IMPLEMENTED",
+        "Server catalog is not enabled",
+      );
+    try {
+      return ServerCatalogSchema.parse(
+        projectOutput(await options.engine.serverCatalog({ connect })),
+      );
+    } catch (error) {
+      if (error instanceof EngineError) throw error;
+      throw new EngineError("CONFIG", "Reviewed server catalog is unavailable");
+    }
+  }
 
   const server = createServer(
     {
@@ -170,6 +225,45 @@ export function createApi(options: {
           ),
         );
         writeJson(response, 200, servers, requestId);
+        return;
+      }
+      if (path === "/servers/catalog") {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        sessions.authenticate(request.headers.authorization);
+        const catalog = await readServerCatalog(false);
+        writeJson(response, 200, catalog, requestId);
+        return;
+      }
+      if (path === "/servers/check") {
+        if (request.method !== "POST") {
+          response.setHeader("allow", "POST");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        const userId = sessions.authenticate(request.headers.authorization);
+        if (!options.engine)
+          throw new HttpError(
+            501,
+            "NOT_IMPLEMENTED",
+            "Server catalog is not enabled",
+          );
+        const retryAfter = claimCatalogCheck(userId);
+        if (retryAfter !== null) {
+          response.setHeader("retry-after", String(retryAfter));
+          throw new HttpError(
+            429,
+            "RATE_LIMITED",
+            "Server check temporarily rate limited",
+          );
+        }
+        // The active check has no client-controlled launch contract. Consume
+        // and ignore an optional body so executable-looking JSON cannot affect
+        // the fixed reviewed presets selected by the engine.
+        if (requestHasBody(request)) await readJson(request);
+        const catalog = await readServerCatalog(true);
+        writeJson(response, 200, catalog, requestId);
         return;
       }
       if (path === "/runs") {

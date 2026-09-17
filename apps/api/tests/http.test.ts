@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { request } from "node:http";
 import { createApi, type ApiConfig } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import type { Database } from "@wap/db";
@@ -9,7 +10,7 @@ afterEach(async () => {
   servers.clear();
 });
 
-async function makeApi() {
+async function makeApi(options: { principalExists?: () => Promise<boolean> } = {}) {
   const config: ApiConfig = {
     host: "127.0.0.1",
     port: 0,
@@ -24,11 +25,44 @@ async function makeApi() {
   const api = createApi({
     db,
     config,
-    principalExists: async () => true,
+    principalExists: options.principalExists ?? (async () => true),
   });
   servers.add(api);
   const baseUrl = await api.listen();
   return { api, baseUrl };
+}
+
+async function sendChunkedJson(baseUrl: string, chunks: readonly string[]) {
+  const target = new URL(`${baseUrl}/auth/login`);
+  return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const outgoing = request(
+      target,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+        },
+      },
+      (incoming) => {
+        const body: Buffer[] = [];
+        incoming.on("data", (chunk) => body.push(Buffer.from(chunk)));
+        incoming.on("end", () => {
+          try {
+            resolve({
+              status: incoming.statusCode ?? 0,
+              body: JSON.parse(Buffer.concat(body).toString("utf8")),
+            });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    outgoing.on("error", reject);
+    for (const chunk of chunks) outgoing.write(chunk);
+    outgoing.end();
+  });
 }
 
 describe("API-01 HTTP boundary", () => {
@@ -99,5 +133,35 @@ describe("API-01 HTTP boundary", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "BODY_TOO_LARGE" },
     });
+  });
+
+  it("rejects malformed and oversized chunked JSON before principal lookup", async () => {
+    let principalLookups = 0;
+    const { baseUrl } = await makeApi({
+      principalExists: async () => {
+        principalLookups++;
+        return true;
+      },
+    });
+
+    await expect(sendChunkedJson(baseUrl, ['{"email":'])).resolves.toEqual({
+      status: 400,
+      body: expect.objectContaining({
+        error: expect.objectContaining({ code: "INVALID_JSON" }),
+      }),
+    });
+    await expect(
+      sendChunkedJson(baseUrl, [
+        '{"email":"demo@example.local","password":"',
+        "x".repeat(65_536),
+        '"}',
+      ]),
+    ).resolves.toEqual({
+      status: 413,
+      body: expect.objectContaining({
+        error: expect.objectContaining({ code: "BODY_TOO_LARGE" }),
+      }),
+    });
+    expect(principalLookups).toBe(0);
   });
 });

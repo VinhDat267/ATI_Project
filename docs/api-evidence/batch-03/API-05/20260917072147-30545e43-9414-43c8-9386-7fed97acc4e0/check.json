@@ -1,0 +1,16 @@
+{
+  "id": "check",
+  "command": "npm run check",
+  "started_at": "2026-09-17T07:21:49.095Z",
+  "finished_at": "2026-09-17T07:22:33.576Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "error": null,
+  "stdout": "\n> check\n> npm run typecheck && npm run build && npm test && npm run test:unit -w @wap/engine && npm run test:unit -w @wap/api && npm run test:unit -w @wap/web && npm run schema:json && npm run api:generate\n\n\n> typecheck\n> tsc -p tsconfig.json && npm run typecheck -w @wap/web\n\n\n> typecheck\n> tsc -p tsconfig.json && tsc -p tsconfig.tools.json\n\n\n> build\n> npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine && npm run build -w @wap/api && npm run build -w @wap/web\n\n\n> @wap/dsl@0.1.0 build\n> tsc\n\n\n> @wap/db@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/mcp-task-hub@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/engine@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> @wap/api@0.1.0 build\n> tsc -p tsconfig.json\n\n\n> build\n> tsc -p tsconfig.json && vite build\n\nvite v8.3.0 building client environment for production...\ntransforming...\n✓ 120 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.40 kB │ gzip:   0.27 kB\ndist/assets/index-D7vrtSOK.css    3.99 kB │ gzip:   1.49 kB\ndist/assets/index-BxtbZlBv.js   336.25 kB │ gzip: 101.75 kB\n\n✓ built in 247ms\n\n> test\n> npm run test -w @wap/dsl\n\n\n> @wap/dsl@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/packages/dsl\n\n\n Test Files  4 passed (4)\n      Tests  43 passed (43)\n   Start at  14:22:13\n   Duration  972ms (transform 356ms, setup 0ms, import 1.22s, tests 1.21s, environment 0ms)\n\n\n> @wap/engine@0.1.0 test:unit\n> vitest run --config vitest.unit.config.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/packages/engine\n\n\n Test Files  9 passed (9)\n      Tests  104 passed | 1 skipped (105)\n   Start at  14:22:15\n   Duration  4.99s (transform 319ms, setup 0ms, import 2.71s, tests 937ms, environment 1ms)\n\n\n> @wap/api@0.1.0 test:unit\n> vitest run --config vitest.unit.config.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/api\n\n\n Test Files  9 passed (9)\n      Tests  26 passed (26)\n   Start at  14:22:21\n   Duration  7.90s (transform 347ms, setup 0ms, import 3.76s, tests 2.84s, environment 1ms)\n\n\n> test:unit\n> vitest run --config vitest.unit.config.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/web\n\n\n Test Files  6 passed (6)\n      Tests  38 passed (38)\n   Start at  14:22:30\n   Duration  692ms (transform 309ms, setup 0ms, import 946ms, tests 285ms, environment 1ms)\n\n\n> schema:json\n> npm run schema:json -w @wap/dsl\n\n\n> @wap/dsl@0.1.0 schema:json\n> tsx scripts/emit-json-schema.ts\n\nĐã sinh JSON Schema vào generated/\n\n> api:generate\n> tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts\n\nGenerated docs/openapi.yaml\n✨ openapi-typescript 7.13.0\n🚀 docs/openapi.yaml → packages/dsl/generated/api.d.ts [117.4ms]\n",
+  "stderr": "",
+  "cleanup_evidence": {
+    "status": "NOT_REPORTED_TO_RUNNER",
+    "independently_verified": false
+  }
+}

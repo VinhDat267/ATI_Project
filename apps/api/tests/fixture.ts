@@ -10,10 +10,15 @@ import {
 import { createApi, type ApiRuntime } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import type { ApiConfig } from "../src/config.js";
-import { loadDevPlanner } from "../src/dev-planner.js";
+import { loadDevPlanner, type DevPlanner } from "../src/dev-planner.js";
 import { createPrepareWorker, type WorkerControl } from "../src/worker.js";
 import { createExpiryMaintenance } from "../src/maintenance.js";
-import { WorkflowEngine, openLocalGateway, type Gateway } from "@wap/engine";
+import {
+  WorkflowEngine,
+  openLocalGateway,
+  type Gateway,
+  type PlannerPort,
+} from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -47,6 +52,7 @@ export async function makeApiFixture(
     workerEnabled?: boolean;
     plannerMode?: "disabled" | "dev_fixture";
     filesystemEnabled?: boolean;
+    planner?: PlannerPort;
   } = {},
 ): Promise<ApiFixture> {
   const dbName = `api_it_${randomUUID().replaceAll("-", "")}`;
@@ -77,7 +83,9 @@ export async function makeApiFixture(
     fileURLToPath(new URL("../../../", import.meta.url)),
   );
   const planner =
-    config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined;
+    options.planner ??
+    (config.plannerMode === "dev_fixture" ? loadDevPlanner(root) : undefined);
+  const devPlanner = planner as Partial<DevPlanner> | undefined;
   let gateway: Gateway | undefined;
   let worker: WorkerControl | undefined;
   let filesystemBase: string | undefined;
@@ -151,10 +159,10 @@ export async function makeApiFixture(
     engine,
     gateway,
     allowedRoot,
-    b02Prompt: planner?.b02Prompt ?? "",
+    b02Prompt: devPlanner?.b02Prompt ?? "",
     fsCopyPrompt:
-      planner?.entries.find((entry) => entry.id === "fs-copy-notify")?.prompt ??
-      "",
+      devPlanner?.entries?.find((entry) => entry.id === "fs-copy-notify")
+        ?.prompt ?? "",
     async login() {
       const response = await fetch(`${baseUrl}/auth/login`, {
         method: "POST",

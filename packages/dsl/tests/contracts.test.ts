@@ -149,3 +149,90 @@ it("exposes a strict read-only reconciliation projection", () => {
     }).success,
   ).toBe(false);
 });
+
+it("keeps the reviewed server catalog ordered and strict", () => {
+  const catalog = [
+    {
+      slug: "task_hub",
+      status: "connected",
+      policy_version: "b-local-1",
+      observed_at: "2026-09-17T00:00:00.000Z",
+      tools: [
+        {
+          server: "task_hub",
+          name: "list_cards",
+          side_effect: "read",
+          policy_version: "b-local-1",
+          artifact_hash: "a".repeat(64),
+          input_schema: { type: "object" },
+          output_schema: { type: "object" },
+        },
+      ],
+    },
+    {
+      slug: "filesystem",
+      status: "disconnected",
+      policy_version: "b-local-fs-1",
+      observed_at: "2026-09-17T00:00:00.000Z",
+      tools: [],
+    },
+  ];
+  expect(api.ServerCatalogSchema.parse(catalog)).toEqual(catalog);
+  expect(
+    api.ServerCatalogSchema.safeParse([...catalog.slice(1), catalog[0]])
+      .success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogSchema.safeParse(
+      catalog.map((entry) => ({ ...entry, canary: "secret" })),
+    ).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogSchema.safeParse(
+      catalog.map((entry) => ({
+        ...entry,
+        tools: entry.tools.map((tool) => ({ ...tool, canary: "secret" })),
+      })),
+    ).success,
+  ).toBe(false);
+  const reviewedTool = catalog[0]!.tools[0]!;
+  expect(
+    api.ServerCatalogEntrySchema.safeParse({
+      ...catalog[0],
+      tools: [],
+    }).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogEntrySchema.safeParse({
+      ...catalog[0],
+      policy_version: null,
+    }).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogEntrySchema.safeParse({
+      ...catalog[0],
+      tools: [
+        reviewedTool,
+        { ...reviewedTool, name: "get_card", policy_version: "other" },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogEntrySchema.safeParse({
+      ...catalog[0],
+      tools: [{ ...reviewedTool, server: "filesystem" }],
+    }).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogToolSchema.safeParse({
+      ...reviewedTool,
+      input_schema: { invalid: () => undefined },
+    }).success,
+  ).toBe(false);
+  expect(
+    api.ServerCatalogEntrySchema.safeParse({
+      ...catalog[0],
+      status: "disconnected",
+    }).success,
+  ).toBe(false);
+});

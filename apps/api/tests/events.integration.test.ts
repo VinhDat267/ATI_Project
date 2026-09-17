@@ -40,22 +40,37 @@ describe("API-03 event paging", () => {
       };
       expect(body.events).toHaveLength(200);
       expect(body.next_seq).toBe(200);
-      const seqs = body.events.map((event) => event.seq);
-      let cursor = body.next_seq;
-      while (true) {
-        const response = await fixture.call(
-          `/runs/${run_id}/events?since_seq=${cursor}`,
-          { headers: { authorization: `Bearer ${token}` } },
-        );
-        expect(response.status).toBe(200);
-        const next = (await response.json()) as typeof body;
-        if (!next.events.length) {
-          expect(next.next_seq).toBe(cursor);
-          break;
-        }
-        seqs.push(...next.events.map((event) => event.seq));
-        cursor = next.next_seq;
-      }
+      const secondResponse = await fixture.call(
+        `/runs/${run_id}/events?since_seq=${body.next_seq}`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      const second = (await secondResponse.json()) as typeof body;
+      expect(second.events).toHaveLength(200);
+      expect(second.next_seq).toBe(400);
+      const retryResponse = await fixture.call(
+        `/runs/${run_id}/events?since_seq=${body.next_seq}`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      expect(retryResponse.status).toBe(200);
+      expect(await retryResponse.json()).toEqual(second);
+      const thirdResponse = await fixture.call(
+        `/runs/${run_id}/events?since_seq=${second.next_seq}`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      const third = (await thirdResponse.json()) as typeof body;
+      expect(third.events).toHaveLength(51);
+      expect(third.next_seq).toBe(451);
+      const emptyResponse = await fixture.call(
+        `/runs/${run_id}/events?since_seq=${third.next_seq}`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      expect(await emptyResponse.json()).toEqual({
+        events: [],
+        next_seq: 451,
+      });
+      const seqs = [...body.events, ...second.events, ...third.events].map(
+        (event) => event.seq,
+      );
       expect(seqs).toEqual(
         Array.from({ length: 451 }, (_, index) => index + 1),
       );

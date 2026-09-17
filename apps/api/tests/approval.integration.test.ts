@@ -51,6 +51,23 @@ describe("API-04 approval and execution", () => {
         snapshot_hash: approval.snapshot_hash,
         decision: "approved",
       };
+      const stale = await fixture.call(`/runs/${run_id}/approval`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          ...decision,
+          workflow_version_id: "00000000-0000-4000-8000-000000000099",
+        }),
+      });
+      expect(stale.status).toBe(409);
+      expect(
+        await fixture.db.client`
+          SELECT count(*)::int AS n FROM run_outbox
+          WHERE run_id=${run_id} AND job_kind='execute'`,
+      ).toEqual([{ n: 0 }]);
       const replies = await Promise.all([
         fixture.call(`/runs/${run_id}/approval`, {
           method: "POST",

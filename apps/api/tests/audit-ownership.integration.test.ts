@@ -98,6 +98,31 @@ describe("audit owner and session boundaries", () => {
       );
       const authorization = { authorization: `Bearer ${foreignToken}` };
 
+      const unauthenticatedReads = await Promise.all(
+        [
+          "/runs",
+          `/runs/${runId}`,
+          `/runs/${runId}/events`,
+          `/runs/${runId}/trace`,
+          `/runs/${runId}/reconciliation`,
+        ].map((route) => fetch(`${foreignBaseUrl}${route}`)),
+      );
+      expect(unauthenticatedReads.map((response) => response.status)).toEqual([
+        401, 401, 401, 401, 401,
+      ]);
+      const unauthenticatedWrites = await Promise.all(
+        ["approval", "cancel"].map((route) =>
+          fetch(`${foreignBaseUrl}/runs/${runId}/${route}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          }),
+        ),
+      );
+      expect(unauthenticatedWrites.map((response) => response.status)).toEqual([
+        401, 401,
+      ]);
+
       const list = await fetch(`${foreignBaseUrl}/runs`, {
         headers: authorization,
       });
@@ -241,6 +266,16 @@ describe("audit owner and session boundaries", () => {
       expect(await history.json()).toEqual([
         expect.objectContaining({ run_id: runId, status: "planning" }),
       ]);
+      const traceWithoutMcp = await fetch(
+        `${restartedBaseUrl}/runs/${runId}/trace`,
+        { headers: { authorization: `Bearer ${restartedToken}` } },
+      );
+      expect(traceWithoutMcp.status).toBe(200);
+      expect(await traceWithoutMcp.json()).toEqual({
+        run_id: runId,
+        attempts: [],
+        next_cursor: null,
+      });
       const servers = await fetch(`${restartedBaseUrl}/servers`, {
         headers: { authorization: `Bearer ${restartedToken}` },
       });

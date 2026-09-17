@@ -1,6 +1,7 @@
 import { openDatabase } from "@wap/db";
 import {
   WorkflowEngine,
+  inspectLocalGateway,
   loadFilesystemLaunch,
   openLocalGateway,
 } from "@wap/engine";
@@ -19,6 +20,10 @@ if (!databaseUrl)
   throw new Error("Missing required configuration G1_DATABASE_URL");
 const db = openDatabase(databaseUrl);
 const root = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+const filesystemConfigured = (() => {
+  const flag = process.env.G1_FILESYSTEM_ENABLED;
+  return flag !== undefined && !["0", "false", "off"].includes(flag.toLowerCase());
+})();
 const gateway = createGatewayManager(config.userId, async () => {
   const filesystem = await loadFilesystemLaunch(root, config.userId);
   return openLocalGateway({
@@ -27,6 +32,24 @@ const gateway = createGatewayManager(config.userId, async () => {
     userId: config.userId,
     ...(filesystem ? { filesystem } : {}),
   });
+}, async () => {
+  let filesystem;
+  try {
+    filesystem = await loadFilesystemLaunch(root, config.userId);
+  } catch {
+    // Keep the task hub inspection independent when the filesystem preset
+    // cannot be loaded; the catalog reports only a sanitized filesystem error.
+    filesystem = undefined;
+  }
+  return inspectLocalGateway(
+    {
+      root,
+      databaseUrl,
+      userId: config.userId,
+      ...(filesystem ? { filesystem } : {}),
+    },
+    { filesystemConfigured },
+  );
 });
 const engine = new WorkflowEngine(db, gateway, config.userId, {
   secrets: [
@@ -47,7 +70,11 @@ const worker = createPrepareWorker({
   onError: (code) =>
     console.error(JSON.stringify({ event: "worker_deferred", code })),
 });
-const maintenance = createExpiryMaintenance({ engine });
+const maintenance = createExpiryMaintenance({
+  engine,
+  onError: (code) =>
+    console.error(JSON.stringify({ event: "maintenance_deferred", code })),
+});
 const api = createApi({ db, config, engine, worker, maintenance });
 const url = await api.listen();
 worker?.start();

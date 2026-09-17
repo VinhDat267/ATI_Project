@@ -11,5 +11,8 @@ export {
   EventPageSchema,
   ServerSummaryListSchema,
   ServerSummarySchema,
+  ServerCatalogSchema,
+  ServerCatalogEntrySchema,
+  ServerCatalogToolSchema,
 } from "@wap/dsl";
 export type { LoginRequest } from "@wap/dsl";

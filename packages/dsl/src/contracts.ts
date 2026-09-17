@@ -102,6 +102,90 @@ export const ServerSummarySchema = z
   .strict();
 export const ServerSummaryListSchema = z.array(ServerSummarySchema);
 
+export const ServerCatalogToolSchema = z
+  .object({
+    server: z.enum(["task_hub", "filesystem"]),
+    name: z.string().min(1),
+    side_effect: z.enum(["read", "write"]),
+    policy_version: z.string().min(1),
+    artifact_hash: z.string().regex(/^[a-f0-9]{64}$/),
+    input_schema: z.record(z.string(), ArgValueSchema),
+    output_schema: z.record(z.string(), ArgValueSchema),
+  })
+  .strict();
+export type ServerCatalogTool = z.infer<typeof ServerCatalogToolSchema>;
+
+export const ServerCatalogEntrySchema = z
+  .object({
+    slug: z.enum(["task_hub", "filesystem"]),
+    status: z.enum(["connected", "disconnected", "error", "unreviewed"]),
+    policy_version: z.string().nullable(),
+    observed_at: z.iso.datetime({ offset: true }),
+    tools: z.array(ServerCatalogToolSchema),
+  })
+  .strict()
+  .superRefine((entry, ctx) => {
+    for (const [index, tool] of entry.tools.entries()) {
+      if (tool.server !== entry.slug)
+        ctx.addIssue({
+          code: "custom",
+          path: ["tools", index, "server"],
+          message: "tool server must match the catalog entry slug",
+        });
+    }
+    if (entry.status !== "connected") {
+      if (entry.tools.length > 0)
+        ctx.addIssue({
+          code: "custom",
+          path: ["tools"],
+          message: "non-connected entries cannot publish tools",
+        });
+      return;
+    }
+    if (entry.policy_version === null)
+      ctx.addIssue({
+        code: "custom",
+        path: ["policy_version"],
+        message: "connected entries require one policy version",
+      });
+    if (entry.tools.length === 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["tools"],
+        message: "connected entries require at least one reviewed tool",
+      });
+    for (const [index, tool] of entry.tools.entries())
+      if (
+        entry.policy_version !== null &&
+        tool.policy_version !== entry.policy_version
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["tools", index, "policy_version"],
+          message: "tool policy version must match the entry policy version",
+        });
+  });
+export type ServerCatalogEntry = z.infer<typeof ServerCatalogEntrySchema>;
+
+export const ServerCatalogSchema = z
+  .array(ServerCatalogEntrySchema)
+  .length(2)
+  .superRefine((entries, ctx) => {
+    if (entries[0]?.slug !== "task_hub")
+      ctx.addIssue({
+        code: "custom",
+        path: [0, "slug"],
+        message: "task_hub must be the first catalog entry",
+      });
+    if (entries[1]?.slug !== "filesystem")
+      ctx.addIssue({
+        code: "custom",
+        path: [1, "slug"],
+        message: "filesystem must be the second catalog entry",
+      });
+  });
+export type ServerCatalog = z.infer<typeof ServerCatalogSchema>;
+
 export const RunAcceptedSchema = z
   .object({ run_id: z.string().min(1), status: z.literal("planning") })
   .strict();

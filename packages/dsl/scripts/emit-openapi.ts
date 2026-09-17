@@ -16,6 +16,9 @@ const definitions = {
   LoginResponse: dsl.LoginResponseSchema,
   ApiError: dsl.ApiErrorSchema,
   ServerSummary: dsl.ServerSummarySchema,
+  ServerCatalogTool: dsl.ServerCatalogToolSchema,
+  ServerCatalogEntry: dsl.ServerCatalogEntrySchema,
+  ServerCatalog: dsl.ServerCatalogSchema,
   RunAccepted: dsl.RunAcceptedSchema,
   RunDetail: dsl.RunDetailSchema,
   Approval: dsl.ApprovalSchema,
@@ -73,7 +76,7 @@ const spec = {
     title: "ATI Workflow Platform — B/local",
     version: "0.3.0",
     description:
-      "B/local HTTP boundary through API-03: login, server discovery, durable run acceptance, owned run read model, event polling, stable trace cursors, and read-only reconciliation. Poll events every 2 seconds. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
+      "B/local HTTP boundary through API-CATALOG: login, stable server summaries, a no-launch reviewed catalog read, and a rate-limited active reviewed-preset check, plus durable run lifecycle, polling, trace cursors, and read-only reconciliation. GET /servers/catalog never launches MCP; POST /servers/check is the explicit active check. Session state remains in memory, and LLM/retrieval/replan, BullMQ, and browser integration remain outside this technical boundary. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
   },
   servers: [{ url: "/api/v1" }],
   security: [{ bearerAuth: [] }],
@@ -86,7 +89,7 @@ const spec = {
           { name: "cursor", in: "query", schema: { type: "string" } },
         ],
         description:
-          "Full immutable attempt snapshots, up to 100 per page. Opaque next_cursor binds a snapshot watermark and (started_at,id) position. Restart without cursor to see newer attempts. Legacy unknown metadata is explicit.",
+          "Full immutable attempt snapshots, up to 100 per page. Opaque HMAC-signed next_cursor binds user/run, snapshot_id, and offset. Restart without cursor to see newer attempts. Legacy unknown metadata is explicit.",
         responses: { "200": response("Trace"), ...errors },
       },
     },
@@ -121,6 +124,54 @@ const spec = {
           "200": {
             description: "OK",
             content: json({ type: "array", items: ref("ServerSummary") }),
+          },
+          ...errors,
+        },
+      },
+    },
+    "/servers/catalog": {
+      get: {
+        operationId: "getServerCatalog",
+        summary:
+          "Read the reviewed server catalog without launching connections",
+        description:
+          "Authenticated read-only catalog. The engine calls serverCatalog({connect:false}); it must not launch or ensure MCP connections.",
+        responses: {
+          "200": response("ServerCatalog"),
+          "501": {
+            description: "Server catalog is not enabled",
+            content: json(ref("ApiError")),
+          },
+          ...errors,
+        },
+      },
+    },
+    "/servers/check": {
+      post: {
+        operationId: "checkServerCatalog",
+        summary: "Actively inspect the fixed reviewed server presets",
+        description:
+          "Authenticated active check. The request has no launch parameters; the server invokes serverCatalog({connect:true}) against fixed reviewed presets only. Calls are rate limited per principal.",
+        responses: {
+          "200": response("ServerCatalog"),
+          "429": {
+            description: "Active check rate limited",
+            headers: {
+              "Retry-After": {
+                description:
+                  "Integer seconds until another active check is allowed",
+                schema: { type: "integer", minimum: 1 },
+              },
+            },
+            content: json(ref("ApiError")),
+          },
+          "501": {
+            description: "Server catalog is not enabled",
+            content: json(ref("ApiError")),
+          },
+          "503": {
+            description: "Reviewed connection or configuration unavailable",
+            content: json(ref("ApiError")),
           },
           ...errors,
         },

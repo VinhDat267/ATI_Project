@@ -14,6 +14,7 @@ import type {
   CallContext,
   ToolTarget,
   ServerConnection,
+  GatewayServerInspection,
   LocalGatewayConfig,
   FilesystemWriteRequest,
 } from "./gateway-types.js";
@@ -24,6 +25,7 @@ export type {
   CallContext,
   ToolTarget,
   ServerConnection,
+  GatewayServerInspection,
   LocalGatewayConfig,
   FilesystemLaunch,
   FilesystemWriteHooks,
@@ -33,6 +35,100 @@ export type {
 
 const targetKey = (target: ToolTarget) =>
   `${target.server}\u0000${target.name}`;
+
+const localCatalogPolicyVersions = {
+  task_hub: "b-local-1",
+  filesystem: "b-local-fs-1",
+} as const;
+
+function failedLocalInspection(
+  server: keyof typeof localCatalogPolicyVersions,
+): GatewayServerInspection {
+  return {
+    server,
+    status: "error",
+    policyVersion: localCatalogPolicyVersions[server],
+    tools: [],
+  };
+}
+
+async function inspectOpenedConnection(
+  connection: ServerConnection,
+): Promise<GatewayServerInspection> {
+  let connected = true;
+  try {
+    connected = connection.isConnected?.() ?? true;
+    const policyVersions = [
+      ...new Set(connection.tools.map((tool) => tool.policyVersion)),
+    ];
+    await connection.assertCurrent();
+    if (!connected) {
+      return {
+        server: connection.server,
+        status: "disconnected",
+        policyVersion: policyVersions.length === 1 ? policyVersions[0]! : null,
+        tools: [],
+      };
+    }
+    return {
+      server: connection.server,
+      status: "connected",
+      policyVersion: policyVersions.length === 1 ? policyVersions[0]! : null,
+      tools: structuredClone([...connection.tools]),
+    };
+  } catch {
+    return {
+      server: connection.server,
+      status: connected ? "error" : "disconnected",
+      policyVersion: null,
+      tools: [],
+    };
+  }
+}
+
+/**
+ * Inspect the reviewed local presets independently for the active catalog
+ * check. This intentionally does not return a Gateway: successful connections
+ * are closed after inspection and therefore cannot become an incomplete
+ * execution gateway. `openLocalGateway` remains the atomic execution opener.
+ */
+export async function inspectLocalGateway(
+  config: LocalGatewayConfig,
+  options: { filesystemConfigured?: boolean } = {},
+): Promise<readonly GatewayServerInspection[]> {
+  const inspections: GatewayServerInspection[] = [];
+
+  let taskHub: ServerConnection | undefined;
+  try {
+    taskHub = await openTaskHubConnection(config);
+    inspections.push(await inspectOpenedConnection(taskHub));
+  } catch {
+    inspections.push(failedLocalInspection("task_hub"));
+  } finally {
+    await taskHub?.close().catch(() => undefined);
+  }
+
+  if (config.filesystem) {
+    let filesystem: ServerConnection | undefined;
+    try {
+      filesystem = await openFilesystemConnection(
+        config,
+        config.filesystem,
+      );
+      inspections.push(await inspectOpenedConnection(filesystem));
+    } catch {
+      inspections.push(failedLocalInspection("filesystem"));
+    } finally {
+      await filesystem?.close().catch(() => undefined);
+    }
+  } else if (options.filesystemConfigured) {
+    // The reviewed filesystem preset was requested but could not be loaded;
+    // preserve the independently inspected task hub result.
+    inspections.push(failedLocalInspection("filesystem"));
+  }
+
+  return inspections;
+}
 
 /** Compose reviewed server connections behind an exact server-qualified target. */
 export function composeGateway(
@@ -76,6 +172,44 @@ export function composeGateway(
     },
     isConnected: () =>
       connections.every((connection) => connection.isConnected?.() ?? true),
+    async inspectServers(): Promise<readonly GatewayServerInspection[]> {
+      return Promise.all(
+        connections.map(async (connection) => {
+          const policyVersions = [
+            ...new Set(connection.tools.map((tool) => tool.policyVersion)),
+          ];
+          const connected = connection.isConnected?.() ?? true;
+          try {
+            await connection.assertCurrent();
+            if (!connected)
+              return {
+                server: connection.server,
+                status: "disconnected" as const,
+                policyVersion:
+                  policyVersions.length === 1 ? policyVersions[0]! : null,
+                tools: [],
+              };
+            return {
+              server: connection.server,
+              status: "connected" as const,
+              policyVersion:
+                policyVersions.length === 1 ? policyVersions[0]! : null,
+              tools: structuredClone([...connection.tools]),
+            };
+          } catch {
+            return {
+              server: connection.server,
+              status: connected
+                ? ("error" as const)
+                : ("disconnected" as const),
+              policyVersion:
+                policyVersions.length === 1 ? policyVersions[0]! : null,
+              tools: [],
+            };
+          }
+        }),
+      );
+    },
     async assertCurrent() {
       const results = await Promise.allSettled(
         connections.map((connection) => connection.assertCurrent()),
@@ -180,6 +314,7 @@ export async function openLocalGateway(
       get tools() {
         return base.tools;
       },
+      inspectServers: () => base.inspectServers!(),
       assertCurrent: () => base.assertCurrent(),
       isConnected: () => base.isConnected!(),
       call: (...args) => base.call(...args),

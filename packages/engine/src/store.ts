@@ -360,6 +360,25 @@ export class Store {
       return expired;
     });
   }
+  async cleanupExpiredTraceSnapshots(limit = 100) {
+    z.number().int().min(1).max(1_000).parse(limit);
+    const rows = await this.db.client`
+      WITH candidates AS (
+        SELECT id
+        FROM http_trace_snapshots
+        WHERE user_id=${this.userId}
+          AND expires_at<=clock_timestamp()
+        ORDER BY expires_at,id
+        LIMIT ${limit}
+      )
+      DELETE FROM http_trace_snapshots snapshot
+      USING candidates
+      WHERE snapshot.id=candidates.id
+        AND snapshot.user_id=${this.userId}
+        AND snapshot.expires_at<=clock_timestamp()
+      RETURNING snapshot.id`;
+    return rows.length;
+  }
   async preview(id: string) {
     await this.run(this.db.client, id);
     const a = await this.approval(this.db.client, id);

@@ -97,6 +97,11 @@ describe("API-04 cancellation and expiry", () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       expect(status).toBe("expired");
+      expect(
+        await fixture.db.client`
+          SELECT count(*)::int AS n FROM hub_receipts
+          WHERE user_id=${fixture.userId}`,
+      ).toEqual([{ n: 0 }]);
       const cancel = await fixture.call(`/runs/${run_id}/cancel`, {
         method: "POST",
         headers: {

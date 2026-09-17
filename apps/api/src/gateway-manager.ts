@@ -4,6 +4,7 @@ import { EngineError, type Gateway } from "@wap/engine";
 export function createGatewayManager(
   userId: string,
   open: () => Promise<Gateway>,
+  catalogCheck?: Gateway["catalogCheck"],
 ): Gateway {
   let current: Gateway | undefined;
   let pending: Promise<void> | undefined;
@@ -11,6 +12,13 @@ export function createGatewayManager(
     userId,
     get tools() {
       return current?.tools ?? [];
+    },
+    get inspectServers() {
+      const gateway = current;
+      return gateway?.inspectServers?.bind(gateway);
+    },
+    get catalogCheck() {
+      return catalogCheck;
     },
     async ensureConnected() {
       if (current && (current.isConnected?.() ?? true)) return;

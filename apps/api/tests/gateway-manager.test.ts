@@ -42,3 +42,27 @@ it("keeps disconnected reads inert, retries failed opens and shares one live con
   expect(closes).toBe(2);
   await expect(manager.assertCurrent()).rejects.toThrow("unavailable");
 });
+
+it("exposes per-server inspection only after a reviewed connection exists", async () => {
+  let inspectCalls = 0;
+  const live: Gateway = {
+    userId: "owner",
+    tools: [],
+    async inspectServers() {
+      inspectCalls++;
+      return [];
+    },
+    async assertCurrent() {},
+    async call() {
+      return { structuredContent: {} };
+    },
+    async close() {},
+  };
+  const manager = createGatewayManager("owner", async () => live);
+
+  expect(manager.inspectServers).toBeUndefined();
+  await manager.ensureConnected!();
+  expect(manager.inspectServers).toBeTypeOf("function");
+  await manager.inspectServers!();
+  expect(inspectCalls).toBe(1);
+});

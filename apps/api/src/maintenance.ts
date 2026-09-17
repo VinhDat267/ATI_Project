@@ -6,23 +6,47 @@ export interface MaintenanceControl {
   stop(): Promise<void>;
 }
 
-/** Expires pending approvals independently from the planner/execute worker. */
+export type MaintenanceErrorCode =
+  | "APPROVAL_EXPIRY_FAILED"
+  | "TRACE_SNAPSHOT_CLEANUP_FAILED";
+
+/** Expires approvals and bounded trace snapshots independently from dispatch. */
 export function createExpiryMaintenance(options: {
   engine: WorkflowEngine;
   intervalMs?: number;
+  traceSnapshotBatchSize?: number;
+  onError?: (code: MaintenanceErrorCode) => void;
 }): MaintenanceControl {
   const intervalMs = options.intervalMs ?? 1_000;
+  const traceSnapshotBatchSize = options.traceSnapshotBatchSize ?? 100;
   let timer: NodeJS.Timeout | undefined;
   let running = false;
   let stopped = false;
   let active: Promise<void> | undefined;
+  const report = (code: MaintenanceErrorCode) => {
+    try {
+      options.onError?.(code);
+    } catch {
+      // Diagnostics must never break maintenance.
+    }
+  };
   const tick = async () => {
     if (stopped || running) return;
     running = true;
-    active = options.engine
-      .expireApprovals()
-      .then(() => undefined)
-      .catch(() => undefined)
+    active = (async () => {
+      try {
+        await options.engine.expireApprovals();
+      } catch {
+        report("APPROVAL_EXPIRY_FAILED");
+      }
+      try {
+        await options.engine.cleanupExpiredTraceSnapshots(
+          traceSnapshotBatchSize,
+        );
+      } catch {
+        report("TRACE_SNAPSHOT_CLEANUP_FAILED");
+      }
+    })()
       .finally(() => {
         running = false;
         active = undefined;

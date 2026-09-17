@@ -102,7 +102,9 @@ test("source selection covers source, tests, scripts, config, migrations, genera
     "apps/api/tests/http.test.ts",
     "apps/api/vitest.unit.config.ts",
     "apps/api/dist/app.js",
+    "apps/web/test-results/.last-run.json",
     "packages/db/migrations/0006_http.sql",
+    "packages/dsl/generated/api.d.ts",
     "scripts/check-api.mjs",
     "compose.g1.yaml",
     "package-lock.json",
@@ -182,7 +184,7 @@ test("git status evidence distinguishes tracked and untracked source from unrela
   });
 });
 
-test("gate plan includes engine unit and passing commands cannot promote missing negative coverage", async () => {
+test("gate plan reuses the offline check and passing commands cannot promote missing negative coverage", async () => {
   const { createGatePlan, deriveGateAssessment } = await loadRunnerHelpers();
   const plan = createGatePlan();
   assert.deepEqual(
@@ -190,7 +192,6 @@ test("gate plan includes engine unit and passing commands cannot promote missing
     [
       "runner-unit",
       "check",
-      "engine-unit",
       "api-unit",
       "api-integration",
       "db-integration",
@@ -210,12 +211,213 @@ test("gate plan includes engine unit and passing commands cannot promote missing
     command_status: "PASS",
     api_verdict: "PARTIAL",
     api_technical_pass: false,
-    process_exit_code: 0,
+    process_exit_code: 2,
     reasons: [
       "required_negative_http_matrix=NOT_RUN",
       "cleanup=NOT_INDEPENDENTLY_VERIFIED",
     ],
   });
+});
+
+test("acceptance matrix only passes a scenario when every exact test title passed", async () => {
+  const { assessAcceptanceMatrix } = await loadRunnerHelpers();
+  const matrix = [
+    {
+      id: "H02",
+      title: "malformed and oversized request bodies",
+      tests: [
+        {
+          command_id: "api-unit",
+          title:
+            "rejects malformed and oversized chunked JSON before principal lookup",
+        },
+      ],
+    },
+  ];
+  const passReport = JSON.stringify({
+    success: true,
+    testResults: [
+      {
+        name: "D:/repo/apps/api/tests/http.test.ts",
+        assertionResults: [
+          {
+            title:
+              "rejects malformed and oversized chunked JSON before principal lookup",
+            fullName:
+              "HTTP boundary rejects malformed and oversized chunked JSON before principal lookup",
+            status: "passed",
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    assessAcceptanceMatrix(
+      [{ id: "api-unit", exit_code: 0, stdout: passReport, stderr: "" }],
+      matrix,
+    ),
+    {
+      status: "PASS",
+      scenarios: [
+        {
+          id: "H02",
+          title: "malformed and oversized request bodies",
+          status: "PASS",
+          tests: [
+            {
+              command_id: "api-unit",
+              title:
+                "rejects malformed and oversized chunked JSON before principal lookup",
+              status: "PASS",
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.equal(
+    assessAcceptanceMatrix(
+      [{ id: "api-unit", exit_code: 0, stdout: "", stderr: "" }],
+      matrix,
+    ).scenarios[0].status,
+    "NOT_ESTABLISHED",
+  );
+  assert.equal(
+    assessAcceptanceMatrix(
+      [{ id: "api-unit", exit_code: 1, stdout: passReport, stderr: "" }],
+      matrix,
+    ).scenarios[0].status,
+    "FAIL",
+  );
+});
+
+test("the default acceptance matrix names every H01 through H20 scenario exactly once", async () => {
+  const { API_ACCEPTANCE_MATRIX } = await loadRunnerHelpers();
+  assert.deepEqual(
+    API_ACCEPTANCE_MATRIX.map(({ id }) => id),
+    Array.from({ length: 20 }, (_, index) =>
+      `H${String(index + 1).padStart(2, "0")}`,
+    ),
+  );
+  for (const scenario of API_ACCEPTANCE_MATRIX) {
+    assert.ok(scenario.title.length > 0, scenario.id);
+    assert.ok(scenario.tests.length > 0, scenario.id);
+  }
+});
+
+test("cleanup comparison detects newly leaked databases, temp roots, and project processes", async () => {
+  const { compareCleanupSnapshots } = await loadRunnerHelpers();
+  const before = {
+    status: "PASS",
+    databases: ["api_it_existing"],
+    temp_roots: ["ati-api-fs-existing"],
+    processes: [{ pid: 10, kind: "api" }],
+    errors: [],
+  };
+
+  assert.deepEqual(compareCleanupSnapshots(before, structuredClone(before)), {
+    status: "PASS",
+    added: { databases: [], temp_roots: [], processes: [] },
+    errors: [],
+  });
+
+  assert.deepEqual(
+    compareCleanupSnapshots(before, {
+      status: "PASS",
+      databases: ["api_it_existing", "engine_it_leak"],
+      temp_roots: ["ati-api-fs-existing", "ati-fs-it-leak"],
+      processes: [
+        { pid: 10, kind: "api" },
+        { pid: 11, kind: "engine-cli" },
+      ],
+      errors: [],
+    }),
+    {
+      status: "FAIL",
+      added: {
+        databases: ["engine_it_leak"],
+        temp_roots: ["ati-fs-it-leak"],
+        processes: [{ pid: 11, kind: "engine-cli" }],
+      },
+      errors: [],
+    },
+  );
+
+  assert.equal(
+    compareCleanupSnapshots(before, {
+      status: "FAIL",
+      databases: [],
+      temp_roots: [],
+      processes: [],
+      errors: ["database oracle unavailable"],
+    }).status,
+    "FAIL",
+  );
+});
+
+test("cleanup ownership filters ignore unrelated resources and keep only project-owned candidates", async () => {
+  const {
+    selectOwnedDatabaseNames,
+    selectOwnedTempRoots,
+    selectOwnedProjectProcesses,
+  } = await loadRunnerHelpers();
+  assert.deepEqual(
+    selectOwnedDatabaseNames([
+      "postgres",
+      "api_it_one",
+      "engine_it_two",
+      "g1_it_three",
+      "api_prod",
+    ]),
+    ["api_it_one", "engine_it_two", "g1_it_three"],
+  );
+  assert.deepEqual(
+    selectOwnedTempRoots([
+      "ordinary",
+      "ati-api-fs-a",
+      "ati-fs-it-b",
+      "ati-cap-probe-c",
+      "ati-vite-proxy-test-d",
+    ]),
+    [
+      "ati-api-fs-a",
+      "ati-cap-probe-c",
+      "ati-fs-it-b",
+      "ati-vite-proxy-test-d",
+    ],
+  );
+  assert.deepEqual(
+    selectOwnedProjectProcesses(
+      [
+        {
+          pid: 42,
+          command_line:
+            "node D:\\Môn học\\ATI\\ATI_Project\\apps\\api\\dist\\main.js",
+        },
+        { pid: 43, command_line: "node C:\\other\\service.js" },
+        {
+          pid: 44,
+          command_line:
+            "node D:\\Môn học\\ATI\\ATI_Project\\packages\\engine\\dist\\cli.js",
+        },
+        { pid: 45, command_line: "node apps/api/src/main.ts" },
+        {
+          pid: 46,
+          command_line:
+            "node packages/engine/tests/filesystem-marker-crash-worker.mjs",
+        },
+      ],
+      "D:\\Môn học\\ATI\\ATI_Project",
+    ),
+    [
+      { pid: 42, kind: "api" },
+      { pid: 44, kind: "engine-cli" },
+      { pid: 45, kind: "api" },
+      { pid: 46, kind: "test-fault-worker" },
+    ],
+  );
 });
 
 test("a cleanup failure makes the gate fail even when every command exits zero", async () => {

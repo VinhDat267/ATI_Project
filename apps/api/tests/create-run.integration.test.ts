@@ -36,6 +36,27 @@ describe("API-02 durable acceptance", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]!.job_kind).toBe("prepare");
       expect(rows[0]!.delivered_at).toBeNull();
+      expect(
+        await fixture.db.client`
+          SELECT
+            (SELECT count(*)::int FROM workflows) AS workflows,
+            (SELECT count(*)::int FROM runs) AS runs,
+            (SELECT count(*)::int FROM workflow_versions) AS versions,
+            (SELECT count(*)::int FROM run_events WHERE run_id=${accepted.run_id}) AS events,
+            (SELECT count(*)::int FROM run_outbox WHERE run_id=${accepted.run_id}) AS jobs`,
+      ).toEqual([
+        { workflows: 1, runs: 1, versions: 0, events: 1, jobs: 1 },
+      ]);
+      expect(
+        await fixture.db.client`
+          SELECT seq,type,payload FROM run_events WHERE run_id=${accepted.run_id}`,
+      ).toEqual([
+        {
+          seq: 1,
+          type: "run.status",
+          payload: { status: "planning", previous: null },
+        },
+      ]);
     } finally {
       await fixture.close();
     }

@@ -1,0 +1,48 @@
+{
+  "task": "API-05",
+  "created_at": "2026-09-15T00:16:28.114Z",
+  "commit": "e71ebf45fda63401b87c4caec552def4968a1083",
+  "node": "v24.19.0",
+  "cwd": "D:\\Môn học\\ATI\\ATI_Project",
+  "commands": [
+    {
+      "id": "check",
+      "command": "npm run check",
+      "started_at": "2026-09-15T00:11:27.399Z",
+      "exit_code": 0
+    },
+    {
+      "id": "api-unit",
+      "command": "npm run test:unit -w @wap/api",
+      "started_at": "2026-09-15T00:11:51.064Z",
+      "exit_code": 0
+    },
+    {
+      "id": "api-integration",
+      "command": "npm run test:integration -w @wap/api",
+      "started_at": "2026-09-15T00:11:54.926Z",
+      "exit_code": 0
+    },
+    {
+      "id": "db-integration",
+      "command": "npm run test:integration -w @wap/mcp-task-hub",
+      "started_at": "2026-09-15T00:12:30.485Z",
+      "exit_code": 0
+    },
+    {
+      "id": "engine-integration",
+      "command": "npm run test:integration -w @wap/engine",
+      "started_at": "2026-09-15T00:13:37.267Z",
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "apps/api/src/app.ts": "5aea3732222709e013c5faae3af745e145ed526ed7439f0ae8f5a2e64683762c",
+    "apps/api/src/worker.ts": "928986e7848af29e6d42e668a7a89cf1dda7d72eacd278b010ddfaa53087dce1",
+    "apps/api/src/maintenance.ts": "aa3041503450f62be00a9e4abd919f49769109b4f5e0f7addbc6e835fbc431d7"
+  },
+  "planner": "DEV_FIXTURE",
+  "browser_e2e": "NOT_RUN",
+  "ai_evaluation": "NOT_RUN",
+  "rubric": "OPEN"
+}

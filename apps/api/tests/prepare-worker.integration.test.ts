@@ -38,6 +38,25 @@ describe("API-02 asynchronous preparation", () => {
       expect(detail?.status).toBe("awaiting_approval");
       expect(detail?.planner_result?.kind).toBe("plan");
       expect(detail?.approval?.actions).toHaveLength(2);
+      expect(detail?.approval?.actions[0]).toMatchObject({
+        step_id: "append",
+        server: "task_hub",
+        tool: "append_sheet_rows",
+        resolved_args: {
+          spreadsheet_id: "dest",
+          sheet_name: "Report",
+          rows: [
+            ["API", "Done"],
+            ["UI", "Doing"],
+          ],
+        },
+      });
+      expect(detail?.approval?.actions[1]).toMatchObject({
+        step_id: "notify",
+        server: "task_hub",
+        tool: "send_slack_message",
+        resolved_args: { channel: "#team", text: "Đã chép 2 dòng." },
+      });
       expect(
         await fixture.db.client`SELECT count(*)::int AS n FROM hub_receipts`,
       ).toEqual([{ n: 0 }]);
