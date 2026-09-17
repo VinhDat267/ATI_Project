@@ -630,6 +630,12 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Mục “Hoạt động” chỉ xuất hiện khi nó thêm thông tin** so với dải “Tiến trình”. Ở `planning` hai mốc duy nhất trùng với dải giai đoạn nên bỏ cả mục lẫn hairline ngăn section, không để lại đường kẻ mồ côi.
 - **Artboard bằng chiều cao nội dung** (làm tròn lên bội số 20px): khoảng trắng dưới cùng là `padding-bottom: 64px` của `main`, không phải phần thừa của khung.
 
+### Icons & bề mặt trình duyệt
+
+- **Một bộ icon, một độ dày nét:** lucide, `viewBox="0 0 24 24"`, `stroke-width="2"` ở mọi kích thước hiển thị (12–32px) vì nét co giãn theo viewBox — không “chỉnh quang học” bằng 1.8 hay 2.4. Nét mảnh 1.4 chỉ thuộc logo ATI, không phải icon giao diện. Không dùng emoji hay ký tự Unicode thay icon.
+- **Kích thước icon** theo vai trò: 14–16px trong pill và dòng chữ, 16px trong nút, 20px trong vòng tròn 40–48px, 32px cho logo.
+- **Bề mặt trình duyệt cũng thuộc hệ:** `::selection` nền `primary-subtle` chữ `primary`; link `ink` với `text-underline-offset: 3px`, hover `primary`; số liệu thời gian và đếm dùng `font-variant-numeric: tabular-nums`; focus là viền 2px `ink`, không glow.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
@@ -662,3 +668,5 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - Font Be Vietnam Pro tự host: đặt file woff2 (400/500/600/700, subset latin + vietnamese) trong `apps/web/src/assets/fonts/`, khai báo `@font-face` với `font-display: swap`, ghi license OFL kèm file.
 - Spacing đặt tên cùng tồn tại với thang số mặc định của Tailwind; trong code ưu tiên tên token.
 - Mockup tham chiếu: canvas review “ATI Run Screens” (riêng tư). Mockup không chứng minh accessibility, responsive hay hành vi polling; các kiểm tra đó thuộc WEB-03.
+- **Ngoại lệ chỉ có ở mockup:** artboard nạp Be Vietnam Pro từ Google Fonts vì canvas không có pipeline font cục bộ; `apps/web` vẫn tự host theo ADR-001/002. Các board mở đầu bằng “Cũ ·” là phương án đã loại, giữ để đối chiếu và **không** nằm trong phạm vi kiểm tra.
+- **Cảnh báo `cramped-padding` được chấp nhận** khi chiều cao cố định thay cho padding: đo trên bản render, hàng tool 65px cách nội dung 11px trên/dưới, vòng tròn icon 40px cách 11px, pill 26px cách chữ 6px. Mọi cảnh báo khác của detector phải sửa chứ không bỏ qua.
