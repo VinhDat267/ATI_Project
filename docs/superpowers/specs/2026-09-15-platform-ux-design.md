@@ -129,8 +129,17 @@ Mục tiêu: biết hệ thống có thể làm gì, trên đích local nào và
 - `GET /servers` hiện chỉ cung cấp slug/status/policy_version. Có thể triển khai trang trạng thái trước; không gọi hai hàng server là danh sách 10 tool.
 - Không dùng `testdata/tools.json` làm bằng chứng server đang kết nối. Trang fixture phải gắn nhãn rõ.
 - “Làm mới trạng thái” chỉ GET; không có tác dụng bật MCP. Gateway hiện kết nối theo nhu cầu nên disconnected chưa đủ kết luận package hỏng hoặc chưa cài.
-- Để làm tool catalog live và kiểm kết nối chủ động (FR-CON-02/04), cần công việc backend riêng: DTO catalog đã review và thao tác kiểm preset với owner/rate/launch-policy guard. Đây là gap của yêu cầu B đã có, không phải quyền nhập arbitrary executable.
+- ~~Cần công việc backend riêng cho catalog live và kiểm kết nối chủ động.~~ Đã có từ API-CATALOG (`c80dedc`): `GET /servers/catalog` chỉ đọc, không khởi động MCP; `POST /servers/check` là kiểm tra chủ động duy nhất trên preset reviewed cố định, rate-limit 5 giây (`429` + `Retry-After`), lỗi cấu hình/kết nối trả `503`. Mỗi tool có `name`, `side_effect`, `policy_version`, `artifact_hash`, `input_schema`, `output_schema`; không có mô tả.
 - Không có form nhập Slack token, nút “Kết nối Trello thật”, thêm/xóa server tùy ý hoặc credential vault.
+
+**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V06):**
+
+- Trang một cột 1120px. Đầu trang giải thích chỉ dùng máy chủ local đã review và quyền đọc/ghi do chính sách ứng dụng quyết định; dòng “N máy chủ đã review · Kiểm tra lúc hh:mm:ss” hoặc “Chưa kiểm tra trong phiên này”; nút primary “Kiểm tra kết nối”.
+- Vào trang chỉ gọi `GET /servers/catalog`. `POST /servers/check` **chỉ khi người dùng bấm**; đang kiểm tra khoá nút, giữ nhãn; `429` khoá nút và đếm ngược theo `Retry-After`; `503` banner danger, giữ dữ liệu lần trước và ghi rõ có thể đã cũ; `401` về đăng nhập; dữ liệu sai hợp đồng không render.
+- Mỗi server một khối ngăn bằng hairline: tên dễ hiểu + slug mono (“Dữ liệu nhóm · `task_hub`”, “Tệp cục bộ · `filesystem`”), badge trạng thái, tóm tắt “N công cụ · X đọc · Y ghi · chính sách … · quan sát lúc …”. `disconnected` khi chưa kiểm tra = “Chưa kiểm tra trong phiên này” (trung tính, không hiện “0 công cụ”); sau kiểm tra = “Không kết nối được” (không kết luận package hỏng); `error` = danger; `unreviewed` = `unknown` “Chưa review — bị chặn”, không liệt kê tool. filesystem tắt theo launch policy hiện “Đang tắt theo cấu hình” khi frontend biết từ cấu hình launch tin cậy (API không có trạng thái riêng).
+- Tool: icon, nhãn và mô tả tiếng Việt từ **bảng nhãn trong frontend có test khớp tên catalog** (tool lạ hiện tên gốc + “Chưa có mô tả”), pill Đọc/Ghi luôn từ `side_effect`, disclosure “Chi tiết kỹ thuật”: tên gốc, chính sách + `policy_version`, `artifact_hash` rút gọn có sao chép, bảng tham số từ `input_schema`, tóm tắt kết quả sinh từ `output_schema`, “Xem JSON schema”.
+- Mobile: nút kiểm tra full-width; hàng tool xếp dọc; bảng tham số cuộn ngang trong khung riêng. Cuối trang: “Đã sẵn sàng? Tạo yêu cầu”.
+- Chưa vẽ: đang kiểm tra, `error`, `unreviewed`, tool lạ.
 
 ## 4. Trạng thái run và hành động
 

@@ -536,6 +536,14 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **Hàng lần chạy:** link toàn hàng; lưới badge 208px · nội dung · thời gian 150px (mobile xếp dọc); yêu cầu `body-lg` 500 tối đa 2 dòng; dòng phụ `body-sm` `muted`, phần cần chú ý dùng màu ngữ nghĩa 600; mã run `mono-sm` `muted`; ngăn bằng `hairline-soft`; focus viền 2px `ink` bo 8px, nền `surface-soft`.
 - **Trạng thái rỗng:** khung hairline bo 14px, icon tròn 56px `surface-strong`, tiêu đề `headline-sm`, đoạn `muted` tối đa ~520px, một hành động.
 
+### Tools & connections (V06)
+
+- **Khối server:** ngăn bằng hairline; icon 52px bo 14px nền `surface-strong`; tên `headline-sm` + slug `mono`; dòng tóm tắt `body-sm` `muted` tabular; badge trạng thái bên phải (`success` đã kết nối, `neutral` chưa kiểm tra/tắt theo cấu hình, `danger` lỗi, `unknown` chưa review).
+- **Hàng tool:** lưới icon tròn 40px · nhãn `body-lg` 500 + mô tả `body-sm` `muted` · pill Đọc/Ghi · nút “Chi tiết kỹ thuật” có chevron và `aria-expanded`; ngăn bằng `hairline-soft`, cao ≥ 64px.
+- **Pill Đọc/Ghi:** 24px, bo full, chữ 12/600 kèm icon (sách/bút); Đọc nền `surface-strong` chữ `ink`, Ghi nền `neutral-subtle` chữ `neutral`. Không dùng màu `action` vì đây là chính sách, không phải việc đang chờ.
+- **Chi tiết kỹ thuật:** khung `surface-soft` bo 14px thụt theo cột nhãn; ô nhãn `overline`; giá trị kỹ thuật `mono-md`; bảng tham số nền `canvas` bo 8px; nút sao chép `icon-button-circle` 32px có `aria-label`.
+- **Nút kiểm tra bị giới hạn:** nền `surface-strong`, chữ `muted`, dòng đếm ngược `body-sm` tabular kèm icon đồng hồ, `role="status"`.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
