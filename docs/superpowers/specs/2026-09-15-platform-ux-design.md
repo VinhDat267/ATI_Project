@@ -180,13 +180,22 @@ Hủy là cooperative: sau POST cancel `202`, UI báo đã gửi yêu cầu hủ
 | `running` | Banner `progress` nêu ghi chưa rõ sẽ dừng và đối chiếu; kết quả từng bước (xong / đang chạy / chưa chạy) | ĐÃ XONG x/y · ĐANG CHẠY bước n; “Yêu cầu huỷ” + “không hoàn tác thao tác đang chạy” |
 | `succeeded` | **Kết quả trước** (mỗi thao tác ghi: việc đã làm, vùng/đích, có biên nhận lúc…), ghi chú “Hoàn tất” không phải kiểm chứng nghiệp vụ; các bước; hoạt động | HOÀN TẤT · ĐÃ GHI; “Xem chứng cứ”, “Tạo yêu cầu mới” |
 | `failed` | Banner danger nêu bước và lỗi đã biết, trạng thái ghi (“chắc chắn chưa ghi” chỉ khi server xác nhận); các bước; chi tiết lỗi (`error_class`, thông điệp) | HOÀN TẤT x/y · THẤT BẠI bước n · ĐÃ GHI; không có nút thử lại |
-| `reconciliation_required` | Như mockup đã chốt: banner `unknown` không đóng, kết quả từng bước, đối chiếu, nhật ký | Thẻ tóm tắt; “Làm mới dữ liệu” (GET), “Tạo yêu cầu mới”; không gửi lại |
+| `reconciliation_required` | Theo receipt của `GET /runs/:id/reconciliation` (xem mục “Đối chiếu theo receipt” dưới bảng) | XONG · CHƯA RÕ · XÁC NHẬN KHI ĐỐI CHIẾU; “Xem chứng cứ”; “Tạo lại yêu cầu này” hoặc “Tạo yêu cầu mới” theo receipt; không gửi lại |
 | `needs_input` | Banner `planner` với câu hỏi nguyên văn; “Việc tiếp theo” gợi ý yêu cầu viết lại; dải giai đoạn dừng ở lập kế hoạch | KẾ HOẠCH “Không có” · ĐÃ GHI “Không”; “Tạo yêu cầu mới”, không trả lời tiếp trên run cũ |
 | `refused` | Banner `planner` với lý do; giải thích chỉ dùng công cụ đã review; link Công cụ & kết nối | LÝ DO; “Tạo yêu cầu mới” |
 | `expired` | Banner `neutral` “không có thao tác ghi nào được thực hiện”; bản xem trước chỉ để xem lại (nền `surface-soft`) | ĐÃ DUYỆT/ĐÃ GHI “Không”; không duyệt lại được |
 | `rejected`, `cancelled` | Theo mẫu `expired`; `cancelled` liệt kê các bước đã xong trước khi huỷ và thao tác ghi đã có biên nhận (chưa vẽ riêng) | Nhãn `neutral`; “Tạo yêu cầu mới” |
 
 Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi triển khai lấy từ `error_class`/`error_message` của attempt và `planner_result` thật.
+
+**Đối chiếu theo receipt — chốt 17/09/2026 (`/impeccable shape`, canvas hàng V05: ReconSoft, ReconConfirmed, ReconConflict; V02 OverviewSoft; V03 CreateRetry). Chỉ UI, không API mới.**
+
+- Section chính “Đối chiếu từng thao tác ghi”: “Kiểm tra lúc hh:mm:ss” + nút GET “Tải lại kết quả đối chiếu” (đang tải khoá nút; lỗi giữ kết quả cũ và ghi có thể đã cũ). Mỗi thao tác ghi là một `<article>`: dòng kết luận `role="status"` có icon/màu, ô ĐÃ GỬI LÚC / NƠI NHẬN / BIÊN NHẬN, **payload mở sẵn**, hướng dẫn theo kết luận, disclosure “Chi tiết kỹ thuật” (operation id, `receiver_mode`, `state`, receipt thô, hash).
+- Kết luận theo `receipt`: `confirmed` → “Nơi nhận xác nhận đã ghi — không cần ghi lại” (`success`, không có “Tạo lại”); `not_observed` → “Chưa thấy trên nơi nhận — kiểm tra bảng đích trước khi tạo lại” (`unknown`, hộp “Cách kiểm tra”, “Tạo lại yêu cầu này” là nút secondary kèm cảnh báo); `conflict` → “Nơi nhận có dữ liệu khác với nội dung đã gửi — kiểm tra thủ công” (`danger`, “So sánh với nội dung đã gửi” chỉ hiện payload đã gửi vì API không trả dữ liệu hiện tại ở nơi nhận; “Tạo lại” `aria-disabled` tới khi mở so sánh); `not_supported` → “Nơi nhận không hỗ trợ đối chiếu tự động — cần tự kiểm tra” (`unknown`, như `not_observed`).
+- Banner tổng hợp theo thao tác xấu nhất: mọi thao tác `confirmed` → banner `success` “Đã đối chiếu…”, kèm giải thích run vẫn mang trạng thái “Cần đối chiếu” và bước nào đã không chạy; ngược lại banner `unknown`/không tự gửi lại. Thẻ phải: “Tạo yêu cầu mới” (primary) khi mọi thao tác `confirmed`, còn lại “Tạo lại yêu cầu này”.
+- V02 Tổng quan gọi GET reconciliation cho các run `reconciliation_required` (thường 0–2): chỉ đưa vào “Cần xử lý” khi còn thao tác chưa `confirmed` (thẻ ghi “N thao tác ghi chưa thấy trên nơi nhận (kiểm tra lúc …)”); mọi thao tác `confirmed` → hàng thường với ghi chú “Đã xác nhận khi đối chiếu”; lỗi tải receipt → giữ trong “Cần xử lý”.
+- V03 “Tạo lại yêu cầu này” (chỉ chế độ AI): điền sẵn prompt cũ vào nháp **trong bộ nhớ** (không đưa prompt vào URL), banner `unknown` “Tạo lại từ lần chạy cần đối chiếu” nêu mã run, dặn kiểm tra bảng đích, link quay lại đối chiếu; banner liên kết với ô yêu cầu qua `aria-describedby`. Chế độ demo chỉ dẫn tới Tạo yêu cầu.
+- Chưa vẽ: nhiều thao tác ghi với receipt khác nhau, `not_supported`, mobile của màn đối chiếu.
 
 ## 5. Luồng end-to-end
 
