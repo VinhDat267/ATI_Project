@@ -211,6 +211,14 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Màn chờ nói thời gian đã trôi:** `planning` và `running` thêm dòng “mốc bắt đầu · đã N giây” trong banner trạng thái. `planning` bỏ mục “Hoạt động” (hai mốc trùng dải “Tiến trình”) cùng hairline ngăn section; `running` giữ vì nhật ký ở đó có mốc duyệt và mốc xem trước.
 - **Khung artboard bằng chiều cao nội dung** (đo trong trình duyệt với Be Vietnam Pro, làm tròn lên 20px). 34/35 khung trước đó thừa 11–533px khoảng trắng và `ReconConflict` thiếu 64px nên bị cắt; nay không khung nào tràn.
 
+**Chữ — chốt 18/09/2026 (`/impeccable typeset`).** Thang chữ đầy đủ nằm trong [DESIGN.md](../../../DESIGN.md); phần áp dụng cho mockup:
+
+- **Thang mobile** thêm ba token (`display-timer-mobile` 32/36, `display-md-mobile` 23/31, `headline-sm-mobile` 18/25) nên bậc lớn nhất đạt 1.39× và 1.28×, hết cảnh báo `flat-type-hierarchy` ở V05/V06 mobile. Tiêu đề run mobile vẫn nằm trong 3 dòng nên chưa cần link “Xem toàn bộ yêu cầu”.
+- **Bỏ cỡ ngoài thang:** 17px (thẻ “Cần xử lý” V02, ô yêu cầu V03, đoạn giới thiệu V01) về 16/24 đúng `body-lg` như DESIGN.md đã quy định; 12.5px về `mono-sm` 12px; “ATI” thống nhất `wordmark` 20/24 desktop, 18/22 mobile.
+- **`overline` lên 12/16** vì 11px làm bẹt dấu trên chữ hoa tiếng Việt (ĐÃ GỬI LÚC, XÁC NHẬN KHI ĐỐI CHIẾU); đã kiểm tra không nhãn nào xuống dòng sau khi tăng.
+- **Trần độ dài dòng ~75 ký tự** áp cho 21 khối văn xuôi; trước đó dài nhất là 101 ký tự (V04 `HISTORY_LIMIT`, V06 `503`/chưa kiểm tra). Tiêu đề và nội dung yêu cầu không áp trần.
+- Board `MainMobile` vẫn còn cảnh báo thang chữ phẳng: đó là phương án cũ đã loại, giữ trên canvas để đối chiếu, không sửa.
+
 ## 5. Luồng end-to-end
 
 ```mermaid

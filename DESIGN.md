@@ -101,10 +101,34 @@ typography:
     fontFeature: "'tnum' 1"
   overline:
     fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 11px
+    fontSize: 12px
     fontWeight: 700
-    lineHeight: 14px
+    lineHeight: 16px
     letterSpacing: 0.04em
+  wordmark:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 20px
+    fontWeight: 700
+    lineHeight: 24px
+    letterSpacing: -0.01em
+  display-timer-mobile:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 32px
+    fontWeight: 700
+    lineHeight: 36px
+    letterSpacing: -0.02em
+    fontFeature: "'tnum' 1"
+  display-md-mobile:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 23px
+    fontWeight: 600
+    lineHeight: 31px
+    letterSpacing: -0.01em
+  headline-sm-mobile:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 18px
+    fontWeight: 600
+    lineHeight: 25px
   mono-md:
     fontFamily: "'Cascadia Mono', Consolas, ui-monospace, 'SFMono-Regular', Menlo, monospace"
     fontSize: 13px
@@ -420,9 +444,23 @@ Nguyên tắc cốt lõi:
 | `nav-link` | 15/20 | 500 | Top nav (mục chọn dùng 600) |
 | `badge` | 13/18 | 600 | Pill trạng thái |
 | `caption` | 13/18, tabular | 400 | Timestamp, thời lượng |
-| `overline` | 11/14, +0.04em | 700 | Nhãn ô trong hộp tóm tắt (THAO TÁC GHI, ĐÍCH) — chỉ nhãn ngắn |
+| `overline` | 12/16, +0.04em | 700 | Nhãn ô trong hộp tóm tắt (THAO TÁC GHI, ĐÍCH) — chỉ nhãn ngắn |
+| `wordmark` | 20/24, -0.01em | 700 | Chữ “ATI” cạnh logo (mobile 18/22) |
+| `mono-md` / `mono-sm` | 13/20, 12/18 | 400 | Mã run, mã băm, tên tool, JSON |
 
-Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạm dòng trên. Không viết hoa toàn câu; `overline` chỉ cho nhãn 1–3 từ.
+**Thang mobile (< 744px)** — chỉ ba role đổi cỡ, phần còn lại giữ nguyên để không sinh thêm biến thể:
+
+| Token | Cỡ/dòng | Thay cho | Dùng cho |
+|---|---|---|---|
+| `display-timer-mobile` | 32/36, tabular | `display-timer` 56/60 | Đồng hồ trong thanh quyết định 80px |
+| `display-md-mobile` | 23/31 | `display-md` 26/34 | Tiêu đề trang và yêu cầu gốc |
+| `headline-sm-mobile` | 18/25 | `headline-sm` 21/28 | Tiêu đề section |
+
+Mỗi bước liền kề của thang phải cách nhau ≥ 1.25× ở ít nhất một bậc: mobile là 32 → 23 → 18 (1.39 và 1.28), desktop là 56 → 26 → 21 → 16 (2.15 và 1.24 và 1.31). Không dùng cỡ ngoài thang (đã bỏ 17px, 12.5px, 19px, 20px thân chữ).
+
+Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạm dòng trên. Không viết hoa toàn câu; `overline` chỉ cho nhãn 1–3 từ (11px làm bẹt dấu trên chữ hoa tiếng Việt nên sàn là 12px).
+
+**Độ dài dòng:** văn xuôi tối đa ~75 ký tự — `max-width` 600px ở 16px, 560px ở 15px, 520px ở 14px; khung có icon thì cộng thêm bề rộng icon, gap và padding. Tiêu đề, nội dung yêu cầu và bảng dữ liệu không áp trần này.
 
 ## Layout
 
