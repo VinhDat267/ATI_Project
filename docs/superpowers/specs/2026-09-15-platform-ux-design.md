@@ -81,6 +81,14 @@ Mục tiêu: mô tả đầu vào, đích mong muốn và công việc cần th�
 - `409 ACTIVE_RUN`: giữ draft trong phiên hiện tại, đề nghị mở run đang hoạt động. `503 PLANNER_UNAVAILABLE`: báo tính năng lập kế hoạch chưa sẵn sàng.
 - Đổi route trước submit không được tạo workflow hoặc run. Draft chỉ ở memory, không đưa vào persistent storage mặc định.
 
+**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V03):** một màn, **hai chế độ** với cùng bố cục hai cột (form trái, cột “Hệ thống làm được gì” 372px phải; mobile thu cột này thành disclosure).
+
+- *Demo/kế hoạch mẫu* (planner `dev_fixture`): nhãn “Demo · kế hoạch mẫu”; ô yêu cầu chỉ đọc; chọn một trong các mẫu đã allowlist bằng thẻ radio; mẫu cần filesystem bị vô hiệu kèm lý do khi filesystem tắt.
+- *AI lập kế hoạch* (planner thật, khi có): nhãn “AI lập kế hoạch”; nhập tự do; gợi ý dạng chip chèn vào ô rồi sửa được; ghi rõ AI có thể hiểu sai, hỏi lại hoặc từ chối; cột phải thêm “AI có thể trả lời: Kế hoạch · Hỏi lại · Từ chối”.
+- Nhãn chế độ luôn hiển thị; chế độ lấy từ cấu hình launch tin cậy cho tới khi có endpoint capabilities. Danh sách mẫu demo là allowlist prompt công khai trong frontend, có test khớp với các entry của `apps/api/src/dev-planner.ts`; gợi ý chế độ AI lấy từ ca dev b01–b06, không dùng holdout b07–b10.
+- Tuỳ chọn nâng cao là disclosure (múi giờ + cặp khoá–giá trị chuỗi/số/đúng-sai), đóng mặc định với dòng tóm tắt. Không hỏi xác nhận khi rời trang; chỉ ghi “Nháp không được lưu khi rời trang”. Phím tắt Ctrl+Enter.
+- Mất phản hồi: banner `unknown` + “Mở Lần chạy để kiểm tra”; nút gửi vẫn bật, không tự gửi lại (server chặn trùng bằng `409 ACTIVE_RUN`). Chưa vẽ: trạng thái đang gửi, `503`, `400`.
+
 ### V04 — Lần chạy
 
 Mục tiêu: tìm lại một lần chạy, xem yêu cầu gì và kết quả ra sao.
