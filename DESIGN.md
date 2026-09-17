@@ -583,6 +583,15 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
 - **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
 
+### Distill rules (after `/impeccable distill`, 18/09/2026)
+
+- **Định danh kỹ thuật nằm sau disclosure “Chi tiết kỹ thuật”.** Thẻ tóm tắt lần chạy chỉ để lộ dữ kiện người dùng đọc được (Duyệt bởi, Múi giờ, Chế độ lập kế hoạch); phiên bản kế hoạch và mã băm bản xem trước nằm sau nút “Chi tiết kỹ thuật” (chevron + `aria-expanded`), đúng mẫu đã dùng ở V06. Chỉ màn `succeeded` mở sẵn disclosure vì đó là lúc người dùng cần chứng cứ; các màn khác đóng.
+- **Không lặp bảng chú giải trạng thái trong sản phẩm.** Bản đồ 14 `RunStatus` chỉ sống trong tài liệu này; mỗi hàng và mỗi thẻ đã tự mang pill trạng thái của nó.
+- **Mỗi con số nói một lần.** Tổng số lần chạy đã tải thuộc dòng chân danh sách; tiêu đề phụ chỉ giữ “Tải lúc” và nghĩa của cột thời gian. Số việc cần xử lý thuộc badge nav và khu “Cần xử lý”, không nhắc lại ở tiêu đề phụ.
+- **Màn chờ nói thời gian đã trôi** ngay trong banner trạng thái, dạng “mốc bắt đầu · đã N”: “Nhận yêu cầu lúc 14:22:07 · đã 4 giây”, “Bắt đầu chạy lúc 14:23:04 · đã 8 giây”.
+- **Mục “Hoạt động” chỉ xuất hiện khi nó thêm thông tin** so với dải “Tiến trình”. Ở `planning` hai mốc duy nhất trùng với dải giai đoạn nên bỏ cả mục lẫn hairline ngăn section, không để lại đường kẻ mồ côi.
+- **Artboard bằng chiều cao nội dung** (làm tròn lên bội số 20px): khoảng trắng dưới cùng là `padding-bottom: 64px` của `main`, không phải phần thừa của khung.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.

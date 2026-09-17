@@ -203,6 +203,14 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Màn chế độ AI/live** (không có nhãn fixture) dùng kịch bản tiếng Việt “tuần 37/38 · Tiến độ nhóm → Báo cáo tuần · #nhom-ati”; nhãn chế độ trong thẻ tóm tắt là “AI lập kế hoạch”.
 - Thời gian trong danh sách và Tổng quan ghi rõ là **lúc tạo yêu cầu**; thẻ “Cần xử lý” ghi “Kết thúc lúc …”. Thời hạn duyệt tính đúng 10 phút kể từ khi bản xem trước sẵn sàng.
 
+**Cắt gọn — chốt 18/09/2026 (`/impeccable distill`).** Bỏ những gì màn hình không cần để người dùng ra quyết định:
+
+- **V02 bỏ bảng chú giải 14 trạng thái.** Bản đồ `RunStatus` → nhãn/màu/icon chỉ nằm trong [DESIGN.md](../../../DESIGN.md) mục Run status; mỗi hàng trên màn đã tự mang pill của nó. Tiêu đề phụ bỏ “2 lần chạy cần bạn xử lý” (badge nav và khu “Cần xử lý” đã nói), và hai câu về “một lần chạy hoạt động” gộp thành một.
+- **Định danh kỹ thuật vào disclosure “Chi tiết kỹ thuật”** trong thẻ tóm tắt V05 và màn đối chiếu: phiên bản kế hoạch và mã băm bản xem trước ẩn sau nút có chevron/`aria-expanded`, chỉ `succeeded` mở sẵn. Thẻ chỉ còn để lộ Duyệt bởi / Múi giờ / Chế độ lập kế hoạch. Dùng lại đúng component `TechDisclosure` của V06 nên không thêm API hay thành phần mới.
+- **V04 không lặp số:** tổng “12 lần chạy đã tải” thuộc dòng chân danh sách; tiêu đề phụ chỉ còn “Tải lúc …” và nghĩa của cột thời gian. Chân danh sách mobile đổi sang “Đang hiển thị 7 / 12 lần chạy đã tải · nhóm …” để vẫn giữ tổng.
+- **Màn chờ nói thời gian đã trôi:** `planning` và `running` thêm dòng “mốc bắt đầu · đã N giây” trong banner trạng thái. `planning` bỏ mục “Hoạt động” (hai mốc trùng dải “Tiến trình”) cùng hairline ngăn section; `running` giữ vì nhật ký ở đó có mốc duyệt và mốc xem trước.
+- **Khung artboard bằng chiều cao nội dung** (đo trong trình duyệt với Be Vietnam Pro, làm tròn lên 20px). 34/35 khung trước đó thừa 11–533px khoảng trắng và `ReconConflict` thiếu 64px nên bị cắt; nay không khung nào tràn.
+
 ## 5. Luồng end-to-end
 
 ```mermaid
