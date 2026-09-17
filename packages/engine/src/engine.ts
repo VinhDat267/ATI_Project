@@ -7,7 +7,8 @@ import { prepare, prepareAccepted } from "./prepare.js";
 import { accept } from "./accept.js";
 import type { PlannerPort } from "./planner-port.js";
 import { decide } from "./approval.js";
-import { execute } from "./execute.js";
+import { execute, type ExecuteOptions } from "./execute.js";
+import type { LocalReplanPort } from "./ai/ports.js";
 import {
   cancel,
   recoverOrphans,
@@ -37,11 +38,12 @@ function defaultInspections(status: "disconnected" | "error") {
 
 export class WorkflowEngine {
   private readonly store: Store;
+  private readonly replanPort?: LocalReplanPort;
   constructor(
     db: Database,
     private readonly gateway: Gateway | undefined,
     userId: string,
-    options: { secrets?: readonly string[] } = {},
+    options: { secrets?: readonly string[]; replan?: LocalReplanPort } = {},
   ) {
     if (gateway && gateway.userId !== userId)
       throw new EngineError(
@@ -49,6 +51,7 @@ export class WorkflowEngine {
         "Gateway principal must match controller principal",
       );
     this.store = new Store(db, userId, options.secrets);
+    this.replanPort = options.replan;
   }
   private executionGateway() {
     if (!this.gateway)
@@ -61,11 +64,21 @@ export class WorkflowEngine {
   accept(request: unknown) {
     return accept(this.store, request);
   }
-  async prepareAccepted(id: string, planner: PlannerPort) {
+  async prepareAccepted(
+    id: string,
+    planner: PlannerPort,
+    options?: { replan?: LocalReplanPort },
+  ) {
     await this.store.run(this.store.db.client, id);
     const gateway = this.executionGateway();
     await gateway.ensureConnected?.();
-    return prepareAccepted(this.store, gateway, id, planner);
+    return prepareAccepted(
+      this.store,
+      gateway,
+      id,
+      planner,
+      options ?? (this.replanPort ? { replan: this.replanPort } : {}),
+    );
   }
   prepare(
     plan: unknown,
@@ -79,11 +92,16 @@ export class WorkflowEngine {
     await gateway.ensureConnected?.();
     return decide(this.store, gateway, id, decision);
   }
-  async execute(id: string) {
+  async execute(id: string, options?: ExecuteOptions) {
     await this.store.run(this.store.db.client, id);
     const gateway = this.executionGateway();
     await gateway.ensureConnected?.();
-    return execute(this.store, gateway, id);
+    return execute(
+      this.store,
+      gateway,
+      id,
+      options ?? (this.replanPort ? { replanPort: this.replanPort } : undefined),
+    );
   }
   detail(id: string) {
     return this.store.detail(id);

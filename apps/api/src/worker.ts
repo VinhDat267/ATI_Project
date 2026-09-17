@@ -3,6 +3,7 @@ import {
   EngineError,
   type WorkflowEngine,
   type PlannerPort,
+  type LocalReplanPort,
 } from "@wap/engine";
 
 export interface WorkerControl {
@@ -17,6 +18,7 @@ export function createPrepareWorker(options: {
   userId: string;
   engine: WorkflowEngine;
   planner?: PlannerPort;
+  replan?: LocalReplanPort;
   intervalMs?: number;
   onError?: (code: string) => void;
 }): WorkerControl {
@@ -44,8 +46,17 @@ export function createPrepareWorker(options: {
       if (job.job_kind === "prepare") {
         if (!options.planner)
           throw new EngineError("CONFIG", "Planner is unavailable");
-        await options.engine.prepareAccepted(job.run_id, options.planner);
-      } else await options.engine.execute(job.run_id);
+        await options.engine.prepareAccepted(
+          job.run_id,
+          options.planner,
+          options.replan ? { replan: options.replan } : undefined,
+        );
+      } else {
+        await options.engine.execute(
+          job.run_id,
+          options.replan ? { replanPort: options.replan } : undefined,
+        );
+      }
     } catch (error) {
       if (
         error instanceof EngineError &&

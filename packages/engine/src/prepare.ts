@@ -26,6 +26,8 @@ import {
 import { receiverModeFor } from "./receiver-policy.js";
 import { callStep } from "./attempts.js";
 import { containsConfiguredSecret } from "./redaction.js";
+import { executeReplan } from "./replan.js";
+import type { LocalReplanPort } from "./ai/ports.js";
 
 type Target = {
   id: string;
@@ -83,6 +85,7 @@ export async function prepareAccepted(
   gateway: Gateway,
   id: string,
   planner: PlannerPort,
+  options: { replan?: LocalReplanPort } = {},
 ) {
   return store.withWorker(
     async () => {
@@ -138,6 +141,7 @@ export async function prepareAccepted(
           accepted: true,
         },
         plan,
+        options.replan,
       );
     },
     () => gateway.close(),
@@ -149,6 +153,7 @@ async function preparePlanUnderLease(
   gateway: Gateway,
   target: Target,
   plan: ReturnType<typeof validateManualPlan>,
+  replanPort?: LocalReplanPort,
 ) {
   const layers = validateGraph(plan).layers;
   await gateway.assertCurrent();
@@ -233,7 +238,39 @@ async function preparePlanUnderLease(
           tool,
           args,
         );
-        if (!result.ok) throw new EngineError("READ_FAILED", result.message!);
+        if (!result.ok) {
+          const run = await store.run(store.db.client, target.id);
+          if (
+            result.certainty !== "unknown" &&
+            step.on_error === "replan" &&
+            replanPort &&
+            run.replan_count < 2 &&
+            !run.cancel_requested_at
+          ) {
+            return await executeReplan({
+              store,
+              gateway,
+              runId: target.id,
+              failedStepId: step.id,
+              errorClass: result.errorClass ?? "bad_args",
+              errorMessage: result.message ?? "Read step failed",
+              replanPort,
+              certainty: result.certainty,
+            });
+          }
+          if (
+            result.certainty !== "unknown" &&
+            step.on_error === "replan" &&
+            replanPort &&
+            run.replan_count >= 2
+          ) {
+            throw new EngineError(
+              "REPLAN_LIMIT_EXCEEDED",
+              `Local replan limit reached (${run.replan_count}/2)`,
+            );
+          }
+          throw new EngineError("READ_FAILED", result.message!);
+        }
         context.stepOutputs[step.id] = result.output;
       } else {
         const intent = resolveValue(step.idempotency_key!, context);

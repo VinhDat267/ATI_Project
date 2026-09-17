@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { normalizeToolResult, validateToolCall, type Step } from "@wap/dsl";
+import {
+  normalizeToolResult,
+  validateToolCall,
+  type ErrorClass,
+  type Step,
+} from "@wap/dsl";
 import { Store } from "./store.js";
 import type { Gateway, GatewayResult, CallContext } from "./gateway.js";
 import {
@@ -19,21 +24,44 @@ export interface AttemptOutcome {
   output: unknown;
   certainty: Certainty;
   message: string | null;
+  errorClass?: ErrorClass;
+}
+function extractErrorCode(result: GatewayResult | undefined): string | undefined {
+  if (!result?.isError) return undefined;
+  try {
+    const item = result.content?.[0] as
+      { type?: string; text?: string } | undefined;
+    if (item?.type === "text" && item.text) {
+      const parsed = JSON.parse(item.text) as { code?: string };
+      return parsed.code;
+    }
+  } catch {
+    // If not JSON, check plain text
+    const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+    if (text && ["BAD_ARGS", "BAD_RANGE", "NOT_FOUND"].includes(text)) {
+      return text;
+    }
+  }
+  return undefined;
 }
 function knownToolError(tool: EngineTool, result: GatewayResult) {
   if (tool.server !== "task_hub") return false;
   if (!result.isError) return false;
-  try {
-    const item = result.content?.[0] as
-      { type?: string; text?: string } | undefined;
-    const code =
-      item?.type === "text" ? JSON.parse(item.text ?? "").code : undefined;
-    return ["BAD_ARGS", "BAD_RANGE", "NOT_FOUND", "NOT_AUTHORIZED"].includes(
-      code,
-    );
-  } catch {
-    return false;
-  }
+  const code = extractErrorCode(result);
+  return code !== undefined && ["BAD_ARGS", "BAD_RANGE", "NOT_FOUND", "NOT_AUTHORIZED"].includes(code);
+}
+function classifyOutcomeError(
+  tool: EngineTool,
+  response: GatewayResult | undefined,
+  isBeforeDispatch: boolean,
+): ErrorClass {
+  if (isBeforeDispatch) return "bad_args";
+  if (!response) return "fatal";
+  const code = extractErrorCode(response);
+  if (code === "BAD_ARGS" || code === "BAD_RANGE") return "bad_args";
+  if (code === "NOT_FOUND") return "bad_tool";
+  if (!response.isError) return "bad_assumption";
+  return "fatal";
 }
 /** Persist intent before transport. Complete an attempt once, retaining every retry. */
 export async function callStep(
@@ -57,6 +85,10 @@ export async function callStep(
     );
   const receiverMode = isWrite ? receiverModeFor(tool) : undefined;
   const maximum = isWrite ? 1 : step.retry.max_attempts;
+  const [initialStepState] = await store.db.client`
+    SELECT attempts FROM step_states WHERE run_id=${runId} AND step_id=${step.id}
+  `;
+  const baseAttempts = initialStepState?.attempts ?? 0;
   for (let attempt = 1; attempt <= maximum; attempt++) {
     const attemptId = randomUUID(),
       started = Date.now();
@@ -75,20 +107,20 @@ export async function callStep(
           );
         const [state] =
           await tx`UPDATE step_states SET status='running',attempts=attempts+1,started_at=COALESCE(started_at,now()) WHERE run_id=${runId} AND step_id=${step.id} RETURNING id,attempts`;
-        if (!state || state.attempts !== attempt)
+        if (!state || state.attempts !== baseAttempts + attempt)
           throw new EngineError("CONFLICT", "Attempt has already been claimed");
         await tx`INSERT INTO step_attempts(id,step_state_id,attempt_no,workflow_version_id,tool_snapshot,resolved_args,operation_id,outcome_certainty)
-        VALUES (${attemptId},${state.id},${attempt},${run.workflow_version_id},${tx.json(json(toolTrace(tool)))},${tx.json(json(args))},${auth?.operation_id ?? null},'unknown')`;
+        VALUES (${attemptId},${state.id},${state.attempts},${run.workflow_version_id},${tx.json(json(toolTrace(tool)))},${tx.json(json(args))},${auth?.operation_id ?? null},'unknown')`;
         await store.emit(tx, runId, "step.started", {
           step_id: step.id,
           description: step.description,
           tool: step.tool,
           side_effect: tool.sideEffect,
-          attempt_no: attempt,
+          attempt_no: state.attempts,
         });
         await store.emit(tx, runId, "step.attempt", {
           step_id: step.id,
-          attempt_no: attempt,
+          attempt_no: state.attempts,
           resolved_args: args,
         });
         return { timeZone: run.time_zone };
@@ -148,6 +180,7 @@ export async function callStep(
           message: response.isError
             ? "MCP tool rejected the request"
             : "MCP output failed its reviewed schema",
+          errorClass: classifyOutcomeError(tool, response, false),
         };
     } catch (error) {
       if (error instanceof BeforeDispatchError)
@@ -156,6 +189,7 @@ export async function callStep(
           output: null,
           certainty: "before_dispatch",
           message: error.message,
+          errorClass: classifyOutcomeError(tool, undefined, true),
         };
     }
     // A valid reply alone is insufficient evidence that a local write committed.
@@ -177,6 +211,7 @@ export async function callStep(
           output: null,
           certainty: "unknown",
           message: "Local receipt does not confirm the reported write result",
+          errorClass: "fatal",
         };
     }
     const retry =
@@ -184,16 +219,21 @@ export async function callStep(
       !outcome.ok &&
       outcome.message === "MCP call failed or timed out" &&
       attempt < maximum;
+    const resolvedErrorClass = outcome.ok
+      ? null
+      : retry
+        ? "transient"
+        : outcome.errorClass ?? "fatal";
     await store.db.client.begin(async (tx) => {
       await store.run(tx, runId, true);
       const done =
-        await tx`UPDATE step_attempts SET ended_at=now(),duration_ms=${Date.now() - started},result=${tx.json(json(outcome.output))},outcome_certainty=${outcome.certainty},error_message=${outcome.message},error_class=${outcome.ok ? null : retry ? "transient" : "fatal"} WHERE id=${attemptId} AND ended_at IS NULL RETURNING id`;
+        await tx`UPDATE step_attempts SET ended_at=now(),duration_ms=${Date.now() - started},result=${tx.json(json(outcome.output))},outcome_certainty=${outcome.certainty},error_message=${outcome.message},error_class=${resolvedErrorClass} WHERE id=${attemptId} AND ended_at IS NULL RETURNING id`;
       if (!done.length)
         throw new EngineError(
           "CONFLICT",
           "Completed attempts cannot be overwritten",
         );
-      await tx`UPDATE step_states SET status=${outcome.ok ? "succeeded" : retry ? "running" : "failed"},output=${tx.json(json(outcome.output))},last_error=${outcome.message},last_error_class=${outcome.ok ? null : retry ? "transient" : "fatal"},ended_at=${retry ? null : new Date()} WHERE run_id=${runId} AND step_id=${step.id}`;
+      await tx`UPDATE step_states SET status=${outcome.ok ? "succeeded" : retry ? "running" : "failed"},output=${tx.json(json(outcome.output))},last_error=${outcome.message},last_error_class=${resolvedErrorClass},ended_at=${retry ? null : new Date()} WHERE run_id=${runId} AND step_id=${step.id}`;
       if (isWrite)
         await tx`UPDATE tool_operations SET state=${outcome.ok ? "succeeded" : outcome.certainty === "unknown" ? "unknown" : "known_failed"},result=${tx.json(json(outcome.output))},error_message=${outcome.message},completed_at=now() WHERE operation_id=${auth!.operation_id!} AND state='in_flight'`;
       if (outcome.ok)
@@ -208,7 +248,7 @@ export async function callStep(
           step_id: step.id,
           attempts: attempt,
           error_message: outcome.message!,
-          error_class: "fatal",
+          error_class: resolvedErrorClass ?? "fatal",
           on_error: step.on_error,
         });
     });

@@ -15,8 +15,19 @@ import {
   payloadHash,
 } from "./snapshot.js";
 import { receiverModeFor } from "./receiver-policy.js";
+import { executeReplan } from "./replan.js";
+import type { LocalReplanPort } from "./ai/ports.js";
 
-export async function execute(store: Store, gateway: Gateway, id: string) {
+export interface ExecuteOptions {
+  readonly replanPort?: LocalReplanPort;
+}
+
+export async function execute(
+  store: Store,
+  gateway: Gateway,
+  id: string,
+  options?: ExecuteOptions,
+) {
   return store.withWorker(
     async () => {
       const snapshot = await store.db.client.begin(async (tx) => {
@@ -140,15 +151,42 @@ export async function execute(store: Store, gateway: Gateway, id: string) {
             auth,
           );
           if (!outcome.ok) {
+            const currentRun = await store.run(store.db.client, id);
+            if (
+              outcome.certainty !== "unknown" &&
+              step.on_error === "replan" &&
+              options?.replanPort &&
+              currentRun.replan_count < 2 &&
+              !currentRun.cancel_requested_at
+            ) {
+              return await executeReplan({
+                store,
+                gateway,
+                runId: id,
+                failedStepId: step.id,
+                errorClass: outcome.errorClass ?? "bad_args",
+                errorMessage: outcome.message ?? "Step execution failed",
+                replanPort: options.replanPort,
+                certainty: outcome.certainty,
+              });
+            }
+
             await store.db.client.begin(async (tx) => {
               const run = await store.run(tx, id, true);
+              const errorMessage =
+                outcome.certainty !== "unknown" &&
+                step.on_error === "replan" &&
+                options?.replanPort &&
+                currentRun.replan_count >= 2
+                  ? `Local replan limit reached (${currentRun.replan_count}/2)`
+                  : outcome.message!;
               await store.transition(
                 tx,
                 run,
                 outcome.certainty === "unknown"
                   ? "reconciliation_required"
                   : "failed",
-                { error: outcome.message! },
+                { error: errorMessage },
               );
             });
             return store.detail(id);

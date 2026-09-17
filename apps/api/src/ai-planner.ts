@@ -3,11 +3,13 @@ import path from "node:path";
 import {
   AiPlannerAdapter,
   AiPlannerError,
+  AiReplanAdapter,
   InMemoryToolRetriever,
   loadLocalReviewedCatalog,
   toolContentHash,
   type EngineTool,
   type PlannerPort,
+  type LocalReplanPort,
   type StructuredModelClient,
   type EmbeddingPort,
   type QueryExpansionPort,
@@ -130,6 +132,68 @@ export function loadAiPlanner(options: LoadAiPlannerOptions): PlannerPort {
     variant: options.variant ?? "all_tools",
     topK: options.topK ?? 10,
     maxPlanningCalls: options.maxPlanningCalls ?? 3,
+    deadlineMs: options.deadlineMs ?? 60_000,
+    validatePlan: () => [],
+  });
+}
+
+export function loadAiReplan(options: LoadAiPlannerOptions): LocalReplanPort {
+  const catalog = loadLocalReviewedCatalog(
+    options.root,
+    currentReviewedGatewayTools(options.root),
+  );
+  const catalogHash = catalog.catalogHash;
+
+  const rows: ToolEmbeddingRow[] = catalog.tools.map((tool) => {
+    const toolText = `${tool.server}.${tool.name}: ${tool.description}`;
+    return {
+      server: tool.server,
+      name: tool.name,
+      vector: deterministicEmbedding(toolText, DEFAULT_PROVENANCE.dimensions),
+      contentHash: toolContentHash(tool),
+      provenance: {
+        ...DEFAULT_PROVENANCE,
+        catalogHash,
+      },
+    };
+  });
+
+  const embeddingPort: EmbeddingPort = options.embeddingPort ?? {
+    async embed(req) {
+      return {
+        embedding: deterministicEmbedding(req.text, DEFAULT_PROVENANCE.dimensions),
+        ...DEFAULT_PROVENANCE,
+        catalogHash,
+        usage: null,
+      };
+    },
+  };
+
+  const retriever = new InMemoryToolRetriever({
+    catalog,
+    rows,
+    embeddingPort,
+    queryExpansionPort: options.queryExpansionPort,
+  });
+
+  const defaultUnconfiguredClient: StructuredModelClient = {
+    async complete() {
+      throw new AiPlannerError(
+        "INVALID_CONFIGURATION",
+        "AI model provider unconfigured: missing provider credentials. Silent fallback to dev_fixture is forbidden.",
+        0,
+      );
+    },
+  };
+
+  const model = options.modelClient ?? defaultUnconfiguredClient;
+
+  return new AiReplanAdapter({
+    retriever,
+    model,
+    variant: options.variant ?? "all_tools",
+    topK: options.topK ?? 10,
+    maxRepairCalls: options.maxPlanningCalls ?? 3,
     deadlineMs: options.deadlineMs ?? 60_000,
     validatePlan: () => [],
   });

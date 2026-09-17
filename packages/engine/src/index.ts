@@ -76,4 +76,15 @@ export {
   type EmbeddingResult,
   type EmbeddingUsage,
   type ToolEmbeddingRow,
+  AiReplanAdapter,
+  type AiReplanAdapterOptions,
+  type LocalReplanPort,
+  type LocalReplanInput,
+  validateLocalScopeInvariants,
 } from "./ai/index.js";
+export {
+  executeReplan,
+  type ExecuteReplanOptions,
+  type ReplanCertainty,
+} from "./replan.js";
+export { type ExecuteOptions } from "./execute.js";

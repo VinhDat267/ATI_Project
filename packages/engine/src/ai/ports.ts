@@ -63,3 +63,23 @@ export interface QueryExpansionPort {
     readonly signal?: AbortSignal;
   }): Promise<QueryExpansionResult>;
 }
+
+export interface LocalReplanInput {
+  readonly runId: string;
+  readonly userId: string;
+  readonly sourcePrompt: string;
+  readonly currentPlan: import("@wap/dsl").WorkflowPlan;
+  readonly failedStepId: string;
+  readonly errorMessage: string;
+  readonly errorClass: import("@wap/dsl").ErrorClass;
+  readonly completedOutputs: Record<string, unknown>;
+  readonly failedApproaches: readonly string[];
+  readonly replanCount: number;
+  readonly maxReplans: number;
+  readonly runtime?: Record<string, string>;
+  readonly signal?: AbortSignal;
+}
+
+export interface LocalReplanPort {
+  replan(input: LocalReplanInput): Promise<import("@wap/dsl").PlannerResult>;
+}

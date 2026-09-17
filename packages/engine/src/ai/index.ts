@@ -4,3 +4,4 @@ export * from "./ports.js";
 export * from "./planner.js";
 export * from "./pgvector-index.js";
 export * from "./retrieval.js";
+export * from "./replan.js";
