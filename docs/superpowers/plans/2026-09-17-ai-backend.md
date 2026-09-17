@@ -151,17 +151,17 @@ structured-output probe và sanitized evidence.
 approval evidence.
 **Không sửa:** unknown-write semantics thành retryable.
 
-- [ ] Map failed attempt certainty và completed steps trước khi gọi AI.
-- [ ] Reject replan nếu write đã dispatch nhưng certainty unknown.
-- [ ] Gọi `LocalReplanPort` với scope local, max 2, completed outputs và failed
+- [x] Map failed attempt certainty và completed steps trước khi gọi AI.
+- [x] Reject replan nếu write đã dispatch nhưng certainty unknown.
+- [x] Gọi `LocalReplanPort` với scope local, max 2, completed outputs và failed
       approaches đã redacted.
-- [ ] Giữ nguyên successful steps/operations; chỉ cấp operation mới cho phần
+- [x] Giữ nguyên successful steps/operations; chỉ cấp operation mới cho phần
       chưa chắc chắn và chưa hoàn tất.
-- [ ] Validate plan, snapshot, catalog/policy/artifact hash trước preview mới.
-- [ ] Supersede approval cũ và yêu cầu approval mới.
-- [ ] Events/trace phải ghi replan count, changed steps, old/new version và
+- [x] Validate plan, snapshot, catalog/policy/artifact hash trước preview mới.
+- [x] Supersede approval cũ và yêu cầu approval mới.
+- [x] Events/trace phải ghi replan count, changed steps, old/new version và
       approval tuple.
-- [ ] Tests: safe read failure, changed args, changed tool, changed read data,
+- [x] Tests: safe read failure, changed args, changed tool, changed read data,
       second replan limit, unknown write, already-successful write, cancel and
       expiry race.
 
