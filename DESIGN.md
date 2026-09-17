@@ -1,22 +1,21 @@
 ---
 version: alpha
-name: ATI Operations
-description: "Light-first operational workspace: navy primary on clean white/slate neutrals, semantic run-status colors that always pair with icon and text, dense but readable Vietnamese payloads."
+name: ATI Soft Operations
+description: "Airbnb-inspired soft workspace with a navy accent: white canvas, near-black ink, hairline dividers, generous 8/14px radii, 48px controls, one shadow tier, a sticky decision card, and semantic run-status colors that always pair with icon and text."
 colors:
   primary: "#1E3A5F"
   primary-hover: "#162D4A"
   primary-subtle: "#E8EEF6"
   on-primary: "#FFFFFF"
-  background: "#F8FAFC"
-  surface: "#FFFFFF"
-  surface-muted: "#F1F5F9"
-  on-surface: "#0F172A"
-  on-surface-muted: "#475569"
-  on-surface-subtle: "#64748B"
-  border: "#E2E8F0"
-  border-control: "#64748B"
-  link: "#1D4ED8"
-  focus-ring: "#2563EB"
+  canvas: "#FFFFFF"
+  surface-soft: "#F7F7F7"
+  surface-strong: "#F2F2F2"
+  ink: "#222222"
+  muted: "#6A6A6A"
+  hairline: "#DDDDDD"
+  hairline-soft: "#EBEBEB"
+  border-control: "#8A8A8A"
+  focus-ring: "#222222"
   progress: "#1D4ED8"
   progress-subtle: "#DBEAFE"
   success: "#166534"
@@ -34,390 +33,463 @@ colors:
   planner-subtle: "#EDE9FE"
   demo: "#854D0E"
   demo-subtle: "#FEF9C3"
-  tooltip: "#0F172A"
-  on-tooltip: "#FFFFFF"
 typography:
-  headline-lg:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 24px
+  display-timer:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 56px
+    fontWeight: 700
+    lineHeight: 60px
+    letterSpacing: -0.03em
+    fontFeature: "'tnum' 1"
+  display-md:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 26px
     fontWeight: 600
-    lineHeight: 32px
-    letterSpacing: -0.01em
-  headline-md:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 20px
+    lineHeight: 34px
+    letterSpacing: -0.02em
+  headline-sm:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 21px
     fontWeight: 600
     lineHeight: 28px
+    letterSpacing: -0.01em
   title-md:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
     fontSize: 16px
     fontWeight: 600
-    lineHeight: 24px
+    lineHeight: 22px
   body-lg:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
     fontSize: 16px
     fontWeight: 400
-    lineHeight: 26px
+    lineHeight: 24px
   body-md:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 14px
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 15px
     fontWeight: 400
     lineHeight: 22px
   body-sm:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 13px
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 14px
     fontWeight: 400
     lineHeight: 20px
-  label-md:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+  button-md:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 16px
+    fontWeight: 600
+    lineHeight: 20px
+  button-sm:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
     fontSize: 14px
+    fontWeight: 600
+    lineHeight: 20px
+  nav-link:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 15px
     fontWeight: 500
     lineHeight: 20px
-  label-sm:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 12px
-    fontWeight: 500
-    lineHeight: 16px
+  badge:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 13px
+    fontWeight: 600
+    lineHeight: 18px
   caption:
-    fontFamily: "ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-    fontSize: 12px
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 13px
     fontWeight: 400
     lineHeight: 18px
     fontFeature: "'tnum' 1"
+  overline:
+    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
+    fontSize: 11px
+    fontWeight: 700
+    lineHeight: 14px
+    letterSpacing: 0.04em
   mono-md:
-    fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace"
+    fontFamily: "'Cascadia Mono', Consolas, ui-monospace, 'SFMono-Regular', Menlo, monospace"
     fontSize: 13px
     fontWeight: 400
     lineHeight: 20px
   mono-sm:
-    fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace"
+    fontFamily: "'Cascadia Mono', Consolas, ui-monospace, 'SFMono-Regular', Menlo, monospace"
     fontSize: 12px
     fontWeight: 400
     lineHeight: 18px
 rounded:
   none: 0px
-  sm: 4px
-  md: 6px
-  lg: 8px
-  xl: 12px
+  xs: 4px
+  sm: 8px
+  md: 14px
+  lg: 20px
   full: 9999px
 spacing:
+  xxs: 2px
   xs: 4px
   sm: 8px
   md: 12px
-  lg: 16px
-  xl: 24px
-  2xl: 32px
-  3xl: 48px
-  sidebar-width: 240px
-  header-height: 56px
-  content-max: 1200px
-  gutter-mobile: 16px
-  control-height: 36px
-  row-height: 44px
+  base: 16px
+  lg: 24px
+  xl: 32px
+  xxl: 48px
+  section: 64px
+  nav-height: 80px
+  content-max: 1120px
+  rail-width: 372px
+  rail-gap: 72px
+  gutter-desktop: 80px
+  gutter-mobile: 24px
+  control-height: 48px
+  control-height-compact: 36px
 components:
   page:
-    backgroundColor: "{colors.background}"
-    textColor: "{colors.on-surface}"
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
     typography: "{typography.body-md}"
-  card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    rounded: "{rounded.lg}"
-    padding: 16px
-  card-divider:
-    backgroundColor: "{colors.border}"
+  top-nav:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.nav-link}"
+    height: "{spacing.nav-height}"
+  nav-link:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.muted}"
+    typography: "{typography.nav-link}"
+  nav-link-active:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.nav-link}"
+  divider:
+    backgroundColor: "{colors.hairline}"
     height: 1px
-  sidebar:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-muted}"
-    width: "{spacing.sidebar-width}"
-  nav-item:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-muted}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
-    height: 36px
-    padding: 8px 12px
-  nav-item-active:
-    backgroundColor: "{colors.primary-subtle}"
-    textColor: "{colors.primary}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
+  divider-soft:
+    backgroundColor: "{colors.hairline-soft}"
+    height: 1px
+  icon-button-circle:
+    backgroundColor: "{colors.surface-strong}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.full}"
+    size: 36px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
     height: "{spacing.control-height}"
-    padding: 0px 16px
+    padding: 0px 24px
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
     textColor: "{colors.on-primary}"
   button-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
     height: "{spacing.control-height}"
-    padding: 0px 16px
+    padding: 0px 24px
   button-secondary-hover:
-    backgroundColor: "{colors.surface-muted}"
-    textColor: "{colors.primary}"
-  button-ghost:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-muted}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
-    height: "{spacing.control-height}"
+    backgroundColor: "{colors.surface-soft}"
+    textColor: "{colors.ink}"
+  button-text:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button-sm}"
   button-danger:
     backgroundColor: "{colors.danger}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
     height: "{spacing.control-height}"
-    padding: 0px 16px
   button-danger-hover:
     backgroundColor: "{colors.danger-hover}"
     textColor: "{colors.on-primary}"
   input:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    height: "{spacing.control-height}"
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.sm}"
+    height: 56px
     padding: 0px 12px
   input-border:
     backgroundColor: "{colors.border-control}"
     width: 1px
-  input-helper:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-subtle}"
-    typography: "{typography.caption}"
   focus-ring:
     backgroundColor: "{colors.focus-ring}"
     width: 2px
-  link:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.link}"
-    typography: "{typography.label-md}"
-  tab-active:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
-    typography: "{typography.label-md}"
-  tab-inactive:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-muted}"
-    typography: "{typography.label-md}"
-  list-row:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
+  decision-card:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
     typography: "{typography.body-md}"
-    height: "{spacing.row-height}"
-    padding: 0px 16px
-  list-row-hover:
-    backgroundColor: "{colors.background}"
-    textColor: "{colors.on-surface}"
+    rounded: "{rounded.md}"
+    padding: 24px
+    width: "{spacing.rail-width}"
+  decision-timer:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.display-timer}"
+  summary-box:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+    padding: 10px 12px
+  summary-label:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.overline}"
+  step-row:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    height: 48px
+  step-row-meta:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.muted}"
+    typography: "{typography.body-sm}"
+  step-icon-read:
+    backgroundColor: "{colors.surface-strong}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.full}"
+    size: 48px
+  step-icon-write:
+    backgroundColor: "{colors.action-subtle}"
+    textColor: "{colors.action}"
+    rounded: "{rounded.full}"
+    size: 48px
+  write-card:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.md}"
+  payload-table-head:
+    backgroundColor: "{colors.surface-soft}"
+    textColor: "{colors.muted}"
+    typography: "{typography.caption}"
+  payload-block:
+    backgroundColor: "{colors.surface-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.mono-md}"
+    rounded: "{rounded.sm}"
+    padding: 12px 16px
+  selected-row:
+    backgroundColor: "{colors.primary-subtle}"
+    textColor: "{colors.primary}"
   status-progress:
     backgroundColor: "{colors.progress-subtle}"
     textColor: "{colors.progress}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-action:
     backgroundColor: "{colors.action-subtle}"
     textColor: "{colors.action}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-success:
     backgroundColor: "{colors.success-subtle}"
     textColor: "{colors.success}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-danger:
     backgroundColor: "{colors.danger-subtle}"
     textColor: "{colors.danger}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-unknown:
     backgroundColor: "{colors.unknown-subtle}"
     textColor: "{colors.unknown}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-neutral:
     backgroundColor: "{colors.neutral-subtle}"
     textColor: "{colors.neutral}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    padding: 4px 10px
   status-planner:
     backgroundColor: "{colors.planner-subtle}"
     textColor: "{colors.planner}"
-    typography: "{typography.label-sm}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
-  banner-unknown:
-    backgroundColor: "{colors.unknown-subtle}"
-    textColor: "{colors.unknown}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: 12px 16px
+    padding: 4px 10px
   banner-action:
     backgroundColor: "{colors.action-subtle}"
     textColor: "{colors.action}"
     typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: 12px 16px
+    rounded: "{rounded.md}"
+    padding: 20px
+  banner-unknown:
+    backgroundColor: "{colors.unknown-subtle}"
+    textColor: "{colors.unknown}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.md}"
+    padding: 20px
+  banner-danger:
+    backgroundColor: "{colors.danger-subtle}"
+    textColor: "{colors.danger}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.md}"
+    padding: 20px
   badge-demo:
     backgroundColor: "{colors.demo-subtle}"
     textColor: "{colors.demo}"
-    typography: "{typography.label-sm}"
-    rounded: "{rounded.sm}"
-    padding: 2px 8px
-  action-card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: 16px
-  payload-block:
-    backgroundColor: "{colors.surface-muted}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.mono-md}"
-    rounded: "{rounded.md}"
-    padding: 12px
+    typography: "{typography.badge}"
+    rounded: "{rounded.full}"
+    padding: 4px 12px
   identifier:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface-muted}"
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.muted}"
     typography: "{typography.mono-sm}"
   tooltip:
-    backgroundColor: "{colors.tooltip}"
-    textColor: "{colors.on-tooltip}"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.on-primary}"
     typography: "{typography.body-sm}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.sm}"
     padding: 6px 10px
   dialog:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    rounded: "{rounded.xl}"
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.lg}"
     padding: 24px
+  mobile-decision-bar:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    height: 80px
+    padding: 12px 24px
 ---
 
 # ATI UI/UX and Design System
 
-**Trạng thái: `DIRECTION_SELECTED` — người dùng chọn hướng A (navy trầm, nền trắng/slate sạch) ngày 17/09/2026.** Token và quy tắc dưới đây là hợp đồng thị giác cho WEB-01C trở đi, theo [ADR-002](docs/ADR-002-FRONTEND-UI-DATA-LAYER.md). Chưa được kiểm chứng trên màn hình thật: cần review trực quan (canvas/mockup) các màn V05 chờ duyệt, V05 cần đối chiếu và V02 trước khi coi là `APPROVED_FOR_IMPLEMENTATION`. Hướng Airtable trước đó đã bị người dùng rút lại ngày 16/09/2026 và file tham khảo đã xoá ngày 17/09/2026.
+**Trạng thái: `DIRECTION_SELECTED` — người dùng chốt “kiểu Airbnb, nhấn navy” ngày 17/09/2026** sau khi so sánh ba phương án V05 trên canvas review (gốc, giàu hơn, kiểu Airbnb). Token và quy tắc dưới đây là hợp đồng thị giác cho WEB-01C trở đi theo [ADR-002](docs/ADR-002-FRONTEND-UI-DATA-LAYER.md). Chưa kiểm chứng trong ứng dụng thật; cần review trực quan bộ màn đã vẽ lại (V05 chờ duyệt, V05 cần đối chiếu, V05 mobile, V02) trước khi coi là `APPROVED_FOR_IMPLEMENTATION`. Hướng navy/slate dạng sidebar (17/09) và Airbnb gốc chỉ còn trong lịch sử git.
 
 ## Overview
 
-ATI là **công cụ vận hành có kiểm soát**, không phải trang marketing. Người dùng (trưởng nhóm dự án môn học) cần đọc kỹ kế hoạch, payload sẽ ghi, thời hạn duyệt và chứng cứ sau khi chạy. Giao diện phải tạo cảm giác **bình tĩnh, chính xác, đáng tin**: nền trắng/slate trung tính, primary navy trầm, màu chỉ xuất hiện khi mang nghĩa trạng thái hoặc hành động.
+ATI là công cụ **duyệt và kiểm soát thao tác ghi** cho trưởng nhóm dự án môn học. Giao diện mượn **ngôn ngữ hình khối và khoảng trắng** của một marketplace tiêu dùng (tham khảo phân tích Airbnb): nền trắng, chữ gần đen, đường kẻ mảnh thay khung, bo góc mềm, nút lớn dễ bấm, chỉ một mức bóng. Mục tiêu cảm xúc: **thân thiện, rõ ràng, đáng tin** — người không rành kỹ thuật vẫn hiểu “cái gì sẽ bị ghi, ở đâu, còn bao lâu để quyết”.
 
 Nguyên tắc cốt lõi:
 
-- **Nội dung là nhân vật chính.** Payload, đích ghi, lý do lỗi và timestamp quan trọng hơn trang trí. Không gradient, không minh hoạ, không glassmorphism, không số liệu trang trí.
-- **Màu có nghĩa cố định.** Mỗi họ màu gắn với một nhóm trạng thái (xem Components → Run status). Màu không bao giờ là tín hiệu duy nhất: luôn đi kèm icon và chữ.
-- **Server là authority.** UI không tạo cảm giác chắc chắn giả: không phần trăm tiến trình tự tính, không “thành công” trước khi server xác nhận, không animation gợi ý đã xong.
-- **Mật độ vừa phải.** Dày hơn trang tài liệu, thoáng hơn bảng tính: đọc được đoạn tiếng Việt dài mà vẫn quét được danh sách.
-- **Light-first.** B/local chỉ có giao diện sáng. Dark mode ngoài phạm vi; token màu đặt tên theo vai trò để có thể thêm sau mà không đổi component.
+- **Một màu nhấn: navy (#1E3A5F).** Chỉ dùng cho hành động chính và mục đang chọn. Đỏ/cam/amber được dành riêng cho trạng thái, không bao giờ làm màu thương hiệu.
+- **Nội dung trước, khung sau.** Section ngăn bằng hairline và khoảng trắng 32px; chỉ nội dung cần gom (payload, thẻ quyết định) mới có khung bo 14px.
+- **Một khoảnh khắc chữ lớn duy nhất:** đồng hồ thời hạn duyệt (56px) trong thẻ quyết định — tương tự số điểm đánh giá của Airbnb. Mọi tiêu đề khác giữ độ đậm vừa (600).
+- **Màu trạng thái luôn kèm icon và chữ.** Server là authority: không phần trăm tiến trình tự tính, không báo thành công trước khi server xác nhận.
+- **Light-only trong B/local.** Dark mode ngoài phạm vi; token đặt theo vai trò để có thể thêm sau.
 
-Nguồn tham khảo đã chọn lọc (không sao chép nguyên): bảng màu navy/slate và chip quy trình của CorpScale; quy tắc audit-trail của ComplianceOne; cấu trúc token của Command Center; quy tắc tương tác kiểu Vercel. Các mẫu này chỉ là input thị giác.
+**Không sao chép thương hiệu Airbnb:** không dùng màu Rausch, font Airbnb Cereal, logo, minh hoạ, ảnh hay bố cục marketing/listing của họ. Chỉ mượn nguyên tắc hình khối, khoảng trắng, mật độ và mẫu “thẻ đặt chỗ dính bên phải”.
 
 ## Colors
 
-Bảng màu gồm một primary navy, thang neutral slate và bảy họ màu ngữ nghĩa. Mỗi họ có cặp **đậm (chữ/icon)** và **nhạt (nền)**, mọi cặp đạt WCAG AA ≥ 4.5:1 cho chữ thường.
+**Nhấn và nền**
 
-**Primary và neutral**
+- **Navy (#1E3A5F) — `primary`:** nút chính (“Duyệt 2 thao tác ghi”, “Lập kế hoạch”), avatar/logo, hàng đang chọn (`primary-subtle` #E8EEF6). Chữ trắng 11.5:1. Hover `primary-hover` (#162D4A).
+- **Canvas (#FFFFFF):** nền toàn trang và card. **Surface soft (#F7F7F7):** đầu bảng payload, khối JSON, bong bóng tin nhắn xem trước. **Surface strong (#F2F2F2):** nút icon tròn, icon bước đọc.
+- **Ink (#222222):** chữ chính, nút secondary viền, link dạng gạch chân, focus ring. 15.9:1 trên trắng.
+- **Muted (#6A6A6A):** chữ phụ, nav chưa chọn, timestamp. 5.41:1 trên trắng, 5.05:1 trên `surface-soft`, 4.83:1 trên `surface-strong` — đạt AA trên mọi nền trung tính của hệ.
+- **Hairline (#DDDDDD) / hairline soft (#EBEBEB):** divider section, viền card, dòng bảng. Chỉ mang tính trang trí.
+- **Border control (#8A8A8A):** viền input, checkbox, hộp tóm tắt trong thẻ quyết định — 3.45:1, đạt ngưỡng 3:1 cho thành phần giao diện.
 
-- **Navy (#1E3A5F) — `primary`:** hành động chính (Lập kế hoạch, Duyệt), mục điều hướng đang chọn, tab đang chọn. Chữ trắng trên navy 11.5:1. Hover `primary-hover` (#162D4A). Nền chọn nhẹ `primary-subtle` (#E8EEF6).
-- **Slate canvas (#F8FAFC) — `background`:** nền trang. **White (#FFFFFF) — `surface`:** card, sidebar, dialog, input. **Slate muted (#F1F5F9) — `surface-muted`:** khối payload, vùng phụ.
-- **Ink (#0F172A) — `on-surface`:** chữ chính. **Slate 600 (#475569) — `on-surface-muted`:** chữ phụ, nhãn, nav chưa chọn. **Slate 500 (#64748B) — `on-surface-subtle`:** helper text, timestamp — **chỉ đặt trên `surface` hoặc `background`**, không đặt trên `surface-muted` (4.34:1, không đạt AA).
-- **Border (#E2E8F0):** viền card/divider mang tính trang trí. **Border control (#64748B):** viền input, checkbox, radio — đạt 4.76:1, vượt ngưỡng 3:1 cho thành phần giao diện.
-- **Link (#1D4ED8)**, **Focus ring (#2563EB)** 2px với offset 2px, 5.17:1 trên nền trắng.
-
-**Họ màu ngữ nghĩa**
+**Họ màu ngữ nghĩa** (giữ nguyên từ bản trước; mọi cặp đạt AA ≥ 4.5:1)
 
 | Token | Đậm / nhạt | Ý nghĩa | Contrast |
 |---|---|---|---|
-| `progress` | #1D4ED8 / #DBEAFE | Hệ thống đang xử lý, người dùng chỉ cần chờ | 5.49:1 |
-| `action` | #92400E / #FEF3C7 | Cần người dùng quyết định ngay (chờ duyệt, TTL) | 6.37:1 |
-| `success` | #166534 / #DCFCE7 | Hoàn tất có xác nhận của server | 6.49:1 |
+| `progress` | #1D4ED8 / #DBEAFE | Hệ thống đang xử lý | 5.49:1 |
+| `action` | #92400E / #FEF3C7 | Cần người dùng quyết định (chờ duyệt, TTL) | 6.37:1 |
+| `success` | #166534 / #DCFCE7 | Hoàn tất có xác nhận | 6.49:1 |
 | `danger` | #B91C1C / #FEE2E2 | Lỗi đã biết, hành động phá huỷ | 5.30:1 |
-| `unknown` | #9A3412 / #FFEDD5 | Kết quả ghi **chưa xác định**, cần đối chiếu | 6.38:1 |
-| `neutral` | #334155 / #F1F5F9 | Kết thúc không lỗi do người/thời gian (từ chối, huỷ, hết hạn) | 9.45:1 |
-| `planner` | #5B21B6 / #EDE9FE | Planner không tạo được kế hoạch (từ chối hỗ trợ, cần bổ sung) | 7.57:1 |
-| `demo` | #854D0E / #FEF9C3 | Dữ liệu mô phỏng/fixture | 6.38:1 |
-
-`action` (amber) và `unknown` (cam đất) gần nhau về sắc: luôn phân biệt thêm bằng icon và nhãn chữ. `danger` đặc (#B91C1C, chữ trắng 6.47:1) chỉ dùng cho nút phá huỷ; từ chối duyệt **không** phải hành động phá huỷ.
+| `unknown` | #9A3412 / #FFEDD5 | Kết quả ghi chưa xác định | 6.38:1 |
+| `neutral` | #334155 / #F1F5F9 | Từ chối, huỷ, hết hạn | 9.45:1 |
+| `planner` | #5B21B6 / #EDE9FE | Planner từ chối / cần bổ sung | 7.57:1 |
+| `demo` | #854D0E / #FEF9C3 | Dữ liệu mô phỏng | 6.38:1 |
 
 ## Typography
 
-Dùng **font hệ thống**, không tải font từ CDN (ràng buộc ADR-001/002). Trên Windows là Segoe UI, trên macOS/iOS là San Francisco, Android là Roboto — đều hiển thị đủ dấu tiếng Việt. Mono dùng Cascadia Mono/Consolas/SF Mono cho định danh, hash, JSON payload.
+**Be Vietnam Pro** (SIL Open Font License, thiết kế cho tiếng Việt) cho toàn bộ giao diện, **tự host** trong `apps/web` (không tải từ Google Fonts/CDN theo ADR-001/002), fallback Segoe UI/system-ui. Chỉ nạp 400/500/600/700, subset `latin` + `vietnamese`. Mono: Cascadia Mono/Consolas/SF Mono cho mã run, hash, tên tool, JSON.
 
-- **Headline (`headline-lg` 24/32, `headline-md` 20/28, 600):** tiêu đề trang và tiêu đề run. Không dùng cỡ hero.
-- **Title (`title-md` 16/24, 600):** tiêu đề card, ActionCard, section trong chi tiết run.
-- **Body (`body-md` 14/22):** chữ mặc định. `body-lg` 16/26 cho đoạn yêu cầu gốc và mô tả payload dài. `body-sm` 13/20 cho mô tả phụ.
-- **Label (`label-md` 14/20, `label-sm` 12/16, 500):** nút, nav, tab, badge trạng thái.
-- **Caption (12/18, tabular numbers):** timestamp, đếm ngược TTL, số lượng — số không nhảy độ rộng khi cập nhật mỗi 2 giây.
-- **Mono (`mono-md` 13/20, `mono-sm` 12/18):** `run_id`, `approval_id`, `snapshot_hash`, tên tool, JSON.
+| Token | Cỡ/dòng | Đậm | Dùng cho |
+|---|---|---|---|
+| `display-timer` | 56/60, tabular | 700 | Đồng hồ thời hạn duyệt — khoảnh khắc chữ lớn duy nhất |
+| `display-md` | 26/34 | 600 | Tiêu đề trang, yêu cầu gốc của run |
+| `headline-sm` | 21/28 | 600 | Tiêu đề section (“Kế hoạch gồm 3 bước”) |
+| `title-md` | 16/22 | 600 | Tiêu đề card, thẻ ghi |
+| `body-lg` | 16/24 | 400 | Tên bước, input, đoạn quan trọng |
+| `body-md` | 15/22 | 400 | Chữ mặc định |
+| `body-sm` | 14/20 | 400 | Dòng phụ, bảng payload |
+| `button-md` / `button-sm` | 16/20, 14/20 | 600 | Nút 48px / nút chữ |
+| `nav-link` | 15/20 | 500 | Top nav (mục chọn dùng 600) |
+| `badge` | 13/18 | 600 | Pill trạng thái |
+| `caption` | 13/18, tabular | 400 | Timestamp, thời lượng |
+| `overline` | 11/14, +0.04em | 700 | Nhãn ô trong hộp tóm tắt (THAO TÁC GHI, ĐÍCH) — chỉ nhãn ngắn |
 
-Line-height thân chữ ≥ 1.5 để dấu tiếng Việt chồng (ví dụ “ệ”, “ỗ”) không chạm dòng trên. Tối đa hai độ đậm trên một vùng (400 và 500/600). Không viết hoa toàn bộ câu tiếng Việt; chỉ nhãn nhóm ngắn được dùng chữ hoa nhỏ.
+Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạm dòng trên. Không viết hoa toàn câu; `overline` chỉ cho nhãn 1–3 từ.
 
 ## Layout
 
-- **Khung desktop (≥ 1024px):** sidebar trái 240px nền trắng, viền phải `border`; header 56px chứa tên trang, nhãn chế độ (demo/live) và phiên; nội dung tối đa 1200px, padding 24px.
-- **Tablet (768–1023px):** sidebar thu thành nút “Điều hướng” mở panel; nội dung một cột.
-- **Mobile (390px, tối thiểu 320px):** gutter 16px, mọi hàng hành động xếp dọc, không cuộn ngang trang; bảng chuyển thành danh sách thẻ, khối payload tự cuộn ngang bên trong.
-- **Thang spacing 4px:** 4 / 8 / 12 / 16 / 24 / 32 / 48. Khoảng giữa section 24px, trong nhóm liên quan 12–16px, padding card 16px (dialog 24px).
-- **Chiều cao điều khiển:** 36px mặc định; hàng danh sách 44px; vùng chạm trên mobile ≥ 44px.
-- **Chi tiết run (V05):** header ổn định (yêu cầu gốc, thời gian, badge trạng thái, hành động chính) → banner trạng thái nếu có → tabs Kế hoạch / Tiến trình / Chứng cứ. Khu vực chờ duyệt đặt **tóm tắt số thao tác ghi, đích, TTL** ngay dưới header, trước mọi chi tiết đọc.
+- **Desktop (≥ 1128px):** top nav 80px trắng, hairline dưới: logo trái, 4 mục điều hướng ở giữa (Tổng quan, Tạo yêu cầu, Lần chạy, Công cụ & kết nối), nhãn “Dữ liệu mô phỏng” + nút tài khoản dạng pill bên phải. Nội dung rộng tối đa **1120px** căn giữa, lề tối thiểu 80px.
+- **Chi tiết run (V05):** hai cột — nội dung trái (co giãn) và **thẻ quyết định 372px dính bên phải**, cách nhau 72px. Trạng thái không cần quyết định (đối chiếu, kết thúc): cột phải là thẻ tóm tắt kết quả, không có nút ghi.
+- **Tablet (744–1127px):** top nav giữ logo + nút menu; một cột, thẻ quyết định nằm trên nội dung.
+- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy 80px** chứa thời hạn + nút chính, nút phụ nằm trong nội dung; bảng payload cuộn ngang trong khung riêng, trang không cuộn ngang.
+- **Nhịp khoảng cách:** section cách nhau bằng hairline + padding 32px; nhóm liên quan 16–20px; card padding 20–24px; khoảng lớn giữa vùng trang 64px.
+- **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ). Vùng chạm ≥ 44px.
 
 ## Elevation & Depth
 
-Phân tầng bằng **nền và viền**, không bằng bóng:
+Hệ có **đúng một mức bóng**:
 
-- Tầng 0 `background` (#F8FAFC) → tầng 1 `surface` (#FFFFFF) có viền `border` 1px.
-- Bóng chỉ cho lớp nổi: dropdown/popover `0 4px 12px rgba(15,23,42,0.08)`; dialog `0 12px 32px rgba(15,23,42,0.16)` với overlay `rgba(15,23,42,0.40)`.
-- Không blur, không bóng màu, không nâng card khi hover.
-- Chuyển động: 150ms `cubic-bezier(0.4,0,0.2,1)` cho hover/focus/mở disclosure; tôn trọng `prefers-reduced-motion`. Không animation cho cập nhật polling.
+`box-shadow: rgba(0,0,0,0.02) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px 0, rgba(0,0,0,0.1) 0 4px 8px 0`
+
+dùng cho thẻ quyết định, nút tài khoản, dropdown/popover và thanh quyết định mobile. Mọi bề mặt khác phẳng, phân tách bằng hairline và khoảng trắng. Dialog dùng scrim `ink` 50%. Không blur, không bóng màu, không nâng card khi hover. Chuyển động 150ms ease-out cho hover/focus/mở disclosure, tôn trọng `prefers-reduced-motion`, không animation khi polling cập nhật.
 
 ## Shapes
 
-Bo góc **vừa phải, nhất quán**: đủ mềm để hiện đại, không tròn kiểu ứng dụng tiêu dùng.
+- `xs` 4px: code inline.
+- `sm` 8px: nút, input, hộp tóm tắt, khối JSON, tooltip.
+- `md` 14px: card, thẻ ghi, thẻ quyết định, banner.
+- `lg` 20px: dialog.
+- `full`: pill trạng thái, nhãn demo, nút icon tròn, icon bước, avatar, nút tài khoản.
 
-- `sm` 4px: badge demo, chip lọc, code inline.
-- `md` 6px: nút, input, nav item, tooltip, khối payload.
-- `lg` 8px: card, ActionCard, banner.
-- `xl` 12px: dialog.
-- `full`: badge trạng thái dạng pill, chấm trạng thái, avatar.
-
-Không trộn góc vuông 0px với bo tròn trong cùng một view; `none` chỉ cho divider và hàng bảng full-width.
+Không góc vuông trên phần tử tương tác; `none` chỉ cho hairline và hàng bảng.
 
 ## Components
 
-Tất cả component lấy từ shadcn/ui (Radix) và được chỉnh theo token trên; không dùng giá trị màu/spacing tuỳ ý.
+Component lấy từ shadcn/ui (Radix), chỉnh theo token; không giá trị màu/spacing tuỳ ý.
+
+### Top navigation
+
+`top-nav` 80px. Mục đang chọn: chữ `ink` 600 + gạch chân 2px `ink` sát đáy nav, `aria-current="page"`; mục khác `muted` 500. Có badge số lượng việc cần xử lý cạnh “Lần chạy” khi > 0 (pill `action`).
 
 ### Buttons
 
-- **Primary** (`button-primary`): một hành động chính mỗi vùng — “Lập kế hoạch”, “Duyệt và ghi”. Hover `primary-hover`.
-- **Secondary** (`button-secondary`): nền trắng, chữ navy, viền `border-control`. “Từ chối”, “Làm mới”, “Mở chi tiết”.
-- **Ghost** (`button-ghost`): thao tác phụ trong toolbar/disclosure.
-- **Danger** (`button-danger`): chỉ cho hành động phá huỷ thật. B/local hiện chưa có; không dùng cho Từ chối/Huỷ run.
-- **Đang gửi:** khoá nút, giữ nguyên nhãn, thêm spinner sau 150ms; không đổi nhãn thành “Thành công” trước khi server trả lời. Disabled giữ contrast chữ ≥ 4.5:1 và có lý do hiển thị gần đó (ví dụ “Đang tải lại snapshot”).
-- Nhãn nút là động từ cụ thể: “Duyệt 2 thao tác ghi”, không phải “Tiếp tục”.
+- **Primary** (`button-primary`): navy, 48px, bo 8px, chữ 16/600. Một nút chính mỗi vùng; trong thẻ quyết định dàn full-width.
+- **Secondary** (`button-secondary`): nền trắng, viền 1px `ink`, chữ `ink`. “Từ chối ghi”.
+- **Text** (`button-text`): chữ `ink` 600 gạch chân, không nền. “Xem JSON gốc”, “Yêu cầu huỷ lần chạy”, “Xem chứng cứ đầy đủ”.
+- **Icon tròn** (`icon-button-circle`): 36px nền `surface-strong`, luôn có `aria-label` (nút quay lại).
+- **Danger**: chỉ cho hành động phá huỷ thật; B/local chưa có. Không dùng cho Từ chối/Huỷ.
+- **Đang gửi:** khoá nút, giữ nhãn, spinner sau 150ms; không đổi nhãn sang thành công trước phản hồi server. Disabled có lý do hiển thị gần đó.
 
-### Inputs
+### Decision card (thẻ quyết định)
 
-- `input`: nền trắng, viền `border-control` 1px, cao 36px, focus ring 2px `focus-ring`.
-- Label luôn hiển thị phía trên (không dùng placeholder thay label); helper text `caption` màu `on-surface-subtle`.
-- Lỗi: viền và chữ `danger`, icon cảnh báo đứng trước thông điệp, liên kết `aria-describedby`.
-- Ô yêu cầu (V03) là textarea tự giãn, `body-lg`, tối thiểu 4 dòng.
+Thẻ 372px dính bên phải, bo 14px, hairline + mức bóng duy nhất, padding 24px. Thứ tự cố định:
+
+1. Nhãn “Thời gian còn lại để duyệt” (`muted`) → `display-timer` mm:ss → “Hết hạn lúc hh:mm:ss theo máy chủ”. Thời hạn lấy từ `approval.expires_at`; về 0 thì khoá nút và tải lại chi tiết.
+2. `summary-box` viền `border-control` bo 8px, chia ô bằng đường 1px: **THAO TÁC GHI** · **ĐÃ GHI** (hàng trên), **ĐÍCH** (hàng dưới). Nhãn `overline`, giá trị `body-md`.
+3. Nút primary “Duyệt N thao tác ghi”, nút secondary “Từ chối ghi”, dòng phụ căn giữa.
+4. Hairline, rồi các dòng key–value: phiên bản kế hoạch, mã bản xem trước (mono), múi giờ.
+
+Trên mobile, phần 1 + nút primary thành `mobile-decision-bar` dính đáy; phần 2–4 nằm cuối nội dung.
+
+### Steps list
+
+Mỗi bước là một hàng: icon tròn 48px (`step-icon-read` nền `surface-strong` cho bước đọc; `step-icon-write` nền `action-subtle` cho bước ghi đang chờ), tên bước `body-lg` 500, dòng phụ `body-sm` `muted` (“Bước 2 · ghi · dùng dữ liệu của bước 1”), trạng thái bên phải là chữ màu ngữ nghĩa có icon. Không đóng khung từng hàng.
+
+### Write card (thẻ ghi)
+
+Viền hairline bo 14px. Đầu thẻ: tiêu đề `title-md` (“Bảng ‘Báo cáo tuần’ · thêm 3 dòng”), dòng tool/đích mono `muted`, nút text “Xem JSON gốc” bên phải. Thân thẻ hiển thị payload **ở dạng người đọc được**: bảng cho dòng dữ liệu (đầu bảng `surface-soft`), bong bóng xem trước cho tin nhắn. JSON gốc mở trong `payload-block`. Payload không sửa được.
 
 ### Run status
 
-Mỗi trạng thái trong 14 `RunStatus` ánh xạ đúng một biến thể badge. Badge luôn gồm **icon + nhãn tiếng Việt**; trạng thái chưa kết thúc có icon động nhẹ (spinner) trừ khi người dùng bật reduced motion.
+Pill `badge` 13/600, bo full, padding 4×10, **icon + nhãn tiếng Việt**; trạng thái đang chạy có spinner trừ khi reduced motion.
 
 | RunStatus | Nhãn hiển thị | Biến thể | Icon (lucide) |
 |---|---|---|---|
@@ -438,51 +510,45 @@ Mỗi trạng thái trong 14 `RunStatus` ánh xạ đúng một biến thể bad
 
 ### Banners
 
-- **`banner-action`** (chờ duyệt): tóm tắt số thao tác ghi, đích, đồng hồ TTL (caption tabular). Không tự đóng.
-- **`banner-unknown`** (cần đối chiếu): giải thích có thao tác ghi chưa rõ kết quả, dẫn tới tab Chứng cứ. **Không bao giờ tự đóng, không có nút retry/resume.**
-- Lỗi phiên/mạng: dùng `danger-subtle`, nêu cách thoát (“Đăng nhập lại”, “Làm mới”).
-- Banner dùng `role="status"` cho thông tin, `role="alert"` chỉ khi cần người dùng xử lý ngay.
+Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 + đoạn 15/24.
 
-### ActionCard
+- **`banner-action`** (chờ duyệt): “Hệ thống đang chờ bạn quyết định”. Không tự đóng.
+- **`banner-unknown`** (cần đối chiếu): giải thích thao tác chưa rõ kết quả và việc cần tự kiểm tra; **không tự đóng, không có nút đóng, retry hay resume**; `role="alert"`.
+- **`banner-danger`**: lỗi phiên/mạng/thất bại, nêu cách thoát.
 
-Một card cho mỗi thao tác ghi trong snapshot chờ duyệt: tiêu đề `title-md` (tên thao tác bằng tiếng Việt), dòng đích (server/tool trong `identifier` mono), khối `payload-block` hiển thị payload đã resolve (tự cuộn ngang, không cắt nội dung). Viền trái 3px `action` khi đang chờ duyệt. Payload không bao giờ sửa được từ UI.
+### Inputs
 
-### Navigation và tabs
+56px, bo 8px, viền 1px `border-control`; focus: viền 2px `ink`, không glow. Label luôn phía trên (`body-sm` 600); helper `caption` `muted`; lỗi dùng `danger` kèm icon và `aria-describedby`. Ô yêu cầu (V03) là textarea tự giãn, `body-lg`, tối thiểu 4 dòng.
 
-- `nav-item` 36px, icon 16px + nhãn; mục đang chọn `nav-item-active` (nền `primary-subtle`, chữ navy) và `aria-current="page"`.
-- Tabs chi tiết run: gạch chân 2px `primary` cho tab đang chọn, chữ `on-surface-muted` cho tab khác; điều khiển bằng phím mũi tên (Radix Tabs).
+### Lists, tables, dialog, tooltip, demo badge
 
-### Lists và bảng
-
-- `list-row` 44px, divider `border`, hover `background`. Cột thời gian dùng `caption` tabular; định danh dùng `identifier`.
-- Mobile: mỗi hàng thành thẻ xếp dọc (trạng thái → yêu cầu → thời gian).
-- Trạng thái rỗng và “không có kết quả lọc” là hai thông điệp khác nhau.
-
-### Dialog, tooltip, demo badge
-
-- **Dialog** (`dialog`, bo 12px, padding 24px): chỉ dùng cho xác nhận quyết định ghi; tiêu đề nêu số thao tác và đích; focus đầu vào nút an toàn (Huỷ), Esc đóng, trả focus về nút mở.
-- **Tooltip** (`tooltip` nền ink, chữ trắng): chỉ bổ sung, không chứa thông tin bắt buộc; hiện sau 300ms, có với cả focus bàn phím.
-- **Demo badge** (`badge-demo`): “Dữ liệu mô phỏng” luôn hiển thị ở header khi build fixture; không tắt được.
+- **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
+- **Dialog** bo 20px: chỉ cho xác nhận quyết định; focus vào nút an toàn; Esc đóng; trả focus.
+- **Tooltip** nền `ink`, chữ trắng, bo 8px; chỉ bổ sung, có với focus bàn phím.
+- **Demo badge**: pill “Dữ liệu mô phỏng” luôn ở top nav khi build fixture.
 
 ## Do's and Don'ts
 
-- **Do** ghép màu trạng thái với icon và nhãn chữ; kiểm lại bằng chế độ xám (grayscale) vẫn phân biệt được.
-- **Do** hiển thị timestamp (và TTL tính từ `approval.expires_at` của server) ở mọi thay đổi trạng thái quan trọng.
-- **Do** đặt payload ghi, đích và số thao tác lên trước mọi chi tiết đọc khi chờ duyệt.
-- **Do** dùng token qua class Tailwind sinh từ `@theme`; mọi giá trị mới phải thêm vào DESIGN.md trước.
-- **Do** giữ focus ring 2px nhìn thấy được trên mọi phần tử tương tác; kiểm bàn phím toàn bộ luồng duyệt.
-- **Do** giữ nguyên vị trí cuộn, disclosure đang mở và focus khi dữ liệu polling cập nhật.
+- **Do** dùng navy chỉ cho hành động chính và mục đang chọn; mọi màu khác phải mang nghĩa trạng thái.
+- **Do** ghép màu trạng thái với icon và chữ; kiểm lại ở chế độ xám.
+- **Do** đặt thời hạn, số thao tác ghi và đích trong thẻ quyết định trước mọi chi tiết khác.
+- **Do** hiển thị payload dạng bảng/xem trước cho người đọc, JSON gốc luôn mở được.
+- **Do** ngăn section bằng hairline và khoảng trắng; chỉ đóng khung nội dung cần gom.
+- **Do** giữ vị trí cuộn, disclosure và focus khi dữ liệu polling cập nhật.
+- **Do** tự host Be Vietnam Pro; mọi token mới thêm vào DESIGN.md trước khi dùng.
+- **Don't** dùng màu Rausch, font Cereal, logo, ảnh hay bố cục marketing của Airbnb.
+- **Don't** thêm mức bóng thứ hai, blur, gradient hay bóng màu.
+- **Don't** dùng chữ lớn/đậm 700 ngoài đồng hồ thời hạn duyệt.
 - **Don't** dùng giá trị tuỳ ý (`bg-[#...]`, `p-[13px]`) trong view/component.
-- **Don't** tự đóng banner cần đối chiếu, chờ duyệt hoặc lỗi.
-- **Don't** hiển thị phần trăm tiến trình, biểu đồ trang trí hay số liệu “tỷ lệ thành công” không có ý nghĩa đo.
-- **Don't** dùng `danger` đặc cho Từ chối/Huỷ; dùng nút secondary.
-- **Don't** đặt chữ `on-surface-subtle` trên nền `surface-muted`.
-- **Don't** tải font, icon hay ảnh từ CDN; không gradient, glassmorphism, bóng màu.
-- **Don't** dùng animation > 150ms hoặc animation báo hiệu dữ liệu mới mỗi lần poll.
+- **Don't** tự đóng banner chờ duyệt, cần đối chiếu hoặc lỗi; không thêm retry/resume cho ghi chưa rõ.
+- **Don't** hiển thị phần trăm tiến trình hay số liệu trang trí không có ý nghĩa đo.
+- **Don't** dùng danger đặc cho Từ chối/Huỷ.
 
 ## Implementation notes
 
-- Kiểm tra hợp lệ và contrast bằng `@google/design.md@0.4.0 lint DESIGN.md` trước khi commit thay đổi token. Lần kiểm 17/09/2026: 0 error, 0 warning (33 colors, 11 typography, 6 rounded, 13 spacing, 37 components).
-- `export --format css-tailwind` của bản 0.4.0 **chưa dùng trực tiếp được**: (1) bọc cả font stack trong một cặp nháy kép nên trình duyệt coi là một tên font; (2) bỏ `fontFeature` và toàn bộ component token; (3) sinh `--leading-*` riêng thay vì `--text-<name>--line-height` của Tailwind v4. WEB-01C phải có bước sinh `apps/web/src/app/theme.css` từ DESIGN.md (export rồi hậu xử lý có test, hoặc script đọc frontmatter) và review file sinh ra; không chỉnh tay theme.css, sửa DESIGN.md rồi sinh lại.
-- Spacing đặt tên (`--spacing-sm`…) cùng tồn tại với thang số mặc định của Tailwind (`p-2`, `gap-4`); trong code ưu tiên tên token, thang số chỉ dùng khi giá trị trùng thang 4px ở trên.
-- Component token dùng `backgroundColor` cho `card-divider`, `input-border`, `focus-ring` để biểu diễn màu đường viền, vì spec alpha chưa có thuộc tính border; khi áp vào CSS đó là `border-color`/`outline-color`.
+- Kiểm tra hợp lệ và contrast bằng `@google/design.md@0.4.0 lint DESIGN.md` trước khi commit thay đổi token.
+- `export --format css-tailwind` của bản 0.4.0 **chưa dùng trực tiếp được**: bọc cả font stack trong một cặp nháy kép; bỏ `fontFeature` và component token; sinh `--leading-*` thay vì `--text-<name>--line-height`. WEB-01C cần bước sinh `apps/web/src/app/theme.css` có hậu xử lý và test; không chỉnh tay file sinh ra.
+- Component token dùng `backgroundColor` cho `divider`, `input-border`, `focus-ring` để biểu diễn màu đường kẻ, vì spec alpha chưa có thuộc tính border; khi áp vào CSS đó là `border-color`/`outline-color`.
+- Font Be Vietnam Pro tự host: đặt file woff2 (400/500/600/700, subset latin + vietnamese) trong `apps/web/src/assets/fonts/`, khai báo `@font-face` với `font-display: swap`, ghi license OFL kèm file.
+- Spacing đặt tên cùng tồn tại với thang số mặc định của Tailwind; trong code ưu tiên tên token.
+- Mockup tham chiếu: canvas review “ATI Run Screens” (riêng tư). Mockup không chứng minh accessibility, responsive hay hành vi polling; các kiểm tra đó thuộc WEB-03.
