@@ -94,7 +94,7 @@ Mục tiêu: mô tả đầu vào, đích mong muốn và công việc cần th�
 - *AI lập kế hoạch* (planner thật, khi có): nhãn “AI lập kế hoạch”; nhập tự do; gợi ý dạng chip chèn vào ô rồi sửa được; ghi rõ AI có thể hiểu sai, hỏi lại hoặc từ chối; cột phải thêm “AI có thể trả lời: Kế hoạch · Hỏi lại · Từ chối”.
 - Nhãn chế độ luôn hiển thị; chế độ lấy từ cấu hình launch tin cậy cho tới khi có endpoint capabilities. Danh sách mẫu demo là allowlist prompt công khai trong frontend, có test khớp với các entry của `apps/api/src/dev-planner.ts`; gợi ý chế độ AI lấy từ ca dev b01–b06, không dùng holdout b07–b10.
 - Tuỳ chọn nâng cao là disclosure (múi giờ + cặp khoá–giá trị chuỗi/số/đúng-sai), đóng mặc định với dòng tóm tắt. Không hỏi xác nhận khi rời trang; chỉ ghi “Nháp không được lưu khi rời trang”. Phím tắt Ctrl+Enter.
-- Mất phản hồi: banner `unknown` + “Mở Lần chạy để kiểm tra”; nút gửi vẫn bật, không tự gửi lại (server chặn trùng bằng `409 ACTIVE_RUN`). Chưa vẽ: trạng thái đang gửi, `503`, `400`.
+- Mất phản hồi: banner `unknown`; hành động chính là nút primary “Mở Lần chạy để kiểm tra”; gửi lại là nút secondary “Gửi lại yêu cầu” kèm điều kiện, không tự gửi lại (server chặn trùng bằng `409 ACTIVE_RUN`). `409 ACTIVE_RUN`: nút “Lập kế hoạch” disabled với lý do, CTA primary “Mở lần chạy đang chờ”. Mẫu bị chặn dùng `aria-disabled` để lý do đọc được bằng bàn phím. Chưa vẽ: trạng thái đang gửi, `503`, `400`.
 
 ### V04 — Lần chạy
 
@@ -112,7 +112,7 @@ Mục tiêu: tìm lại một lần chạy, xem yêu cầu gì và kết quả r
 - Lọc 5 nhóm có số đếm trên dữ liệu đã tải: *Tất cả · Cần xử lý* (`awaiting_approval`, `reconciliation_required`) *· Đang chạy* (`planning`, `validating`, `dry_running`, `running`, `replanning`) *· Hoàn tất* (`succeeded`) *· Không hoàn tất* (`failed`, `rejected`, `cancelled`, `expired`, `refused`, `needs_input`). Tìm theo nội dung yêu cầu và tiền tố mã run, không phân biệt hoa thường và dấu; lọc và tìm kết hợp.
 - Hàng là link tới V05: badge, yêu cầu tối đa 2 dòng, thời gian tạo, mã run, dòng phụ suy từ dữ liệu có sẵn (số bước, số thao tác ghi, tên server; “Hết hạn duyệt lúc hh:mm” tĩnh cho `awaiting_approval`; số thao tác ghi chưa rõ cho `reconciliation_required`; câu của planner cho `refused`/`needs_input`). `created_at` thiếu thì ghi “Không rõ thời gian”. Chưa có quy tắc ánh xạ đích theo tool thì chỉ hiện tên server.
 - Hiển thị 50 hàng + “Hiển thị thêm” theo bước 50, kèm “Đang hiển thị X / Y”. Quay về từ V05 giữ bộ lọc, từ khoá, số hàng và vị trí cuộn trong bộ nhớ (không vào URL). Kết quả lọc thông báo qua `aria-live`.
-- Trạng thái: chưa có run (ẩn thanh lọc, CTA “Tạo yêu cầu đầu tiên”); không khớp (nêu nhóm + từ khoá, “Xoá bộ lọc”); `409 HISTORY_LIMIT` (banner `unknown`, không hiển thị danh sách một phần, “Thử lại” + “Mở Tổng quan”); lỗi mạng/dữ liệu sai hợp đồng (banner danger + “Thử lại”); `401` về đăng nhập. Chưa vẽ: đang tải, lỗi mạng, > 50 run.
+- Trạng thái: chưa có run (ẩn thanh lọc, CTA “Tạo yêu cầu đầu tiên”); không khớp (nêu nhóm + từ khoá, “Xoá bộ lọc”); `409 HISTORY_LIMIT` (banner `neutral` vì là giới hạn chứ không phải lỗi, không hiển thị danh sách một phần, không có “Thử lại”/“Làm mới”, chỉ “Mở Tổng quan”); lỗi mạng/dữ liệu sai hợp đồng (banner danger + “Thử lại”); `401` về đăng nhập. Chưa vẽ: đang tải, lỗi mạng, > 50 run.
 - Rủi ro ghi nhận: `GET /runs` trả RunDetail đầy đủ tới 1000 run; đo payload/thời gian render ở WEB-03 trước khi đề xuất API tóm tắt.
 
 ### V05 — Chi tiết lần chạy

@@ -573,6 +573,16 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 | Nhãn trạng thái run | Đúng bảng Run status (ví dụ “Đang đọc dữ liệu xem trước”, “Đang điều chỉnh kế hoạch”) | rút gọn tuỳ màn |
 | Tiêu đề run | Nguyên văn yêu cầu ở mọi màn (cắt bằng CSS, không viết lại) | bản rút gọn bằng tay |
 
+### Hardening rules (after `/impeccable harden`, 17/09/2026)
+
+- **Control không được mâu thuẫn với chữ cạnh nó.** Hành động bị server từ chối chắc chắn (vd. `409 ACTIVE_RUN`) thì nút bị `disabled` với lý do liên kết qua `aria-describedby`; khi kết quả gửi chưa rõ, hành động chính là **kiểm tra** (nút primary “Mở Lần chạy để kiểm tra”), gửi lại chỉ là nút secondary “Gửi lại yêu cầu” kèm điều kiện.
+- **Giới hạn không phải lỗi.** `409 HISTORY_LIMIT` dùng banner `neutral` với icon thông tin, không có “Thử lại”/“Làm mới” vô ích; `unknown` chỉ dành cho kết quả ghi chưa rõ, `danger` cho lỗi thật.
+- **Trạng thái chỉ có ở API thật không mang gợi ý fixture.** `401`, `429`, phiên hết hạn không có badge “Dữ liệu mô phỏng”, gợi ý email demo hay “mật khẩu bất kỳ”; ô lỗi có `aria-invalid="true"` và `aria-describedby` trỏ tới banner.
+- **Đồng hồ thời hạn** có `role="timer"` với `aria-label` đầy đủ phút/giây; một vùng `aria-live="polite"` ẩn chỉ thông báo theo mốc (9, 5, 1 phút, hết hạn), không đọc mỗi giây. Banner chờ duyệt có `role="status"`.
+- **Tên truy cập duy nhất:** nút lặp lại phải nêu đối tượng (“Chi tiết kỹ thuật: Thêm dòng vào bảng tính”, “Xem JSON gốc: Kênh #nhom-ati”, “Xem nội dung: Bảng “Báo cáo tuần””). Hàng lần chạy là một link với `aria-label` gọn “Trạng thái: yêu cầu, thời gian”.
+- **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
+- **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
