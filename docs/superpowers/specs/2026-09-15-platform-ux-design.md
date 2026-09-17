@@ -197,6 +197,12 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - V03 “Tạo lại yêu cầu này” (chỉ chế độ AI): điền sẵn prompt cũ vào nháp **trong bộ nhớ** (không đưa prompt vào URL), banner `unknown` “Tạo lại từ lần chạy cần đối chiếu” nêu mã run, dặn kiểm tra bảng đích, link quay lại đối chiếu; banner liên kết với ô yêu cầu qua `aria-describedby`. Chế độ demo chỉ dẫn tới Tạo yêu cầu.
 - Chưa vẽ: nhiều thao tác ghi với receipt khác nhau, `not_supported`, mobile của màn đối chiếu.
 
+**Kịch bản demo — chốt 18/09/2026 (`/impeccable clarify`).** Nhãn “Dữ liệu mô phỏng” và nội dung phải khớp nhau:
+
+- **Màn chế độ demo** (có nhãn fixture) chỉ dùng đúng yêu cầu và dữ liệu của fixture server-owned: prompt `b02` “Chép nguyên các dòng Progress!A1:B2 … #team” và hai mẫu `fs-*`. Mọi tham chiếu tới lần chạy đang hoạt động trên các màn này (vd. `409 ACTIVE_RUN`) cũng dùng chính prompt đó.
+- **Màn chế độ AI/live** (không có nhãn fixture) dùng kịch bản tiếng Việt “tuần 37/38 · Tiến độ nhóm → Báo cáo tuần · #nhom-ati”; nhãn chế độ trong thẻ tóm tắt là “AI lập kế hoạch”.
+- Thời gian trong danh sách và Tổng quan ghi rõ là **lúc tạo yêu cầu**; thẻ “Cần xử lý” ghi “Kết thúc lúc …”. Thời hạn duyệt tính đúng 10 phút kể từ khi bản xem trước sẵn sàng.
+
 ## 5. Luồng end-to-end
 
 ```mermaid

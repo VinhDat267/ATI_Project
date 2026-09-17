@@ -557,7 +557,7 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 | Chỗ dùng | Chuẩn | Không dùng |
 |---|---|---|
 | Tên sản phẩm | **ATI** | ati |
-| Nhãn dữ liệu fixture | Pill “Dữ liệu mô phỏng” 28px/13px ở mọi kích thước màn; chỉ khi transport là fixture | “Mô phỏng”, hiện trên run chế độ AI thật |
+| Nhãn dữ liệu fixture | Pill “Dữ liệu mô phỏng” 28px/13px ở mọi kích thước màn; **chỉ** khi transport là fixture, và màn đó phải kể đúng yêu cầu/dữ liệu fixture đang có trên server | “Mô phỏng”; hiện trên màn kể chuyện chạy thật; kể chuyện fixture mà nội dung không có trong fixture |
 | Chế độ lập kế hoạch | “Kế hoạch mẫu” · “AI lập kế hoạch”; nhãn khoá–giá trị “Chế độ lập kế hoạch” | “Demo · kế hoạch mẫu”, “Chế độ planner” |
 | Chủ thể trong câu | “Hệ thống …” (hỏi, trả lời, không lập được kế hoạch) | “Planner …” |
 | Trạng thái bước | Xong · Đang chạy · Chưa chạy (còn có thể chạy) · Không chạy (sẽ không chạy) · Thất bại · Chờ duyệt — luôn kèm icon | Hoàn tất (dành cho trạng thái run), Không thực hiện, không diễn ra |
