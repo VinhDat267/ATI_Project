@@ -522,7 +522,7 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 
 ### Request composer (V03)
 
-- **Nhãn chế độ planner** cạnh tiêu đề, không đặt phía trên tiêu đề: demo dùng `badge-demo` (“Demo · kế hoạch mẫu”); AI dùng pill `primary-subtle`/`primary` (“AI lập kế hoạch”). Luôn hiển thị.
+- **Nhãn chế độ planner** cạnh tiêu đề, không đặt phía trên tiêu đề: demo dùng `badge-demo` (“Kế hoạch mẫu”); AI dùng pill `primary-subtle`/`primary` (“AI lập kế hoạch”). Luôn hiển thị.
 - **Ô yêu cầu:** chế độ demo chỉ đọc, nền `surface-soft`, icon khoá và lý do trong thanh dưới ô; chế độ AI sửa được, nền `canvas`, focus viền 2px `ink`, gợi ý viết trong thanh dưới ô. Bộ đếm ký tự chỉ hiện khi gần giới hạn 4000.
 - **Mẫu (demo):** thẻ radio thật bo 14px; đang chọn viền 2px `ink`; vô hiệu nền `surface-soft`, chữ `muted`, kèm lý do có icon.
 - **Gợi ý (AI):** chip pill 40px viền `hairline`, chữ `ink` 14/500; chèn vào ô, không tự gửi.
@@ -549,6 +549,29 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **Khung:** không top nav; logo trái, badge demo phải; hai cột 1120px (giới thiệu · thẻ form 420px), căn giữa dọc; mobile form trước.
 - **Giới thiệu:** tiêu đề 40/50px đậm 600 tracking -0.03em (ngoại lệ đã ghi trong Do's and Don'ts); đoạn `body-lg` `muted`; 3 bước dạng hàng icon tròn 48px `surface-strong` + tiêu đề `body-lg` 500 + dòng phụ `body-sm` `muted`, không đánh số.
 - **Thẻ form:** `decision-card` style (hairline, bo 14px, mức bóng duy nhất, padding 32px); input 56px; nút hiện/ẩn mật khẩu `icon-button-circle` 40px bên trong ô; helper `caption` `muted`; banner lỗi/hết phiên bo 14px đặt dưới tiêu đề form; dòng môi trường `caption` `muted` sau hairline.
+
+### Copy & labeling conventions
+
+Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); code và test dùng đúng các chuỗi này.
+
+| Chỗ dùng | Chuẩn | Không dùng |
+|---|---|---|
+| Tên sản phẩm | **ATI** | ati |
+| Nhãn dữ liệu fixture | Pill “Dữ liệu mô phỏng” 28px/13px ở mọi kích thước màn; chỉ khi transport là fixture | “Mô phỏng”, hiện trên run chế độ AI thật |
+| Chế độ lập kế hoạch | “Kế hoạch mẫu” · “AI lập kế hoạch”; nhãn khoá–giá trị “Chế độ lập kế hoạch” | “Demo · kế hoạch mẫu”, “Chế độ planner” |
+| Chủ thể trong câu | “Hệ thống …” (hỏi, trả lời, không lập được kế hoạch) | “Planner …” |
+| Trạng thái bước | Xong · Đang chạy · Chưa chạy (còn có thể chạy) · Không chạy (sẽ không chạy) · Thất bại · Chờ duyệt — luôn kèm icon | Hoàn tất (dành cho trạng thái run), Không thực hiện, không diễn ra |
+| Tiêu đề danh sách bước | “Kế hoạch gồm N bước” (trước khi thực thi: chờ duyệt, hết hạn) · “Kết quả từng bước” (từ lúc thực thi) · “Tiến trình” (dải giai đoạn khi chưa có kế hoạch) | “Các bước” |
+| Nhật ký | “Hoạt động” | “Nhật ký sự kiện” |
+| Thẻ bên phải V05 (không quyết định) | Nhãn “Tóm tắt lần chạy” + giá trị là tình trạng hiện tại | “Trạng thái”, “Kết quả lần chạy” |
+| Hộp tóm tắt | XONG “x / y bước” · ĐANG CHẠY / THẤT BẠI / CHƯA RÕ “Bước n” · ĐÃ GHI “Chưa ghi gì” / “N thao tác” · KẾ HOẠCH “Chưa có” (đang lập) / “Không có” (kết thúc) | ĐÃ XONG, HOÀN TẤT, “Không có thao tác ghi nào” |
+| Chứng cứ | Nút secondary “Xem chứng cứ” trong thẻ phải của run có kế hoạch đã kết thúc; link chữ “Xem chứng cứ” cuối mục Hoạt động | “Xem chứng cứ đầy đủ” |
+| Huỷ | Nút chữ gạch chân “Yêu cầu huỷ lần chạy” cuối thẻ phải, kèm hệ quả (“Huỷ sẽ dừng trước bước kế tiếp” / “không hoàn tác thao tác đang chạy”) | Nút secondary “Yêu cầu huỷ”, đặt góc trên |
+| Kết nối server | “Đã kết nối” · “Đang tắt theo cấu hình” · “Chưa kiểm tra trong phiên này” · “Không kết nối được” | “Sẵn sàng”, “Đang tắt” |
+| Mốc thời gian | “Tải lúc” (danh sách) · “Cập nhật lúc” (chi tiết đang poll) · “Kiểm tra lúc” (V06) · “quan sát lúc” (`observed_at`) | giờ trần không nhãn |
+| Badge nav | “Lần chạy” + số việc cần xử lý (amber) trên mọi trang có nav khi > 0; có chữ ẩn “cần xử lý:” | chỉ hiện ở Tổng quan |
+| Nhãn trạng thái run | Đúng bảng Run status (ví dụ “Đang đọc dữ liệu xem trước”, “Đang điều chỉnh kế hoạch”) | rút gọn tuỳ màn |
+| Tiêu đề run | Nguyên văn yêu cầu ở mọi màn (cắt bằng CSS, không viết lại) | bản rút gọn bằng tay |
 
 ### Lists, tables, dialog, tooltip, demo badge
 
