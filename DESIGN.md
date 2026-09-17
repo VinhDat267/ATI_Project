@@ -529,6 +529,13 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **Tuỳ chọn nâng cao:** disclosure ngăn bằng hairline trên/dưới, tiêu đề 16/600 + dòng tóm tắt `muted`.
 - **Cột “Hệ thống làm được gì”:** viền hairline bo 14px, không bóng; nhóm việc với icon tròn 40px, trạng thái kết nối có icon + chữ, cam kết trước khi ghi; chế độ AI thêm các kết quả planner có thể trả về.
 
+### Run history (V04)
+
+- **Filter pill:** 40px, bo full, viền 1px `hairline`, chữ `ink` 14/500 kèm số đếm `muted` tabular; đang chọn nền `ink`, chữ và số trắng 600, `aria-pressed="true"`. Mobile: hàng pill cuộn ngang trong khung riêng.
+- **Ô tìm kiếm:** 48px, viền `border-control`, icon kính lúp trái, nút xoá tròn `icon-button-circle` khi có từ khoá; label ẩn nhưng đọc được.
+- **Hàng lần chạy:** link toàn hàng; lưới badge 208px · nội dung · thời gian 150px (mobile xếp dọc); yêu cầu `body-lg` 500 tối đa 2 dòng; dòng phụ `body-sm` `muted`, phần cần chú ý dùng màu ngữ nghĩa 600; mã run `mono-sm` `muted`; ngăn bằng `hairline-soft`; focus viền 2px `ink` bo 8px, nền `surface-soft`.
+- **Trạng thái rỗng:** khung hairline bo 14px, icon tròn 56px `surface-strong`, tiêu đề `headline-sm`, đoạn `muted` tối đa ~520px, một hành động.
+
 ### Lists, tables, dialog, tooltip, demo badge
 
 - **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.

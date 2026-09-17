@@ -99,6 +99,15 @@ Mục tiêu: tìm lại một lần chạy, xem yêu cầu gì và kết quả r
 - `409 HISTORY_LIMIT`: thông báo cần hỗ trợ API history pagination; không âm thầm cắt dữ liệu hoặc hứa tìm được mọi run.
 - Không có nút clone/rerun/delete trong đợt đầu. Yêu cầu mới được người dùng tạo và duyệt riêng.
 
+**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V04):**
+
+- Danh sách phẳng mới nhất trước, rộng 1120px, không cột phải. Đầu trang: “N lần chạy đã tải · Tải lúc hh:mm:ss”, nút “Làm mới” (GET, không poll 2 giây) và “Tạo yêu cầu”.
+- Lọc 5 nhóm có số đếm trên dữ liệu đã tải: *Tất cả · Cần xử lý* (`awaiting_approval`, `reconciliation_required`) *· Đang chạy* (`planning`, `validating`, `dry_running`, `running`, `replanning`) *· Hoàn tất* (`succeeded`) *· Không hoàn tất* (`failed`, `rejected`, `cancelled`, `expired`, `refused`, `needs_input`). Tìm theo nội dung yêu cầu và tiền tố mã run, không phân biệt hoa thường và dấu; lọc và tìm kết hợp.
+- Hàng là link tới V05: badge, yêu cầu tối đa 2 dòng, thời gian tạo, mã run, dòng phụ suy từ dữ liệu có sẵn (số bước, số thao tác ghi, tên server; “Hết hạn duyệt lúc hh:mm” tĩnh cho `awaiting_approval`; số thao tác ghi chưa rõ cho `reconciliation_required`; câu của planner cho `refused`/`needs_input`). `created_at` thiếu thì ghi “Không rõ thời gian”. Chưa có quy tắc ánh xạ đích theo tool thì chỉ hiện tên server.
+- Hiển thị 50 hàng + “Hiển thị thêm” theo bước 50, kèm “Đang hiển thị X / Y”. Quay về từ V05 giữ bộ lọc, từ khoá, số hàng và vị trí cuộn trong bộ nhớ (không vào URL). Kết quả lọc thông báo qua `aria-live`.
+- Trạng thái: chưa có run (ẩn thanh lọc, CTA “Tạo yêu cầu đầu tiên”); không khớp (nêu nhóm + từ khoá, “Xoá bộ lọc”); `409 HISTORY_LIMIT` (banner `unknown`, không hiển thị danh sách một phần, “Thử lại” + “Mở Tổng quan”); lỗi mạng/dữ liệu sai hợp đồng (banner danger + “Thử lại”); `401` về đăng nhập. Chưa vẽ: đang tải, lỗi mạng, > 50 run.
+- Rủi ro ghi nhận: `GET /runs` trả RunDetail đầy đủ tới 1000 run; đo payload/thời gian render ở WEB-03 trước khi đề xuất API tóm tắt.
+
 ### V05 — Chi tiết lần chạy
 
 Mục tiêu: hiểu kế hoạch, quyết định việc ghi, theo dõi kết quả và xem chứng cứ tại một nơi.
