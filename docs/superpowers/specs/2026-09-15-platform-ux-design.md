@@ -201,7 +201,7 @@ Kiểm lockfile tại thời điểm thiết kế: **264 entries tổng, trong �
 
 Rút lại lập luận “chỉ có hai màn hình nên framework không mang lại nhiều” và “React/Vite chắc chắn thêm vài trăm package”. Mức tăng phải đo trên lockfile ứng viên; dùng dependency transitive làm dependency trực tiếp vẫn là thay đổi cần review. Package ít không tự chứng minh dễ audit hoặc an toàn hơn.
 
-Thiết kế UX này không phụ thuộc framework. Các yêu cầu đánh giá dưới đây đã được xử lý ở [ADR-001 và kết quả đo WEB-00](../../ADR-001-FRONTEND-STACK.md): chọn React + TypeScript + Vite cho phạm vi sáu view hiện tại; editor/library vẫn ngoài B. Các phép đo browser/focus/polling đầy đủ thuộc WEB-01–03, chưa có trong build probe.
+Thiết kế UX này không phụ thuộc framework. Các yêu cầu đánh giá dưới đây đã được xử lý ở [ADR-001 và kết quả đo WEB-00](../../ADR-001-FRONTEND-STACK.md): chọn React + TypeScript + Vite cho phạm vi sáu view hiện tại; [ADR-002](../../ADR-002-FRONTEND-UI-DATA-LAYER.md) thay CSS thuần bằng Tailwind CSS v4 + shadcn/ui và thêm TanStack Query; editor/library vẫn ngoài B. Các phép đo browser/focus/polling đầy đủ thuộc WEB-01–03, chưa có trong build probe.
 
 - So sánh TS + DOM và một phương án component framework trên cùng bài toán: 6 view, polling không mất focus/disclosure, session expiry, URL navigation và action submit bị khóa.
 - Đo dependencies trực tiếp/bắc cầu mới so baseline lockfile, package version/integrity, bundle thực, lệnh build/test và nơi phải bảo trì DOM/state thủ công. Không cài hai stack vào repo chính để đo.

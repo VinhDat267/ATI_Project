@@ -12,8 +12,8 @@ Nguồn scope: [BASELINE](BASELINE.md). Thay thế các quyết định A/B chư
 | QĐ-06 | Unknown write → reconciliation; bỏ resume tự động | Không suy ra exactly-once từ bảng key; xem EXECUTION-CONTRACT |
 | QĐ-07 | PlannerResult = plan/refusal/clarification | Version chỉ lưu plan thực thi hợp lệ |
 | QĐ-08 | Sáu view/bốn mục điều hướng, một worker tuần tự; không WS/hybrid/GitHub | UI cập nhật 15/09 theo UX platform; không mở scope editor/reuse |
-| QĐ-09 | React + TypeScript + Vite, CSS thuần; hash routes, runtime Zod validation | [ADR-001](ADR-001-FRONTEND-STACK.md), DECIDED_FOR_PLAN ở WEB-00; WEB-01B là fixture shell provisional, chưa tích hợp live API |
-| QĐ-10 | Airtable từng được chọn làm hướng tham chiếu thị giác nền | `WITHDRAWN_BY_USER` ngày 16/09/2026; [DESIGN-airtable.md](design/DESIGN-airtable.md) chỉ còn là ứng viên tham khảo, chưa có hướng UI/UX hay theme thay thế được chốt |
+| QĐ-09 | React + TypeScript + Vite; hash routes, runtime Zod validation. Styling/component/data layer: Tailwind CSS v4 + shadcn/ui (Radix) + TanStack Query theo [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md), thay CSS thuần ngày 17/09/2026 | [ADR-001](ADR-001-FRONTEND-STACK.md), DECIDED_FOR_PLAN ở WEB-00; WEB-01B là fixture shell provisional, chưa tích hợp live API |
+| QĐ-10 | Hướng thị giác A: light-first, navy trầm (#1E3A5F) trên nền trắng/slate, 7 họ màu ngữ nghĩa cho 14 RunStatus, font hệ thống | `DIRECTION_SELECTED` 17/09/2026 theo [DESIGN.md](../DESIGN.md), lint 0 error/0 warning; cần review trực quan V05/V02 trước `APPROVED_FOR_IMPLEMENTATION`. Airtable `WITHDRAWN_BY_USER` 16/09/2026; file tham khảo đã xoá 17/09/2026 (còn trong lịch sử git `652531a`) |
 
 Quỹ giờ là giả định khả dụng do kế hoạch trước ghi: khoảng 14h/người/tuần, 2 người. Không dùng các ước lượng 230h/145h cũ làm số đo. Lịch mới phân bổ 112h công việc + 23h dự phòng trong trần xây dựng 135h; cần hiệu chỉnh sau tuần 1. 6×2×14 = 168h, trong đó 28h tuần 6 và 5h đệm chung ngoài trần xây dựng. Không coi trần này là bằng chứng hoàn thành chắc chắn.
 

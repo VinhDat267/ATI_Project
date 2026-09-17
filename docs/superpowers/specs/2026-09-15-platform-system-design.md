@@ -202,7 +202,8 @@ apps/web/src/
     navigation.ts       # route parser/serializer
     run-state.ts        # reducer/immutable projection
     events.ts           # seq validation + page merge
-    polling.ts          # one-flight timer + drain/abort
+    queries.ts          # TanStack Query keys/options gọi Transport; không import React (ADR-002)
+    polling.ts          # điều kiện refetch/drain theo seq; one-flight do Query bảo đảm
     errors.ts           # API error envelope -> safe view error
   adapters/
     http-transport.ts   # relative /api/v1, AbortSignal, response parsing
@@ -210,8 +211,9 @@ apps/web/src/
   controllers/          # commands: login, list, create, decision, cancel, trace
   app/                  # composition/session gate/AppShell
   views/                # login, overview, new, history, run, tools
+  components/ui/        # shadcn/ui (Radix) đã review, commit trong repo
   components/           # StatusPill, disclosure, progress, action, timeline...
-  styles.css
+  app/theme.css         # Tailwind @theme token sinh từ DESIGN.md
 ```
 
 State ownership:
@@ -220,7 +222,8 @@ State ownership:
 |---|---|---|
 | Route + `runId` | URL hash | parse allowlist; UUID phải hợp lệ; không có token/prompt |
 | Bearer token | `SessionController` memory | xóa khi logout/401; generation fence mọi request |
-| Run status/events/trace | `RunState` store | chỉ server response hợp lệ cập nhật; seq tăng strict |
+| Server snapshot (history, detail, servers, trace) | TanStack Query cache, key chứa session generation | chỉ response parse hợp lệ; clear khi đổi phiên; không persist |
+| Run events | `RunState` store qua `ingestEvents` | Query chỉ lập lịch poll; seq tăng strict do core kiểm |
 | Draft form/filter/disclosure/focus | view local state | không POST khi đổi route; không persist mặc định |
 | Approval tuple/TTL | server detail projection | client countdown chỉ hỗ trợ UX; server quyết định |
 | Fixture/live mode | build entry/config | fixture có nhãn; live bundle không import fixture |
@@ -302,6 +305,7 @@ Các mục hiện tại:
 | HTTP API/session/approval loopback | API_TECHNICAL_PASS | `docs/API-STATUS-2026-09-15.md` |
 | UX sitemap và wireframe | ADOPTED_FOR_FRONTEND_PLAN | `docs/superpowers/specs/2026-09-15-platform-ux-design.md` |
 | React stack | DECIDED_FOR_PLAN | `docs/ADR-001-FRONTEND-STACK.md` |
+| Tailwind/shadcn/TanStack Query | DECIDED_FOR_PLAN | `docs/ADR-002-FRONTEND-UI-DATA-LAYER.md` |
 | AI quality/retrieval/replan thật | NOT_RUN | baseline/API status |
 | Browser với API/DB thật | NOT_RUN | API status |
 | Rubric chính thức/công việc nhóm thật | OPEN | G1 status/rubric map |

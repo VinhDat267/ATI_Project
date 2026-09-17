@@ -1,6 +1,6 @@
 # ADR-001 — React + TypeScript + Vite cho frontend B/local
 
-Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00. WEB-01B đã tạo fixture shell ở trạng thái **PROVISIONAL_IMPLEMENTATION**; live frontend chưa tích hợp API. System design cấp hệ thống là [tài liệu riêng](superpowers/specs/2026-09-15-platform-system-design.md) và phải được duyệt trước WEB-01C/WEB-02. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau [thiết kế UX](superpowers/specs/2026-09-15-platform-ux-design.md). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
+Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00. **PARTIALLY_SUPERSEDED 17/09/2026:** phần CSS thuần, “không UI kit/query cache/React plugin” và budget 160 KiB được thay bởi [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md) (Tailwind CSS v4, shadcn/ui trên Radix, TanStack Query, Fast Refresh); renderer, proxy, hash routes và ràng buộc bảo mật dưới đây vẫn hiệu lực. WEB-01B đã tạo fixture shell ở trạng thái **PROVISIONAL_IMPLEMENTATION**; live frontend chưa tích hợp API. System design cấp hệ thống là [tài liệu riêng](superpowers/specs/2026-09-15-platform-system-design.md) và phải được duyệt trước WEB-01C/WEB-02. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau [thiết kế UX](superpowers/specs/2026-09-15-platform-ux-design.md). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
 
 ## Quyết định
 

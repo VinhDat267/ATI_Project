@@ -6,11 +6,11 @@
 
 **Architecture:** React chỉ render snapshot và nhận thao tác. Modules TypeScript thuần quản lý session generation, API validation, event ingestion, polling và quyết định không retry POST. Vite proxy loopback giữ API origin guard; fixtures và live transport tách rõ.
 
-**Tech Stack:** React/react-dom 19.3.0, TypeScript 5.9.3, Vite 8.3.0, Zod 4.6.2, Vitest 2.1.9, Playwright Test 1.63.0, CSS thuần. Node >=22.12.0.
+**Tech Stack:** React/react-dom 19.3.0, TypeScript 5.9.3, Vite 8.3.0 + @vitejs/plugin-react 6.1.1, Zod 4.6.2, Tailwind CSS 4.3.3, shadcn/ui trên radix-ui 1.6.7, lucide-react 1.47.0, TanStack Query 5.103.1, Vitest 4.1.11, Playwright Test 1.63.0 + @axe-core/playwright 4.13.0. Node `^22.12.0 || >=24.0.0`. Xem [ADR-002](../../ADR-002-FRONTEND-UI-DATA-LAYER.md).
 
-**Spec:** [UX platform](../specs/2026-09-15-platform-ux-design.md), [ADR-001](../../ADR-001-FRONTEND-STACK.md), [frontend handoff](../../FRONTEND-HANDOFF.md).
+**Spec:** [UX platform](../specs/2026-09-15-platform-ux-design.md), [ADR-001](../../ADR-001-FRONTEND-STACK.md), [ADR-002](../../ADR-002-FRONTEND-UI-DATA-LAYER.md), [frontend handoff](../../FRONTEND-HANDOFF.md).
 
-**Trạng thái:** `PROVISIONAL` cho WEB-01B và **BLOCKED_PENDING_SYSTEM_DESIGN_REVIEW** cho WEB-01C/WEB-02/WEB-03. `docs/superpowers/specs/2026-09-15-platform-system-design.md` là cổng kiến trúc mới; phải chuyển sang `APPROVED_FOR_IMPLEMENTATION` và audit commit `23a41d8` trước khi viết thêm frontend. WEB-00 chỉ có kiểm lock/build mẫu trong temp; browser/application/AI vẫn NOT_RUN. Đọc toàn bộ repo có chọn lọc trước khi implement: BASELINE, FR, EXECUTION-CONTRACT, API source/contracts, engine lifecycle, policy/fingerprint, báo cáo API audit, screens/wireframes, Git policy. Không đọc secrets hoặc toàn bộ raw capture lịch sử.
+**Trạng thái:** `PROVISIONAL` cho WEB-01B và **BLOCKED_PENDING_SYSTEM_DESIGN_REVIEW** cho WEB-01C/WEB-02/WEB-03. `docs/superpowers/specs/2026-09-15-platform-system-design.md` là cổng kiến trúc mới; phải chuyển sang `APPROVED_FOR_IMPLEMENTATION` và audit commit `23a41d8` trước khi viết thêm frontend. **Cần sửa plan theo ADR-002 trước khi giao WEB-01C:** các task WEB-01C/WEB-02 dưới đây còn mô tả CSS thuần và controller/polling tự viết; phải thêm bước setup Tailwind/shadcn/theme và chuyển GET/mutation sang query options trong `core/queries.ts`, giữ nguyên các kiểm thử hành vi. WEB-00 chỉ có kiểm lock/build mẫu trong temp; browser/application/AI vẫn NOT_RUN. Đọc toàn bộ repo có chọn lọc trước khi implement: BASELINE, FR, EXECUTION-CONTRACT, API source/contracts, engine lifecycle, policy/fingerprint, báo cáo API audit, screens/wireframes, Git policy. Không đọc secrets hoặc toàn bộ raw capture lịch sử.
 
 ## Global Constraints
 
@@ -21,7 +21,7 @@
 - Write chưa rõ kết quả không retry/resume; cancel cooperative không rollback. Không auto retry bất kỳ POST.
 - Không editor, workflow library/reuse, rerun, schedule, SaaS, user/team admin hoặc config arbitrary MCP.
 - Backend API-GATE đã đạt `API_TECHNICAL_PASS`. Fixture không phải AI; browser mock không phải receiver evidence và frontend vẫn cần live browser gate riêng.
-- CSS kế thừa screens.html; 1280/390/320px, keyboard, focus, không tràn ngang trang. Text tiếng Việt; thuật ngữ kỹ thuật nằm trong disclosure khi có ích.
+- Styling bằng Tailwind CSS v4 với token `@theme` lấy từ DESIGN.md; component từ shadcn/ui được review và commit trong repo; không arbitrary color/spacing (ADR-002). screens.html chỉ là tham chiếu bố cục. 1280/390/320px, keyboard, focus, không tràn ngang trang. Text tiếng Việt; thuật ngữ kỹ thuật nằm trong disclosure khi có ích.
 - Cài dependency chỉ khi bắt đầu WEB-01; pin exact, review lock delta và fingerprint trước live MCP. Không ghi đè lịch sử evidence, migrations hoặc data demo.
 - Sau mỗi task: targeted tests, diff review, stage exact files, commit checkpoint; không push. Không gọi npm run check là full integration.
 
@@ -304,7 +304,7 @@ Trước giao WEB-01: ADR + spec + kế hoạch này là đầu vào. Trước n
 ```text
 Làm trong D:\Môn học\ATI\ATI_Project. Trước code, nghiên cứu repo để giải thích mục tiêu B/local,
 kiến trúc DSL/API/engine/MCP, invariant approval/unknown/session và hiện trạng bằng chứng.
-Đọc BASELINE, EXECUTION-CONTRACT, FR, FRONTEND-HANDOFF, ADR-001-FRONTEND-STACK,
+Đọc BASELINE, EXECUTION-CONTRACT, FR, FRONTEND-HANDOFF, ADR-001-FRONTEND-STACK, ADR-002-FRONTEND-UI-DATA-LAYER,
 spec platform UX và toàn bộ plan 2026-09-15-frontend-platform. Không đọc secrets hoặc dữ liệu thật của user.
 Triển khai WEB-01A trước; các task khác dùng để hiểu interfaces. Nếu source lệch plan, chỉ rõ
 file/contract trước khi sửa. Không tự mở scope editor/library/SaaS hoặc nâng toàn bộ dependencies.
