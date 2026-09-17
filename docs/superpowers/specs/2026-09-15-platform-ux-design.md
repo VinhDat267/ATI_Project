@@ -171,6 +171,23 @@ Tất cả 14 trạng thái dùng chung V05; không tạo 14 trang. Các termina
 
 Hủy là cooperative: sau POST cancel `202`, UI báo đã gửi yêu cầu hủy và tiếp tục poll đến terminal thật. Retry/skip của step là trạng thái engine, không phải nút để người dùng ép chạy lại.
 
+**Chốt V05 theo trạng thái — 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V05 và “V05 — Các trạng thái khác”):** mọi trạng thái dùng chung bố cục hai cột (nội dung trái, thẻ tóm tắt 372px dính phải với hộp chia ô, hành động và bảng khoá–giá trị); chỉ `awaiting_approval` có đồng hồ thời hạn lớn và nút duyệt.
+
+| Nhóm trạng thái | Nội dung trái | Thẻ phải |
+|---|---|---|
+| `planning`, `validating`, `dry_running`, `replanning` | Banner `progress` nói hệ thống sẽ dừng chờ duyệt trước mọi thao tác ghi; danh sách 6 giai đoạn (giai đoạn hiện tại có spinner, không phần trăm); hoạt động | KẾ HOẠCH/ĐÃ GHI “Chưa có”; “Yêu cầu huỷ” + “Huỷ sẽ dừng trước bước kế tiếp” |
+| `awaiting_approval` | Như mockup V05 đã chốt: banner action, kế hoạch, thẻ ghi dạng người đọc được | Thẻ quyết định với đồng hồ, duyệt/từ chối |
+| `running` | Banner `progress` nêu ghi chưa rõ sẽ dừng và đối chiếu; kết quả từng bước (xong / đang chạy / chưa chạy) | ĐÃ XONG x/y · ĐANG CHẠY bước n; “Yêu cầu huỷ” + “không hoàn tác thao tác đang chạy” |
+| `succeeded` | **Kết quả trước** (mỗi thao tác ghi: việc đã làm, vùng/đích, có biên nhận lúc…), ghi chú “Hoàn tất” không phải kiểm chứng nghiệp vụ; các bước; hoạt động | HOÀN TẤT · ĐÃ GHI; “Xem chứng cứ”, “Tạo yêu cầu mới” |
+| `failed` | Banner danger nêu bước và lỗi đã biết, trạng thái ghi (“chắc chắn chưa ghi” chỉ khi server xác nhận); các bước; chi tiết lỗi (`error_class`, thông điệp) | HOÀN TẤT x/y · THẤT BẠI bước n · ĐÃ GHI; không có nút thử lại |
+| `reconciliation_required` | Như mockup đã chốt: banner `unknown` không đóng, kết quả từng bước, đối chiếu, nhật ký | Thẻ tóm tắt; “Làm mới dữ liệu” (GET), “Tạo yêu cầu mới”; không gửi lại |
+| `needs_input` | Banner `planner` với câu hỏi nguyên văn; “Việc tiếp theo” gợi ý yêu cầu viết lại; dải giai đoạn dừng ở lập kế hoạch | KẾ HOẠCH “Không có” · ĐÃ GHI “Không”; “Tạo yêu cầu mới”, không trả lời tiếp trên run cũ |
+| `refused` | Banner `planner` với lý do; giải thích chỉ dùng công cụ đã review; link Công cụ & kết nối | LÝ DO; “Tạo yêu cầu mới” |
+| `expired` | Banner `neutral` “không có thao tác ghi nào được thực hiện”; bản xem trước chỉ để xem lại (nền `surface-soft`) | ĐÃ DUYỆT/ĐÃ GHI “Không”; không duyệt lại được |
+| `rejected`, `cancelled` | Theo mẫu `expired`; `cancelled` liệt kê các bước đã xong trước khi huỷ và thao tác ghi đã có biên nhận (chưa vẽ riêng) | Nhãn `neutral`; “Tạo yêu cầu mới” |
+
+Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi triển khai lấy từ `error_class`/`error_message` của attempt và `planner_result` thật.
+
 ## 5. Luồng end-to-end
 
 ```mermaid
