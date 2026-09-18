@@ -1,12 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
 import { Dialog, DropdownMenu } from "radix-ui";
 import { useState, type ReactNode } from "react";
-import { attentionCount } from "../../core/presentation.js";
-import { listQuery } from "../../core/queries.js";
 import type { Route } from "../../core/navigation.js";
 import { navigate, routeToHash } from "../../core/navigation.js";
 import { cn } from "@/lib/cn";
 import { useApp } from "../context";
+import { useAttention } from "../hooks";
 import { Icon } from "../components/Icon";
 import { Logo } from "./Logo";
 
@@ -49,9 +47,8 @@ export function AppShell({
   route: Route;
   children: ReactNode;
 }) {
-  const { transport, generation, session, email, mode } = useApp();
-  const list = useQuery(listQuery(transport, generation));
-  const attention = list.data ? attentionCount(list.data) : 0;
+  const { session, email, mode } = useApp();
+  const attention = useAttention().runs.length;
   const [menuOpen, setMenuOpen] = useState(false);
 
   const signOut = (): void => {

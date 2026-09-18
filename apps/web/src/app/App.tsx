@@ -94,16 +94,25 @@ export function App({
     session.store.getSnapshot,
     session.store.getSnapshot,
   );
-  const [queryClient] = useState(createQueryClient);
+  // One query cache per session generation: a new session can never read the
+  // previous one's server state, and the old cache is cancelled and dropped.
+  const queryClient = useMemo(
+    () => createQueryClient(),
+    [snapshot.generation],
+  );
+  useEffect(
+    () => () => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+    },
+    [queryClient],
+  );
   const [drafts] = useState(() => providedDrafts ?? createDraftStore());
   const [email, setEmail] = useState<string | null>(null);
 
-  // A new session must never see the previous session's server state.
   useEffect(() => {
-    void queryClient.cancelQueries();
-    queryClient.clear();
     if (!snapshot.token) drafts.clear();
-  }, [snapshot.generation, snapshot.token, queryClient, drafts]);
+  }, [snapshot.token, drafts]);
 
   const context = useMemo(
     () => ({
