@@ -34,13 +34,6 @@ colors:
   demo: "#854D0E"
   demo-subtle: "#FEF9C3"
 typography:
-  display-timer:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 56px
-    fontWeight: 700
-    lineHeight: 60px
-    letterSpacing: -0.03em
-    fontFeature: "'tnum' 1"
   display-md:
     fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
     fontSize: 26px
@@ -111,13 +104,6 @@ typography:
     fontWeight: 700
     lineHeight: 24px
     letterSpacing: -0.01em
-  display-timer-mobile:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 32px
-    fontWeight: 700
-    lineHeight: 36px
-    letterSpacing: -0.02em
-    fontFeature: "'tnum' 1"
   display-md-mobile:
     fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
     fontSize: 23px
@@ -249,7 +235,16 @@ components:
   decision-timer:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.display-timer}"
+    typography: "{typography.title-md}"
+  decision-timer-urgent:
+    backgroundColor: "{colors.action-subtle}"
+    textColor: "{colors.action}"
+    typography: "{typography.title-md}"
+    rounded: "{rounded.sm}"
+  write-summary:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.headline-sm}"
   summary-box:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
@@ -397,7 +392,7 @@ Nguyên tắc cốt lõi:
 
 - **Một màu nhấn: navy (#1E3A5F).** Chỉ dùng cho hành động chính và mục đang chọn. Đỏ/cam/amber được dành riêng cho trạng thái, không bao giờ làm màu thương hiệu.
 - **Nội dung trước, khung sau.** Section ngăn bằng hairline và khoảng trắng 32px; chỉ nội dung cần gom (payload, thẻ quyết định) mới có khung bo 14px.
-- **Một khoảnh khắc chữ lớn duy nhất:** đồng hồ thời hạn duyệt (56px) trong thẻ quyết định — tương tự số điểm đánh giá của Airbnb. Mọi tiêu đề khác giữ độ đậm vừa (600).
+- **Điều người dùng sắp đồng ý là thứ lớn nhất, không phải thời hạn.** Khối “Bạn sắp ghi” (`headline-sm`) đứng đầu thẻ quyết định; đồng hồ là một dòng `title-md` ngay trên nút duyệt và chỉ nổi lên ở 2 phút cuối (chốt 18/09/2026, thay đồng hồ 56px của phương án A). Mọi tiêu đề giữ độ đậm vừa (600).
 - **Màu trạng thái luôn kèm icon và chữ.** Server là authority: không phần trăm tiến trình tự tính, không báo thành công trước khi server xác nhận.
 - **Light-only trong B/local.** Dark mode ngoài phạm vi; token đặt theo vai trò để có thể thêm sau.
 
@@ -433,7 +428,6 @@ Nguyên tắc cốt lõi:
 
 | Token | Cỡ/dòng | Đậm | Dùng cho |
 |---|---|---|---|
-| `display-timer` | 56/60, tabular | 700 | Đồng hồ thời hạn duyệt — khoảnh khắc chữ lớn duy nhất |
 | `display-md` | 26/34 | 600 | Tiêu đề trang, yêu cầu gốc của run |
 | `headline-sm` | 21/28 | 600 | Tiêu đề section (“Kế hoạch gồm 3 bước”) |
 | `title-md` | 16/22 | 600 | Tiêu đề card, thẻ ghi |
@@ -448,15 +442,14 @@ Nguyên tắc cốt lõi:
 | `wordmark` | 20/24, -0.01em | 700 | Chữ “ATI” cạnh logo (mobile 18/22) |
 | `mono-md` / `mono-sm` | 13/20, 12/18 | 400 | Mã run, mã băm, tên tool, JSON |
 
-**Thang mobile (< 744px)** — chỉ ba role đổi cỡ, phần còn lại giữ nguyên để không sinh thêm biến thể:
+**Thang mobile (< 744px)** — chỉ hai role đổi cỡ, phần còn lại giữ nguyên để không sinh thêm biến thể:
 
 | Token | Cỡ/dòng | Thay cho | Dùng cho |
 |---|---|---|---|
-| `display-timer-mobile` | 32/36, tabular | `display-timer` 56/60 | Đồng hồ trong thanh quyết định 80px |
 | `display-md-mobile` | 23/31 | `display-md` 26/34 | Tiêu đề trang và yêu cầu gốc |
 | `headline-sm-mobile` | 18/25 | `headline-sm` 21/28 | Tiêu đề section |
 
-Mỗi bước liền kề của thang phải cách nhau ≥ 1.25× ở ít nhất một bậc: mobile là 32 → 23 → 18 (1.39 và 1.28), desktop là 56 → 26 → 21 → 16 (2.15 và 1.24 và 1.31). Không dùng cỡ ngoài thang (đã bỏ 17px, 12.5px, 19px, 20px thân chữ).
+Mỗi bước liền kề của thang phải cách nhau ≥ 1.25× ở ít nhất một bậc: mobile là 23 → 18 (1.28), desktop là 26 → 21 → 16 (1.24 và 1.31). Không dùng cỡ ngoài thang (đã bỏ 17px, 12.5px, 19px, 20px thân chữ).
 
 Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạm dòng trên. Không viết hoa toàn câu; `overline` chỉ cho nhãn 1–3 từ (11px làm bẹt dấu trên chữ hoa tiếng Việt nên sàn là 12px).
 
@@ -467,7 +460,7 @@ Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạ
 - **Desktop (≥ 1128px):** top nav 80px trắng, hairline dưới: logo trái, 4 mục điều hướng ở giữa (Tổng quan, Tạo yêu cầu, Lần chạy, Công cụ & kết nối), nhãn “Dữ liệu mô phỏng” + nút tài khoản dạng pill bên phải. Nội dung rộng tối đa **1120px** căn giữa, lề tối thiểu 80px.
 - **Chi tiết run (V05):** hai cột — nội dung trái (co giãn) và **thẻ quyết định 372px dính bên phải**, cách nhau 72px. Trạng thái không cần quyết định (đối chiếu, kết thúc): cột phải là thẻ tóm tắt kết quả, không có nút ghi.
 - **Tablet (744–1127px):** top nav giữ logo + nút menu; một cột, thẻ quyết định nằm trên nội dung.
-- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy ~100px** gồm dòng “Hết hạn lúc … theo máy chủ” (mốc tuyệt đối, vì người dùng mobile hay rời app rồi quay lại) và hàng đồng hồ + nút chính, nút duyệt có `aria-describedby` tới mốc hết hạn và câu cảnh báo; câu “Nếu dữ liệu nguồn thay đổi…” nằm trong banner chờ duyệt ở đầu trang — chỗ người dùng đọc đầu tiên khi quay lại; nút phụ nằm trong nội dung. Payload dạng bảng **không cuộn ngang trên màn duyệt**: mỗi dòng thành một bản ghi có nhãn (DÒNG n · Tuần / Thành viên / Công việc / Tình trạng) để đọc hết mọi ô trước khi đồng ý; trang không cuộn ngang.
+- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy ~98px** gồm một dòng “Còn mm:ss · hết hạn lúc … theo máy chủ” (mốc tuyệt đối, vì người dùng mobile hay rời app rồi quay lại) và nút chính rộng hết thanh, nút duyệt có `aria-describedby` tới mốc hết hạn và câu cảnh báo; câu “Nếu dữ liệu nguồn thay đổi…” nằm trong banner chờ duyệt ở đầu trang — chỗ người dùng đọc đầu tiên khi quay lại; nút phụ nằm trong nội dung. Payload dạng bảng **không cuộn ngang trên màn duyệt**: mỗi dòng thành một bản ghi có nhãn (DÒNG n · Tuần / Thành viên / Công việc / Tình trạng) để đọc hết mọi ô trước khi đồng ý; trang không cuộn ngang.
 - **Nhịp khoảng cách:** section cách nhau bằng hairline + padding 32px; nhóm liên quan 16–20px; card padding 20–24px; khoảng lớn giữa vùng trang 64px.
 - **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ). Vùng chạm ≥ 44px.
 
@@ -510,12 +503,13 @@ Component lấy từ shadcn/ui (Radix), chỉnh theo token; không giá trị m�
 
 Thẻ 372px dính bên phải, bo 14px, hairline + mức bóng duy nhất, padding 24px. Thứ tự cố định:
 
-1. Nhãn “Thời gian còn lại để duyệt” (`muted`) → `display-timer` mm:ss → “Hết hạn lúc hh:mm:ss theo máy chủ”. Thời hạn lấy từ `approval.expires_at`; về 0 thì khoá nút và tải lại chi tiết.
-2. `summary-box` viền `border-control` bo 8px, chia ô bằng đường 1px: **THAO TÁC GHI** · **ĐÃ GHI** (hàng trên), **ĐÍCH** (hàng dưới). Nhãn `overline`, giá trị `body-md`.
-3. Nút primary “Duyệt N thao tác ghi”, nút secondary “Từ chối ghi”, dòng phụ căn giữa.
-4. Hairline, rồi các dòng key–value: phiên bản kế hoạch, mã bản xem trước (mono), múi giờ.
+1. `write-summary`: nhãn “Bạn sắp ghi” (`muted`), rồi mỗi thao tác ghi một dòng `headline-sm` kèm icon tròn 40px nền `action-subtle` (“Thêm 3 dòng vào “Báo cáo tuần””, “Gửi 1 tin nhắn vào #nhom-ati”); tên đích không xuống dòng giữa chừng. Đây là phần tử lớn nhất thẻ.
+2. Hairline, dòng khoá–giá trị “Chế độ lập kế hoạch”.
+3. `decision-timer` ngay trên nút duyệt: icon đồng hồ trong vòng 32px + “Còn mm:ss” (`title-md`, tabular) + “Hết hạn lúc hh:mm:ss theo máy chủ” (`caption`). Thời hạn lấy từ `approval.expires_at`; về 0 thì khoá nút và tải lại chi tiết. Còn ≤ 2 phút: `decision-timer-urgent` (nền `action-subtle`, chữ `action`, icon đồng hồ cát, “Sắp hết hạn · còn mm:ss”), không đổi bố cục, không nhấp nháy.
+4. Nút primary “Duyệt N thao tác ghi” (`aria-describedby` tới `write-summary` và dòng hết hạn), nút secondary “Từ chối ghi”, dòng phụ căn giữa.
+5. Hairline, rồi múi giờ và disclosure “Chi tiết kỹ thuật” (phiên bản kế hoạch, mã bản xem trước).
 
-Trên mobile, phần 1 + nút primary thành `mobile-decision-bar` dính đáy; phần 2–4 nằm cuối nội dung.
+Trên mobile, dòng đồng hồ + nút primary rộng hết thanh thành `mobile-decision-bar` dính đáy (~98px); `write-summary` là các bản ghi có nhãn trong nội dung, phần còn lại nằm cuối nội dung.
 
 ### Steps list
 
@@ -616,7 +610,7 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Control không được mâu thuẫn với chữ cạnh nó.** Hành động bị server từ chối chắc chắn (vd. `409 ACTIVE_RUN`) thì nút bị `disabled` với lý do liên kết qua `aria-describedby`; khi kết quả gửi chưa rõ, hành động chính là **kiểm tra** (nút primary “Mở Lần chạy để kiểm tra”), gửi lại chỉ là nút secondary “Gửi lại yêu cầu” kèm điều kiện.
 - **Giới hạn không phải lỗi.** `409 HISTORY_LIMIT` dùng banner `neutral` với icon thông tin, không có “Thử lại”/“Làm mới” vô ích; `unknown` chỉ dành cho kết quả ghi chưa rõ, `danger` cho lỗi thật.
 - **Trạng thái chỉ có ở API thật không mang gợi ý fixture.** `401`, `429`, phiên hết hạn không có badge “Dữ liệu mô phỏng”, gợi ý email demo hay “mật khẩu bất kỳ”; ô lỗi có `aria-invalid="true"` và `aria-describedby` trỏ tới banner.
-- **Đồng hồ thời hạn** có `role="timer"` với `aria-label` đầy đủ phút/giây; một vùng `aria-live="polite"` ẩn chỉ thông báo theo mốc (9, 5, 1 phút, hết hạn), không đọc mỗi giây. Banner chờ duyệt có `role="status"`.
+- **Đồng hồ thời hạn** có `role="timer"` với `aria-label` đầy đủ phút/giây; một vùng `aria-live="polite"` ẩn chỉ thông báo theo mốc (9, 5, 2, 1 phút, hết hạn); mốc 2 phút cũng là lúc dòng đồng hồ chuyển sang `decision-timer-urgent`, không đọc mỗi giây. Banner chờ duyệt có `role="status"`.
 - **Tên truy cập duy nhất:** nút lặp lại phải nêu đối tượng (“Chi tiết kỹ thuật: Thêm dòng vào bảng tính”, “Xem JSON gốc: Kênh #nhom-ati”, “Xem nội dung: Bảng “Báo cáo tuần””). Hàng lần chạy là một link với `aria-label` gọn “Trạng thái: yêu cầu, thời gian”.
 - **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
 - **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
@@ -654,7 +648,7 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Do** tự host Be Vietnam Pro; mọi token mới thêm vào DESIGN.md trước khi dùng.
 - **Don't** dùng màu Rausch, font Cereal, logo, ảnh hay bố cục marketing của Airbnb.
 - **Don't** thêm mức bóng thứ hai, blur, gradient hay bóng màu.
-- **Don't** dùng chữ lớn/đậm 700 ngoài đồng hồ thời hạn duyệt. Ngoại lệ duy nhất: tiêu đề giới thiệu ở trang Đăng nhập (V01) được 40/50px nhưng đậm 600.
+- **Don't** dùng đậm 700 cho chữ nội dung; 700 chỉ dành cho `overline` và `wordmark`. Không có con số khổng lồ nào trên màn thao tác; ngoại lệ cỡ chữ duy nhất là tiêu đề giới thiệu ở trang Đăng nhập (V01) 40/50px, đậm 600.
 - **Don't** dùng giá trị tuỳ ý (`bg-[#...]`, `p-[13px]`) trong view/component.
 - **Don't** tự đóng banner chờ duyệt, cần đối chiếu hoặc lỗi; không thêm retry/resume cho ghi chưa rõ.
 - **Don't** hiển thị phần trăm tiến trình hay số liệu trang trí không có ý nghĩa đo.

@@ -223,6 +223,11 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 
 - **Màn duyệt (`MobileSoft`, P0):** thanh dính đáy có thêm dòng “Hết hạn lúc 14:32:10 theo máy chủ” trên đồng hồ, vì đồng hồ đếm phía client không có mốc khi người dùng quay lại app. Câu “Nếu dữ liệu nguồn thay đổi, hãy tạo yêu cầu mới thay vì duyệt bản này.” đặt trong banner chờ duyệt ở đầu trang, chỗ đọc đầu tiên khi quay lại; nút duyệt có `aria-describedby` tới cả hai. Dưới “Từ chối ghi” thêm “Bạn sẽ thấy kết quả từng bước sau khi duyệt” như desktop.
 - **Payload dạng bảng trên màn duyệt mobile** đổi từ bảng cuộn ngang (cắt giữa ô, không có dấu hiệu cuộn) sang bản ghi có nhãn DÒNG n · Tuần / Thành viên / Công việc / Tình trạng. Board dài thêm ~260px; đổi lại người dùng đọc hết mọi ô mình sắp đồng ý ghi.
+- **Màn duyệt — chốt phương án B, 18/09/2026 (`/impeccable shape`).** Critique 29/40 chỉ ra đồng hồ 56px là phần tử lớn nhất màn duyệt, trong khi đó là thứ duy nhất người dùng không làm gì được. Đã vẽ phương án B cạnh A và chọn B:
+  - Thẻ quyết định mở đầu bằng “Bạn sắp ghi” và mỗi thao tác ghi một dòng 21px đậm có icon (“Thêm 3 dòng vào “Báo cáo tuần””, “Gửi 1 tin nhắn vào #nhom-ati”); hộp THAO TÁC GHI / ĐÃ GHI / ĐÍCH bỏ vì nội dung đã nằm trong câu. Tiếp theo là dòng “Chế độ lập kế hoạch”.
+  - Đồng hồ là một dòng “Còn 08:41” 16px + “Hết hạn lúc 14:32:10 theo máy chủ” ngay trên nút duyệt. Còn ≤ 2 phút: dòng này chuyển nền `action-subtle`, icon đồng hồ cát, “Sắp hết hạn · còn 01:48”; bố cục không đổi, không nhấp nháy; `aria-live` thêm mốc 2 phút (board `MainSoft2min`).
+  - Mobile theo cùng nguyên tắc: thanh dính đáy là một dòng “Còn 08:41 · hết hạn lúc 14:32:10 theo máy chủ” + nút duyệt rộng hết thanh; bỏ số 32px.
+  - DESIGN.md bỏ token `display-timer` và `display-timer-mobile`, thêm `decision-timer-urgent` và `write-summary`. Phương án A giữ ở hàng “Cũ” (`MainSoftA`) để đối chiếu.
 - **Bộ lọc V04 mobile (`RunsMobile`, P1):** hàng 5 pill cuộn ngang, nơi pill đang bật nằm ngoài màn hình, đổi thành một `select` 48px “Nhóm trạng thái” hiện rõ “Không hoàn tất · 7”, ngay dưới là “Đang hiển thị 7 / 12 lần chạy đã tải” và nút “Bỏ lọc”. Dòng chân cũ bỏ vì số đếm đã lên đầu. Cùng năm nhóm như desktop, chỉ khác control.
 
 ## 5. Luồng end-to-end
