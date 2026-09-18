@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { fixtureCalls, openSignedIn } from "./helpers";
 
+test.describe("tools", () => {
+  test("shows server status and re-checks with one GET", async ({ page }) => {
+    await openSignedIn(page, "#/tools");
+    await expect(page.getByText("Đã kết nối")).toBeVisible();
+    await expect(page.getByText("Đang tắt theo cấu hình")).toBeVisible();
+    const before = (await fixtureCalls(page)).filter((c) => c.path === "/servers").length;
+    await page.getByRole("button", { name: "Kiểm tra lại" }).click();
+    await expect(page.getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled();
+    const after = (await fixtureCalls(page)).filter((c) => c.path === "/servers").length;
+    expect(after).toBe(before + 1);
+  });
+});
+
 test.describe("request composer", () => {
   test("creates a run from a prompt and opens it", async ({ page }) => {
     await openSignedIn(page, "#/new");
