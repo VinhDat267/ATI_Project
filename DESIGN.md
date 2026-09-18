@@ -351,6 +351,24 @@ components:
     typography: "{typography.body-md}"
     rounded: "{rounded.md}"
     padding: 20px
+  origin-banner:
+    backgroundColor: "{colors.surface-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.md}"
+    padding: 20px
+  origin-strip:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.sm}"
+    padding: 12px 16px
+  recovery-option:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.title-md}"
+    rounded: "{rounded.sm}"
+    padding: 12px 16px
   badge-demo:
     backgroundColor: "{colors.demo-subtle}"
     textColor: "{colors.demo}"
@@ -547,6 +565,16 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 - **`banner-action`** (chờ duyệt): “Hệ thống đang chờ bạn quyết định”. Không tự đóng.
 - **`banner-unknown`** (cần đối chiếu): giải thích thao tác chưa rõ kết quả và việc cần tự kiểm tra; **không tự đóng, không có nút đóng, retry hay resume**; `role="alert"`.
 - **`banner-danger`**: lỗi phiên/mạng/thất bại, nêu cách thoát.
+- **`origin-banner`** (V03, yêu cầu điền sẵn từ lần chạy khác): nền `surface-soft`, icon `history`, tiêu đề nêu mã lần chạy gốc và câu trả lời của người dùng, link quay về lần chạy gốc. Khi yêu cầu sẽ ghi lại thứ có thể đã ghi (câu trả lời “Không thấy”), banner dùng `banner-unknown` thay cho nền trung tính.
+
+### Recovery (khôi phục sau lần chạy kết thúc)
+
+Chốt 18/09/2026 (`/impeccable shape`). Mọi màn kết thúc có đường đi tiếp bằng một cú bấm, và không bao giờ bắt người dùng gõ lại yêu cầu.
+
+- **Chỉ màn đối chiếu hỏi về nơi nhận.** Thay nút “Tạo lại” bằng `recovery-question`: câu hỏi `title-md` (“Trên bảng “Báo cáo tuần” đã có 4 dòng tuần 37 chưa?”) và các đáp án `recovery-option`, xếp dọc, sức nặng ngang nhau. Mỗi đáp án là **link** (dẫn sang V03 đã điền sẵn), gồm nhãn đậm, dòng hệ quả `muted` và chevron: “Đã thấy đủ 4 dòng” → yêu cầu chỉ gửi thông báo; “Không thấy” → đủ yêu cầu. `conflict` thêm đáp án thứ ba “Thấy nhưng khác nội dung”, là `<button aria-expanded>` mở hướng dẫn sửa trực tiếp trên bảng tại chỗ, không tạo lại. Dưới nhóm luôn có dòng “Câu trả lời chỉ dùng để điền sẵn yêu cầu mới. Lần chạy này vẫn ở trạng thái “Cần đối chiếu”.” Không có cổng “So sánh” (API không trả dữ liệu hiện tại ở nơi nhận, nên cổng đó không cho thêm thông tin).
+- **`confirmed`:** nút primary “Tạo yêu cầu chỉ gửi thông báo”, không hỏi.
+- **`expired`, `failed`:** nút primary “Dùng lại yêu cầu này” (icon `rotate-ccw`) + dòng giải thích điều sẽ khác; “Tạo yêu cầu trống” là link. **`needs_input`:** primary “Dùng câu gợi ý này”, link “Dùng lại câu gốc”. **`refused`:** giữ “Tạo yêu cầu mới” (dùng lại sẽ bị từ chối lần nữa).
+- **Nguồn gốc đi theo tới màn duyệt.** Màn duyệt của lần chạy tạo lại có `origin-strip` (viền `hairline`, icon `history`, “Tạo lại từ lần chạy … · bạn trả lời “…””, link “Xem lần chạy gốc”) giữa tiêu đề và nội dung, và dòng “Tạo lại từ” trong phần chi tiết của thẻ quyết định. Kế hoạch khớp câu trả lời: một dòng `success` trong `write-summary` (“Khớp câu trả lời của bạn: không ghi lại dòng nào vào …”). Kế hoạch ghi vào đích người dùng đã xác nhận là có dữ liệu: `banner-unknown` “Kế hoạch này ghi lại … bạn đã thấy trên bảng” thay banner chờ duyệt, dòng ghi trùng mang nhãn “Trùng với câu trả lời của bạn”, **“Từ chối và sửa yêu cầu” thành primary**, nút duyệt lui thành secondary “Vẫn duyệt N thao tác ghi” với `aria-describedby` bắt đầu bằng cảnh báo. Không khoá nút duyệt: người dùng có thể đã đổi ý.
 
 ### Inputs
 
