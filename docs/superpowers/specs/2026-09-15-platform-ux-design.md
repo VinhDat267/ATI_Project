@@ -219,6 +219,12 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Trần độ dài dòng ~75 ký tự** áp cho 21 khối văn xuôi; trước đó dài nhất là 101 ký tự (V04 `HISTORY_LIMIT`, V06 `503`/chưa kiểm tra). Tiêu đề và nội dung yêu cầu không áp trần.
 - Board `MainMobile` vẫn còn cảnh báo thang chữ phẳng: đó là phương án cũ đã loại, giữ trên canvas để đối chiếu, không sửa.
 
+**Mobile — chốt 18/09/2026 (`/impeccable adapt`, sau critique 29/40).** Thiết kế lại cho người dùng mobile hay bị gián đoạn, không chỉ thu nhỏ desktop:
+
+- **Màn duyệt (`MobileSoft`, P0):** thanh dính đáy có thêm dòng “Hết hạn lúc 14:32:10 theo máy chủ” trên đồng hồ, vì đồng hồ đếm phía client không có mốc khi người dùng quay lại app. Câu “Nếu dữ liệu nguồn thay đổi, hãy tạo yêu cầu mới thay vì duyệt bản này.” đặt trong banner chờ duyệt ở đầu trang, chỗ đọc đầu tiên khi quay lại; nút duyệt có `aria-describedby` tới cả hai. Dưới “Từ chối ghi” thêm “Bạn sẽ thấy kết quả từng bước sau khi duyệt” như desktop.
+- **Payload dạng bảng trên màn duyệt mobile** đổi từ bảng cuộn ngang (cắt giữa ô, không có dấu hiệu cuộn) sang bản ghi có nhãn DÒNG n · Tuần / Thành viên / Công việc / Tình trạng. Board dài thêm ~260px; đổi lại người dùng đọc hết mọi ô mình sắp đồng ý ghi.
+- **Bộ lọc V04 mobile (`RunsMobile`, P1):** hàng 5 pill cuộn ngang, nơi pill đang bật nằm ngoài màn hình, đổi thành một `select` 48px “Nhóm trạng thái” hiện rõ “Không hoàn tất · 7”, ngay dưới là “Đang hiển thị 7 / 12 lần chạy đã tải” và nút “Bỏ lọc”. Dòng chân cũ bỏ vì số đếm đã lên đầu. Cùng năm nhóm như desktop, chỉ khác control.
+
 ## 5. Luồng end-to-end
 
 ```mermaid

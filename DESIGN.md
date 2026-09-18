@@ -467,7 +467,7 @@ Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạ
 - **Desktop (≥ 1128px):** top nav 80px trắng, hairline dưới: logo trái, 4 mục điều hướng ở giữa (Tổng quan, Tạo yêu cầu, Lần chạy, Công cụ & kết nối), nhãn “Dữ liệu mô phỏng” + nút tài khoản dạng pill bên phải. Nội dung rộng tối đa **1120px** căn giữa, lề tối thiểu 80px.
 - **Chi tiết run (V05):** hai cột — nội dung trái (co giãn) và **thẻ quyết định 372px dính bên phải**, cách nhau 72px. Trạng thái không cần quyết định (đối chiếu, kết thúc): cột phải là thẻ tóm tắt kết quả, không có nút ghi.
 - **Tablet (744–1127px):** top nav giữ logo + nút menu; một cột, thẻ quyết định nằm trên nội dung.
-- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy 80px** chứa thời hạn + nút chính, nút phụ nằm trong nội dung; bảng payload cuộn ngang trong khung riêng, trang không cuộn ngang.
+- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy ~100px** gồm dòng “Hết hạn lúc … theo máy chủ” (mốc tuyệt đối, vì người dùng mobile hay rời app rồi quay lại) và hàng đồng hồ + nút chính, nút duyệt có `aria-describedby` tới mốc hết hạn và câu cảnh báo; câu “Nếu dữ liệu nguồn thay đổi…” nằm trong banner chờ duyệt ở đầu trang — chỗ người dùng đọc đầu tiên khi quay lại; nút phụ nằm trong nội dung. Payload dạng bảng **không cuộn ngang trên màn duyệt**: mỗi dòng thành một bản ghi có nhãn (DÒNG n · Tuần / Thành viên / Công việc / Tình trạng) để đọc hết mọi ô trước khi đồng ý; trang không cuộn ngang.
 - **Nhịp khoảng cách:** section cách nhau bằng hairline + padding 32px; nhóm liên quan 16–20px; card padding 20–24px; khoảng lớn giữa vùng trang 64px.
 - **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ). Vùng chạm ≥ 44px.
 
@@ -523,7 +523,7 @@ Mỗi bước là một hàng: icon tròn 48px (`step-icon-read` nền `surface-
 
 ### Write card (thẻ ghi)
 
-Viền hairline bo 14px. Đầu thẻ: tiêu đề `title-md` (“Bảng ‘Báo cáo tuần’ · thêm 3 dòng”), dòng tool/đích mono `muted`, nút text “Xem JSON gốc” bên phải. Thân thẻ hiển thị payload **ở dạng người đọc được**: bảng cho dòng dữ liệu (đầu bảng `surface-soft`), bong bóng xem trước cho tin nhắn. JSON gốc mở trong `payload-block`. Payload không sửa được.
+Viền hairline bo 14px. Đầu thẻ: tiêu đề `title-md` (“Bảng ‘Báo cáo tuần’ · thêm 3 dòng”), dòng tool/đích mono `muted`, nút text “Xem JSON gốc” bên phải. Thân thẻ hiển thị payload **ở dạng người đọc được**: bảng cho dòng dữ liệu (đầu bảng `surface-soft`; mobile đổi thành bản ghi có nhãn), bong bóng xem trước cho tin nhắn. JSON gốc mở trong `payload-block`. Payload không sửa được.
 
 ### Run status
 
@@ -569,7 +569,7 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 
 ### Run history (V04)
 
-- **Filter pill:** 40px, bo full, viền 1px `hairline`, chữ `ink` 14/500 kèm số đếm `muted` tabular; đang chọn nền `ink`, chữ và số trắng 600, `aria-pressed="true"`. Mobile: hàng pill cuộn ngang trong khung riêng.
+- **Filter pill:** 40px, bo full, viền 1px `hairline`, chữ `ink` 14/500 kèm số đếm `muted` tabular; đang chọn nền `ink`, chữ và số trắng 600, `aria-pressed="true"`. Mobile: một `select` 48px có nhãn “Nhóm trạng thái” (giá trị đang lọc luôn nhìn thấy, bộ chọn của hệ điều hành lo phần chạm), ngay dưới là “Đang hiển thị x / y lần chạy đã tải” và nút chữ “Bỏ lọc” — không dùng hàng pill cuộn ngang vì pill đang bật có thể nằm ngoài màn hình.
 - **Ô tìm kiếm:** 48px, viền `border-control`, icon kính lúp trái, nút xoá tròn `icon-button-circle` khi có từ khoá; label ẩn nhưng đọc được.
 - **Hàng lần chạy:** link toàn hàng; lưới badge 208px · nội dung · thời gian 150px (mobile xếp dọc); yêu cầu `body-lg` 500 tối đa 2 dòng; dòng phụ `body-sm` `muted`, phần cần chú ý dùng màu ngữ nghĩa 600; mã run `mono-sm` `muted`; ngăn bằng `hairline-soft`; focus viền 2px `ink` bo 8px, nền `surface-soft`.
 - **Trạng thái rỗng:** khung hairline bo 14px, icon tròn 56px `surface-strong`, tiêu đề `headline-sm`, đoạn `muted` tối đa ~520px, một hành động.
