@@ -22,6 +22,7 @@ import type {
   Servers,
   Transport,
 } from "./contracts.js";
+import { createWorld, WORLD_IDS, type WorldRun } from "../fixtures/world.js";
 
 export const FIXTURE_RUN_ID = "11111111-1111-4111-8111-111111111111";
 const FIXTURE_VERSION_ID = "22222222-2222-4222-8222-222222222222";
@@ -190,28 +191,56 @@ function resolveFactoryWithSignal<T>(
   return resolveWithSignal(factory(), signal);
 }
 
-export interface FixtureTransport extends Transport {
+export interface FixtureHints {
+  /** Planner suggestion shown on needs_input runs (fixture-only data). */
+  suggestedPrompt(runId: string): string | null;
+}
+
+export interface FixtureTransport extends Transport, FixtureHints {
   readonly runId: string;
   readonly calls: FixtureCall[];
 }
 
+function notFound(): Error {
+  return new Error("Synthetic run not found");
+}
+
+/**
+ * Synthetic transport over the multi-run fixture world. A valid `scenario`
+ * status (?scenario=… in the fixture build) adds the legacy single-run
+ * scenario under FIXTURE_RUN_ID so earlier checks keep their meaning.
+ */
 export function createFixtureTransport(
   requestedStatus?: string,
 ): FixtureTransport {
-  const statusResult = RunStatusSchema.safeParse(requestedStatus ?? "planning");
-  const status: RunStatus = statusResult.success
-    ? statusResult.data
-    : "planning";
-  let currentStatus = status;
+  const world = createWorld(new Date());
+  const runs: WorldRun[] = [...world.runs];
+  const statusResult = RunStatusSchema.safeParse(requestedStatus);
+  if (statusResult.success) {
+    runs.unshift({
+      detail: createFixtureScenario(statusResult.data),
+      trace: TraceSchema.parse({ run_id: FIXTURE_RUN_ID, attempts: [], next_cursor: null }),
+      events: [],
+      reconciliation: null,
+    });
+  }
   const calls: FixtureCall[] = [];
   const record = (method: FixtureCall["method"], path: string): void => {
     calls.push({ method, path });
   };
-  const detail = (): RunDetail => createFixtureScenario(currentStatus);
+  const find = (id: string): WorldRun => {
+    const run = runs.find((candidate) => candidate.detail.run_id === id);
+    if (!run) throw notFound();
+    return run;
+  };
+  let created = 0;
 
   return {
-    runId: FIXTURE_RUN_ID,
+    runId: statusResult.success ? FIXTURE_RUN_ID : WORLD_IDS.approval,
     calls,
+    suggestedPrompt(runId) {
+      return runs.find((run) => run.detail.run_id === runId)?.suggestedPrompt ?? null;
+    },
     async login(email, password, signal) {
       record("POST", "/auth/login");
       LoginRequestSchema.parse({ email, password });
@@ -220,105 +249,104 @@ export function createFixtureTransport(
     async list(signal) {
       record("GET", "/runs");
       return resolveFactoryWithSignal(
-        () => [RunDetailSchema.parse(detail())],
+        () => runs.map((run) => RunDetailSchema.parse(run.detail)),
         signal,
       );
     },
     async servers(signal) {
       record("GET", "/servers");
       return resolveFactoryWithSignal(
-        () =>
-          ServerSummaryListSchema.parse([
-            {
-              slug: "task_hub",
-              status: "connected",
-              policy_version: "b-local-1",
-            },
-            {
-              slug: "filesystem",
-              status: "disconnected",
-              policy_version: null,
-            },
-          ]),
+        () => ServerSummaryListSchema.parse(world.servers),
         signal,
       );
     },
     async create(input: CreateInput, signal) {
       record("POST", "/runs");
       const parsed = CreateRunSchema.parse(input);
-      void parsed;
-      currentStatus = "planning";
+      created += 1;
+      const id = `e5a0c7d3-0000-4000-8000-${String(created).padStart(12, "0")}`;
+      const now = new Date().toISOString();
+      runs.unshift({
+        detail: RunDetailSchema.parse({
+          run_id: id,
+          status: "planning",
+          workflow_version_id: null,
+          plan: null,
+          planner_result: null,
+          approval: null,
+          time_zone: parsed.time_zone,
+          runtime: { today: now.slice(0, 10), now },
+          last_seq: 0,
+          source_prompt: parsed.source_prompt,
+          created_at: now,
+          read_outputs: {},
+        }),
+        trace: TraceSchema.parse({ run_id: id, attempts: [], next_cursor: null }),
+        events: [],
+        reconciliation: null,
+      });
       return resolveFactoryWithSignal(
-        () =>
-          RunAcceptedSchema.parse({
-            run_id: FIXTURE_RUN_ID,
-            status: "planning",
-          }),
+        () => RunAcceptedSchema.parse({ run_id: id, status: "planning" }),
         signal,
       );
     },
     async detail(id, signal) {
       record("GET", `/runs/${id}`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
-      return resolveFactoryWithSignal(detail, signal);
+      const run = find(id);
+      return resolveFactoryWithSignal(() => RunDetailSchema.parse(run.detail), signal);
     },
     async events(id, since, signal) {
       record("GET", `/runs/${id}/events?since_seq=${since}`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
+      const run = find(id);
       return resolveFactoryWithSignal(
         () =>
-          EventPageSchema.parse({ events: [], next_seq: detail().last_seq }),
+          EventPageSchema.parse({
+            events: run.events.filter((event) => event.seq > since),
+            next_seq: Math.max(since, run.events.length),
+          }),
         signal,
       );
     },
     async decide(id, input: DecisionInput, signal) {
       record("POST", `/runs/${id}/approval`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
+      const run = find(id);
       ApprovalDecisionSchema.parse(input);
-      currentStatus = input.decision === "approved" ? "running" : "rejected";
-      return resolveFactoryWithSignal(detail, signal);
+      const approval = run.detail.approval;
+      if (
+        run.detail.status !== "awaiting_approval" ||
+        !approval ||
+        approval.id !== input.approval_id ||
+        approval.snapshot_hash !== input.snapshot_hash ||
+        approval.workflow_version_id !== input.workflow_version_id
+      ) {
+        throw new Error("Synthetic approval conflict");
+      }
+      run.detail = RunDetailSchema.parse({
+        ...run.detail,
+        status: input.decision === "approved" ? "running" : "rejected",
+        approval: { ...approval, decision: input.decision },
+      });
+      return resolveFactoryWithSignal(() => run.detail, signal);
     },
     async cancel(id, signal) {
       record("POST", `/runs/${id}/cancel`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
-      currentStatus = "cancelled";
+      const run = find(id);
+      run.detail = RunDetailSchema.parse({ ...run.detail, status: "cancelled" });
       await resolveWithSignal(undefined, signal);
     },
     async trace(id, cursor, signal) {
       record("GET", `/runs/${id}/trace${cursor ? `?cursor=${cursor}` : ""}`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
-      return resolveFactoryWithSignal(
-        () =>
-          TraceSchema.parse({
-            run_id: FIXTURE_RUN_ID,
-            attempts: [],
-            next_cursor: null,
-          }),
-        signal,
-      );
+      const run = find(id);
+      return resolveFactoryWithSignal(() => TraceSchema.parse(run.trace), signal);
     },
     async reconciliation(id, signal) {
       record("GET", `/runs/${id}/reconciliation`);
-      if (id !== FIXTURE_RUN_ID) {
-        throw new Error("Synthetic run not found");
-      }
+      const run = find(id);
       return resolveFactoryWithSignal(
         () =>
-          ReconciliationSchema.parse({
-            run_id: FIXTURE_RUN_ID,
-            read_only: true,
-            operations: [],
-          }),
+          ReconciliationSchema.parse(
+            run.reconciliation ?? { run_id: id, read_only: true, operations: [] },
+          ),
         signal,
       );
     },
