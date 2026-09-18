@@ -1,5 +1,30 @@
 import { expect, test } from "@playwright/test";
-import { openSignedIn } from "./helpers";
+import { fixtureCalls, openSignedIn } from "./helpers";
+
+test.describe("request composer", () => {
+  test("creates a run from a prompt and opens it", async ({ page }) => {
+    await openSignedIn(page, "#/new");
+    await page.getByRole("button", { name: "Lập kế hoạch" }).click();
+    await expect(page.getByText("Nhập yêu cầu trước khi lập kế hoạch.")).toBeVisible();
+    await page.getByLabel("Yêu cầu").fill("Gửi tiêu đề thẻ mới vào #nhom-ati");
+    await page.getByRole("button", { name: "Lập kế hoạch" }).click();
+    await expect(page).toHaveURL(/#\/runs\/e5a0c7d3-/);
+    const calls = await fixtureCalls(page);
+    expect(calls.filter((c) => c.method === "POST" && c.path === "/runs")).toHaveLength(1);
+  });
+
+  test("rejects a malformed input value before sending", async ({ page }) => {
+    await openSignedIn(page, "#/new");
+    await page.getByLabel("Yêu cầu").fill("Liệt kê thẻ");
+    await page.getByText("Tuỳ chọn nâng cao").click();
+    await page.getByRole("button", { name: "Thêm giá trị" }).click();
+    await page.getByLabel("Khoá").fill("Bad Key");
+    await expect(page.getByText(/Khoá dùng chữ thường/)).toBeVisible();
+    await page.getByRole("button", { name: "Lập kế hoạch" }).click();
+    const calls = await fixtureCalls(page);
+    expect(calls.filter((c) => c.method === "POST" && c.path === "/runs")).toHaveLength(0);
+  });
+});
 
 test.describe("overview and history", () => {
   test("overview lists runs needing attention as whole-card links", async ({ page }) => {
