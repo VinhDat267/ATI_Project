@@ -22,7 +22,12 @@ export function bootstrap(): void {
 
   createRoot(rootElement).render(
     <StrictMode>
-      <App transport={transport} session={session} mode="fixture" />
+      <App
+        transport={transport}
+        session={session}
+        mode="fixture"
+        hints={transport}
+      />
     </StrictMode>,
   );
 }

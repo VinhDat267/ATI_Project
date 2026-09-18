@@ -123,6 +123,11 @@
   column-gap: 72px;
   align-items: start;
 }
+@utility grid-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
 @utility grid-step {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;

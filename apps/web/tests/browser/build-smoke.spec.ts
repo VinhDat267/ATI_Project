@@ -9,7 +9,7 @@ test.describe("Build smoke", () => {
       page.getByRole("heading", { name: "Đăng nhập" }),
     ).toBeVisible();
     await page.getByLabel("Email").fill("demo@local");
-    await page.getByLabel("Mật khẩu").fill("synthetic-password");
+    await page.getByLabel("Mật khẩu", { exact: true }).fill("synthetic-password");
     await page.getByRole("button", { name: "Đăng nhập" }).click();
     await expect(
       page.getByRole("heading", { name: "Tổng quan" }),
