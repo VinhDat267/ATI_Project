@@ -1,4 +1,6 @@
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { localProxy } from "./tooling/local-proxy.js";
 
@@ -9,6 +11,7 @@ const frontendOrigin =
 export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@wap/web-mode-entry": fileURLToPath(
         new URL(
           mode === "live" ? "./src/main.live.tsx" : "./src/main.fixture.tsx",
@@ -32,6 +35,8 @@ export default defineConfig(({ mode }) => ({
     open: false,
   },
   plugins: [
+    react(),
+    tailwindcss(),
     localProxy({
       target: apiTarget,
       devOrigin: frontendOrigin,

@@ -11,6 +11,7 @@
     "noEmit": true,
     "types": ["vite/client"],
     "paths": {
+      "@/*": ["./src/*"],
       "@wap/web-mode-entry": ["./src/main.fixture.tsx"]
     }
   },

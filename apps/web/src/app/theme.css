@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens from DESIGN.md (ATI Soft Operations). This file is the only
+ * place tokens are declared; views use the generated classes, never literals.
+ * The default Tailwind palette and radii are cleared so an off-token class
+ * fails to exist instead of silently drifting.
+ */
+@theme {
+  --color-*: initial;
+  --color-primary: #1e3a5f;
+  --color-primary-hover: #162d4a;
+  --color-primary-subtle: #e8eef6;
+  --color-on-primary: #ffffff;
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
+  --color-ink: #222222;
+  --color-muted: #6a6a6a;
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-control: #8a8a8a;
+  --color-focus-ring: #222222;
+  --color-progress: #1d4ed8;
+  --color-progress-subtle: #dbeafe;
+  --color-success: #166534;
+  --color-success-subtle: #dcfce7;
+  --color-action: #92400e;
+  --color-action-subtle: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
+  --color-danger-subtle: #fee2e2;
+  --color-unknown: #9a3412;
+  --color-unknown-subtle: #ffedd5;
+  --color-neutral: #334155;
+  --color-neutral-subtle: #f1f5f9;
+  --color-planner: #5b21b6;
+  --color-planner-subtle: #ede9fe;
+  --color-demo: #854d0e;
+  --color-demo-subtle: #fef9c3;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --radius-*: initial;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, Roboto,
+    sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+
+  --text-*: initial;
+  --text-display-md: 26px;
+  --text-display-md--line-height: 34px;
+  --text-display-md--font-weight: 600;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-display-md-mobile: 23px;
+  --text-display-md-mobile--line-height: 31px;
+  --text-display-md-mobile--font-weight: 600;
+  --text-display-md-mobile--letter-spacing: -0.01em;
+  --text-headline-sm: 21px;
+  --text-headline-sm--line-height: 28px;
+  --text-headline-sm--font-weight: 600;
+  --text-headline-sm--letter-spacing: -0.01em;
+  --text-headline-sm-mobile: 18px;
+  --text-headline-sm-mobile--line-height: 25px;
+  --text-headline-sm-mobile--font-weight: 600;
+  --text-title-md: 16px;
+  --text-title-md--line-height: 22px;
+  --text-title-md--font-weight: 600;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-md: 15px;
+  --text-body-md--line-height: 22px;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 20px;
+  --text-button-md: 16px;
+  --text-button-md--line-height: 20px;
+  --text-button-md--font-weight: 600;
+  --text-button-sm: 14px;
+  --text-button-sm--line-height: 20px;
+  --text-button-sm--font-weight: 600;
+  --text-nav-link: 15px;
+  --text-nav-link--line-height: 20px;
+  --text-nav-link--font-weight: 500;
+  --text-badge: 13px;
+  --text-badge--line-height: 18px;
+  --text-badge--font-weight: 600;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-overline: 12px;
+  --text-overline--line-height: 16px;
+  --text-overline--font-weight: 700;
+  --text-overline--letter-spacing: 0.04em;
+  --text-wordmark: 20px;
+  --text-wordmark--line-height: 24px;
+  --text-wordmark--font-weight: 700;
+  --text-wordmark--letter-spacing: -0.01em;
+  --text-mono-md: 13px;
+  --text-mono-md--line-height: 20px;
+  --text-mono-sm: 12px;
+  --text-mono-sm--line-height: 18px;
+
+  --container-content: 1120px;
+  --container-measure: 600px;
+  --container-measure-sm: 520px;
+
+  --breakpoint-desk: 860px;
+
+  --shadow-card: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+}
+
+/* Layout grids named in DESIGN.md (content column + 372px rail, 72px gap). */
+@utility grid-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  column-gap: 72px;
+  align-items: start;
+}
+@utility grid-step {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: center;
+}
+@utility grid-timeline {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  column-gap: 16px;
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+@utility sr-only-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body-md);
+    line-height: var(--text-body-md--line-height);
+  }
+  a {
+    color: var(--color-ink);
+    text-underline-offset: 3px;
+  }
+  a:hover {
+    color: var(--color-primary);
+  }
+  ::selection {
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+}

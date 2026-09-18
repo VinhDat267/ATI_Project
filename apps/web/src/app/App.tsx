@@ -10,6 +10,7 @@ import type { Transport } from "../core/contracts.js";
 import type { Route } from "../core/navigation.js";
 import { navigate, parseRoute, routeToHash } from "../core/navigation.js";
 import type { SessionController } from "../core/session.js";
+import "./theme.css";
 import "./styles.css";
 
 export interface AppProps {
