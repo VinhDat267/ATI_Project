@@ -462,7 +462,7 @@ Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạ
 - **Tablet (744–1127px):** top nav giữ logo + nút menu; một cột, thẻ quyết định nằm trên nội dung.
 - **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy ~98px** gồm một dòng “Còn mm:ss · hết hạn lúc … theo máy chủ” (mốc tuyệt đối, vì người dùng mobile hay rời app rồi quay lại) và nút chính rộng hết thanh, nút duyệt có `aria-describedby` tới mốc hết hạn và câu cảnh báo; câu “Nếu dữ liệu nguồn thay đổi…” nằm trong banner chờ duyệt ở đầu trang — chỗ người dùng đọc đầu tiên khi quay lại; nút phụ nằm trong nội dung. Payload dạng bảng **không cuộn ngang trên màn duyệt**: mỗi dòng thành một bản ghi có nhãn (DÒNG n · Tuần / Thành viên / Công việc / Tình trạng) để đọc hết mọi ô trước khi đồng ý; trang không cuộn ngang.
 - **Nhịp khoảng cách:** section cách nhau bằng hairline + padding 32px; nhóm liên quan 16–20px; card padding 20–24px; khoảng lớn giữa vùng trang 64px.
-- **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ). Vùng chạm ≥ 44px.
+- **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ — chỉ trên desktop có con trỏ). Mobile: mọi điều khiển ≥ 44px, kể cả nút chữ, nút quay lại và nút hiện mật khẩu. Link chữ đứng riêng ở mọi độ rộng có vùng chạm cao 44px (`min-height`), chữ giữ nguyên cỡ.
 
 ## Elevation & Depth
 
@@ -612,6 +612,11 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Trạng thái chỉ có ở API thật không mang gợi ý fixture.** `401`, `429`, phiên hết hạn không có badge “Dữ liệu mô phỏng”, gợi ý email demo hay “mật khẩu bất kỳ”; ô lỗi có `aria-invalid="true"` và `aria-describedby` trỏ tới banner.
 - **Đồng hồ thời hạn** có `role="timer"` với `aria-label` đầy đủ phút/giây; một vùng `aria-live="polite"` ẩn chỉ thông báo theo mốc (9, 5, 2, 1 phút, hết hạn); mốc 2 phút cũng là lúc dòng đồng hồ chuyển sang `decision-timer-urgent`, không đọc mỗi giây. Banner chờ duyệt có `role="status"`.
 - **Tên truy cập duy nhất:** nút lặp lại phải nêu đối tượng (“Chi tiết kỹ thuật: Thêm dòng vào bảng tính”, “Xem JSON gốc: Kênh #nhom-ati”, “Xem nội dung: Bảng “Báo cáo tuần””). Hàng lần chạy là một link với `aria-label` gọn “Trạng thái: yêu cầu, thời gian”.
+- **Focus nhìn thấy được ở mọi trang:** `:focus-visible { outline: 2px solid ink; outline-offset: 2px }` áp chung, không phần tử nào tự tắt outline.
+- **Thẻ dẫn tới việc cần làm là một link cả thẻ** (thẻ “Cần xử lý” ở Tổng quan, hàng V04): `aria-label` gọn “Hành động: yêu cầu (trạng thái, thời gian)”, chữ hành động có mũi tên ở cuối thẻ chỉ là dấu hiệu nhìn thấy, không phải link lồng.
+- **Điều hướng là link, hành động là nút:** “Xem chứng cứ” là `<a>` có dáng nút phụ. Hai link cùng tên được phép khi cùng đích (vd. “Tạo yêu cầu” ở nav và CTA trang).
+- **Đăng nhập có một dàn ý ở mọi độ rộng:** H1 “Đăng nhập”, form đứng trước khối giới thiệu trong DOM (desktop dùng grid để đặt giới thiệu bên trái). `aria-invalid` và viền `danger` chỉ khi chính giá trị ô sai (401); 429 và hết phiên không đánh dấu ô.
+- **Nút chỉ có icon** mang `font: inherit` để không rơi về cỡ chữ mặc định của trình duyệt khi có thêm chữ.
 - **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
 - **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
 
