@@ -663,4 +663,4 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - Spacing đặt tên cùng tồn tại với thang số mặc định của Tailwind; trong code ưu tiên tên token.
 - Mockup tham chiếu: canvas review “ATI Run Screens” (riêng tư). Mockup không chứng minh accessibility, responsive hay hành vi polling; các kiểm tra đó thuộc WEB-03.
 - **Ngoại lệ chỉ có ở mockup:** artboard nạp Be Vietnam Pro từ Google Fonts vì canvas không có pipeline font cục bộ; `apps/web` vẫn tự host theo ADR-001/002. Các board mở đầu bằng “Cũ ·” là phương án đã loại, giữ để đối chiếu và **không** nằm trong phạm vi kiểm tra.
-- **Cảnh báo `cramped-padding` được chấp nhận** khi chiều cao cố định thay cho padding: đo trên bản render, hàng tool 65px cách nội dung 11px trên/dưới, vòng tròn icon 40px cách 11px, pill 26px cách chữ 6px. Mọi cảnh báo khác của detector phải sửa chứ không bỏ qua.
+- **Cảnh báo `cramped-padding` được chấp nhận** khi chiều cao cố định thay cho padding: đo trên bản render, hàng tool 65px cách nội dung 11px trên/dưới, vòng tròn icon 40px cách 11px, pill 26px cách chữ 4.6–5.4px (đo lại ở critique 18/09). Mọi cảnh báo khác của detector phải sửa chứ không bỏ qua.

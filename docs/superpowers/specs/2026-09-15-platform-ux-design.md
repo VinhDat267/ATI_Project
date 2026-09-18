@@ -228,6 +228,7 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
   - Đồng hồ là một dòng “Còn 08:41” 16px + “Hết hạn lúc 14:32:10 theo máy chủ” ngay trên nút duyệt. Còn ≤ 2 phút: dòng này chuyển nền `action-subtle`, icon đồng hồ cát, “Sắp hết hạn · còn 01:48”; bố cục không đổi, không nhấp nháy; `aria-live` thêm mốc 2 phút (board `MainSoft2min`).
   - Mobile theo cùng nguyên tắc: thanh dính đáy là một dòng “Còn 08:41 · hết hạn lúc 14:32:10 theo máy chủ” + nút duyệt rộng hết thanh; bỏ số 32px.
   - DESIGN.md bỏ token `display-timer` và `display-timer-mobile`, thêm `decision-timer-urgent` và `write-summary`. Phương án A giữ ở hàng “Cũ” (`MainSoftA`) để đối chiếu.
+- **Polish sau critique — 18/09/2026:** “Chế độ lập kế hoạch” có trên mọi thẻ tóm tắt V05 và màn đối chiếu (trước đó 3/35 board). `Create409` và `CreateLost` giữ nguyên bố cục của `CreateSoft` — cột “Hệ thống làm được gì”, chọn mẫu, thanh khoá có `aria-describedby`, ô yêu cầu 4 dòng — banner trạng thái chỉ chèn thêm vào cột trái; hàng “Giá trị đầu vào” dùng một chiều cao 56px và một cỡ chữ 16px. Mobile bỏ hộp THAO TÁC GHI / ĐÃ GHI / ĐÍCH (đã có trong bản ghi và banner) theo phương án B.
 - **Bộ lọc V04 mobile (`RunsMobile`, P1):** hàng 5 pill cuộn ngang, nơi pill đang bật nằm ngoài màn hình, đổi thành một `select` 48px “Nhóm trạng thái” hiện rõ “Không hoàn tất · 7”, ngay dưới là “Đang hiển thị 7 / 12 lần chạy đã tải” và nút “Bỏ lọc”. Dòng chân cũ bỏ vì số đếm đã lên đầu. Cùng năm nhóm như desktop, chỉ khác control.
 
 ## 5. Luồng end-to-end
