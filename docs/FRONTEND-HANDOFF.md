@@ -1,12 +1,59 @@
-# Frontend handoff — API-05 B/local
+# Frontend handoff — API-05 B/local & WEB-02 Live Integration
 
-Status: `API_TECHNICAL_PASS` for the local DEV_FIXTURE planner path (H01–H20 plus independent cleanup delta passed on 2026-09-17). WEB-01B is a **PROVISIONAL_IMPLEMENTATION** (fixture shell only); browser E2E against the real API, polling and AI evaluation are still `NOT_RUN`; official rubric and representative group work remain `OPEN`.
+Status: `WEB_LIVE_PASS` on branch `feat/web-02-live` (2026-09-19). Live frontend integration and E2E verification are complete. TanStack Query v5 caches server projections while session-scoped pure-TypeScript controllers manage atomic event sequence ingestion, uncertain write mutations, command mutual exclusion, and trace cursor pagination.
 
-WEB-01C fixture implementation is complete on branch `feat/web-01c` (2026-09-19): six views, four navigation items, all 14 statuses, multi-run fixture world, approval/reconciliation/recovery flows, Tailwind v4 theme, TanStack Query, and mobile/a11y gates are implemented. Verification: `npm run typecheck -w @wap/web` passed; `npm run test:unit -w @wap/web` passed (12 files, 67 tests); `npm run test:browser -w @wap/web` passed (25 tests); axe serious/critical violations 0; horizontal overflow at 1280/390/320px 0; production bundle gzip JS 177,121 bytes and CSS 6,287 bytes; `npm audit --omit=dev` reports 0 vulnerabilities. This is `WEB_FIXTURE_PASS`, not live API certification.
+## Verification Summary
 
-Remaining: WEB-02 live transport/events/session-expiry, real API browser E2E, AI evaluation, official rubric and representative group work. The system design gate remains recorded as not formally approved; this fixture batch does not claim it. Font self-hosting, API `origin`/origin-strip, and the separate mobile recovery-question adaptation remain open.
+- **TypeScript Typecheck**: `npm run typecheck -w @wap/web` passed (0 errors across app, tools, tests).
+- **Unit Tests**: `npm run test:unit -w @wap/web` passed (20 files, 117 tests green).
+- **Fixture Browser Tests**: `npm run test:browser -w @wap/web` passed (25 tests green, 0 axe violations, 0 horizontal overflow).
+- **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (5 tests green across cleanup, lifecycle, login).
+- **Production Bundle Budgets**:
+  - Live bundle JS: 176.78 KiB initial gzip (budget: ≤ 200 KiB).
+  - Live bundle CSS: 6.31 KiB initial gzip (budget: ≤ 30 KiB).
+  - Fixture leakage audit: 0 synthetic fixture modules in live bundle.
 
-Navigation for the next frontend batch: [platform UX](superpowers/specs/2026-09-15-platform-ux-design.md), six views/four navigation items. WEB-00 synchronizes the UI baseline and selects [React + TypeScript + Vite](ADR-001-FRONTEND-STACK.md), with styling/component/data layer replaced by [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md) (Tailwind CSS v4, shadcn/ui, TanStack Query), for the [WEB-01–03 implementation plan](superpowers/plans/2026-09-15-frontend-platform.md). The system design gate is [platform system design](superpowers/specs/2026-09-15-platform-system-design.md); review it and audit WEB-01B before adding views or live controllers. Workflow editing/reuse remains outside B.
+## Architecture & Guarantees
+
+### 1. In-Memory Session Isolation & Generation Fencing
+- Bearer tokens, active request abort controllers, and draft stores reside strictly in JavaScript memory for the active browser tab.
+- Zero persistence: `localStorage`, `sessionStorage`, cookies, query parameters, HTML, and logs never store credentials or tokens.
+- An integer `generation` advances on login, logout, or session reset. All in-flight requests and callbacks check `isCurrent()`, discarding late responses or stale 401s across session boundaries.
+
+### 2. Contiguous Ordered Event Ingestion (`ingestEvents`)
+- `apps/web/src/core/events.ts`: Pure immutable reducer enforces monotonically increasing contiguous `seq`.
+- Sequence gaps halt cursor advancement and flag protocol errors; duplicate events with identical payloads are idempotent no-ops; conflicting payloads at the same sequence raise fatal errors.
+- Tail drainage continues until the terminal `run.finished` event is ingested or polling times out.
+
+### 3. Session-Scoped Pure-TypeScript Controllers
+- **`RunSyncController`** (`apps/web/src/controllers/run-sync.ts`): Single-flight polling coordinator synchronizing `RunDetail` and event stream without concurrent duplicated requests.
+- **`CreateRunController`** (`apps/web/src/controllers/create-run.ts`): Manages run creation lifecycle (`idle | submitting | confirming | accepted | error`). Lost responses/timeouts transition to `confirming` with `lostAt` timestamp. Survives route changes via `ControllerRegistry`; reconciles authoritatively when visiting history or via manual check without automated re-POSTing.
+- **`RunCommandController`** (`apps/web/src/controllers/run-commands.ts`): Coordinates shared approval and cancellation for each run with mutual exclusion (approving locks cancel; cancelling locks approve/reject). Reconciles uncertain command outcomes via `reconcileWithDetail(run)`.
+- **`TraceController`** (`apps/web/src/controllers/trace.ts`): Paginates attempts with opaque cursors; automatically restarts pagination from the beginning upon receiving a 400 Bad Request (expired/invalid cursor).
+- **`ControllerRegistry`** (`apps/web/src/controllers/registry.ts`): Session-scoped store registry instantiated per session generation and cleaned up on logout/clear.
+
+### 4. Local Loopback Proxy & Live Test Fixture
+- `apps/web/tooling/local-proxy.ts`: Vite plugin forwarding relative `/api/v1` requests to loopback API targets, stripping forbidden headers and rejecting foreign origins.
+- `apps/web/tests/live/fixtures.ts` & `cleanup.ts`: Launches isolated backend API fixture (`makeApiFixture`) on dynamic ports, provisions ephemeral databases (`api_it_*`), serves preview builds on dynamic ports, and guarantees complete database destruction and port release in `finally` blocks.
+
+## Test Commands
+
+```bash
+# Run unit tests
+npm run test:unit -w @wap/web
+
+# Run fixture browser tests (synthetic world)
+npm run test:browser -w @wap/web
+
+# Run live E2E tests against real ephemeral backend API
+npm run test:live -w @wap/web
+
+# Typecheck frontend and tooling
+npm run typecheck -w @wap/web
+
+# Build production live bundle
+npm run build -w @wap/web -- --mode live
+```
 
 The API listens on loopback and uses the `/api/v1` prefix. The frontend keeps the bearer token in memory for the current tab and sends it only as `Authorization: Bearer <token>`. Do not store it in localStorage, cookies, URLs, logs, or HTML.
 
