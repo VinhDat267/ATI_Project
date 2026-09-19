@@ -216,9 +216,19 @@ describe("T4 catalog embedding and live index gates", () => {
     const active = {
       id: "index-a",
       provenance: { ...PROFILE, catalogHash: catalog.catalogHash },
+      vectorHash: "a".repeat(64),
+      policyHash: "b".repeat(64),
     };
     const index = {
-      activeIndex: vi.fn(async () => active),
+      pin: vi.fn(async (_catalog: unknown, expected: { model?: string }) => {
+        if (expected.model !== active.provenance.model)
+          throw new RetrievalValidationError(
+            "active embedding index profile does not match the selected provider profile",
+            "EMBEDDING_PROFILE_MISMATCH",
+          );
+        return active;
+      }),
+      assertCurrent: vi.fn(async () => undefined),
       search: vi.fn(),
     } as never;
     const queryExpansion = { expand: vi.fn() };

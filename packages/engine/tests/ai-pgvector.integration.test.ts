@@ -149,4 +149,82 @@ describe("AI-01 pgvector reviewed catalog index", () => {
       { state: "superseded", count: 3 },
     ]);
   });
+
+  it("pins persisted fingerprints and rejects a superseded index", async () => {
+    const catalog = createReviewedCatalogSnapshot([
+      makeTool({ name: "pin-alpha" }),
+      makeTool({ name: "pin-beta" }),
+    ]);
+    const index = new PgvectorCatalogIndex(db, DEMO_USER_ID);
+    const active = await index.activate({
+      catalog,
+      rows: rowsFor(catalog, "pin-model-a"),
+    });
+    const pinned = await index.pin(catalog, active.provenance);
+    expect(pinned).toMatchObject({
+      id: active.id,
+      provenance: active.provenance,
+      vectorHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      policyHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    await expect(index.assertCurrent(catalog, pinned)).resolves.toBeUndefined();
+    const mutatedVector = `[${Array.from({ length: PGVECTOR_DIMENSIONS }, (_, index) => (index === 0 ? 0.5 : 0)).join(",")}]`;
+    await db.client`
+      UPDATE reviewed_tool_embeddings
+      SET embedding=${mutatedVector}::vector
+      WHERE index_id=${pinned.id} AND tool_server='task_hub' AND tool_name='pin-alpha'`;
+    await expect(index.assertCurrent(catalog, pinned)).rejects.toMatchObject({
+      code: "INDEX_CHANGED",
+    });
+    await index.activate({
+      catalog,
+      rows: rowsFor(catalog, "pin-model-b"),
+    });
+    await expect(index.assertCurrent(catalog, pinned)).rejects.toMatchObject({
+      code: "INDEX_CHANGED",
+    });
+  });
+
+  it("discards a semantic result when the active index changes during query embedding", async () => {
+    const catalog = createReviewedCatalogSnapshot([
+      makeTool({ name: "race-alpha" }),
+      makeTool({ name: "race-beta" }),
+    ]);
+    const index = new PgvectorCatalogIndex(db, DEMO_USER_ID);
+    const first = await index.activate({
+      catalog,
+      rows: rowsFor(catalog, "race-model-a"),
+    });
+    let resolveEmbedding!: (value: any) => void;
+    let signalEmbeddingStarted!: () => void;
+    const embeddingStarted = new Promise<void>((resolve) => {
+      signalEmbeddingStarted = resolve;
+    });
+    const retriever = new PgvectorToolRetriever({
+      catalog,
+      index,
+      embeddingPort: {
+        async embed() {
+          signalEmbeddingStarted();
+          return new Promise((resolve) => {
+            resolveEmbedding = resolve;
+          });
+        },
+      },
+    });
+    const pending = retriever.retrieve({
+      query: "race",
+      variant: "semantic",
+      topK: 1,
+    });
+    await embeddingStarted;
+    await index.activate({ catalog, rows: rowsFor(catalog, "race-model-b") });
+    resolveEmbedding({
+      embedding: vector(0),
+      purpose: "query",
+      ...first.provenance,
+      usage: null,
+    });
+    await expect(pending).rejects.toMatchObject({ code: "INDEX_CHANGED" });
+  });
 });
