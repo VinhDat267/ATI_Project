@@ -5,12 +5,13 @@ Status: `WEB_LIVE_PASS` on branch `feat/web-02-live` (2026-09-19). Live frontend
 ## Verification Summary
 
 - **TypeScript Typecheck**: `npm run typecheck -w @wap/web` passed (0 errors across app, tools, tests).
-- **Unit Tests**: `npm run test:unit -w @wap/web` passed (20 files, 117 tests green).
+- **Unit Tests**: `npm run test:unit -w @wap/web` passed (21 files, 128 tests green).
 - **Fixture Browser Tests**: `npm run test:browser -w @wap/web` passed (25 tests green, 0 axe violations, 0 horizontal overflow).
-- **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (5 tests green across cleanup, lifecycle, login).
+- **StrictMode Development Browser Test**: `npm exec -w @wap/web -- playwright test --config=playwright.strict.config.ts` passed (1 test green, verified polling continuity across React StrictMode effect replay and SPA navigation).
+- **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (7 tests green across partial cleanup, DB drop/port release, create uncertainty fence, lifecycle, login).
 - **Production Bundle Budgets**:
-  - Live bundle JS: 176.78 KiB initial gzip (budget: ≤ 200 KiB).
-  - Live bundle CSS: 6.31 KiB initial gzip (budget: ≤ 30 KiB).
+  - Live bundle JS: 176.87 KiB initial gzip (budget: ≤ 200 KiB).
+  - Live bundle CSS: 6.36 KiB initial gzip (budget: ≤ 30 KiB).
   - Fixture leakage audit: 0 synthetic fixture modules in live bundle.
 
 ## Architecture & Guarantees
@@ -26,15 +27,15 @@ Status: `WEB_LIVE_PASS` on branch `feat/web-02-live` (2026-09-19). Live frontend
 - Tail drainage continues until the terminal `run.finished` event is ingested or polling times out.
 
 ### 3. Session-Scoped Pure-TypeScript Controllers
-- **`RunSyncController`** (`apps/web/src/controllers/run-sync.ts`): Single-flight polling coordinator synchronizing `RunDetail` and event stream without concurrent duplicated requests.
-- **`CreateRunController`** (`apps/web/src/controllers/create-run.ts`): Manages run creation lifecycle (`idle | submitting | confirming | accepted | error`). Lost responses/timeouts transition to `confirming` with `lostAt` timestamp. Survives route changes via `ControllerRegistry`; reconciles authoritatively when visiting history or via manual check without automated re-POSTing.
+- **`RunSyncController`** (`apps/web/src/controllers/run-sync.ts`): Single-flight polling coordinator synchronizing `RunDetail` and event stream without concurrent duplicated requests. Tracks `pollingEpoch`, `isTickInProgress`, and `hasPendingImmediateIntent` with sibling `Promise.allSettled` settlement, ensuring clean restart without dropping ticks or running overlapping requests during React StrictMode effect replay or rapid navigation.
+- **`CreateRunController`** (`apps/web/src/controllers/create-run.ts`): Manages run creation lifecycle (`idle | submitting | confirming | accepted | error`). Lost responses/timeouts transition to `confirming` with `lostAt` timestamp. Because the backend API lacks request correlation / idempotency keys, prompt equality or history queries cannot prove a lost POST succeeded. The uncertainty fence remains locked in `confirming` for the remainder of the session tab. `submit()` is blocked at the controller level during `submitting` or `confirming`, `reset()` is a no-op when unknown, and unsafe prompt-based reconciliation is completely eliminated. Replay-safe `teardown()` aborts in-flight requests while preserving uncertainty fences across StrictMode effect replays.
 - **`RunCommandController`** (`apps/web/src/controllers/run-commands.ts`): Coordinates shared approval and cancellation for each run with mutual exclusion (approving locks cancel; cancelling locks approve/reject). Reconciles uncertain command outcomes via `reconcileWithDetail(run)`.
 - **`TraceController`** (`apps/web/src/controllers/trace.ts`): Paginates attempts with opaque cursors; automatically restarts pagination from the beginning upon receiving a 400 Bad Request (expired/invalid cursor).
 - **`ControllerRegistry`** (`apps/web/src/controllers/registry.ts`): Session-scoped store registry instantiated per session generation and cleaned up on logout/clear.
 
 ### 4. Local Loopback Proxy & Live Test Fixture
 - `apps/web/tooling/local-proxy.ts`: Vite plugin forwarding relative `/api/v1` requests to loopback API targets, stripping forbidden headers and rejecting foreign origins.
-- `apps/web/tests/live/fixtures.ts` & `cleanup.ts`: Launches isolated backend API fixture (`makeApiFixture`) on dynamic ports, provisions ephemeral databases (`api_it_*`), serves preview builds on dynamic ports, and guarantees complete database destruction and port release in `finally` blocks.
+- `apps/web/tests/live/fixtures.ts` & `cleanup.ts`: Launches isolated backend API fixture (`makeApiFixture`) on dynamic ports, provisions ephemeral databases (`api_it_*`), serves preview builds on dynamic ports. Guarantees cleanup-on-failure: if preview startup or port resolution fails midway, previously acquired API processes and databases are reliably closed and dropped, and environment variables are restored. Safe teardown guarantees both preview and API closures even if one throws.
 
 ## Test Commands
 
