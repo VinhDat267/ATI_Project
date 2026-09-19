@@ -174,9 +174,24 @@ export function assertAiLiveApproval(
   }
   if (
     record.providers.length !== expected.providers.length ||
-    record.providers.some((provider) => !expected.providers.includes(provider))
+    record.providers.some(
+      (provider) => !expected.providers.includes(provider),
+    ) ||
+    new Set(expected.providers).size !== expected.providers.length
   ) {
-    throw new AiApprovalError("approval providers do not match execution scope");
+    throw new AiApprovalError(
+      "approval providers do not match execution scope",
+    );
+  }
+  const expectedRoles = Object.keys(expected.models);
+  const approvedRoles = Object.keys(record.models);
+  if (
+    approvedRoles.length !== expectedRoles.length ||
+    expectedRoles.some((role) => !approvedRoles.includes(role))
+  ) {
+    throw new AiApprovalError(
+      "approval model roles do not match execution scope",
+    );
   }
   for (const [role, model] of Object.entries(expected.models)) {
     if (record.models[role] !== model)

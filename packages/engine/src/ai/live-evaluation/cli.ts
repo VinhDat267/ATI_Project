@@ -42,6 +42,11 @@ import {
   type AiLiveApprovalRecord,
 } from "../providers/approval.js";
 import { InMemoryProviderCallLedger } from "../providers/accounting.js";
+import {
+  deriveLiveExecutionScope,
+  hashLiveConfig,
+  type LiveExecutionPhase,
+} from "./authorization.js";
 
 export interface LiveEvaluationCliEnvironment {
   readonly root?: string;
@@ -136,7 +141,10 @@ function parseCliArgs(args: readonly string[]): {
   return { command, flags };
 }
 
-function cliError(error: unknown, exitCode: 0 | 1 | 2 = 2): LiveEvaluationCliResult {
+function cliError(
+  error: unknown,
+  exitCode: 0 | 1 | 2 = 2,
+): LiveEvaluationCliResult {
   const message = error instanceof Error ? error.message : String(error);
   return {
     exitCode,
@@ -147,6 +155,19 @@ function cliError(error: unknown, exitCode: 0 | 1 | 2 = 2): LiveEvaluationCliRes
 
 async function writeExclusive(path: string, content: string): Promise<void> {
   await writeFile(path, content, { encoding: "utf8", flag: "wx" });
+}
+
+async function readLiveConfig(root: string): Promise<{
+  readonly raw: Buffer;
+  readonly parsed: ReturnType<typeof parseLiveEvalConfigFile>;
+  readonly hash: string;
+}> {
+  const raw = await readFile(join(root, "testdata/ai-live-eval-config.json"));
+  return {
+    raw,
+    parsed: parseLiveEvalConfigFile(JSON.parse(raw.toString("utf8"))),
+    hash: hashLiveConfig(raw),
+  };
 }
 
 export async function runLiveEvaluationCli(
@@ -181,12 +202,17 @@ export async function runLiveEvaluationCli(
     const allowedFlags = new Set(["offline"]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
-        return cliError(new Error(`preflight rejects unknown flag "--${f}"`), 2);
+        return cliError(
+          new Error(`preflight rejects unknown flag "--${f}"`),
+          2,
+        );
       }
     }
     if (flags.offline !== true) {
       return cliError(
-        new Error("preflight requires --offline flag and does zero network calls"),
+        new Error(
+          "preflight requires --offline flag and does zero network calls",
+        ),
         2,
       );
     }
@@ -254,7 +280,10 @@ export async function runLiveEvaluationCli(
           ? resolve(flags.output)
           : join(dir, "freeze.json");
 
-      await writeExclusive(artifactPath, `${JSON.stringify(freeze, null, 2)}\n`);
+      await writeExclusive(
+        artifactPath,
+        `${JSON.stringify(freeze, null, 2)}\n`,
+      );
       return {
         exitCode: 0,
         artifactPath,
@@ -267,7 +296,12 @@ export async function runLiveEvaluationCli(
 
   // 3. PROBE
   if (command === "probe") {
-    const allowedFlags = new Set(["profile", "campaign", "approval", "execute"]);
+    const allowedFlags = new Set([
+      "profile",
+      "campaign",
+      "approval",
+      "execute",
+    ]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
         return cliError(new Error(`probe rejects unknown flag "--${f}"`), 2);
@@ -280,7 +314,10 @@ export async function runLiveEvaluationCli(
       return cliError(new Error("probe requires --campaign <id>"), 2);
     }
     if (typeof flags.approval !== "string" || !flags.approval.trim()) {
-      return cliError(new Error("probe requires --approval <approved-json>"), 2);
+      return cliError(
+        new Error("probe requires --approval <approved-json>"),
+        2,
+      );
     }
     if (flags.execute !== true) {
       return cliError(
@@ -294,14 +331,13 @@ export async function runLiveEvaluationCli(
         await readFile(resolve(flags.approval), "utf8"),
       );
       const approval = parseAiLiveApprovalRecord(rawApproval);
-      const rawConfig = JSON.parse(
-        await readFile(join(root, "testdata/ai-live-eval-config.json"), "utf8"),
-      );
-      const parsedConfig = parseLiveEvalConfigFile(rawConfig);
+      const { parsed: parsedConfig, hash: configHash } =
+        await readLiveConfig(root);
       const profile = parsedConfig.profiles[flags.profile];
       if (!profile) {
         throw new Error(`Profile "${flags.profile}" not found in config`);
       }
+      const scope = deriveLiveExecutionScope(profile, "probe", configHash);
 
       assertAiLiveApproval(
         approval,
@@ -309,9 +345,7 @@ export async function runLiveEvaluationCli(
           campaignId: flags.campaign,
           phase: "probe",
           profileId: flags.profile,
-          configHash: approval.configHash,
-          providers: [profile.planning.provider],
-          models: { planning: profile.planning.model },
+          ...scope,
         },
         now(),
       );
@@ -328,7 +362,12 @@ export async function runLiveEvaluationCli(
 
   // 4. INDEX
   if (command === "index") {
-    const allowedFlags = new Set(["profile", "campaign", "approval", "execute"]);
+    const allowedFlags = new Set([
+      "profile",
+      "campaign",
+      "approval",
+      "execute",
+    ]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
         return cliError(new Error(`index rejects unknown flag "--${f}"`), 2);
@@ -341,7 +380,10 @@ export async function runLiveEvaluationCli(
       return cliError(new Error("index requires --campaign <id>"), 2);
     }
     if (typeof flags.approval !== "string" || !flags.approval.trim()) {
-      return cliError(new Error("index requires --approval <approved-json>"), 2);
+      return cliError(
+        new Error("index requires --approval <approved-json>"),
+        2,
+      );
     }
     if (flags.execute !== true) {
       return cliError(
@@ -357,14 +399,13 @@ export async function runLiveEvaluationCli(
         await readFile(resolve(flags.approval), "utf8"),
       );
       const approval = parseAiLiveApprovalRecord(rawApproval);
-      const rawConfig = JSON.parse(
-        await readFile(join(root, "testdata/ai-live-eval-config.json"), "utf8"),
-      );
-      const parsedConfig = parseLiveEvalConfigFile(rawConfig);
+      const { parsed: parsedConfig, hash: configHash } =
+        await readLiveConfig(root);
       const profile = parsedConfig.profiles[flags.profile];
       if (!profile) {
         throw new Error(`Profile "${flags.profile}" not found in config`);
       }
+      const scope = deriveLiveExecutionScope(profile, "index", configHash);
 
       assertAiLiveApproval(
         approval,
@@ -372,9 +413,7 @@ export async function runLiveEvaluationCli(
           campaignId: flags.campaign,
           phase: "index",
           profileId: flags.profile,
-          configHash: approval.configHash,
-          providers: [profile.planning.provider],
-          models: { planning: profile.planning.model },
+          ...scope,
         },
         now(),
       );
@@ -434,7 +473,10 @@ export async function runLiveEvaluationCli(
         2,
       );
     }
-    if (flags.phase === "legacy-regression" && typeof flags.freeze !== "string") {
+    if (
+      flags.phase === "legacy-regression" &&
+      typeof flags.freeze !== "string"
+    ) {
       return cliError(
         new Error("Phase 'legacy-regression' requires --freeze <freeze-json>"),
         2,
@@ -470,21 +512,24 @@ export async function runLiveEvaluationCli(
       const rawRubric: LiveRubric = JSON.parse(
         await readFile(join(root, "testdata/ai-live-rubric.json"), "utf8"),
       );
-      const rawConfig = JSON.parse(
-        await readFile(join(root, "testdata/ai-live-eval-config.json"), "utf8"),
-      );
+      const { parsed: parsedConfig, hash: configHash } =
+        await readLiveConfig(root);
       const catalogJson = JSON.parse(
         await readFile(join(root, "testdata/tools.json"), "utf8"),
       );
 
       const parsedDataset = parseLiveDataset(rawCases, rawManifest, rawRubric);
-      const parsedConfig = parseLiveEvalConfigFile(rawConfig);
       const catalog = createOfflineReviewedCatalog(catalogJson);
 
       const profile = parsedConfig.profiles[flags.profile];
       if (!profile) {
         throw new Error(`Profile "${flags.profile}" not found in config`);
       }
+      const scope = deriveLiveExecutionScope(
+        profile,
+        flags.phase as LiveExecutionPhase,
+        configHash,
+      );
 
       assertAiLiveApproval(
         approval,
@@ -492,9 +537,7 @@ export async function runLiveEvaluationCli(
           campaignId,
           phase: flags.phase,
           profileId: flags.profile,
-          configHash: approval.configHash,
-          providers: [profile.planning.provider],
-          models: { planning: profile.planning.model },
+          ...scope,
         },
         now(),
       );

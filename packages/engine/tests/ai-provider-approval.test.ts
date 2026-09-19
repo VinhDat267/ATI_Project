@@ -82,4 +82,29 @@ describe("non-secret live approval boundary", () => {
       ),
     ).toThrow(/not yet|valid/i);
   });
+
+  it("requires an exact model-role key set rather than a matching subset", () => {
+    const parsed = parseAiLiveApprovalRecord(approval);
+    expect(() =>
+      assertAiLiveApproval(
+        parsed,
+        {
+          ...approval,
+          models: {
+            ...approval.models,
+            repair: "gpt-5.6-terra",
+          },
+        },
+        new Date("2026-09-19T00:30:00.000Z"),
+      ),
+    ).toThrow(/model|role|scope/i);
+
+    expect(() =>
+      assertAiLiveApproval(
+        parsed,
+        { ...approval, models: { planning: "gemini-3.8-flash" } },
+        new Date("2026-09-19T00:30:00.000Z"),
+      ),
+    ).toThrow(/model|role|scope/i);
+  });
 });

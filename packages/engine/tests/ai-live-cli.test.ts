@@ -20,7 +20,11 @@ afterEach(async () => {
 });
 
 async function createTempDir(prefix = "ai-live-cli-"): Promise<string> {
-  const dir = resolve(root, ".artifacts", `${prefix}${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = resolve(
+    root,
+    ".artifacts",
+    `${prefix}${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   await mkdir(dir, { recursive: true });
   tempDirs.push(dir);
   return dir;
@@ -34,17 +38,55 @@ async function writeValidApproval(
     join(root, "testdata/ai-live-eval-config.json"),
     "utf8",
   );
+  const config = JSON.parse(configContent) as {
+    profiles: Record<
+      string,
+      {
+        planning: { provider: "openai" | "google"; model: string };
+        queryExpansion: { provider: "openai" | "google"; model: string };
+        embedding: { provider: "openai" | "google"; model: string };
+      }
+    >;
+  };
+  const profileId = overrides?.profileId ?? "openai-only";
+  const phase = overrides?.phase ?? "smoke";
+  const profile = config.profiles[profileId]!;
+  const roleProfiles = {
+    planning: profile.planning,
+    repair: profile.planning,
+    replan: profile.planning,
+    query_expansion: profile.queryExpansion,
+    embedding: profile.embedding,
+  } as const;
+  const roles =
+    phase === "index" ? (["embedding"] as const) : Object.keys(roleProfiles);
+  const providers = [
+    ...new Set(
+      roles.map(
+        (role) => roleProfiles[role as keyof typeof roleProfiles].provider,
+      ),
+    ),
+  ];
+  const models = Object.fromEntries(
+    roles.map((role) => [
+      role,
+      roleProfiles[role as keyof typeof roleProfiles].model,
+    ]),
+  );
   const crypto = await import("node:crypto");
-  const configHash = crypto.createHash("sha256").update(configContent).digest("hex");
+  const configHash = crypto
+    .createHash("sha256")
+    .update(configContent)
+    .digest("hex");
 
   const approval: AiLiveApprovalRecord = {
     kind: "ai-live-approval",
     campaignId: "camp-cli-test",
-    phase: "smoke",
-    profileId: "openai-only",
+    phase,
+    profileId,
     configHash,
-    providers: ["openai"],
-    models: { planning: "gpt-5.6-terra" },
+    providers,
+    models,
     budgetMicros: 5_000_000,
     approvedAt: new Date(Date.now() - 10_000).toISOString(),
     expiresAt: new Date(Date.now() + 3600_000).toISOString(),
@@ -136,7 +178,9 @@ describe("ai-live-cli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.artifactPath).toBeTruthy();
-    expect(result.message).toContain('Live evaluation freeze created for profile "openai-only"');
+    expect(result.message).toContain(
+      'Live evaluation freeze created for profile "openai-only"',
+    );
 
     const content = JSON.parse(await readFile(result.artifactPath!, "utf8"));
     expect(content.format).toBe("ati-ai-live-freeze-v1");
@@ -150,7 +194,9 @@ describe("ai-live-cli", () => {
 
     expect(() =>
       validateEvalDatabaseUrl("postgres://prod/app", "postgres://prod/app"),
-    ).toThrow(/AI_EVAL_DATABASE_URL must not point to the normal application database/);
+    ).toThrow(
+      /AI_EVAL_DATABASE_URL must not point to the normal application database/,
+    );
 
     // URL normalization check: different query params or case but same host and path
     expect(() =>
@@ -158,7 +204,9 @@ describe("ai-live-cli", () => {
         "postgres://prod:5432/app?sslmode=disable",
         "postgres://PROD:5432/app",
       ),
-    ).toThrow(/AI_EVAL_DATABASE_URL must not point to the normal application database/);
+    ).toThrow(
+      /AI_EVAL_DATABASE_URL must not point to the normal application database/,
+    );
 
     expect(() =>
       validateEvalDatabaseUrl("postgres://test/eval", "postgres://prod/app"),
@@ -182,7 +230,9 @@ describe("ai-live-cli", () => {
       { root },
     );
     expect(probeRes.exitCode).toBe(2);
-    expect(probeRes.message).toContain("Safety guard: --execute flag required for probe");
+    expect(probeRes.message).toContain(
+      "Safety guard: --execute flag required for probe",
+    );
 
     const indexRes = await runLiveEvaluationCli(
       [
@@ -197,7 +247,9 @@ describe("ai-live-cli", () => {
       { root },
     );
     expect(indexRes.exitCode).toBe(2);
-    expect(indexRes.message).toContain("Safety guard: --execute flag required for index");
+    expect(indexRes.message).toContain(
+      "Safety guard: --execute flag required for index",
+    );
 
     const runRes = await runLiveEvaluationCli(
       [
@@ -214,7 +266,9 @@ describe("ai-live-cli", () => {
       { root },
     );
     expect(runRes.exitCode).toBe(2);
-    expect(runRes.message).toContain("Safety guard: --execute flag required for run");
+    expect(runRes.message).toContain(
+      "Safety guard: --execute flag required for run",
+    );
   });
 
   it("executes probe successfully with valid approval and --execute", async () => {
@@ -237,6 +291,39 @@ describe("ai-live-cli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.message).toContain("Live probe passed for profile");
+  });
+
+  it("rejects a probe when the approval hash is not the raw config hash", async () => {
+    const tempDir = await createTempDir("probe-config-hash-test");
+    const approvalPath = await writeValidApproval(tempDir, {
+      phase: "probe",
+      configHash: "b".repeat(64),
+    });
+    let sessionTouched = false;
+
+    const result = await runLiveEvaluationCli(
+      [
+        "probe",
+        "--profile",
+        "openai-only",
+        "--campaign",
+        "camp-cli-test",
+        "--approval",
+        approvalPath,
+        "--execute",
+      ],
+      {
+        root,
+        getSession: async () => {
+          sessionTouched = true;
+          throw new Error("SESSION_MUST_NOT_BE_CREATED");
+        },
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.message).toMatch(/configHash|scope/i);
+    expect(sessionTouched).toBe(false);
   });
 
   it("executes index successfully with valid approval, eval DB and --execute", async () => {
@@ -278,7 +365,10 @@ describe("ai-live-cli", () => {
     );
     const b01Case = casesJson.cases.find((c: any) => c.id === "b01");
     const catalog = createOfflineReviewedCatalog(catalogJson);
-    const mockSession = createMockSession(catalog.tools, b01Case.expected_result);
+    const mockSession = createMockSession(
+      catalog.tools,
+      b01Case.expected_result,
+    );
 
     const result = await runLiveEvaluationCli(
       [
@@ -312,7 +402,10 @@ describe("ai-live-cli", () => {
 
     // Verify journal.jsonl was written
     const runDir = resolve(result.artifactPath!, "..");
-    const journalContent = await readFile(join(runDir, "journal.jsonl"), "utf8");
+    const journalContent = await readFile(
+      join(runDir, "journal.jsonl"),
+      "utf8",
+    );
     expect(journalContent).toContain("trial_scheduled");
     expect(journalContent).toContain("trial_completed");
 
@@ -351,7 +444,9 @@ describe("ai-live-cli", () => {
     );
 
     expect(result.exitCode).toBe(2);
-    expect(result.message).toContain("Phase 'legacy-regression' requires --freeze <freeze-json>");
+    expect(result.message).toContain(
+      "Phase 'legacy-regression' requires --freeze <freeze-json>",
+    );
   });
 
   it("extracts campaign ID from approval when --campaign is omitted in run command", async () => {
@@ -368,7 +463,10 @@ describe("ai-live-cli", () => {
     );
     const b01Case = casesJson.cases.find((c: any) => c.id === "b01");
     const catalog = createOfflineReviewedCatalog(catalogJson);
-    const mockSession = createMockSession(catalog.tools, b01Case.expected_result);
+    const mockSession = createMockSession(
+      catalog.tools,
+      b01Case.expected_result,
+    );
 
     // Omit --campaign flag from CLI call
     const result = await runLiveEvaluationCli(
