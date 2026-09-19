@@ -17,16 +17,16 @@
     },
     "b02": {
       "expectedKind": "plan",
-      "semanticIntent": "Read cards from Done on board_a, append to sheet Archive in dest_b, and notify #ops",
+      "semanticIntent": "Copy rows Progress!A1:B2 from source to Report in dest, then notify #team",
       "requiredReads": [
-        { "server": "task_hub", "name": "list_cards" }
+        { "server": "task_hub", "name": "read_sheet_range" }
       ],
       "requiredWrites": [
         { "server": "task_hub", "name": "append_sheet_rows" },
         { "server": "task_hub", "name": "send_slack_message" }
       ],
       "causalOrdering": [
-        ["task_hub.list_cards", "task_hub.append_sheet_rows"],
+        ["task_hub.read_sheet_range", "task_hub.append_sheet_rows"],
         ["task_hub.append_sheet_rows", "task_hub.send_slack_message"]
       ],
       "forbidExtraWrites": true
@@ -59,7 +59,7 @@
     "b05": {
       "expectedKind": "clarification",
       "semanticIntent": "Ask which task/card to move to Done due to missing card identifier in prompt",
-      "clarificationMissingInfo": ["card_id", "task", "tiêu đề", "nào", "which task"]
+      "clarificationMissingInfo": ["card_id", "task", "thẻ nào", "tiêu đề", "which task"]
     },
     "b06": {
       "expectedKind": "refusal",

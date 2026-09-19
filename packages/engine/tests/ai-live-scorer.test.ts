@@ -453,5 +453,367 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       expect(outcome.verdict).toBeUndefined();
       expect(outcome.reason).toMatch(/discrepancy/i);
     });
+
+    it("rejects adjudication when duplicate entries are from the same judge ID", () => {
+      const record: AdjudicationRecord = {
+        caseId: "b01",
+        candidateHash: "abc123hash",
+        adjudications: [
+          {
+            judgeId: "judge-1",
+            judgment: "correct",
+            reason: "Looks good",
+            adjudicatedAt: "2026-09-19T10:00:00Z",
+          },
+          {
+            judgeId: "judge-1",
+            judgment: "correct",
+            reason: "Looks good again",
+            adjudicatedAt: "2026-09-19T10:05:00Z",
+          },
+        ],
+        resolved: false,
+      };
+
+      const outcome = adjudicateAmbiguousCase(record);
+      expect(outcome.resolved).toBe(false);
+      expect(outcome.reason).toMatch(/distinct independent judges/i);
+    });
+  });
+
+  describe("Audited Edge Cases & Rubric Verification Fixes", () => {
+    it("enforces bijective multiset matching for output values to reject duplicated value collisions", () => {
+      const oracleWithDupValues: LiveCaseOracle = {
+        id: "test_dup_outputs",
+        expected_result: {
+          kind: "plan",
+          plan: {
+            version: "1.0",
+            name: "Dup outputs",
+            source_prompt: "test",
+            inputs: {},
+            steps: [
+              {
+                id: "read",
+                description: "read",
+                tool: { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" } },
+                depends_on: [],
+                side_effect: "read",
+              },
+            ],
+            outputs: { count_a: "${runtime.time_zone}", count_b: "${runtime.time_zone}" },
+          },
+        },
+        read_fixture: [
+          { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" }, output: { cards: [] } },
+        ],
+        expected_writes: [],
+        expected_outputs: { count_a: "UTC", count_b: "UTC" },
+        forbid_extra_writes: true,
+      };
+
+      // Candidate has outputs resolving to ["UTC", "user-123"] instead of ["UTC", "UTC"]
+      const badCandidate = {
+        kind: "plan" as const,
+        plan: {
+          version: "1.0",
+          name: "Dup outputs",
+          source_prompt: "test",
+          inputs: {},
+          steps: [
+            {
+              id: "read",
+              description: "read",
+              tool: { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" } },
+              depends_on: [],
+              side_effect: "read" as const,
+            },
+          ],
+          outputs: {
+            out_x: "${runtime.time_zone}",
+            out_y: "${runtime.user_id}", // Different value from "UTC"
+          },
+        },
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: { id: "test_dup_outputs", prompt: "test", runtime: { time_zone: "UTC", user_id: "user-123" } },
+        oracle: oracleWithDupValues,
+        registry,
+        candidate: badCandidate,
+      });
+
+      expect(score.outputCorrect).toBe(false);
+      expect(score.semanticJudgment).toBe("incorrect");
+    });
+
+    it("accepts independent writes reordered when no causal dependency exists between them", () => {
+      const twoWriteOracle: LiveCaseOracle = {
+        id: "test_independent_writes",
+        expected_result: {
+          kind: "plan",
+          plan: {
+            version: "1.0",
+            name: "Two writes",
+            source_prompt: "Write two independent files",
+            inputs: {},
+            steps: [
+              {
+                id: "write_a",
+                description: "a",
+                tool: { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
+                depends_on: [],
+                side_effect: "write",
+                idempotency_key: "idem_a",
+              },
+              {
+                id: "write_b",
+                description: "b",
+                tool: { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+                depends_on: [],
+                side_effect: "write",
+                idempotency_key: "idem_b",
+              },
+            ],
+            outputs: {},
+          },
+        },
+        read_fixture: [],
+        expected_writes: [
+          { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
+          { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+        ],
+        expected_outputs: {},
+        forbid_extra_writes: true,
+      };
+
+      // Candidate executes write_b first, then write_a
+      const candidate = {
+        kind: "plan" as const,
+        plan: {
+          version: "1.0",
+          name: "Two writes reversed",
+          source_prompt: "Write two independent files",
+          inputs: {},
+          steps: [
+            {
+              id: "write_b",
+              description: "b",
+              tool: { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+              depends_on: [],
+              side_effect: "write" as const,
+              idempotency_key: "idem_b",
+            },
+            {
+              id: "write_a",
+              description: "a",
+              tool: { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
+              depends_on: [],
+              side_effect: "write" as const,
+              idempotency_key: "idem_a",
+            },
+          ],
+          outputs: {},
+        },
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: { id: "test_independent_writes", prompt: "Write two independent files", runtime: {} },
+        oracle: twoWriteOracle,
+        registry,
+        candidate,
+      });
+
+      expect(score.structuralValidity).toBe(true);
+      expect(score.semanticJudgment).toBe("correct");
+      expect(score.taskCorrect).toBe(true);
+    });
+
+    it("detects causal order violation when successor tool executes both before and after predecessor", () => {
+      const causalOracle: LiveCaseOracle = {
+        id: "test_causal",
+        expected_result: {
+          kind: "plan",
+          plan: {
+            version: "1.0",
+            name: "Causal",
+            source_prompt: "write file then notify or create card",
+            inputs: {},
+            steps: [
+              {
+                id: "write",
+                description: "write",
+                tool: { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
+                depends_on: [],
+                side_effect: "write",
+                idempotency_key: "idem_write",
+              },
+            ],
+            outputs: {},
+          },
+        },
+        read_fixture: [],
+        expected_writes: [
+          { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
+          { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c1" } },
+          { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c2" } },
+        ],
+        expected_outputs: {},
+        forbid_extra_writes: false,
+      };
+
+      const causalRubric: LiveRubric = {
+        format: "ati-ai-live-rubric-v1",
+        status: "PROPOSED_EXPLORATORY",
+        version: "1.0.0",
+        approvedBy: null,
+        approvedAt: null,
+        cases: {
+          test_causal: {
+            expectedKind: "plan",
+            semanticIntent: "Must write file before creating cards",
+            causalOrdering: [["filesystem.write_file", "task_hub.create_card"]],
+          },
+        },
+      };
+
+      // Candidate runs: create_card (early) -> write_file -> create_card (late)
+      const candidate = {
+        kind: "plan" as const,
+        plan: {
+          version: "1.0",
+          name: "Causal violation",
+          source_prompt: "write file then notify or create card",
+          inputs: {},
+          steps: [
+            {
+              id: "early_create",
+              description: "early create",
+              tool: { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c1" } },
+              depends_on: [],
+              side_effect: "write" as const,
+              idempotency_key: "idem_early",
+            },
+            {
+              id: "write",
+              description: "write",
+              tool: { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
+              depends_on: ["early_create"],
+              side_effect: "write" as const,
+              idempotency_key: "idem_write",
+            },
+            {
+              id: "late_create",
+              description: "late create",
+              tool: { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c2" } },
+              depends_on: ["write"],
+              side_effect: "write" as const,
+              idempotency_key: "idem_late",
+            },
+          ],
+          outputs: {},
+        },
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: { id: "test_causal", prompt: "write file then notify or create card", runtime: {} },
+        oracle: causalOracle,
+        rubric: causalRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.semanticJudgment).toBe("incorrect");
+      expect(score.taskCorrect).toBe(false);
+      expect(score.issues.some((i) => /causal order violated/i.test(i))).toBe(true);
+    });
+
+    it("flags needs_review when refusal reason lacks expected rubric domain keywords", () => {
+      // Candidate refuses on b06 (translation) with an unhelpful non-domain reason
+      const candidate = {
+        kind: "refusal",
+        reason: "Tôi cảm thấy mệt mỏi và không muốn làm hôm nay.",
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: b06.input,
+        oracle: b06.oracle,
+        rubric: rawRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.semanticJudgment).toBe("needs_review");
+      expect(score.reviewReason).toMatch(/refusal reason did not contain expected rubric domain keywords/i);
+    });
+
+    it("flags needs_review when clarification question lacks expected missing info targets", () => {
+      // Candidate asks an irrelevant question on b05
+      const candidate = {
+        kind: "clarification",
+        question: "Hôm nay trời có mưa không?",
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: b05.input,
+        oracle: b05.oracle,
+        rubric: rawRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.semanticJudgment).toBe("needs_review");
+      expect(score.reviewReason).toMatch(/clarification question did not reference expected missing info/i);
+    });
+
+    it("rejects plan when a required read from rubric was not executed", () => {
+      // b01 requires task_hub.list_cards in rubric.
+      // Candidate produces a valid plan with a write step, but does not execute the required read.
+      const candidate = {
+        kind: "plan" as const,
+        plan: {
+          version: "1.0",
+          name: "Plan without required read",
+          source_prompt: "test",
+          inputs: {},
+          steps: [
+            {
+              id: "write_something",
+              description: "write something else",
+              tool: { server: "filesystem", name: "write_file", args: { path: "log.txt", content: "done" } },
+              depends_on: [],
+              side_effect: "write" as const,
+              idempotency_key: "idem_log",
+            },
+          ],
+          outputs: {},
+        },
+      };
+
+      const score = scoreLiveCandidate({
+        caseInput: b01.input,
+        oracle: b01.oracle,
+        rubric: rawRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.semanticJudgment).toBe("incorrect");
+      expect(score.issues.some((i) => /required read tool not executed/i.test(i))).toBe(true);
+    });
+
+    it("handles invalid runtime time zone gracefully without throwing an unhandled exception", () => {
+      const candidate = structuredClone(b01.oracle.expected_result);
+      const score = scoreLiveCandidate({
+        caseInput: { id: "b01", prompt: "test", runtime: { time_zone: "Invalid/Fake_Zone_123" } },
+        oracle: b01.oracle,
+        rubric: rawRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.structuralValidity).toBe(false);
+      expect(score.reviewReason).toMatch(/invalid runtime environment/i);
+    });
   });
 });

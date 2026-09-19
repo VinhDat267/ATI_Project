@@ -247,6 +247,21 @@ export function assertNoGoldCanaryInPayload(
 
     if (payload instanceof AbortSignal) return;
 
+    if (payload instanceof Set) {
+      for (const item of payload) {
+        assertNoGoldCanaryInPayload(item, canary, seen);
+      }
+      return;
+    }
+
+    if (payload instanceof Map) {
+      for (const [key, value] of payload) {
+        assertNoGoldCanaryInPayload(key, canary, seen);
+        assertNoGoldCanaryInPayload(value, canary, seen);
+      }
+      return;
+    }
+
     if (Array.isArray(payload)) {
       for (const item of payload) {
         assertNoGoldCanaryInPayload(item, canary, seen);
@@ -277,10 +292,28 @@ export function validateSealedHoldoutBundle(bundle: unknown): boolean {
   }
 
   const approver = parsed.data.approvedBy.toLowerCase();
-  const agentTokens = ["agent", "claude", "bot", "auto", "synthetic", "script"];
+  const agentTokens = [
+    "agent",
+    "claude",
+    "bot",
+    "auto",
+    "synthetic",
+    "script",
+    "copilot",
+    "gpt",
+    "gemini",
+    "llm",
+    "ai",
+  ];
   if (agentTokens.some((token) => approver.includes(token))) {
     throw new LiveDatasetError(
       "A coding agent cannot approve its own generated holdout by writing an approval field",
+    );
+  }
+
+  if (!approver.startsWith("user:")) {
+    throw new LiveDatasetError(
+      "Sealed holdout bundle must be approved by an authorized human user principal ('user:<id>')",
     );
   }
 

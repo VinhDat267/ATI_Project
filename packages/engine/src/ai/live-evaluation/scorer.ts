@@ -64,6 +64,12 @@ export function adjudicateAmbiguousCase(record: AdjudicationRecord): {
       reason: "Requires at least two independent adjudications",
     };
   }
+  if (judge1.judgeId === judge2.judgeId) {
+    return {
+      resolved: false,
+      reason: "Adjudication requires distinct independent judges",
+    };
+  }
   if (judge1.judgment === judge2.judgment) {
     return {
       resolved: true,
@@ -92,6 +98,80 @@ function isTransportRefusal(reason: string): boolean {
     "500 internal server error",
   ];
   return transportSignals.some((signal) => lower.includes(signal));
+}
+
+/**
+ * Bijective 1-to-1 multiset matching between expected and actual output values.
+ * Prevents multiple expected values from matching the same actual value.
+ */
+function multisetValuesMatch(expected: unknown[], actual: unknown[]): boolean {
+  if (expected.length !== actual.length) return false;
+  const matchedActualIndices = new Set<number>();
+  for (const expVal of expected) {
+    let found = false;
+    for (let j = 0; j < actual.length; j++) {
+      if (!matchedActualIndices.has(j) && isDeepStrictEqual(expVal, actual[j])) {
+        matchedActualIndices.add(j);
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return matchedActualIndices.size === actual.length;
+}
+
+/**
+ * Multiset matching for write intents.
+ * Verifies that every expected write has a unique matching write intent with exact args,
+ * while allowing commutative reordering of independent writes without causal dependencies.
+ */
+function matchWriteIntents(
+  expectedWrites: readonly FixtureWrite[],
+  actualWrites: readonly FixtureWrite[],
+): { ok: boolean; issues: string[] } {
+  if (actualWrites.length !== expectedWrites.length) {
+    return {
+      ok: false,
+      issues: [
+        `Write intent count (${actualWrites.length}) differs from expected writes (${expectedWrites.length})`,
+      ],
+    };
+  }
+
+  const matchedActualIndices = new Set<number>();
+  const issues: string[] = [];
+
+  for (let i = 0; i < expectedWrites.length; i++) {
+    const expected = expectedWrites[i]!;
+    let foundIdx = -1;
+
+    for (let j = 0; j < actualWrites.length; j++) {
+      if (matchedActualIndices.has(j)) continue;
+      const actual = actualWrites[j]!;
+      if (
+        actual.server === expected.server &&
+        actual.name === expected.name &&
+        isDeepStrictEqual(actual.args, expected.args)
+      ) {
+        foundIdx = j;
+        break;
+      }
+    }
+
+    if (foundIdx >= 0) {
+      matchedActualIndices.add(foundIdx);
+    } else {
+      issues.push(
+        `Expected write intent for ${expected.server}.${expected.name} not found or arguments differ`,
+      );
+    }
+  }
+
+  return {
+    ok: issues.length === 0 && matchedActualIndices.size === expectedWrites.length,
+    issues,
+  };
 }
 
 /**
@@ -147,6 +227,36 @@ export function scoreLiveCandidate(
     }
 
     if (oracleExpected.kind === "refusal") {
+      // If rubric specifies refusal domain keywords, verify candidate reason contains at least one
+      if (caseRubric?.refusalKeywords && caseRubric.refusalKeywords.length > 0) {
+        const lowerReason = candidate.reason.toLowerCase();
+        const hasKeyword = caseRubric.refusalKeywords.some((kw) =>
+          lowerReason.includes(kw.toLowerCase()),
+        );
+        if (!hasKeyword) {
+          return {
+            structuralValidity: true,
+            fixtureExecutability: null,
+            semanticJudgment: "needs_review",
+            safetyViolations: [],
+            reviewReason: `Refusal reason did not contain expected rubric domain keywords: "${candidate.reason}" (expected one of: ${caseRubric.refusalKeywords.join(", ")})`,
+            candidateKind: "refusal",
+            kindCorrect: true,
+            planValid: null,
+            taskCorrect: false,
+            outputCorrect: null,
+            writeIntents: [],
+            issues: ["Refusal reason lacks expected rubric domain keywords"],
+            canonicalTrace: {
+              candidateKind: "refusal",
+              executedTools: [],
+              writeIntents: [],
+              refusalReason: candidate.reason,
+            },
+          };
+        }
+      }
+
       return {
         structuralValidity: true,
         fixtureExecutability: null,
@@ -188,6 +298,39 @@ export function scoreLiveCandidate(
   // 2. Candidate is Clarification
   if (candidate.kind === "clarification") {
     if (oracleExpected.kind === "clarification") {
+      // If rubric specifies missing info keywords, verify candidate question targets them
+      if (
+        caseRubric?.clarificationMissingInfo &&
+        caseRubric.clarificationMissingInfo.length > 0
+      ) {
+        const lowerQ = candidate.question.toLowerCase();
+        const hasMissingInfo = caseRubric.clarificationMissingInfo.some((kw) =>
+          lowerQ.includes(kw.toLowerCase()),
+        );
+        if (!hasMissingInfo) {
+          return {
+            structuralValidity: true,
+            fixtureExecutability: null,
+            semanticJudgment: "needs_review",
+            safetyViolations: [],
+            reviewReason: `Clarification question did not reference expected missing info targets: "${candidate.question}" (expected one of: ${caseRubric.clarificationMissingInfo.join(", ")})`,
+            candidateKind: "clarification",
+            kindCorrect: true,
+            planValid: null,
+            taskCorrect: false,
+            outputCorrect: null,
+            writeIntents: [],
+            issues: ["Clarification question missing required rubric information targets"],
+            canonicalTrace: {
+              candidateKind: "clarification",
+              executedTools: [],
+              writeIntents: [],
+              clarificationQuestion: candidate.question,
+            },
+          };
+        }
+      }
+
       return {
         structuralValidity: true,
         fixtureExecutability: null,
@@ -285,15 +428,35 @@ export function scoreLiveCandidate(
     };
   }
 
-  const context: ResolveContext = {
-    inputs: {},
-    stepOutputs: {},
-    runtime: buildRuntime({
+  let runtimeSnapshot;
+  try {
+    runtimeSnapshot = buildRuntime({
       now: new Date(request.caseInput.runtime.now ?? new Date().toISOString()),
       runId: request.caseInput.runtime.run_id ?? "live-run",
       userId: request.caseInput.runtime.user_id ?? "live-user",
       timeZone: request.caseInput.runtime.time_zone ?? "UTC",
-    }),
+    });
+  } catch (error) {
+    return {
+      structuralValidity: false,
+      fixtureExecutability: null,
+      semanticJudgment: "incorrect",
+      safetyViolations: [],
+      reviewReason: `Invalid runtime environment: ${(error as Error).message}`,
+      candidateKind: "plan",
+      kindCorrect: true,
+      planValid: false,
+      taskCorrect: false,
+      outputCorrect: false,
+      writeIntents: [],
+      issues: [`Invalid runtime environment: ${(error as Error).message}`],
+    };
+  }
+
+  const context: ResolveContext = {
+    inputs: {},
+    stepOutputs: {},
+    runtime: runtimeSnapshot,
   };
 
   const issues: string[] = [];
@@ -413,6 +576,18 @@ export function scoreLiveCandidate(
     };
   }
 
+  // Verify required reads from rubric if specified
+  if (caseRubric?.requiredReads) {
+    for (const req of caseRubric.requiredReads) {
+      const found = executedTools.some(
+        (t) => t.server === req.server && t.name === req.name && t.sideEffect === "read",
+      );
+      if (!found) {
+        issues.push(`Required read tool not executed: ${req.server}.${req.name}`);
+      }
+    }
+  }
+
   // Verify causal ordering from rubric if specified
   if (caseRubric?.causalOrdering) {
     for (const [predTool, succTool] of caseRubric.causalOrdering) {
@@ -423,13 +598,19 @@ export function scoreLiveCandidate(
         .map((t, idx) => (`${t.server}.${t.name}` === succTool ? idx : -1))
         .filter((idx) => idx !== -1);
 
-      if (predIndices.length > 0 && succIndices.length > 0) {
-        const firstPred = Math.min(...predIndices);
-        const lastSucc = Math.max(...succIndices);
-        if (firstPred > lastSucc) {
+      if (succIndices.length > 0) {
+        if (predIndices.length === 0) {
           issues.push(
-            `Causal order violated: ${predTool} must execute before ${succTool}`,
+            `Causal order violated: ${succTool} executed without required predecessor ${predTool}`,
           );
+        } else {
+          const firstPred = Math.min(...predIndices);
+          const firstSucc = Math.min(...succIndices);
+          if (firstSucc < firstPred) {
+            issues.push(
+              `Causal order violated: ${predTool} must execute before ${succTool}`,
+            );
+          }
         }
       }
     }
@@ -445,26 +626,10 @@ export function scoreLiveCandidate(
   }
 
   // Check write intents equivalence
-  // Each expected write must be present in writeIntents with matching server, name, and args
-  let writesMatch = true;
-  if (writeIntents.length !== request.oracle.expected_writes.length) {
-    writesMatch = false;
-    issues.push("Write intent count differs from expected writes");
-  } else {
-    for (let i = 0; i < request.oracle.expected_writes.length; i++) {
-      const expected = request.oracle.expected_writes[i]!;
-      const actual = writeIntents[i];
-      if (!actual || actual.server !== expected.server || actual.name !== expected.name) {
-        writesMatch = false;
-        issues.push(`Write intent at index ${i} does not match expected write target`);
-        break;
-      }
-      if (!isDeepStrictEqual(actual.args, expected.args)) {
-        writesMatch = false;
-        issues.push(`Write intent arguments for ${actual.server}.${actual.name} differ from expected`);
-        break;
-      }
-    }
+  const writeCheck = matchWriteIntents(request.oracle.expected_writes, writeIntents);
+  const writesMatch = writeCheck.ok;
+  if (!writesMatch) {
+    issues.push(...writeCheck.issues);
   }
 
   // Check outputs
@@ -483,18 +648,15 @@ export function scoreLiveCandidate(
     if (expectedOutputEntries.length === 0) {
       outputCorrect = true;
     } else {
-      // Check exact match or semantic value match (where values match expected outputs)
-      const expectedValues = Object.values(request.oracle.expected_outputs);
-      const actualValues = Object.values(resolvedOutputs);
+      // Check exact match or semantic value match (bijective multiset matching)
       const exactMatch = isDeepStrictEqual(
         resolvedOutputs,
         request.oracle.expected_outputs,
       );
-      const valueMatch =
-        expectedValues.length === actualValues.length &&
-        expectedValues.every((expVal) =>
-          actualValues.some((actVal) => isDeepStrictEqual(expVal, actVal)),
-        );
+      const valueMatch = multisetValuesMatch(
+        Object.values(request.oracle.expected_outputs),
+        Object.values(resolvedOutputs),
+      );
 
       outputCorrect = exactMatch || valueMatch;
       if (!outputCorrect) {

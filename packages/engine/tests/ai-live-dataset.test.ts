@@ -200,6 +200,34 @@ describe("AI Live Evaluation Dataset & Boundary (Task T5)", () => {
         assertNoGoldCanaryInPayload(req, GOLD_CANARY_SECRET);
       }
     });
+
+    it("detects and throws when gold canary leaks into nested Set or Map objects", () => {
+      const CANARY = "CANARY_IN_COLLECTION_123";
+
+      // Leaked in Set
+      const setPayload = {
+        data: new Set(["safe_item", `prefix_${CANARY}_suffix`]),
+      };
+      expect(() => assertNoGoldCanaryInPayload(setPayload, CANARY)).toThrow(
+        /Gold canary leaked/i,
+      );
+
+      // Leaked in Map value
+      const mapValPayload = {
+        headers: new Map([["content-type", "application/json"], ["x-debug", CANARY]]),
+      };
+      expect(() => assertNoGoldCanaryInPayload(mapValPayload, CANARY)).toThrow(
+        /Gold canary leaked/i,
+      );
+
+      // Leaked in Map key
+      const mapKeyPayload = {
+        cache: new Map([[CANARY, "some_value"]]),
+      };
+      expect(() => assertNoGoldCanaryInPayload(mapKeyPayload, CANARY)).toThrow(
+        /Gold canary leaked/i,
+      );
+    });
   });
 
   describe("Exposure tracking (dev vs legacy_regression)", () => {
@@ -260,6 +288,22 @@ describe("AI Live Evaluation Dataset & Boundary (Task T5)", () => {
 
       expect(() => validateSealedHoldoutBundle(agentBundle)).toThrow(
         /agent.*cannot approve.*holdout/i,
+      );
+    });
+
+    it("rejects approvers without the required 'user:<id>' human principal prefix", () => {
+      const invalidBundle: SealedHoldoutBundle = {
+        format: "ati-ai-live-sealed-holdout-v1",
+        approvedBy: "github-actions-ci",
+        approvedAt: "2026-09-19T00:00:00Z",
+        exposureHistory: "previously_unseen_fresh_holdout",
+        casesHash: "a".repeat(64),
+        rubricHash: "b".repeat(64),
+        budgetCapMicros: 10_000_000,
+      };
+
+      expect(() => validateSealedHoldoutBundle(invalidBundle)).toThrow(
+        /authorized human user principal/i,
       );
     });
 
