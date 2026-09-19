@@ -12,7 +12,11 @@ import type { Route } from "../core/navigation.js";
 import { navigate, parseRoute } from "../core/navigation.js";
 import { shouldRetry } from "../core/queries.js";
 import type { SessionController } from "../core/session.js";
-import { AppProvider, type AppHints } from "./context";
+import {
+  AppProvider,
+  createControllerRegistry,
+  type AppHints,
+} from "./context";
 import { AppShell } from "./shell/AppShell";
 import { HistoryView } from "./views/HistoryView";
 import { LoginView } from "./views/LoginView";
@@ -114,6 +118,17 @@ export function App({
     if (!snapshot.token) drafts.clear();
   }, [snapshot.token, drafts]);
 
+  const controllers = useMemo(
+    () => createControllerRegistry(transport, session),
+    [transport, session, snapshot.generation],
+  );
+  useEffect(
+    () => () => {
+      controllers.clear();
+    },
+    [controllers],
+  );
+
   const context = useMemo(
     () => ({
       transport,
@@ -123,8 +138,18 @@ export function App({
       drafts,
       hints,
       mode,
+      controllers,
     }),
-    [transport, session, snapshot.generation, email, drafts, hints, mode],
+    [
+      transport,
+      session,
+      snapshot.generation,
+      email,
+      drafts,
+      hints,
+      mode,
+      controllers,
+    ],
   );
 
   if (!snapshot.token) {

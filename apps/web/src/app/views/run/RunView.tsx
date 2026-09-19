@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { EventPage, Reconciliation, RunDetail, TracePage } from "../../../core/contracts.js";
 import { routeToHash } from "../../../core/navigation.js";
 import {
@@ -279,16 +279,28 @@ function SummaryRail({
 
 /** V05 — one run: plan, what will be/was written, decision, recovery. */
 export function RunView({ runId }: { runId: string }) {
-  const { transport, generation, hints } = useApp();
-  const detailOptions = detailQuery(transport, generation, runId);
-  const detail = useQuery({
-    ...detailOptions,
-    refetchInterval: (query) => detailOptions.refetchInterval(query.state.data),
-  });
-  const run = detail.data;
+  const { transport, generation, hints, controllers } = useApp();
+  const runSync = controllers.getRunSync(runId);
+
+  useEffect(() => {
+    runSync.start();
+    return () => runSync.stop();
+  }, [runSync]);
+
+  const syncSnapshot = useSyncExternalStore(
+    runSync.subscribe,
+    runSync.getSnapshot,
+    runSync.getSnapshot,
+  );
+
+  const run = syncSnapshot.detail;
+  const events = syncSnapshot.eventState.events;
   const pollWhileLive = run && !runPresentation(run.status).terminal ? 2000 : false;
-  const trace = useQuery({ ...traceQuery(transport, generation, runId), enabled: !!run, refetchInterval: pollWhileLive });
-  const events = useQuery({ ...eventsQuery(transport, generation, runId), enabled: !!run, refetchInterval: pollWhileLive });
+  const trace = useQuery({
+    ...traceQuery(transport, generation, runId),
+    enabled: !!run,
+    refetchInterval: pollWhileLive,
+  });
   const reconciliation = useQuery({
     ...reconciliationQuery(transport, generation, runId),
     enabled: run?.status === "reconciliation_required",
@@ -305,24 +317,24 @@ export function RunView({ runId }: { runId: string }) {
     </a>
   );
 
-  if (detail.isPending) {
+  if (!run) {
+    if (syncSnapshot.error) {
+      return (
+        <>
+          {back}
+          <h1 className="m-0 text-display-md-mobile desk:text-display-md">Không mở được lần chạy</h1>
+          <ErrorState
+            title="Lần chạy không tồn tại hoặc không thuộc phiên này"
+            error={syncSnapshot.error}
+            onRetry={() => void runSync.refresh()}
+          />
+        </>
+      );
+    }
     return (
       <>
         {back}
         <LoadingState label="Đang tải lần chạy…" />
-      </>
-    );
-  }
-  if (detail.isError || !run) {
-    return (
-      <>
-        {back}
-        <h1 className="m-0 text-display-md-mobile desk:text-display-md">Không mở được lần chạy</h1>
-        <ErrorState
-          title="Lần chạy không tồn tại hoặc không thuộc phiên này"
-          error={detail.error}
-          onRetry={() => void detail.refetch()}
-        />
       </>
     );
   }
@@ -451,7 +463,7 @@ export function RunView({ runId }: { runId: string }) {
             </TechDisclosure>
           </section>
 
-          <Activity run={run} events={events.data} />
+          <Activity run={run} events={events} />
         </div>
 
         <aside className="flex flex-col gap-4 desk:sticky desk:top-6">

@@ -2,6 +2,9 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { Transport } from "../core/contracts.js";
 import type { DraftStore } from "../core/draft.js";
 import type { SessionController } from "../core/session.js";
+import type { ControllerRegistry } from "../controllers/registry.js";
+
+export { createControllerRegistry, type ControllerRegistry } from "../controllers/registry.js";
 
 export interface AppHints {
   /** Planner suggestion for a needs_input run, when the transport has one. */
@@ -16,6 +19,7 @@ export interface AppContextValue {
   drafts: DraftStore;
   hints: AppHints;
   mode: "fixture" | "live";
+  controllers: ControllerRegistry;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
