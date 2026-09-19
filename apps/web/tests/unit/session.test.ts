@@ -36,4 +36,31 @@ describe("createSession", () => {
     expect(scope.isCurrent()).toBe(false);
     expect(scope.signal.aborted).toBe(true);
   });
+
+  it("aborts active requests and advances generation on clear even when logged out", () => {
+    const session = createSession();
+    const initialGen = session.store.getSnapshot().generation;
+    const scope = session.beginRequest();
+
+    expect(scope.isCurrent()).toBe(true);
+    expect(scope.signal.aborted).toBe(false);
+
+    session.clear();
+
+    expect(scope.signal.aborted).toBe(true);
+    expect(scope.isCurrent()).toBe(false);
+    expect(session.store.getSnapshot().generation).toBe(initialGen + 1);
+  });
+
+  it("allows disposing a scope when request completes without aborting", () => {
+    const session = createSession();
+    const scope = session.beginRequest();
+
+    expect(scope.isCurrent()).toBe(true);
+    scope.dispose();
+
+    // Disposing should remove it from active controllers so it's not leaked
+    expect(scope.signal.aborted).toBe(false);
+  });
 });
+

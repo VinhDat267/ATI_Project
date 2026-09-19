@@ -10,6 +10,7 @@ export interface RequestScope {
   signal: AbortSignal;
   isCurrent(): boolean;
   abort(): void;
+  dispose(): void;
 }
 
 export interface SessionController {
@@ -28,11 +29,13 @@ export function createSession(): SessionController {
   const store = createStore<Session>({ generation: 0, token: null });
   const activeControllers = new Set<AbortController>();
 
-  const invalidateRequests = (): void => {
+  const invalidateRequests = (): number => {
+    const count = activeControllers.size;
     for (const controller of activeControllers) {
       controller.abort();
     }
     activeControllers.clear();
+    return count;
   };
 
   const changeToken = (token: string | null): void => {
@@ -53,18 +56,19 @@ export function createSession(): SessionController {
       changeToken(token);
     },
     clear() {
-      changeToken(null);
+      const current = store.getSnapshot();
+      const invalidatedCount = invalidateRequests();
+      if (current.token !== null || invalidatedCount > 0) {
+        store.set({ generation: current.generation + 1, token: null });
+      }
     },
     getToken: () => store.getSnapshot().token,
     beginRequest() {
       const controller = new AbortController();
       const generation = store.getSnapshot().generation;
       activeControllers.add(controller);
-      controller.signal.addEventListener(
-        "abort",
-        () => activeControllers.delete(controller),
-        { once: true },
-      );
+      const onAbort = () => activeControllers.delete(controller);
+      controller.signal.addEventListener("abort", onAbort, { once: true });
       return {
         generation,
         signal: controller.signal,
@@ -72,6 +76,10 @@ export function createSession(): SessionController {
           !controller.signal.aborted &&
           store.getSnapshot().generation === generation,
         abort: () => controller.abort(),
+        dispose: () => {
+          controller.signal.removeEventListener("abort", onAbort);
+          activeControllers.delete(controller);
+        },
       };
     },
   };
