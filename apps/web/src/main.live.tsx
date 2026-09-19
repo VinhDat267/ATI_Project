@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App.js";
+import { createHttpTransport } from "./core/api.js";
 import { createSession } from "./core/session.js";
-import { createUnavailableTransport } from "./core/unavailable-transport.js";
 
 export function bootstrap(): void {
   const rootElement = document.getElementById("app");
@@ -10,11 +10,16 @@ export function bootstrap(): void {
     throw new Error("Root element #app not found");
   }
 
+  const session = createSession();
+  const transport = createHttpTransport({
+    getToken: () => session.getToken(),
+  });
+
   createRoot(rootElement).render(
     <StrictMode>
       <App
-        transport={createUnavailableTransport()}
-        session={createSession()}
+        transport={transport}
+        session={session}
         mode="live"
       />
     </StrictMode>,

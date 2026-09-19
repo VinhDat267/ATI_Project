@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import type { SessionController } from "../../core/session.js";
 import type { Transport } from "../../core/contracts.js";
+import { ClientError } from "../../core/errors.js";
 import { cn } from "@/lib/cn";
 import { Button } from "../components/Button";
 import { Icon, type IconName } from "../components/Icon";
@@ -40,7 +41,7 @@ export function LoginView({
         const token = await transport.login(input.email, input.password, scope.signal);
         return { token, current: scope.isCurrent() };
       } finally {
-        scope.abort();
+        scope.dispose();
       }
     },
     retry: 0,
@@ -60,6 +61,22 @@ export function LoginView({
   };
 
   const failed = login.isError;
+  const errorMessage = (() => {
+    if (!login.error) return null;
+    if (login.error instanceof ClientError) {
+      if (login.error.status === 401) {
+        return "Email hoặc mật khẩu không đúng. Kiểm tra lại mật khẩu rồi thử lại.";
+      }
+      if (login.error.status === 429) {
+        return "Quá nhiều lần thử đăng nhập. Vui lòng đợi và thử lại sau.";
+      }
+      if (login.error.kind === "network") {
+        return "Không thể kết nối đến máy chủ. Kiểm tra kết nối mạng hoặc máy chủ.";
+      }
+      return login.error.message;
+    }
+    return "Email hoặc mật khẩu không đúng. Kiểm tra lại mật khẩu rồi thử lại.";
+  })();
 
   return (
     <div className="min-h-dvh bg-canvas">
@@ -86,9 +103,9 @@ export function LoginView({
           <h1 id="login-title" className="m-0 text-display-md-mobile desk:text-display-md">
             Đăng nhập
           </h1>
-          {failed ? (
+          {failed && errorMessage ? (
             <p id={errorId} role="alert" className="m-0 rounded-sm bg-danger-subtle p-3 text-body-md text-danger">
-              Email hoặc mật khẩu không đúng. Kiểm tra lại mật khẩu rồi thử lại.
+              {errorMessage}
             </p>
           ) : null}
           <div className="flex flex-col gap-2">
