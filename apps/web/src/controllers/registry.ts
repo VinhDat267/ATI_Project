@@ -5,12 +5,17 @@ import {
   type CreateRunController,
 } from "./create-run.js";
 import {
+  createRunCommandController,
+  type RunCommandController,
+} from "./run-commands.js";
+import {
   createRunSyncController,
   type RunSyncController,
 } from "./run-sync.js";
 
 export interface ControllerRegistry {
   getRunSync(runId: string): RunSyncController;
+  getRunCommands(runId: string): RunCommandController;
   getCreateRun(): CreateRunController;
   clear(): void;
 }
@@ -20,6 +25,7 @@ export function createControllerRegistry(
   session: SessionController,
 ): ControllerRegistry {
   const runSyncs = new Map<string, RunSyncController>();
+  const runCommands = new Map<string, RunCommandController>();
   const createRun = createCreateRunController(transport, session);
 
   return {
@@ -31,11 +37,23 @@ export function createControllerRegistry(
       }
       return controller;
     },
+    getRunCommands(runId: string) {
+      let controller = runCommands.get(runId);
+      if (!controller) {
+        controller = createRunCommandController(transport, session, runId);
+        runCommands.set(runId, controller);
+      }
+      return controller;
+    },
     getCreateRun() {
       return createRun;
     },
     clear() {
       createRun.reset();
+      for (const controller of runCommands.values()) {
+        controller.reset();
+      }
+      runCommands.clear();
       for (const controller of runSyncs.values()) {
         controller.stop();
       }

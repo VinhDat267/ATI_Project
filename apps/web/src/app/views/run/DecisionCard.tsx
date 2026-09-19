@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RunDetail } from "../../../core/contracts.js";
 import { formatClock, formatRemaining } from "../../../core/presentation.js";
 import { runKeys } from "../../../core/queries.js";
@@ -35,8 +35,14 @@ function writeIcon(write: WriteSummary): IconName {
  * largest element; the timer is one line above the approve button.
  */
 export function DecisionCard({ run }: { run: RunDetail }) {
-  const { transport, generation } = useApp();
+  const { controllers, generation } = useApp();
   const queryClient = useQueryClient();
+  const commandController = controllers.getRunCommands(run.run_id);
+  const commandSnapshot = useSyncExternalStore(
+    commandController.subscribe,
+    commandController.getSnapshot,
+    commandController.getSnapshot,
+  );
   const approval = run.approval!;
   const writes = approval.actions.map((action) => summarizeAction(action));
   const now = useNow(1000);
@@ -44,6 +50,10 @@ export function DecisionCard({ run }: { run: RunDetail }) {
   const remaining = formatRemaining(remainingMs);
   const [announcement, setAnnouncement] = useState("");
   const announced = useRef<number | null>(null);
+
+  useEffect(() => {
+    commandController.reconcileWithDetail(run);
+  }, [run, commandController]);
 
   // Screen readers hear milestones (9/5/2/1 min, expiry), never every second.
   useEffect(() => {
@@ -68,30 +78,36 @@ export function DecisionCard({ run }: { run: RunDetail }) {
     }
   }, [remaining.expired, queryClient, generation, run.run_id]);
 
-  const decide = useMutation({
-    mutationFn: (decision: "approved" | "rejected") =>
-      transport.decide(
-        run.run_id,
-        {
-          approval_id: approval.id,
-          workflow_version_id: approval.workflow_version_id,
-          snapshot_hash: approval.snapshot_hash,
-          decision,
-        },
-        new AbortController().signal,
-      ),
-    retry: 0,
-    onSuccess: (detail) => {
+  const handleDecide = async (decision: "approved" | "rejected"): Promise<void> => {
+    const detail = await commandController.decide(
+      {
+        approval_id: approval.id,
+        workflow_version_id: approval.workflow_version_id,
+        snapshot_hash: approval.snapshot_hash,
+        decision,
+      },
+      run.time_zone,
+    );
+    if (detail) {
       queryClient.setQueryData(runKeys(generation).detail(run.run_id), detail);
       void queryClient.invalidateQueries({ queryKey: runKeys(generation).list });
-    },
-    onError: () => {
+      const runSync = controllers.getRunSync(run.run_id);
+      void runSync.refresh();
+    } else {
       void queryClient.invalidateQueries({ queryKey: runKeys(generation).detail(run.run_id) });
-    },
-  });
+      const runSync = controllers.getRunSync(run.run_id);
+      void runSync.refresh();
+    }
+  };
 
-  const locked = decide.isPending || remaining.expired;
-  const pendingDecision = decide.isPending ? decide.variables : null;
+  const isSubmitting = commandSnapshot.status === "submitting";
+  const isConfirming = commandSnapshot.status === "confirming";
+  const locked = isSubmitting || isConfirming || remaining.expired;
+  const pendingDecision = isSubmitting
+    ? commandSnapshot.action === "approve"
+      ? "approved"
+      : "rejected"
+    : null;
 
   return (
     <section
@@ -112,9 +128,14 @@ export function DecisionCard({ run }: { run: RunDetail }) {
         </ul>
       </div>
 
-      {decide.isError ? (
+      {commandSnapshot.status === "confirming" ? (
+        <Banner tone="unknown" icon="triangle-alert" title="Chưa xác nhận được quyết định đã được xử lý hay chưa" live>
+          Máy chủ không phản hồi khi gửi quyết định{commandSnapshot.lostAt ? ` lúc ${commandSnapshot.lostAt}` : ""}. Hệ thống không tự gửi lại để tránh ghi trùng. Trạng thái lần chạy đang được kiểm tra tự động.
+        </Banner>
+      ) : commandSnapshot.status === "error" ? (
         <Banner tone="danger" icon="circle-x" title="Chưa gửi được quyết định" live>
-          Trạng thái lần chạy đang được tải lại. Nếu bản xem trước đã hết hạn hoặc đã có quyết định khác, trang sẽ cập nhật theo máy chủ.
+          {commandSnapshot.error?.message ??
+            "Trạng thái lần chạy đang được tải lại. Nếu bản xem trước đã hết hạn hoặc đã có quyết định khác, trang sẽ cập nhật theo máy chủ."}
         </Banner>
       ) : null}
 
@@ -153,11 +174,11 @@ export function DecisionCard({ run }: { run: RunDetail }) {
         <Button
           aria-describedby="write-summary expiry"
           disabled={locked}
-          onClick={() => decide.mutate("approved")}
+          onClick={() => void handleDecide("approved")}
         >
           {pendingDecision === "approved" ? "Đang gửi…" : `Duyệt ${writes.length} thao tác ghi`}
         </Button>
-        <Button variant="secondary" disabled={locked} onClick={() => decide.mutate("rejected")}>
+        <Button variant="secondary" disabled={locked} onClick={() => void handleDecide("rejected")}>
           {pendingDecision === "rejected" ? "Đang gửi…" : "Từ chối ghi"}
         </Button>
         <span className="text-center text-body-sm text-muted">
