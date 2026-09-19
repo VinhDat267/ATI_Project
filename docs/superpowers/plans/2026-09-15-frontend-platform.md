@@ -140,6 +140,8 @@ expect(s.store.getSnapshot()).toEqual({generation:before+2,token:null});
 
 ## WEB-01C — Sáu view và trạng thái tương tác
 
+> **Implemented 2026-09-19 on `feat/web-01c`.** The superseding executable plan is [2026-09-18-web-01c-views.md](2026-09-18-web-01c-views.md), which records the ADR-002 Tailwind/shadcn/TanStack Query architecture, multi-run fixture world, recovery flows and verification gate. Do not execute the legacy checklist below; it is retained for historical planning context only.
+
 **Files:** map C; thêm `apps/web/src/core/presentation.ts`, `apps/web/tests/unit/presentation.test.ts`, `apps/web/tests/browser/views.spec.ts`.
 
 **Consumes:** Route/Transport/RunDetail và stores. **Produces:** view nhận data/loading/error + callbacks, không fetch trong component; `runPresentation(status:RunDetail['status'])` trả `{label:string,tone:'neutral'|'info'|'success'|'warning'|'danger',terminal:boolean,canCancel:boolean}` exhaustive bằng `satisfies Record<RunDetail['status'],...>`. `ActionCard` nhận một Approval.actions entry, không nhận transport/token.
