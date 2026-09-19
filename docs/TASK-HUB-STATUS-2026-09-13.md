@@ -71,7 +71,7 @@ Tất cả 8 tool đều nằm trên **một server stdio `task_hub`** duy nhấ
 # 1. Build mã nguồn TypeScript trước khi chuẩn bị hoặc chạy
 npm run build
 
-# 2. Khởi động Docker containers (PostgreSQL 55432, Redis 56379)
+# 2. Khởi động Docker containers (PostgreSQL 55532, Redis 56379)
 npm run db:up:g1
 
 # 3. Áp dụng toàn bộ 4 migration lên database demo wap_g1 (bảo toàn dữ liệu cũ)

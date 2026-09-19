@@ -1,0 +1,18 @@
+{
+  "mode": "offline",
+  "cells": [
+    { "variant": "all_tools", "topK": 10 },
+    { "variant": "semantic", "topK": 3 },
+    { "variant": "semantic", "topK": 5 },
+    { "variant": "semantic", "topK": 10 },
+    { "variant": "semantic_qe", "topK": 3 },
+    { "variant": "semantic_qe", "topK": 5 },
+    { "variant": "semantic_qe", "topK": 10 }
+  ],
+  "repetitions": 3,
+  "maxPlanningCalls": 3,
+  "deadlineMs": 1000,
+  "modelFixture": "oracle-replay-v1",
+  "embeddingFixture": "character-hash-v1",
+  "expansionFixture": "identity-query-expansion-v1"
+}

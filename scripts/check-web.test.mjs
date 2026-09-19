@@ -10,7 +10,21 @@ import {
   validateBundleBudgets,
   aggregateLatencyReport,
   runCommandSync,
+  resolveWebGateAdminUrls,
 } from "./check-web-lib.mjs";
+
+test("resolveWebGateAdminUrls uses the current 55532 G1 endpoint and de-duplicates overrides", () => {
+  assert.deepEqual(
+    resolveWebGateAdminUrls({
+      API_TEST_ADMIN_URL: "postgresql://wap:wap@127.0.0.1:55532/wap_g1",
+      G1_TEST_ADMIN_URL: "postgresql://wap:wap@127.0.0.1:55532/wap_g1",
+    }),
+    ["postgresql://wap:wap@127.0.0.1:55532/wap_g1"],
+  );
+  assert.deepEqual(resolveWebGateAdminUrls({}), [
+    "postgresql://wap:wap@127.0.0.1:55532/wap_g1",
+  ]);
+});
 
 test("createWebGatePlan returns ordered list of gate commands without shell", () => {
   const plan = createWebGatePlan();

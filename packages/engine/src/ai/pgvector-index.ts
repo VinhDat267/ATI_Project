@@ -15,11 +15,13 @@ import type {
 } from "./ports.js";
 import {
   RetrievalValidationError,
+  assertExpectedEmbeddingProfile,
   type EmbeddingProvenance,
   type RetrievalRequest,
   type RetrievalResult,
   type ToolEmbeddingRow,
   type ToolRetriever,
+  type ExpectedEmbeddingProfile,
 } from "./retrieval.js";
 
 export const PGVECTOR_DIMENSIONS = 1536;
@@ -82,11 +84,20 @@ function parseProvenance(value: unknown, label: string): EmbeddingProvenance {
     typeof record.model !== "string" ||
     !record.model.trim() ||
     typeof record.preprocessingVersion !== "string" ||
-    !record.preprocessingVersion.trim() ||
+    !record.preprocessingVersion.includes("embedding-policy-v1") ||
     typeof record.catalogHash !== "string" ||
     !/^[a-f0-9]{64}$/.test(record.catalogHash)
   )
     throw validation(`${label} provenance is malformed`);
+  if (
+    /synthetic|fixture|character-hash/i.test(
+      `${record.provider}:${record.model}`,
+    )
+  )
+    throw validation(
+      `${label} synthetic provenance cannot activate a live index`,
+      "SYNTHETIC_PROVENANCE",
+    );
   return {
     provider: record.provider,
     model: record.model,
@@ -129,6 +140,8 @@ export function validatePgvectorActivation(
     if (seen.has(identity))
       throw validation(`duplicate embedding row: ${identity}`);
     seen.add(identity);
+    if (row.purpose !== "document")
+      throw validation(`embedding row ${identity} must have document purpose`);
     const rowProvenance = parseProvenance(
       row.provenance,
       `embedding row ${identity}`,
@@ -139,14 +152,23 @@ export function validatePgvectorActivation(
       throw validation("embedding row provenance mismatch");
     if (row.contentHash !== toolContentHash(tool))
       throw validation(`embedding row content hash mismatch: ${identity}`);
+    if (
+      row.embeddingTextHash !== undefined &&
+      !/^[a-f0-9]{64}$/.test(row.embeddingTextHash)
+    )
+      throw validation(`embedding row text hash is malformed: ${identity}`);
     validateVector(row.vector, `embedding row ${identity}`);
     provenance ??= rowProvenance;
     validated.push(
       Object.freeze({
         server: row.server,
         name: row.name,
+        purpose: "document",
         vector: Object.freeze([...row.vector]),
         contentHash: row.contentHash,
+        ...(row.embeddingTextHash
+          ? { embeddingTextHash: row.embeddingTextHash }
+          : {}),
         provenance: Object.freeze({ ...rowProvenance }),
       }),
     );
@@ -179,6 +201,7 @@ function validateQueryEmbedding(
   if (!result || typeof result !== "object")
     throw validation("query embedding result is malformed");
   if (
+    result.purpose !== "query" ||
     result.provider !== expected.provider ||
     result.model !== expected.model ||
     result.dimensions !== expected.dimensions ||
@@ -374,6 +397,7 @@ export class PgvectorToolRetriever implements ToolRetriever {
       index: PgvectorCatalogIndex;
       embeddingPort: EmbeddingPort;
       queryExpansionPort?: QueryExpansionPort;
+      expectedEmbeddingProfile?: ExpectedEmbeddingProfile;
     },
   ) {}
 
@@ -401,6 +425,10 @@ export class PgvectorToolRetriever implements ToolRetriever {
         );
       }
       const active = await this.input.index.activeIndex(this.input.catalog);
+      assertExpectedEmbeddingProfile(
+        active.provenance,
+        this.input.expectedEmbeddingProfile,
+      );
       throwIfAborted(request.signal);
 
       let expansion: QueryExpansionResult;
@@ -417,9 +445,7 @@ export class PgvectorToolRetriever implements ToolRetriever {
       throwIfAborted(request.signal);
 
       if (!expansion || !Array.isArray(expansion.queries)) {
-        throw validation(
-          "query expansion result must contain a queries array",
-        );
+        throw validation("query expansion result must contain a queries array");
       }
 
       const candidateIntents = expansion.queries
@@ -441,6 +467,7 @@ export class PgvectorToolRetriever implements ToolRetriever {
         try {
           queryEmbedding = await this.input.embeddingPort.embed({
             text: queryText,
+            purpose: "query",
             signal: request.signal,
           });
         } catch (error) {
@@ -507,11 +534,16 @@ export class PgvectorToolRetriever implements ToolRetriever {
         "UNSUPPORTED_VARIANT",
       );
     const active = await this.input.index.activeIndex(this.input.catalog);
+    assertExpectedEmbeddingProfile(
+      active.provenance,
+      this.input.expectedEmbeddingProfile,
+    );
     throwIfAborted(request.signal);
     let query: EmbeddingResult;
     try {
       query = await this.input.embeddingPort.embed({
         text: request.query,
+        purpose: "query",
         signal: request.signal,
       });
     } catch (error) {

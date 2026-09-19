@@ -62,7 +62,7 @@ Approval hết hạn sau 10 phút từ lúc preview được tạo; đồng hồ
 | `events <run_id> [since_seq]` | Trả tối đa 100 event; dùng `next_seq` cho lần đọc tiếp |
 | `--help` | Xem cú pháp JSON |
 
-`G1_DATABASE_URL` và `G1_USER_ID` do launcher tin cậy đặt; mặc định DB demo loopback 55432 và demo user. `RUNTIME_TIME_ZONE` áp dụng cho lệnh `prepare`, mặc định `Asia/Ho_Chi_Minh`. Không lấy principal hay lệnh khởi chạy server từ plan. Các lệnh detail/preview/events/trace/cancel/recover/reconcile không cần khởi động MCP, nên có thể kiểm tra DB khi server MCP không chạy. Đây chưa phải HTTP authentication/session.
+`G1_DATABASE_URL` và `G1_USER_ID` do launcher tin cậy đặt; mặc định DB demo loopback 55532 và demo user. `RUNTIME_TIME_ZONE` áp dụng cho lệnh `prepare`, mặc định `Asia/Ho_Chi_Minh`. Không lấy principal hay lệnh khởi chạy server từ plan. Các lệnh detail/preview/events/trace/cancel/recover/reconcile không cần khởi động MCP, nên có thể kiểm tra DB khi server MCP không chạy. Đây chưa phải HTTP authentication/session.
 
 Filesystem local là capability tùy chọn của G1 và mặc định tắt. Chỉ bật sau khi tạo root demo đã được kiểm tra:
 

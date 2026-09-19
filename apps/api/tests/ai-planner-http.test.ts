@@ -1,22 +1,136 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Database } from "@wap/db";
 import {
   AiPlannerError,
+  InMemoryToolRetriever,
+  createReviewedCatalogSnapshot,
+  toolContentHash,
+  type EngineTool,
+  type Gateway,
   type WorkflowEngine,
   type StructuredModelClient,
   type StructuredModelResponse,
+  type ReviewedCatalogSnapshot,
+  type ToolRetriever,
 } from "@wap/engine";
 import { createApi, type ApiConfig, type ApiRuntime } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
-import { loadAiPlanner } from "../src/ai-planner.js";
+import { loadAiPlanner, type LoadAiPlannerOptions } from "../src/ai-planner.js";
 import type { WorkerControl } from "../src/worker.js";
 
 const root = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const openApis = new Set<ApiRuntime>();
+
+function reviewedGatewayTools(): EngineTool[] {
+  const manifest = JSON.parse(
+    readFileSync(path.join(root, "testdata", "tools.json"), "utf8"),
+  ) as {
+    servers: {
+      slug: EngineTool["server"];
+      tools: (Omit<EngineTool, "server" | "artifactHash"> & {
+        description: string;
+        evidence: string;
+      })[];
+    }[];
+  };
+  return manifest.servers.flatMap((server) =>
+    server.tools.map(
+      ({ description: _description, evidence: _evidence, ...tool }) => ({
+        ...tool,
+        server: server.slug,
+        artifactHash: "b".repeat(64),
+      }),
+    ),
+  );
+}
+
+function gatewayFor(tools: readonly EngineTool[]) {
+  let ensureCalls = 0;
+  let currentChecks = 0;
+  const gateway: Gateway = {
+    userId: USER_ID,
+    tools,
+    async ensureConnected() {
+      ensureCalls++;
+    },
+    async assertCurrent() {
+      currentChecks++;
+    },
+    async call() {
+      throw new Error("planner must not dispatch gateway tools");
+    },
+    async close() {},
+  };
+  return {
+    gateway,
+    calls: () => ({ ensureCalls, currentChecks }),
+  };
+}
+
+function syntheticRetriever(catalog: ReviewedCatalogSnapshot): ToolRetriever {
+  const dimensions = 1536;
+  const embed = (text: string) => {
+    const vector = new Float64Array(dimensions);
+    for (let index = 0; index < text.length; index++) {
+      const slot = (text.charCodeAt(index) * 37 + index * 17) % dimensions;
+      vector[slot] = vector[slot]! + 1;
+    }
+    vector[0] = vector[0]! + 0.01;
+    const norm = Math.hypot(...vector);
+    return Array.from(vector, (value) => value / norm);
+  };
+  const provenance = {
+    provider: "test-synthetic",
+    model: "test-synthetic",
+    dimensions,
+    preprocessingVersion: "test-synthetic-v1",
+    catalogHash: catalog.catalogHash,
+  };
+  return new InMemoryToolRetriever({
+    catalog,
+    rows: catalog.tools.map((tool) => ({
+      server: tool.server,
+      name: tool.name,
+      purpose: "document" as const,
+      vector: embed(`${tool.server}.${tool.name}: ${tool.description}`),
+      contentHash: toolContentHash(tool),
+      provenance,
+    })),
+    embeddingPort: {
+      async embed(input) {
+        return {
+          embedding: embed(input.text),
+          purpose: input.purpose,
+          provider: provenance.provider,
+          model: provenance.model,
+          dimensions,
+          preprocessingVersion: provenance.preprocessingVersion,
+          catalogHash: catalog.catalogHash,
+          usage: null,
+        };
+      },
+    },
+  });
+}
+
+function aiPlannerOptions(
+  options: Partial<
+    Omit<LoadAiPlannerOptions, "root" | "gateway" | "createRetriever">
+  > &
+    Pick<Partial<LoadAiPlannerOptions>, "gateway" | "createRetriever"> = {},
+): LoadAiPlannerOptions {
+  return {
+    root,
+    ...options,
+    gateway: options.gateway ?? gatewayFor(reviewedGatewayTools()).gateway,
+    createRetriever: options.createRetriever ?? syntheticRetriever,
+  };
+}
 
 afterEach(async () => {
   for (const api of openApis) await api.close();
@@ -135,19 +249,67 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         API_CURSOR_KEY: Buffer.alloc(32, 1).toString("base64"),
       };
 
-      expect(loadConfig({ ...baseEnv, API_PLANNER_MODE: "ai" }).plannerMode).toBe("ai");
-      expect(loadConfig({ ...baseEnv, WAP_PLANNER_MODE: "ai" }).plannerMode).toBe("ai");
-      expect(loadConfig({ ...baseEnv, WAP_PLANNER_MODE: "dev_fixture" }).plannerMode).toBe("dev_fixture");
+      expect(
+        loadConfig({ ...baseEnv, API_PLANNER_MODE: "ai" }).plannerMode,
+      ).toBe("ai");
+      expect(
+        loadConfig({ ...baseEnv, WAP_PLANNER_MODE: "ai" }).plannerMode,
+      ).toBe("ai");
+      expect(
+        loadConfig({ ...baseEnv, WAP_PLANNER_MODE: "dev_fixture" }).plannerMode,
+      ).toBe("dev_fixture");
       expect(loadConfig(baseEnv).plannerMode).toBe("disabled");
-      expect(() => loadConfig({ ...baseEnv, API_PLANNER_MODE: "unsupported" })).toThrow(
-        /Invalid configuration API_PLANNER_MODE/,
-      );
+      expect(() =>
+        loadConfig({ ...baseEnv, API_PLANNER_MODE: "unsupported" }),
+      ).toThrow(/Invalid configuration API_PLANNER_MODE/);
     });
   });
 
   describe("loadAiPlanner adapter fail-closed behavior", () => {
+    it("rejects live gateway policy drift before invoking the model", async () => {
+      let modelCalls = 0;
+      const liveTools = reviewedGatewayTools().map((tool) =>
+        tool.name === "list_cards"
+          ? { ...tool, policyVersion: "b-local-drifted" }
+          : tool,
+      );
+      const liveGateway = gatewayFor(liveTools);
+      const modelClient: StructuredModelClient = {
+        async complete(): Promise<StructuredModelResponse> {
+          modelCalls++;
+          return {
+            output: { kind: "refusal", reason: "unreachable" },
+            provider: "fake-provider",
+            model: "fake-model",
+          };
+        },
+      };
+      const planner = loadAiPlanner({
+        root,
+        modelClient,
+        gateway: liveGateway.gateway,
+        createRetriever: syntheticRetriever,
+      });
+
+      await expect(
+        planner.produce({
+          runId: "run-live-catalog-drift",
+          userId: USER_ID,
+          request: {
+            source_prompt: "Liệt kê task Done của board board_a",
+            inputs: {},
+            time_zone: "Asia/Ho_Chi_Minh",
+          },
+          runtime: { today: "2026-09-18" },
+        }),
+      ).rejects.toThrow(/current gateway tool differs from review/i);
+
+      expect(modelCalls).toBe(0);
+      expect(liveGateway.calls()).toEqual({ ensureCalls: 1, currentChecks: 1 });
+    });
+
     it("fails closed when model provider is unconfigured without falling back to dev_fixture", async () => {
-      const planner = loadAiPlanner({ root });
+      const planner = loadAiPlanner(aiPlannerOptions());
       expect(planner.mode).toBe("ai");
 
       await expect(
@@ -208,7 +370,9 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         },
       };
 
-      const planner = loadAiPlanner({ root, modelClient: fakeModel });
+      const planner = loadAiPlanner(
+        aiPlannerOptions({ modelClient: fakeModel }),
+      );
       const result = await planner.produce({
         runId: "run-test",
         userId: USER_ID,
@@ -241,7 +405,9 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         },
       };
 
-      const planner = loadAiPlanner({ root, modelClient: fakeModel });
+      const planner = loadAiPlanner(
+        aiPlannerOptions({ modelClient: fakeModel }),
+      );
       const result = await planner.produce({
         runId: "run-test",
         userId: USER_ID,
@@ -273,7 +439,9 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         },
       };
 
-      const planner = loadAiPlanner({ root, modelClient: fakeModel });
+      const planner = loadAiPlanner(
+        aiPlannerOptions({ modelClient: fakeModel }),
+      );
       const result = await planner.produce({
         runId: "run-test",
         userId: USER_ID,
@@ -298,7 +466,9 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         },
       };
 
-      const planner = loadAiPlanner({ root, modelClient: failingModel });
+      const planner = loadAiPlanner(
+        aiPlannerOptions({ modelClient: failingModel }),
+      );
       await expect(
         planner.produce({
           runId: "run-test",

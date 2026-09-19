@@ -12,7 +12,7 @@ const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
 );
-const adminUrl = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+const adminUrl = "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 
 export async function makeFilesystemFixture(userId = DEMO_USER_ID) {
   const dbName = `engine_it_${randomUUID().replaceAll("-", "")}`;

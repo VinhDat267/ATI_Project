@@ -17,6 +17,7 @@ import type {
 } from "../src/ai/ports.js";
 
 const provenance = {
+  purpose: "query" as const,
   provider: "test-provider",
   model: "test-embedding",
   dimensions: 2,
@@ -30,6 +31,7 @@ function rowsFor(
   return catalog.tools.map((tool) => ({
     server: tool.server,
     name: tool.name,
+    purpose: "document" as const,
     vector: vectors[`${tool.server}.${tool.name}`] ?? [1, 0],
     contentHash: toolContentHash(tool),
     provenance: { ...provenance, catalogHash: catalog.catalogHash },
@@ -59,7 +61,11 @@ describe("semantic_qe query expansion retrieval", () => {
     });
 
     await expect(
-      retriever.retrieve({ query: "update sheet", variant: "semantic_qe", topK: 3 }),
+      retriever.retrieve({
+        query: "update sheet",
+        variant: "semantic_qe",
+        topK: 3,
+      }),
     ).rejects.toThrow(/QueryExpansionPort is required/);
   });
 
@@ -94,9 +100,9 @@ describe("semantic_qe query expansion retrieval", () => {
       "update sheet": [0.5, 0.5],
       "add row to spreadsheet": [0.99, 0.01],
       "write excel data": [0.95, 0.05],
-      "append table records": [0.90, 0.10],
+      "append table records": [0.9, 0.1],
       "insert rows": [0.85, 0.15],
-      "update sheet columns": [0.80, 0.20],
+      "update sheet columns": [0.8, 0.2],
       "sheet report logging": [0.75, 0.25],
     };
 

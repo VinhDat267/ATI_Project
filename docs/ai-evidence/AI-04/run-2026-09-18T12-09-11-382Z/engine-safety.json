@@ -1,0 +1,33 @@
+{
+  "format": "ati-ai04-engine-safety-evidence-v1",
+  "observedAt": "2026-09-18T12:09:11.382Z",
+  "scope": "fresh isolated backend regression evidence; not a live AI-quality measurement",
+  "git": {
+    "head": "d3c44f4691191f8f8735491d23653f942fb45d1b",
+    "workspaceMayBeDirty": true
+  },
+  "sourceSha256": {
+    "packages/engine/src/ai/evaluation/cli.ts": "7f9a05c3e394e1c310d8b6bf7f1cb147b1d9dc9a81db66ddd451ce8b0aa8df14",
+    "packages/engine/src/ai/evaluation/runner.ts": "bc25739f04d69c8a07597bda40533caef2bcf197f865ad5c737cec33d395ebe8",
+    "packages/engine/src/ai/evaluation/scorer.ts": "d6ffc283a478dfa5ecae7ea4b3af49bc40dcf0a665b7acca208932dccf95408b",
+    "packages/engine/src/ai/local-catalog.ts": "0edc6e47f94fb9d6732d18a5775bdaeea18157609f07ed84785a905f5b976082",
+    "packages/engine/src/attempts.ts": "919961fc1ffd537c18e8ed744a72e7d901f738b521ec5ada985fec4e07e13cb8",
+    "packages/engine/src/replan.ts": "388f353588befaae1490a896aef4a8511591e1c0f0c0a78c7192ff31defc97b1"
+  },
+  "command": "npm run check:backend",
+  "exitCode": 0,
+  "results": {
+    "dsl": { "passed": 43, "skipped": 0 },
+    "engineUnit": { "passed": 180, "skipped": 1 },
+    "apiUnit": { "passed": 36, "skipped": 0 },
+    "webUnit": { "passed": 38, "skipped": 0 },
+    "mcpTaskHubIntegration": { "passed": 64, "skipped": 0 },
+    "engineIntegration": { "passed": 83, "skipped": 0 },
+    "apiIntegration": { "passed": 34, "skipped": 0 }
+  },
+  "limitations": [
+    "This records engine and integration regression coverage only.",
+    "It does not measure provider behavior, paid usage, live semantic quality, or provider end-to-end latency.",
+    "Recovery correctness is evidenced by the existing isolated engine integration suites, not by the pure offline evaluator."
+  ]
+}

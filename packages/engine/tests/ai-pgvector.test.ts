@@ -13,13 +13,14 @@ function rows(catalog: ReturnType<typeof createReviewedCatalogSnapshot>) {
   return catalog.tools.map((tool) => ({
     server: tool.server,
     name: tool.name,
+    purpose: "document" as const,
     vector: vector(),
     contentHash: toolContentHash(tool),
     provenance: {
       provider: "test",
       model: "test-model",
       dimensions: 1536,
-      preprocessingVersion: "v1",
+      preprocessingVersion: "embedding-policy-v1:test",
       catalogHash: catalog.catalogHash,
     },
   }));
@@ -33,13 +34,14 @@ describe("pgvector catalog activation", () => {
         {
           server: "task_hub",
           name: "list_cards",
+          purpose: "document",
           vector: [1, 0],
           contentHash: toolContentHash(catalog.tools[0]!),
           provenance: {
             provider: "test",
             model: "test-model",
             dimensions: 2,
-            preprocessingVersion: "v1",
+            preprocessingVersion: "embedding-policy-v1:test",
             catalogHash: catalog.catalogHash,
           },
         },
@@ -98,7 +100,8 @@ describe("pgvector catalog activation", () => {
 
   it("rejects semantic_qe when queryExpansionPort is missing", async () => {
     const catalog = createReviewedCatalogSnapshot([makeTool()]);
-    const { PgvectorToolRetriever } = await import("../src/ai/pgvector-index.js");
+    const { PgvectorToolRetriever } =
+      await import("../src/ai/pgvector-index.js");
     const retriever = new PgvectorToolRetriever({
       catalog,
       index: {} as any,

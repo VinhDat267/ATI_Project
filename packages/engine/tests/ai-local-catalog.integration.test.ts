@@ -50,13 +50,14 @@ describe("AI-01 local catalog to reviewed two-server gateway", () => {
         rows: snapshot.tools.map((tool, position) => ({
           server: tool.server,
           name: tool.name,
+          purpose: "document" as const,
           vector: vector(position),
           contentHash: toolContentHash(tool),
           provenance: {
             provider: "test-provider",
             model: "test-embedding",
             dimensions: PGVECTOR_DIMENSIONS,
-            preprocessingVersion: "normalized-v1",
+            preprocessingVersion: "embedding-policy-v1:test",
             catalogHash: snapshot.catalogHash,
           },
         })),
@@ -66,7 +67,12 @@ describe("AI-01 local catalog to reviewed two-server gateway", () => {
         index,
         embeddingPort: {
           async embed() {
-            return { embedding: vector(0), ...active.provenance, usage: null };
+            return {
+              embedding: vector(0),
+              purpose: "query" as const,
+              ...active.provenance,
+              usage: null,
+            };
           },
         },
       });

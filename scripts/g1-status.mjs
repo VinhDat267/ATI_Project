@@ -27,7 +27,7 @@ try {
     recorded_at:new Date().toISOString(),
     scope:'READ_ONLY_DEMO_SNAPSHOT; engine/controller integration is recorded separately; no HTTP/UI/LLM verification',
     node:process.version,
-    launch:{command:process.execPath,args:[serverPath],cwd:root,principal:DEMO_USER_ID,db_host:'127.0.0.1',db_port:55432,db_name:'wap_g1'},
+    launch:{command:process.execPath,args:[serverPath],cwd:root,principal:DEMO_USER_ID,db_host:'127.0.0.1',db_port:55532,db_name:'wap_g1'},
     containers:docker.map(c=>({name:c.Name,image:c.Config.Image,image_id:c.Image,status:c.State.Status,health:c.State.Health?.Status,ports:c.NetworkSettings.Ports})),
     redis_ping:execFileSync('docker',['exec','ati-g1-redis-1','redis-cli','ping'],{encoding:'utf8',windowsHide:true}).trim(),
     postgres:await connection.client`SELECT current_setting('server_version') AS version, (SELECT extversion FROM pg_extension WHERE extname='vector') AS vector_version`,

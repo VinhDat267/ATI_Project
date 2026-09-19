@@ -41,7 +41,7 @@ mkdirSync(evidenceDir, { recursive: true });
 const knownSecrets = collectKnownSecretValues();
 const commands = createGatePlan();
 const results = [];
-const defaultAdminUrl = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+const defaultAdminUrl = "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 
 async function listOwnedDatabases() {
   const urls = [

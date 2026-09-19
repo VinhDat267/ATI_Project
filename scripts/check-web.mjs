@@ -26,6 +26,7 @@ import {
   selectOwnedProjectProcesses,
   selectOwnedTempRoots,
   validateBundleBudgets,
+  resolveWebGateAdminUrls,
   JS_GZIP_BUDGET_BYTES,
   CSS_GZIP_BUDGET_BYTES,
 } from "./check-web-lib.mjs";
@@ -63,14 +64,8 @@ const commands = gateFilter
   ? allCommands.filter((cmd) => gateFilter.includes(cmd.id))
   : allCommands;
 
-const defaultAdminUrl = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
-
 async function listOwnedDatabases() {
-  const urls = [
-    process.env.API_TEST_ADMIN_URL,
-    process.env.G1_TEST_ADMIN_URL,
-    defaultAdminUrl,
-  ].filter((value, index, values) => value && values.indexOf(value) === index);
+  const urls = resolveWebGateAdminUrls();
   const names = [];
   for (const [index, url] of urls.entries()) {
     let client;

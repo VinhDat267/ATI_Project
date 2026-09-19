@@ -5,7 +5,7 @@ import { preview, type PreviewServer } from "vite";
 
 const adminUrl =
   process.env.API_TEST_ADMIN_URL ??
-  "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+  "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 
 export interface ReceiverDatabaseClient {
   client: <T = any>(strings: TemplateStringsArray, ...values: any[]) => Promise<T[]>;

@@ -24,10 +24,11 @@ import type {
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 
 const PROVENANCE = {
-  provider: "openai-compatible",
-  model: "text-embedding-3-small",
+  purpose: "query" as const,
+  provider: "offline-synthetic",
+  model: "character-hash-v1",
   dimensions: 1536,
-  preprocessingVersion: "v1",
+  preprocessingVersion: "lowercase-character-hash-v1",
 };
 
 function currentReviewedGatewayTools(): EngineTool[] {
@@ -57,7 +58,10 @@ function currentReviewedGatewayTools(): EngineTool[] {
  * Deterministic pseudo-embedding for testing retrieval ranking without network calls.
  * Generates a unit vector in 1536 dimensions derived from character hashing.
  */
-function deterministicEmbedding(text: string, dimensions = 1536): readonly number[] {
+function deterministicEmbedding(
+  text: string,
+  dimensions = 1536,
+): readonly number[] {
   const vec = new Float64Array(dimensions);
   const normalized = text.toLowerCase();
   for (let i = 0; i < normalized.length; i++) {
@@ -109,6 +113,7 @@ describe("AI-01: Retrieval Benchmark & FR-NFR-02 Latency Gate", () => {
     return {
       server: tool.server,
       name: tool.name,
+      purpose: "document" as const,
       vector: deterministicEmbedding(toolText, PROVENANCE.dimensions),
       contentHash: toolContentHash(tool),
       provenance: {
@@ -132,11 +137,7 @@ describe("AI-01: Retrieval Benchmark & FR-NFR-02 Latency Gate", () => {
   const queryExpansionPort: QueryExpansionPort = {
     async expand(req): Promise<QueryExpansionResult> {
       return {
-        queries: [
-          req.query,
-          `${req.query} task list`,
-          `${req.query} details`,
-        ],
+        queries: [req.query, `${req.query} task list`, `${req.query} details`],
         usage: { inputTokens: 10, outputTokens: 15, totalTokens: 25 },
         provider: "test-provider",
         model: "test-model",
@@ -283,9 +284,9 @@ describe("AI-01: Retrieval Benchmark & FR-NFR-02 Latency Gate", () => {
 
     it("rejects duplicate tool definitions when creating catalog snapshot", () => {
       const baseTool = catalog.tools[0]!;
-      expect(() =>
-        createReviewedCatalogSnapshot([baseTool, baseTool]),
-      ).toThrow(CatalogValidationError);
+      expect(() => createReviewedCatalogSnapshot([baseTool, baseTool])).toThrow(
+        CatalogValidationError,
+      );
     });
 
     it("rejects retrieval when catalog drift occurs between snapshot and embedding index", async () => {

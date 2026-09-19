@@ -49,6 +49,13 @@ const SYNTHETIC_LEAK_PATTERNS = [
 export const JS_GZIP_BUDGET_BYTES = 200 * 1024; // 204,800 bytes
 export const CSS_GZIP_BUDGET_BYTES = 30 * 1024; // 30,720 bytes
 
+export function resolveWebGateAdminUrls(env = process.env) {
+  const defaultAdminUrl = "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
+  return [env.API_TEST_ADMIN_URL, env.G1_TEST_ADMIN_URL, defaultAdminUrl].filter(
+    (value, index, values) => value && values.indexOf(value) === index,
+  );
+}
+
 export function normalizeRelativePath(value) {
   return String(value).replaceAll("\\", "/").replace(/^\.\//, "");
 }

@@ -14,7 +14,7 @@ import {
 import type { ToolEmbeddingRow } from "../src/ai/retrieval.js";
 import { makeTool } from "./ai-fixtures.js";
 
-const adminUrl = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+const adminUrl = "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const dbName = `engine_ai_it_${randomUUID().replaceAll("-", "")}`;
 const url = new URL(adminUrl);
 url.pathname = `/${dbName}`;
@@ -34,13 +34,14 @@ function rowsFor(
   return catalog.tools.map((tool, index) => ({
     server: tool.server,
     name: tool.name,
+    purpose: "document" as const,
     vector: vector(index),
     contentHash: toolContentHash(tool),
     provenance: {
       provider: "test-provider",
       model,
       dimensions: PGVECTOR_DIMENSIONS,
-      preprocessingVersion: "normalized-v1",
+      preprocessingVersion: "embedding-policy-v1:test",
       catalogHash: catalog.catalogHash,
     },
   }));
@@ -76,6 +77,7 @@ describe("AI-01 pgvector reviewed catalog index", () => {
         async embed() {
           return {
             embedding: vector(0),
+            purpose: "query" as const,
             ...first.provenance,
             usage: null,
           };
