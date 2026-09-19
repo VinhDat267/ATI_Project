@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const isLiveOnly = process.argv.some(
+  (arg) => arg.includes("live") || arg.includes("cleanup.spec"),
+);
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
@@ -23,10 +27,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "npm run preview",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: isLiveOnly
+    ? undefined
+    : {
+        command: "npm run preview",
+        url: "http://127.0.0.1:4173",
+        reuseExistingServer: !process.env.CI,
+        timeout: 30_000,
+      },
 });
