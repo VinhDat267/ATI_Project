@@ -1,5 +1,25 @@
 import type { AiProvider } from "./config.js";
 
+const APPROVAL_FIELDS = new Set([
+  "kind",
+  "campaignId",
+  "phase",
+  "profileId",
+  "configHash",
+  "providers",
+  "models",
+  "budgetMicros",
+  "approvedAt",
+  "expiresAt",
+]);
+const MODEL_ROLES = new Set([
+  "planning",
+  "repair",
+  "replan",
+  "query_expansion",
+  "embedding",
+]);
+
 export interface AiLiveApprovalRecord {
   readonly kind: "ai-live-approval";
   readonly campaignId: string;
@@ -47,6 +67,13 @@ export function parseAiLiveApprovalRecord(
     );
   }
   const record = value as Record<string, unknown>;
+  const unknownFields = Object.keys(record).filter(
+    (field) => !APPROVAL_FIELDS.has(field),
+  );
+  if (unknownFields.length > 0)
+    throw new AiApprovalError(
+      `approval record contains unknown fields: ${unknownFields.join(", ")}`,
+    );
   const required = [
     "campaignId",
     "phase",
@@ -62,8 +89,15 @@ export function parseAiLiveApprovalRecord(
   if (record.kind !== "ai-live-approval")
     throw new AiApprovalError("kind must be ai-live-approval");
   if (
+    typeof record.configHash !== "string" ||
+    !/^[a-f0-9]{64}$/.test(record.configHash)
+  ) {
+    throw new AiApprovalError("configHash must be a lowercase SHA-256 hash");
+  }
+  if (
     !Array.isArray(record.providers) ||
     record.providers.length === 0 ||
+    new Set(record.providers).size !== record.providers.length ||
     record.providers.some(
       (provider) => provider !== "openai" && provider !== "google",
     )
@@ -76,6 +110,12 @@ export function parseAiLiveApprovalRecord(
     Array.isArray(record.models)
   ) {
     throw new AiApprovalError("models is required");
+  }
+  for (const [role, model] of Object.entries(
+    record.models as Record<string, unknown>,
+  )) {
+    if (!MODEL_ROLES.has(role) || !isNonEmptyString(model))
+      throw new AiApprovalError("models contains an invalid role/model");
   }
   if (
     !Number.isInteger(record.budgetMicros) ||
@@ -110,11 +150,16 @@ export function assertAiLiveApproval(
   record: AiLiveApprovalRecord,
   expected: Pick<
     AiLiveApprovalRecord,
-    "campaignId" | "phase" | "profileId" | "configHash"
+    "campaignId" | "phase" | "profileId" | "configHash" | "providers" | "models"
   >,
   now = new Date(),
 ): void {
-  if (Date.parse(record.expiresAt) <= now.getTime())
+  const nowMs = now.getTime();
+  const approvedAt = Date.parse(record.approvedAt);
+  const expiresAt = Date.parse(record.expiresAt);
+  if (approvedAt > nowMs)
+    throw new AiApprovalError("approval is not yet valid");
+  if (expiresAt <= nowMs)
     throw new AiApprovalError("approval record is expired");
   for (const field of [
     "campaignId",
@@ -125,6 +170,18 @@ export function assertAiLiveApproval(
     if (record[field] !== expected[field])
       throw new AiApprovalError(
         `approval ${field} does not match execution scope`,
+      );
+  }
+  if (
+    record.providers.length !== expected.providers.length ||
+    record.providers.some((provider) => !expected.providers.includes(provider))
+  ) {
+    throw new AiApprovalError("approval providers do not match execution scope");
+  }
+  for (const [role, model] of Object.entries(expected.models)) {
+    if (record.models[role] !== model)
+      throw new AiApprovalError(
+        `approval model ${role} does not match execution scope`,
       );
   }
 }

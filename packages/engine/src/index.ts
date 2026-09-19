@@ -120,6 +120,8 @@ export type {
   ProviderCallReservation,
   ProviderCallSettlement,
   ProviderCallRecord,
+  AuthorizeProviderCall,
+  AiProviderCallContext,
   AiLiveApprovalRecord,
   PlannerWire,
 } from "./ai/index.js";

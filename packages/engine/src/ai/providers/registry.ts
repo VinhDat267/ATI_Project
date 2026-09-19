@@ -35,6 +35,15 @@ export interface ProviderCallLedger {
   settle(callId: string, outcome: ProviderCallSettlement): Promise<void>;
 }
 
+export type AuthorizeProviderCall = (
+  request: ProviderCallReservation,
+) => Promise<void>;
+
+export interface AiProviderCallContext {
+  readonly campaignId: string;
+  readonly runId: string;
+}
+
 export interface AiProviderCredentials {
   readonly OPENAI_API_KEY?: string;
   readonly GEMINI_API_KEY?: string;
@@ -46,6 +55,9 @@ export interface CreateAiPortsOptions {
   readonly config: AiProviderConfig;
   readonly credentials: AiProviderCredentials;
   readonly ledger: ProviderCallLedger;
+  /** Required authorization boundary. It runs before credential lookup, reserve, or network. */
+  readonly authorizeCall: AuthorizeProviderCall;
+  readonly callContext?: AiProviderCallContext;
   readonly fetchImpl?: FetchLike;
   readonly now?: () => number;
 }
@@ -65,7 +77,8 @@ export class ProviderClientError extends Error {
     | "PROVIDER_SAFETY_BLOCK"
     | "PROVIDER_TIMEOUT"
     | "PROVIDER_NETWORK_ERROR"
-    | "PROVIDER_VECTOR_INVALID";
+    | "PROVIDER_VECTOR_INVALID"
+    | "AI_LIVE_NOT_READY";
   readonly provider: string;
   readonly requestId: string | null;
   readonly status: number | null;
@@ -314,10 +327,9 @@ async function invokeProvider(
 }> {
   const fetchImpl =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
-  const key = requireKey(profile.provider, options.credentials);
-  const callId = await options.ledger.reserve({
-    campaignId: "live-evaluation",
-    runId: "live-evaluation",
+  const reservation: ProviderCallReservation = {
+    campaignId: options.callContext?.campaignId ?? "live-evaluation",
+    runId: options.callContext?.runId ?? "live-evaluation",
     profileId: `${profile.provider}:${profile.model}`,
     provider: profile.provider,
     purpose,
@@ -325,7 +337,10 @@ async function invokeProvider(
     requestHash: requestHash(body),
     outputCap: profile.maxOutputTokens,
     estimatedCostMicros: options.config.limits.reservationEstimateMicros,
-  });
+  };
+  await options.authorizeCall(reservation);
+  const key = requireKey(profile.provider, options.credentials);
+  const callId = await options.ledger.reserve(reservation);
   const started = (options.now ?? Date.now)();
   const requestSignal = composeRequestSignal(
     signal,
@@ -622,7 +637,6 @@ function createEmbeddingClient(
 ): EmbeddingPort {
   return {
     async embed(input): Promise<EmbeddingResult> {
-      const key = requireKey(profile.provider, options.credentials);
       const body =
         profile.provider === "openai"
           ? {
@@ -654,9 +668,9 @@ function createEmbeddingClient(
                   }
                 : {}),
             };
-      const callId = await options.ledger.reserve({
-        campaignId: "live-evaluation",
-        runId: "live-evaluation",
+      const reservation: ProviderCallReservation = {
+        campaignId: options.callContext?.campaignId ?? "live-evaluation",
+        runId: options.callContext?.runId ?? "live-evaluation",
         profileId: `${profile.provider}:${profile.model}`,
         provider: profile.provider,
         purpose: "embedding",
@@ -664,7 +678,10 @@ function createEmbeddingClient(
         requestHash: requestHash(body),
         embeddingPurpose: input.purpose,
         estimatedCostMicros: options.config.limits.reservationEstimateMicros,
-      });
+      };
+      await options.authorizeCall(reservation);
+      const key = requireKey(profile.provider, options.credentials);
+      const callId = await options.ledger.reserve(reservation);
       const started = (options.now ?? Date.now)();
       let parsed: Record<string, unknown> | undefined;
       const requestSignal = composeRequestSignal(

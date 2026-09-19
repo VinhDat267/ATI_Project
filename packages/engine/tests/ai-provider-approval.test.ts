@@ -48,4 +48,38 @@ describe("non-secret live approval boundary", () => {
       parseAiLiveApprovalRecord({ ...approval, GEMINI_API_KEY: "canary" }),
     ).toThrow(/credential|token|secret/i);
   });
+
+  it("requires a canonical SHA-256 config hash and rejects unknown fields", () => {
+    expect(() =>
+      parseAiLiveApprovalRecord({ ...approval, configHash: "not-a-hash" }),
+    ).toThrow(/configHash/i);
+    expect(() =>
+      parseAiLiveApprovalRecord({ ...approval, unexpected: true }),
+    ).toThrow(/unknown|field|shape/i);
+  });
+
+  it("requires an approval that is already valid and matches provider/model scope", () => {
+    const parsed = parseAiLiveApprovalRecord(approval);
+    expect(() =>
+      assertAiLiveApproval(
+        parsed,
+        { ...approval, providers: ["openai"] },
+        new Date("2026-09-19T00:30:00.000Z"),
+      ),
+    ).toThrow(/provider/i);
+    expect(() =>
+      assertAiLiveApproval(
+        parsed,
+        { ...approval, models: { planning: "gpt-5.6-terra" } },
+        new Date("2026-09-19T00:30:00.000Z"),
+      ),
+    ).toThrow(/model/i);
+    expect(() =>
+      assertAiLiveApproval(
+        parsed,
+        approval,
+        new Date("2026-09-18T23:59:59.000Z"),
+      ),
+    ).toThrow(/not yet|valid/i);
+  });
 });

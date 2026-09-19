@@ -31,12 +31,88 @@ function response(body: unknown, status = 200): Response {
 }
 
 describe("native provider clients with fake transport", () => {
+  it("denies every native operation before credentials, reservation, or fetch", async () => {
+    let fetchCalls = 0;
+    let reserveCalls = 0;
+    const denial = Object.assign(new Error("live execution is not enabled"), {
+      code: "AI_LIVE_NOT_READY",
+    });
+    const ports = createAiPorts({
+      config,
+      credentials: {
+        OPENAI_API_KEY: "openai-canary",
+        GEMINI_API_KEY: "google-canary",
+      },
+      ledger: {
+        async reserve() {
+          reserveCalls += 1;
+          return "unexpected-reservation";
+        },
+        async settle() {},
+      },
+      authorizeCall: async () => {
+        throw denial;
+      },
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return response({});
+      },
+    });
+
+    await expect(
+      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
+    ).rejects.toMatchObject({ code: "AI_LIVE_NOT_READY" });
+    await expect(ports.queryExpansion.expand({ query: "q" })).rejects.toMatchObject({
+      code: "AI_LIVE_NOT_READY",
+    });
+    await expect(
+      ports.embedding.embed({ text: "tool", purpose: "query" }),
+    ).rejects.toMatchObject({ code: "AI_LIVE_NOT_READY" });
+    expect(reserveCalls).toBe(0);
+    expect(fetchCalls).toBe(0);
+  });
+
+  it("uses explicit campaign and run context in every authorization reservation", async () => {
+    const reservations: Array<{ campaignId: string; runId: string; purpose: string }> = [];
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      ledger: ledger(),
+      authorizeCall: async (reservation) => {
+        reservations.push({
+          campaignId: reservation.campaignId,
+          runId: reservation.runId,
+          purpose: reservation.purpose,
+        });
+      },
+      callContext: { campaignId: "campaign-42", runId: "run-99" },
+      fetchImpl: async () =>
+        response({
+          id: "resp_123",
+          model: "gpt-5.6-terra",
+          output_text: JSON.stringify({
+            result: {
+              kind: "refusal",
+              plan: null,
+              refusal: { reason: "not allowed" },
+              clarification: null,
+            },
+          }),
+        }),
+    });
+    await ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} });
+    expect(reservations).toEqual([
+      { campaignId: "campaign-42", runId: "run-99", purpose: "planning" },
+    ]);
+  });
+
   it("sends OpenAI Responses JSON schema without leaking the Gemini key", async () => {
     let request: { url: string; init: RequestInit } | undefined;
     const ports = createAiPorts({
       config,
       credentials: { OPENAI_API_KEY: "openai-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (input, init) => {
         request = { url: String(input), init: init ?? {} };
         return response({
@@ -83,6 +159,7 @@ describe("native provider clients with fake transport", () => {
       config: googleConfig,
       credentials: { GEMINI_API_KEY: "google-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (input, init) => {
         request = { url: String(input), init: init ?? {} };
         return response({
@@ -126,6 +203,7 @@ describe("native provider clients with fake transport", () => {
       config,
       credentials: { GEMINI_API_KEY: "google-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (input) => {
         seen.push(String(input));
         return response({
@@ -163,6 +241,7 @@ describe("native provider clients with fake transport", () => {
       config: openAiConfig,
       credentials: { OPENAI_API_KEY: "openai-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (input, init) => {
         request = { url: String(input), init: init ?? {} };
         return response({
@@ -204,6 +283,7 @@ describe("native provider clients with fake transport", () => {
         GEMINI_API_KEY: "google-canary",
       },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (input, init) => {
         const url = String(input);
         const headers = init?.headers as Record<string, string>;
@@ -255,6 +335,7 @@ describe("native provider clients with fake transport", () => {
           settlements.push(outcome);
         },
       },
+      authorizeCall: async () => {},
       fetchImpl: async () =>
         response({
           output_text: "not-json",
@@ -275,6 +356,7 @@ describe("native provider clients with fake transport", () => {
       config,
       credentials: { GEMINI_API_KEY: "google-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async (_input, init) => {
         expect(
           (init?.headers as Record<string, string>)["x-goog-api-key"],
@@ -317,6 +399,7 @@ describe("native provider clients with fake transport", () => {
           outcomes.push(outcome);
         },
       },
+      authorizeCall: async () => {},
       fetchImpl: async (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener(
@@ -340,6 +423,7 @@ describe("native provider clients with fake transport", () => {
       config,
       credentials: { GEMINI_API_KEY: "google-canary" },
       ledger: ledger(),
+      authorizeCall: async () => {},
       fetchImpl: async () =>
         response({ error: { status: "PERMISSION_DENIED" } }, 403),
     });

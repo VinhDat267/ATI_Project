@@ -4,20 +4,15 @@ import {
   inspectLocalGateway,
   loadFilesystemLaunch,
   openLocalGateway,
-  InMemoryProviderCallLedger,
-  PgvectorCatalogIndex,
-  PgvectorToolRetriever,
-  createAiPorts,
   readAiProviderConfig,
   type AiProvider,
-  type ReviewedCatalogSnapshot,
 } from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createApi } from "./app.js";
 import { loadConfig } from "./config.js";
 import { loadDevPlanner } from "./dev-planner.js";
-import { loadAiPlanner, loadAiReplan } from "./ai-planner.js";
+import { createAiRuntime } from "./ai-runtime.js";
 import { createPrepareWorker } from "./worker.js";
 import { createExpiryMaintenance } from "./maintenance.js";
 import { createGatewayManager } from "./gateway-manager.js";
@@ -83,44 +78,14 @@ const aiRuntime =
             ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY }
             : {}),
         };
-        for (const [name, value] of Object.entries(credentials))
-          if (!value?.trim())
-            throw new Error(
-              `${name} is required when the selected AI profile uses that provider`,
-            );
-        const ledger = new InMemoryProviderCallLedger({
-          campaignLimitMicros: 20_000_000,
-        });
-        const ports = createAiPorts({
+        return createAiRuntime({
+          db,
+          gateway,
+          root,
+          userId: config.userId,
           config: providerConfig,
           credentials,
-          ledger,
         });
-        const index = new PgvectorCatalogIndex(db, config.userId);
-        const createRetriever = (catalog: ReviewedCatalogSnapshot) =>
-          new PgvectorToolRetriever({
-            catalog,
-            index,
-            embeddingPort: ports.embedding,
-            queryExpansionPort: ports.queryExpansion,
-            expectedEmbeddingProfile: providerConfig.embedding,
-          });
-        const options = {
-          root,
-          gateway,
-          modelClient: ports.model,
-          createRetriever,
-          maxPlanningCalls: providerConfig.limits.maxPlanningCalls,
-          maxReplanCalls: providerConfig.limits.maxReplanCalls,
-          deadlineMs: providerConfig.limits.trialDeadlineMs,
-        };
-        return {
-          planner: loadAiPlanner(options),
-          replan: loadAiReplan(options),
-          secrets: Object.values(credentials).filter((value): value is string =>
-            Boolean(value),
-          ),
-        };
       })()
     : undefined;
 const engine = new WorkflowEngine(db, gateway, config.userId, {
