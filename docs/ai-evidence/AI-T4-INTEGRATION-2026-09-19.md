@@ -15,6 +15,7 @@ quality, paid execution readiness, or a completed model evaluation.
 | Embedding content/provenance | `63d3b2f` | Gemini document/query text and policy hashes are explicit |
 | Pgvector fingerprint/currentness | `4d8ddd5` | Migration 0008, persisted vector fingerprints, pin/assertCurrent |
 | Session/replan safety | `951f79a` | Request-scoped semantic pin, post-model currentness, secret redaction, separate repair bound |
+| Replan error-context redaction | `169a8fe` | Secret canaries are removed from error text, failed approaches, current plan, repair prompts, and retrieval query |
 
 ## Fresh verification
 
