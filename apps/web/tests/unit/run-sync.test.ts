@@ -157,4 +157,213 @@ describe("createRunSyncController", () => {
 
     expect(controller.getSnapshot().isPolling).toBe(false);
   });
+
+  it("restarts polling cleanly when start() is called while previous tick is still pending", async () => {
+    const session = createSession();
+    session.setToken("test-token");
+
+    let resolveDetail1!: (val: RunDetail) => void;
+    let resolveEvents1!: (val: EventPage) => void;
+    const detailPromise1 = new Promise<RunDetail>((res) => {
+      resolveDetail1 = res;
+    });
+    const eventsPromise1 = new Promise<EventPage>((res) => {
+      resolveEvents1 = res;
+    });
+
+    let callCount = 0;
+    const mockTransport: Partial<Transport> = {
+      detail: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return detailPromise1;
+        return Promise.resolve(makeDetail("running", 1));
+      }),
+      events: vi.fn().mockImplementation(() => {
+        if (callCount === 1) return eventsPromise1;
+        return Promise.resolve({ events: [makeStatusEvent(1)], next_seq: 2 });
+      }),
+    };
+
+    const controller = createRunSyncController(
+      mockTransport as Transport,
+      session,
+      "run-uuid-1",
+      { pollIntervalMs: 5000 },
+    );
+
+    // 1. First start initiates tick 1
+    controller.start();
+    expect(controller.getSnapshot().isPolling).toBe(true);
+    expect(mockTransport.detail).toHaveBeenCalledTimes(1);
+
+    // 2. Stop while tick 1 is in-flight
+    controller.stop();
+    expect(controller.getSnapshot().isPolling).toBe(false);
+
+    // 3. Start again while tick 1 has NOT settled yet (race condition)
+    controller.start();
+    expect(controller.getSnapshot().isPolling).toBe(true);
+
+    // 4. Now resolve the aborted tick 1's promises
+    resolveDetail1(makeDetail("running", 1));
+    resolveEvents1({ events: [makeStatusEvent(1)], next_seq: 2 });
+
+    // Tick 2 must be triggered after tick 1 finishes unwinding!
+    await vi.waitFor(() => {
+      expect(mockTransport.detail).toHaveBeenCalledTimes(2);
+    });
+
+    await vi.waitFor(() => {
+      const snap = controller.getSnapshot();
+      expect(snap.eventState.seq).toBe(1);
+      expect(snap.isPolling).toBe(true);
+    });
+
+    controller.stop();
+  });
+
+  it("does not resurrect polling if stop() is called after start() while tick was in flight", async () => {
+    const session = createSession();
+    session.setToken("test-token");
+
+    let resolveDetail1!: (val: RunDetail) => void;
+    const detailPromise1 = new Promise<RunDetail>((res) => {
+      resolveDetail1 = res;
+    });
+
+    const mockTransport: Partial<Transport> = {
+      detail: vi.fn().mockReturnValue(detailPromise1),
+      events: vi.fn().mockReturnValue(new Promise(() => {})),
+    };
+
+    const controller = createRunSyncController(
+      mockTransport as Transport,
+      session,
+      "run-uuid-1",
+      { pollIntervalMs: 5000 },
+    );
+
+    controller.start();
+    controller.stop();
+    controller.start();
+    controller.stop(); // final state must be stopped!
+
+    resolveDetail1(makeDetail("running", 1));
+
+    // Wait short time to ensure no new tick fires
+    await new Promise((r) => setTimeout(r, 50));
+    expect(controller.getSnapshot().isPolling).toBe(false);
+    expect(mockTransport.detail).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces multiple refresh() calls while tick is in flight into a single next tick", async () => {
+    const session = createSession();
+    session.setToken("test-token");
+
+    let resolveDetail1!: (val: RunDetail) => void;
+    let resolveEvents1!: (val: EventPage) => void;
+    const detailPromise1 = new Promise<RunDetail>((res) => {
+      resolveDetail1 = res;
+    });
+    const eventsPromise1 = new Promise<EventPage>((res) => {
+      resolveEvents1 = res;
+    });
+
+    let callCount = 0;
+    const mockTransport: Partial<Transport> = {
+      detail: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return detailPromise1;
+        return Promise.resolve(makeDetail("running", 1));
+      }),
+      events: vi.fn().mockImplementation(() => {
+        if (callCount === 1) return eventsPromise1;
+        return Promise.resolve({ events: [makeStatusEvent(1)], next_seq: 2 });
+      }),
+    };
+
+    const controller = createRunSyncController(
+      mockTransport as Transport,
+      session,
+      "run-uuid-1",
+      { pollIntervalMs: 60000 },
+    );
+
+    controller.start();
+    expect(mockTransport.detail).toHaveBeenCalledTimes(1);
+
+    // Call refresh multiple times while tick 1 is in-flight
+    void controller.refresh();
+    void controller.refresh();
+    void controller.refresh();
+
+    // Still only 1 call dispatched so far
+    expect(mockTransport.detail).toHaveBeenCalledTimes(1);
+
+    // Resolve tick 1
+    resolveDetail1(makeDetail("running", 0));
+    resolveEvents1({ events: [], next_seq: 0 });
+
+    // Tick 2 should be dispatched exactly once
+    await vi.waitFor(() => {
+      expect(mockTransport.detail).toHaveBeenCalledTimes(2);
+    });
+
+    // Wait short time to ensure no third tick was queued
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockTransport.detail).toHaveBeenCalledTimes(2);
+
+    controller.stop();
+  });
+
+  it("awaits both detail and events settling when one fails fast", async () => {
+    const session = createSession();
+    session.setToken("test-token");
+
+    let resolveEvents1!: (val: EventPage) => void;
+    const eventsPromise1 = new Promise<EventPage>((res) => {
+      resolveEvents1 = res;
+    });
+
+    let isTick1EventsStillPending = true;
+    const mockTransport: Partial<Transport> = {
+      // detail rejects immediately
+      detail: vi.fn().mockRejectedValueOnce(new Error("Detail network error")),
+      // events is still running
+      events: vi.fn().mockImplementationOnce(() => {
+        return eventsPromise1.finally(() => {
+          isTick1EventsStillPending = false;
+        });
+      }),
+    };
+
+    const controller = createRunSyncController(
+      mockTransport as Transport,
+      session,
+      "run-uuid-1",
+      { pollIntervalMs: 60000 },
+    );
+
+    controller.start();
+
+    // Even though detail failed immediately, the controller should NOT have released the tick owner
+    // until events settles!
+    await new Promise((r) => setTimeout(r, 50));
+    expect(isTick1EventsStillPending).toBe(true);
+
+    // If we call refresh now while events is still pending:
+    void controller.refresh();
+    // detail should NOT have been called a second time yet
+    expect(mockTransport.detail).toHaveBeenCalledTimes(1);
+
+    // Now settle events
+    resolveEvents1({ events: [], next_seq: 0 });
+
+    // Once settled, the next tick can proceed
+    await vi.waitFor(() => {
+      expect(isTick1EventsStillPending).toBe(false);
+    });
+
+    controller.stop();
+  });
 });

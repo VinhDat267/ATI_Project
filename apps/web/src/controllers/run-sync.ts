@@ -46,6 +46,8 @@ export function createRunSyncController(
   let timer: ReturnType<typeof setTimeout> | null = null;
   let activeScope: RequestScope | null = null;
   let isTickInProgress = false;
+  let hasPendingImmediateIntent = false;
+  let pollingEpoch = 0;
   let emptyTerminalPolls = 0;
   let stopped = true;
 
@@ -60,6 +62,8 @@ export function createRunSyncController(
   const pollTick = async (): Promise<void> => {
     if (stopped || isTickInProgress) return;
     isTickInProgress = true;
+    hasPendingImmediateIntent = false;
+    const tickEpoch = pollingEpoch;
 
     activeScope = session.beginRequest();
     const scope = activeScope;
@@ -68,14 +72,35 @@ export function createRunSyncController(
       const current = store.getSnapshot();
       const sinceSeq = current.eventState.seq;
 
-      const [detailResult, eventPage] = await Promise.all([
+      const [detailSettled, eventsSettled] = await Promise.allSettled([
         transport.detail(runId, scope.signal),
         transport.events(runId, sinceSeq, scope.signal),
       ]);
 
-      if (!scope.isCurrent()) {
+      if (stopped || tickEpoch !== pollingEpoch || !scope.isCurrent()) {
         return;
       }
+
+      if (detailSettled.status === "rejected" || eventsSettled.status === "rejected") {
+        const rejectedReason =
+          detailSettled.status === "rejected"
+            ? detailSettled.reason
+            : (eventsSettled as PromiseRejectedResult).reason;
+        const error =
+          rejectedReason instanceof Error
+            ? rejectedReason
+            : new Error(String(rejectedReason));
+        const currentSnapshot = store.getSnapshot();
+        store.set({
+          ...currentSnapshot,
+          error,
+        });
+        scheduleNext(pollIntervalMs);
+        return;
+      }
+
+      const detailResult = detailSettled.value;
+      const eventPage = eventsSettled.value;
 
       // Ingest events
       const nextEventState = ingestEvents(current.eventState, eventPage, runId);
@@ -111,6 +136,8 @@ export function createRunSyncController(
 
       if (shouldStopPolling) {
         stopped = true;
+        pollingEpoch++;
+        hasPendingImmediateIntent = false;
         if (timer) clearTimeout(timer);
         return;
       }
@@ -122,7 +149,7 @@ export function createRunSyncController(
         scheduleNext(pollIntervalMs);
       }
     } catch (err: unknown) {
-      if (!scope.isCurrent()) return;
+      if (stopped || tickEpoch !== pollingEpoch || !scope.isCurrent()) return;
 
       const error = err instanceof Error ? err : new Error(String(err));
       const current = store.getSnapshot();
@@ -139,6 +166,15 @@ export function createRunSyncController(
         activeScope = null;
       }
       isTickInProgress = false;
+
+      if (!stopped && hasPendingImmediateIntent) {
+        hasPendingImmediateIntent = false;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        void pollTick();
+      }
     }
   };
 
@@ -148,13 +184,21 @@ export function createRunSyncController(
     start() {
       if (!stopped) return;
       stopped = false;
+      pollingEpoch++;
       emptyTerminalPolls = 0;
       const current = store.getSnapshot();
       store.set({ ...current, isPolling: true, error: null });
-      void pollTick();
+
+      if (isTickInProgress) {
+        hasPendingImmediateIntent = true;
+      } else {
+        void pollTick();
+      }
     },
     stop() {
       stopped = true;
+      pollingEpoch++;
+      hasPendingImmediateIntent = false;
       if (timer) {
         clearTimeout(timer);
         timer = null;
@@ -169,10 +213,20 @@ export function createRunSyncController(
     async refresh() {
       if (stopped) {
         stopped = false;
+        pollingEpoch++;
+        emptyTerminalPolls = 0;
         const current = store.getSnapshot();
         store.set({ ...current, isPolling: true, error: null });
       }
-      await pollTick();
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (isTickInProgress) {
+        hasPendingImmediateIntent = true;
+      } else {
+        await pollTick();
+      }
     },
   };
 }

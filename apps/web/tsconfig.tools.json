@@ -15,6 +15,7 @@
     "vite.config.ts",
     "vitest.unit.config.ts",
     "playwright.config.ts",
+    "playwright.strict.config.ts",
     "tooling/**/*.ts",
     "tests/**/*.ts"
   ]
