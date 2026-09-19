@@ -1,18 +1,21 @@
-# Frontend handoff — API-05 B/local & WEB-02 Live Integration
+# Frontend handoff — WEB-03 Browser Verification & Gate G3 Closure
 
-Status: `WEB_LIVE_PASS` on branch `feat/web-02-live` (2026-09-19). Live frontend integration and E2E verification are complete. TanStack Query v5 caches server projections while session-scoped pure-TypeScript controllers manage atomic event sequence ingestion, uncertain write mutations, command mutual exclusion, and trace cursor pagination.
+Status: `WEB_BROWSER_EXERCISED_PASS` on branch `feat/web-03-browser-runner-g3` (2026-09-19). Live frontend browser verification and Gate G3 acceptance are complete. See `docs/WEB-STATUS.md` for the formal verification report and gate manifest references. TanStack Query v5 caches server projections while session-scoped pure-TypeScript controllers manage atomic event sequence ingestion, uncertain write mutations, command mutual exclusion, and trace cursor pagination.
 
 ## Verification Summary
 
+- **Web Gate Runner**: `npm run check:web` executes all 6 gate commands sequentially with automated delta cleanup tracking and sanitized evidence capture.
 - **TypeScript Typecheck**: `npm run typecheck -w @wap/web` passed (0 errors across app, tools, tests).
-- **Unit Tests**: `npm run test:unit -w @wap/web` passed (21 files, 128 tests green).
-- **Fixture Browser Tests**: `npm run test:browser -w @wap/web` passed (25 tests green, 0 axe violations, 0 horizontal overflow).
+- **Unit Tests**: `npm run test:unit -w @wap/web` passed (21 files, 128 tests green). Runner unit tests: `node --test scripts/check-web.test.mjs` passed (14 tests green).
 - **StrictMode Development Browser Test**: `npm exec -w @wap/web -- playwright test --config=playwright.strict.config.ts` passed (1 test green, verified polling continuity across React StrictMode effect replay and SPA navigation).
-- **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (7 tests green across partial cleanup, DB drop/port release, create uncertainty fence, lifecycle, login).
+- **Fixture Browser Tests**: `npm run test:browser -w @wap/web` passed (27 tests green, 0 axe violations, 0 horizontal overflow, zero credential persistence across 5 routes, XSS canary text rendering, multi-tab session isolation, logout generation fencing).
+- **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (10 tests green across receiver database receipts oracle, negative rejection & cancellation 0 writes, partial cleanup, DB drop/port release, create uncertainty fence, lifecycle, login, NFR-03 latency gate).
+- **NFR-03 Local Latency Gate**: Event-to-DOM render latency $\ge$ 30 observations, $p50 = 1876$ms, $p95 = 1996$ms (target: $p95 \le 3000$ms).
 - **Production Bundle Budgets**:
-  - Live bundle JS: 176.87 KiB initial gzip (budget: ≤ 200 KiB).
-  - Live bundle CSS: 6.36 KiB initial gzip (budget: ≤ 30 KiB).
+  - Live bundle JS: 175.34 KiB initial gzip (budget: ≤ 200 KiB / 204,800 bytes).
+  - Live bundle CSS: 6.31 KiB initial gzip (budget: ≤ 30 KiB / 30,720 bytes).
   - Fixture leakage audit: 0 synthetic fixture modules in live bundle.
+- **Delta Cleanup Oracle**: PASS (0 leaked `api_it_*` databases, 0 leaked temporary roots, 0 leaked processes after every gate command).
 
 ## Architecture & Guarantees
 
@@ -37,16 +40,25 @@ Status: `WEB_LIVE_PASS` on branch `feat/web-02-live` (2026-09-19). Live frontend
 - `apps/web/tooling/local-proxy.ts`: Vite plugin forwarding relative `/api/v1` requests to loopback API targets, stripping forbidden headers and rejecting foreign origins.
 - `apps/web/tests/live/fixtures.ts` & `cleanup.ts`: Launches isolated backend API fixture (`makeApiFixture`) on dynamic ports, provisions ephemeral databases (`api_it_*`), serves preview builds on dynamic ports. Guarantees cleanup-on-failure: if preview startup or port resolution fails midway, previously acquired API processes and databases are reliably closed and dropped, and environment variables are restored. Safe teardown guarantees both preview and API closures even if one throws.
 
+### 5. Receiver Database Oracle, Browser Security & Latency Gates
+- **Receiver Database Oracle**: `apps/web/tests/live/lifecycle.spec.ts` verifies PostgreSQL `hub_receipts` table via structural client typing (`ReceiverDatabaseClient`) without static imports from backend packages. Verifies 0 receipts prior to approval, exactly 2 receiver receipts upon successful b02 execution completion, and 0 receiver receipts on rejection or cancellation.
+- **XSS Canary & Zero Storage Persistence**: `apps/web/tests/browser/security.spec.ts` asserts that unescaped markup payloads render strictly as text children without script execution or DOM image injection. Audits all 5 core routes asserting zero authentication persistence in `localStorage`, `sessionStorage`, or cookies.
+- **Multi-Tab Session Isolation**: `apps/web/tests/browser/session-races.spec.ts` verifies that independent browser tabs/contexts do not share in-memory session tokens, and logging out advances session generation without leaving persistent residual storage.
+- **NFR-03 Local Latency Gate**: `apps/web/tests/live/nfr03-latency.spec.ts` collects $\ge$ 30 server event timestamp $\to$ DOM status paint observations, memoizing initial render timestamps per sequence via `useRef<Map<number, string>>` in `RunView.tsx` to prevent re-render measurement skew, asserting $p95 \le 3000$ms.
+
 ## Test Commands
 
 ```bash
+# Full automated web gate runner (typecheck, unit, strict, fixture, live, bundle, cleanup oracle)
+npm run check:web
+
 # Run unit tests
 npm run test:unit -w @wap/web
 
-# Run fixture browser tests (synthetic world)
+# Run fixture browser tests (synthetic world, a11y, security, session races)
 npm run test:browser -w @wap/web
 
-# Run live E2E tests against real ephemeral backend API
+# Run live E2E tests against real ephemeral backend API (oracle receipts, negative paths, NFR-03 latency)
 npm run test:live -w @wap/web
 
 # Typecheck frontend and tooling
