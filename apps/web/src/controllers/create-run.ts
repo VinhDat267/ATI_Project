@@ -1,12 +1,11 @@
 import type {
   CreateInput,
   RunAccepted,
-  RunDetail,
   Transport,
 } from "../core/contracts.js";
 import { ClientError, isClientError } from "../core/errors.js";
 import { formatClock } from "../core/presentation.js";
-import type { SessionController } from "../core/session.js";
+import type { RequestScope, SessionController } from "../core/session.js";
 
 export type CreateRunStatus =
   | "idle"
@@ -27,8 +26,7 @@ export interface CreateRunController {
   getSnapshot(): CreateRunState;
   subscribe(listener: () => void): () => void;
   submit(input: CreateInput): Promise<RunAccepted | null>;
-  reconcile(runs: RunDetail[]): RunDetail | null;
-  checkReconciliation(): Promise<RunDetail | null>;
+  teardown(): void;
   reset(): void;
 }
 
@@ -45,6 +43,8 @@ export function createCreateRunController(
   };
 
   const listeners = new Set<() => void>();
+  let activeScope: RequestScope | null = null;
+  let currentSubmissionEpoch = 0;
 
   function notify(): void {
     for (const listener of listeners) {
@@ -68,9 +68,14 @@ export function createCreateRunController(
       };
     },
     async submit(input: CreateInput): Promise<RunAccepted | null> {
-      if (state.status === "submitting") return null;
+      if (state.status === "submitting" || state.status === "confirming") {
+        return null;
+      }
 
-      const scope = session.beginRequest();
+      const submissionEpoch = ++currentSubmissionEpoch;
+      activeScope = session.beginRequest();
+      const scope = activeScope;
+
       setState({
         status: "submitting",
         submittedPrompt: input.source_prompt,
@@ -81,7 +86,9 @@ export function createCreateRunController(
 
       try {
         const accepted = await transport.create(input, scope.signal);
-        if (!scope.isCurrent()) return null;
+        if (!scope.isCurrent() || submissionEpoch !== currentSubmissionEpoch) {
+          return null;
+        }
 
         setState({
           status: "accepted",
@@ -91,7 +98,9 @@ export function createCreateRunController(
         });
         return accepted;
       } catch (err) {
-        if (!scope.isCurrent()) return null;
+        if (!scope.isCurrent() || submissionEpoch !== currentSubmissionEpoch) {
+          return null;
+        }
 
         const clientError = isClientError(err)
           ? err
@@ -120,44 +129,39 @@ export function createCreateRunController(
         return null;
       } finally {
         scope.dispose();
+        if (activeScope === scope) {
+          activeScope = null;
+        }
       }
     },
-    reconcile(runs: RunDetail[]): RunDetail | null {
-      if (state.status !== "confirming" || !state.submittedPrompt) {
-        return null;
+    teardown(): void {
+      currentSubmissionEpoch++;
+      if (activeScope) {
+        activeScope.abort();
+        activeScope = null;
       }
-
-      const match = runs.find(
-        (r) =>
-          r.source_prompt === state.submittedPrompt ||
-          (state.createdRunId && r.run_id === state.createdRunId),
-      );
-
-      if (match) {
+      if (state.status === "submitting") {
         setState({
-          status: "accepted",
-          createdRunId: match.run_id,
-          error: null,
-          lostAt: null,
+          status: "confirming",
+          error: new ClientError({
+            message:
+              "Yêu cầu tạo lần chạy bị gián đoạn; chưa rõ kết quả trên máy chủ",
+            kind: "network",
+            uncertain: true,
+          }),
+          lostAt: formatClock(new Date().toISOString(), "Asia/Ho_Chi_Minh"),
         });
-        return match;
-      }
-      return null;
-    },
-    async checkReconciliation(): Promise<RunDetail | null> {
-      if (state.status !== "confirming") return null;
-      const scope = session.beginRequest();
-      try {
-        const runs = await transport.list(scope.signal);
-        if (!scope.isCurrent()) return null;
-        return controller.reconcile(runs);
-      } catch {
-        return null;
-      } finally {
-        scope.dispose();
       }
     },
     reset(): void {
+      if (state.status === "submitting" || state.status === "confirming") {
+        return;
+      }
+      currentSubmissionEpoch++;
+      if (activeScope) {
+        activeScope.abort();
+        activeScope = null;
+      }
       setState({
         status: "idle",
         submittedPrompt: null,

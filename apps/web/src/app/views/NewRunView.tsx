@@ -185,7 +185,6 @@ export function NewRunView() {
   const [timeZone, setTimeZone] = useState("Asia/Ho_Chi_Minh");
   const [rows, setRows] = useState<InputRow[]>([]);
   const [promptError, setPromptError] = useState<string | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
   const nextRow = useRef(1);
   const hintId = useId();
   const parsed = parseInputs(rows);
@@ -217,19 +216,6 @@ export function NewRunView() {
     if (accepted) {
       drafts.clear();
       navigate({ page: "run", id: accepted.run_id });
-    }
-  };
-
-  const checkStatus = async (): Promise<void> => {
-    setIsChecking(true);
-    try {
-      const match = await createRun.checkReconciliation();
-      if (match) {
-        drafts.clear();
-        navigate({ page: "run", id: match.run_id });
-      }
-    } finally {
-      setIsChecking(false);
     }
   };
 
@@ -269,23 +255,6 @@ export function NewRunView() {
                 >
                   Mở Lần chạy để kiểm tra
                 </a>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void checkStatus()}
-                  disabled={isChecking}
-                >
-                  {isChecking ? "Đang kiểm tra…" : "Kiểm tra máy chủ"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="inline"
-                  onClick={() => createRun.reset()}
-                >
-                  Tạo yêu cầu mới khác
-                </Button>
               </div>
             </span>
           </Banner>

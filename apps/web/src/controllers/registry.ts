@@ -63,7 +63,7 @@ export function createControllerRegistry(
       return controller;
     },
     clear() {
-      createRun.reset();
+      createRun.teardown();
       for (const controller of runCommands.values()) {
         controller.reset();
       }
