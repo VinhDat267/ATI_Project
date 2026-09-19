@@ -12,8 +12,8 @@ Status: `WEB_BROWSER_EXERCISED_PASS` on branch `feat/web-03-browser-runner-g3` (
 - **Live Browser E2E Tests**: `npm run test:live -w @wap/web` passed (10 tests green across receiver database receipts oracle, negative rejection & cancellation 0 writes, partial cleanup, DB drop/port release, create uncertainty fence, lifecycle, login, NFR-03 latency gate).
 - **NFR-03 Local Latency Gate**: Event-to-DOM render latency $\ge$ 30 observations, $p50 = 1876$ms, $p95 = 1996$ms (target: $p95 \le 3000$ms).
 - **Production Bundle Budgets**:
-  - Live bundle JS: 175.34 KiB initial gzip (budget: ≤ 200 KiB / 204,800 bytes).
-  - Live bundle CSS: 6.31 KiB initial gzip (budget: ≤ 30 KiB / 30,720 bytes).
+  - Live bundle JS: 175,338 bytes (~171.2 KiB) initial gzip (budget: ≤ 200 KiB / 204,800 bytes).
+  - Live bundle CSS: 6,306 bytes (~6.2 KiB) initial gzip (budget: ≤ 30 KiB / 30,720 bytes).
   - Fixture leakage audit: 0 synthetic fixture modules in live bundle.
 - **Delta Cleanup Oracle**: PASS (0 leaked `api_it_*` databases, 0 leaked temporary roots, 0 leaked processes after every gate command).
 
