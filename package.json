@@ -32,7 +32,8 @@
     "check:g1": "npm run check && npm run test:integration -w @wap/mcp-task-hub",
     "check:engine": "node scripts/check-engine.mjs",
     "engine": "node packages/engine/dist/cli.js",
-    "ai:eval:offline": "npm run build -w @wap/dsl && npm run build -w @wap/engine && node packages/engine/dist/ai/evaluation/cli.js"
+    "ai:eval:offline": "npm run build -w @wap/dsl && npm run build -w @wap/engine && node packages/engine/dist/ai/evaluation/cli.js",
+    "ai:eval:live": "npm run build -w @wap/dsl && npm run build -w @wap/engine && node packages/engine/dist/ai/live-evaluation/cli.js"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
