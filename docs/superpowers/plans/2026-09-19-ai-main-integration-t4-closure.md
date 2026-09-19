@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` task-by-task in the current checkout, honoring the user's direct implementation preference. Independent Code Reviewer reviews the completed sensitive changes under AGENTS.md. This document authorizes no execution by itself.
 
-**Status:** PROPOSED — planning only, 2026-09-19. No merge, checkout, source edit, migration, paid call or commit performed while preparing this plan.
+**Status:** IMPLEMENTED WITH BOUNDED LIMITATION — execution completed 2026-09-19. Tasks 1–5 are committed; Task 6 evidence is committed with the full unfiltered engine integration suite explicitly not counted after bounded no-output interruptions.
 
 **Goal:** Tích hợp AI backend đã lưu trên nhánh riêng với main hiện hành, sửa các khoảng trống T4 có bằng chứng, đạt regression gates để bắt đầu T5.
 
@@ -234,6 +234,14 @@ T5 là đợt riêng có test cycle riêng theo live-evaluation plan. Không c�
 5. Unit tests cover extra writes/wrong arguments, justified clarification/refusal, empty recall denominator, exposure contradictions; ambiguous semantic cases cần independent adjudications như plan gốc.
 
 Sau T5: T6 durable runner/authorization/ledger/CLI -> T7 readiness -> T8 paid probes khi có approval và ngân sách thực. Không coi T4 guard hoặc local API key là quyền chạy T8.
+
+## 7. Execution outcome
+
+The implementation ledger at
+`.superpowers/sdd/2026-09-19-ai-main-integration-t4-closure/progress.md`
+is authoritative for command counts and checkpoint SHAs. The resulting
+backend remains fail-closed for native provider calls; this plan does not grant
+live or paid execution authority.
 
 ## 6. Self-review và tiêu chí chốt plan
 
