@@ -60,11 +60,13 @@ export async function createLiveFixture(): Promise<LiveFixtureContext> {
   process.env.WAP_PREVIEW_PORT = "0";
 
   // 2. Start Vite preview server on an isolated dynamic port
+  const webRoot = fileURLToPath(new URL("../../", import.meta.url));
   const configPath = fileURLToPath(
     new URL("../../vite.config.ts", import.meta.url),
   );
 
   const previewServer = await preview({
+    root: webRoot,
     configFile: configPath,
     mode: "live",
     preview: {
