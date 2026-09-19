@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import type { RequestDraft } from "../../core/draft.js";
 import { navigate, routeToHash } from "../../core/navigation.js";
 import { formatClock, shortId } from "../../core/presentation.js";
@@ -170,7 +170,13 @@ function Capabilities() {
 
 /** V03 — compose a request; recovery links arrive here with a prefilled draft. */
 export function NewRunView() {
-  const { transport, drafts } = useApp();
+  const { drafts, controllers } = useApp();
+  const createRun = controllers.getCreateRun();
+  const createSnapshot = useSyncExternalStore(
+    createRun.subscribe,
+    createRun.getSnapshot,
+    createRun.getSnapshot,
+  );
   // Read in the initializer, clear in an effect: StrictMode may call the
   // initializer twice, and take() would hand the draft to the discarded one.
   const [draft] = useState<RequestDraft | null>(() => drafts.get());
@@ -179,32 +185,19 @@ export function NewRunView() {
   const [timeZone, setTimeZone] = useState("Asia/Ho_Chi_Minh");
   const [rows, setRows] = useState<InputRow[]>([]);
   const [promptError, setPromptError] = useState<string | null>(null);
-  const [lostAt, setLostAt] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
   const nextRow = useRef(1);
   const hintId = useId();
   const parsed = parseInputs(rows);
 
-  const create = useMutation({
-    // Not aborted on unmount: once sent, the outcome must still be observed.
-    mutationFn: (input: {
-      source_prompt: string;
-      inputs: Record<string, string | number | boolean>;
-      time_zone: string;
-    }) => transport.create(input, new AbortController().signal),
-    retry: 0,
-    onSuccess: (accepted) => {
-      drafts.clear();
-      navigate({ page: "run", id: accepted.run_id });
-    },
-    onError: () => {
-      // The request may have reached the server: never resend it silently.
-      setLostAt(formatClock(new Date().toISOString(), timeZone));
-    },
-  });
-
-  const submit = (event?: FormEvent<HTMLFormElement>): void => {
+  const submit = async (event?: FormEvent<HTMLFormElement>): Promise<void> => {
     event?.preventDefault();
-    if (create.isPending) return;
+    if (
+      createSnapshot.status === "submitting" ||
+      createSnapshot.status === "confirming"
+    ) {
+      return;
+    }
     const text = prompt.trim();
     if (!text) {
       setPromptError("Nhập yêu cầu trước khi lập kế hoạch.");
@@ -216,14 +209,34 @@ export function NewRunView() {
     }
     if (parsed.errors.size > 0) return;
     setPromptError(null);
-    setLostAt(null);
-    create.mutate({ source_prompt: text, inputs: parsed.values, time_zone: timeZone });
+    const accepted = await createRun.submit({
+      source_prompt: text,
+      inputs: parsed.values,
+      time_zone: timeZone,
+    });
+    if (accepted) {
+      drafts.clear();
+      navigate({ page: "run", id: accepted.run_id });
+    }
+  };
+
+  const checkStatus = async (): Promise<void> => {
+    setIsChecking(true);
+    try {
+      const match = await createRun.checkReconciliation();
+      if (match) {
+        drafts.clear();
+        navigate({ page: "run", id: match.run_id });
+      }
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      submit();
+      void submit();
     }
   };
 
@@ -241,14 +254,44 @@ export function NewRunView() {
           </p>
         </div>
 
-        {lostAt ? (
+        {createSnapshot.status === "confirming" ? (
           <Banner tone="unknown" icon="triangle-alert" title="Chưa xác nhận được lần chạy đã được tạo hay chưa" live>
-            <span className="flex flex-col">
-              Máy chủ không phản hồi sau khi bạn bấm “Lập kế hoạch” lúc {lostAt}. Yêu cầu có thể đã được nhận. Hệ thống không tự gửi lại để tránh tạo lần chạy trùng.
-              <a href={routeToHash({ page: "history" })} className="mt-1 inline-flex min-h-11 items-center self-start text-button-sm text-current">
-                Mở Lần chạy để kiểm tra
-              </a>
+            <span className="flex flex-col gap-2">
+              <span>
+                Máy chủ không phản hồi sau khi bạn bấm “Lập kế hoạch”
+                {createSnapshot.lostAt ? ` lúc ${createSnapshot.lostAt}` : ""}.
+                Yêu cầu có thể đã được nhận. Hệ thống không tự gửi lại để tránh tạo lần chạy trùng.
+              </span>
+              <div className="flex flex-wrap items-center gap-3 mt-1">
+                <a
+                  href={routeToHash({ page: "history" })}
+                  className="inline-flex min-h-11 items-center self-start text-button-sm text-current"
+                >
+                  Mở Lần chạy để kiểm tra
+                </a>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void checkStatus()}
+                  disabled={isChecking}
+                >
+                  {isChecking ? "Đang kiểm tra…" : "Kiểm tra máy chủ"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="inline"
+                  onClick={() => createRun.reset()}
+                >
+                  Tạo yêu cầu mới khác
+                </Button>
+              </div>
             </span>
+          </Banner>
+        ) : createSnapshot.status === "error" && createSnapshot.error ? (
+          <Banner tone="danger" icon="triangle-alert" title="Không thể gửi yêu cầu">
+            <span>{createSnapshot.error.message}</span>
           </Banner>
         ) : draft ? (
           <OriginBanner draft={draft} />
@@ -377,14 +420,25 @@ export function NewRunView() {
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-4">
-            <Button type="submit" disabled={create.isPending} aria-busy={create.isPending}>
-              {create.isPending ? "Đang gửi…" : lostAt ? "Gửi lại yêu cầu" : "Lập kế hoạch"}
+            <Button
+              type="submit"
+              disabled={
+                createSnapshot.status === "submitting" ||
+                createSnapshot.status === "confirming"
+              }
+              aria-busy={createSnapshot.status === "submitting"}
+            >
+              {createSnapshot.status === "submitting"
+                ? "Đang gửi…"
+                : createSnapshot.status === "confirming"
+                  ? "Chờ xác nhận…"
+                  : "Lập kế hoạch"}
             </Button>
             <span className="text-body-sm text-muted">hoặc Ctrl + Enter</span>
           </div>
           <p className="m-0 max-w-measure-sm text-body-sm text-muted">
-            {lostAt
-              ? "Chỉ gửi lại khi Lần chạy không có yêu cầu này. Nếu đã có, mở lần chạy đó thay vì tạo mới."
+            {createSnapshot.status === "confirming"
+              ? "Trạng thái chưa rõ. Kiểm tra Lần chạy hoặc chờ hệ thống xác nhận trước khi tiếp tục."
               : "Chưa có dữ liệu nào bị ghi ở bước này. Kế hoạch có thể hiểu sai, hỏi lại hoặc từ chối yêu cầu — bạn luôn xem trước khi duyệt. Nháp không được lưu khi rời trang."}
           </p>
         </div>

@@ -30,13 +30,20 @@ const remembered = new Map<number, HistoryFilters>();
 const initial: HistoryFilters = { group: "all", query: "", shown: PAGE, scrollY: 0 };
 
 export function HistoryView() {
-  const { generation } = useApp();
+  const { generation, controllers } = useApp();
   const list = useRuns();
   const attention = useAttention();
+  const createRun = controllers.getCreateRun();
   const [filters, setFilters] = useState<HistoryFilters>(
     () => remembered.get(generation) ?? initial,
   );
   const restoredScroll = useRef(false);
+
+  useEffect(() => {
+    if (list.data) {
+      createRun.reconcile(list.data);
+    }
+  }, [list.data, createRun]);
 
   useEffect(() => {
     remembered.set(generation, filters);
