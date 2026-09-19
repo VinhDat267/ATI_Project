@@ -27,6 +27,8 @@ import type { RetrievalVariant, ToolRetriever } from "./retrieval.js";
 
 export interface AiReplanAdapterOptions {
   readonly retriever: ToolRetriever;
+  /** Revalidate request-scoped retrieval state after model output. */
+  readonly assertCurrent?: () => Promise<void>;
   readonly model: StructuredModelClient;
   readonly variant?: RetrievalVariant;
   readonly topK?: number;
@@ -142,7 +144,9 @@ export function validateLocalScopeInvariants(
         message: `Already-completed step '${stepId}' tool cannot be changed from ${original.tool.server}.${original.tool.name} to ${replacement.tool.server}.${replacement.tool.name}`,
       });
     }
-    if (canonicalJson(original.tool.args) !== canonicalJson(replacement.tool.args)) {
+    if (
+      canonicalJson(original.tool.args) !== canonicalJson(replacement.tool.args)
+    ) {
       issues.push({
         layer: "tool",
         path: ["steps", stepId, "tool", "args"],
@@ -156,6 +160,7 @@ export function validateLocalScopeInvariants(
 
 export class AiReplanAdapter implements LocalReplanPort {
   private readonly retriever: ToolRetriever;
+  private readonly assertCurrent: () => Promise<void>;
   private readonly model: StructuredModelClient;
   private readonly variant: RetrievalVariant;
   private readonly topK: number;
@@ -198,6 +203,7 @@ export class AiReplanAdapter implements LocalReplanPort {
         0,
       );
     this.retriever = options.retriever;
+    this.assertCurrent = options.assertCurrent ?? (async () => {});
     this.model = options.model;
     this.variant = options.variant ?? "all_tools";
     this.topK = topK;
@@ -320,6 +326,7 @@ export class AiReplanAdapter implements LocalReplanPort {
           usage: response.usage ? { ...response.usage } : null,
         });
         throwIfAborted(input.signal, attempt);
+        await bounded(() => this.assertCurrent(), controller.signal);
 
         let result: PlannerResult | undefined;
         try {

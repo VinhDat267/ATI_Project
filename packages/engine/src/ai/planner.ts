@@ -38,6 +38,8 @@ export class AiPlannerError extends Error {
 
 export interface AiPlannerAdapterOptions {
   readonly retriever: ToolRetriever;
+  /** Revalidate request-scoped retrieval state after model output. */
+  readonly assertCurrent?: () => Promise<void>;
   readonly model: StructuredModelClient;
   readonly variant?: RetrievalVariant;
   readonly topK?: number;
@@ -128,6 +130,7 @@ function throwIfAborted(
 export class AiPlannerAdapter {
   readonly mode = "ai" as const;
   private readonly retriever: ToolRetriever;
+  private readonly assertCurrent: () => Promise<void>;
   private readonly model: StructuredModelClient;
   private readonly variant: OfflineRetrievalVariant;
   private readonly topK: number;
@@ -169,6 +172,7 @@ export class AiPlannerAdapter {
         0,
       );
     this.retriever = options.retriever;
+    this.assertCurrent = options.assertCurrent ?? (async () => {});
     this.model = options.model;
     this.variant = options.variant ?? "all_tools";
     this.topK = topK;
@@ -280,6 +284,7 @@ export class AiPlannerAdapter {
           usage: response.usage ? { ...response.usage } : null,
         });
         throwIfAborted(input.signal, attempt);
+        await bounded(() => this.assertCurrent(), controller.signal);
 
         let result: PlannerResult | undefined;
         try {

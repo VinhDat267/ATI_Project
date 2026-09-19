@@ -77,6 +77,7 @@ export {
   type RetrievalRequest,
   type RetrievalResult,
   type RetrievalVariant,
+  type AiRetrievalSession,
   type ToolRetriever,
   type QueryExpansionPort,
   type QueryExpansionResult,

@@ -219,6 +219,42 @@ describe("AiReplanAdapter unit tests", () => {
     expect(result).toEqual(clarification);
   });
 
+  it("revalidates the retrieval session after model output", async () => {
+    const replanned: PlannerResult = {
+      kind: "plan",
+      plan: {
+        ...initialDraft(),
+        steps: [
+          initialDraft().steps[0]!,
+          {
+            ...initialDraft().steps[1]!,
+            tool: {
+              server: "task_hub",
+              name: "create_card",
+              args: { title: "New Card", list_id: "todo" },
+            },
+          },
+        ],
+      },
+    };
+    const { client } = clientFrom([replanned]);
+    const assertCurrent = vi.fn(async () => {
+      throw Object.assign(new Error("active embedding index changed"), {
+        code: "INDEX_CHANGED",
+      });
+    });
+    const adapter = new AiReplanAdapter({
+      retriever: retriever(),
+      model: client,
+      assertCurrent,
+    });
+
+    await expect(adapter.replan(baseInput)).rejects.toMatchObject({
+      code: "INDEX_CHANGED",
+    });
+    expect(assertCurrent).toHaveBeenCalledTimes(1);
+  });
+
   it("enforces local scope invariants: rejects plan that alters completed steps", async () => {
     // Attempt 1 alters step_read args (completed step)
     const badPlan: PlannerResult = {
@@ -228,7 +264,11 @@ describe("AiReplanAdapter unit tests", () => {
         steps: [
           {
             ...initialDraft().steps[0]!,
-            tool: { server: "task_hub", name: "list_cards", args: { filter: "changed" } },
+            tool: {
+              server: "task_hub",
+              name: "list_cards",
+              args: { filter: "changed" },
+            },
           },
           initialDraft().steps[1]!,
         ],
@@ -263,7 +303,9 @@ describe("AiReplanAdapter unit tests", () => {
     const result = await adapter.replan(baseInput);
     expect(result.kind).toBe("plan");
     expect(prompts.length).toBe(2);
-    expect(prompts[1]).toContain("Already-completed step 'step_read' arguments cannot be changed");
+    expect(prompts[1]).toContain(
+      "Already-completed step 'step_read' arguments cannot be changed",
+    );
   });
 
   it("enforces local scope invariants: rejects plan that removes failed step id", async () => {
@@ -308,7 +350,9 @@ describe("AiReplanAdapter unit tests", () => {
     const result = await adapter.replan(baseInput);
     expect(result.kind).toBe("plan");
     expect(prompts.length).toBe(2);
-    expect(prompts[1]).toContain("Local replan must retain the failed step id 'step_write'");
+    expect(prompts[1]).toContain(
+      "Local replan must retain the failed step id 'step_write'",
+    );
   });
 
   it("exhausts repair attempts and throws AiPlannerError on repeated invalid outputs", async () => {
@@ -319,7 +363,11 @@ describe("AiReplanAdapter unit tests", () => {
         steps: [
           {
             ...initialDraft().steps[0]!,
-            tool: { server: "task_hub", name: "list_cards", args: { modified: true } },
+            tool: {
+              server: "task_hub",
+              name: "list_cards",
+              args: { modified: true },
+            },
           },
           initialDraft().steps[1]!,
         ],
@@ -370,7 +418,12 @@ describe("validateLocalScopeInvariants helper directly", () => {
         },
       ],
     };
-    const issues = validateLocalScopeInvariants(current, modified, "step_write", ["step_read"]);
+    const issues = validateLocalScopeInvariants(
+      current,
+      modified,
+      "step_write",
+      ["step_read"],
+    );
     expect(issues).toEqual([]);
   });
 
@@ -385,9 +438,16 @@ describe("validateLocalScopeInvariants helper directly", () => {
         current.steps[1]!,
       ],
     };
-    const issues = validateLocalScopeInvariants(current, modified, "step_write", ["step_read"]);
+    const issues = validateLocalScopeInvariants(
+      current,
+      modified,
+      "step_write",
+      ["step_read"],
+    );
     expect(issues.length).toBeGreaterThan(0);
-    expect(issues[0]!.message).toContain("cannot be changed from task_hub.list_cards");
+    expect(issues[0]!.message).toContain(
+      "cannot be changed from task_hub.list_cards",
+    );
   });
 
   it("fails when completed step is omitted entirely", () => {
@@ -395,8 +455,15 @@ describe("validateLocalScopeInvariants helper directly", () => {
       ...current,
       steps: [current.steps[1]!],
     };
-    const issues = validateLocalScopeInvariants(current, modified, "step_write", ["step_read"]);
+    const issues = validateLocalScopeInvariants(
+      current,
+      modified,
+      "step_write",
+      ["step_read"],
+    );
     expect(issues.length).toBeGreaterThan(0);
-    expect(issues[0]!.message).toContain("removed already-completed step 'step_read'");
+    expect(issues[0]!.message).toContain(
+      "removed already-completed step 'step_read'",
+    );
   });
 });

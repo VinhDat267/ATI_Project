@@ -19,8 +19,10 @@ import {
   type EmbeddingProvenance,
   type RetrievalRequest,
   type RetrievalResult,
+  type RetrievalVariant,
   type ToolEmbeddingRow,
   type ToolRetriever,
+  type AiRetrievalSession,
   type ExpectedEmbeddingProfile,
 } from "./retrieval.js";
 import {
@@ -173,8 +175,13 @@ export function validatePgvectorActivation(
       typeof row.embeddingTextHash !== "string" ||
       !/^[a-f0-9]{64}$/.test(row.embeddingTextHash)
     )
-      throw validation(`embedding row text hash is required and malformed: ${identity}`);
-    if (row.embeddingTextHash !== hashEmbeddingText(serializeReviewedToolForEmbedding(tool)))
+      throw validation(
+        `embedding row text hash is required and malformed: ${identity}`,
+      );
+    if (
+      row.embeddingTextHash !==
+      hashEmbeddingText(serializeReviewedToolForEmbedding(tool))
+    )
       throw validation(`embedding row text hash mismatch: ${identity}`);
     validateVector(row.vector, `embedding row ${identity}`);
     provenance ??= rowProvenance;
@@ -242,7 +249,9 @@ export interface PinnedEmbeddingIndex extends ActivePgvectorIndex {
   readonly policyHash: string;
 }
 
-function policyManifest(provenance: EmbeddingProvenance): Record<string, unknown> {
+function policyManifest(
+  provenance: EmbeddingProvenance,
+): Record<string, unknown> {
   return {
     format: "embedding-policy-v1",
     provider: provenance.provider,
@@ -285,9 +294,17 @@ function fingerprintRows(
       contentHash: row.content_hash,
       purpose: row.purpose,
       embeddingTextHash: row.embedding_text_hash,
-      vector: parsePersistedVector(row.embedding, `${label} ${row.tool_server}.${row.tool_name}`),
+      vector: parsePersistedVector(
+        row.embedding,
+        `${label} ${row.tool_server}.${row.tool_name}`,
+      ),
     }))
-    .sort((left, right) => compareIdentity(`${left.server}.${left.name}`, `${right.server}.${right.name}`));
+    .sort((left, right) =>
+      compareIdentity(
+        `${left.server}.${left.name}`,
+        `${right.server}.${right.name}`,
+      ),
+    );
   return hash(normalized);
 }
 
@@ -338,7 +355,9 @@ export class PgvectorCatalogIndex {
       for (const row of activation.rows) {
         const embeddingTextHash = row.embeddingTextHash;
         if (!embeddingTextHash)
-          throw validation("embedding text hash missing after activation validation");
+          throw validation(
+            "embedding text hash missing after activation validation",
+          );
         await tx`
           INSERT INTO reviewed_tool_embeddings(
             index_id,tool_server,tool_name,content_hash,purpose,embedding_text_hash,embedding
@@ -347,14 +366,16 @@ export class PgvectorCatalogIndex {
             ${embeddingTextHash},${vectorLiteral(row.vector)}::vector
           )`;
       }
-      const persistedRows = await tx<{
-        tool_server: string;
-        tool_name: string;
-        content_hash: string;
-        purpose: string | null;
-        embedding_text_hash: string | null;
-        embedding: unknown;
-      }[]>`
+      const persistedRows = await tx<
+        {
+          tool_server: string;
+          tool_name: string;
+          content_hash: string;
+          purpose: string | null;
+          embedding_text_hash: string | null;
+          embedding: unknown;
+        }[]
+      >`
         SELECT tool_server,tool_name,content_hash,purpose,embedding_text_hash,embedding
         FROM reviewed_tool_embeddings WHERE index_id=${id}
         ORDER BY tool_server,tool_name`;
@@ -363,10 +384,7 @@ export class PgvectorCatalogIndex {
         throw validation(
           "pgvector embedding index row count changed during activation",
         );
-      const vectorHash = fingerprintRows(
-        persistedRows,
-        "activation",
-      );
+      const vectorHash = fingerprintRows(persistedRows, "activation");
       await tx`
         UPDATE reviewed_embedding_indexes
         SET vector_hash=${vectorHash}, state='active', activated_at=clock_timestamp()
@@ -425,7 +443,9 @@ export class PgvectorCatalogIndex {
       );
     }
     const expectedManifest = policyManifest(provenance);
-    if (canonicalJson(index.policy_manifest) !== canonicalJson(expectedManifest))
+    if (
+      canonicalJson(index.policy_manifest) !== canonicalJson(expectedManifest)
+    )
       throw validation(
         "active pgvector index policy manifest drifted",
         "INDEX_CHANGED",
@@ -475,7 +495,10 @@ export class PgvectorCatalogIndex {
     }
     const vectorHash = fingerprintRows(rows, "active index");
     if (vectorHash !== index.vector_hash)
-      throw validation("active pgvector index fingerprint drifted", "INDEX_CHANGED");
+      throw validation(
+        "active pgvector index fingerprint drifted",
+        "INDEX_CHANGED",
+      );
     return Object.freeze({
       id: index.id,
       provenance: Object.freeze(provenance),
@@ -501,7 +524,10 @@ export class PgvectorCatalogIndex {
     try {
       current = await this.activeIndex(catalog);
     } catch (error) {
-      if (error instanceof RetrievalValidationError && error.code === "INDEX_CHANGED")
+      if (
+        error instanceof RetrievalValidationError &&
+        error.code === "INDEX_CHANGED"
+      )
         throw error;
       throw error;
     }
@@ -510,7 +536,10 @@ export class PgvectorCatalogIndex {
       current.vectorHash !== pinned.vectorHash ||
       current.policyHash !== pinned.policyHash
     )
-      throw validation("active embedding index changed during request", "INDEX_CHANGED");
+      throw validation(
+        "active embedding index changed during request",
+        "INDEX_CHANGED",
+      );
   }
 
   async search(input: {
@@ -573,8 +602,31 @@ export class PgvectorToolRetriever implements ToolRetriever {
       embeddingPort: EmbeddingPort;
       queryExpansionPort?: QueryExpansionPort;
       expectedEmbeddingProfile?: ExpectedEmbeddingProfile;
+      pinnedIndex?: PinnedEmbeddingIndex;
     },
   ) {}
+
+  /** Pin semantic retrieval once for one planner/replan invocation. */
+  async createSession(variant: RetrievalVariant): Promise<AiRetrievalSession> {
+    if (variant === "all_tools")
+      return {
+        retriever: this,
+        assertCurrent: async () => {},
+      };
+    const pinnedIndex = await this.input.index.pin(
+      this.input.catalog,
+      this.input.expectedEmbeddingProfile,
+    );
+    const retriever = new PgvectorToolRetriever({
+      ...this.input,
+      pinnedIndex,
+    });
+    return {
+      retriever,
+      assertCurrent: () =>
+        this.input.index.assertCurrent(this.input.catalog, pinnedIndex),
+    };
+  }
 
   async retrieve(request: RetrievalRequest): Promise<RetrievalResult> {
     validateTopK(request.topK);
@@ -599,10 +651,12 @@ export class PgvectorToolRetriever implements ToolRetriever {
           "MISSING_QUERY_EXPANSION_PORT",
         );
       }
-      const active = await this.input.index.pin(
-        this.input.catalog,
-        this.input.expectedEmbeddingProfile,
-      );
+      const active =
+        this.input.pinnedIndex ??
+        (await this.input.index.pin(
+          this.input.catalog,
+          this.input.expectedEmbeddingProfile,
+        ));
       throwIfAborted(request.signal);
       await this.input.index.assertCurrent(this.input.catalog, active);
 
@@ -712,10 +766,12 @@ export class PgvectorToolRetriever implements ToolRetriever {
         `retrieval variant is unsupported in AI-01: ${String(request.variant)}`,
         "UNSUPPORTED_VARIANT",
       );
-    const active = await this.input.index.pin(
-      this.input.catalog,
-      this.input.expectedEmbeddingProfile,
-    );
+    const active =
+      this.input.pinnedIndex ??
+      (await this.input.index.pin(
+        this.input.catalog,
+        this.input.expectedEmbeddingProfile,
+      ));
     throwIfAborted(request.signal);
     await this.input.index.assertCurrent(this.input.catalog, active);
     let query: EmbeddingResult;

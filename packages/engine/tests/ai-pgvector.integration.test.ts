@@ -39,7 +39,9 @@ function rowsFor(
     purpose: "document" as const,
     vector: vector(index),
     contentHash: toolContentHash(tool),
-    embeddingTextHash: hashEmbeddingText(serializeReviewedToolForEmbedding(tool)),
+    embeddingTextHash: hashEmbeddingText(
+      serializeReviewedToolForEmbedding(tool),
+    ),
     provenance: {
       provider: "test-provider",
       model,
@@ -183,6 +185,48 @@ describe("AI-01 pgvector reviewed catalog index", () => {
     await expect(index.assertCurrent(catalog, pinned)).rejects.toMatchObject({
       code: "INDEX_CHANGED",
     });
+  });
+
+  it("keeps one pinned index for a semantic retrieval session", async () => {
+    const catalog = createReviewedCatalogSnapshot([
+      makeTool({ name: "session-alpha" }),
+      makeTool({ name: "session-beta" }),
+    ]);
+    const index = new PgvectorCatalogIndex(db, DEMO_USER_ID);
+    const first = await index.activate({
+      catalog,
+      rows: rowsFor(catalog, "session-model-a"),
+    });
+    const retriever = new PgvectorToolRetriever({
+      catalog,
+      index,
+      embeddingPort: {
+        async embed() {
+          return {
+            embedding: vector(0),
+            purpose: "query" as const,
+            ...first.provenance,
+            usage: null,
+          };
+        },
+      },
+    });
+    const session = await retriever.createSession("semantic");
+    await index.activate({
+      catalog,
+      rows: rowsFor(catalog, "session-model-b"),
+    });
+
+    await expect(session.assertCurrent()).rejects.toMatchObject({
+      code: "INDEX_CHANGED",
+    });
+    await expect(
+      session.retriever.retrieve({
+        query: "session",
+        variant: "semantic",
+        topK: 1,
+      }),
+    ).rejects.toMatchObject({ code: "INDEX_CHANGED" });
   });
 
   it("discards a semantic result when the active index changes during query embedding", async () => {

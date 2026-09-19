@@ -7,6 +7,7 @@ import {
   type PlannerPort,
   type LocalReplanPort,
   type StructuredModelClient,
+  type AiRetrievalSession,
   type ToolRetriever,
   type ReviewedCatalogSnapshot,
   type RetrievalVariant,
@@ -19,11 +20,20 @@ export interface LoadAiPlannerOptions {
   readonly modelClient?: StructuredModelClient;
   /** Explicit composition seam. Production must provide a persisted-index retriever. */
   readonly createRetriever: (catalog: ReviewedCatalogSnapshot) => ToolRetriever;
+  /** Optional request-scoped session; used to pin and revalidate semantic indexes. */
+  readonly createSession?: (
+    catalog: ReviewedCatalogSnapshot,
+    variant: RetrievalVariant,
+  ) => Promise<AiRetrievalSession>;
   readonly variant?: RetrievalVariant;
   readonly topK?: number;
   readonly maxPlanningCalls?: number;
+  /** Local replan count is enforced by WorkflowEngine; this is model repair attempts. */
+  readonly maxRepairCalls?: number;
+  /** @deprecated Kept for callers while local replan policy stays in WorkflowEngine. */
   readonly maxReplanCalls?: number;
   readonly deadlineMs?: number;
+  readonly secrets?: readonly string[];
 }
 
 async function loadRuntimeCatalog(options: LoadAiPlannerOptions) {
@@ -45,14 +55,22 @@ function configuredModel(options: LoadAiPlannerOptions): StructuredModelClient {
   return options.modelClient ?? defaultUnconfiguredClient;
 }
 
-function createPlanner(
+async function createPlanner(
   options: LoadAiPlannerOptions,
   catalog: ReturnType<typeof loadLocalReviewedCatalog>,
-): AiPlannerAdapter {
+): Promise<AiPlannerAdapter> {
+  const variant = options.variant ?? "all_tools";
+  const session = options.createSession
+    ? await options.createSession(catalog, variant)
+    : {
+        retriever: options.createRetriever(catalog),
+        assertCurrent: async () => {},
+      };
   return new AiPlannerAdapter({
-    retriever: options.createRetriever(catalog),
+    retriever: session.retriever,
+    assertCurrent: session.assertCurrent,
     model: configuredModel(options),
-    variant: options.variant ?? "all_tools",
+    variant,
     topK: options.topK ?? 10,
     maxPlanningCalls: options.maxPlanningCalls ?? 3,
     deadlineMs: options.deadlineMs ?? 60_000,
@@ -64,24 +82,33 @@ export function loadAiPlanner(options: LoadAiPlannerOptions): PlannerPort {
   return {
     mode: "ai",
     async produce(input) {
-      return createPlanner(options, await loadRuntimeCatalog(options)).produce(
-        input,
-      );
+      return (
+        await createPlanner(options, await loadRuntimeCatalog(options))
+      ).produce(input);
     },
   };
 }
 
-function createReplanner(
+async function createReplanner(
   options: LoadAiPlannerOptions,
   catalog: ReturnType<typeof loadLocalReviewedCatalog>,
-): AiReplanAdapter {
+): Promise<AiReplanAdapter> {
+  const variant = options.variant ?? "all_tools";
+  const session = options.createSession
+    ? await options.createSession(catalog, variant)
+    : {
+        retriever: options.createRetriever(catalog),
+        assertCurrent: async () => {},
+      };
   return new AiReplanAdapter({
-    retriever: options.createRetriever(catalog),
+    retriever: session.retriever,
+    assertCurrent: session.assertCurrent,
     model: configuredModel(options),
-    variant: options.variant ?? "all_tools",
+    variant,
     topK: options.topK ?? 10,
-    maxRepairCalls: options.maxReplanCalls ?? 2,
+    maxRepairCalls: options.maxRepairCalls ?? 3,
     deadlineMs: options.deadlineMs ?? 60_000,
+    secrets: options.secrets,
     validatePlan: () => [],
   });
 }
@@ -89,9 +116,9 @@ function createReplanner(
 export function loadAiReplan(options: LoadAiPlannerOptions): LocalReplanPort {
   return {
     async replan(input) {
-      return createReplanner(options, await loadRuntimeCatalog(options)).replan(
-        input,
-      );
+      return (
+        await createReplanner(options, await loadRuntimeCatalog(options))
+      ).replan(input);
     },
   };
 }

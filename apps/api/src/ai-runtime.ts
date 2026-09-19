@@ -12,6 +12,7 @@ import {
   PgvectorToolRetriever,
   type Gateway,
   type ReviewedCatalogSnapshot,
+  type RetrievalVariant,
 } from "@wap/engine";
 import type { Database } from "@wap/db";
 import { loadAiPlanner, loadAiReplan } from "./ai-planner.js";
@@ -53,9 +54,7 @@ export async function denyAiLiveCalls(): Promise<never> {
   );
 }
 
-export function createAiRuntimePorts(
-  options: AiRuntimePortsOptions,
-): AiPorts {
+export function createAiRuntimePorts(options: AiRuntimePortsOptions): AiPorts {
   const ledger = options.ledger ?? {
     async reserve(): Promise<never> {
       throw new ProviderClientError(
@@ -88,21 +87,32 @@ export function createAiRuntime(options: CreateAiRuntimeOptions): AiRuntime {
       queryExpansionPort: ports.queryExpansion,
       expectedEmbeddingProfile: options.config.embedding,
     });
+  const createSession = async (
+    catalog: ReviewedCatalogSnapshot,
+    variant: RetrievalVariant,
+  ) => createRetriever(catalog).createSession(variant);
+  const secrets = Object.values(options.credentials).filter(
+    (value): value is string => Boolean(value),
+  );
   const plannerOptions = {
     root: options.root,
     gateway: options.gateway,
     modelClient: ports.model,
     createRetriever,
+    createSession,
+    // Keep production composition explicit until T5 selects a live retrieval
+    // profile; all reviewed tools is fail-closed and requires no index.
+    variant: "all_tools" as const,
+    topK: 10,
     maxPlanningCalls: options.config.limits.maxPlanningCalls,
-    maxReplanCalls: options.config.limits.maxReplanCalls,
+    maxRepairCalls: 3,
     deadlineMs: options.config.limits.trialDeadlineMs,
+    secrets,
   };
   return {
     ports,
     planner: loadAiPlanner(plannerOptions),
     replan: loadAiReplan(plannerOptions),
-    secrets: Object.values(options.credentials).filter(
-      (value): value is string => Boolean(value),
-    ),
+    secrets,
   };
 }

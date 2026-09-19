@@ -68,6 +68,16 @@ export interface ToolRetriever {
   retrieve(input: RetrievalRequest): Promise<RetrievalResult>;
 }
 
+/**
+ * Request-scoped retrieval state. Semantic sessions pin one persisted index;
+ * callers must revalidate it after any awaited model/repair call before using
+ * the resulting plan.
+ */
+export interface AiRetrievalSession {
+  readonly retriever: ToolRetriever;
+  assertCurrent(): Promise<void>;
+}
+
 type IndexRow = ToolEmbeddingRow & { readonly identity: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

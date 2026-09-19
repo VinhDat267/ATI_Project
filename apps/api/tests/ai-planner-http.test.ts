@@ -14,6 +14,8 @@ import {
   type StructuredModelClient,
   type StructuredModelResponse,
   type ReviewedCatalogSnapshot,
+  type AiRetrievalSession,
+  type LocalReplanInput,
   type ToolRetriever,
 } from "@wap/engine";
 import { createApi, type ApiConfig, type ApiRuntime } from "../src/app.js";
@@ -21,6 +23,8 @@ import { hashPassword } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { loadAiPlanner, type LoadAiPlannerOptions } from "../src/ai-planner.js";
 import type { WorkerControl } from "../src/worker.js";
+import { loadAiReplan } from "../src/ai-planner.js";
+import { WorkflowPlanSchema } from "@wap/dsl";
 
 const root = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
 const USER_ID = "00000000-0000-4000-8000-000000000001";
@@ -481,6 +485,143 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
           runtime: { today: "2026-09-17" },
         }),
       ).rejects.toThrow(/HTTP 502 Bad Gateway/);
+    });
+
+    it("checks the retrieval session after model output before returning a plan", async () => {
+      let modelCalls = 0;
+      let currentnessChecks = 0;
+      const fakeModel: StructuredModelClient = {
+        async complete(): Promise<StructuredModelResponse> {
+          modelCalls++;
+          return {
+            output: {
+              kind: "plan",
+              plan: {
+                version: "1.0",
+                name: "List Cards Plan",
+                source_prompt: "Liệt kê task Done của board board_a",
+                steps: [
+                  {
+                    id: "step1",
+                    description: "List cards",
+                    tool: {
+                      server: "task_hub",
+                      name: "list_cards",
+                      args: { board_id: "board_a" },
+                    },
+                    side_effect: "read",
+                  },
+                ],
+              },
+            },
+            provider: "fake-provider",
+            model: "fake-model",
+          };
+        },
+      };
+      const planner = loadAiPlanner(
+        aiPlannerOptions({
+          modelClient: fakeModel,
+          createSession: async (catalog): Promise<AiRetrievalSession> => ({
+            retriever: syntheticRetriever(catalog),
+            async assertCurrent() {
+              currentnessChecks++;
+              throw Object.assign(new Error("active embedding index changed"), {
+                code: "INDEX_CHANGED",
+              });
+            },
+          }),
+        }),
+      );
+
+      await expect(
+        planner.produce({
+          runId: "run-index-switch-after-model",
+          userId: USER_ID,
+          request: {
+            source_prompt: "Liệt kê task Done của board board_a",
+            inputs: {},
+            time_zone: "Asia/Ho_Chi_Minh",
+          },
+          runtime: { today: "2026-09-17" },
+        }),
+      ).rejects.toMatchObject({ code: "INDEX_CHANGED" });
+      expect(modelCalls).toBe(1);
+      expect(currentnessChecks).toBe(1);
+    });
+
+    it("passes configured secrets into the loaded replan adapter", async () => {
+      const secret = "replan-load-secret-canary";
+      let prompt = "";
+      const plan = WorkflowPlanSchema.parse({
+        version: "1.0",
+        name: "replan secret wiring",
+        source_prompt: "List cards",
+        inputs: {},
+        steps: [
+          {
+            id: "step1",
+            description: "List cards",
+            tool: {
+              server: "task_hub",
+              name: "list_cards",
+              args: { board_id: "board_a" },
+            },
+            side_effect: "read",
+            on_error: "replan",
+          },
+        ],
+        outputs: {},
+      });
+      const modelPlan = {
+        version: "1.0" as const,
+        name: "replan secret wiring",
+        source_prompt: "List cards",
+        steps: [
+          {
+            id: "step1",
+            description: "List cards",
+            tool: {
+              server: "task_hub" as const,
+              name: "list_cards",
+              args: { board_id: "board_a" },
+            },
+            side_effect: "read" as const,
+            on_error: "replan" as const,
+          },
+        ],
+        outputs: {},
+      };
+      const replan = loadAiReplan(
+        aiPlannerOptions({
+          secrets: [secret],
+          modelClient: {
+            async complete(input) {
+              prompt = input.userPrompt;
+              return {
+                output: { kind: "plan", plan: modelPlan },
+                provider: "fake-provider",
+                model: "fake-model",
+              };
+            },
+          },
+        }),
+      );
+      const input: LocalReplanInput = {
+        runId: "run-replan-secret",
+        userId: USER_ID,
+        sourcePrompt: "List cards",
+        currentPlan: plan,
+        failedStepId: "step1",
+        errorMessage: "bad args",
+        errorClass: "bad_args",
+        completedOutputs: { secret_result: secret },
+        failedApproaches: [],
+        replanCount: 1,
+        maxReplans: 2,
+      };
+      await replan.replan(input);
+      expect(prompt).not.toContain(secret);
     });
   });
 });
