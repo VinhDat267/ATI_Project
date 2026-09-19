@@ -73,6 +73,7 @@ function eventLine(event: RunEvent, run: RunDetail): string | null {
 }
 
 function Activity({ run, events }: { run: RunDetail; events: RunEvent[] | undefined }) {
+  const renderedAtRef = useRef<Map<number, string>>(new Map());
   const lines = (events ?? [])
     .map((event) => ({ event, text: eventLine(event, run) }))
     .filter((line): line is { event: RunEvent; text: string } => line.text !== null)
@@ -83,12 +84,26 @@ function Activity({ run, events }: { run: RunDetail; events: RunEvent[] | undefi
         <p className="m-0 text-body-md text-muted">Chưa có hoạt động nào được ghi nhận.</p>
       ) : (
         <ol className="m-0 flex list-none flex-col gap-3.5 p-0 text-body-md">
-          {lines.map(({ event, text }, index) => (
-            <li key={event.seq} className="grid-timeline">
-              <span className="tabular text-muted">{formatClock(event.created_at, run.time_zone)}</span>
-              <span className={index === 0 ? "font-semibold" : undefined}>{text}</span>
-            </li>
-          ))}
+          {lines.map(({ event, text }, index) => {
+            let renderedAt = renderedAtRef.current.get(event.seq);
+            if (!renderedAt) {
+              renderedAt = new Date().toISOString();
+              renderedAtRef.current.set(event.seq, renderedAt);
+            }
+            return (
+              <li
+                key={event.seq}
+                className="grid-timeline"
+                data-event-seq={event.seq}
+                data-event-created-at={event.created_at}
+                data-event-type={event.type}
+                data-event-rendered-at={renderedAt}
+              >
+                <span className="tabular text-muted">{formatClock(event.created_at, run.time_zone)}</span>
+                <span className={index === 0 ? "font-semibold" : undefined}>{text}</span>
+              </li>
+            );
+          })}
         </ol>
       )}
     </Section>
