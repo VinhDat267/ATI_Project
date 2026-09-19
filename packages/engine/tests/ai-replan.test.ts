@@ -171,21 +171,30 @@ describe("AiReplanAdapter unit tests", () => {
     };
 
     const { client, prompts } = clientFrom([replanned]);
+    let retrievalQuery = "";
     const adapter = new AiReplanAdapter({
-      retriever: retriever(),
+      retriever: {
+        async retrieve(input) {
+          retrievalQuery = input.query;
+          return retriever().retrieve(input);
+        },
+      },
       model: client,
       secrets: ["SUPER_SECRET_TOKEN"],
     });
 
     const inputWithSecret: LocalReplanInput = {
       ...baseInput,
+      errorMessage: "provider rejected SUPER_SECRET_TOKEN",
       completedOutputs: {
         step_read: { token: "SUPER_SECRET_TOKEN", cards: [] },
       },
+      failedApproaches: ["SUPER_SECRET_TOKEN was echoed by the provider"],
     };
 
     await adapter.replan(inputWithSecret);
     expect(prompts[0]).not.toContain("SUPER_SECRET_TOKEN");
+    expect(retrievalQuery).not.toContain("SUPER_SECRET_TOKEN");
     expect(prompts[0]).toContain("[REDACTED]");
   });
 

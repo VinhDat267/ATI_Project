@@ -238,10 +238,12 @@ export class AiReplanAdapter implements LocalReplanPort {
     );
 
     try {
+      const safeSourcePrompt = safeProject(input.sourcePrompt, this.secrets);
+      const safeErrorMessage = safeProject(input.errorMessage, this.secrets);
       const retrieval = await bounded(
         () =>
           this.retriever.retrieve({
-            query: `${input.sourcePrompt} ${input.errorMessage}`,
+            query: `${safeProject(input.sourcePrompt, this.secrets)} ${safeProject(input.errorMessage, this.secrets)}`,
             variant: this.variant,
             topK: this.topK,
             signal: controller.signal,
@@ -253,19 +255,24 @@ export class AiReplanAdapter implements LocalReplanPort {
       const tools = retrieval.tools.map(asPromptTool);
       const systemPrompt = buildSystemPrompt();
 
-      // Redact sensitive values from completedOutputs before prompting the LLM
+      // Redact configured values from every provider-bound replan context. This
+      // includes retrieval text: query embeddings are also provider calls.
+      const safeFailedApproaches = input.failedApproaches.map((approach) =>
+        safeProject(approach, this.secrets),
+      );
+      const safeCurrentPlan = safeProject(input.currentPlan, this.secrets);
       const safeOutputs = safeProject(input.completedOutputs, this.secrets);
       const completedStepIds = Object.keys(input.completedOutputs);
 
       const originalPrompt = buildReplanPrompt({
-        sourcePrompt: input.sourcePrompt,
-        currentPlan: input.currentPlan,
+        sourcePrompt: safeSourcePrompt,
+        currentPlan: safeCurrentPlan,
         failedStepId: input.failedStepId,
-        errorMessage: input.errorMessage,
+        errorMessage: safeErrorMessage,
         errorClass: input.errorClass,
         scope: "local",
         completedOutputs: safeOutputs,
-        failedApproaches: [...input.failedApproaches],
+        failedApproaches: safeFailedApproaches,
         tools,
         replanCount: input.replanCount,
         maxReplans: input.maxReplans,
@@ -403,12 +410,14 @@ export class AiReplanAdapter implements LocalReplanPort {
           originalPrompt +
           "\n\n" +
           buildRepairPrompt({
-            userPrompt: input.sourcePrompt,
-            failedPlan,
-            issues,
+            userPrompt: safeSourcePrompt,
+            failedPlan: safeProject(failedPlan, this.secrets),
+            issues: safeProject(issues, this.secrets),
             attemptNo: attempt,
             maxAttempts: this.maxRepairCalls,
-            previousAttempts,
+            previousAttempts: previousAttempts.map((previous) =>
+              safeProject(previous, this.secrets),
+            ),
           });
         issues = [];
       }

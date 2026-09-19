@@ -613,10 +613,10 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
         sourcePrompt: "List cards",
         currentPlan: plan,
         failedStepId: "step1",
-        errorMessage: "bad args",
+        errorMessage: `bad args: ${secret}`,
         errorClass: "bad_args",
         completedOutputs: { secret_result: secret },
-        failedApproaches: [],
+        failedApproaches: [secret],
         replanCount: 1,
         maxReplans: 2,
       };
