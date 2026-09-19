@@ -10,10 +10,7 @@ import {
   shortId,
 } from "../../../core/presentation.js";
 import {
-  detailQuery,
-  eventsQuery,
   reconciliationQuery,
-  traceQuery,
 } from "../../../core/queries.js";
 import { recoveryFor, type ReceiptKind } from "../../../core/recovery.js";
 import { stepViews } from "../../../core/steps.js";
@@ -281,6 +278,7 @@ function SummaryRail({
 export function RunView({ runId }: { runId: string }) {
   const { transport, generation, hints, controllers } = useApp();
   const runSync = controllers.getRunSync(runId);
+  const traceController = controllers.getTrace(runId);
 
   useEffect(() => {
     runSync.start();
@@ -293,14 +291,21 @@ export function RunView({ runId }: { runId: string }) {
     runSync.getSnapshot,
   );
 
+  const traceSnapshot = useSyncExternalStore(
+    traceController.subscribe,
+    traceController.getSnapshot,
+    traceController.getSnapshot,
+  );
+
   const run = syncSnapshot.detail;
   const events = syncSnapshot.eventState.events;
-  const pollWhileLive = run && !runPresentation(run.status).terminal ? 2000 : false;
-  const trace = useQuery({
-    ...traceQuery(transport, generation, runId),
-    enabled: !!run,
-    refetchInterval: pollWhileLive,
-  });
+
+  useEffect(() => {
+    if (run) {
+      void traceController.loadInitial();
+    }
+  }, [run?.run_id, traceController]);
+
   const reconciliation = useQuery({
     ...reconciliationQuery(transport, generation, runId),
     enabled: run?.status === "reconciliation_required",
@@ -339,10 +344,15 @@ export function RunView({ runId }: { runId: string }) {
     );
   }
 
+  const traceData: TracePage = {
+    run_id: runId,
+    attempts: traceSnapshot.attempts,
+    next_cursor: traceSnapshot.nextCursor,
+  };
   const counts = planCounts(run);
-  const steps = stepViews(run, trace.data);
+  const steps = stepViews(run, traceData);
   const writes = (run.approval?.actions ?? []).map((action) => ({ action, write: summarizeAction(action) }));
-  const failedAttempt = trace.data?.attempts.find((a) => a.error_message);
+  const failedAttempt = traceSnapshot.attempts.find((a) => a.error_message);
   const suggestion = hints.suggestedPrompt(run.run_id);
   const showEvidence = (): void => {
     const node = evidenceRef.current;
@@ -380,10 +390,10 @@ export function RunView({ runId }: { runId: string }) {
 
       <div className="mt-2 grid gap-10 desk:grid-run">
         <div className="flex min-w-0 flex-col">
-          <StatusBanner run={run} trace={trace.data} reconciliation={reconciliation.data} />
+          <StatusBanner run={run} trace={traceData} reconciliation={reconciliation.data} />
 
           {run.status === "reconciliation_required" ? (
-            <ReconciliationSection run={run} trace={trace.data} query={reconciliation} />
+            <ReconciliationSection run={run} trace={traceData} query={reconciliation} />
           ) : null}
 
           {run.status === "needs_input" ? (
@@ -454,12 +464,31 @@ export function RunView({ runId }: { runId: string }) {
             <h2 id="evidence-title" className="m-0 text-headline-sm">
               Chứng cứ
             </h2>
-            <TechDisclosure summary={`${trace.data?.attempts.length ?? 0} lần thử đã ghi nhận`}>
-              {trace.data && trace.data.attempts.length > 0 ? (
-                <JsonBlock value={trace.data.attempts} />
-              ) : (
-                <p className="m-0 text-body-sm text-muted">Chưa có lần thử nào.</p>
-              )}
+            <TechDisclosure summary={`${traceSnapshot.attempts.length} lần thử đã ghi nhận`}>
+              <div className="flex flex-col gap-3">
+                {traceSnapshot.attempts.length > 0 ? (
+                  <JsonBlock value={traceSnapshot.attempts} />
+                ) : traceSnapshot.isLoading ? (
+                  <p className="m-0 text-body-sm text-muted">Đang tải chứng cứ…</p>
+                ) : (
+                  <p className="m-0 text-body-sm text-muted">Chưa có lần thử nào.</p>
+                )}
+                {traceSnapshot.hasMore ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="self-start"
+                    disabled={traceSnapshot.isLoadingMore}
+                    onClick={() => void traceController.loadMore()}
+                  >
+                    {traceSnapshot.isLoadingMore ? "Đang tải thêm…" : "Tải thêm chứng cứ"}
+                  </Button>
+                ) : null}
+                {traceSnapshot.error ? (
+                  <p className="m-0 text-body-sm text-danger">{traceSnapshot.error.message}</p>
+                ) : null}
+              </div>
             </TechDisclosure>
           </section>
 
@@ -470,7 +499,7 @@ export function RunView({ runId }: { runId: string }) {
           {run.status === "awaiting_approval" && run.approval?.decision === "pending" ? (
             <DecisionCard run={run} />
           ) : (
-            <SummaryRail run={run} trace={trace.data} reconciliation={reconciliation.data} onEvidence={showEvidence} />
+            <SummaryRail run={run} trace={traceData} reconciliation={reconciliation.data} onEvidence={showEvidence} />
           )}
           {run.status === "awaiting_approval" ? (
             <p className="m-0 flex items-start gap-2 px-2 text-caption text-muted">
