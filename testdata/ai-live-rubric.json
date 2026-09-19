@@ -1,0 +1,108 @@
+{
+  "format": "ati-ai-live-rubric-v1",
+  "status": "PROPOSED_EXPLORATORY",
+  "version": "1.0.0",
+  "approvedBy": null,
+  "approvedAt": null,
+  "approvalBlockReason": "Formal quality gate remains blocked until human rubric owner conducts manual approval review.",
+  "cases": {
+    "b01": {
+      "expectedKind": "plan",
+      "semanticIntent": "List cards from Done list on board_a for current week in Vietnam time zone",
+      "requiredReads": [
+        { "server": "task_hub", "name": "list_cards" }
+      ],
+      "requiredWrites": [],
+      "forbidExtraWrites": true
+    },
+    "b02": {
+      "expectedKind": "plan",
+      "semanticIntent": "Read cards from Done on board_a, append to sheet Archive in dest_b, and notify #ops",
+      "requiredReads": [
+        { "server": "task_hub", "name": "list_cards" }
+      ],
+      "requiredWrites": [
+        { "server": "task_hub", "name": "append_sheet_rows" },
+        { "server": "task_hub", "name": "send_slack_message" }
+      ],
+      "causalOrdering": [
+        ["task_hub.list_cards", "task_hub.append_sheet_rows"],
+        ["task_hub.append_sheet_rows", "task_hub.send_slack_message"]
+      ],
+      "forbidExtraWrites": true
+    },
+    "b03": {
+      "expectedKind": "plan",
+      "semanticIntent": "Read notes.txt, write summary to summary.txt, create card in Backlog on board_a",
+      "requiredReads": [
+        { "server": "filesystem", "name": "read_file" }
+      ],
+      "requiredWrites": [
+        { "server": "filesystem", "name": "write_file" },
+        { "server": "task_hub", "name": "create_card" }
+      ],
+      "causalOrdering": [
+        ["filesystem.read_file", "filesystem.write_file"],
+        ["filesystem.write_file", "task_hub.create_card"]
+      ],
+      "forbidExtraWrites": true
+    },
+    "b04": {
+      "expectedKind": "plan",
+      "semanticIntent": "Create card 'Viết tài liệu API' in Backlog of board_a",
+      "requiredReads": [],
+      "requiredWrites": [
+        { "server": "task_hub", "name": "create_card" }
+      ],
+      "forbidExtraWrites": true
+    },
+    "b05": {
+      "expectedKind": "clarification",
+      "semanticIntent": "Ask which task/card to move to Done due to missing card identifier in prompt",
+      "clarificationMissingInfo": ["card_id", "task", "tiêu đề", "nào", "which task"]
+    },
+    "b06": {
+      "expectedKind": "refusal",
+      "semanticIntent": "Refuse translation request because catalog lacks translation tools",
+      "refusalReasonCategory": "unsupported_capability",
+      "refusalKeywords": ["dịch", "translate", "tool", "catalog", "không có", "chưa hỗ trợ"]
+    },
+    "b07": {
+      "expectedKind": "plan",
+      "semanticIntent": "Copy rows in Status!A1:B1 from source_b to Archive in dest_b, then notify #ops",
+      "requiredReads": [
+        { "server": "task_hub", "name": "read_sheet_range" }
+      ],
+      "requiredWrites": [
+        { "server": "task_hub", "name": "append_sheet_rows" },
+        { "server": "task_hub", "name": "send_slack_message" }
+      ],
+      "causalOrdering": [
+        ["task_hub.read_sheet_range", "task_hub.append_sheet_rows"],
+        ["task_hub.append_sheet_rows", "task_hub.send_slack_message"]
+      ],
+      "forbidExtraWrites": true
+    },
+    "b08": {
+      "expectedKind": "plan",
+      "semanticIntent": "Read cards and members from board_a, compute members with tasks",
+      "requiredReads": [
+        { "server": "task_hub", "name": "list_cards" },
+        { "server": "task_hub", "name": "list_members" }
+      ],
+      "requiredWrites": [],
+      "forbidExtraWrites": true
+    },
+    "b09": {
+      "expectedKind": "refusal",
+      "semanticIntent": "Refuse selecting user with fewest tasks because DSL lacks min operation and catalog lacks min selection tool",
+      "refusalReasonCategory": "dsl_or_catalog_limitation",
+      "refusalKeywords": ["min", "ít task nhất", "dsl", "catalog", "không hỗ trợ", "không có"]
+    },
+    "b10": {
+      "expectedKind": "clarification",
+      "semanticIntent": "Ask for missing source workbook/range and destination workbook/sheet",
+      "clarificationMissingInfo": ["source", "destination", "sheet", "range", "workbook"]
+    }
+  }
+}

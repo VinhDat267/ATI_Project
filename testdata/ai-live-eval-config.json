@@ -1,0 +1,113 @@
+{
+  "format": "ati-ai-live-eval-config-v1",
+  "limits": {
+    "requestTimeoutMs": 45000,
+    "trialDeadlineMs": 120000,
+    "maxPlanningCalls": 3,
+    "maxReplanCalls": 2,
+    "maxQueryExpansionCalls": 1,
+    "reservationEstimateMicros": 100000
+  },
+  "profiles": {
+    "openai-only": {
+      "id": "openai-only",
+      "description": "Pure OpenAI stack for planning, query expansion, and embeddings",
+      "planning": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "apiMode": "responses",
+        "maxOutputTokens": 4096
+      },
+      "queryExpansion": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "apiMode": "responses",
+        "maxOutputTokens": 1024
+      },
+      "embedding": {
+        "provider": "openai",
+        "model": "text-embedding-3-large",
+        "apiMode": "embeddings",
+        "dimensions": 1536,
+        "documentTask": "RETRIEVAL_DOCUMENT",
+        "queryTask": "RETRIEVAL_QUERY",
+        "normalize": false
+      }
+    },
+    "google-only": {
+      "id": "google-only",
+      "description": "Pure Google Gemini stack for planning, query expansion, and embeddings",
+      "planning": {
+        "provider": "google",
+        "model": "gemini-3.8-flash",
+        "apiMode": "interactions",
+        "maxOutputTokens": 4096
+      },
+      "queryExpansion": {
+        "provider": "google",
+        "model": "gemini-2.5-flash",
+        "apiMode": "interactions",
+        "maxOutputTokens": 1024
+      },
+      "embedding": {
+        "provider": "google",
+        "model": "gemini-embedding-001",
+        "apiMode": "embedContent",
+        "dimensions": 1536,
+        "documentTask": "RETRIEVAL_DOCUMENT",
+        "queryTask": "RETRIEVAL_QUERY",
+        "normalize": true
+      }
+    },
+    "openai-google": {
+      "id": "openai-google",
+      "description": "OpenAI planning with Google Gemini embeddings",
+      "planning": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "apiMode": "responses",
+        "maxOutputTokens": 4096
+      },
+      "queryExpansion": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "apiMode": "responses",
+        "maxOutputTokens": 1024
+      },
+      "embedding": {
+        "provider": "google",
+        "model": "gemini-embedding-001",
+        "apiMode": "embedContent",
+        "dimensions": 1536,
+        "documentTask": "RETRIEVAL_DOCUMENT",
+        "queryTask": "RETRIEVAL_QUERY",
+        "normalize": true
+      }
+    },
+    "google-openai": {
+      "id": "google-openai",
+      "description": "Google Gemini planning with OpenAI embeddings",
+      "planning": {
+        "provider": "google",
+        "model": "gemini-3.8-flash",
+        "apiMode": "interactions",
+        "maxOutputTokens": 4096
+      },
+      "queryExpansion": {
+        "provider": "google",
+        "model": "gemini-2.5-flash",
+        "apiMode": "interactions",
+        "maxOutputTokens": 1024
+      },
+      "embedding": {
+        "provider": "openai",
+        "model": "text-embedding-3-large",
+        "apiMode": "embeddings",
+        "dimensions": 1536,
+        "documentTask": "RETRIEVAL_DOCUMENT",
+        "queryTask": "RETRIEVAL_QUERY",
+        "normalize": false
+      }
+    }
+  }
+}
