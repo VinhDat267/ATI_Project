@@ -30,7 +30,7 @@ Từ root project, chạy `npm ci`, `npm run db:up:g1`, `npm run db:migrate:g1`,
 }
 ```
 
-Đường dẫn trên là máy đã kiểm; đổi sang đường dẫn tuyệt đối của bản build nếu chuyển máy. Server mặc định dùng PostgreSQL demo `127.0.0.1:55432/wap_g1` và principal `00000000-0000-4000-8000-000000000001`. Có thể truyền biến môi trường `G1_DATABASE_URL`, `G1_USER_ID` từ launcher. Server không tự đọc `.env`, không lấy principal từ tool arguments và chưa có HTTP login/session.
+Đường dẫn trên là máy đã kiểm; đổi sang đường dẫn tuyệt đối của bản build nếu chuyển máy. Server mặc định dùng PostgreSQL demo `127.0.0.1:55532/wap_g1` và principal `00000000-0000-4000-8000-000000000001`. Có thể truyền biến môi trường `G1_DATABASE_URL`, `G1_USER_ID` từ launcher. Server không tự đọc `.env`, không lấy principal từ tool arguments và chưa có HTTP login/session.
 
 Seed mặc định tạo:
 - `source/Progress` hai dòng (`["API", "Done"]`, `["UI", "Doing"]`), `dest/Report` rỗng.

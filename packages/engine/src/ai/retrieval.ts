@@ -23,10 +23,17 @@ export interface EmbeddingProvenance {
 export interface ToolEmbeddingRow {
   readonly server: string;
   readonly name: string;
+  readonly purpose: "document";
   readonly vector: readonly number[];
   readonly contentHash: string;
+  /** Hash of the exact canonical document text sent to the provider. */
+  readonly embeddingTextHash?: string;
   readonly provenance: EmbeddingProvenance;
 }
+export type ExpectedEmbeddingProfile = Pick<
+  EmbeddingProvenance,
+  "provider" | "model" | "dimensions" | "preprocessingVersion"
+>;
 export type RetrievalVariant = "all_tools" | "semantic" | "semantic_qe";
 export class RetrievalValidationError extends Error {
   constructor(
@@ -120,6 +127,23 @@ function sameProvenance(
   );
 }
 
+export function assertExpectedEmbeddingProfile(
+  actual: EmbeddingProvenance,
+  expected: ExpectedEmbeddingProfile | undefined,
+): void {
+  if (
+    expected &&
+    (actual.provider !== expected.provider ||
+      actual.model !== expected.model ||
+      actual.dimensions !== expected.dimensions ||
+      actual.preprocessingVersion !== expected.preprocessingVersion)
+  )
+    throw new RetrievalValidationError(
+      "active embedding index profile does not match the selected provider profile",
+      "EMBEDDING_PROFILE_MISMATCH",
+    );
+}
+
 function validateProvenance(
   value: unknown,
   label: string,
@@ -179,6 +203,11 @@ function validateIndexRows(
       );
     seen.add(identity);
 
+    if (row.purpose !== "document")
+      throw new RetrievalValidationError(
+        `embedding row ${identity} must have document purpose`,
+      );
+
     const rowProvenance = validateProvenance(
       row.provenance,
       `embedding row ${identity}`,
@@ -192,6 +221,13 @@ function validateIndexRows(
       throw new RetrievalValidationError(
         `embedding row content hash mismatch: ${identity}`,
       );
+    if (
+      row.embeddingTextHash !== undefined &&
+      !/^[a-f0-9]{64}$/.test(row.embeddingTextHash)
+    )
+      throw new RetrievalValidationError(
+        `embedding row text hash is malformed: ${identity}`,
+      );
     validateVector(
       row.vector,
       rowProvenance.dimensions,
@@ -201,6 +237,7 @@ function validateIndexRows(
       Object.freeze({
         server: row.server,
         name: row.name,
+        purpose: "document",
         vector: Object.freeze([...row.vector]),
         contentHash: row.contentHash,
         provenance: Object.freeze({ ...rowProvenance }),
@@ -226,6 +263,7 @@ function validateQueryEmbedding(
     throw new RetrievalValidationError("query embedding result is malformed");
   const dimensions = result.dimensions;
   if (
+    result.purpose !== "query" ||
     result.provider !== expected.provider ||
     result.model !== expected.model ||
     result.preprocessingVersion !== expected.preprocessingVersion ||
@@ -258,17 +296,20 @@ export class InMemoryToolRetriever implements ToolRetriever {
   private readonly rows: readonly ToolEmbeddingRow[];
   private readonly embeddingPort: EmbeddingPort;
   private readonly queryExpansionPort?: QueryExpansionPort;
+  private readonly expectedEmbeddingProfile?: ExpectedEmbeddingProfile;
 
   constructor(input: {
     catalog: ReviewedCatalogSnapshot;
     rows: readonly ToolEmbeddingRow[];
     embeddingPort: EmbeddingPort;
     queryExpansionPort?: QueryExpansionPort;
+    expectedEmbeddingProfile?: ExpectedEmbeddingProfile;
   }) {
     this.catalog = input.catalog;
     this.rows = input.rows;
     this.embeddingPort = input.embeddingPort;
     this.queryExpansionPort = input.queryExpansionPort;
+    this.expectedEmbeddingProfile = input.expectedEmbeddingProfile;
   }
 
   async retrieve(request: RetrievalRequest): Promise<RetrievalResult> {
@@ -297,6 +338,10 @@ export class InMemoryToolRetriever implements ToolRetriever {
         );
       }
       const index = validateIndexRows(this.catalog, this.rows);
+      assertExpectedEmbeddingProfile(
+        index.provenance,
+        this.expectedEmbeddingProfile,
+      );
       throwIfAborted(request.signal);
 
       let expansion: QueryExpansionResult;
@@ -337,6 +382,7 @@ export class InMemoryToolRetriever implements ToolRetriever {
         try {
           queryEmbedding = await this.embeddingPort.embed({
             text: queryText,
+            purpose: "query",
             signal: request.signal,
           });
         } catch (error) {
@@ -401,11 +447,16 @@ export class InMemoryToolRetriever implements ToolRetriever {
       );
 
     const index = validateIndexRows(this.catalog, this.rows);
+    assertExpectedEmbeddingProfile(
+      index.provenance,
+      this.expectedEmbeddingProfile,
+    );
     throwIfAborted(request.signal);
     let queryEmbedding: EmbeddingResult;
     try {
       queryEmbedding = await this.embeddingPort.embed({
         text: request.query,
+        purpose: "query",
         signal: request.signal,
       });
     } catch (error) {

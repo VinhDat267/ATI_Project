@@ -66,3 +66,4 @@ AGENTS.md
 # protect already tracked files.
 /docs/api-evidence/**/
 /docs/task-hub-evidence/**/
+.codegraph/

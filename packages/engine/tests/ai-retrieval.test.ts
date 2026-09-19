@@ -12,6 +12,7 @@ import { makeTool } from "./ai-fixtures.js";
 import type { EmbeddingPort, EmbeddingResult } from "../src/ai/ports.js";
 
 const provenance = {
+  purpose: "query" as const,
   provider: "test-provider",
   model: "test-embedding",
   dimensions: 2,
@@ -33,6 +34,7 @@ function rowsFor(
   return catalog.tools.map((tool) => ({
     server: tool.server,
     name: tool.name,
+    purpose: "document" as const,
     vector: vectors[`${tool.server}.${tool.name}`] ?? [1, 0],
     contentHash: toolContentHash(tool),
     provenance: { ...provenance, catalogHash: catalog.catalogHash },

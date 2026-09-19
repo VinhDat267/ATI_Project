@@ -374,7 +374,7 @@ function dedicatedAdminAddress(value) {
   if (
     address.protocol !== 'postgresql:'
     || !['127.0.0.1', 'localhost'].includes(address.hostname)
-    || address.port !== '55432'
+    || address.port !== '55532'
     || address.pathname !== '/wap_g1'
     || address.search !== ''
     || address.hash !== ''
@@ -422,7 +422,7 @@ function assertMigrationParserFixtures() {
     throw new Error('credential scanner clean fixture failed');
   let queryOverrideRejected = false;
   try {
-    dedicatedAdminAddress('postgresql://wap:wap@127.0.0.1:55432/wap_g1?database=wap_g1');
+    dedicatedAdminAddress('postgresql://wap:wap@127.0.0.1:55532/wap_g1?database=wap_g1');
   } catch {
     queryOverrideRejected = true;
   }

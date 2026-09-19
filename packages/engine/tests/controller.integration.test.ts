@@ -20,7 +20,7 @@ const plan = JSON.parse(
   readFileSync(path.join(root, "testdata/test-cases.json"), "utf8"),
 ).cases.find((x: any) => x.id === "b02").expected_result.plan;
 const dbName = "engine_it_" + randomUUID().replaceAll("-", "");
-const adminUrl = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+const adminUrl = "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const address = new URL(adminUrl);
 address.pathname = "/" + dbName;
 const url = address.href;

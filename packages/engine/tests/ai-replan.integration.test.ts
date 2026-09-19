@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { WorkflowPlanSchema, type WorkflowPlan, type PlannerResult } from "@wap/dsl";
+import {
+  WorkflowPlanSchema,
+  type WorkflowPlan,
+  type PlannerResult,
+} from "@wap/dsl";
 import {
   WorkflowEngine,
   openLocalGateway,
@@ -46,7 +50,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "list_cards",
-            args: { board_id: "board_a", since: "2026-09-30", until: "2026-09-01" },
+            args: {
+              board_id: "board_a",
+              since: "2026-09-30",
+              until: "2026-09-01",
+            },
           },
           side_effect: "read" as const,
           on_error: "replan" as const,
@@ -63,7 +71,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "list_cards",
-            args: { board_id: "board_a", since: "2026-09-01", until: "2026-09-30" },
+            args: {
+              board_id: "board_a",
+              since: "2026-09-01",
+              until: "2026-09-30",
+            },
           },
         },
       ],
@@ -125,7 +137,8 @@ describe("AI-03 Local Replan Integration Tests", () => {
     });
 
     // Verify workflow_versions in DB has origin = 'replan'
-    const [runRow] = await fixture.db.client`SELECT workflow_id FROM runs WHERE id=${run.run_id}`;
+    const [runRow] = await fixture.db
+      .client`SELECT workflow_id FROM runs WHERE id=${run.run_id}`;
     const versions = await fixture.db.client`
       SELECT version_no, origin FROM workflow_versions WHERE workflow_id=${runRow!.workflow_id} ORDER BY version_no
     `;
@@ -145,10 +158,18 @@ describe("AI-03 Local Replan Integration Tests", () => {
         {
           id: "read_cards",
           description: "Read cards first",
-          tool: { server: "task_hub", name: "list_cards", args: { board_id: "board_a" } },
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: { board_id: "board_a" },
+          },
           side_effect: "read",
           on_error: "fail",
-          retry: { max_attempts: 1, backoff: "exponential", initial_delay_ms: 0 },
+          retry: {
+            max_attempts: 1,
+            backoff: "exponential",
+            initial_delay_ms: 0,
+          },
         },
         {
           id: "write_card",
@@ -156,7 +177,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Nonexistent_List", title: "Valid Title" },
+            args: {
+              board_id: "board_a",
+              list_name: "Nonexistent_List",
+              title: "Valid Title",
+            },
           },
           side_effect: "write",
           idempotency_key: "create-invalid-due-date",
@@ -176,7 +201,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Doing", title: "Valid Title" },
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "Valid Title",
+            },
           },
         },
       ],
@@ -207,7 +236,9 @@ describe("AI-03 Local Replan Integration Tests", () => {
     await engine.decide(preparedRun.run_id, decisionFor(preparedRun as any));
 
     // Execute with replanPort
-    const replannedRun = await engine.execute(preparedRun.run_id, { replanPort });
+    const replannedRun = await engine.execute(preparedRun.run_id, {
+      replanPort,
+    });
     expect(replanInvoked).toBe(true);
 
     // After replan of write, the run MUST transition to 'awaiting_approval' with a new approval
@@ -255,7 +286,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Doing", title: "Card One Unique" },
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "Card One Unique",
+            },
           },
           side_effect: "write",
           idempotency_key: "two-write-first-card",
@@ -267,7 +302,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Nonexistent_List", title: "Card Two" },
+            args: {
+              board_id: "board_a",
+              list_name: "Nonexistent_List",
+              title: "Card Two",
+            },
           },
           side_effect: "write",
           idempotency_key: "two-write-second-card",
@@ -287,7 +326,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Doing", title: "Card Two Fixed" },
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "Card Two Fixed",
+            },
           },
         },
       ],
@@ -335,6 +378,376 @@ describe("AI-03 Local Replan Integration Tests", () => {
     expect(attempts).toHaveLength(1);
   });
 
+  it("[AI-03-07] rejects an untrusted replan that adds a duplicate of a successful write", async () => {
+    const initialPlan = WorkflowPlanSchema.parse({
+      version: "1.0",
+      name: "Reject duplicate successful write",
+      source_prompt: "Create two cards safely",
+      inputs: {},
+      steps: [
+        {
+          id: "write_succeeded",
+          description: "Create the first card",
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "AI-03 guarded first card",
+            },
+          },
+          side_effect: "write",
+          idempotency_key: "ai-03-guarded-first-card",
+          on_error: "fail",
+        },
+        {
+          id: "write_failed",
+          description: "Create the second card with a bad list",
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Missing_AI_03_List",
+              title: "AI-03 guarded second card",
+            },
+          },
+          side_effect: "write",
+          idempotency_key: "ai-03-guarded-second-card",
+          on_error: "replan",
+          depends_on: ["write_succeeded"],
+        },
+      ],
+      outputs: {},
+    });
+    const maliciousPlan: WorkflowPlan = {
+      ...initialPlan,
+      steps: [
+        initialPlan.steps[0]!,
+        {
+          ...initialPlan.steps[1]!,
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "AI-03 guarded second card",
+            },
+          },
+        },
+        {
+          ...initialPlan.steps[0]!,
+          id: "write_succeeded_again",
+          description: "Replay the successful first write",
+          idempotency_key: "ai-03-duplicate-successful-write",
+          depends_on: ["write_failed"],
+        },
+      ],
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: maliciousPlan };
+      },
+    };
+    const engine = new WorkflowEngine(fixture.db, gateway, fixture.userId);
+    const prepared = await engine.prepare(initialPlan);
+    await engine.decide(prepared.run_id, decisionFor(prepared as any));
+
+    const result = await engine.execute(prepared.run_id, { replanPort });
+
+    expect(result.status).toBe("failed");
+    const [run] = await fixture.db.client`
+      SELECT workflow_id FROM runs WHERE id=${prepared.run_id}
+    `;
+    const versions = await fixture.db.client`
+      SELECT version_no FROM workflow_versions
+      WHERE workflow_id=${run!.workflow_id}
+      ORDER BY version_no
+    `;
+    expect(versions).toHaveLength(1);
+  });
+
+  it("[AI-03-08] rejects an untrusted replan that changes a nonfailed pending step", async () => {
+    const initialPlan = WorkflowPlanSchema.parse({
+      version: "1.0",
+      name: "Reject pending step mutation",
+      source_prompt: "Read then create one card",
+      inputs: {},
+      steps: [
+        {
+          id: "read_failed",
+          description: "Read cards with an invalid date range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read",
+          on_error: "replan",
+        },
+        {
+          id: "write_pending",
+          description: "Create the planned card",
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "AI-03 original pending card",
+            },
+          },
+          side_effect: "write",
+          idempotency_key: "ai-03-original-pending-card",
+          on_error: "fail",
+          depends_on: ["read_failed"],
+        },
+      ],
+      outputs: {},
+    });
+    const maliciousPlan: WorkflowPlan = {
+      ...initialPlan,
+      steps: [
+        {
+          ...initialPlan.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-09-01",
+              until: "2026-10-01",
+            },
+          },
+        },
+        {
+          ...initialPlan.steps[1]!,
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "AI-03 altered pending card",
+            },
+          },
+        },
+      ],
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: maliciousPlan };
+      },
+    };
+    const engine = new WorkflowEngine(fixture.db, gateway, fixture.userId, {
+      replan: replanPort,
+    });
+    const accepted = await engine.accept({
+      source_prompt: initialPlan.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: initialPlan };
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    const [run] = await fixture.db.client`
+      SELECT workflow_id FROM runs WHERE id=${accepted.run_id}
+    `;
+    const versions = await fixture.db.client`
+      SELECT origin FROM workflow_versions
+      WHERE workflow_id=${run!.workflow_id}
+    `;
+    expect(
+      versions.filter((version) => version.origin === "replan"),
+    ).toHaveLength(0);
+  });
+
+  it("[AI-03-09] rejects a replanned write payload containing a configured secret before preview persistence", async () => {
+    const secret = `ai-03-replan-secret-${crypto.randomUUID()}`;
+    const initialPlan = WorkflowPlanSchema.parse({
+      version: "1.0",
+      name: "Reject secret from replanned write",
+      source_prompt: "Create a local card",
+      inputs: {},
+      steps: [
+        {
+          id: "write_failed",
+          description: "Create a card with a bad list",
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Missing_AI_03_Secret_List",
+              title: "Safe initial title",
+            },
+          },
+          side_effect: "write",
+          idempotency_key: "ai-03-replan-secret",
+          on_error: "replan",
+        },
+      ],
+      outputs: {},
+    });
+    const replannedSecretPlan: WorkflowPlan = {
+      ...initialPlan,
+      steps: [
+        {
+          ...initialPlan.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: `Protected ${secret} payload`,
+            },
+          },
+        },
+      ],
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: replannedSecretPlan };
+      },
+    };
+    const engine = new WorkflowEngine(fixture.db, gateway, fixture.userId, {
+      secrets: [secret],
+    });
+    const prepared = await engine.prepare(initialPlan);
+    await engine.decide(prepared.run_id, decisionFor(prepared as any));
+
+    const result = await engine.execute(prepared.run_id, { replanPort });
+
+    expect(result.status).toBe("failed");
+    const approvals = await fixture.db.client`
+      SELECT preview::text AS preview
+      FROM approvals
+      WHERE run_id=${prepared.run_id}
+      ORDER BY created_at
+    `;
+    const operations = await fixture.db.client`
+      SELECT resolved_args::text AS resolved_args
+      FROM tool_operations
+      WHERE run_id=${prepared.run_id}
+      ORDER BY created_at
+    `;
+    const versions = await fixture.db.client`
+      SELECT plan::text AS plan
+      FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${prepared.run_id})
+      ORDER BY version_no
+    `;
+    const replanEvents = await fixture.db.client`
+      SELECT payload::text AS payload
+      FROM run_events
+      WHERE run_id=${prepared.run_id} AND type='replan.applied'
+      ORDER BY seq
+    `;
+    expect(approvals).toHaveLength(1);
+    expect(operations).toHaveLength(1);
+    expect(versions).toHaveLength(1);
+    expect(replanEvents).toHaveLength(0);
+    expect(JSON.stringify(approvals)).not.toContain(secret);
+    expect(JSON.stringify(operations)).not.toContain(secret);
+    expect(JSON.stringify(versions)).not.toContain(secret);
+    expect(JSON.stringify(replanEvents)).not.toContain(secret);
+  });
+
+  it("[AI-03-10] rejects a replanned intent key resolved from a configured secret", async () => {
+    const secret = `ai-03-replan-intent-${crypto.randomUUID()}`;
+    const initialPlan = WorkflowPlanSchema.parse({
+      version: "1.0",
+      name: "Reject secret from replanned intent",
+      source_prompt: "Create a local card with a safe initial key",
+      inputs: {
+        protected_intent: { type: "string", required: true },
+      },
+      steps: [
+        {
+          id: "write_failed",
+          description: "Create a card with a bad list",
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Missing_AI_03_Intent_List",
+              title: "Safe initial title",
+            },
+          },
+          side_effect: "write",
+          idempotency_key: "ai-03-safe-initial-intent",
+          on_error: "replan",
+        },
+      ],
+      outputs: {},
+    });
+    const replannedIntentPlan: WorkflowPlan = {
+      ...initialPlan,
+      steps: [
+        {
+          ...initialPlan.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "create_card",
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "Safe replanned title",
+            },
+          },
+          idempotency_key: "${inputs.protected_intent}",
+        },
+      ],
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: replannedIntentPlan };
+      },
+    };
+    const unguardedEngine = new WorkflowEngine(
+      fixture.db,
+      gateway,
+      fixture.userId,
+    );
+    const prepared = await unguardedEngine.prepare(initialPlan, {
+      inputs: { protected_intent: secret },
+    });
+    await unguardedEngine.decide(prepared.run_id, decisionFor(prepared as any));
+    const guardedEngine = new WorkflowEngine(
+      fixture.db,
+      gateway,
+      fixture.userId,
+      {
+        secrets: [secret],
+      },
+    );
+
+    const result = await guardedEngine.execute(prepared.run_id, { replanPort });
+
+    expect(result.status).toBe("failed");
+    const operations = await fixture.db.client`
+      SELECT intent_key
+      FROM tool_operations
+      WHERE run_id=${prepared.run_id}
+      ORDER BY created_at
+    `;
+    expect(operations).toHaveLength(1);
+    expect(JSON.stringify(operations)).not.toContain(secret);
+  });
+
   it("[AI-03-04] enforces local replan limit (max 2 replans per run)", async () => {
     const alwaysBadDraft = {
       version: "1.0" as const,
@@ -347,7 +760,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "list_cards",
-            args: { board_id: "board_a", since: "2026-10-01", until: "2026-09-01" },
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
           },
           side_effect: "read" as const,
           on_error: "replan" as const,
@@ -381,7 +798,10 @@ describe("AI-03 Local Replan Integration Tests", () => {
       produce: async () => ({ kind: "plan" as const, plan: alwaysBadDraft }),
     };
 
-    const finished = await engine.prepareAccepted(accepted.run_id, initialPlanner);
+    const finished = await engine.prepareAccepted(
+      accepted.run_id,
+      initialPlanner,
+    );
     // Failure 1 -> replan 1 -> failure 2 -> replan 2 -> failure 3 -> max replans reached -> failed
     expect(finished.status).toBe("failed");
     const [runRow] = await fixture.db.client`
@@ -404,7 +824,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "create_card",
-            args: { board_id: "board_a", list_name: "Doing", title: "Card Title" },
+            args: {
+              board_id: "board_a",
+              list_name: "Doing",
+              title: "Card Title",
+            },
           },
           side_effect: "write",
           idempotency_key: "unknown-certainty-key",
@@ -464,7 +888,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
           tool: {
             server: "task_hub",
             name: "list_cards",
-            args: { board_id: "board_a", since: "2026-10-01", until: "2026-09-01" },
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
           },
           side_effect: "read" as const,
           on_error: "replan" as const,
@@ -489,7 +917,11 @@ describe("AI-03 Local Replan Integration Tests", () => {
                 tool: {
                   server: "task_hub",
                   name: "list_cards",
-                  args: { board_id: "board_a", since: "2026-09-01", until: "2026-10-01" },
+                  args: {
+                    board_id: "board_a",
+                    since: "2026-09-01",
+                    until: "2026-10-01",
+                  },
                 },
               },
             ],
@@ -512,7 +944,755 @@ describe("AI-03 Local Replan Integration Tests", () => {
       produce: async () => ({ kind: "plan" as const, plan: draft }),
     };
 
-    const result = await engine.prepareAccepted(accepted.run_id, initialPlanner);
+    const result = await engine.prepareAccepted(
+      accepted.run_id,
+      initialPlanner,
+    );
     expect(result.status).toBe("cancelled");
+  });
+
+  it("[AI-03-11] ignores a late refusal after the replan worker loses its advisory lease", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Lease loss during replan",
+      source_prompt: "Fence a late replan result",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    let signalEntered!: () => void;
+    let releaseResult!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      signalEntered = resolve;
+    });
+    const resultReleased = new Promise<void>((resolve) => {
+      releaseResult = resolve;
+    });
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        signalEntered();
+        await resultReleased;
+        return { kind: "refusal", reason: "Late model response" };
+      },
+    };
+    const leaseGateway = await openLocalGateway(fixture.gatewayConfig);
+    const engine = new WorkflowEngine(
+      fixture.db,
+      leaseGateway,
+      fixture.userId,
+      {
+        replan: replanPort,
+      },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+    const execution = engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    await entered;
+    const leases = await fixture.db.client`
+      SELECT pid
+      FROM pg_locks
+      WHERE locktype='advisory' AND objid=638019814
+        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    `;
+    expect(leases).toHaveLength(1);
+    const [termination] = await fixture.db.client`
+      SELECT pg_terminate_backend(${leases[0]!.pid}) AS terminated
+    `;
+    expect(termination!.terminated).toBe(true);
+    const remainingLeases = await fixture.db.client`
+      SELECT pid
+      FROM pg_locks
+      WHERE locktype='advisory' AND objid=638019814
+        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    `;
+    expect(remainingLeases).toHaveLength(0);
+
+    releaseResult();
+    const result = await execution;
+
+    expect(result.status).toBe("replanning");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const events = await fixture.db.client`
+      SELECT type FROM run_events WHERE run_id=${accepted.run_id} ORDER BY seq
+    `;
+    expect(versions).toHaveLength(1);
+    expect(events.map((event) => event.type)).not.toContain("run.finished");
+    await engine.recoverOrphans();
+    await leaseGateway.close();
+  });
+
+  it("[AI-03-12] ignores a late replacement plan after the replan worker loses its advisory lease", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Lease loss before replacement plan",
+      source_prompt: "Fence a late replacement plan",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const replacement = {
+      ...draft,
+      steps: [
+        {
+          ...draft.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-09-01",
+              until: "2026-10-01",
+            },
+          },
+        },
+      ],
+    };
+    let signalEntered!: () => void;
+    let releaseResult!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      signalEntered = resolve;
+    });
+    const resultReleased = new Promise<void>((resolve) => {
+      releaseResult = resolve;
+    });
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        signalEntered();
+        await resultReleased;
+        return { kind: "plan", plan: replacement };
+      },
+    };
+    const leaseGateway = await openLocalGateway(fixture.gatewayConfig);
+    const engine = new WorkflowEngine(
+      fixture.db,
+      leaseGateway,
+      fixture.userId,
+      {
+        replan: replanPort,
+      },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+    const execution = engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    await entered;
+    const [lease] = await fixture.db.client`
+      SELECT pid
+      FROM pg_locks
+      WHERE locktype='advisory' AND objid=638019814
+        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    `;
+    const [termination] = await fixture.db.client`
+      SELECT pg_terminate_backend(${lease!.pid}) AS terminated
+    `;
+    expect(termination!.terminated).toBe(true);
+    const remainingLeases = await fixture.db.client`
+      SELECT pid
+      FROM pg_locks
+      WHERE locktype='advisory' AND objid=638019814
+        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    `;
+    expect(remainingLeases).toHaveLength(0);
+
+    releaseResult();
+    const result = await execution;
+
+    expect(result.status).toBe("replanning");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const approvals = await fixture.db.client`
+      SELECT id FROM approvals WHERE run_id=${accepted.run_id}
+    `;
+    expect(versions).toHaveLength(1);
+    expect(approvals).toHaveLength(0);
+    await engine.recoverOrphans();
+    await leaseGateway.close();
+  });
+
+  it("[AI-03-13] rejects a replacement plan when the reviewed gateway drifts before version publication", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Gateway drift during replan",
+      source_prompt: "Reject drifted catalog",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const replacement = {
+      ...draft,
+      steps: [
+        {
+          ...draft.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-09-01",
+              until: "2026-10-01",
+            },
+          },
+        },
+      ],
+    };
+    let drifted = false;
+    const driftingGateway: Gateway = {
+      ...gateway,
+      async assertCurrent() {
+        if (drifted) throw new Error("reviewed gateway drifted");
+        await gateway.assertCurrent();
+      },
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        drifted = true;
+        return { kind: "plan", plan: replacement };
+      },
+    };
+    const engine = new WorkflowEngine(
+      fixture.db,
+      driftingGateway,
+      fixture.userId,
+      { replan: replanPort },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const approvals = await fixture.db.client`
+      SELECT id FROM approvals WHERE run_id=${accepted.run_id}
+    `;
+    const appliedEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='replan.applied'
+    `;
+    expect(versions).toHaveLength(1);
+    expect(approvals).toHaveLength(0);
+    expect(appliedEvents).toHaveLength(0);
+  });
+
+  it("[AI-03-14] does not persist a late replan read outcome after its advisory lease is lost", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Lease loss after replanned read",
+      source_prompt: "Fence a late read result",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const replacement = {
+      ...draft,
+      steps: [
+        {
+          ...draft.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: { board_id: "board_a" },
+          },
+        },
+      ],
+    };
+    const realGateway = await openLocalGateway(fixture.gatewayConfig);
+    let readCalls = 0;
+    let lostLease = false;
+    const gatewayLosingLease: Gateway = {
+      ...realGateway,
+      async call(...args: Parameters<typeof realGateway.call>) {
+        const response = await realGateway.call(...args);
+        if (args[0].name === "list_cards" && ++readCalls === 2) {
+          const [lease] = await fixture.db.client`
+            SELECT pid
+            FROM pg_locks
+            WHERE locktype='advisory' AND objid=638019814
+              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+          `;
+          const [termination] = await fixture.db.client`
+            SELECT pg_terminate_backend(${lease!.pid}) AS terminated
+          `;
+          expect(termination!.terminated).toBe(true);
+          const remainingLeases = await fixture.db.client`
+            SELECT pid
+            FROM pg_locks
+            WHERE locktype='advisory' AND objid=638019814
+              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+          `;
+          expect(remainingLeases).toHaveLength(0);
+          lostLease = true;
+        }
+        return response;
+      },
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: replacement };
+      },
+    };
+    const engine = new WorkflowEngine(
+      fixture.db,
+      gatewayLosingLease,
+      fixture.userId,
+      { replan: replanPort },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(lostLease).toBe(true);
+    expect(result.status).toBe("dry_running");
+    const finishedEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='run.finished'
+    `;
+    const successfulReads = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='step.succeeded'
+    `;
+    expect(finishedEvents).toHaveLength(0);
+    expect(successfulReads).toHaveLength(0);
+    await engine.recoverOrphans();
+    await realGateway.close();
+  });
+
+  it("[AI-03-15] stops before preview publication when the gateway drifts after a replanned read", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Gateway drift before replan preview",
+      source_prompt: "Do not publish a drifted preview",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const replacement = {
+      ...draft,
+      steps: [
+        {
+          ...draft.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: { board_id: "board_a" },
+          },
+        },
+      ],
+    };
+    let currentChecks = 0;
+    const gatewayDriftingBeforePreview: Gateway = {
+      ...gateway,
+      async assertCurrent() {
+        currentChecks++;
+        if (currentChecks === 3)
+          throw new Error("reviewed gateway drifted before preview");
+        await gateway.assertCurrent();
+      },
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(): Promise<PlannerResult> {
+        return { kind: "plan", plan: replacement };
+      },
+    };
+    const engine = new WorkflowEngine(
+      fixture.db,
+      gatewayDriftingBeforePreview,
+      fixture.userId,
+      { replan: replanPort },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const approvals = await fixture.db.client`
+      SELECT id FROM approvals WHERE run_id=${accepted.run_id}
+    `;
+    const readyEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='dryrun.ready'
+    `;
+    expect(versions).toHaveLength(2);
+    expect(approvals).toHaveLength(0);
+    expect(readyEvents).toHaveLength(0);
+  });
+
+  it("[AI-03-16] ignores a replacement plan whose replan owner changed while the model was waiting", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Owner change during replan",
+      source_prompt: "Fence an old owner",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const replacement = {
+      ...draft,
+      steps: [
+        {
+          ...draft.steps[0]!,
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: { board_id: "board_a" },
+          },
+        },
+      ],
+    };
+    const replanPort: LocalReplanPort = {
+      async replan(input): Promise<PlannerResult> {
+        await fixture.db.client`
+          UPDATE runs SET claimed_by=${crypto.randomUUID()} WHERE id=${input.runId}
+        `;
+        return { kind: "plan", plan: replacement };
+      },
+    };
+    const engine = new WorkflowEngine(fixture.db, gateway, fixture.userId, {
+      replan: replanPort,
+    });
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(result.status).toBe("replanning");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    expect(versions).toHaveLength(1);
+    await engine.recoverOrphans();
+  });
+
+  it("[AI-03-17] returns the current run when the lease is lost before replan initialization", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Lease loss before replan initialization",
+      source_prompt: "Do not terminally settle a stale replan",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    const realGateway = await openLocalGateway(fixture.gatewayConfig);
+    let lostLease = false;
+    const gatewayLosingLease: Gateway = {
+      ...realGateway,
+      async call(...args: Parameters<typeof realGateway.call>) {
+        const response = await realGateway.call(...args);
+        if (args[0].name === "list_cards") {
+          const [lease] = await fixture.db.client`
+            SELECT pid
+            FROM pg_locks
+            WHERE locktype='advisory' AND objid=638019814
+              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+          `;
+          const [termination] = await fixture.db.client`
+            SELECT pg_terminate_backend(${lease!.pid}) AS terminated
+          `;
+          expect(termination!.terminated).toBe(true);
+          const remainingLeases = await fixture.db.client`
+            SELECT pid
+            FROM pg_locks
+            WHERE locktype='advisory' AND objid=638019814
+              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+          `;
+          expect(remainingLeases).toHaveLength(0);
+          lostLease = true;
+        }
+        return response;
+      },
+    };
+    let replanCalled = false;
+    const engine = new WorkflowEngine(
+      fixture.db,
+      gatewayLosingLease,
+      fixture.userId,
+      {
+        replan: {
+          async replan(): Promise<PlannerResult> {
+            replanCalled = true;
+            throw new Error("replan must not start after lease loss");
+          },
+        },
+      },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(lostLease).toBe(true);
+    expect(replanCalled).toBe(false);
+    expect(result.status).toBe("dry_running");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const startedEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='replan.started'
+    `;
+    const finishedEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='run.finished'
+    `;
+    expect(versions).toHaveLength(1);
+    expect(startedEvents).toHaveLength(0);
+    expect(finishedEvents).toHaveLength(0);
+    await engine.recoverOrphans();
+    await realGateway.close();
+  });
+
+  it("[AI-03-18] returns the current run when its owner changes before replan initialization", async () => {
+    const draft = {
+      version: "1.0" as const,
+      name: "Owner change before replan initialization",
+      source_prompt: "Do not terminally settle another owner's run",
+      steps: [
+        {
+          id: "read_step",
+          description: "Read with an invalid range",
+          tool: {
+            server: "task_hub",
+            name: "list_cards",
+            args: {
+              board_id: "board_a",
+              since: "2026-10-01",
+              until: "2026-09-01",
+            },
+          },
+          side_effect: "read" as const,
+          on_error: "replan" as const,
+        },
+      ],
+      outputs: {},
+    };
+    let ownerChanged = false;
+    let runId: string | undefined;
+    const gatewayChangingOwner: Gateway = {
+      ...gateway,
+      async call(...args: Parameters<typeof gateway.call>) {
+        const response = await gateway.call(...args);
+        if (args[0].name === "list_cards") {
+          if (!runId) throw new Error("Run must be accepted before dispatch");
+          await fixture.db.client`
+            UPDATE runs SET claimed_by=${crypto.randomUUID()}
+            WHERE id=${runId}
+          `;
+          ownerChanged = true;
+        }
+        return response;
+      },
+    };
+    let replanCalled = false;
+    const engine = new WorkflowEngine(
+      fixture.db,
+      gatewayChangingOwner,
+      fixture.userId,
+      {
+        replan: {
+          async replan(): Promise<PlannerResult> {
+            replanCalled = true;
+            throw new Error("replan must not start after owner change");
+          },
+        },
+      },
+    );
+    const accepted = await engine.accept({
+      source_prompt: draft.source_prompt,
+      inputs: {},
+    });
+    runId = accepted.run_id;
+
+    const result = await engine.prepareAccepted(accepted.run_id, {
+      mode: "ai",
+      async produce() {
+        return { kind: "plan", plan: draft };
+      },
+    });
+
+    expect(ownerChanged).toBe(true);
+    expect(replanCalled).toBe(false);
+    expect(result.status).toBe("dry_running");
+    const versions = await fixture.db.client`
+      SELECT id FROM workflow_versions
+      WHERE workflow_id=(SELECT workflow_id FROM runs WHERE id=${accepted.run_id})
+    `;
+    const finishedEvents = await fixture.db.client`
+      SELECT id FROM run_events
+      WHERE run_id=${accepted.run_id} AND type='run.finished'
+    `;
+    expect(versions).toHaveLength(1);
+    expect(finishedEvents).toHaveLength(0);
+    await engine.recoverOrphans();
   });
 });

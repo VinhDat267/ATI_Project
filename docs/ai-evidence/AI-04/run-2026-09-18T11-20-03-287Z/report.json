@@ -1,0 +1,2339 @@
+{
+  "format": "ati-ai04-offline-report-v1",
+  "mode": "offline",
+  "runId": "run-2026-09-18T11-20-03-287Z",
+  "createdAt": "2026-09-18T11:20:03.287Z",
+  "harnessVerdict": "OFFLINE_HARNESS_PASS",
+  "aiEvaluationVerdict": "AI_EVALUATION_NOT_RUN",
+  "evidenceKind": "OFFLINE_SYNTHETIC_REPLAY_NOT_MODEL_QUALITY",
+  "freezeHash": "bd5ae252e23880399923ca0a66515d10216e7d92e55dc46bef89791e3ba41641",
+  "fingerprints": {
+    "dataset": "8e506e984399799a0f0b31e43a655b2bfcd9f85beed74aee035d96625df91b25",
+    "experimentManifest": "957b160c2204e432de8c8fc8fa4404018eb550c17170499c289d517f5625c00c",
+    "catalog": "a168a1025192b6699ce9ce5a08ecc4508c14d442bf44d8a01d50df386e724724",
+    "prompts": "fcf985caa96d125197b2f423de386c10797672b914dae46de0669698056372f6",
+    "evaluator": "c394ac8f576e2dca614509ebf5639364d6bcc666392acaee65fc67930f9e9363",
+    "fixtures": "13c7aaa8dfbe7b1555fc53f599d93853789f81f83e783854897cd79e2900a3bc",
+    "config": "eff7e7e0773a8508c78b35d41e4448d61518304e09a45a31dbccbb8b11ce85de",
+    "policiesAndArtifacts": "07bb3fb9f8b5d3bddf5f7507a6592168ca50bad02e967788d3c626fd249cc94d",
+    "lockfile": "7ebf014ee34047417b0dfc2d73398388a671c37c9d712d4392bc90f1c3f16021"
+  },
+  "holdoutExposure": "previously_exercised_by_offline_tests",
+  "summary": {
+    "uniqueCaseCount": 4,
+    "observationCount": 84,
+    "bySplit": {
+      "dev": {
+        "uniqueCaseCount": 0,
+        "observationCount": 0
+      },
+      "holdout": {
+        "uniqueCaseCount": 4,
+        "observationCount": 84
+      }
+    },
+    "kindCorrect": {
+      "numerator": 72,
+      "denominator": 84,
+      "value": 0.8571428571428571
+    },
+    "planValid": {
+      "numerator": 30,
+      "denominator": 42,
+      "value": 0.7142857142857143
+    },
+    "taskCorrect": {
+      "numerator": 30,
+      "denominator": 42,
+      "value": 0.7142857142857143
+    },
+    "retrievalRecall": {
+      "total": 38,
+      "denominator": 42,
+      "value": 0.9047619047619048
+    },
+    "plannerErrors": 12,
+    "timing": {
+      "sampleCount": 108,
+      "p50Ms": 0.01269999999999527,
+      "p95Ms": 0.04789999999997008,
+      "scope": "offline_in_process_planning_calls_only"
+    }
+  },
+  "observations": [
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "planner_error",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 3
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 0.6666666666666666
+      },
+      "metrics": {
+        "outcomeValid": null,
+        "kindCorrect": null,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b07",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b08",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": 1
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": true,
+        "taskCorrect": true,
+        "outputCorrect": true
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b09",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "all_tools",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 3
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 3,
+        "returnedToolCount": 3,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 5
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 5,
+        "returnedToolCount": 5,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 1,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 2,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    },
+    {
+      "caseId": "b10",
+      "split": "holdout",
+      "cell": {
+        "variant": "semantic_qe",
+        "topK": 10
+      },
+      "repetition": 3,
+      "status": "completed",
+      "model": {
+        "provider": "offline-synthetic",
+        "name": "oracle-replay-v1",
+        "planningCallCount": 1
+      },
+      "retrieval": {
+        "requestedTopK": 10,
+        "returnedToolCount": 10,
+        "recall": null
+      },
+      "metrics": {
+        "outcomeValid": true,
+        "kindCorrect": true,
+        "planValid": null,
+        "taskCorrect": null,
+        "outputCorrect": null
+      }
+    }
+  ],
+  "limitations": [
+    "Offline synthetic replay validates evaluator wiring only; it is not model-quality evidence.",
+    "No provider, gateway, MCP receiver, database, or external network was called by this report.",
+    "Holdout cases were previously exercised by offline tests and are not claimed as untouched.",
+    "Recovery, paid usage, provider latency, and live semantic quality remain NOT_RUN."
+  ]
+}

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { ToolSchema, canonicalJson, type EngineTool } from "../snapshot.js";
+import { ToolSchema, canonicalJson, hash, type EngineTool } from "../snapshot.js";
 import {
   CatalogValidationError,
   createReviewedCatalogSnapshot,
@@ -31,6 +31,12 @@ const ManifestSchema = z
         })
         .passthrough(),
     ),
+  })
+  .passthrough();
+const OfflineManifestEvidenceSchema = z
+  .object({
+    profile: z.literal("B-local-v1"),
+    evidence: z.literal("MIXED_IMPLEMENTED_AND_PLANNED_CONTRACTS"),
   })
   .passthrough();
 
@@ -136,6 +142,39 @@ export function createLocalReviewedCatalog(
       ...actual.get(qualifiedToolIdentity(tool))!,
       description: tool.description,
     })),
+  );
+}
+
+/**
+ * Build the checked-in 8+2 reviewed snapshot for an explicitly offline
+ * evaluator. Unlike createLocalReviewedCatalog, this has no gateway dependency
+ * and its artifact hashes are labelled synthetic manifest fingerprints.
+ */
+export function createOfflineReviewedCatalog(
+  manifest: unknown,
+): ReviewedCatalogSnapshot {
+  if (!OfflineManifestEvidenceSchema.safeParse(manifest).success)
+    throw new CatalogValidationError(
+      "offline reviewed catalog manifest evidence is malformed",
+    );
+  const manifestTools = localManifestTools(manifest);
+  return createReviewedCatalogSnapshot(
+    manifestTools.map(({ evidence, description, ...tool }) => {
+      const candidate = {
+        ...tool,
+        artifactHash: hash({
+          format: "ai-offline-reviewed-manifest-artifact-v1",
+          evidence,
+          tool: { ...tool, description },
+        }),
+      };
+      const parsed = ToolSchema.safeParse(candidate);
+      if (!parsed.success)
+        throw new CatalogValidationError(
+          "offline reviewed catalog tool is not a reviewed EngineTool",
+        );
+      return { ...parsed.data, description };
+    }),
   );
 }
 

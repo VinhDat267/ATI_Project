@@ -6,7 +6,7 @@ import {
   type ErrorClass,
   type Step,
 } from "@wap/dsl";
-import { Store } from "./store.js";
+import { Store, type Tx } from "./store.js";
 import type { Gateway, GatewayResult, CallContext } from "./gateway.js";
 import {
   EngineError,
@@ -26,7 +26,10 @@ export interface AttemptOutcome {
   message: string | null;
   errorClass?: ErrorClass;
 }
-function extractErrorCode(result: GatewayResult | undefined): string | undefined {
+export type AttemptGuard = (tx: Tx) => Promise<void>;
+function extractErrorCode(
+  result: GatewayResult | undefined,
+): string | undefined {
   if (!result?.isError) return undefined;
   try {
     const item = result.content?.[0] as
@@ -48,7 +51,10 @@ function knownToolError(tool: EngineTool, result: GatewayResult) {
   if (tool.server !== "task_hub") return false;
   if (!result.isError) return false;
   const code = extractErrorCode(result);
-  return code !== undefined && ["BAD_ARGS", "BAD_RANGE", "NOT_FOUND", "NOT_AUTHORIZED"].includes(code);
+  return (
+    code !== undefined &&
+    ["BAD_ARGS", "BAD_RANGE", "NOT_FOUND", "NOT_AUTHORIZED"].includes(code)
+  );
 }
 function classifyOutcomeError(
   tool: EngineTool,
@@ -72,6 +78,7 @@ export async function callStep(
   tool: EngineTool,
   args: Record<string, unknown>,
   auth?: Record<string, string>,
+  beforeMutation?: AttemptGuard,
 ): Promise<AttemptOutcome> {
   const isWrite = tool.sideEffect === "write";
   const checked = validateToolCall(
@@ -96,6 +103,7 @@ export async function callStep(
     try {
       context = await store.db.client.begin(async (tx) => {
         await store.assertWorker(tx);
+        await beforeMutation?.(tx);
         const run = await store.run(tx, runId, true);
         if (
           run.cancel_requested_at ||
@@ -126,6 +134,11 @@ export async function callStep(
         return { timeZone: run.time_zone };
       });
     } catch (error) {
+      if (
+        error instanceof EngineError &&
+        (error.code === "LEASE_LOST" || error.code === "STALE_REPLAN")
+      )
+        throw error;
       throw new BeforeDispatchError(
         error instanceof EngineError
           ? error.message
@@ -223,8 +236,9 @@ export async function callStep(
       ? null
       : retry
         ? "transient"
-        : outcome.errorClass ?? "fatal";
+        : (outcome.errorClass ?? "fatal");
     await store.db.client.begin(async (tx) => {
+      await beforeMutation?.(tx);
       await store.run(tx, runId, true);
       const done =
         await tx`UPDATE step_attempts SET ended_at=now(),duration_ms=${Date.now() - started},result=${tx.json(json(outcome.output))},outcome_certainty=${outcome.certainty},error_message=${outcome.message},error_class=${resolvedErrorClass} WHERE id=${attemptId} AND ended_at IS NULL RETURNING id`;
@@ -258,6 +272,7 @@ export async function callStep(
       30000,
     );
     await store.db.client.begin(async (tx) => {
+      await beforeMutation?.(tx);
       await store.run(tx, runId, true);
       await store.emit(tx, runId, "step.retrying", {
         step_id: step.id,

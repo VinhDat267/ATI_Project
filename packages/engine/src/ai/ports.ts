@@ -5,6 +5,7 @@ export interface EmbeddingUsage {
 }
 export interface EmbeddingResult {
   readonly embedding: readonly number[];
+  readonly purpose: "document" | "query";
   readonly provider: string;
   readonly model: string;
   readonly dimensions: number;
@@ -17,6 +18,7 @@ export interface EmbeddingResult {
 export interface EmbeddingPort {
   embed(input: {
     readonly text: string;
+    readonly purpose: "document" | "query";
     readonly signal?: AbortSignal;
   }): Promise<EmbeddingResult>;
 }
@@ -38,6 +40,7 @@ export interface StructuredModelClient {
     readonly systemPrompt: string;
     readonly userPrompt: string;
     readonly schema: unknown;
+    readonly purpose?: "planning" | "repair" | "replan";
     readonly signal?: AbortSignal;
   }): Promise<StructuredModelResponse>;
 }

@@ -24,4 +24,4 @@ Runner `packages/db/src/migrate.ts` dùng một connection/advisory lock, ledger
 
 HNSW/1536 chiều được giữ. GIN tsvector là PostgreSQL full-text, không phải BM25; hybrid nằm ngoài B.
 
-Hạ tầng riêng: `npm run db:up:g1` dùng compose.g1.yaml, project ati-g1, volume ati-g1_g1_pgdata; PostgreSQL 55432, Redis 56379, chỉ bind loopback. `db:migrate:g1` và `db:seed:g1` dùng G1_DATABASE_URL hoặc URL demo mặc định. `docker compose -f compose.g1.yaml stop` dừng services và giữ dữ liệu. Compose cũ là lịch sử; không reset hay đổi volume services khác. Redis PING được kiểm, BullMQ chưa tích hợp.
+Hạ tầng riêng: `npm run db:up:g1` dùng compose.g1.yaml, project ati-g1, volume ati-g1_g1_pgdata; PostgreSQL 55532, Redis 56379, chỉ bind loopback. `db:migrate:g1` và `db:seed:g1` dùng G1_DATABASE_URL hoặc URL demo mặc định. `docker compose -f compose.g1.yaml stop` dừng services và giữ dữ liệu. Compose cũ là lịch sử; không reset hay đổi volume services khác. Redis PING được kiểm, BullMQ chưa tích hợp.

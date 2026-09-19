@@ -1,7 +1,8 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema.js";
-export const G1_DATABASE_URL = "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+export const G1_DATABASE_URL =
+  process.env.G1_DATABASE_URL ?? "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 export function openDatabase(url: string) {
   const options = {
     max: 5,

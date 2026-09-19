@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../../", import.meta.url));
 const name = "g1_it_" + randomUUID().replaceAll("-", "");
 const adminUrl =
   process.env.G1_TEST_ADMIN_URL ??
-  "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+  "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const address = new URL(adminUrl);
 if (
   !["127.0.0.1", "localhost"].includes(address.hostname) ||
@@ -44,6 +44,7 @@ it("applies SQL migrations exactly once and detects checksum drift", async () =>
     "0004_task_hub_cards.sql",
     "0005_filesystem_dispatches.sql",
     "0006_http_trace_snapshots.sql",
+    "0007_ai_reviewed_catalog_index.sql",
   ]);
   expect((await implementation.migrate(url)).applied).toEqual([]);
   const dir = mkdtempSync(path.join(tmpdir(), "ati-migration-test-"));

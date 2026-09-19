@@ -11,7 +11,7 @@ import {
   type ResolveContext,
   type WorkflowPlan,
 } from "@wap/dsl";
-import { Store, type RunRow } from "./store.js";
+import { Store, type RunRow, type Tx } from "./store.js";
 import type { Gateway } from "./gateway.js";
 import { callStep } from "./attempts.js";
 import {
@@ -23,14 +23,12 @@ import {
   payloadHash,
   validateManualPlan,
 } from "./snapshot.js";
+import { containsConfiguredSecret } from "./redaction.js";
 import { receiverModeFor } from "./receiver-policy.js";
 import type { LocalReplanPort } from "./ai/ports.js";
 
 export type ReplanCertainty =
-  | "confirmed"
-  | "known_not_applied"
-  | "before_dispatch"
-  | "unknown";
+  "confirmed" | "known_not_applied" | "before_dispatch" | "unknown";
 
 export interface ExecuteReplanOptions {
   readonly store: Store;
@@ -43,67 +41,188 @@ export interface ExecuteReplanOptions {
   readonly certainty: ReplanCertainty;
 }
 
-export async function executeReplan(
-  options: ExecuteReplanOptions,
+type ReplanToken = Readonly<{
+  workflowVersionId: string;
+  replanCount: number;
+  phase: "replanning" | "dry_running";
+}>;
+
+function isStaleReplanError(error: unknown): boolean {
+  return (
+    error instanceof EngineError &&
+    (error.code === "LEASE_LOST" || error.code === "STALE_REPLAN")
+  );
+}
+
+async function assertReplanCurrent(
+  store: Store,
+  tx: Tx,
+  runId: string,
+  token: ReplanToken,
+): Promise<RunRow> {
+  await store.assertWorker(tx);
+  const run = await store.run(tx, runId, true);
+  if (
+    run.claimed_by !== store.workerId ||
+    run.workflow_version_id !== token.workflowVersionId ||
+    run.replan_count !== token.replanCount ||
+    run.status !== token.phase
+  )
+    throw new EngineError("STALE_REPLAN", "Replan state is no longer current");
+  return run;
+}
+
+function assertLocalReplanScope(
+  currentPlan: WorkflowPlan,
+  newPlan: WorkflowPlan,
+  failedStepId: string,
+): void {
+  const currentIds = currentPlan.steps.map((step) => step.id);
+  const newIds = newPlan.steps.map((step) => step.id);
+  if (
+    currentIds.length !== newIds.length ||
+    currentIds.some((stepId, index) => stepId !== newIds[index])
+  ) {
+    throw new EngineError(
+      "INVALID_PLAN",
+      "Local replan may not add, remove, or reorder workflow steps",
+    );
+  }
+
+  const { steps: _currentSteps, ...currentEnvelope } = currentPlan;
+  const { steps: _newSteps, ...newEnvelope } = newPlan;
+  if (canonicalJson(currentEnvelope) !== canonicalJson(newEnvelope)) {
+    throw new EngineError(
+      "INVALID_PLAN",
+      "Local replan may not change workflow fields outside the failed step",
+    );
+  }
+
+  for (let index = 0; index < currentPlan.steps.length; index++) {
+    const currentStep = currentPlan.steps[index]!;
+    const newStep = newPlan.steps[index]!;
+    if (
+      currentStep.id !== failedStepId &&
+      canonicalJson(currentStep) !== canonicalJson(newStep)
+    ) {
+      throw new EngineError(
+        "INVALID_PLAN",
+        `Local replan may only change failed step '${failedStepId}'`,
+      );
+    }
+  }
+}
+
+async function failInvalidReplan(
+  store: Store,
+  runId: string,
+  token: ReplanToken,
+  error: unknown,
 ) {
-  const { store, gateway, runId, failedStepId, errorClass, errorMessage, replanPort, certainty } =
-    options;
+  try {
+    await store.db.client.begin(async (tx) => {
+      const run = await assertReplanCurrent(store, tx, runId, token);
+      if (run.cancel_requested_at) {
+        await store.transition(tx, run, "cancelled");
+        return;
+      }
+      await store.transition(tx, run, "failed", {
+        error:
+          error instanceof EngineError
+            ? error.message
+            : "Local replan produced an invalid plan",
+      });
+    });
+  } catch (settleError) {
+    if (isStaleReplanError(settleError)) return store.detail(runId);
+    throw settleError;
+  }
+  return store.detail(runId);
+}
+
+export async function executeReplan(options: ExecuteReplanOptions) {
+  const {
+    store,
+    gateway,
+    runId,
+    failedStepId,
+    errorClass,
+    errorMessage,
+    replanPort,
+    certainty,
+  } = options;
 
   // 1. Unknown write certainty strictly prohibits replan (FR-EXE-12).
   if (certainty === "unknown") {
     await store.db.client.begin(async (tx) => {
       const run = await store.run(tx, runId, true);
       await store.transition(tx, run, "reconciliation_required", {
-        error: "Dispatched write outcome certainty is unknown; replan is prohibited",
+        error:
+          "Dispatched write outcome certainty is unknown; replan is prohibited",
       });
     });
     return store.detail(runId);
   }
 
   // 2. Worker assertion & initial transition to 'replanning'
-  const state = await store.db.client.begin(async (tx) => {
-    await store.assertWorker(tx);
-    const run = await store.run(tx, runId, true);
-    if (run.cancel_requested_at) {
-      await store.transition(tx, run, "cancelled");
-      return null;
-    }
-    if (run.replan_count >= 2) {
-      await store.transition(tx, run, "failed", {
-        error: `Local replan limit reached (${run.replan_count}/2)`,
+  const state = await store.db.client
+    .begin(async (tx) => {
+      await store.assertWorker(tx);
+      const run = await store.run(tx, runId, true);
+      if (run.cancel_requested_at) {
+        await store.transition(tx, run, "cancelled");
+        return null;
+      }
+      if (
+        !run.workflow_version_id ||
+        !["running", "dry_running"].includes(run.status) ||
+        run.claimed_by !== store.workerId
+      )
+        throw new EngineError(
+          "STALE_REPLAN",
+          "Run is no longer current for replan",
+        );
+      if (run.replan_count >= 2) {
+        await store.transition(tx, run, "failed", {
+          error: `Local replan limit reached (${run.replan_count}/2)`,
+        });
+        return null;
+      }
+
+      const nextReplanCount = run.replan_count + 1;
+      await tx`UPDATE runs SET replan_count=${nextReplanCount},claimed_by=${store.workerId},claimed_at=now(),heartbeat_at=now() WHERE id=${runId}`;
+      await store.transition(tx, run, "replanning");
+      await store.emit(tx, runId, "replan.started", {
+        failed_step_id: failedStepId,
+        error_class: errorClass,
+        scope: "local",
+        replan_count: nextReplanCount,
       });
-      return null;
-    }
 
-    const nextReplanCount = run.replan_count + 1;
-    await tx`UPDATE runs SET replan_count=${nextReplanCount},claimed_by=${store.workerId},claimed_at=now(),heartbeat_at=now() WHERE id=${runId}`;
-    await store.transition(tx, run, "replanning");
-    await store.emit(tx, runId, "replan.started", {
-      failed_step_id: failedStepId,
-      error_class: errorClass,
-      scope: "local",
-      replan_count: nextReplanCount,
-    });
+      const [verRow] =
+        await tx`SELECT plan FROM workflow_versions WHERE id=${run.workflow_version_id} AND workflow_id=${run.workflow_id}`;
+      if (!verRow)
+        throw new EngineError(
+          "NOT_FOUND",
+          "Current workflow version plan not found",
+        );
 
-    const [verRow] =
-      await tx`SELECT plan FROM workflow_versions WHERE id=${run.workflow_version_id} AND workflow_id=${run.workflow_id}`;
-    if (!verRow)
-      throw new EngineError("NOT_FOUND", "Current workflow version plan not found");
-
-    // Reconstruct completed step outputs
-    const succeededSteps = await tx`
+      // Reconstruct completed step outputs
+      const succeededSteps = await tx`
       SELECT step_id, output, side_effect
       FROM step_states
       WHERE run_id=${runId} AND status='succeeded'
     `;
-    const completedOutputs: Record<string, unknown> = {};
-    for (const s of succeededSteps) {
-      if (s.output !== null && s.output !== undefined) {
-        completedOutputs[s.step_id] = s.output;
+      const completedOutputs: Record<string, unknown> = {};
+      const completedStepIds = new Set<string>();
+      for (const s of succeededSteps) {
+        completedStepIds.add(s.step_id);
+        if (s.output !== null && s.output !== undefined) {
+          completedOutputs[s.step_id] = s.output;
+        }
       }
-    }
 
-    const readAttempts = await tx`
+      const readAttempts = await tx`
       SELECT s.step_id, a.result
       FROM step_attempts a
       JOIN step_states s ON s.id=a.step_state_id
@@ -111,12 +230,12 @@ export async function executeReplan(
         AND a.ended_at IS NOT NULL AND a.error_class IS NULL AND a.result IS NOT NULL
       ORDER BY a.started_at, a.id
     `;
-    for (const a of readAttempts) {
-      completedOutputs[a.step_id] = a.result;
-    }
+      for (const a of readAttempts) {
+        completedOutputs[a.step_id] = a.result;
+      }
 
-    // Load failed approaches for the failed step
-    const failedAttemptRows = await tx`
+      // Load failed approaches for the failed step
+      const failedAttemptRows = await tx`
       SELECT a.resolved_args, a.error_message
       FROM step_attempts a
       JOIN step_states s ON s.id=a.step_state_id
@@ -124,18 +243,28 @@ export async function executeReplan(
         AND a.ended_at IS NOT NULL AND a.error_class IS NOT NULL
       ORDER BY a.started_at
     `;
-    const failedApproaches = failedAttemptRows.map(
-      (r) => `${JSON.stringify(r.resolved_args)}: ${r.error_message}`,
-    );
+      const failedApproaches = failedAttemptRows.map(
+        (r) => `${JSON.stringify(r.resolved_args)}: ${r.error_message}`,
+      );
 
-    return {
-      run,
-      currentPlan: verRow.plan as WorkflowPlan,
-      completedOutputs,
-      failedApproaches,
-      nextReplanCount,
-    };
-  });
+      return {
+        run,
+        currentPlan: verRow.plan as WorkflowPlan,
+        completedOutputs,
+        completedStepIds: [...completedStepIds],
+        failedApproaches,
+        nextReplanCount,
+        token: {
+          workflowVersionId: run.workflow_version_id,
+          replanCount: nextReplanCount,
+          phase: "replanning" as const,
+        },
+      };
+    })
+    .catch((error: unknown) => {
+      if (isStaleReplanError(error)) return null;
+      throw error;
+    });
 
   if (!state) return store.detail(runId);
 
@@ -157,91 +286,149 @@ export async function executeReplan(
       runtime: state.run.runtime as Record<string, string>,
     });
   } catch (error) {
-    await store.db.client.begin(async (tx) => {
-      const run = await store.run(tx, runId, true);
-      if (run.cancel_requested_at) {
-        await store.transition(tx, run, "cancelled");
-        return;
-      }
-      await store.transition(tx, run, "failed", {
-        error: error instanceof Error ? error.message : "Replan failed",
+    try {
+      await store.db.client.begin(async (tx) => {
+        const run = await assertReplanCurrent(store, tx, runId, state.token);
+        if (run.cancel_requested_at) {
+          await store.transition(tx, run, "cancelled");
+          return;
+        }
+        await store.transition(tx, run, "failed", {
+          error: error instanceof Error ? error.message : "Replan failed",
+        });
       });
-    });
+    } catch (settleError) {
+      if (isStaleReplanError(settleError)) return store.detail(runId);
+      throw settleError;
+    }
     return store.detail(runId);
   }
 
   // 4. Handle refusal or clarification
   if (replanResult.kind === "refusal") {
-    await store.db.client.begin(async (tx) => {
-      const run = await store.run(tx, runId, true);
-      await store.transition(tx, run, "refused", {
-        error: replanResult.reason,
+    try {
+      await store.db.client.begin(async (tx) => {
+        const run = await assertReplanCurrent(store, tx, runId, state.token);
+        if (run.cancel_requested_at) {
+          await store.transition(tx, run, "cancelled");
+          return;
+        }
+        await store.transition(tx, run, "refused", {
+          error: replanResult.reason,
+        });
       });
-    });
+    } catch (error) {
+      if (isStaleReplanError(error)) return store.detail(runId);
+      throw error;
+    }
     return store.detail(runId);
   }
 
   if (replanResult.kind === "clarification") {
-    await store.db.client.begin(async (tx) => {
-      const run = await store.run(tx, runId, true);
-      await store.transition(tx, run, "needs_input", {
-        error: replanResult.question,
+    try {
+      await store.db.client.begin(async (tx) => {
+        const run = await assertReplanCurrent(store, tx, runId, state.token);
+        if (run.cancel_requested_at) {
+          await store.transition(tx, run, "cancelled");
+          return;
+        }
+        await store.transition(tx, run, "needs_input", {
+          error: replanResult.question,
+        });
       });
-    });
+    } catch (error) {
+      if (isStaleReplanError(error)) return store.detail(runId);
+      throw error;
+    }
     return store.detail(runId);
   }
 
-  // 5. Kind is 'plan': validate plan and local invariants
-  const newPlan = validateManualPlan(replanResult.plan, gateway.tools);
-  const layers = validateGraph(newPlan).layers;
+  // 5. Kind is 'plan': validate engine-owned local scope before persistence.
+  if (containsConfiguredSecret(replanResult.plan, store.secrets))
+    return failInvalidReplan(
+      store,
+      runId,
+      state.token,
+      new EngineError(
+        "SECRET_IN_WRITE",
+        "Replan contains protected configuration data",
+      ),
+    );
 
-  const completedStepIds = new Set(Object.keys(state.completedOutputs));
+  let newPlan: WorkflowPlan;
+  let layers: ReturnType<typeof validateGraph>["layers"];
+  try {
+    await gateway.assertCurrent();
+    newPlan = validateManualPlan(replanResult.plan, gateway.tools);
+    assertLocalReplanScope(state.currentPlan, newPlan, failedStepId);
+    layers = validateGraph(newPlan).layers;
+  } catch (error) {
+    return failInvalidReplan(
+      store,
+      runId,
+      state.token,
+      error instanceof EngineError
+        ? error
+        : new EngineError("CONFLICT", "Reviewed gateway changed during replan"),
+    );
+  }
+
+  const completedStepIds = new Set(state.completedStepIds);
   const newVersionId = randomUUID();
   let newVersionNo = 1;
 
-  await store.db.client.begin(async (tx) => {
-    await store.assertWorker(tx);
-    const run = await store.run(tx, runId, true);
-    if (run.cancel_requested_at) {
-      await store.transition(tx, run, "cancelled");
-      return;
-    }
-
-    // Invalidate existing pending or approved approvals (FR-APR-06)
-    await tx`UPDATE approvals SET decision='superseded' WHERE run_id=${runId} AND decision IN ('pending','approved')`;
-
-    const [vRow] =
-      await tx`SELECT COALESCE(MAX(version_no), 1) + 1 AS next_ver FROM workflow_versions WHERE workflow_id=${run.workflow_id}`;
-    newVersionNo = Number(vRow!.next_ver);
-
-    await tx`INSERT INTO workflow_versions(id, workflow_id, version_no, plan, origin)
-      VALUES (${newVersionId}, ${run.workflow_id}, ${newVersionNo}, ${tx.json(json({ ...newPlan, source_prompt: run.source_prompt }))}, 'replan')`;
-
-    await tx`UPDATE runs SET workflow_version_id=${newVersionId}, claimed_by=${store.workerId}, claimed_at=now(), heartbeat_at=now() WHERE id=${runId}`;
-
-    // Reset step_states for uncompleted steps
-    for (const step of newPlan.steps) {
-      if (!completedStepIds.has(step.id)) {
-        await tx`INSERT INTO step_states(run_id, step_id, side_effect, status)
-          VALUES (${runId}, ${step.id}, ${step.side_effect}, 'pending')
-          ON CONFLICT (run_id, step_id) DO UPDATE SET status='pending', last_error=NULL, last_error_class=NULL, ended_at=NULL`;
+  let applied = false;
+  try {
+    applied = await store.db.client.begin(async (tx) => {
+      const run = await assertReplanCurrent(store, tx, runId, state.token);
+      if (run.cancel_requested_at) {
+        await store.transition(tx, run, "cancelled");
+        return false;
       }
-    }
 
-    await store.emit(tx, runId, "replan.applied", {
-      workflow_version_id: newVersionId,
-      version_no: newVersionNo,
-      plan: { ...newPlan, source_prompt: run.source_prompt },
-      layers,
-      changed_step_ids: [failedStepId],
+      // Invalidate existing pending or approved approvals (FR-APR-06)
+      await tx`UPDATE approvals SET decision='superseded' WHERE run_id=${runId} AND decision IN ('pending','approved')`;
+
+      const [vRow] =
+        await tx`SELECT COALESCE(MAX(version_no), 1) + 1 AS next_ver FROM workflow_versions WHERE workflow_id=${run.workflow_id}`;
+      newVersionNo = Number(vRow!.next_ver);
+
+      await tx`INSERT INTO workflow_versions(id, workflow_id, version_no, plan, origin)
+        VALUES (${newVersionId}, ${run.workflow_id}, ${newVersionNo}, ${tx.json(json({ ...newPlan, source_prompt: run.source_prompt }))}, 'replan')`;
+
+      await tx`UPDATE runs SET workflow_version_id=${newVersionId}, claimed_by=${store.workerId}, claimed_at=now(),heartbeat_at=now() WHERE id=${runId}`;
+
+      // Reset step_states for uncompleted steps
+      for (const step of newPlan.steps) {
+        if (!completedStepIds.has(step.id)) {
+          await tx`INSERT INTO step_states(run_id, step_id, side_effect, status)
+            VALUES (${runId}, ${step.id}, ${step.side_effect}, 'pending')
+            ON CONFLICT (run_id, step_id) DO UPDATE SET side_effect=EXCLUDED.side_effect, status='pending', last_error=NULL, last_error_class=NULL, ended_at=NULL`;
+        }
+      }
+
+      await store.emit(tx, runId, "replan.applied", {
+        workflow_version_id: newVersionId,
+        version_no: newVersionNo,
+        plan: { ...newPlan, source_prompt: run.source_prompt },
+        layers,
+        changed_step_ids: [failedStepId],
+      });
+
+      await store.transition(tx, run, "dry_running");
+      return true;
     });
+  } catch (error) {
+    if (isStaleReplanError(error)) return store.detail(runId);
+    throw error;
+  }
 
-    await store.transition(tx, run, "dry_running");
-  });
-
-  // Check if cancelled after version insertion
-  const freshRun = await store.run(store.db.client, runId);
-  if (freshRun.status === "cancelled") return store.detail(runId);
+  if (!applied) return store.detail(runId);
+  const previewToken: ReplanToken = {
+    workflowVersionId: newVersionId,
+    replanCount: state.token.replanCount,
+    phase: "dry_running",
+  };
 
   // 6. Dry-run remaining steps to produce new preview
   const context: ResolveContext = {
@@ -251,14 +438,18 @@ export async function executeReplan(
   };
 
   const actions: Approval["actions"] = [];
+  const actionIntents = new Map<string, string>();
 
   try {
     for (const stepId of layers.flat()) {
       const step = newPlan.steps.find((s) => s.id === stepId)!;
-      const current = await store.run(store.db.client, runId);
-      if (current.cancel_requested_at) {
-        throw new EngineError("CANCELLED", "Cancelled before next preview step");
-      }
+      const current = await store.db.client.begin(async (tx) => {
+        const run = await assertReplanCurrent(store, tx, runId, previewToken);
+        if (!run.cancel_requested_at) return true;
+        await store.transition(tx, run, "cancelled");
+        return false;
+      });
+      if (!current) return store.detail(runId);
 
       // If already completed in an earlier attempt/version, preserve output and skip execution
       if (completedStepIds.has(step.id)) {
@@ -267,7 +458,7 @@ export async function executeReplan(
 
       if (step.condition && !evaluate(step.condition, context)) {
         await store.db.client.begin(async (tx) => {
-          await store.run(tx, runId, true);
+          await assertReplanCurrent(store, tx, runId, previewToken);
           await tx`UPDATE step_states SET status='skipped',ended_at=now() WHERE run_id=${runId} AND step_id=${step.id}`;
           await store.emit(tx, runId, "step.skipped", {
             step_id: step.id,
@@ -289,7 +480,18 @@ export async function executeReplan(
       }
 
       if (tool.sideEffect === "read") {
-        const result = await callStep(store, gateway, runId, step, tool, args);
+        const result = await callStep(
+          store,
+          gateway,
+          runId,
+          step,
+          tool,
+          args,
+          undefined,
+          async (tx) => {
+            await assertReplanCurrent(store, tx, runId, previewToken);
+          },
+        );
         if (!result.ok) {
           const run = await store.run(store.db.client, runId);
           if (
@@ -332,19 +534,39 @@ export async function executeReplan(
             "Resolved intent key must be a nonempty string",
           );
         }
+        if (containsConfiguredSecret(intent, store.secrets))
+          throw new EngineError(
+            "SECRET_IN_WRITE",
+            "Write intent contains protected configuration data",
+          );
+        const operationId = randomUUID();
         actions.push({
           step_id: step.id,
-          operation_id: randomUUID(),
+          operation_id: operationId,
           server: tool.server,
           tool: tool.name,
           policy_version: tool.policyVersion,
           resolved_args: JSON.parse(canonicalJson(args)),
           payload_hash: payloadHash(tool, args),
         });
+        actionIntents.set(operationId, intent);
       }
     }
 
-    const persistedPlan = { ...newPlan, source_prompt: state.run.source_prompt };
+    if (
+      actions.some((action) =>
+        containsConfiguredSecret(action.resolved_args, store.secrets),
+      )
+    )
+      throw new EngineError(
+        "SECRET_IN_WRITE",
+        "Write payload contains protected configuration data",
+      );
+
+    const persistedPlan = {
+      ...newPlan,
+      source_prompt: state.run.source_prompt,
+    };
     const snapshot = SnapshotSchema.parse({
       format: "b-local-preview-1",
       run_id: runId,
@@ -359,8 +581,9 @@ export async function executeReplan(
       actions,
     });
 
+    await gateway.assertCurrent();
     await store.db.client.begin(async (tx) => {
-      const run = await store.run(tx, runId, true);
+      const run = await assertReplanCurrent(store, tx, runId, previewToken);
       if (run.cancel_requested_at) {
         throw new EngineError("CANCELLED", "Cancelled before preview");
       }
@@ -380,7 +603,12 @@ export async function executeReplan(
           const tool = gateway.tools.find(
             (t) => t.server === action.server && t.name === action.tool,
           )!;
-          const intent = resolveValue(step.idempotency_key!, context) as string;
+          const intent = actionIntents.get(action.operation_id);
+          if (!intent)
+            throw new EngineError(
+              "CONFLICT",
+              "Replan action intent was not prepared",
+            );
           await tx`INSERT INTO tool_operations(operation_id,user_id,run_id,workflow_version_id,step_id,tool_server,tool_name,policy_version,intent_key,payload_hash,resolved_args,state,receiver_mode)
             VALUES (${action.operation_id},${store.userId},${runId},${newVersionId},${action.step_id},${action.server},${action.tool},${action.policy_version},${intent},${action.payload_hash},${tx.json(json(action.resolved_args))},'reserved',${receiverModeFor(tool)})`;
           await tx`UPDATE step_states SET status='ready' WHERE run_id=${runId} AND step_id=${action.step_id}`;
@@ -402,31 +630,34 @@ export async function executeReplan(
       }
     });
   } catch (error) {
-    await store.db.client.begin(async (tx) => {
-      const run = await store.run(tx, runId, true);
-      if (run.status === "succeeded" || run.status === "awaiting_approval") {
-        return;
-      }
-      await store.closeOpenAttempts(
-        tx,
-        runId,
-        "Replan preview stopped before persisting outcome",
-      );
-      await store.transition(
-        tx,
-        run,
-        run.cancel_requested_at ||
-          (error instanceof EngineError && error.code === "CANCELLED")
-          ? "cancelled"
-          : "failed",
-        {
-          error:
-            error instanceof EngineError
-              ? error.message
-              : "Replan preview failed",
-        },
-      );
-    });
+    if (isStaleReplanError(error)) return store.detail(runId);
+    try {
+      await store.db.client.begin(async (tx) => {
+        const run = await assertReplanCurrent(store, tx, runId, previewToken);
+        await store.closeOpenAttempts(
+          tx,
+          runId,
+          "Replan preview stopped before persisting outcome",
+        );
+        await store.transition(
+          tx,
+          run,
+          run.cancel_requested_at ||
+            (error instanceof EngineError && error.code === "CANCELLED")
+            ? "cancelled"
+            : "failed",
+          {
+            error:
+              error instanceof EngineError
+                ? error.message
+                : "Replan preview failed",
+          },
+        );
+      });
+    } catch (settleError) {
+      if (isStaleReplanError(settleError)) return store.detail(runId);
+      throw settleError;
+    }
   }
 
   return store.detail(runId);

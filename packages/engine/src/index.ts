@@ -51,13 +51,19 @@ export {
   type PlanValidator,
 } from "./ai/planner.js";
 export {
+  createReviewedCatalogSnapshot,
   createLocalReviewedCatalog,
   loadLocalReviewedCatalog,
   toolContentHash,
+  buildCatalogEmbeddingRows,
+  serializeReviewedToolForEmbedding,
+  buildEmbeddingPolicyVersion,
+  REVIEWED_TOOL_SERIALIZER_VERSION,
   PgvectorCatalogIndex,
   PgvectorToolRetriever,
   InMemoryToolRetriever,
   RetrievalValidationError,
+  assertExpectedEmbeddingProfile,
   validatePgvectorActivation,
   PGVECTOR_DIMENSIONS,
   type ActivePgvectorIndex,
@@ -76,6 +82,7 @@ export {
   type EmbeddingResult,
   type EmbeddingUsage,
   type ToolEmbeddingRow,
+  type ReviewedCatalogSnapshot,
   AiReplanAdapter,
   type AiReplanAdapterOptions,
   type LocalReplanPort,
@@ -83,8 +90,73 @@ export {
   validateLocalScopeInvariants,
 } from "./ai/index.js";
 export {
+  AiProviderConfigError,
+  providerCapabilities,
+  assertProviderModel,
+  readAiProviderConfig,
+  InMemoryProviderCallLedger,
+  ProviderAccountingError,
+  ProviderClientError,
+  AiApprovalError,
+  createAiPorts,
+  parseAiLiveApprovalRecord,
+  assertAiLiveApproval,
+  encodePlannerWire,
+  decodePlannerWire,
+  openAiPlannerWireJsonSchema,
+  googlePlannerWireJsonSchema,
+  PlannerWireSchemaError,
+} from "./ai/index.js";
+export type {
+  AiProvider,
+  AiProviderConfig,
+  AiProviderCredentials,
+  AiPorts,
+  CreateAiPortsOptions,
+  FetchLike,
+  GenerationProfile,
+  EmbeddingProfile,
+  ProviderCallLedger,
+  ProviderCallReservation,
+  ProviderCallSettlement,
+  ProviderCallRecord,
+  AiLiveApprovalRecord,
+  PlannerWire,
+} from "./ai/index.js";
+export {
   executeReplan,
   type ExecuteReplanOptions,
   type ReplanCertainty,
 } from "./replan.js";
 export { type ExecuteOptions } from "./execute.js";
+export {
+  parseDataset,
+  selectCases,
+  assertCatalogSupportsDataset,
+  assertFrozen,
+  EvaluationDatasetError,
+} from "./ai/evaluation/dataset.js";
+export {
+  scoreCandidate,
+  type EvaluationScore,
+  type ScoreCandidateRequest,
+} from "./ai/evaluation/scorer.js";
+// The offline evaluator is intentionally not part of the package API. Its
+// executable boundary is the guarded AI-04 CLI, which creates and checks the
+// freeze before selecting a split. Unit tests import the internal seam directly.
+export {
+  buildOfflineEvaluationReport,
+  renderOfflineEvaluationMarkdown,
+  type OfflineEvaluationReport,
+  type OfflineEvaluationSummary,
+  type Ratio,
+} from "./ai/evaluation/report.js";
+export {
+  EvalConfigSchema,
+  EvalDatasetSchema,
+  ExperimentManifestSchema,
+  FrozenEvaluationSchema,
+  type EvalCase,
+  type EvalConfig,
+  type FrozenEvaluation,
+} from "./ai/evaluation/contracts.js";

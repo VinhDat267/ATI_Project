@@ -30,7 +30,7 @@ const serverPath = path.join(root, "apps/mcp-task-hub/dist/server.js");
 const dbName = "g1_it_" + randomUUID().replaceAll("-", "");
 const adminUrl =
   process.env.G1_TEST_ADMIN_URL ??
-  "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+  "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const address = new URL(adminUrl);
 if (
   !["localhost", "127.0.0.1"].includes(address.hostname) ||
@@ -2187,5 +2187,4 @@ it("[TH-05] live discovery exposes active tools matching toolDefinitions", async
     expect(t.outputSchema).toEqual(matching!.outputSchema);
   }
 });
-
 

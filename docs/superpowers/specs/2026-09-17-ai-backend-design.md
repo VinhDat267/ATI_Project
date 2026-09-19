@@ -211,10 +211,15 @@ parallel execution hoặc automatic resume để né thời gian chờ này.
 
 ## 5.1 Bộ quyết định AI-00 đã xác nhận
 
+**Amendment 19/09/2026:** Người dùng xác nhận hỗ trợ Gemini cho cả planning và
+embedding ngay đợt này. [Multi-provider design](2026-09-19-ai-multi-provider-design.md)
+là phần bổ sung có hiệu lực cho cấu hình provider; các safety/live gates ở đây
+không đổi. Hỗ trợ provider trong thiết kế không phải bằng chứng đã triển khai.
+
 | Hạng mục | Quyết định | Giới hạn bằng chứng |
 |---|---|---|
-| Provider/model | OpenAI; lựa chọn người dùng: GPT-5.6 Terra | Model ID/API availability, quyền truy cập, schema và settings phải probe; tên trong Codex không chứng minh API backend hỗ trợ |
-| Embedding | `text-embedding-3-large`, explicit `dimensions=1536`, cosine | Baseline ưu tiên chất lượng; chưa chứng minh hơn `small` trên ATI |
+| Provider/model | Configurable OpenAI hoặc Google Gemini; profile OpenAI giữ lựa chọn GPT-5.6 Terra | Adapter/capability/probe riêng từng provider/model; không fallback hoặc chọn model mới ngầm |
+| Embedding | Configurable OpenAI hoặc Google, độc lập planning; explicit dimensions=1536, cosine; profile OpenAI giữ `text-embedding-3-large` | Đổi space phải có index tương ứng và document/query policy đúng model; chưa có live comparative evidence |
 | Search | Exact cosine trên reviewed catalog tối đa 10 tool | Kiểm query thực tế không dùng approximate HNSW; không coi index có sẵn là runtime retrieval |
 | Secret local | Inject vào backend process environment lúc chạy; mặc định prompt ẩn, vault mã hóa tùy chọn | Không bắt buộc SecretStore; launcher/isolated-secret tests chưa triển khai |
 | Queue | PostgreSQL outbox authority, single sequential worker; defer BullMQ | Không cam kết exactly-once arbitrary MCP writes |

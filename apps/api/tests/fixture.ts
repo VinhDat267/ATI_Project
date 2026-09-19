@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 
 const adminUrl =
   process.env.API_TEST_ADMIN_URL ??
-  "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
+  "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 
 export interface ApiFixture {
   baseUrl: string;
@@ -83,14 +83,6 @@ export async function makeApiFixture(
   const root = path.resolve(
     fileURLToPath(new URL("../../../", import.meta.url)),
   );
-  const planner =
-    options.planner ??
-    (config.plannerMode === "dev_fixture"
-      ? loadDevPlanner(root)
-      : config.plannerMode === "ai"
-        ? loadAiPlanner({ root })
-        : undefined);
-  const devPlanner = planner as Partial<DevPlanner> | undefined;
   let gateway: Gateway | undefined;
   let worker: WorkerControl | undefined;
   let filesystemBase: string | undefined;
@@ -135,6 +127,23 @@ export async function makeApiFixture(
         : {}),
     });
   }
+  const planner =
+    options.planner ??
+    (config.plannerMode === "dev_fixture"
+      ? loadDevPlanner(root)
+      : config.plannerMode === "ai" && gateway
+        ? loadAiPlanner({
+            root,
+            gateway,
+            // Test fixture only: production composition must use pgvector.
+            createRetriever: () => {
+              throw new Error(
+                "AI fixture retriever must be injected by the test",
+              );
+            },
+          })
+        : undefined);
+  const devPlanner = planner as Partial<DevPlanner> | undefined;
   const engine = new WorkflowEngine(db, gateway, userId, {
     secrets: [
       passwordHash,
