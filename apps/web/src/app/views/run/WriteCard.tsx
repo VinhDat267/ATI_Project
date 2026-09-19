@@ -15,7 +15,7 @@ export function WritePayload({ write }: { write: WriteSummary }) {
           <thead>
             <tr className="bg-surface-soft text-left text-muted">
               {Array.from({ length: width }, (_, i) => (
-                <th key={i} scope="col" className="px-4 py-2.5 text-badge">
+                <th key={i} scope="col" className="px-4 py-2.5 tabular text-caption font-semibold">
                   Cột {COLUMN_LETTERS[i] ?? i + 1}
                 </th>
               ))}

@@ -381,7 +381,7 @@ export function RunView({ runId }: { runId: string }) {
     <>
       {back}
       <div className="flex flex-col gap-2.5">
-        <h1 className="m-0 max-w-215 text-display-md-mobile desk:text-display-md">{run.source_prompt ?? "Lần chạy"}</h1>
+        <h1 className="m-0 max-w-content text-display-md-mobile desk:text-display-md">{run.source_prompt ?? "Lần chạy"}</h1>
         <div className="flex flex-wrap items-center gap-2.5 text-body-sm text-muted">
           <StatusPill status={run.status} />
           {run.created_at ? (
@@ -417,7 +417,7 @@ export function RunView({ runId }: { runId: string }) {
                 Lần chạy này đã kết thúc và không tạo kế hoạch nào, nên không có gì bị ghi. Hãy gửi lại yêu cầu có bổ sung thông tin còn thiếu.
               </p>
               {suggestion ? (
-                <div className="flex flex-col gap-1.5 rounded-md bg-surface-soft px-4.5 py-4 text-body-lg">
+                <div className="flex flex-col gap-1.5 rounded-md bg-surface-soft p-4 text-body-lg">
                   <span className="text-body-sm text-muted">Câu gợi ý</span>
                   {suggestion}
                 </div>

@@ -25,7 +25,7 @@ function isActive(route: Route, item: Route): boolean {
 function AttentionBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-action-subtle px-1.5 text-overline tracking-normal text-action">
+    <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-action-subtle px-1.5 tabular text-overline tracking-normal text-action">
       <span className="sr-only">cần xử lý: </span>
       {count}
     </span>
@@ -103,7 +103,7 @@ export function AppShell({
         <div className="mx-auto flex h-16 max-w-content items-center justify-between gap-4 px-6 desk:grid-header desk:h-20 xl:px-0">
           <a
             href={routeToHash({ page: "overview" })}
-            className="flex min-h-11 items-center no-underline"
+            className="flex min-h-11 min-w-11 items-center no-underline"
             aria-label="ATI — Tổng quan"
           >
             <Logo />
@@ -159,7 +159,7 @@ export function AppShell({
                 >
                   <Icon name="menu" size={20} />
                   {attention > 0 ? (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-action-subtle px-1 text-overline tracking-normal text-action">
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-action-subtle px-1 tabular text-overline tracking-normal text-action">
                       <span className="sr-only">cần xử lý: </span>
                       {attention}
                     </span>
@@ -175,7 +175,7 @@ export function AppShell({
                       <button
                         type="button"
                         aria-label="Đóng menu"
-                        className="flex size-11 items-center justify-center rounded-full"
+                        className="flex size-11 items-center justify-center rounded-full hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                       >
                         <Icon name="x" size={20} />
                       </button>

@@ -1,6 +1,7 @@
 import type { Reconciliation, RunDetail } from "../../core/contracts.js";
 import { routeToHash } from "../../core/navigation.js";
 import {
+  formatClock,
   formatDateTime,
   formatRemaining,
   isTerminal,
@@ -30,7 +31,7 @@ function AttentionCard({
       : null;
   const when = awaiting
     ? remaining && !remaining.expired
-      ? `Hết hạn sau ${remaining.text}`
+      ? `Hết hạn sau ${remaining.text}${run.approval ? ` (${formatClock(run.approval.expires_at, run.time_zone)})` : ""}`
       : "Đã hết thời hạn duyệt"
     : run.created_at
       ? `Tạo lúc ${formatDateTime(run.created_at, run.time_zone)}`

@@ -59,6 +59,7 @@ Desktop.ini
 .superpowers/
 .impeccable/
 AGENTS.md
+CLAUDE.md
 
 # New evidence captures are ignored by default. After content review, add only
 # the exact approved checkpoint files with git add -f -- <path>; never
@@ -70,3 +71,4 @@ AGENTS.md
 
 # Codegraph
 .codegraph/
+.gitnexus/

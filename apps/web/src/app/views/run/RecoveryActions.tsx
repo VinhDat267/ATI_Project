@@ -45,7 +45,7 @@ function DiffersOption({ option }: { option: RecoveryOption }) {
         aria-expanded={open}
         aria-controls="conflict-guide"
         onClick={() => setOpen((value) => !value)}
-        className="grid grid-cols-[minmax(0,1fr)_18px] items-center gap-3 rounded-sm border border-ink bg-canvas px-4 py-3 text-left aria-expanded:border-2 aria-expanded:px-3.75 aria-expanded:py-2.75"
+        className="grid grid-cols-[minmax(0,1fr)_18px] items-center gap-3 rounded-sm border border-ink bg-canvas px-4 py-3 text-left aria-expanded:ring-1 aria-expanded:ring-ink"
       >
         <span className="flex flex-col gap-0.5">
           <span className="text-title-md">{option.label}</span>

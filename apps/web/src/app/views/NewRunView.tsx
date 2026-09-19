@@ -188,13 +188,13 @@ export function NewRunView() {
   const nextRow = useRef(1);
   const hintId = useId();
   const parsed = parseInputs(rows);
+  const isLocked =
+    createSnapshot.status === "submitting" ||
+    createSnapshot.status === "confirming";
 
   const submit = async (event?: FormEvent<HTMLFormElement>): Promise<void> => {
     event?.preventDefault();
-    if (
-      createSnapshot.status === "submitting" ||
-      createSnapshot.status === "confirming"
-    ) {
+    if (isLocked) {
       return;
     }
     const text = prompt.trim();
@@ -287,9 +287,10 @@ export function NewRunView() {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={onKeyDown}
+              disabled={isLocked}
               aria-describedby={describedBy}
               aria-invalid={promptError ? true : undefined}
-              className="block min-h-38 w-full resize-y rounded-sm border-0 bg-transparent p-4 text-body-lg caret-primary outline-none focus-visible:outline-none"
+              className="block min-h-38 w-full resize-y rounded-sm border-0 bg-transparent p-4 text-body-lg caret-primary outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
           {promptError ? (
@@ -311,11 +312,12 @@ export function NewRunView() {
               <button
                 key={item.label}
                 type="button"
+                disabled={isLocked}
                 onClick={() => {
                   setPrompt(item.text);
                   document.getElementById("request")?.focus();
                 }}
-                className="inline-flex min-h-11 items-center rounded-full border border-hairline px-4 text-button-sm hover:border-ink"
+                className="inline-flex min-h-11 items-center rounded-full border border-hairline px-4 text-button-sm hover:border-ink disabled:pointer-events-none disabled:opacity-50"
               >
                 {item.label}
               </button>
@@ -336,8 +338,9 @@ export function NewRunView() {
               <span className="text-title-md">Múi giờ</span>
               <select
                 value={timeZone}
+                disabled={isLocked}
                 onChange={(event) => setTimeZone(event.target.value)}
-                className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg"
+                className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (UTC+7)</option>
                 <option value="UTC">UTC</option>
@@ -352,21 +355,21 @@ export function NewRunView() {
                 return (
                   <div key={row.id} className="flex flex-col gap-1">
                     <div className="grid gap-2 desk:grid-cols-4">
-                      <input aria-label="Khoá" value={row.key} onChange={(e) => update({ key: e.target.value })} className="h-12 rounded-sm border border-border-control px-3 font-mono text-mono-md" />
-                      <select aria-label="Kiểu" value={row.type} onChange={(e) => update({ type: e.target.value as InputType, value: e.target.value === "boolean" ? "true" : "" })} className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg">
+                      <input aria-label="Khoá" disabled={isLocked} value={row.key} onChange={(e) => update({ key: e.target.value })} className="h-12 rounded-sm border border-border-control px-3 font-mono text-mono-md disabled:cursor-not-allowed disabled:opacity-60" />
+                      <select aria-label="Kiểu" disabled={isLocked} value={row.type} onChange={(e) => update({ type: e.target.value as InputType, value: e.target.value === "boolean" ? "true" : "" })} className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg disabled:cursor-not-allowed disabled:opacity-60">
                         <option value="string">Chuỗi</option>
                         <option value="number">Số</option>
                         <option value="boolean">Đúng/sai</option>
                       </select>
                       {row.type === "boolean" ? (
-                        <select aria-label="Giá trị" value={row.value} onChange={(e) => update({ value: e.target.value })} className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg">
+                        <select aria-label="Giá trị" disabled={isLocked} value={row.value} onChange={(e) => update({ value: e.target.value })} className="h-12 rounded-sm border border-border-control bg-canvas px-3 text-body-lg disabled:cursor-not-allowed disabled:opacity-60">
                           <option value="true">Đúng</option>
                           <option value="false">Sai</option>
                         </select>
                       ) : (
-                        <input aria-label="Giá trị" value={row.value} inputMode={row.type === "number" ? "decimal" : undefined} onChange={(e) => update({ value: e.target.value })} className="h-12 rounded-sm border border-border-control px-3 text-body-lg" />
+                        <input aria-label="Giá trị" disabled={isLocked} value={row.value} inputMode={row.type === "number" ? "decimal" : undefined} onChange={(e) => update({ value: e.target.value })} className="h-12 rounded-sm border border-border-control px-3 text-body-lg disabled:cursor-not-allowed disabled:opacity-60" />
                       )}
-                      <Button variant="link" size="inline" onClick={() => setRows((current) => current.filter((r) => r.id !== row.id))}>
+                      <Button variant="link" size="inline" disabled={isLocked} onClick={() => setRows((current) => current.filter((r) => r.id !== row.id))}>
                         Xoá giá trị
                       </Button>
                     </div>
@@ -377,6 +380,7 @@ export function NewRunView() {
               <Button
                 variant="secondary"
                 size="sm"
+                disabled={isLocked}
                 className="self-start"
                 onClick={() => setRows((current) => [...current, { id: nextRow.current++, key: "", type: "string", value: "" }])}
               >

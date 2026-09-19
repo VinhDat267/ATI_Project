@@ -155,6 +155,23 @@
   html {
     -webkit-text-size-adjust: 100%;
   }
+  * {
+    scrollbar-color: var(--color-border-control) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-hairline);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-control);
+  }
   body {
     margin: 0;
     background: var(--color-canvas);
