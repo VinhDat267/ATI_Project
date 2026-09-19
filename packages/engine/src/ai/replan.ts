@@ -243,7 +243,7 @@ export class AiReplanAdapter implements LocalReplanPort {
       const retrieval = await bounded(
         () =>
           this.retriever.retrieve({
-            query: `${safeProject(input.sourcePrompt, this.secrets)} ${safeProject(input.errorMessage, this.secrets)}`,
+            query: `${safeSourcePrompt} ${safeErrorMessage}`,
             variant: this.variant,
             topK: this.topK,
             signal: controller.signal,
