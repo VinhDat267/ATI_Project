@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` task-by-task in the current checkout, honoring the user's direct implementation preference. Independent Code Reviewer reviews the completed sensitive changes under AGENTS.md. This document authorizes no execution by itself.
 
-**Status:** IMPLEMENTED WITH BOUNDED LIMITATION — execution completed 2026-09-19. Tasks 1–5 are committed; Task 6 evidence is committed with the full unfiltered engine integration suite explicitly not counted after bounded no-output interruptions.
+**Status:** IMPLEMENTED — execution and regression closure completed 2026-09-19. Tasks 1–5 and Task 6 evidence are committed; the complete engine integration suite passes 93/93 when run serially against the isolated PostgreSQL fixtures. Paid provider execution remains intentionally blocked pending T6/T8.
 
 **Goal:** Tích hợp AI backend đã lưu trên nhánh riêng với main hiện hành, sửa các khoảng trống T4 có bằng chứng, đạt regression gates để bắt đầu T5.
 
