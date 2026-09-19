@@ -66,4 +66,52 @@ test.describe("Live Fixture & Cleanup Harness", () => {
     const previewPortReleased = await assertPortReleased(previewPort);
     expect(previewPortReleased).toBe(true);
   });
+
+  test("verified DB drop and API port release when preview setup fails", async () => {
+    const fixtureModule = "../../../api/tests/fixture.js";
+    const { makeApiFixture } = (await import(fixtureModule)) as {
+      makeApiFixture: (options?: {
+        workerEnabled?: boolean;
+        plannerMode?: "disabled" | "dev_fixture" | "ai";
+        filesystemEnabled?: boolean;
+      }) => Promise<any>;
+    };
+
+    let capturedApi: any = null;
+    let dbName = "";
+    let apiPort = 0;
+
+    try {
+      await expect(
+        createLiveFixture({
+          makeApiFixture: async (opts) => {
+            capturedApi = await makeApiFixture(opts);
+            dbName = new URL(capturedApi.databaseUrl).pathname.slice(1);
+            apiPort = Number(new URL(capturedApi.baseUrl).port);
+            return capturedApi;
+          },
+          startPreview: async () => {
+            throw new Error("Simulated Vite preview startup failure");
+          },
+        }),
+      ).rejects.toThrow("Simulated Vite preview startup failure");
+
+      expect(dbName).toBeTruthy();
+      expect(apiPort).toBeGreaterThan(0);
+
+      const isDropped = await assertDatabaseDropped(dbName);
+      expect(isDropped).toBe(true);
+
+      const isPortReleased = await assertPortReleased(apiPort);
+      expect(isPortReleased).toBe(true);
+    } finally {
+      if (capturedApi) {
+        try {
+          await capturedApi.close();
+        } catch {
+          // ignore defensive cleanup errors
+        }
+      }
+    }
+  });
 });
