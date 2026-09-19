@@ -7,12 +7,18 @@ const adminUrl =
   process.env.API_TEST_ADMIN_URL ??
   "postgresql://wap:wap@127.0.0.1:55432/wap_g1";
 
+export interface ReceiverDatabaseClient {
+  client: <T = any>(strings: TemplateStringsArray, ...values: any[]) => Promise<T[]>;
+}
+
 export interface ApiFixture {
   baseUrl: string;
   databaseUrl: string;
   email: string;
   password: string;
   b02Prompt: string;
+  userId?: string;
+  db?: ReceiverDatabaseClient;
   login(): Promise<string>;
   call(path: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
@@ -133,11 +139,14 @@ export async function createLiveFixture(
 
   try {
     // 1. Launch backend API fixture
-    api = await makeApi({
+    const apiInstance = await makeApi({
       workerEnabled: true,
       plannerMode: "dev_fixture",
       filesystemEnabled: false,
     });
+    api = apiInstance;
+    api.db = (apiInstance as any).db;
+    api.userId = (apiInstance as any).userId;
 
     const apiUrl = api.baseUrl;
     const apiTargetUrl = new URL(apiUrl);
