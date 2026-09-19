@@ -106,6 +106,35 @@ describe("native provider clients with fake transport", () => {
     ]);
   });
 
+  it("keeps Gemini embedding-001 text separate from its taskType for both purposes", async () => {
+    const embeddingConfig = readAiProviderConfig({
+      AI_PLANNING_PROVIDER: "google",
+      AI_PLANNING_MODEL: "gemini-3.8-flash",
+      AI_EMBEDDING_PROVIDER: "google",
+      AI_EMBEDDING_MODEL: "gemini-embedding-001",
+    });
+    const bodies: Record<string, unknown>[] = [];
+    const ports = createAiPorts({
+      config: embeddingConfig,
+      credentials: { GEMINI_API_KEY: "google-canary" },
+      ledger: ledger(),
+      authorizeCall: async () => {},
+      fetchImpl: async (_input, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return response({
+          embedding: { values: Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0)) },
+          model: "gemini-embedding-001",
+        });
+      },
+    });
+    await ports.embedding.embed({ text: "unique tool description canary", purpose: "document" });
+    await ports.embedding.embed({ text: "unique query canary", purpose: "query" });
+    expect((bodies[0]!.content as any).parts[0].text).toBe("unique tool description canary");
+    expect(bodies[0]!.taskType).toBe("RETRIEVAL_DOCUMENT");
+    expect((bodies[1]!.content as any).parts[0].text).toBe("unique query canary");
+    expect(bodies[1]!.taskType).toBe("RETRIEVAL_QUERY");
+  });
+
   it("sends OpenAI Responses JSON schema without leaking the Gemini key", async () => {
     let request: { url: string; init: RequestInit } | undefined;
     const ports = createAiPorts({

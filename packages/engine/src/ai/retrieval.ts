@@ -12,6 +12,7 @@ import type {
   QueryExpansionResult,
   QueryExpansionUsage,
 } from "./ports.js";
+import { isEmbeddingPolicyVersion } from "./embedding-policy.js";
 
 export interface EmbeddingProvenance {
   readonly provider: string;
@@ -163,8 +164,7 @@ function validateProvenance(
     typeof dimensions !== "number" ||
     !Number.isInteger(dimensions) ||
     dimensions < 1 ||
-    typeof preprocessingVersion !== "string" ||
-    preprocessingVersion.trim().length === 0 ||
+    !isEmbeddingPolicyVersion(preprocessingVersion) ||
     typeof catalogHash !== "string" ||
     !/^[a-f0-9]{64}$/.test(catalogHash)
   )

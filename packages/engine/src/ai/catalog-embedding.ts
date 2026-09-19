@@ -1,11 +1,15 @@
-import { canonicalJson, hash } from "../snapshot.js";
+import { canonicalJson } from "../snapshot.js";
 import {
   qualifiedToolIdentity,
   toolContentHash,
   type ReviewedCatalogSnapshot,
   type ReviewedCatalogTool,
 } from "./catalog.js";
-import { REVIEWED_TOOL_SERIALIZER_VERSION } from "./embedding-policy.js";
+import {
+  hashEmbeddingText,
+  isEmbeddingPolicyVersion,
+  REVIEWED_TOOL_SERIALIZER_VERSION,
+} from "./embedding-policy.js";
 import type { EmbeddingPort } from "./ports.js";
 import {
   RetrievalValidationError,
@@ -90,8 +94,7 @@ export async function buildCatalogEmbeddingRows(
       !result.provider.trim() ||
       typeof result.model !== "string" ||
       !result.model.trim() ||
-      typeof result.preprocessingVersion !== "string" ||
-      !result.preprocessingVersion.includes("embedding-policy-v1")
+      !isEmbeddingPolicyVersion(result.preprocessingVersion)
     )
       throw validation(
         "catalog embedding provenance is missing the policy version",
@@ -113,7 +116,7 @@ export async function buildCatalogEmbeddingRows(
       purpose: "document",
       vector: [...result.embedding],
       contentHash: toolContentHash(tool),
-      embeddingTextHash: hash(text),
+      embeddingTextHash: hashEmbeddingText(text),
       provenance,
     });
   }

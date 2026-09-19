@@ -3,6 +3,8 @@ import {
   createReviewedCatalogSnapshot,
   toolContentHash,
 } from "../src/ai/catalog.js";
+import { serializeReviewedToolForEmbedding } from "../src/ai/catalog-embedding.js";
+import { hashEmbeddingText } from "../src/ai/embedding-policy.js";
 import { validatePgvectorActivation } from "../src/ai/pgvector-index.js";
 import { makeTool } from "./ai-fixtures.js";
 
@@ -16,11 +18,12 @@ function rows(catalog: ReturnType<typeof createReviewedCatalogSnapshot>) {
     purpose: "document" as const,
     vector: vector(),
     contentHash: toolContentHash(tool),
+    embeddingTextHash: hashEmbeddingText(serializeReviewedToolForEmbedding(tool)),
     provenance: {
       provider: "test",
       model: "test-model",
       dimensions: 1536,
-      preprocessingVersion: "embedding-policy-v1:test",
+      preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
       catalogHash: catalog.catalogHash,
     },
   }));
@@ -37,11 +40,14 @@ describe("pgvector catalog activation", () => {
           purpose: "document",
           vector: [1, 0],
           contentHash: toolContentHash(catalog.tools[0]!),
+          embeddingTextHash: hashEmbeddingText(
+            serializeReviewedToolForEmbedding(catalog.tools[0]!),
+          ),
           provenance: {
             provider: "test",
             model: "test-model",
             dimensions: 2,
-            preprocessingVersion: "embedding-policy-v1:test",
+            preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
             catalogHash: catalog.catalogHash,
           },
         },

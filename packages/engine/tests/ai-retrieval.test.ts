@@ -16,7 +16,7 @@ const provenance = {
   provider: "test-provider",
   model: "test-embedding",
   dimensions: 2,
-  preprocessingVersion: "v1",
+  preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
 };
 
 function embeddingPort(vector: readonly number[]): EmbeddingPort {

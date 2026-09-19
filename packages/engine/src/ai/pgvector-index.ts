@@ -23,6 +23,11 @@ import {
   type ToolRetriever,
   type ExpectedEmbeddingProfile,
 } from "./retrieval.js";
+import {
+  hashEmbeddingText,
+  isEmbeddingPolicyVersion,
+  REVIEWED_TOOL_SERIALIZER_VERSION,
+} from "./embedding-policy.js";
 
 export const PGVECTOR_DIMENSIONS = 1536;
 
@@ -40,6 +45,19 @@ function validation(
 
 function compareIdentity(left: string, right: string): number {
   return left === right ? 0 : left < right ? -1 : 1;
+}
+
+function serializeReviewedToolForEmbedding(tool: ReviewedCatalogTool): string {
+  return canonicalJson({
+    format: REVIEWED_TOOL_SERIALIZER_VERSION,
+    identity: qualifiedToolIdentity(tool),
+    description: tool.description,
+    input_schema: tool.inputSchema,
+    output_schema: tool.outputSchema,
+    side_effect: tool.sideEffect,
+    policy_version: tool.policyVersion,
+    artifact_hash: tool.artifactHash,
+  });
 }
 
 function validateVector(vector: readonly number[], label: string): void {
@@ -83,8 +101,7 @@ function parseProvenance(value: unknown, label: string): EmbeddingProvenance {
     !record.provider.trim() ||
     typeof record.model !== "string" ||
     !record.model.trim() ||
-    typeof record.preprocessingVersion !== "string" ||
-    !record.preprocessingVersion.includes("embedding-policy-v1") ||
+    !isEmbeddingPolicyVersion(record.preprocessingVersion) ||
     typeof record.catalogHash !== "string" ||
     !/^[a-f0-9]{64}$/.test(record.catalogHash)
   )
@@ -153,10 +170,12 @@ export function validatePgvectorActivation(
     if (row.contentHash !== toolContentHash(tool))
       throw validation(`embedding row content hash mismatch: ${identity}`);
     if (
-      row.embeddingTextHash !== undefined &&
+      typeof row.embeddingTextHash !== "string" ||
       !/^[a-f0-9]{64}$/.test(row.embeddingTextHash)
     )
-      throw validation(`embedding row text hash is malformed: ${identity}`);
+      throw validation(`embedding row text hash is required and malformed: ${identity}`);
+    if (row.embeddingTextHash !== hashEmbeddingText(serializeReviewedToolForEmbedding(tool)))
+      throw validation(`embedding row text hash mismatch: ${identity}`);
     validateVector(row.vector, `embedding row ${identity}`);
     provenance ??= rowProvenance;
     validated.push(
@@ -166,9 +185,7 @@ export function validatePgvectorActivation(
         purpose: "document",
         vector: Object.freeze([...row.vector]),
         contentHash: row.contentHash,
-        ...(row.embeddingTextHash
-          ? { embeddingTextHash: row.embeddingTextHash }
-          : {}),
+        embeddingTextHash: row.embeddingTextHash,
         provenance: Object.freeze({ ...rowProvenance }),
       }),
     );

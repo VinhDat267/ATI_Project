@@ -28,7 +28,7 @@ const PROVENANCE = {
   provider: "offline-synthetic",
   model: "character-hash-v1",
   dimensions: 1536,
-  preprocessingVersion: "lowercase-character-hash-v1",
+  preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
 };
 
 function currentReviewedGatewayTools(): EngineTool[] {

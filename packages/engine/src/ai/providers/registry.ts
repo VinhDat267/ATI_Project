@@ -603,8 +603,10 @@ function formatGoogleEmbeddingText(
   text: string,
   purpose: "document" | "query",
 ): string {
+  if (profile.model === "gemini-embedding-001") return text;
   const template =
     purpose === "document" ? profile.documentTask : profile.queryTask;
+  if (!template.includes("{content}")) return text;
   return template.replace("{content}", text);
 }
 

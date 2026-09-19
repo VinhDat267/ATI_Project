@@ -6,6 +6,8 @@ import {
   createReviewedCatalogSnapshot,
   toolContentHash,
 } from "../src/ai/catalog.js";
+import { serializeReviewedToolForEmbedding } from "../src/ai/catalog-embedding.js";
+import { hashEmbeddingText } from "../src/ai/embedding-policy.js";
 import {
   PgvectorCatalogIndex,
   PgvectorToolRetriever,
@@ -37,11 +39,12 @@ function rowsFor(
     purpose: "document" as const,
     vector: vector(index),
     contentHash: toolContentHash(tool),
+    embeddingTextHash: hashEmbeddingText(serializeReviewedToolForEmbedding(tool)),
     provenance: {
       provider: "test-provider",
       model,
       dimensions: PGVECTOR_DIMENSIONS,
-      preprocessingVersion: "embedding-policy-v1:test",
+      preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
       catalogHash: catalog.catalogHash,
     },
   }));

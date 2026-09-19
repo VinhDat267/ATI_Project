@@ -3,6 +3,7 @@ import {
   buildCatalogEmbeddingRows,
   serializeReviewedToolForEmbedding,
 } from "../src/ai/catalog-embedding.js";
+import { hashEmbeddingText } from "../src/ai/embedding-policy.js";
 import {
   createReviewedCatalogSnapshot,
   toolContentHash,
@@ -19,7 +20,7 @@ const PROFILE = {
   provider: "openai",
   model: "text-embedding-3-large",
   dimensions: 1536,
-  preprocessingVersion: "embedding-policy-v1:test",
+  preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
 };
 
 const vector = (first = 1): readonly number[] =>
@@ -137,7 +138,7 @@ describe("T4 catalog embedding and live index gates", () => {
         catalog,
         embeddingPort({
           provider: "offline-synthetic",
-          preprocessingVersion: "embedding-policy-v1:test",
+          preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
         }),
       ),
     ).rejects.toMatchObject({ code: "SYNTHETIC_PROVENANCE" });
@@ -149,6 +150,9 @@ describe("T4 catalog embedding and live index gates", () => {
           purpose: "document",
           vector: vector(),
           contentHash: toolContentHash(catalog.tools[0]!),
+          embeddingTextHash: hashEmbeddingText(
+            serializeReviewedToolForEmbedding(catalog.tools[0]!),
+          ),
           provenance: {
             ...PROFILE,
             provider: "offline-synthetic",
@@ -169,6 +173,9 @@ describe("T4 catalog embedding and live index gates", () => {
           purpose: "document",
           vector: vector(),
           contentHash: toolContentHash(catalog.tools[0]!),
+          embeddingTextHash: hashEmbeddingText(
+            serializeReviewedToolForEmbedding(catalog.tools[0]!),
+          ),
           provenance: {
             ...PROFILE,
             preprocessingVersion: "legacy-v1",

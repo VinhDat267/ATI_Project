@@ -4,6 +4,12 @@ import {
   readAiProviderConfig,
   type AiProviderConfig,
 } from "../src/ai/providers/config.js";
+import {
+  buildEmbeddingPolicyVersion,
+  hashEmbeddingText,
+  isEmbeddingPolicyVersion,
+} from "../src/ai/embedding-policy.js";
+import { createHash } from "node:crypto";
 
 const baseEnv = {
   AI_PLANNING_PROVIDER: "openai",
@@ -90,5 +96,25 @@ describe("provider configuration", () => {
     const config: AiProviderConfig = readAiProviderConfig(env);
     expect(JSON.stringify(config)).not.toContain("secret-canary");
     expect(JSON.stringify(config)).not.toContain("other-secret-canary");
+  });
+
+  it("builds a strict versioned manifest and hashes exact UTF-8 text bytes", () => {
+    const version = buildEmbeddingPolicyVersion({
+      provider: "google",
+      model: "gemini-embedding-001",
+      apiMode: "embedContent",
+      dimensions: 1536,
+      documentTask: "RETRIEVAL_DOCUMENT",
+      queryTask: "RETRIEVAL_QUERY",
+      normalize: true,
+    });
+    expect(version).toMatch(/^embedding-policy-v1:[a-f0-9]{64}$/);
+    expect(isEmbeddingPolicyVersion(version)).toBe(true);
+    expect(isEmbeddingPolicyVersion("embedding-policy-v1:test")).toBe(false);
+    expect(isEmbeddingPolicyVersion("prefix-embedding-policy-v1:abc")).toBe(false);
+    const expected = createHash("sha256")
+      .update(Buffer.from("café", "utf8"))
+      .digest("hex");
+    expect(hashEmbeddingText("café")).toBe(expected);
   });
 });

@@ -2,6 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { openLocalGateway } from "../src/gateway.js";
 import { loadLocalReviewedCatalog } from "../src/ai/local-catalog.js";
 import { toolContentHash } from "../src/ai/catalog.js";
+import { serializeReviewedToolForEmbedding } from "../src/ai/catalog-embedding.js";
+import { hashEmbeddingText } from "../src/ai/embedding-policy.js";
 import {
   PGVECTOR_DIMENSIONS,
   PgvectorCatalogIndex,
@@ -53,11 +55,14 @@ describe("AI-01 local catalog to reviewed two-server gateway", () => {
           purpose: "document" as const,
           vector: vector(position),
           contentHash: toolContentHash(tool),
+          embeddingTextHash: hashEmbeddingText(
+            serializeReviewedToolForEmbedding(tool),
+          ),
           provenance: {
             provider: "test-provider",
             model: "test-embedding",
             dimensions: PGVECTOR_DIMENSIONS,
-            preprocessingVersion: "embedding-policy-v1:test",
+            preprocessingVersion: `embedding-policy-v1:${"0".repeat(64)}`,
             catalogHash: snapshot.catalogHash,
           },
         })),
