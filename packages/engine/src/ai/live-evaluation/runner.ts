@@ -1,4 +1,3 @@
-import { appendFile } from "node:fs/promises";
 import { buildRuntime, type PlannerResult, type TrustedTool } from "@wap/dsl";
 import { AiPlannerAdapter, type ModelCallEvidence } from "../planner.js";
 import type { StructuredModelClient } from "../ports.js";
@@ -14,13 +13,11 @@ import type {
   LiveTrialScheduleItem,
   LiveTrialStatus,
 } from "./contracts.js";
-import {
-  assertNoGoldCanaryInPayload,
-  type ParsedLiveCase,
-} from "./dataset.js";
+import { assertNoGoldCanaryInPayload, type ParsedLiveCase } from "./dataset.js";
 import { scoreLiveCandidate } from "./scorer.js";
 import type { ProviderCallLedger } from "../providers/registry.js";
 import { ProviderAccountingError } from "../providers/accounting.js";
+import { createLiveJournal, type LiveJournal } from "./journal.js";
 
 export interface LiveEvaluationSession {
   readonly model: StructuredModelClient;
@@ -43,9 +40,7 @@ export interface LiveEvaluationRunnerOptions {
 
 export interface LiveEvaluationRunResult {
   readonly verdict:
-    | "LIVE_EVALUATION_PASS"
-    | "LIVE_EVALUATION_FAIL"
-    | "LIVE_EVALUATION_PARTIAL";
+    "LIVE_EVALUATION_PASS" | "LIVE_EVALUATION_FAIL" | "LIVE_EVALUATION_PARTIAL";
   readonly plannedCount: number;
   readonly completedCount: number;
   readonly failedCount: number;
@@ -55,13 +50,22 @@ export interface LiveEvaluationRunResult {
   readonly haltReason?: string;
 }
 
-export function createFileJournalWriter(
-  filePath: string,
-): (event: LiveJournalEvent) => Promise<void> {
-  return async (event: LiveJournalEvent) => {
-    const line = `${JSON.stringify(event)}\n`;
-    await appendFile(filePath, line, { encoding: "utf8" });
+export function createFileJournalWriter(filePath: string): ((
+  event: LiveJournalEvent,
+) => Promise<void>) & {
+  readonly close: () => Promise<void>;
+  readonly replay: LiveJournal["replay"];
+} {
+  const journalPromise = createLiveJournal(filePath);
+  const writer = (async (event: LiveJournalEvent): Promise<void> => {
+    await (await journalPromise).append(event);
+  }) as ((event: LiveJournalEvent) => Promise<void>) & {
+    readonly close: () => Promise<void>;
+    readonly replay: LiveJournal["replay"];
   };
+  writer.close = async () => (await journalPromise).close();
+  writer.replay = async () => (await journalPromise).replay();
+  return writer;
 }
 
 function safeErrorMessage(error: unknown): string {
@@ -391,10 +395,16 @@ export async function runLiveEvaluation(
   }
 
   const plannedCount = options.trials.length;
-  const completedCount = outcomes.filter((o) => o.status === "completed").length;
+  const completedCount = outcomes.filter(
+    (o) => o.status === "completed",
+  ).length;
   const failedCount = outcomes.filter((o) => o.status === "failed").length;
-  const cancelledCount = outcomes.filter((o) => o.status === "cancelled").length;
-  const notStartedCount = outcomes.filter((o) => o.status === "not_started").length;
+  const cancelledCount = outcomes.filter(
+    (o) => o.status === "cancelled",
+  ).length;
+  const notStartedCount = outcomes.filter(
+    (o) => o.status === "not_started",
+  ).length;
 
   let verdict: LiveEvaluationRunResult["verdict"];
   if (failedCount > 0 || cancelledCount > 0 || notStartedCount > 0) {

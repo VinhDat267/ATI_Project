@@ -171,9 +171,13 @@ describe("ai-live-runner", () => {
     expect(result.verdict).toBe("LIVE_EVALUATION_PASS");
 
     // Every scheduled trial must transition: scheduled -> started -> completed
-    const scheduledEvents = journal.filter((e) => e.event === "trial_scheduled");
+    const scheduledEvents = journal.filter(
+      (e) => e.event === "trial_scheduled",
+    );
     const startedEvents = journal.filter((e) => e.event === "trial_started");
-    const completedEvents = journal.filter((e) => e.event === "trial_completed");
+    const completedEvents = journal.filter(
+      (e) => e.event === "trial_completed",
+    );
 
     expect(scheduledEvents).toHaveLength(7);
     expect(startedEvents).toHaveLength(7);
@@ -286,7 +290,9 @@ describe("ai-live-runner", () => {
         if (event.event === "trial_completed") {
           completedSoFar++;
           if (completedSoFar === 2) {
-            controller.abort(new Error("user interrupted evaluation with Ctrl+C"));
+            controller.abort(
+              new Error("user interrupted evaluation with Ctrl+C"),
+            );
           }
         }
       },
@@ -380,6 +386,7 @@ describe("ai-live-runner", () => {
       expect(lines[0].event).toBe("trial_scheduled");
       expect(lines[1].event).toBe("trial_started");
       expect(lines[2].event).toBe("trial_completed");
+      await writer.close();
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
