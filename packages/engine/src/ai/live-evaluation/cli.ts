@@ -244,6 +244,7 @@ export async function runLiveEvaluationCli(
     environment.runId ??
     (() => `run-${now().toISOString().replace(/[:.]/g, "-")}`);
   const env = environment.env ?? process.env;
+  const injectedEvidenceKind = environment.runtime?.evidenceKind;
 
   let parsed: {
     readonly command: string;
@@ -424,6 +425,7 @@ export async function runLiveEvaluationCli(
             runId: runId(),
             profileId: flags.profile,
             budgetCapMicros: approval.budgetMicros,
+            evidenceKind: injectedEvidenceKind ?? "LIVE_PROVIDER",
           });
           ownedRuntime = await createDefaultLiveRuntime({
             root,
@@ -527,6 +529,7 @@ export async function runLiveEvaluationCli(
             profileId: flags.profile,
             phase: "index",
             budgetCapMicros: approval.budgetMicros,
+            evidenceKind: injectedEvidenceKind ?? "LIVE_PROVIDER",
           });
           ownedRuntime = await createDefaultLiveRuntime({
             root,
@@ -720,6 +723,11 @@ export async function runLiveEvaluationCli(
         profileId: flags.profile,
         phase: flags.phase,
         budgetCapMicros: approval.budgetMicros,
+        evidenceKind:
+          injectedEvidenceKind ??
+          (environment.getSession
+            ? "FAKE_TRANSPORT_TEST"
+            : "LIVE_PROVIDER"),
         freezeHash: hashLiveFreeze(liveFreeze),
         fingerprints: liveFreeze.fingerprints,
       });
@@ -803,6 +811,10 @@ export async function runLiveEvaluationCli(
         fingerprints: liveFreeze.fingerprints,
         plannedTrials: trials,
         outcomes: runResult.outcomes,
+        evidenceKind:
+          ownedRuntime?.evidenceKind ??
+          environment.runtime?.evidenceKind ??
+          "FAKE_TRANSPORT_TEST",
         ledgerRecords: ledger.records(),
         haltReason: runResult.haltReason,
       });
@@ -887,7 +899,8 @@ export async function runLiveEvaluationCli(
         plannedTrials: recovered.plannedTrials,
         outcomes: recovered.outcomes,
         ledgerRecords: recovered.ledgerRecords,
-        evidenceKind: "FAKE_TRANSPORT_TEST",
+        evidenceKind:
+          recovered.runMetadata?.evidenceKind ?? "FAKE_TRANSPORT_TEST",
         rubricStatus: "PROPOSED_EXPLORATORY",
         freezeMatches: false,
         indexCurrent: false,

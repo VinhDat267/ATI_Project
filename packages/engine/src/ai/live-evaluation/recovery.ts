@@ -29,6 +29,7 @@ export interface RecoveredLiveRunMetadata {
   readonly profileId: string;
   readonly phase: string;
   readonly budgetCapMicros: number;
+  readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
   readonly freezeHash?: string;
   readonly fingerprints?: LiveEvaluationFingerprints;
 }
@@ -143,6 +144,13 @@ export function recoverLiveEvaluationState(
         throw new Error("Invalid live run_started metadata");
       }
       if (
+        payload.evidenceKind !== undefined &&
+        payload.evidenceKind !== "LIVE_PROVIDER" &&
+        payload.evidenceKind !== "FAKE_TRANSPORT_TEST"
+      ) {
+        throw new Error("Invalid live run_started evidence kind");
+      }
+      if (
         payload.freezeHash !== undefined &&
         (typeof payload.freezeHash !== "string" ||
           !/^[a-f0-9]{64}$/.test(payload.freezeHash))
@@ -162,6 +170,9 @@ export function recoverLiveEvaluationState(
         profileId: payload.profileId,
         phase: payload.phase,
         budgetCapMicros: payload.budgetCapMicros,
+        ...(payload.evidenceKind
+          ? { evidenceKind: payload.evidenceKind }
+          : {}),
         ...(typeof payload.freezeHash === "string"
           ? { freezeHash: payload.freezeHash }
           : {}),

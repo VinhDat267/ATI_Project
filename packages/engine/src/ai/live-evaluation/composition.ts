@@ -114,6 +114,9 @@ async function loadCatalog(root: string) {
 export async function createLiveEvaluationRuntimeComposition(
   options: LiveEvaluationCompositionOptions,
 ): Promise<LiveEvaluationRuntime> {
+  if (options.evalDatabaseUrl?.trim()) {
+    assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
+  }
   let catalog: Awaited<ReturnType<typeof loadCatalog>>;
   try {
     catalog = await loadCatalog(options.root);
@@ -155,6 +158,9 @@ export async function createLiveEvaluationRuntimeComposition(
     });
 
   const runtime = createLiveEvaluationRuntime({
+    evidenceKind: options.fetchImpl
+      ? "FAKE_TRANSPORT_TEST"
+      : "LIVE_PROVIDER",
     probe: async (request) => {
       const context = {
         campaignId: request.campaignId,

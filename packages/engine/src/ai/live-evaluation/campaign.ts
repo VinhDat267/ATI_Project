@@ -20,6 +20,7 @@ export interface OpenLiveCampaignOptions {
   readonly runId: string;
   readonly profileId: string;
   readonly phase: string;
+  readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
   readonly budgetCapMicros: number;
   readonly freezeHash?: string;
   readonly fingerprints?: LiveEvaluationFingerprints;
@@ -126,6 +127,7 @@ export async function openLiveCampaign(
         runId: options.runId,
         profileId: options.profileId,
         phase: options.phase,
+        ...(options.evidenceKind ? { evidenceKind: options.evidenceKind } : {}),
         startedAt: new Date().toISOString(),
         pid: process.pid,
       })}\n`,

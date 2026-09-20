@@ -42,6 +42,7 @@ export interface LiveIndexResult {
 }
 
 export interface LiveEvaluationRuntime {
+  readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
   readonly probe: (request: LiveProbeRequest) => Promise<LiveProbeResult>;
   readonly index: (request: LiveIndexRequest) => Promise<LiveIndexResult>;
   readonly createSession: (
@@ -53,6 +54,7 @@ export interface LiveEvaluationRuntime {
 }
 
 export interface LiveEvaluationRuntimeImplementation {
+  readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
   readonly probe: (request: LiveProbeRequest) => Promise<LiveProbeResult>;
   readonly index: (request: LiveIndexRequest) => Promise<LiveIndexResult>;
   readonly createSession?: (
@@ -103,6 +105,9 @@ export function createLiveEvaluationRuntime(
     if (closed) throw new Error("live evaluation runtime is closed");
   };
   return {
+    ...(implementation.evidenceKind
+      ? { evidenceKind: implementation.evidenceKind }
+      : {}),
     probe: async (request) => {
       assertOpen();
       return assertProbeResult(await implementation.probe(request));
