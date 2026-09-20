@@ -377,11 +377,13 @@ export function decodePlannerWire(value: unknown): PlannerResult {
   }
   const kind = envelope.kind;
   if (kind === "refusal") {
+    // Leniently accept a non-null plan field: some providers (e.g. Google Gemini) return a
+    // dummy plan object alongside the refusal payload despite `kind === "refusal"`. The refusal
+    // semantics are determined solely by `refusal.reason`, so coerce plan/clarification to null.
     if (
-      envelope.plan !== null ||
-      envelope.clarification !== null ||
       !isRecord(envelope.refusal) ||
-      typeof envelope.refusal.reason !== "string"
+      typeof envelope.refusal.reason !== "string" ||
+      envelope.refusal.reason.trim().length === 0
     ) {
       throw new PlannerWireSchemaError(
         "refusal branch must contain refusal and null other branches",
@@ -390,11 +392,12 @@ export function decodePlannerWire(value: unknown): PlannerResult {
     return PlannerResultSchema.parse({ kind, reason: envelope.refusal.reason });
   }
   if (kind === "clarification") {
+    // Leniently accept a non-null plan/refusal field alongside clarification
+    // (same provider tolerance as the refusal branch above).
     if (
-      envelope.plan !== null ||
-      envelope.refusal !== null ||
       !isRecord(envelope.clarification) ||
-      typeof envelope.clarification.question !== "string"
+      typeof envelope.clarification.question !== "string" ||
+      envelope.clarification.question.trim().length === 0
     ) {
       throw new PlannerWireSchemaError(
         "clarification branch must contain clarification and null other branches",
@@ -651,6 +654,23 @@ const plannerWireSchema = {
 } as const;
 
 export const openAiPlannerWireJsonSchema = plannerWireSchema;
-export const googlePlannerWireJsonSchema = JSON.parse(
-  JSON.stringify(plannerWireSchema),
-) as typeof plannerWireSchema;
+
+function createGooglePlannerWireJsonSchema(): typeof plannerWireSchema {
+  const schema = JSON.parse(
+    JSON.stringify(plannerWireSchema),
+  ) as typeof plannerWireSchema & {
+    $defs: {
+      wireValue: {
+        required: string[];
+      };
+    };
+  };
+  // Google's interactions schema validator rejects self-referential / recursive fields in
+  // "required" arrays because it treats them as non-terminating grammar recursion.
+  schema.$defs.wireValue.required = schema.$defs.wireValue.required.filter(
+    (field) => field !== "array_value" && field !== "object_entries",
+  );
+  return schema;
+}
+
+export const googlePlannerWireJsonSchema = createGooglePlannerWireJsonSchema();

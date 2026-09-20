@@ -342,7 +342,13 @@ describe("AI Live Evaluation Dataset & Boundary (Task T5)", () => {
       // Check Google-only profile
       const googleProfile = parsedConfig.profiles["google-only"]!;
       expect(googleProfile.planning.provider).toBe("google");
-      expect(["gemini-3.8-flash", "gemini-2.5-flash"]).toContain(googleProfile.planning.model);
+      expect([
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+      ]).toContain(googleProfile.planning.model);
       expect(googleProfile.embedding.provider).toBe("google");
       expect(["gemini-embedding-001", "gemini-embedding-2"]).toContain(googleProfile.embedding.model);
     });
