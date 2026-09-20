@@ -1088,7 +1088,7 @@ if (
       if (result.artifactPath) {
         console.log(`Artifact: ${result.artifactPath}`);
       }
-      process.exit(result.exitCode);
+      process.exitCode = result.exitCode;
     })
     .finally(() => process.removeListener("SIGINT", abort));
 }
