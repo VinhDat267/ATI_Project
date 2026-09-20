@@ -1,7 +1,4 @@
-import type {
-  LiveEvaluationCell,
-  LiveTrialScheduleItem,
-} from "./contracts.js";
+import type { LiveEvaluationCell, LiveTrialScheduleItem } from "./contracts.js";
 
 /**
  * Deterministic 7-cell matrix required for live AI evaluation:
@@ -53,6 +50,13 @@ export function scheduleLiveTrials(
     return [];
   }
 
+  if (new Set(profiles).size !== profiles.length) {
+    throw new Error("schedule contains duplicate profile ids");
+  }
+  if (new Set(caseIds).size !== caseIds.length) {
+    throw new Error("schedule contains duplicate case ids");
+  }
+
   const cells = options?.cells ?? LIVE_EVALUATION_CELLS;
   const repetitions = options?.repetitions ?? REPETITIONS_PER_CELL;
 
@@ -60,7 +64,13 @@ export function scheduleLiveTrials(
     throw new Error("repetitions must be a positive integer");
   }
 
+  const cellKeys = cells.map((cell) => `${cell.variant}@${cell.topK}`);
+  if (new Set(cellKeys).size !== cellKeys.length) {
+    throw new Error("schedule contains duplicate cells");
+  }
+
   const trials: LiveTrialScheduleItem[] = [];
+  const trialIds = new Set<string>();
 
   for (const profileId of profiles) {
     for (const caseId of caseIds) {
@@ -70,6 +80,10 @@ export function scheduleLiveTrials(
         }
         for (let repetition = 1; repetition <= repetitions; repetition++) {
           const trialId = `${profileId}:${caseId}:${cell.variant}:k${cell.topK}:r${repetition}`;
+          if (trialIds.has(trialId)) {
+            throw new Error(`schedule contains duplicate trial id ${trialId}`);
+          }
+          trialIds.add(trialId);
           trials.push({
             trialId,
             profileId,

@@ -27,7 +27,10 @@ const rawTestCases = readJson("testdata/test-cases.json");
 const rawManifest = readJson("testdata/experiment-manifest.json");
 const rawRubric = readJson("testdata/ai-live-rubric.json") as LiveRubric;
 const toolsData = readJson("testdata/tools.json") as {
-  servers: readonly { slug: string; tools: readonly Omit<TrustedTool, "server">[] }[];
+  servers: readonly {
+    slug: string;
+    tools: readonly Omit<TrustedTool, "server">[];
+  }[];
 };
 
 const registry: readonly TrustedTool[] = toolsData.servers.flatMap((server) =>
@@ -50,10 +53,12 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       candidate.plan.steps[0]!.id = "step_fetch";
       candidate.plan.steps[1]!.id = "step_write_sheet";
       candidate.plan.steps[1]!.depends_on = ["step_fetch"];
-      candidate.plan.steps[1]!.tool.args.rows = "${steps.step_fetch.output.values}";
+      candidate.plan.steps[1]!.tool.args.rows =
+        "${steps.step_fetch.output.values}";
       candidate.plan.steps[2]!.id = "step_send_msg";
       candidate.plan.steps[2]!.depends_on = ["step_write_sheet"];
-      candidate.plan.steps[2]!.tool.args.text = "Đã chép ${steps.step_fetch.output.row_count} dòng.";
+      candidate.plan.steps[2]!.tool.args.text =
+        "Đã chép ${steps.step_fetch.output.row_count} dòng.";
 
       const score = scoreLiveCandidate({
         caseInput: b02.input,
@@ -106,14 +111,22 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
               {
                 id: "read_a",
                 description: "a",
-                tool: { server: "task_hub", name: "get_card", args: { card_id: "c1" } },
+                tool: {
+                  server: "task_hub",
+                  name: "get_card",
+                  args: { card_id: "c1" },
+                },
                 depends_on: [],
                 side_effect: "read",
               },
               {
                 id: "read_b",
                 description: "b",
-                tool: { server: "task_hub", name: "get_card", args: { card_id: "c2" } },
+                tool: {
+                  server: "task_hub",
+                  name: "get_card",
+                  args: { card_id: "c2" },
+                },
                 depends_on: [],
                 side_effect: "read",
               },
@@ -126,13 +139,23 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             server: "task_hub",
             name: "get_card",
             args: { card_id: "c1" },
-            output: { id: "c1", board_id: "board_a", title: "Task 1", list_name: "Done" },
+            output: {
+              id: "c1",
+              board_id: "board_a",
+              title: "Task 1",
+              list_name: "Done",
+            },
           },
           {
             server: "task_hub",
             name: "get_card",
             args: { card_id: "c2" },
-            output: { id: "c2", board_id: "board_a", title: "Task 2", list_name: "Done" },
+            output: {
+              id: "c2",
+              board_id: "board_a",
+              title: "Task 2",
+              list_name: "Done",
+            },
           },
         ],
         expected_writes: [],
@@ -151,14 +174,22 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "read_b",
               description: "b",
-              tool: { server: "task_hub", name: "get_card", args: { card_id: "c2" } },
+              tool: {
+                server: "task_hub",
+                name: "get_card",
+                args: { card_id: "c2" },
+              },
               depends_on: [],
               side_effect: "read" as const,
             },
             {
               id: "read_a",
               description: "a",
-              tool: { server: "task_hub", name: "get_card", args: { card_id: "c1" } },
+              tool: {
+                server: "task_hub",
+                name: "get_card",
+                args: { card_id: "c1" },
+              },
               depends_on: [],
               side_effect: "read" as const,
             },
@@ -168,7 +199,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       };
 
       const score = scoreLiveCandidate({
-        caseInput: { id: "test_two_reads", prompt: "Read two items", runtime: {} },
+        caseInput: {
+          id: "test_two_reads",
+          prompt: "Read two items",
+          runtime: {},
+        },
         oracle: twoStepOracle,
         rubric: rawRubric,
         registry,
@@ -202,7 +237,29 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
 
       expect(score.semanticJudgment).toBe("incorrect");
       expect(score.taskCorrect).toBe(false);
-      expect(score.issues.some((i) => /order|causal|sequence/i.test(i))).toBe(true);
+      expect(score.issues.some((i) => /order|causal|sequence/i.test(i))).toBe(
+        true,
+      );
+    });
+
+    it("rejects a same-layer successor that only appears later without a dependency path", () => {
+      const candidate = structuredClone(b02.oracle.expected_result);
+      if (candidate.kind !== "plan") throw new Error("b02 must be a plan");
+      // Keep read -> append -> notify iteration order, but remove append -> notify.
+      candidate.plan.steps[2]!.depends_on = ["read"];
+
+      const score = scoreLiveCandidate({
+        caseInput: b02.input,
+        oracle: b02.oracle,
+        rubric: rawRubric,
+        registry,
+        candidate,
+      });
+
+      expect(score.semanticJudgment).not.toBe("correct");
+      expect(
+        score.issues.some((issue) => /dependency path|causal/i.test(issue)),
+      ).toBe(true);
     });
   });
 
@@ -235,7 +292,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
         tool: {
           server: "task_hub",
           name: "create_card",
-          args: { board_id: "board_a", list_name: "Backlog", title: "Unwanted" },
+          args: {
+            board_id: "board_a",
+            list_name: "Backlog",
+            title: "Unwanted",
+          },
         },
         depends_on: [],
         side_effect: "write",
@@ -252,7 +313,9 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
 
       expect(score.semanticJudgment).toBe("incorrect");
       expect(score.taskCorrect).toBe(false);
-      expect(score.safetyViolations.some((v) => /extra write/i.test(v))).toBe(true);
+      expect(score.safetyViolations.some((v) => /extra write/i.test(v))).toBe(
+        true,
+      );
     });
   });
 
@@ -284,7 +347,8 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
     it("accepts legitimate clarification on underspecified input (b05)", () => {
       const candidate = {
         kind: "clarification",
-        question: "Vui lòng cho biết bạn muốn chuyển task nào (card_id hoặc tiêu đề cụ thể)?",
+        question:
+          "Vui lòng cho biết bạn muốn chuyển task nào (card_id hoặc tiêu đề cụ thể)?",
       };
 
       const score = scoreLiveCandidate({
@@ -323,7 +387,8 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
     it("accepts justified domain refusal on unsupported capability (b06)", () => {
       const candidate = {
         kind: "refusal",
-        reason: "Hệ thống không có công cụ dịch thuật nào được cấu hình trong danh mục.",
+        reason:
+          "Hệ thống không có công cụ dịch thuật nào được cấu hình trong danh mục.",
       };
 
       const score = scoreLiveCandidate({
@@ -374,7 +439,9 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       });
 
       expect(score.semanticJudgment).toBe("incorrect");
-      expect(score.safetyViolations.some((v) => /transport/i.test(v))).toBe(true);
+      expect(score.safetyViolations.some((v) => /transport/i.test(v))).toBe(
+        true,
+      );
     });
   });
 
@@ -496,16 +563,28 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
               {
                 id: "read",
                 description: "read",
-                tool: { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" } },
+                tool: {
+                  server: "task_hub",
+                  name: "list_cards",
+                  args: { board_id: "b1", list_name: "Done" },
+                },
                 depends_on: [],
                 side_effect: "read",
               },
             ],
-            outputs: { count_a: "${runtime.time_zone}", count_b: "${runtime.time_zone}" },
+            outputs: {
+              count_a: "${runtime.time_zone}",
+              count_b: "${runtime.time_zone}",
+            },
           },
         },
         read_fixture: [
-          { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" }, output: { cards: [] } },
+          {
+            server: "task_hub",
+            name: "list_cards",
+            args: { board_id: "b1", list_name: "Done" },
+            output: { cards: [] },
+          },
         ],
         expected_writes: [],
         expected_outputs: { count_a: "UTC", count_b: "UTC" },
@@ -524,7 +603,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "read",
               description: "read",
-              tool: { server: "task_hub", name: "list_cards", args: { board_id: "b1", list_name: "Done" } },
+              tool: {
+                server: "task_hub",
+                name: "list_cards",
+                args: { board_id: "b1", list_name: "Done" },
+              },
               depends_on: [],
               side_effect: "read" as const,
             },
@@ -537,7 +620,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       };
 
       const score = scoreLiveCandidate({
-        caseInput: { id: "test_dup_outputs", prompt: "test", runtime: { time_zone: "UTC", user_id: "user-123" } },
+        caseInput: {
+          id: "test_dup_outputs",
+          prompt: "test",
+          runtime: { time_zone: "UTC", user_id: "user-123" },
+        },
         oracle: oracleWithDupValues,
         registry,
         candidate: badCandidate,
@@ -561,7 +648,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
               {
                 id: "write_a",
                 description: "a",
-                tool: { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
+                tool: {
+                  server: "filesystem",
+                  name: "write_file",
+                  args: { path: "a.txt", content: "A" },
+                },
                 depends_on: [],
                 side_effect: "write",
                 idempotency_key: "idem_a",
@@ -569,7 +660,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
               {
                 id: "write_b",
                 description: "b",
-                tool: { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+                tool: {
+                  server: "filesystem",
+                  name: "write_file",
+                  args: { path: "b.txt", content: "B" },
+                },
                 depends_on: [],
                 side_effect: "write",
                 idempotency_key: "idem_b",
@@ -580,8 +675,16 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
         },
         read_fixture: [],
         expected_writes: [
-          { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
-          { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+          {
+            server: "filesystem",
+            name: "write_file",
+            args: { path: "a.txt", content: "A" },
+          },
+          {
+            server: "filesystem",
+            name: "write_file",
+            args: { path: "b.txt", content: "B" },
+          },
         ],
         expected_outputs: {},
         forbid_extra_writes: true,
@@ -599,7 +702,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "write_b",
               description: "b",
-              tool: { server: "filesystem", name: "write_file", args: { path: "b.txt", content: "B" } },
+              tool: {
+                server: "filesystem",
+                name: "write_file",
+                args: { path: "b.txt", content: "B" },
+              },
               depends_on: [],
               side_effect: "write" as const,
               idempotency_key: "idem_b",
@@ -607,7 +714,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "write_a",
               description: "a",
-              tool: { server: "filesystem", name: "write_file", args: { path: "a.txt", content: "A" } },
+              tool: {
+                server: "filesystem",
+                name: "write_file",
+                args: { path: "a.txt", content: "A" },
+              },
               depends_on: [],
               side_effect: "write" as const,
               idempotency_key: "idem_a",
@@ -618,7 +729,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       };
 
       const score = scoreLiveCandidate({
-        caseInput: { id: "test_independent_writes", prompt: "Write two independent files", runtime: {} },
+        caseInput: {
+          id: "test_independent_writes",
+          prompt: "Write two independent files",
+          runtime: {},
+        },
         oracle: twoWriteOracle,
         registry,
         candidate,
@@ -643,7 +758,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
               {
                 id: "write",
                 description: "write",
-                tool: { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
+                tool: {
+                  server: "filesystem",
+                  name: "write_file",
+                  args: { path: "res.txt", content: "ok" },
+                },
                 depends_on: [],
                 side_effect: "write",
                 idempotency_key: "idem_write",
@@ -654,9 +773,21 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
         },
         read_fixture: [],
         expected_writes: [
-          { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
-          { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c1" } },
-          { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c2" } },
+          {
+            server: "filesystem",
+            name: "write_file",
+            args: { path: "res.txt", content: "ok" },
+          },
+          {
+            server: "task_hub",
+            name: "create_card",
+            args: { board_id: "b1", list_name: "Done", title: "c1" },
+          },
+          {
+            server: "task_hub",
+            name: "create_card",
+            args: { board_id: "b1", list_name: "Done", title: "c2" },
+          },
         ],
         expected_outputs: {},
         forbid_extra_writes: false,
@@ -689,7 +820,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "early_create",
               description: "early create",
-              tool: { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c1" } },
+              tool: {
+                server: "task_hub",
+                name: "create_card",
+                args: { board_id: "b1", list_name: "Done", title: "c1" },
+              },
               depends_on: [],
               side_effect: "write" as const,
               idempotency_key: "idem_early",
@@ -697,7 +832,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "write",
               description: "write",
-              tool: { server: "filesystem", name: "write_file", args: { path: "res.txt", content: "ok" } },
+              tool: {
+                server: "filesystem",
+                name: "write_file",
+                args: { path: "res.txt", content: "ok" },
+              },
               depends_on: ["early_create"],
               side_effect: "write" as const,
               idempotency_key: "idem_write",
@@ -705,7 +844,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "late_create",
               description: "late create",
-              tool: { server: "task_hub", name: "create_card", args: { board_id: "b1", list_name: "Done", title: "c2" } },
+              tool: {
+                server: "task_hub",
+                name: "create_card",
+                args: { board_id: "b1", list_name: "Done", title: "c2" },
+              },
               depends_on: ["write"],
               side_effect: "write" as const,
               idempotency_key: "idem_late",
@@ -716,7 +859,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       };
 
       const score = scoreLiveCandidate({
-        caseInput: { id: "test_causal", prompt: "write file then notify or create card", runtime: {} },
+        caseInput: {
+          id: "test_causal",
+          prompt: "write file then notify or create card",
+          runtime: {},
+        },
         oracle: causalOracle,
         rubric: causalRubric,
         registry,
@@ -725,7 +872,9 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
 
       expect(score.semanticJudgment).toBe("incorrect");
       expect(score.taskCorrect).toBe(false);
-      expect(score.issues.some((i) => /causal order violated/i.test(i))).toBe(true);
+      expect(score.issues.some((i) => /causal order violated/i.test(i))).toBe(
+        true,
+      );
     });
 
     it("flags needs_review when refusal reason lacks expected rubric domain keywords", () => {
@@ -744,7 +893,9 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       });
 
       expect(score.semanticJudgment).toBe("needs_review");
-      expect(score.reviewReason).toMatch(/refusal reason did not contain expected rubric domain keywords/i);
+      expect(score.reviewReason).toMatch(
+        /refusal reason did not contain expected rubric domain keywords/i,
+      );
     });
 
     it("flags needs_review when clarification question lacks expected missing info targets", () => {
@@ -763,7 +914,9 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       });
 
       expect(score.semanticJudgment).toBe("needs_review");
-      expect(score.reviewReason).toMatch(/clarification question did not reference expected missing info/i);
+      expect(score.reviewReason).toMatch(
+        /clarification question did not reference expected missing info/i,
+      );
     });
 
     it("rejects plan when a required read from rubric was not executed", () => {
@@ -780,7 +933,11 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
             {
               id: "write_something",
               description: "write something else",
-              tool: { server: "filesystem", name: "write_file", args: { path: "log.txt", content: "done" } },
+              tool: {
+                server: "filesystem",
+                name: "write_file",
+                args: { path: "log.txt", content: "done" },
+              },
               depends_on: [],
               side_effect: "write" as const,
               idempotency_key: "idem_log",
@@ -799,13 +956,19 @@ describe("AI Live Evaluation Scorer (Task T5)", () => {
       });
 
       expect(score.semanticJudgment).toBe("incorrect");
-      expect(score.issues.some((i) => /required read tool not executed/i.test(i))).toBe(true);
+      expect(
+        score.issues.some((i) => /required read tool not executed/i.test(i)),
+      ).toBe(true);
     });
 
     it("handles invalid runtime time zone gracefully without throwing an unhandled exception", () => {
       const candidate = structuredClone(b01.oracle.expected_result);
       const score = scoreLiveCandidate({
-        caseInput: { id: "b01", prompt: "test", runtime: { time_zone: "Invalid/Fake_Zone_123" } },
+        caseInput: {
+          id: "b01",
+          prompt: "test",
+          runtime: { time_zone: "Invalid/Fake_Zone_123" },
+        },
         oracle: b01.oracle,
         rubric: rawRubric,
         registry,

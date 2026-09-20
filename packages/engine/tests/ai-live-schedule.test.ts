@@ -39,10 +39,7 @@ describe("ai-live-schedule", () => {
   });
 
   it("strictly groups trials into contiguous sequential profile blocks", () => {
-    const trials = scheduleLiveTrials(
-      ["openai-only", "google-only"],
-      devCases,
-    );
+    const trials = scheduleLiveTrials(["openai-only", "google-only"], devCases);
 
     // First 126 trials must be openai-only
     const firstBlock = trials.slice(0, 126);
@@ -98,5 +95,23 @@ describe("ai-live-schedule", () => {
   it("returns empty schedule when profiles or cases are empty", () => {
     expect(scheduleLiveTrials([], devCases)).toEqual([]);
     expect(scheduleLiveTrials(["p1"], [])).toEqual([]);
+  });
+
+  it("rejects duplicate profiles, cases, cells, and derived trial IDs", () => {
+    expect(() => scheduleLiveTrials(["p1", "p1"], ["b01"])).toThrow(
+      /duplicate profile/i,
+    );
+    expect(() => scheduleLiveTrials(["p1"], ["b01", "b01"])).toThrow(
+      /duplicate case/i,
+    );
+    expect(() =>
+      scheduleLiveTrials(["p1"], ["b01"], {
+        repetitions: 1,
+        cells: [
+          { variant: "semantic", topK: 3 },
+          { variant: "semantic", topK: 3 },
+        ],
+      }),
+    ).toThrow(/duplicate cell|duplicate trial/i);
   });
 });
