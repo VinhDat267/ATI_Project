@@ -11,7 +11,7 @@ Không có mật khẩu hay secret mặc định trong mã nguồn. Trước khi
 - `API_DEMO_PASSWORD_HASH`: chuỗi scrypt theo định dạng `scrypt$16384$8$1$<salt-hex-32>$<key-hex-128>`.
 - `API_CURSOR_KEY`: khóa 32 byte ở dạng base64 chuẩn (ký HMAC cho trace cursor).
 
-Tuỳ chọn: `API_PORT` (mặc định `3001`), `API_SESSION_TTL_MS` (mặc định 8 giờ), `G1_USER_ID`, `API_PLANNER_MODE` (`disabled` hoặc `dev_fixture`), và `API_NEW_RUNS_ENABLED` (`1` mặc định; đặt `0`/`off` để tạm ngắt nhận run mới). Tạo hash/key trong một phiên shell riêng hoặc secret manager; không truyền mật khẩu như command-line argument.
+Tuỳ chọn: `API_PORT` (mặc định `3001`), `API_SESSION_TTL_MS` (mặc định 8 giờ), `G1_USER_ID`, `API_PLANNER_MODE` (`disabled` hoặc `dev_fixture`), `API_NEW_RUNS_ENABLED` (`1` mặc định; đặt `0`/`off` để tạm ngắt nhận run mới), và `AI_PROVIDER_CALLS_ENABLED` (`1` mặc định; đặt `0`/`off` để chặn provider call trước credential/ledger/fetch). Tạo hash/key trong một phiên shell riêng hoặc secret manager; không truyền mật khẩu như command-line argument.
 
 ## Lệnh
 

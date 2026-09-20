@@ -13,6 +13,8 @@ export interface ApiConfig {
   plannerMode: "disabled" | "dev_fixture" | "ai";
   /** Production kill switch; omitted in older fixtures means enabled. */
   readonly allowNewRuns?: boolean;
+  /** Provider-call kill switch; omitted in older fixtures means enabled. */
+  readonly allowProviderCalls?: boolean;
   /** Retrieval is explicit; all_tools remains the fail-safe default. */
   readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
 }
@@ -83,6 +85,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     throw new Error("Invalid configuration API_PLANNER_MODE");
   const plannerMode = rawPlannerMode;
   const allowNewRuns = boolean(env, "API_NEW_RUNS_ENABLED", true);
+  const allowProviderCalls = boolean(
+    env,
+    "AI_PROVIDER_CALLS_ENABLED",
+    true,
+  );
   const rawRetrievalVariant = env.AI_RETRIEVAL_VARIANT ?? "all_tools";
   if (
     rawRetrievalVariant !== "all_tools" &&
@@ -101,6 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     cursorKey: cursorKey(required(env, "API_CURSOR_KEY")),
     plannerMode,
     allowNewRuns,
+    allowProviderCalls,
     aiRetrievalVariant,
   };
 }

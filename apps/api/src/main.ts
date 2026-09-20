@@ -132,6 +132,7 @@ const aiRuntime =
             runId: "api-runtime-bootstrap",
             profileId: "api-profile-v1",
           },
+          providerCallsEnabled: config.allowProviderCalls,
           retrievalVariant: config.aiRetrievalVariant,
         });
       })()

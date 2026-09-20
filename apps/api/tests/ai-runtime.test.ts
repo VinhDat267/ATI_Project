@@ -63,6 +63,38 @@ describe("AI runtime composition", () => {
     }
   });
 
+  it("honors an explicit provider-call kill switch before reservation or fetch", async () => {
+    let fetchCalls = 0;
+    let reserveCalls = 0;
+    const ports = createAiRuntimePorts(
+      options({
+        providerCallsEnabled: false,
+        authorizeCall: async () => {
+          throw new Error("authorization should not be reached");
+        },
+        ledger: {
+          async reserve() {
+            reserveCalls += 1;
+            return "call-1";
+          },
+          async settle() {},
+        },
+        fetchImpl: async () => {
+          fetchCalls += 1;
+          return new Response("{}", {
+            headers: { "content-type": "application/json" },
+          });
+        },
+      }),
+    );
+
+    await expect(
+      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
+    ).rejects.toMatchObject({ code: "AI_PROVIDER_CALLS_DISABLED" });
+    expect(reserveCalls).toBe(0);
+    expect(fetchCalls).toBe(0);
+  });
+
   it("keeps an API runtime fail-closed when durable accounting is unavailable", async () => {
     const runtime = createAiRuntime({
       db: {} as Database,

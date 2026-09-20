@@ -95,7 +95,8 @@ export class ProviderClientError extends Error {
     | "PROVIDER_VECTOR_INVALID"
     | "PRICE_BOUND_UNPROVEN"
     | "AI_LIVE_NOT_READY"
-    | "AI_CALL_UNAUTHORIZED";
+    | "AI_CALL_UNAUTHORIZED"
+    | "AI_PROVIDER_CALLS_DISABLED";
   readonly provider: string;
   readonly requestId: string | null;
   readonly status: number | null;

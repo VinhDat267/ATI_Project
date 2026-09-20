@@ -15,6 +15,7 @@ describe("API configuration", () => {
     expect(config.port).toBe(3001);
     expect(config.cursorKey).toHaveLength(32);
     expect(config.allowNewRuns).toBe(true);
+    expect(config.allowProviderCalls).toBe(true);
   });
 
   it("rejects missing secrets and non-canonical cursor keys", async () => {
@@ -66,5 +67,18 @@ describe("API configuration", () => {
     expect(() =>
       loadConfig({ ...env, API_NEW_RUNS_ENABLED: "maybe" }),
     ).toThrow(/Invalid boolean configuration API_NEW_RUNS_ENABLED/);
+  });
+
+  it("parses the provider-call kill switch independently", async () => {
+    const env = await baseEnv();
+    expect(
+      loadConfig({ ...env, AI_PROVIDER_CALLS_ENABLED: "0" }).allowProviderCalls,
+    ).toBe(false);
+    expect(
+      loadConfig({ ...env, AI_PROVIDER_CALLS_ENABLED: "on" }).allowProviderCalls,
+    ).toBe(true);
+    expect(() =>
+      loadConfig({ ...env, AI_PROVIDER_CALLS_ENABLED: "unknown" }),
+    ).toThrow(/Invalid boolean configuration AI_PROVIDER_CALLS_ENABLED/);
   });
 });

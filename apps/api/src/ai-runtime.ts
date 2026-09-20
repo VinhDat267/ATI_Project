@@ -75,6 +75,8 @@ export const DEFAULT_AI_PRICE_CARD: ProviderPriceCard = {
 export interface AiRuntimePortsOptions {
   readonly config: AiProviderConfig;
   readonly credentials: AiProviderCredentials;
+  /** Separate emergency switch; false denies before credential/ledger/network work. */
+  readonly providerCallsEnabled?: boolean;
   readonly ledger?: ProviderCallLedger;
   readonly authorizeCall?: AuthorizeProviderCall;
   readonly callContext?: AiProviderCallContext;
@@ -206,11 +208,21 @@ export function createAiRuntimePorts(options: AiRuntimePortsOptions): AiPorts {
     },
     async settle(): Promise<void> {},
   };
+  const authorizeCall: AuthorizeProviderCall =
+    options.providerCallsEnabled === false
+      ? async () => {
+          throw new ProviderClientError(
+            "AI_PROVIDER_CALLS_DISABLED",
+            "AI provider calls are temporarily disabled",
+            { provider: "runtime" },
+          );
+        }
+      : (options.authorizeCall ?? denyAiLiveCalls);
   return createAiPorts({
     config: options.config,
     credentials: options.credentials,
     ledger,
-    authorizeCall: options.authorizeCall ?? denyAiLiveCalls,
+    authorizeCall,
     ...(options.callContext ? { callContext: options.callContext } : {}),
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     ...(options.now ? { now: options.now } : {}),
