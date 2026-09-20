@@ -159,7 +159,7 @@ const worker = createPrepareWorker({
   userId: config.userId,
   engine,
   planner,
-  shutdownTimeoutMs: 30_000,
+  shutdownTimeoutMs: config.workerShutdownTimeoutMs ?? 30_000,
   onError: (code) =>
     console.error(JSON.stringify({ event: "worker_deferred", code })),
 });

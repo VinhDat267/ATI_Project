@@ -17,6 +17,8 @@ export interface ApiConfig {
   readonly allowProviderCalls?: boolean;
   /** Retrieval is explicit; all_tools remains the fail-safe default. */
   readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
+  /** Maximum time the API worker waits for an active tick during shutdown. */
+  readonly workerShutdownTimeoutMs?: number;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -98,6 +100,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   )
     throw new Error("Invalid configuration AI_RETRIEVAL_VARIANT");
   const aiRetrievalVariant = rawRetrievalVariant;
+  const workerShutdownTimeoutMs = integer(
+    env,
+    "API_WORKER_SHUTDOWN_TIMEOUT_MS",
+    30_000,
+  );
   return {
     host: "127.0.0.1",
     port: integer(env, "API_PORT", 3001),
@@ -110,5 +117,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     allowNewRuns,
     allowProviderCalls,
     aiRetrievalVariant,
+    workerShutdownTimeoutMs,
   };
 }

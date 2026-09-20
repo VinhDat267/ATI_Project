@@ -81,4 +81,16 @@ describe("API configuration", () => {
       loadConfig({ ...env, AI_PROVIDER_CALLS_ENABLED: "unknown" }),
     ).toThrow(/Invalid boolean configuration AI_PROVIDER_CALLS_ENABLED/);
   });
+
+  it("parses the worker shutdown deadline with a bounded default", async () => {
+    const env = await baseEnv();
+    expect(loadConfig(env).workerShutdownTimeoutMs).toBe(30_000);
+    expect(
+      loadConfig({ ...env, API_WORKER_SHUTDOWN_TIMEOUT_MS: "1500" })
+        .workerShutdownTimeoutMs,
+    ).toBe(1500);
+    expect(() =>
+      loadConfig({ ...env, API_WORKER_SHUTDOWN_TIMEOUT_MS: "-1" }),
+    ).toThrow(/Invalid integer configuration API_WORKER_SHUTDOWN_TIMEOUT_MS/);
+  });
 });
