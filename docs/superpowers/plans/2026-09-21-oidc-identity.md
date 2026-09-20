@@ -66,9 +66,9 @@ The following boundaries are fixed before implementation:
 
 **Interfaces:**
 - Produce `OidcConfig` with `enabled`, `issuerUrl`, `clientId`, `clientSecret`, `redirectUri`, `audience`, `scopes`, `webOrigin`, `sessionCookieName`, `transactionTtlMs`, `sessionTtlMs`, and `clockSkewSeconds`.
-- Produce `SessionCredential = { authorization?: string; cookie?: string }`.
+- Produce `SessionCredential = { authorization?: string; cookie?: string }` and `SessionInput = SessionCredential | string | undefined` for the bearer compatibility path.
 - Produce `SessionMetadata = { createdFrom: "oidc" | "legacy"; issuer?: string; subject?: string }`.
-- Change `SessionAuthority.authenticate` and `revoke` to accept `SessionCredential`; add `issue(userId: string, metadata: SessionMetadata): Promise<string>` while retaining `login` for compatibility.
+- Change `SessionAuthority.authenticate` and `revoke` to accept `SessionInput`; add `issue(userId: string, metadata: SessionMetadata): Promise<string>` while retaining `login` for compatibility.
 - Produce `AuthIdentitySchema`, `AuthMeSchema`, and `OidcErrorSchema` in the shared DSL boundary. `AuthMeSchema` contains `user_id`, `email`, `display_name`, and `roles`.
 
 - [ ] **Step 1: Write failing configuration and contract tests.** Assert OIDC is disabled when `OIDC_ENABLED=0`, enabled configuration requires an HTTPS issuer outside local mode, `OIDC_SCOPES` is non-empty, TTLs are positive and bounded, the cookie name is token-safe, and the new schemas reject unknown/empty identity fields.
@@ -104,7 +104,7 @@ The following boundaries are fixed before implementation:
 **Interfaces:**
 - Produce `AuthRepository` methods `findOrCreateIdentity`, `createSession`, `findSession`, `revokeSession`, `consumeOidcTransaction`, and `createOidcTransaction`.
 - Produce `DurableSessionAuthority implements SessionAuthority`, with `issue`, `authenticate`, `revoke`, and compatibility `login`.
-- Session lookup accepts the `SessionCredential` object and returns only a local UUID; repository methods never return raw session values.
+- Session lookup accepts `SessionInput` and returns only a local UUID; repository methods never return raw session values.
 
 - [ ] **Step 1: Write the migration and repository red tests.** Add tests that migrate a temporary database from schema 0008, create two users and verify unique `(issuer, subject)`, session hash-only persistence, transaction expiry/one-time consumption, and cascade behavior when a user is removed.
 - [ ] **Step 2: Run the integration test to establish the failure.**

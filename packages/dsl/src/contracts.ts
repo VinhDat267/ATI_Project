@@ -81,6 +81,23 @@ export const LoginResponseSchema = z
   .object({ token: z.string().min(1) })
   .strict();
 
+export const AuthMeSchema = z
+  .object({
+    user_id: z.uuid(),
+    email: z.string().min(1).max(320),
+    display_name: z.string().max(200).nullable(),
+    roles: z.array(z.enum(["user", "operator"])).min(1),
+  })
+  .strict();
+export type AuthMe = z.infer<typeof AuthMeSchema>;
+
+export const OidcErrorSchema = z
+  .object({
+    code: z.string().min(1).max(80),
+    message: z.string().min(1).max(500),
+  })
+  .strict();
+
 export const ApiErrorSchema = z
   .object({
     error: z

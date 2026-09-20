@@ -73,6 +73,19 @@ interface Session {
   expiresAt: number;
 }
 
+export interface SessionCredential {
+  authorization?: string;
+  cookie?: string;
+}
+
+export type SessionInput = SessionCredential | string | undefined;
+
+export interface SessionMetadata {
+  createdFrom: "oidc" | "legacy";
+  issuer?: string;
+  subject?: string;
+}
+
 export interface SessionStoreOptions {
   userId: string;
   email: string;
@@ -85,8 +98,25 @@ export interface SessionStoreOptions {
 /** Authentication boundary; implementations may be in-memory or durable. */
 export interface SessionAuthority {
   login(email: string, password: string, clientKey?: string): Promise<string>;
-  authenticate(header: string | undefined): string | Promise<string>;
-  revoke(header: string | undefined): void | Promise<void>;
+  issue(userId: string, metadata: SessionMetadata): Promise<string>;
+  authenticate(input: SessionInput): string | Promise<string>;
+  revoke(input: SessionInput): void | Promise<void>;
+}
+
+function normalizeCredential(input: SessionInput): SessionCredential {
+  return typeof input === "string" ? { authorization: input } : (input ?? {});
+}
+
+function sessionToken(input: SessionInput): string | null {
+  const credential = normalizeCredential(input);
+  const bearer = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(
+    credential.authorization ?? "",
+  )?.[1];
+  if (bearer) return bearer;
+  const cookie = credential.cookie?.match(
+    /(?:^|;\s*)wap_session=([^;]*)/,
+  )?.[1];
+  return cookie && /^[A-Za-z0-9_-]{43}$/.test(cookie) ? cookie : null;
 }
 
 export class SessionStore implements SessionAuthority {
@@ -138,32 +168,44 @@ export class SessionStore implements SessionAuthority {
       this.prune(this.now());
       if (this.sessions.size >= MAX_SESSIONS)
         throw new AuthError("RATE_LIMITED", "Too many active sessions");
-      const token = randomBytes(32).toString("base64url");
-      this.sessions.set(this.digest(token), {
-        userId: this.options.userId,
-        expiresAt: this.now() + this.options.ttlMs,
-      });
-      return token;
+      return this.issue(this.options.userId, { createdFrom: "legacy" });
     } finally {
       this.kdfInFlight -= 1;
     }
   }
 
-  authenticate(header: string | undefined): string {
+  async issue(userId: string, _metadata: SessionMetadata): Promise<string> {
+    if (userId !== this.options.userId)
+      throw new AuthError(
+        "UNAUTHENTICATED",
+        "Authentication principal is not configured",
+      );
     this.prune(this.now());
-    const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header ?? "");
-    if (!match)
+    if (this.sessions.size >= MAX_SESSIONS)
+      throw new AuthError("RATE_LIMITED", "Too many active sessions");
+    const token = randomBytes(32).toString("base64url");
+    this.sessions.set(this.digest(token), {
+      userId,
+      expiresAt: this.now() + this.options.ttlMs,
+    });
+    return token;
+  }
+
+  authenticate(input: SessionInput): string {
+    this.prune(this.now());
+    const token = sessionToken(input);
+    if (!token)
       throw new AuthError("UNAUTHENTICATED", "Authentication required");
-    const session = this.sessions.get(this.digest(match[1]!));
+    const session = this.sessions.get(this.digest(token));
     if (!session || session.expiresAt <= this.now())
       throw new AuthError("UNAUTHENTICATED", "Authentication required");
     return session.userId;
   }
 
-  revoke(header: string | undefined): void {
+  revoke(input: SessionInput): void {
     this.prune(this.now());
-    const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header ?? "");
-    if (!match || !this.sessions.delete(this.digest(match[1]!)))
+    const token = sessionToken(input);
+    if (!token || !this.sessions.delete(this.digest(token)))
       throw new AuthError("UNAUTHENTICATED", "Authentication required");
   }
 

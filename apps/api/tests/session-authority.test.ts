@@ -18,11 +18,16 @@ describe("session authority seam", () => {
         calls.push("login");
         return "token";
       },
-      authenticate(header) {
+      async issue() {
+        return "issued";
+      },
+      authenticate(input) {
+        const header = typeof input === "string" ? input : input?.authorization;
         calls.push(`authenticate:${header ?? "none"}`);
         return "00000000-0000-4000-8000-000000000001";
       },
-      revoke(header) {
+      revoke(input) {
+        const header = typeof input === "string" ? input : input?.authorization;
         calls.push(`revoke:${header ?? "none"}`);
       },
     };
@@ -57,11 +62,16 @@ describe("session authority seam", () => {
         calls.push(`login:${email}:${password}:${clientKey}`);
         return "async-token";
       },
-      async authenticate(header) {
+      async issue() {
+        return "issued";
+      },
+      async authenticate(input) {
+        const header = typeof input === "string" ? input : input?.authorization;
         calls.push(`authenticate:${header ?? "none"}`);
         return "00000000-0000-4000-8000-000000000001";
       },
-      async revoke(header) {
+      async revoke(input) {
+        const header = typeof input === "string" ? input : input?.authorization;
         calls.push(`revoke:${header ?? "none"}`);
       },
     };

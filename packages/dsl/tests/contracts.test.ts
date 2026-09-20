@@ -20,6 +20,26 @@ it("does not expose an executable run without a version and plan", () => {
   ).toBe(false);
 });
 
+it("strictly validates the authenticated local identity contract", () => {
+  expect(
+    dsl.AuthMeSchema.safeParse({
+      user_id: "00000000-0000-4000-8000-000000000001",
+      email: "user@example.local",
+      display_name: "User",
+      roles: ["user"],
+    }).success,
+  ).toBe(true);
+  expect(
+    dsl.AuthMeSchema.safeParse({
+      user_id: "not-a-uuid",
+      email: "user@example.local",
+      display_name: null,
+      roles: ["operator"],
+      unexpected: true,
+    }).success,
+  ).toBe(false);
+});
+
 it("trace exposes full immutable attempt snapshots and distinguishes incomplete legacy history", () => {
   expect(api.TraceSchema).toBeDefined();
   const trace = {

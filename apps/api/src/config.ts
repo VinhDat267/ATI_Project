@@ -19,6 +19,22 @@ export interface ApiConfig {
   readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
   /** Maximum time the API worker waits for an active tick during shutdown. */
   readonly workerShutdownTimeoutMs?: number;
+  readonly oidc?: OidcConfig;
+}
+
+export interface OidcConfig {
+  readonly enabled: boolean;
+  readonly issuerUrl: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly redirectUri: string;
+  readonly audience: string;
+  readonly scopes: string[];
+  readonly webOrigin: string;
+  readonly sessionCookieName: string;
+  readonly transactionTtlMs: number;
+  readonly sessionTtlMs: number;
+  readonly clockSkewSeconds: number;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -71,6 +87,142 @@ function boolean(
   throw new Error(`Invalid boolean configuration ${name}`);
 }
 
+function oidcString(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  enabled: boolean,
+): string {
+  const value = env[name]?.trim() ?? "";
+  if (enabled && !value)
+    throw new Error(`Missing required configuration ${name}`);
+  return value;
+}
+
+function oidcPositiveInteger(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+  max: number,
+): number {
+  const value = env[name] ?? String(fallback);
+  if (!/^[1-9][0-9]*$/.test(value))
+    throw new Error(`Invalid integer configuration ${name}`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > max)
+    throw new Error(`Invalid integer configuration ${name}`);
+  return parsed;
+}
+
+function oidcScopes(env: NodeJS.ProcessEnv, enabled: boolean): string[] {
+  const raw = env.OIDC_SCOPES ?? "openid,profile,email";
+  const parts = raw.split(",").map((scope) => scope.trim());
+  const scopes = parts.filter(Boolean);
+  if (enabled && parts.some((scope) => !scope))
+    throw new Error("Invalid configuration OIDC_SCOPES");
+  if (
+    enabled &&
+    (!scopes.includes("openid") || scopes.length !== new Set(scopes).size)
+  )
+    throw new Error("Invalid configuration OIDC_SCOPES");
+  if (enabled && scopes.some((scope) => !/^[A-Za-z0-9._:-]+$/.test(scope)))
+    throw new Error("Invalid configuration OIDC_SCOPES");
+  return scopes;
+}
+
+function parseOrigin(value: string, name: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`Invalid configuration ${name}`);
+  }
+  if (
+    !parsed.port &&
+    (parsed.protocol === "http:" || parsed.protocol === "https:")
+  ) {
+    // URL.port is empty for default ports and is valid here.
+  }
+  if (
+    !/^https?:$/.test(parsed.protocol) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  )
+    throw new Error(`Invalid configuration ${name}`);
+  return parsed;
+}
+
+function oidcConfig(env: NodeJS.ProcessEnv, sessionTtlMs: number): OidcConfig {
+  const enabled = boolean(env, "OIDC_ENABLED", false);
+  const issuerUrl = oidcString(env, "OIDC_ISSUER_URL", enabled);
+  const clientId = oidcString(env, "OIDC_CLIENT_ID", enabled);
+  const clientSecret = oidcString(env, "OIDC_CLIENT_SECRET", enabled);
+  const redirectUri = oidcString(env, "OIDC_REDIRECT_URI", enabled);
+  const audience = oidcString(env, "OIDC_AUDIENCE", enabled);
+  const webOrigin = oidcString(env, "OIDC_WEB_ORIGIN", enabled);
+  const scopes = oidcScopes(env, enabled);
+  const sessionCookieName =
+    env.OIDC_SESSION_COOKIE_NAME?.trim() || "wap_session";
+  if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(sessionCookieName))
+    throw new Error("Invalid configuration OIDC_SESSION_COOKIE_NAME");
+  const transactionTtlMs = oidcPositiveInteger(
+    env,
+    "OIDC_TRANSACTION_TTL_MS",
+    10 * 60 * 1000,
+    15 * 60 * 1000,
+  );
+  const configuredSessionTtl = oidcPositiveInteger(
+    env,
+    "OIDC_SESSION_TTL_MS",
+    sessionTtlMs,
+    24 * 60 * 60 * 1000,
+  );
+  const clockSkewSeconds = oidcPositiveInteger(
+    env,
+    "OIDC_CLOCK_SKEW_SECONDS",
+    60,
+    300,
+  );
+  if (!enabled)
+    return {
+      enabled,
+      issuerUrl,
+      clientId,
+      clientSecret,
+      redirectUri,
+      audience,
+      scopes,
+      webOrigin,
+      sessionCookieName,
+      transactionTtlMs,
+      sessionTtlMs: configuredSessionTtl,
+      clockSkewSeconds,
+    };
+  const issuer = parseOrigin(issuerUrl, "OIDC_ISSUER_URL");
+  const redirect = parseOrigin(redirectUri, "OIDC_REDIRECT_URI");
+  parseOrigin(webOrigin, "OIDC_WEB_ORIGIN");
+  const loopback = new Set(["127.0.0.1", "localhost", "[::1]"]);
+  if (issuer.protocol !== "https:" && !loopback.has(issuer.hostname))
+    throw new Error("OIDC_ISSUER_URL must use HTTPS outside local loopback");
+  if (redirect.protocol !== "https:" && !loopback.has(redirect.hostname))
+    throw new Error("OIDC_REDIRECT_URI must use HTTPS outside local loopback");
+  return {
+    enabled,
+    issuerUrl: issuer.toString().replace(/\/$/, ""),
+    clientId,
+    clientSecret,
+    redirectUri: redirect.toString(),
+    audience,
+    scopes,
+    webOrigin,
+    sessionCookieName,
+    transactionTtlMs,
+    sessionTtlMs: configuredSessionTtl,
+    clockSkewSeconds,
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const userId = env.G1_USER_ID ?? DEMO_USER_ID;
   z.uuid().parse(userId);
@@ -87,11 +239,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     throw new Error("Invalid configuration API_PLANNER_MODE");
   const plannerMode = rawPlannerMode;
   const allowNewRuns = boolean(env, "API_NEW_RUNS_ENABLED", true);
-  const allowProviderCalls = boolean(
-    env,
-    "AI_PROVIDER_CALLS_ENABLED",
-    true,
-  );
+  const allowProviderCalls = boolean(env, "AI_PROVIDER_CALLS_ENABLED", true);
   const rawRetrievalVariant = env.AI_RETRIEVAL_VARIANT ?? "all_tools";
   if (
     rawRetrievalVariant !== "all_tools" &&
@@ -105,18 +253,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     "API_WORKER_SHUTDOWN_TIMEOUT_MS",
     30_000,
   );
+  const sessionTtlMs = sessionTtl(env);
+  const oidc = oidcConfig(env, sessionTtlMs);
   return {
     host: "127.0.0.1",
     port: integer(env, "API_PORT", 3001),
     userId,
     email,
     passwordHash,
-    sessionTtlMs: sessionTtl(env),
+    sessionTtlMs,
     cursorKey: cursorKey(required(env, "API_CURSOR_KEY")),
     plannerMode,
     allowNewRuns,
     allowProviderCalls,
     aiRetrievalVariant,
     workerShutdownTimeoutMs,
+    oidc,
   };
 }

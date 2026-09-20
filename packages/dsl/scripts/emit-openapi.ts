@@ -14,6 +14,8 @@ const definitions = {
   CreateRun: dsl.CreateRunSchema,
   LoginRequest: dsl.LoginRequestSchema,
   LoginResponse: dsl.LoginResponseSchema,
+  AuthMe: dsl.AuthMeSchema,
+  OidcError: dsl.OidcErrorSchema,
   ApiError: dsl.ApiErrorSchema,
   ServerSummary: dsl.ServerSummarySchema,
   ServerCatalogTool: dsl.ServerCatalogToolSchema,
@@ -148,7 +150,10 @@ const spec = {
         security: [],
         summary: "Dependency readiness probe",
         responses: {
-          "200": { description: "Dependencies are ready", content: json(health) },
+          "200": {
+            description: "Dependencies are ready",
+            content: json(health),
+          },
           "503": {
             description: "Dependency is unavailable",
             content: json(ref("ApiError")),

@@ -1633,6 +1633,51 @@ components:
       required:
         - token
       additionalProperties: false
+    AuthMe:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        email:
+          type: string
+          minLength: 1
+          maxLength: 320
+        display_name:
+          anyOf:
+            - type: string
+              maxLength: 200
+            - type: "null"
+        roles:
+          minItems: 1
+          type: array
+          items:
+            type: string
+            enum:
+              - user
+              - operator
+      required:
+        - user_id
+        - email
+        - display_name
+        - roles
+      additionalProperties: false
+    OidcError:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 80
+        message:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+        - code
+        - message
+      additionalProperties: false
     ApiError:
       type: object
       properties:
