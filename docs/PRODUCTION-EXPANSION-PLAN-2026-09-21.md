@@ -6,8 +6,8 @@
 
 ### CONFIRMED
 
-- Checkout hiện tại kết thúc ở `0682456`; worktree sạch.
-- Full integrated gate đã pass trên commit `6237334`; latest backend gate trên code commit `a1914e6` cũng pass: DSL 43, engine unit 341 (1 skipped), API unit 51, web unit 128; MCP integration 64, engine integration 102, API integration 40. WEB-03 pass đủ 6 browser/build gates trên code commit `20dc8bd`.
+- Checkout hiện tại kết thúc ở `b957e2d`; worktree sạch.
+- Full integrated gate đã pass trên commit `6237334`; latest backend gate trên code commit `b957e2d` cũng pass: DSL 43, engine unit 341 (1 skipped), API unit 54, web unit 128; MCP integration 64, engine integration 102, API integration 40. WEB-03 pass đủ 6 browser/build gates trên code commit `20dc8bd`.
 - Manifest browser sạch mới nhất là `docs/web-evidence/WEB-03/20260920190747-fb09486c-88d3-4460-907a-ac9454db2327/manifest.json`.
 - PostgreSQL demo được migrate additive đến tổng 9 migrations, không reset volume.
 - Google probe 6 calls đã pass. Đây là connectivity/protocol evidence, không phải quality evaluation; OpenAI live probe và formal live evaluation chưa chạy.
