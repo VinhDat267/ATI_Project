@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   WorkflowEngine,
   encodePlannerWire,
+  hashEmbeddingText,
+  loadLocalReviewedCatalog,
+  PGVECTOR_DIMENSIONS,
+  PgvectorCatalogIndex,
   readAiProviderConfig,
+  serializeReviewedToolForEmbedding,
+  toolContentHash,
   type Gateway,
   type ProviderCallReservation,
 } from "@wap/engine";
@@ -236,5 +242,136 @@ describe("provider-backed API replan wiring", () => {
       }),
     ).rejects.toThrow(/active pgvector index|no active/i);
     expect(fetchCalls).toBe(0);
+  });
+
+  it("runs semantic retrieval through the active pgvector index before planning", async () => {
+    const fixture = await makeApiFixture({
+      workerEnabled: true,
+      filesystemEnabled: true,
+    });
+    openFixtures.add(fixture);
+    const catalog = loadLocalReviewedCatalog(root, fixture.gateway!.tools);
+    const config = readAiProviderConfig({
+      AI_PLANNING_PROVIDER: "openai",
+      AI_PLANNING_MODEL: "gpt-5.6-terra",
+      AI_EMBEDDING_PROVIDER: "openai",
+      AI_EMBEDDING_MODEL: "text-embedding-3-large",
+    });
+    const vector = Array.from({ length: PGVECTOR_DIMENSIONS }, (_, index) =>
+      index === 0 ? 1 : 0,
+    );
+    await new PgvectorCatalogIndex(fixture.db, fixture.userId).activate({
+      catalog,
+      rows: catalog.tools.map((tool) => ({
+        server: tool.server,
+        name: tool.name,
+        purpose: "document" as const,
+        vector,
+        contentHash: toolContentHash(tool),
+        embeddingTextHash: hashEmbeddingText(
+          serializeReviewedToolForEmbedding(tool),
+        ),
+        provenance: {
+          provider: config.embedding.provider,
+          model: config.embedding.model,
+          dimensions: config.embedding.dimensions,
+          preprocessingVersion: config.embedding.preprocessingVersion,
+          catalogHash: catalog.catalogHash,
+        },
+      })),
+    });
+
+    const reservations: ProviderCallReservation[] = [];
+    let fetchCalls = 0;
+    const runtime = createAiRuntime({
+      db: fixture.db,
+      gateway: fixture.gateway!,
+      root,
+      userId: fixture.userId,
+      retrievalVariant: "semantic",
+      config,
+      credentials: { OPENAI_API_KEY: "integration-test-key" },
+      ledger: {
+        async reserve(input) {
+          reservations.push(input);
+          return `semantic-provider-call-${reservations.length}`;
+        },
+        async settle() {},
+      },
+      authorizeCall: async () => {},
+      fetchImpl: async (_input, init) => {
+        fetchCalls++;
+        const body = JSON.parse(String(init?.body)) as { input?: unknown };
+        if (String(_input).endsWith("/embeddings")) {
+          return new Response(
+            JSON.stringify({
+              id: "semantic-query-embedding",
+              model: config.embedding.model,
+              data: [{ embedding: vector }],
+              usage: { prompt_tokens: 12, total_tokens: 12 },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        expect(body.input).toBeTruthy();
+        const result: PlannerResult = {
+          kind: "plan",
+          plan: {
+            version: "1.0",
+            name: "List cards",
+            source_prompt: "List September cards",
+            inputs: {},
+            steps: [
+              {
+                id: "read_cards",
+                description: "List cards",
+                tool: {
+                  server: "task_hub",
+                  name: "list_cards",
+                  args: { board_id: "board_a" },
+                },
+                depends_on: [],
+                condition: null,
+                idempotency_key: null,
+                side_effect: "read",
+                on_error: "fail",
+              },
+            ],
+            outputs: { count: "${steps.read_cards.output.count}" },
+          },
+        };
+        return new Response(
+          JSON.stringify({
+            id: "semantic-planner-response",
+            model: config.planning.model,
+            output_text: JSON.stringify(encodePlannerWire(result)),
+            usage: {
+              input_tokens: 100,
+              output_tokens: 40,
+              reasoning_tokens: 0,
+              total_tokens: 140,
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+
+    const result = await runtime.planner.produce({
+      runId: "semantic-with-index",
+      userId: fixture.userId,
+      request: {
+        source_prompt: "List September cards",
+        inputs: {},
+        time_zone: "Asia/Ho_Chi_Minh",
+      },
+      runtime: { today: "2026-09-21" },
+    });
+    expect(result.kind).toBe("plan");
+    expect(fetchCalls).toBe(2);
+    expect(reservations.map((call) => call.purpose)).toEqual([
+      "embedding",
+      "planning",
+    ]);
   });
 });
