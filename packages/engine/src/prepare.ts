@@ -104,7 +104,15 @@ export async function prepareAccepted(
             runtime: run.runtime,
           }),
         );
-      } catch {
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            event: "planner_error",
+            run_id: id,
+            error: String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+          }),
+        );
         await store.failPlanning(id, "Planner returned an invalid result");
         return store.detail(id);
       }

@@ -8,6 +8,7 @@ import {
   type AuthorizeProviderCall,
   type FetchLike,
   type ProviderCallLedger,
+  type ProviderPriceCard,
   PgvectorCatalogIndex,
   PgvectorToolRetriever,
   type Gateway,
@@ -17,6 +18,57 @@ import {
 import type { Database } from "@wap/db";
 import { loadAiPlanner, loadAiReplan } from "./ai-planner.js";
 
+export const DEFAULT_AI_PRICE_CARD: ProviderPriceCard = {
+  version: "default-api-price-card-v1",
+  entries: {
+    "gemini-3.5-flash": {
+      inputMicrosPerMillion: 150_000,
+      cachedInputMicrosPerMillion: 75_000,
+      outputMicrosPerMillion: 600_000,
+      reasoningMicrosPerMillion: 600_000,
+    },
+    "gemini-2.5-flash": {
+      inputMicrosPerMillion: 150_000,
+      cachedInputMicrosPerMillion: 75_000,
+      outputMicrosPerMillion: 600_000,
+      reasoningMicrosPerMillion: 600_000,
+    },
+    "gemini-3.6-flash": {
+      inputMicrosPerMillion: 150_000,
+      cachedInputMicrosPerMillion: 75_000,
+      outputMicrosPerMillion: 600_000,
+      reasoningMicrosPerMillion: 600_000,
+    },
+    "gemini-3.7-flash": {
+      inputMicrosPerMillion: 150_000,
+      cachedInputMicrosPerMillion: 75_000,
+      outputMicrosPerMillion: 600_000,
+      reasoningMicrosPerMillion: 600_000,
+    },
+    "gemini-3.8-flash": {
+      inputMicrosPerMillion: 150_000,
+      cachedInputMicrosPerMillion: 75_000,
+      outputMicrosPerMillion: 600_000,
+      reasoningMicrosPerMillion: 600_000,
+    },
+    "gemini-embedding-001": {
+      inputMicrosPerMillion: 25_000,
+    },
+    "gemini-embedding-2": {
+      inputMicrosPerMillion: 25_000,
+    },
+    "gpt-5.6-terra": {
+      inputMicrosPerMillion: 2_500_000,
+      cachedInputMicrosPerMillion: 1_250_000,
+      outputMicrosPerMillion: 10_000_000,
+      reasoningMicrosPerMillion: 10_000_000,
+    },
+    "text-embedding-3-large": {
+      inputMicrosPerMillion: 130_000,
+    },
+  },
+};
+
 export interface AiRuntimePortsOptions {
   readonly config: AiProviderConfig;
   readonly credentials: AiProviderCredentials;
@@ -25,6 +77,7 @@ export interface AiRuntimePortsOptions {
   readonly callContext?: AiProviderCallContext;
   readonly fetchImpl?: FetchLike;
   readonly now?: () => number;
+  readonly priceCard?: ProviderPriceCard;
 }
 
 export interface CreateAiRuntimeOptions extends AiRuntimePortsOptions {
@@ -73,6 +126,7 @@ export function createAiRuntimePorts(options: AiRuntimePortsOptions): AiPorts {
     ...(options.callContext ? { callContext: options.callContext } : {}),
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     ...(options.now ? { now: options.now } : {}),
+    priceCard: options.priceCard ?? DEFAULT_AI_PRICE_CARD,
   });
 }
 

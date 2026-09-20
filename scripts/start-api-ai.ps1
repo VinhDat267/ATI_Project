@@ -5,11 +5,13 @@
 
 $ErrorActionPreference = "Stop"
 
-# ── Static demo credentials (not real user data) ──────────────────────────────
+# ── Load demo credentials from .artifacts/demo-config.json ────────────────────
+$cfg = Get-Content '.artifacts/demo-config.json' | ConvertFrom-Json
 $env:G1_DATABASE_URL          = "postgresql://wap:wap@127.0.0.1:55532/wap_g1"
-$env:API_DEMO_EMAIL           = "demo@local.dev"
-$env:API_DEMO_PASSWORD_HASH   = "scrypt`$16384`$8`$1`$19bcc1910a38373b93f6ec2e044c44ae`$4bd92ed2b52ab4820394c4807953beb16c2968df9d2976d92003736fba04176ce41105b256f427fe2aaef62453ba205d6a9a36a0ec03fb25e4f67c47d16b5230"
-$env:API_CURSOR_KEY           = "ROOqEsg+vyYDpPyBovPBu9zO9gu4VJEjdbL6lARCZ+k="
+$env:G1_FILESYSTEM_ENABLED    = "true"
+$env:API_DEMO_EMAIL           = "demo@ati.local"
+$env:API_DEMO_PASSWORD_HASH   = $cfg.HASH
+$env:API_CURSOR_KEY           = $cfg.CURSOR_KEY
 $env:API_PORT                 = "3001"
 
 # ── AI planner — Google Gemini ─────────────────────────────────────────────────

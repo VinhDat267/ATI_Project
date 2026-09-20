@@ -135,6 +135,7 @@ export type {
   AiProviderCallContext,
   AiLiveApprovalRecord,
   PlannerWire,
+  ProviderPriceCard,
 } from "./ai/index.js";
 export {
   executeReplan,
