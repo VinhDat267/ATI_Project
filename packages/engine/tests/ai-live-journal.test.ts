@@ -69,6 +69,23 @@ describe("durable live-evaluation journal", () => {
     }
   });
 
+  it("poisons the journal after a sync failure and rejects later appends", async () => {
+    const journalPath = await createTempJournalPath("poison");
+    const failure = new Error("sync failed");
+    const journal = await createLiveJournal(journalPath, {
+      sync: async () => {
+        throw failure;
+      },
+    });
+    try {
+      await expect(journal.append(event())).rejects.toBe(failure);
+      await expect(journal.append(event("t2"))).rejects.toBe(failure);
+    } finally {
+      await journal.close();
+      await rm(resolve(journalPath, ".."), { recursive: true, force: true });
+    }
+  });
+
   it("replays complete events and reports an incomplete final fragment", async () => {
     const journalPath = await createTempJournalPath("truncated");
     const journal = await createLiveJournal(journalPath);

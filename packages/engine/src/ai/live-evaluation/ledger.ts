@@ -156,6 +156,8 @@ export class JournaledProviderCallLedger implements ProviderCallLedger {
   private readonly journal: LiveJournal;
   private readonly store = new Map<string, ProviderCallRecord>();
   private sequence: number;
+  private failure: unknown;
+  private tail: Promise<void> = Promise.resolve();
 
   constructor(options: JournaledProviderCallLedgerOptions) {
     if (
@@ -176,6 +178,20 @@ export class JournaledProviderCallLedger implements ProviderCallLedger {
     this.sequence = nextSequence(this.store.values());
   }
 
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(async () => {
+      if (this.failure !== undefined) throw this.failure;
+      try {
+        return await operation();
+      } catch (error) {
+        this.failure = error;
+        throw error;
+      }
+    });
+    this.tail = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   async reserve(input: ProviderCallReservation): Promise<string> {
     const trialId = requireTrialId(input);
     if (
@@ -184,63 +200,67 @@ export class JournaledProviderCallLedger implements ProviderCallLedger {
     ) {
       throw new Error("estimatedCostMicros must be non-negative");
     }
-    const committed = [...this.store.values()].reduce(
-      (sum, record) =>
-        sum +
-        (record.costMicros ??
-          (record.reservationHeld ? record.estimatedCostMicros : 0)),
-      0,
-    );
-    if (committed + input.estimatedCostMicros > this.limitMicros) {
-      throw new ProviderAccountingError(
-        "BUDGET_EXCEEDED",
-        `provider call reservation exceeds campaign cap of ${this.limitMicros} micros`,
+    return this.enqueue(async () => {
+      const committed = [...this.store.values()].reduce(
+        (sum, record) =>
+          sum +
+          (record.costMicros ??
+            (record.reservationHeld ? record.estimatedCostMicros : 0)),
+        0,
       );
-    }
+      if (committed + input.estimatedCostMicros > this.limitMicros) {
+        throw new ProviderAccountingError(
+          "BUDGET_EXCEEDED",
+          `provider call reservation exceeds campaign cap of ${this.limitMicros} micros`,
+        );
+      }
 
-    const callId = `provider-call-${++this.sequence}`;
-    const reservation = { ...input, trialId };
-    await this.journal.append({
-      event: "provider_call_reserved",
-      timestamp: eventTimestamp(),
-      trialId,
-      payload: { callId, reservation },
+      const callId = `provider-call-${++this.sequence}`;
+      const reservation = { ...input, trialId };
+      await this.journal.append({
+        event: "provider_call_reserved",
+        timestamp: eventTimestamp(),
+        trialId,
+        payload: { callId, reservation },
+      });
+      this.store.set(callId, {
+        ...reservation,
+        callId,
+        status: "reserved",
+        usage: null,
+        costMicros: null,
+        errorCode: null,
+        reservationHeld: true,
+      });
+      return callId;
     });
-    this.store.set(callId, {
-      ...reservation,
-      callId,
-      status: "reserved",
-      usage: null,
-      costMicros: null,
-      errorCode: null,
-      reservationHeld: true,
-    });
-    return callId;
   }
 
   async settle(callId: string, outcome: ProviderCallSettlement): Promise<void> {
-    const current = this.store.get(callId);
-    if (!current) {
-      throw new ProviderAccountingError(
-        "CALL_NOT_FOUND",
-        `unknown provider call ${callId}`,
-      );
-    }
-    const normalized = normalizeSettlement(outcome);
-    if (current.status !== "reserved") {
-      if (sameSettlement(settlementOf(current), normalized)) return;
-      throw new ProviderAccountingError(
-        "CALL_ALREADY_SETTLED",
-        `provider call ${callId} is already settled`,
-      );
-    }
-    await this.journal.append({
-      event: "provider_call_settled",
-      timestamp: eventTimestamp(),
-      trialId: current.trialId!,
-      payload: { callId, outcome: normalized },
+    return this.enqueue(async () => {
+      const current = this.store.get(callId);
+      if (!current) {
+        throw new ProviderAccountingError(
+          "CALL_NOT_FOUND",
+          `unknown provider call ${callId}`,
+        );
+      }
+      const normalized = normalizeSettlement(outcome);
+      if (current.status !== "reserved") {
+        if (sameSettlement(settlementOf(current), normalized)) return;
+        throw new ProviderAccountingError(
+          "CALL_ALREADY_SETTLED",
+          `provider call ${callId} is already settled`,
+        );
+      }
+      await this.journal.append({
+        event: "provider_call_settled",
+        timestamp: eventTimestamp(),
+        trialId: current.trialId!,
+        payload: { callId, outcome: normalized },
+      });
+      this.store.set(callId, applySettlement(current, normalized));
     });
-    this.store.set(callId, applySettlement(current, normalized));
   }
 
   records(): ProviderCallRecord[] {

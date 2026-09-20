@@ -129,4 +129,27 @@ describe("journal-backed provider call ledger", () => {
       await rm(resolve(journalPath, ".."), { recursive: true, force: true });
     }
   });
+
+  it("serializes concurrent reservations before checking the shared budget", async () => {
+    const journalPath = await createTempJournalPath("concurrent-budget");
+    const journal = await createLiveJournal(journalPath);
+    const ledger = new JournaledProviderCallLedger({
+      campaignLimitMicros: 100,
+      journal,
+    });
+    try {
+      const results = await Promise.allSettled([
+        ledger.reserve(reservation(60)),
+        ledger.reserve({ ...reservation(60), trialId: "trial-2" }),
+      ]);
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")[0]).toMatchObject({
+        reason: { code: "BUDGET_EXCEEDED" },
+      });
+      expect(ledger.records()).toHaveLength(1);
+    } finally {
+      await journal.close();
+      await rm(resolve(journalPath, ".."), { recursive: true, force: true });
+    }
+  });
 });

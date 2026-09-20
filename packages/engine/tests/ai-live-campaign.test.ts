@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openLiveCampaign } from "../src/ai/live-evaluation/campaign.js";
@@ -77,5 +77,57 @@ describe("ai-live campaign coordinator", () => {
       }),
     ).rejects.toMatchObject({ code: "BUDGET_EXCEEDED" });
     await second.close();
+  });
+
+  it("does not destroy an existing run when a duplicate run id is opened", async () => {
+    const outputRoot = await root();
+    const options = {
+      outputRoot,
+      campaignId: "campaign-duplicate",
+      runId: "run-1",
+      profileId: "openai-only",
+      phase: "smoke",
+      budgetCapMicros: 100,
+    } as const;
+    const first = await openLiveCampaign(options);
+    await first.journal.append({
+      event: "trial_started",
+      timestamp: new Date().toISOString(),
+      trialId: "trial-1",
+      payload: { marker: "retain-me" },
+    });
+    const journalPath = join(first.runDirectory, "journal.jsonl");
+    await first.close();
+    const before = await readFile(journalPath, "utf8");
+
+    await expect(openLiveCampaign(options)).rejects.toThrow();
+
+    expect(await readFile(journalPath, "utf8")).toBe(before);
+  });
+
+  it("blocks a campaign when a previously registered run journal is missing", async () => {
+    const outputRoot = await root();
+    const first = await openLiveCampaign({
+      outputRoot,
+      campaignId: "campaign-missing-journal",
+      runId: "run-1",
+      profileId: "openai-only",
+      phase: "smoke",
+      budgetCapMicros: 100,
+    });
+    const runDirectory = first.runDirectory;
+    await first.close();
+    await rm(join(runDirectory, "journal.jsonl"));
+
+    await expect(
+      openLiveCampaign({
+        outputRoot,
+        campaignId: "campaign-missing-journal",
+        runId: "run-2",
+        profileId: "openai-only",
+        phase: "dev",
+        budgetCapMicros: 100,
+      }),
+    ).rejects.toThrow(/cannot verify prior campaign run|missing/i);
   });
 });

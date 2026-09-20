@@ -119,25 +119,44 @@ export async function createLiveJournal(
   const sync = options.sync ?? ((file: FileHandle) => file.sync());
   let sequence = 0;
   let closed = false;
+  let failure: unknown;
+  let tail: Promise<void> = Promise.resolve();
+
+  const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+    const run = tail.then(async () => {
+      if (failure !== undefined) throw failure;
+      try {
+        return await operation();
+      } catch (error) {
+        failure = error;
+        throw error;
+      }
+    });
+    tail = run.then(() => undefined, () => undefined);
+    return run;
+  };
 
   const append = async (
     event: LiveJournalEvent,
   ): Promise<DurableLiveJournalEvent> => {
     if (closed) throw new Error("Live journal is already closed");
-    const durable = DurableLiveJournalEventSchema.parse({
-      version: 1,
-      sequence: ++sequence,
-      eventId: randomUUID(),
-      ...event,
+    return enqueue(async () => {
+      const durable = DurableLiveJournalEventSchema.parse({
+        version: 1,
+        sequence: ++sequence,
+        eventId: randomUUID(),
+        ...event,
+      });
+      await handle.write(`${JSON.stringify(durable)}\n`, undefined, "utf8");
+      await sync(handle);
+      return durable;
     });
-    await handle.write(`${JSON.stringify(durable)}\n`, undefined, "utf8");
-    await sync(handle);
-    return durable;
   };
 
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
+    await tail;
     await handle.close();
   };
 

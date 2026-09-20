@@ -106,6 +106,8 @@ export async function openLiveCampaign(
 
   let lock: FileHandle;
   const lockPath = join(campaignDirectory, "campaign.lock");
+  const ownerToken = randomUUID();
+  let runDirectoryCreated = false;
   try {
     lock = await open(lockPath, "wx");
   } catch (error) {
@@ -119,7 +121,7 @@ export async function openLiveCampaign(
     await lock.writeFile(
       `${JSON.stringify({
         format: "ati-ai-live-campaign-lock-v1",
-        owner: randomUUID(),
+        owner: ownerToken,
         campaignId: options.campaignId,
         runId: options.runId,
         profileId: options.profileId,
@@ -131,6 +133,7 @@ export async function openLiveCampaign(
     );
     await lock.sync();
     await mkdir(runDirectory, { recursive: false });
+    runDirectoryCreated = true;
     const previousRecords = [];
     const runsDirectory = join(campaignDirectory, "runs");
     const { readdir } = await import("node:fs/promises");
@@ -141,7 +144,11 @@ export async function openLiveCampaign(
         const replay = await replayLiveJournal(priorJournalPath);
         previousRecords.push(...restoreProviderCallRecords(replay.events));
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          throw new Error(`cannot verify prior campaign run "${priorRunId}": journal is missing`, {
+            cause: error,
+          });
+        }
         throw new Error(`cannot verify prior campaign run "${priorRunId}"`, {
           cause: error,
         });
@@ -181,16 +188,34 @@ export async function openLiveCampaign(
         await runJournal.close();
         await lock.close();
         // The lock file is removed only after the owning handle is closed.
-        const { unlink } = await import("node:fs/promises");
-        await unlink(lockPath);
+        const { unlink, readFile } = await import("node:fs/promises");
+        try {
+          const lockMetadata = JSON.parse(await readFile(lockPath, "utf8")) as {
+            readonly owner?: string;
+          };
+          if (lockMetadata.owner === ownerToken) await unlink(lockPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
       },
     };
   } catch (error) {
     await journal?.close().catch(() => undefined);
     await lock.close();
-    const { unlink, rm } = await import("node:fs/promises");
-    await unlink(lockPath).catch(() => undefined);
-    await rm(runDirectory, { recursive: true, force: true }).catch(() => undefined);
+    const { unlink, readFile, rm } = await import("node:fs/promises");
+    try {
+      const lockMetadata = JSON.parse(await readFile(lockPath, "utf8")) as {
+        readonly owner?: string;
+      };
+      if (lockMetadata.owner === ownerToken) await unlink(lockPath);
+    } catch (cleanupError) {
+      if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT") {
+        // Preserve the original open error while leaving diagnostics on disk.
+      }
+    }
+    if (runDirectoryCreated) {
+      await rm(runDirectory, { recursive: true, force: true }).catch(() => undefined);
+    }
     throw error;
   }
 }
