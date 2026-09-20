@@ -356,4 +356,9 @@ card/index, provider account probes, formal rubric/fresh holdout approval,
 independent read-only review, and the final operator `READY_FOR_LIVE_PROBE`
 decision. These are not inferred from fake transport or local test passes.
 
+Final verification on 2026-09-20: `npm run check:backend` passed with engine
+unit `308 passed, 1 skipped`, MCP integration `64 passed`, engine integration
+`98 passed`, and API integration `34 passed`. No provider key or paid network
+request was used by these checks.
+
 **Planning self-review:** This plan closes the remaining integration obligations, reuses existing modules, includes pricing and campaign-wide durability that a simple runtime hookup would miss, and preserves an executable bootstrap order. The original proposed rubric is not a preparation blocker. All eight implementation tasks are pending; only this document is created in the planning turn.
