@@ -23,6 +23,38 @@ import {
   validateSealedHoldoutBundle,
 } from "./dataset.js";
 
+/**
+ * Parse index evidence emitted by the index command.  The evidence may be
+ * either the index object itself or the `{ index, rowCount }` artifact envelope.
+ * Placeholder hashes are rejected because they do not bind a freeze to the
+ * evaluator database that was actually indexed.
+ */
+export function parseLiveActiveIndexEvidence(
+  value: unknown,
+): LiveExecutionFingerprint["activeIndex"] {
+  const candidate =
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "index" in value
+      ? (value as { index: unknown }).index
+      : value;
+  const parsed = LiveExecutionFingerprintSchema.shape.activeIndex.parse(
+    candidate,
+  );
+  if (
+    parsed.id === "idx-freeze-pending" ||
+    [parsed.provenanceHash, parsed.vectorHash, parsed.policyHash].some(
+      (hash) => /^0+$/.test(hash),
+    )
+  ) {
+    throw new Error(
+      "active index evidence must contain non-placeholder provenance, vector, and policy hashes",
+    );
+  }
+  return parsed;
+}
+
 export const LIVE_EVALUATION_BEHAVIOR_PATHS = [
   "packages/engine/src/ai/live-evaluation/contracts.ts",
   "packages/engine/src/ai/live-evaluation/dataset.ts",

@@ -71,10 +71,28 @@ npm run ai:eval:live -- index `
   --profile openai-only `
   --campaign <campaign-id> `
   --approval <index-approval-json> `
-  --execute
+  --execute `
+  --output <active-index-evidence.json>
 ```
 
-4. Run smoke before any larger phase. Smoke is exactly nine trials: one dev
+The output is the read-back active-index evidence (`id`, provenance hash,
+vector hash and policy hash). Keep it with the run artifacts; the freeze command
+rejects missing or all-zero placeholder hashes.
+
+4. Create an immutable execution freeze using the same campaign/profile scope,
+the approved budget and the index evidence produced above. A complete freeze
+also requires the price card used for the provider calls:
+
+```powershell
+npm run ai:eval:live -- freeze `
+  --profile openai-only `
+  --campaign <campaign-id> `
+  --approval <smoke-approval-json> `
+  --price-card <price-card-json> `
+  --index <active-index-evidence.json>
+```
+
+5. Run smoke before any larger phase. Smoke is exactly nine trials: one dev
    plan, refusal and clarification case across `all_tools`, `semantic`, and
    `semantic_qe`, all at K=10.
 
@@ -87,12 +105,12 @@ npm run ai:eval:live -- run `
   --execute
 ```
 
-5. `dev` schedules 126 trials (six dev cases × three cells × three
+6. `dev` schedules 126 trials (six dev cases × three cells × three
    repetitions). `legacy-regression` schedules 84 trials and additionally
    requires `--freeze <freeze.json>`. A proposed rubric or fake evidence keeps
    the report formally blocked even when all trials complete.
 
-6. Render/recover a run without provider or database access:
+7. Render/recover a run without provider or database access:
 
 ```powershell
 npm run ai:eval:live -- report --run <run-directory>

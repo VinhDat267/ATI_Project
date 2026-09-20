@@ -99,6 +99,28 @@ async function writeValidApproval(
   return filePath;
 }
 
+async function writeValidIndexEvidence(dir: string): Promise<string> {
+  const filePath = join(dir, "index.json");
+  await writeFile(
+    filePath,
+    `${JSON.stringify(
+      {
+        index: {
+          id: "idx-cli-test",
+          provenanceHash: "a".repeat(64),
+          vectorHash: "b".repeat(64),
+          policyHash: "c".repeat(64),
+        },
+        rowCount: 42,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  return filePath;
+}
+
 function createTestRuntime() {
   return createLiveEvaluationRuntime({
     probe: async () => ({
@@ -213,6 +235,11 @@ describe("ai-live-cli", () => {
   });
   it("executes freeze command with --price-card and writes execution snapshot", async () => {
     const tempDir = await createTempDir("freeze-price-test");
+    const approvalPath = await writeValidApproval(tempDir, {
+      phase: "smoke",
+      budgetMicros: 123_456,
+    });
+    const indexPath = await writeValidIndexEvidence(tempDir);
     const priceCardPath = join(tempDir, "price-card.json");
     await writeFile(
       priceCardPath,
@@ -235,8 +262,12 @@ describe("ai-live-cli", () => {
         "openai-only",
         "--campaign",
         "camp-cli-test",
+        "--approval",
+        approvalPath,
         "--price-card",
         priceCardPath,
+        "--index",
+        indexPath,
       ],
       {
         root,
@@ -248,7 +279,81 @@ describe("ai-live-cli", () => {
     const content = JSON.parse(await readFile(result.artifactPath!, "utf8"));
     expect(content.execution).toBeDefined();
     expect(content.execution.priceCardHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(content.execution.budgetCapMicros).toBe(123_456);
+    expect(content.budgetCapMicros).toBe(123_456);
+    expect(content.execution.activeIndex.id).toBe("idx-cli-test");
     expect(content.execution.sourceManifest.length).toBeGreaterThan(5);
+  });
+
+  it("rejects an execution freeze without approval, price, or index evidence", async () => {
+    const tempDir = await createTempDir("freeze-missing-evidence-test");
+    const result = await runLiveEvaluationCli(
+      [
+        "freeze",
+        "--profile",
+        "openai-only",
+        "--campaign",
+        "camp-cli-test",
+        "--price-card",
+        join(tempDir, "missing-price-card.json"),
+      ],
+      { root, outputRoot: tempDir },
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.message).toContain("freeze requires --approval");
+  });
+
+  it("rejects placeholder active-index evidence", async () => {
+    const tempDir = await createTempDir("freeze-placeholder-index-test");
+    const approvalPath = await writeValidApproval(tempDir);
+    const indexPath = join(tempDir, "index.json");
+    await writeFile(
+      indexPath,
+      JSON.stringify({
+        index: {
+          id: "idx-freeze-pending",
+          provenanceHash: "0".repeat(64),
+          vectorHash: "0".repeat(64),
+          policyHash: "0".repeat(64),
+        },
+      }),
+      "utf8",
+    );
+    const priceCardPath = join(tempDir, "price-card.json");
+    await writeFile(
+      priceCardPath,
+      JSON.stringify({
+        version: "price-test-v1",
+        entries: {
+          "openai:responses:planning:gpt-5.6-terra": {
+            inputMicrosPerMillion: 2_000_000,
+            outputMicrosPerMillion: 4_000_000,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const result = await runLiveEvaluationCli(
+      [
+        "freeze",
+        "--profile",
+        "openai-only",
+        "--campaign",
+        "camp-cli-test",
+        "--approval",
+        approvalPath,
+        "--price-card",
+        priceCardPath,
+        "--index",
+        indexPath,
+      ],
+      { root, outputRoot: tempDir },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.message).toContain("non-placeholder");
   });
 
 
@@ -417,6 +522,7 @@ describe("ai-live-cli", () => {
   it("executes index successfully with valid approval, eval DB and --execute", async () => {
     const tempDir = await createTempDir("index-test");
     const approvalPath = await writeValidApproval(tempDir, { phase: "index" });
+    const indexEvidencePath = join(tempDir, "active-index.json");
 
     const result = await runLiveEvaluationCli(
       [
@@ -428,6 +534,8 @@ describe("ai-live-cli", () => {
         "--approval",
         approvalPath,
         "--execute",
+        "--output",
+        indexEvidencePath,
       ],
       {
         root,
@@ -441,6 +549,10 @@ describe("ai-live-cli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.message).toContain("Tool index built and activated");
+    expect(result.artifactPath).toBe(indexEvidencePath);
+    const evidence = JSON.parse(await readFile(indexEvidencePath, "utf8"));
+    expect(evidence.index.id).toBe("index-test");
+    expect(evidence.rowCount).toBe(10);
   });
 
   it("executes run --phase smoke and generates journal, summary.json, and summary.md", async () => {

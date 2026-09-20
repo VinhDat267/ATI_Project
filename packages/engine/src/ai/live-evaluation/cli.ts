@@ -34,6 +34,7 @@ import {
   computeLiveFingerprints,
   hashLiveFreeze,
   buildLiveExecutionFingerprint,
+  parseLiveActiveIndexEvidence,
 } from "./freeze.js";
 import { scheduleLiveTrials } from "./schedule.js";
 import {
@@ -346,38 +347,116 @@ export async function runLiveEvaluationCli(
       return cliError(new Error("freeze requires --campaign <id>"), 2);
     }
 
+    const hasApproval =
+      typeof flags.approval === "string" && flags.approval.trim().length > 0;
+    const hasPriceCard =
+      typeof flags["price-card"] === "string" &&
+      flags["price-card"].trim().length > 0;
+    const hasIndex =
+      typeof flags.index === "string" && flags.index.trim().length > 0;
+    if (hasApproval || hasPriceCard || hasIndex) {
+      if (!hasApproval) {
+        return cliError(
+          new Error(
+            "freeze requires --approval <approved-json> when creating an execution freeze",
+          ),
+          2,
+        );
+      }
+      if (!hasPriceCard) {
+        return cliError(
+          new Error(
+            "freeze requires --price-card <price-card-json> when creating an execution freeze",
+          ),
+          2,
+        );
+      }
+      if (!hasIndex) {
+        return cliError(
+          new Error(
+            "freeze requires --index <index-evidence-json> when creating an execution freeze",
+          ),
+          2,
+        );
+      }
+    }
+
     try {
-      const { parsed: parsedConfig } = await readLiveConfig(root);
+      const { parsed: parsedConfig, hash: configHash } =
+        await readLiveConfig(root);
       const profile = parsedConfig.profiles[flags.profile];
       if (!profile) {
         throw new Error(`Profile "${flags.profile}" not found in config`);
       }
 
+      let approval: AiLiveApprovalRecord | undefined;
+      let approvalScope:
+        | ReturnType<typeof deriveLiveExecutionScope> & {
+            readonly campaignId: string;
+            readonly profileId: string;
+            readonly phase: string;
+            readonly budgetMicros: number;
+          }
+        | undefined;
+      if (hasApproval) {
+        approval = parseAiLiveApprovalRecord(
+          JSON.parse(await readFile(resolve(flags.approval as string), "utf8")),
+        );
+        if (
+          approval.phase !== "smoke" &&
+          approval.phase !== "dev" &&
+          approval.phase !== "legacy-regression"
+        ) {
+          throw new Error(
+            `freeze approval phase "${approval.phase}" is not a runnable phase`,
+          );
+        }
+        const scope = deriveLiveExecutionScope(
+          profile,
+          approval.phase as LiveExecutionPhase,
+          configHash,
+        );
+        assertAiLiveApproval(
+          approval,
+          {
+            campaignId: flags.campaign,
+            phase: approval.phase,
+            profileId: flags.profile,
+            ...scope,
+          },
+          now(),
+        );
+        approvalScope = {
+          ...scope,
+          campaignId: flags.campaign,
+          profileId: flags.profile,
+          phase: approval.phase,
+          budgetMicros: approval.budgetMicros,
+        };
+      }
+
       let priceCard: ProviderPriceCard | undefined;
-      if (
-        typeof flags["price-card"] === "string" &&
-        flags["price-card"].trim()
-      ) {
+      if (hasPriceCard) {
         priceCard = validateProviderPriceCard(
-          JSON.parse(await readFile(resolve(flags["price-card"]), "utf8")),
+          JSON.parse(
+            await readFile(resolve(flags["price-card"] as string), "utf8"),
+          ),
         );
       }
 
       let execution: LiveExecutionFingerprint | undefined;
-      if (priceCard) {
-        const activeIndex = {
-          id: typeof flags.index === "string" ? flags.index : "idx-freeze-pending",
-          provenanceHash: "0".repeat(64),
-          vectorHash: "0".repeat(64),
-          policyHash: "0".repeat(64),
-        };
+      if (approval && priceCard && hasIndex) {
+        const activeIndex = parseLiveActiveIndexEvidence(
+          JSON.parse(await readFile(resolve(flags.index as string), "utf8")),
+        );
         execution = await buildLiveExecutionFingerprint({
           root,
           profile,
           campaignId: flags.campaign,
-          budgetCapMicros: 5_000_000,
+          budgetCapMicros: approval.budgetMicros,
           priceCard,
           activeIndex,
+          approvalScope,
         });
       }
 
@@ -386,6 +465,7 @@ export async function runLiveEvaluationCli(
         profileId: flags.profile,
         campaignId: flags.campaign,
         createdAt: now().toISOString(),
+        ...(approval ? { budgetCapMicros: approval.budgetMicros } : {}),
         ...(execution ? { execution } : {}),
       });
 
@@ -533,6 +613,7 @@ export async function runLiveEvaluationCli(
       "approval",
       "execute",
       "price-card",
+      "output",
     ]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
@@ -627,9 +708,22 @@ export async function runLiveEvaluationCli(
           signal: environment.signal,
         });
 
+        let artifactPath: string | null = null;
+        if (typeof flags.output === "string" && flags.output.trim()) {
+          artifactPath = resolve(flags.output);
+          await writeExclusive(
+            artifactPath,
+            `${JSON.stringify(
+              { index: indexed.index, rowCount: indexed.rowCount },
+              null,
+              2,
+            )}\n`,
+          );
+        }
+
         return {
           exitCode: 0,
-          artifactPath: null,
+          artifactPath,
           message: `Tool index built and activated for profile "${flags.profile}" (index: ${indexed.index.id}, rows: ${indexed.rowCount})`,
         };
       } finally {
@@ -790,12 +884,20 @@ export async function runLiveEvaluationCli(
             budgetCapMicros: approval.budgetMicros,
             priceCard,
             activeIndex: savedFreeze.execution.activeIndex,
+            approvalScope: {
+              ...scope,
+              campaignId,
+              profileId: flags.profile,
+              phase: flags.phase,
+              budgetMicros: approval.budgetMicros,
+            },
           });
           liveFreeze = await createLiveFreeze({
             root,
             profileId: flags.profile,
             campaignId,
             createdAt: now().toISOString(),
+            budgetCapMicros: approval.budgetMicros,
             execution: currentExecution,
           });
         }

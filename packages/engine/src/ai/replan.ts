@@ -292,6 +292,7 @@ export class AiReplanAdapter implements LocalReplanPort {
           response = await bounded(
             () =>
               this.model.complete({
+                purpose: "replan",
                 systemPrompt,
                 userPrompt,
                 schema: PlannerResultSchema,
