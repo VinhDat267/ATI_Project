@@ -101,3 +101,25 @@ Lệnh chạy typecheck, build bốn package, DSL/schema/OpenAPI, DB/MCP receive
 Facade `WorkflowEngine(db, gateway, userId)` dùng cho prepare/decide/execute; inspector có thể truyền `undefined` thay gateway. PostgreSQL lưu status, events, outbox, snapshot và attempts. Native SQL transaction và Drizzle dùng các pool riêng vì Drizzle thay JSON/date codecs; không trộn hai handle vào một transaction.
 
 HTTP/UI/polling, session, LLM/retrieval/replan và BullMQ chưa được triển khai trong module này. Filesystem read/write, hai-server controller, CLI và crash/lost-response checks đã được nối qua launch policy và approval guard; E08, cả hai mode E10 và E14 đều PASS trong FS-05. Toàn bộ 8 tool của server `task_hub` và 2 public filesystem tools đã hoàn tất về mặt kỹ thuật. G1 overall vẫn `PARTIAL` vì rubric chính thức và công việc nhóm đại diện `OPEN`, còn HTTP/UI/polling và AI evaluation `NOT_RUN`. Shared trace/event schemas đã dùng được cho lớp HTTP kế tiếp; OpenAPI hiện vẫn là hợp đồng dự kiến.
+
+## AI live-evaluation preparation
+
+The evaluator-only CLI is available after the offline gate and never enables
+the normal API runtime. From the repository root:
+
+```powershell
+npm run ai:eval:live -- preflight --offline
+npm run ai:eval:live -- probe --profile <profile> --campaign <id> --approval <json> --execute
+npm run ai:eval:live -- index --profile <profile> --campaign <id> --approval <json> --execute
+npm run ai:eval:live -- run --phase smoke --profile <profile> --campaign <id> --approval <json> --execute
+npm run ai:eval:live -- report --run <run-directory>
+```
+
+Probe/index/run require an explicitly approved scope and an isolated
+`AI_EVAL_DATABASE_URL`; the evaluator rejects the application/demo database,
+including loopback aliases and default ports. The campaign lock and journal
+carry reservations across runs, and Ctrl+C propagates cancellation. Fake
+transport/isolated-DB tests cover all four OpenAI/Google role combinations;
+they do not establish live provider quality, pricing, latency or formal rubric
+acceptance. Follow the [readiness runbook](../../docs/ai-evidence/AI-LIVE/READINESS-RUNBOOK.md)
+and keep live status `NOT_RUN` until those external gates are approved.

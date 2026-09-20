@@ -2,8 +2,8 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` for direct implementation in the current checkout. Follow the tasks in dependency order, with failing regression tests before behavior changes. Obtain independent code review at the final gate.
 >
-> **Status:** PROPOSED — planning only; no implementation or paid execution performed by this document.
-> **Evidence:** HEAD `7533f474ad81e4da38a2f26802a79eb3bdb56efb`, branch `main`, clean worktree before this document, verified 2026-09-20.
+> **Status:** IMPLEMENTED_PARTIAL — T1–T3 and the core T5–T7 technical gates are implemented; paid provider execution, human rubric approval and independent review remain open.
+> **Evidence:** commits `95596f6`, `202738b`, `8f672df`, `4381c86`, `f94aa4e`, `df5230f`; verified 2026-09-20.
 
 **Goal:** Close the remaining integration gaps in T6 and the readiness checks in T7, so the real CLI can safely compose OpenAI/Google adapters, a dedicated pgvector evaluation database, campaign accounting, and recoverable evidence. Earn `READY_FOR_LIVE_PROBE` from tests and review; actual provider compatibility, quality, cost and latency remain `NOT_RUN` until separately authorized T8.
 
@@ -335,5 +335,25 @@ Prerequisite failures (Docker unavailable, permission to create test DB absent) 
 - [ ] Four provider combinations, QE override, replan/lease/approval and production denial are covered with fake HTTP.
 - [ ] Final backend regression gate and independent review pass; runbook/status reflect actual evidence.
 - [ ] Readiness is `READY_FOR_LIVE_PROBE`; paid execution and formal AI quality acceptance remain separate, explicit T8 work.
+
+## 14. Execution record
+
+Implemented in the current checkout:
+
+- T1: durable campaign lock, cross-run replay and shared journal ledger.
+- T2: cached-token usage normalization and exact integer micro-USD pricing with
+  unknown-cost preservation.
+- T3: concrete OpenAI/Google composition, isolated PostgreSQL/pgvector
+  lifecycle, provenance read-back and session currentness.
+- T4/T5/T6 hardening: effective DB identity checks, nine-trial smoke inventory,
+  signal propagation, whole-freeze hashing, durable `run_started` metadata and
+  report recovery without relying on `summary.json`.
+- T7 core: one isolated integration suite covers all four role combinations,
+  ten embeddings, semantic+QE retrieval, planning codec and credential scope.
+
+Remaining by design: complete execution snapshots tied to a live approved price
+card/index, provider account probes, formal rubric/fresh holdout approval,
+independent read-only review, and the final operator `READY_FOR_LIVE_PROBE`
+decision. These are not inferred from fake transport or local test passes.
 
 **Planning self-review:** This plan closes the remaining integration obligations, reuses existing modules, includes pricing and campaign-wide durability that a simple runtime hookup would miss, and preserves an executable bootstrap order. The original proposed rubric is not a preparation blocker. All eight implementation tasks are pending; only this document is created in the planning turn.
