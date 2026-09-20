@@ -6,6 +6,7 @@ import {
   runLiveEvaluation,
   createFileJournalWriter,
   type LiveEvaluationSession,
+  type LiveEvaluationSessionContext,
 } from "../src/ai/live-evaluation/runner.js";
 import { scheduleLiveTrials } from "../src/ai/live-evaluation/schedule.js";
 import {
@@ -358,7 +359,7 @@ describe("ai-live-runner", () => {
       repetitions: 1,
     })[0]!;
     const baseSession = createMockSession(casesMap, catalog.tools);
-    const contexts: Array<Record<string, string>> = [];
+    const contexts: LiveEvaluationSessionContext[] = [];
     const session: LiveEvaluationSession = {
       ...baseSession,
       model: {

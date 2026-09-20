@@ -37,6 +37,22 @@ describe("ai-live-freeze", () => {
         approvedBy: "user:reviewer",
       }),
     ).toThrow(/approvedAt/);
+    expect(() =>
+      LiveRubricSchema.parse({
+        ...proposed,
+        status: "APPROVED_FROZEN",
+        approvedBy: "user:reviewer",
+        approvedAt: "2026-09-20T00:00:00.000Z",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      LiveRubricSchema.parse({
+        ...proposed,
+        status: "APPROVED_FROZEN",
+        approvedBy: "user:reviewer",
+        approvedAt: "2026-09-20T00:00:00.000",
+      }),
+    ).toThrow(/approvedAt/);
   });
   it("creates a tamper-evident live freeze with all required fingerprints", async () => {
     const freeze = await createLiveFreeze({
@@ -150,7 +166,7 @@ describe("ai-live-freeze", () => {
       sourceManifest: [
         { path: "packages/engine/src/index.ts", sha256: "8".repeat(64) },
       ],
-    } as const;
+    };
     const freeze = await createLiveFreeze({
       root,
       profileId: "openai-only",

@@ -113,11 +113,14 @@ export const LiveRubricSchema = z
           path: ["approvedAt"],
           message: "APPROVED_FROZEN rubric requires approvedAt",
         });
-      } else if (Number.isNaN(Date.parse(rubric.approvedAt))) {
+      } else if (
+        !z.string().datetime({ offset: true }).safeParse(rubric.approvedAt)
+          .success
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["approvedAt"],
-          message: "approvedAt must be a valid timestamp",
+          message: "approvedAt must be an offset timestamp",
         });
       }
     } else {
