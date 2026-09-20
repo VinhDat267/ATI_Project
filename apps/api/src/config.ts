@@ -20,6 +20,7 @@ export interface ApiConfig {
   /** Maximum time the API worker waits for an active tick during shutdown. */
   readonly workerShutdownTimeoutMs?: number;
   readonly oidc?: OidcConfig;
+  readonly legacyPasswordAuthEnabled?: boolean;
 }
 
 export interface OidcConfig {
@@ -255,6 +256,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   );
   const sessionTtlMs = sessionTtl(env);
   const oidc = oidcConfig(env, sessionTtlMs);
+  const legacyPasswordAuthEnabled = boolean(
+    env,
+    "API_LEGACY_PASSWORD_AUTH_ENABLED",
+    !oidc.enabled,
+  );
   return {
     host: "127.0.0.1",
     port: integer(env, "API_PORT", 3001),
@@ -269,5 +275,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     aiRetrievalVariant,
     workerShutdownTimeoutMs,
     oidc,
+    legacyPasswordAuthEnabled,
   };
 }

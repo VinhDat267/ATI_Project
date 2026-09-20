@@ -108,6 +108,7 @@ describe("API configuration", () => {
   it("keeps oidc disabled by default and parses the bounded provider configuration", async () => {
     const env = await baseEnv();
     expect(loadConfig(env).oidc!.enabled).toBe(false);
+    expect(loadConfig(env).legacyPasswordAuthEnabled).toBe(true);
     const config = loadConfig({
       ...env,
       OIDC_ENABLED: "1",
@@ -127,6 +128,7 @@ describe("API configuration", () => {
       scopes: ["openid", "profile", "email"],
     });
     expect(config.oidc!.clientSecret).toBe("client-secret");
+    expect(config.legacyPasswordAuthEnabled).toBe(false);
   });
 
   it("rejects unsafe oidc scopes and production http issuers", async () => {

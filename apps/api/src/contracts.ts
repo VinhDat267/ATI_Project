@@ -1,5 +1,6 @@
 export {
   ApiErrorSchema,
+  AuthMeSchema,
   ApprovalDecisionSchema,
   CreateRunSchema,
   LoginRequestSchema,
@@ -16,3 +17,4 @@ export {
   ServerCatalogToolSchema,
 } from "@wap/dsl";
 export type { LoginRequest } from "@wap/dsl";
+export type { AuthMe } from "@wap/dsl";

@@ -23,6 +23,7 @@ import {
   createAuthRepository,
   DurableSessionAuthority,
 } from "./durable-auth.js";
+import { createOidcFlow, OidcProviderClient } from "./oidc.js";
 
 const config = loadConfig();
 const databaseUrl = process.env.G1_DATABASE_URL;
@@ -174,12 +175,24 @@ const maintenance = createExpiryMaintenance({
   onError: (code) =>
     console.error(JSON.stringify({ event: "maintenance_deferred", code })),
 });
-const sessionStore = config.oidc?.enabled
-  ? new DurableSessionAuthority(createAuthRepository(db), {
-      sessionTtlMs: config.oidc.sessionTtlMs,
-      cookieName: config.oidc.sessionCookieName,
-    })
+const authRepository = config.oidc?.enabled
+  ? createAuthRepository(db)
   : undefined;
+const sessionStore =
+  authRepository && config.oidc
+    ? new DurableSessionAuthority(authRepository, {
+        sessionTtlMs: config.oidc.sessionTtlMs,
+        cookieName: config.oidc.sessionCookieName,
+      })
+    : undefined;
+const oidcFlow =
+  authRepository && config.oidc
+    ? createOidcFlow({
+        config: config.oidc,
+        repository: authRepository,
+        provider: new OidcProviderClient({ config: config.oidc }),
+      })
+    : undefined;
 const api = createApi({
   db,
   config,
@@ -187,6 +200,7 @@ const api = createApi({
   worker,
   maintenance,
   ...(sessionStore ? { sessionStore } : {}),
+  ...(oidcFlow ? { oidcFlow } : {}),
   health: {
     readiness: async () => {
       try {

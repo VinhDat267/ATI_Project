@@ -84,7 +84,7 @@ const spec = {
     title: "ATI Workflow Platform — B/local",
     version: "0.3.0",
     description:
-      "B/local HTTP boundary through API-CATALOG: login, stable server summaries, a no-launch reviewed catalog read, and a rate-limited active reviewed-preset check, plus durable run lifecycle, polling, trace cursors, and read-only reconciliation. GET /servers/catalog never launches MCP; POST /servers/check is the explicit active check. Session state remains in memory, and LLM/retrieval/replan, BullMQ, and browser integration remain outside this technical boundary. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
+      "B/local HTTP boundary through API-CATALOG: compatibility login, OIDC cookie session routes when enabled, stable server summaries, a no-launch reviewed catalog read, and a rate-limited active reviewed-preset check, plus durable run lifecycle, polling, trace cursors, and read-only reconciliation. GET /servers/catalog never launches MCP; POST /servers/check is the explicit active check. Session state remains in memory when OIDC is disabled; durable identity is an additive expansion. Shared schema generation does not encode every Zod refinement or runtime authorization rule.",
   },
   servers: [{ url: "/api/v1" }],
   security: [{ bearerAuth: [] }],
@@ -130,6 +130,69 @@ const spec = {
         summary: "Revoke the current in-memory bearer session",
         responses: {
           "204": { description: "Session revoked" },
+          ...errors,
+        },
+      },
+    },
+    "/auth/oidc/start": {
+      get: {
+        operationId: "startOidcLogin",
+        security: [],
+        summary: "Start OIDC Authorization Code + PKCE login",
+        parameters: [
+          {
+            name: "return_to",
+            in: "query",
+            schema: { type: "string", maxLength: 512 },
+          },
+        ],
+        responses: {
+          "302": { description: "Redirect to the configured OIDC issuer" },
+          "503": {
+            description: "OIDC is disabled or unavailable",
+            content: json(ref("ApiError")),
+          },
+        },
+      },
+    },
+    "/auth/oidc/callback": {
+      get: {
+        operationId: "completeOidcLogin",
+        security: [],
+        summary: "Complete the OIDC callback and create an application session",
+        parameters: [
+          {
+            name: "code",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+          {
+            name: "state",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "302": { description: "Redirect to the approved web route" },
+          "400": {
+            description: "Invalid or replayed OIDC callback",
+            content: json(ref("ApiError")),
+          },
+          "503": {
+            description: "OIDC provider unavailable",
+            content: json(ref("ApiError")),
+          },
+        },
+      },
+    },
+    "/auth/me": {
+      get: {
+        operationId: "getAuthenticatedIdentity",
+        summary: "Read the local identity bound to the current session",
+        responses: {
+          "200": response("AuthMe"),
           ...errors,
         },
       },

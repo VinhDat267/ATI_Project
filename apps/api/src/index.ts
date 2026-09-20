@@ -13,6 +13,14 @@ export {
   DurableSessionAuthority,
   type AuthRepository,
 } from "./durable-auth.js";
+export {
+  createOidcFlow,
+  OidcProviderClient,
+  OidcProviderError,
+  type OidcFlow,
+  type OidcIdentity,
+  type OidcTokenSet,
+} from "./oidc.js";
 export { loadDevPlanner, type DevPlanner } from "./dev-planner.js";
 export {
   loadAiPlanner,

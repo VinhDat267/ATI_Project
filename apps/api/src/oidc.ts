@@ -5,7 +5,10 @@ import {
   type JWK,
   type JWTPayload,
 } from "jose";
+import { createHash, randomBytes } from "node:crypto";
 import type { OidcConfig } from "./config.js";
+import type { SessionMetadata } from "./auth.js";
+import type { AuthRepository } from "./durable-auth.js";
 
 export type OidcFetch = (
   input: string | URL,
@@ -45,6 +48,23 @@ export interface OidcIdentity {
   emailVerified: boolean;
   displayName: string | null;
   roles: string[];
+}
+
+export interface OidcFlow {
+  start(returnTo: string): Promise<{
+    authorizationUrl: URL;
+    transactionCookie: string;
+  }>;
+  complete(input: {
+    code: string;
+    state: string;
+    transactionCookie: string;
+  }): Promise<{
+    userId: string;
+    identity: OidcIdentity;
+    sessionMetadata: SessionMetadata;
+    returnTo: string;
+  }>;
 }
 
 interface ProviderMetadata {
@@ -327,6 +347,140 @@ export class OidcProviderClient {
       if (timer) clearTimeout(timer);
     }
   }
+}
+
+export function createOidcFlow(options: {
+  config: OidcConfig;
+  repository: AuthRepository;
+  provider: OidcProviderClient;
+  now?: () => number;
+}): OidcFlow {
+  const now = options.now ?? Date.now;
+  const hash = (value: string) =>
+    createHash("sha256").update(value, "utf8").digest("hex");
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  const decode = (
+    value: string,
+  ): {
+    state: string;
+    nonce: string;
+    verifier: string;
+    returnTo: string;
+  } => {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(value, "base64url").toString("utf8"),
+      ) as Record<string, unknown>;
+      if (
+        typeof parsed.state !== "string" ||
+        typeof parsed.nonce !== "string" ||
+        typeof parsed.verifier !== "string" ||
+        typeof parsed.returnTo !== "string"
+      )
+        throw new Error("invalid transaction");
+      return {
+        state: parsed.state,
+        nonce: parsed.nonce,
+        verifier: parsed.verifier,
+        returnTo: parsed.returnTo,
+      };
+    } catch {
+      throw new OidcProviderError(
+        "OIDC_INVALID_TOKEN",
+        "OIDC transaction cookie is invalid",
+      );
+    }
+  };
+  const normalizeReturnTo = (value: string): string => {
+    if (
+      value.length > 512 ||
+      !value.startsWith("/") ||
+      value.startsWith("//") ||
+      value.includes("\\")
+    )
+      return "/";
+    return value;
+  };
+  return {
+    async start(returnTo) {
+      const normalized = normalizeReturnTo(returnTo);
+      const state = randomBytes(32).toString("base64url");
+      const nonce = randomBytes(32).toString("base64url");
+      const verifier = randomBytes(32).toString("base64url");
+      const codeChallenge = createHash("sha256")
+        .update(verifier, "utf8")
+        .digest("base64url");
+      await options.repository.createOidcTransaction({
+        stateHash: hash(state),
+        nonceHash: hash(nonce),
+        verifierHash: hash(verifier),
+        issuer: options.config.issuerUrl,
+        clientId: options.config.clientId,
+        redirectUri: options.config.redirectUri,
+        returnTo: normalized,
+        expiresAt: new Date(now() + options.config.transactionTtlMs),
+      });
+      return {
+        authorizationUrl: await options.provider.authorizationUrl({
+          state,
+          nonce,
+          codeChallenge,
+        }),
+        transactionCookie: encode({
+          state,
+          nonce,
+          verifier,
+          returnTo: normalized,
+        }),
+      };
+    },
+
+    async complete(input) {
+      const envelope = decode(input.transactionCookie);
+      if (envelope.state !== input.state)
+        throw new OidcProviderError(
+          "OIDC_INVALID_TOKEN",
+          "OIDC transaction state does not match",
+        );
+      const transaction = await options.repository.consumeOidcTransaction(
+        hash(input.state),
+      );
+      if (
+        !transaction ||
+        transaction.nonceHash !== hash(envelope.nonce) ||
+        transaction.verifierHash !== hash(envelope.verifier) ||
+        transaction.returnTo !== envelope.returnTo
+      )
+        throw new OidcProviderError(
+          "OIDC_INVALID_TOKEN",
+          "OIDC transaction is invalid or expired",
+        );
+      const tokens = await options.provider.exchangeCode(
+        input.code,
+        envelope.verifier,
+      );
+      const identity = await options.provider.validateIdentity(tokens, {
+        nonce: envelope.nonce,
+      });
+      const local = await options.repository.findOrCreateIdentity({
+        issuer: identity.issuer,
+        subject: identity.subject,
+        email: identity.email,
+        displayName: identity.displayName,
+      });
+      return {
+        userId: local.userId,
+        identity,
+        sessionMetadata: {
+          createdFrom: "oidc",
+          issuer: identity.issuer,
+          subject: identity.subject,
+        },
+        returnTo: transaction.returnTo,
+      };
+    },
+  };
 }
 
 function extractRoles(payload: JWTPayload): string[] {

@@ -12,17 +12,24 @@ export interface RequestLogEntry {
  */
 export function requestRouteTemplate(pathname: string): string {
   const pathOnly = pathname.split("?", 1)[0] ?? "";
-  const segments = pathOnly
-    .split("/")
-    .filter((segment) => segment.length > 0);
+  const segments = pathOnly.split("/").filter((segment) => segment.length > 0);
   const [root, , subpath] = segments;
 
   if (
     segments.length === 2 &&
     root === "auth" &&
-    (segments[1] === "login" || segments[1] === "logout")
+    (segments[1] === "login" ||
+      segments[1] === "logout" ||
+      segments[1] === "me")
   )
     return `/auth/${segments[1]}`;
+  if (
+    segments.length === 3 &&
+    root === "auth" &&
+    segments[1] === "oidc" &&
+    (segments[2] === "start" || segments[2] === "callback")
+  )
+    return `/auth/oidc/${segments[2]}`;
   if (segments.length === 1 && root === "servers") return "/servers";
   if (segments.length === 1 && root === "runs") return "/runs";
   if (

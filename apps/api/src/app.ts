@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -10,6 +10,7 @@ import { z } from "zod";
 import { EngineError, type WorkflowEngine } from "@wap/engine";
 import {
   ApiErrorSchema,
+  AuthMeSchema,
   CreateRunSchema,
   ApprovalDecisionSchema,
   LoginRequestSchema,
@@ -24,6 +25,15 @@ import {
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore, type SessionAuthority } from "./auth.js";
+import { OidcProviderError, type OidcFlow } from "./oidc.js";
+import {
+  assertAuthMutationOrigin,
+  hasCookie,
+  parseCookieHeader,
+  serializeCookie,
+  sessionCredential,
+  setCookies,
+} from "./http-auth.js";
 import { HttpError, readJson, writeEmpty, writeJson } from "./http.js";
 import type { WorkerControl } from "./worker.js";
 import type { MaintenanceControl } from "./maintenance.js";
@@ -66,6 +76,10 @@ export interface CreateApiOptions {
   health?: HealthOptions;
   /** Optional durable/session implementation; memory SessionStore remains default. */
   sessionStore?: SessionAuthority;
+  /** OIDC flow is injected so provider/network behavior is testable and replaceable. */
+  oidcFlow?: OidcFlow;
+  /** Principal profile lookup kept outside the HTTP router. */
+  identityLookup?: (userId: string) => Promise<z.infer<typeof AuthMeSchema>>;
   /** Structured request sink; it must not receive bodies, headers, or secrets. */
   requestLogger?: (entry: RequestLogEntry) => void;
 }
@@ -98,6 +112,28 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       ttlMs: config.sessionTtlMs,
       principalExists,
       now: options.now,
+    });
+  const identityLookup =
+    options.identityLookup ??
+    (async (userId: string) => {
+      const rows = await options.db.client<
+        {
+          id: string;
+          email: string;
+          display_name: string | null;
+          roles: string[];
+        }[]
+      >`
+        SELECT id,email,display_name,roles FROM users WHERE id=${userId}`;
+      const user = rows[0];
+      if (!user)
+        throw new AuthError("UNAUTHENTICATED", "Authentication required");
+      return AuthMeSchema.parse({
+        user_id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        roles: user.roles?.length ? user.roles : ["user"],
+      });
     });
   const configuredSecrets = [
     config.passwordHash,
@@ -218,8 +254,17 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
     try {
       if (closing)
         throw new HttpError(503, "SHUTTING_DOWN", "API is shutting down");
-      const origin = request.headers.origin;
-      if (origin && baseOrigin && origin !== baseOrigin)
+      const origin =
+        request.headers["x-wap-frontend-origin"] ?? request.headers.origin;
+      const configuredOrigins = new Set(
+        [baseOrigin, config.oidc?.webOrigin].filter(
+          (value): value is string => typeof value === "string",
+        ),
+      );
+      if (
+        origin !== undefined &&
+        (typeof origin !== "string" || !configuredOrigins.has(origin))
+      )
         throw new HttpError(403, "ORIGIN_NOT_ALLOWED", "Origin is not allowed");
       const parsed = new URL(
         request.url ?? "/",
@@ -249,19 +294,137 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         writeJson(response, 200, { status: "ready" }, requestId);
         return;
       }
+      if (path === "/auth/oidc/start") {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        if (!config.oidc?.enabled || !options.oidcFlow)
+          throw new HttpError(
+            503,
+            "OIDC_NOT_CONFIGURED",
+            "OIDC is not enabled",
+          );
+        const returnTo = parsed.searchParams.get("return_to") ?? "/";
+        const started = await options.oidcFlow.start(returnTo);
+        const secure = config.oidc.webOrigin.startsWith("https://");
+        const csrf = randomBytes(32).toString("base64url");
+        response.statusCode = 302;
+        response.setHeader("location", started.authorizationUrl.toString());
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("x-content-type-options", "nosniff");
+        response.setHeader("x-request-id", requestId);
+        setCookies(response, [
+          serializeCookie("wap_oidc_tx", started.transactionCookie, {
+            maxAge: Math.ceil(config.oidc.transactionTtlMs / 1000),
+            secure,
+          }),
+          serializeCookie("wap_csrf", csrf, { maxAge: 900, secure }),
+        ]);
+        response.end();
+        return;
+      }
+      if (path === "/auth/oidc/callback") {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        if (!config.oidc?.enabled || !options.oidcFlow)
+          throw new HttpError(
+            503,
+            "OIDC_NOT_CONFIGURED",
+            "OIDC is not enabled",
+          );
+        const code = parsed.searchParams.get("code");
+        const state = parsed.searchParams.get("state");
+        const transactionCookie = parseCookieHeader(request.headers.cookie).get(
+          "wap_oidc_tx",
+        );
+        if (!code || !state || !transactionCookie)
+          throw new HttpError(
+            400,
+            "OIDC_INVALID_CALLBACK",
+            "OIDC callback is invalid",
+          );
+        const completed = await options.oidcFlow.complete({
+          code,
+          state,
+          transactionCookie,
+        });
+        const session = await sessions.issue(
+          completed.userId,
+          completed.sessionMetadata,
+        );
+        const secure = config.oidc.webOrigin.startsWith("https://");
+        response.statusCode = 302;
+        response.setHeader(
+          "location",
+          new URL(completed.returnTo, config.oidc.webOrigin).toString(),
+        );
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("x-content-type-options", "nosniff");
+        response.setHeader("x-request-id", requestId);
+        setCookies(response, [
+          serializeCookie(config.oidc.sessionCookieName, session, {
+            maxAge: Math.ceil(config.oidc.sessionTtlMs / 1000),
+            secure,
+          }),
+          serializeCookie("wap_oidc_tx", "", { maxAge: 0, secure }),
+        ]);
+        response.end();
+        return;
+      }
+      if (path === "/auth/me") {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        if (!config.oidc?.enabled)
+          throw new HttpError(
+            503,
+            "OIDC_NOT_CONFIGURED",
+            "OIDC is not enabled",
+          );
+        const userId = await sessions.authenticate(sessionCredential(request));
+        writeJson(
+          response,
+          200,
+          AuthMeSchema.parse(await identityLookup(userId)),
+          requestId,
+        );
+        return;
+      }
       if (path === "/auth/login" || path === "/auth/logout") {
         if (request.method !== "POST") {
           response.setHeader("allow", "POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         if (path === "/auth/logout") {
-          await sessions.revoke({
-            authorization: request.headers.authorization,
-            cookie: request.headers.cookie,
-          });
+          if (
+            config.oidc?.enabled &&
+            hasCookie(request, config.oidc.sessionCookieName)
+          )
+            assertAuthMutationOrigin(request, config.oidc, baseOrigin);
+          await sessions.revoke(sessionCredential(request));
+          if (config.oidc?.enabled) {
+            const secure = config.oidc.webOrigin.startsWith("https://");
+            setCookies(response, [
+              serializeCookie(config.oidc.sessionCookieName, "", {
+                maxAge: 0,
+                secure,
+              }),
+              serializeCookie("wap_csrf", "", { maxAge: 0, secure }),
+            ]);
+          }
           writeEmpty(response, 204, requestId);
           return;
         }
+        if (config.oidc?.enabled && config.legacyPasswordAuthEnabled === false)
+          throw new HttpError(
+            404,
+            "AUTH_METHOD_DISABLED",
+            "Password authentication is disabled",
+          );
         const body = parseInput(LoginRequestSchema, await readJson(request));
         const token = await sessions.login(
           body.email,
@@ -281,10 +444,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        await sessions.authenticate({
-          authorization: request.headers.authorization,
-          cookie: request.headers.cookie,
-        });
+        await sessions.authenticate(sessionCredential(request));
         const servers = ServerSummaryListSchema.parse(
           projectOutput(
             options.engine
@@ -311,10 +471,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        await sessions.authenticate({
-          authorization: request.headers.authorization,
-          cookie: request.headers.cookie,
-        });
+        await sessions.authenticate(sessionCredential(request));
         const catalog = await readServerCatalog(false);
         writeJson(response, 200, catalog, requestId);
         return;
@@ -324,10 +481,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = await sessions.authenticate({
-          authorization: request.headers.authorization,
-          cookie: request.headers.cookie,
-        });
+        const userId = await sessions.authenticate(sessionCredential(request));
         if (!options.engine)
           throw new HttpError(
             501,
@@ -353,10 +507,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       }
       if (path === "/runs") {
         if (request.method === "GET") {
-          await sessions.authenticate({
-            authorization: request.headers.authorization,
-            cookie: request.headers.cookie,
-          });
+          await sessions.authenticate(sessionCredential(request));
           if (!options.engine)
             throw new HttpError(
               501,
@@ -377,10 +528,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET, POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = await sessions.authenticate({
-          authorization: request.headers.authorization,
-          cookie: request.headers.cookie,
-        });
+        const userId = await sessions.authenticate(sessionCredential(request));
         if (config.allowNewRuns === false)
           throw new HttpError(
             503,
@@ -418,10 +566,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", writeRoute ? "POST" : "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = await sessions.authenticate({
-          authorization: request.headers.authorization,
-          cookie: request.headers.cookie,
-        });
+        const userId = await sessions.authenticate(sessionCredential(request));
         parseInput(z.uuid(), id);
         if (!subpath) {
           writeJson(
@@ -606,6 +751,12 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
     if (error instanceof AuthError)
       return new HttpError(
         error.code === "RATE_LIMITED" ? 429 : 401,
+        error.code,
+        error.message,
+      );
+    if (error instanceof OidcProviderError)
+      return new HttpError(
+        error.code === "OIDC_PROVIDER_UNAVAILABLE" ? 503 : 400,
         error.code,
         error.message,
       );
