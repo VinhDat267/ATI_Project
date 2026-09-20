@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLiveEvaluationRuntime } from "../src/ai/live-evaluation/runtime.js";
 import type { ProviderCallLedger } from "../src/ai/providers/registry.js";
+import { createLiveEvaluationRuntimeComposition } from "../src/ai/live-evaluation/composition.js";
 
 describe("ai-live runtime lifecycle", () => {
   it("executes probe/index through owned boundaries and closes once", async () => {
@@ -111,5 +112,22 @@ describe("ai-live runtime lifecycle", () => {
       expect.objectContaining({ trialId: "trial-1" }),
       ledger,
     );
+  });
+
+  it("rejects a non-PostgreSQL evaluator URL before opening runtime state", async () => {
+    await expect(
+      createLiveEvaluationRuntimeComposition({
+        root: process.cwd(),
+        campaignId: "camp-1",
+        profile: {} as never,
+        userId: "00000000-0000-0000-0000-000000000000",
+        evalDatabaseUrl: "https://example.test/eval",
+        credentials: {},
+        ledger: {
+          reserve: vi.fn(),
+          settle: vi.fn(),
+        },
+      }),
+    ).rejects.toThrow(/PostgreSQL/i);
   });
 });

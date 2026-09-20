@@ -424,7 +424,7 @@ describe("ai-live-cli", () => {
       await readFile(result.artifactPath!, "utf8"),
     );
     expect(summaryJson.format).toBe("ati-ai-live-report-v1");
-    expect(summaryJson.trialAccounting.totalPlanned).toBe(7);
+    expect(summaryJson.trialAccounting.totalPlanned).toBe(9);
 
     // Verify journal.jsonl was written
     const runDir = resolve(result.artifactPath!, "..");

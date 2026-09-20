@@ -45,6 +45,7 @@ import {
   type AiLiveApprovalRecord,
 } from "../providers/approval.js";
 import { openLiveCampaign } from "./campaign.js";
+import { createLiveEvaluationRuntimeComposition } from "./composition.js";
 import {
   deriveLiveExecutionScope,
   hashLiveConfig,
@@ -62,6 +63,50 @@ export interface LiveEvaluationCliEnvironment {
   readonly getSession?: (
     context: LiveEvaluationSessionContext,
   ) => Promise<LiveEvaluationSession>;
+}
+
+async function createDefaultLiveRuntime(options: {
+  readonly root: string;
+  readonly env: Record<string, string | undefined>;
+  readonly campaignId: string;
+  readonly profile: LiveProfileConfig;
+  readonly ledger: import("../providers/registry.js").ProviderCallLedger;
+}): Promise<LiveEvaluationRuntime> {
+  const needsOpenAi = [
+    options.profile.planning.provider,
+    options.profile.queryExpansion.provider,
+    options.profile.embedding.provider,
+  ].includes("openai");
+  const needsGoogle = [
+    options.profile.planning.provider,
+    options.profile.queryExpansion.provider,
+    options.profile.embedding.provider,
+  ].includes("google");
+  const credentials = {
+    ...(needsOpenAi && options.env.OPENAI_API_KEY
+      ? { OPENAI_API_KEY: options.env.OPENAI_API_KEY }
+      : {}),
+    ...(needsGoogle && options.env.GEMINI_API_KEY
+      ? { GEMINI_API_KEY: options.env.GEMINI_API_KEY }
+      : {}),
+  };
+  const userId = options.env.AI_EVAL_USER_ID?.trim();
+  if (!userId) throw new Error("AI_EVAL_USER_ID is required for live evaluation");
+  return createLiveEvaluationRuntimeComposition({
+    root: options.root,
+    campaignId: options.campaignId,
+    profile: options.profile,
+    userId,
+    evalDatabaseUrl: options.env.AI_EVAL_DATABASE_URL ?? "",
+    appDatabaseUrl: options.env.DATABASE_URL,
+    credentials,
+    ledger: options.ledger,
+    authorizeCall: async (request) => {
+      if (request.campaignId !== options.campaignId) {
+        throw new Error("provider call campaign does not match approval");
+      }
+    },
+  });
 }
 
 export interface LiveEvaluationCliResult {
@@ -368,22 +413,43 @@ export async function runLiveEvaluationCli(
         now(),
       );
 
-      if (!environment.runtime) {
-        throw new Error(
-          "No live evaluation runtime configured for probe execution",
-        );
-      }
-      const probe = await environment.runtime.probe({
-        campaignId: flags.campaign,
-        profileId: flags.profile,
-        phase: "probe",
-      });
+      let ownedCampaign: Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
+      let ownedRuntime: LiveEvaluationRuntime | undefined;
+      try {
+        if (environment.runtime) {
+          ownedRuntime = environment.runtime;
+        } else {
+          ownedCampaign = await openLiveCampaign({
+            outputRoot,
+            campaignId: flags.campaign,
+            runId: runId(),
+            profileId: flags.profile,
+            phase: "probe",
+            budgetCapMicros: approval.budgetMicros,
+          });
+          ownedRuntime = await createDefaultLiveRuntime({
+            root,
+            env: environment.env ?? process.env,
+            campaignId: flags.campaign,
+            profile,
+            ledger: ownedCampaign.ledger,
+          });
+        }
+        const probe = await ownedRuntime.probe({
+          campaignId: flags.campaign,
+          profileId: flags.profile,
+          phase: "probe",
+        });
 
-      return {
-        exitCode: 0,
-        artifactPath: null,
-        message: `Live probe passed for profile "${flags.profile}" (campaign: ${flags.campaign}, calls: ${probe.calls.length})`,
-      };
+        return {
+          exitCode: 0,
+          artifactPath: null,
+          message: `Live probe passed for profile "${flags.profile}" (campaign: ${flags.campaign}, calls: ${probe.calls.length})`,
+        };
+      } finally {
+        if (!environment.runtime) await ownedRuntime?.close();
+        await ownedCampaign?.close();
+      }
     } catch (error) {
       return cliError(error, 1);
     }
@@ -446,22 +512,43 @@ export async function runLiveEvaluationCli(
       );
 
       validateEvalDatabaseUrl(env.AI_EVAL_DATABASE_URL, env.DATABASE_URL);
-      if (!environment.runtime) {
-        throw new Error(
-          "No live evaluation runtime configured for index execution",
-        );
-      }
-      const indexed = await environment.runtime.index({
-        campaignId: flags.campaign,
-        profileId: flags.profile,
-        phase: "index",
-      });
+      let ownedCampaign: Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
+      let ownedRuntime: LiveEvaluationRuntime | undefined;
+      try {
+        if (environment.runtime) {
+          ownedRuntime = environment.runtime;
+        } else {
+          ownedCampaign = await openLiveCampaign({
+            outputRoot,
+            campaignId: flags.campaign,
+            runId: runId(),
+            profileId: flags.profile,
+            phase: "index",
+            budgetCapMicros: approval.budgetMicros,
+          });
+          ownedRuntime = await createDefaultLiveRuntime({
+            root,
+            env,
+            campaignId: flags.campaign,
+            profile,
+            ledger: ownedCampaign.ledger,
+          });
+        }
+        const indexed = await ownedRuntime.index({
+          campaignId: flags.campaign,
+          profileId: flags.profile,
+          phase: "index",
+        });
 
-      return {
-        exitCode: 0,
-        artifactPath: null,
-        message: `Tool index built and activated for profile "${flags.profile}" (index: ${indexed.index.id}, rows: ${indexed.rowCount})`,
-      };
+        return {
+          exitCode: 0,
+          artifactPath: null,
+          message: `Tool index built and activated for profile "${flags.profile}" (index: ${indexed.index.id}, rows: ${indexed.rowCount})`,
+        };
+      } finally {
+        if (!environment.runtime) await ownedRuntime?.close();
+        await ownedCampaign?.close();
+      }
     } catch (error) {
       return cliError(error, 1);
     }
@@ -597,9 +684,17 @@ export async function runLiveEvaluationCli(
 
       let caseIds: readonly string[];
       let repetitions = 3;
+      let smokeCells:
+        | readonly { variant: "all_tools" | "semantic" | "semantic_qe"; topK: 10 }[]
+        | undefined;
       if (flags.phase === "smoke") {
-        caseIds = ["b01"];
+        caseIds = ["b01", "b05", "b06"];
         repetitions = 1;
+        smokeCells = [
+          { variant: "all_tools", topK: 10 },
+          { variant: "semantic", topK: 10 },
+          { variant: "semantic_qe", topK: 10 },
+        ];
       } else if (flags.phase === "dev") {
         caseIds = ["b01", "b02", "b03", "b04", "b05", "b06"];
       } else {
@@ -608,6 +703,7 @@ export async function runLiveEvaluationCli(
 
       const trials = scheduleLiveTrials([flags.profile], caseIds, {
         repetitions,
+        ...(smokeCells ? { cells: smokeCells } : {}),
       });
 
       const currentRunId = runId();
@@ -632,6 +728,17 @@ export async function runLiveEvaluationCli(
         profilesMap.set(id, prof);
       }
 
+      const ownedRuntime =
+        environment.runtime ??
+        (environment.getSession
+          ? undefined
+          : await createDefaultLiveRuntime({
+              root,
+              env,
+              campaignId,
+              profile,
+              ledger,
+            }));
       let runResult: Awaited<ReturnType<typeof runLiveEvaluation>>;
       try {
         runResult = await runLiveEvaluation({
@@ -645,8 +752,8 @@ export async function runLiveEvaluationCli(
           runId: currentRunId,
           getSession:
             environment.getSession ??
-            (environment.runtime
-              ? (context) => environment.runtime!.createSession(context, ledger)
+            (ownedRuntime
+              ? (context) => ownedRuntime.createSession(context, ledger)
               : async () => {
                   throw new Error(
                     "No live evaluation session provider available in CLI environment",
@@ -657,6 +764,7 @@ export async function runLiveEvaluationCli(
           },
         });
       } finally {
+        if (!environment.runtime && ownedRuntime) await ownedRuntime.close();
         await campaign.close();
       }
 

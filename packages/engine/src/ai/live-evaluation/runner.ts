@@ -22,6 +22,7 @@ import { createLiveJournal, type LiveJournal } from "./journal.js";
 export interface LiveEvaluationSession {
   readonly model: StructuredModelClient;
   readonly retriever: ToolRetriever;
+  readonly assertCurrent?: () => Promise<void>;
 }
 
 export interface LiveEvaluationSessionContext {
@@ -29,6 +30,7 @@ export interface LiveEvaluationSessionContext {
   readonly runId: string;
   readonly profileId: string;
   readonly trialId: string;
+  readonly variant?: LiveEvaluationCell["variant"];
 }
 
 export interface LiveEvaluationRunnerOptions {
@@ -227,6 +229,7 @@ export async function runLiveEvaluation(
         runId: options.runId ?? trial.trialId,
         profileId: trial.profileId,
         trialId: trial.trialId,
+        variant: trial.cell.variant,
       });
       coldSetupMs = Math.max(0, now() - coldStart);
 
@@ -240,6 +243,7 @@ export async function runLiveEvaluation(
 
       const planner = new AiPlannerAdapter({
         retriever: observingRetriever,
+        assertCurrent: session.assertCurrent,
         model: session.model,
         variant: trial.cell.variant,
         topK: trial.cell.topK,

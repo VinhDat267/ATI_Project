@@ -15,4 +15,7 @@ export * from "./providers/registry.js";
 export * from "./providers/approval.js";
 export * from "./live-evaluation/ledger.js";
 export * from "./live-evaluation/runtime.js";
+export * from "./live-evaluation/campaign.js";
+export * from "./live-evaluation/composition.js";
+export * from "./live-evaluation/pricing.js";
 export * from "./live-evaluation/recovery.js";
