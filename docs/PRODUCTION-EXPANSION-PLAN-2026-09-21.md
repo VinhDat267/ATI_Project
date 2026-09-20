@@ -25,6 +25,8 @@
 
 Provider quality/cost/latency, fresh sealed holdout, human rubric, independent AI safety review, representative-user acceptance, visual direction/Design System và production identity vẫn chưa được duyệt. Không được suy ra production readiness từ fixture/browser pass hoặc Google probe.
 
+- P3 shutdown evidence vẫn OPEN: runtime probe với `recoverOrphans()` không hoàn tất cho thấy `worker.stop()` không trả về trong 150 ms (`TIMEOUT`); chưa có deadline drain hoặc hung-call shutdown test.
+
 ## 2. Kiến trúc đề xuất
 
 **PROPOSED:** production pilot cho một tổ chức, vẫn giữ modular monolith, PostgreSQL outbox và một executor tuần tự. Chưa mở multi-tenant, microservices, worker pool, scheduler hay realtime cho tới khi pilot có tải và nhu cầu được đo.
