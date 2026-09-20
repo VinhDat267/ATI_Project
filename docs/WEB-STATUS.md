@@ -1,6 +1,6 @@
 # Trạng thái Frontend & Nghiệm thu Cổng G3 — WEB-03
 
-Trạng thái: `WEB_BROWSER_EXERCISED_PASS` (2026-09-19)
+Trạng thái: `WEB_BROWSER_EXERCISED_PASS` (2026-09-21)
 Cổng G3 Tuần 3: **TECHNICAL PASS** cho toàn bộ 6 view, luồng duyệt ghi và dọn dẹp tài nguyên.
 
 ## 1. Kết quả Verification Gate (check-web)
@@ -10,10 +10,10 @@ Cổng G3 Tuần 3: **TECHNICAL PASS** cho toàn bộ 6 view, luồng duyệt gh
 - **Strict Mode Dev Browser Test**: PASS (1 test green, xác nhận tính liên tục của polling qua StrictMode double mounting và effect replay — `playwright.strict.config.ts`).
 - **Fixture Browser Tests**: PASS (27 tests green gồm accessibility 0 axe violations, security XSS canary text rendering, zero credential persistence across 5 routes, multi-tab session isolation, logout generation fencing, views).
 - **Live Browser E2E Tests**: PASS (10 tests green gồm positive b02 receiver database receipts oracle, negative rejection & cancellation 0 writes, create uncertainty fence, login, NFR-03 latency gate).
-- **NFR-03 Local Latency**: PASS (Đo lường 30 quan sát server event timestamp $\to$ DOM status render, $p50 = 1876$ms, $p95 = 1996$ms $\le 3000$ms target).
+- **NFR-03 Local Latency**: PASS (Đo lường 30 quan sát server event timestamp $\to$ DOM status render, $p50 = 1865$ms, $p95 = 1990$ms $\le 3000$ms target).
 - **Production Bundle Budgets**: PASS:
-  - Live bundle JS gzip: 175,338 bytes (~171.2 KiB) (ngân sách $\le$ 200 KiB / 204,800 bytes).
-  - Live bundle CSS gzip: 6,306 bytes (~6.2 KiB) (ngân sách $\le$ 30 KiB / 30,720 bytes).
+  - Live bundle JS gzip: 175,425 bytes (~171.3 KiB) (ngân sách $\le$ 200 KiB / 204,800 bytes).
+  - Live bundle CSS gzip: 6,418 bytes (~6.3 KiB) (ngân sách $\le$ 30 KiB / 30,720 bytes).
   - Fixture leakage audit: 0 synthetic fixture modules in live bundle.
 - **Delta Cleanup Oracle**: PASS (0 DB `api_it_*`, 0 tiến trình, 0 temp root bị rò rỉ sau toàn bộ 6 gate commands).
 
