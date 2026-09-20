@@ -626,6 +626,9 @@ function generationBody(
     model: profile.model,
     input: `${systemPrompt}\n\n${userPrompt}`,
     response_format: schema,
+    generation_config: {
+      max_output_tokens: profile.maxOutputTokens,
+    },
   };
 }
 

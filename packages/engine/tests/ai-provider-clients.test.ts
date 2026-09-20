@@ -290,6 +290,9 @@ describe("native provider clients with fake transport", () => {
     expect(
       (request?.init.headers as Record<string, string>)["x-goog-api-key"],
     ).toBe("google-canary");
+    expect(JSON.parse(String(request?.init.body)).generation_config).toEqual({
+      max_output_tokens: 4096,
+    });
     expect(JSON.stringify(request?.init.body)).not.toContain("OPENAI_API_KEY");
   });
 
@@ -507,6 +510,10 @@ describe("native provider clients with fake transport", () => {
         expect(
           (init?.headers as Record<string, string>)["x-goog-api-key"],
         ).toBe("google-canary");
+        expect(
+          (JSON.parse(String(init?.body)) as Record<string, unknown>)
+            .generation_config,
+        ).toEqual({ max_output_tokens: 1024 });
         return response({
           model: "gemini-3.8-flash",
           output_text: JSON.stringify({
