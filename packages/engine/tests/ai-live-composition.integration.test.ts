@@ -20,6 +20,18 @@ databaseUrl.pathname = `/${dbName}`;
 const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 let database: ReturnType<typeof openDatabase>;
+type TestProvider = "openai" | "google";
+type ProviderMatrixCase = readonly [
+  string,
+  readonly TestProvider[],
+  readonly TestProvider[],
+];
+const providerMatrix: readonly ProviderMatrixCase[] = [
+  ["openai-only", ["openai"], ["openai"]],
+  ["google-only", ["google"], ["google"]],
+  ["openai-google", ["openai", "google"], ["google"]],
+  ["google-openai", ["google", "openai"], ["openai"]],
+];
 
 function vector(): number[] {
   return Array.from({ length: PGVECTOR_DIMENSIONS }, (_, index) =>
@@ -115,12 +127,7 @@ describe("AI live evaluator native composition", () => {
     }
   });
 
-  it.each([
-    ["openai-only", ["openai"], ["openai"]],
-    ["google-only", ["google"], ["google"]],
-    ["openai-google", ["openai", "google"], ["google"]],
-    ["google-openai", ["google", "openai"], ["openai"]],
-  ] as const)(
+  it.each(providerMatrix)(
     "runs the %s planning/embedding profile through native codecs and QE",
     async (profileId, expectedGenerationProviders, expectedEmbeddingProviders) => {
       const profile = (await readLiveConfig()).resolveProfile(profileId);
