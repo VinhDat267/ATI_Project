@@ -16,6 +16,7 @@
 - API có kill switch `API_NEW_RUNS_ENABLED=0|off` trả `503 NEW_RUNS_DISABLED` sau auth và trước khi parse/accept run; mặc định vẫn bật để giữ tương thích B/local.
 - Runtime AI có kill switch `AI_PROVIDER_CALLS_ENABLED=0|off` chặn authorization trước credential lookup, ledger reservation và network fetch; mặc định bật nhưng durable authorization/accounting vẫn bắt buộc.
 - API có `POST /auth/logout` để revoke bearer session hiện tại; đây là revocation trong process, chưa thay thế P2 durable identity/session hoặc OIDC.
+- API có `/health/live` và `/health/ready`; readiness kiểm tra DB, không gọi provider và không bị bearer auth chặn. Đây là probe contract, chưa phải deployment/restore/incident evidence.
 
 ### OPEN / NOT_RUN
 

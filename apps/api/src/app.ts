@@ -48,6 +48,11 @@ export interface CatalogCheckOptions {
   cooldownMs?: number;
 }
 
+export interface HealthOptions {
+  /** DB/dependency readiness check; provider calls are deliberately excluded. */
+  readiness?: () => Promise<boolean>;
+}
+
 export interface CreateApiOptions {
   db: Database;
   config: ApiConfig;
@@ -58,6 +63,7 @@ export interface CreateApiOptions {
   /** Shared clock injection; also used by the in-memory session store. */
   now?: () => number;
   catalogCheck?: CatalogCheckOptions;
+  health?: HealthOptions;
   /** Structured request sink; it must not receive bodies, headers, or secrets. */
   requestLogger?: (entry: RequestLogEntry) => void;
 }
@@ -66,6 +72,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
   const { config } = options;
   const catalogCheckNow = options.catalogCheck?.now ?? options.now ?? Date.now;
   const catalogCooldownMs = options.catalogCheck?.cooldownMs ?? 5_000;
+  const readiness = options.health?.readiness ?? (async () => true);
   const requestLogger =
     options.requestLogger ??
     ((entry: RequestLogEntry) => {
@@ -218,6 +225,26 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         throw new HttpError(404, "NOT_FOUND", "Route not found");
       const path = parsed.pathname.slice("/api/v1".length) || "/";
       route = requestRouteTemplate(path);
+      if (path === "/health/live" || path === "/health/ready") {
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET");
+          throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        if (path === "/health/live") {
+          writeJson(response, 200, { status: "ok" }, requestId);
+          return;
+        }
+        let ready = false;
+        try {
+          ready = await readiness();
+        } catch {
+          ready = false;
+        }
+        if (!ready)
+          throw new HttpError(503, "NOT_READY", "Service is not ready");
+        writeJson(response, 200, { status: "ready" }, requestId);
+        return;
+      }
       if (path === "/auth/login" || path === "/auth/logout") {
         if (request.method !== "POST") {
           response.setHeader("allow", "POST");

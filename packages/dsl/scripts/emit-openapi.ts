@@ -48,6 +48,12 @@ function component(schema: z.ZodType, name: string): unknown {
   return visit(result);
 }
 const json = (schema: unknown) => ({ "application/json": { schema } });
+const health = {
+  type: "object",
+  additionalProperties: false,
+  properties: { status: { type: "string", enum: ["ok", "ready"] } },
+  required: ["status"],
+};
 const response = (name: string, description = "OK") => ({
   description,
   content: json(ref(name)),
@@ -123,6 +129,30 @@ const spec = {
         responses: {
           "204": { description: "Session revoked" },
           ...errors,
+        },
+      },
+    },
+    "/health/live": {
+      get: {
+        operationId: "healthLive",
+        security: [],
+        summary: "Process liveness probe",
+        responses: {
+          "200": { description: "Process is alive", content: json(health) },
+        },
+      },
+    },
+    "/health/ready": {
+      get: {
+        operationId: "healthReady",
+        security: [],
+        summary: "Dependency readiness probe",
+        responses: {
+          "200": { description: "Dependencies are ready", content: json(health) },
+          "503": {
+            description: "Dependency is unavailable",
+            content: json(ref("ApiError")),
+          },
         },
       },
     },

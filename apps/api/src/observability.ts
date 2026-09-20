@@ -25,6 +25,12 @@ export function requestRouteTemplate(pathname: string): string {
     return `/auth/${segments[1]}`;
   if (segments.length === 1 && root === "servers") return "/servers";
   if (segments.length === 1 && root === "runs") return "/runs";
+  if (
+    segments.length === 2 &&
+    root === "health" &&
+    (segments[1] === "live" || segments[1] === "ready")
+  )
+    return `/health/${segments[1]}`;
   if (root !== "runs" || segments.length < 2 || segments.length > 3)
     return "/unknown";
 

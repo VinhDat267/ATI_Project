@@ -14,7 +14,7 @@ security:
   - bearerAuth: []
 paths:
   /runs/{runId}/trace:
-    parameters: &a3
+    parameters: &a4
       - name: runId
         in: path
         required: true
@@ -89,6 +89,44 @@ paths:
           description: Session revoked
         "401": *a1
         "404": *a2
+  /health/live:
+    get:
+      operationId: healthLive
+      security: []
+      summary: Process liveness probe
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema: &a3
+                type: object
+                additionalProperties: false
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                      - ready
+                required:
+                  - status
+  /health/ready:
+    get:
+      operationId: healthReady
+      security: []
+      summary: Dependency readiness probe
+      responses:
+        "200":
+          description: Dependencies are ready
+          content:
+            application/json:
+              schema: *a3
+        "503":
+          description: Dependency is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /servers:
     get:
       operationId: listServers
@@ -199,7 +237,7 @@ paths:
         "401": *a1
         "404": *a2
   /runs/{runId}:
-    parameters: *a3
+    parameters: *a4
     get:
       operationId: getRun
       responses:
@@ -212,7 +250,7 @@ paths:
         "401": *a1
         "404": *a2
   /runs/{runId}/events:
-    parameters: *a3
+    parameters: *a4
     get:
       operationId: getRunEvents
       parameters:
@@ -233,7 +271,7 @@ paths:
         "401": *a1
         "404": *a2
   /runs/{runId}/reconciliation:
-    parameters: *a3
+    parameters: *a4
     get:
       operationId: getRunReconciliation
       description: Read-only receipt and dispatch-marker projection for uncertain writes. This endpoint never retries or
@@ -250,7 +288,7 @@ paths:
         "409":
           description: History or cursor limit
   /runs/{runId}/approval:
-    parameters: *a3
+    parameters: *a4
     post:
       operationId: decideApproval
       description: Atomically compare owner, pending decision, run status, version, snapshot and expiry. Duplicate/stale
@@ -273,7 +311,7 @@ paths:
         "409":
           description: Stale, expired or already decided approval
   /runs/{runId}/cancel:
-    parameters: *a3
+    parameters: *a4
     post:
       operationId: cancelRun
       description: Cooperative cancellation. Never claim rollback of an in-flight tool call. Unknown writes terminate as

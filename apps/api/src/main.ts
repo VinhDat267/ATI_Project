@@ -167,7 +167,23 @@ const maintenance = createExpiryMaintenance({
   onError: (code) =>
     console.error(JSON.stringify({ event: "maintenance_deferred", code })),
 });
-const api = createApi({ db, config, engine, worker, maintenance });
+const api = createApi({
+  db,
+  config,
+  engine,
+  worker,
+  maintenance,
+  health: {
+    readiness: async () => {
+      try {
+        await db.client`SELECT 1`;
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  },
+});
 const url = await api.listen();
 worker?.start();
 maintenance.start();
