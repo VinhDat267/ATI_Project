@@ -6,7 +6,7 @@
 
 ### CONFIRMED
 
-- Checkout hiện tại kết thúc ở `ddb59ad`; worktree sạch trước khi cập nhật tài liệu này.
+- Code checkout dùng cho backend gate kết thúc ở `ddb59ad`; commit tài liệu này ghi nhận trạng thái đó và worktree hiện sạch.
 - Full integrated gate đã pass trên commit `a0a0ae4`; backend gate trên code commit `ddb59ad` cũng pass: DSL 43, engine unit 341 (1 skipped), API unit 55, web unit 128; MCP integration 64, engine integration 102, API integration 40. WEB-03 pass đủ 6 browser/build gates trên code commit `20dc8bd`.
 - Manifest browser sạch mới nhất là `docs/web-evidence/WEB-03/20260920200046-3f2db4d3-f0df-494b-aa17-8ded6d759f47/manifest.json`.
 - PostgreSQL demo được migrate additive đến tổng 9 migrations, không reset volume.
