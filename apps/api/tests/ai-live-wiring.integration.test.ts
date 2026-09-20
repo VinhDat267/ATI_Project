@@ -50,6 +50,7 @@ describe("provider-backed API replan wiring", () => {
       version: "1.0",
       name: "Invalid read range",
       source_prompt: "List September cards",
+      inputs: {},
       steps: [
         {
           id: "read_1",
@@ -63,6 +64,11 @@ describe("provider-backed API replan wiring", () => {
               until: "2026-09-01",
             },
           },
+          depends_on: [],
+          condition: null,
+          retry: { max_attempts: 1, backoff: "exponential", initial_delay_ms: 0 },
+          idempotency_key: null,
+          timeout_ms: 30_000,
           side_effect: "read",
           on_error: "replan",
         },
@@ -86,6 +92,26 @@ describe("provider-backed API replan wiring", () => {
           },
         },
       ],
+    };
+    const badProviderPlan: Extract<PlannerResult, { kind: "plan" }>["plan"] = {
+      version: badPlan.version,
+      name: badPlan.name,
+      source_prompt: badPlan.source_prompt,
+      inputs: {},
+      steps: badPlan.steps.map(
+        ({ retry: _retry, timeout_ms: _timeoutMs, ...step }) => step,
+      ),
+      outputs: badPlan.outputs,
+    };
+    const repairedProviderPlan: Extract<PlannerResult, { kind: "plan" }>["plan"] = {
+      version: repairedPlan.version,
+      name: repairedPlan.name,
+      source_prompt: repairedPlan.source_prompt,
+      inputs: {},
+      steps: repairedPlan.steps.map(
+        ({ retry: _retry, timeout_ms: _timeoutMs, ...step }) => step,
+      ),
+      outputs: repairedPlan.outputs,
     };
 
     const reservations: ProviderCallReservation[] = [];
@@ -116,7 +142,10 @@ describe("provider-backed API replan wiring", () => {
           input?: Array<{ content?: Array<{ text?: string }> }>;
         };
         expect(request.input?.[1]?.content?.[0]?.text).toContain("read_1");
-        const result: PlannerResult = { kind: "plan", plan: repairedPlan };
+        const result: PlannerResult = {
+          kind: "plan",
+          plan: repairedProviderPlan,
+        };
         return new Response(
           JSON.stringify({
             id: "provider-replan-response",
@@ -144,7 +173,7 @@ describe("provider-backed API replan wiring", () => {
     const result = await engine.prepareAccepted(accepted.run_id, {
       mode: "ai",
       async produce() {
-        return { kind: "plan", plan: badPlan };
+        return { kind: "plan", plan: badProviderPlan };
       },
     });
 
