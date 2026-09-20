@@ -19,7 +19,7 @@ Cổng G3 Tuần 3: **TECHNICAL PASS** cho toàn bộ 6 view, luồng duyệt gh
 
 ## 2. Bằng chứng kiểm định (Evidence Manifest)
 
-- Thư mục bằng chứng: `docs/web-evidence/WEB-03/20260920190747-fb09486c-88d3-4460-907a-ac9454db2327/manifest.json`
+- Thư mục bằng chứng: `docs/web-evidence/WEB-03/20260920200046-3f2db4d3-f0df-494b-aa17-8ded6d759f47/manifest.json`
 - Lệnh chạy kiểm định tự động: `npm run check:web` (được tích hợp trong `npm run check:full`).
 
 ## 3. Ranh giới chuyển giao Tuần 4
