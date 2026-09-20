@@ -7,6 +7,7 @@ import {
   validateEvalDatabaseUrl,
 } from "../src/ai/live-evaluation/cli.js";
 import { createOfflineReviewedCatalog } from "../src/ai/local-catalog.js";
+import { createLiveEvaluationRuntime } from "../src/ai/live-evaluation/runtime.js";
 import type { LiveEvaluationSession } from "../src/ai/live-evaluation/runner.js";
 import type { AiLiveApprovalRecord } from "../src/ai/providers/approval.js";
 
@@ -96,6 +97,30 @@ async function writeValidApproval(
   const filePath = join(dir, "approval.json");
   await writeFile(filePath, `${JSON.stringify(approval, null, 2)}\n`, "utf8");
   return filePath;
+}
+
+function createTestRuntime() {
+  return createLiveEvaluationRuntime({
+    probe: async () => ({
+      calls: [
+        {
+          role: "planning",
+          provider: "openai",
+          model: "gpt-5.6-terra",
+          requestId: "probe-test",
+        },
+      ],
+    }),
+    index: async () => ({
+      index: {
+        id: "index-test",
+        provenanceHash: "a".repeat(64),
+        vectorHash: "b".repeat(64),
+        policyHash: "c".repeat(64),
+      },
+      rowCount: 10,
+    }),
+  });
 }
 
 function createMockSession(
@@ -286,7 +311,7 @@ describe("ai-live-cli", () => {
         approvalPath,
         "--execute",
       ],
-      { root },
+      { root, runtime: createTestRuntime() },
     );
 
     expect(result.exitCode).toBe(0);
@@ -347,6 +372,7 @@ describe("ai-live-cli", () => {
           AI_EVAL_DATABASE_URL: "postgresql://user:pass@localhost:5432/eval_db",
           DATABASE_URL: "postgresql://user:pass@localhost:5432/app_db",
         },
+        runtime: createTestRuntime(),
       },
     );
 

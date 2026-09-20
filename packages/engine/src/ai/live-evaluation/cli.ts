@@ -48,6 +48,7 @@ import {
   hashLiveConfig,
   type LiveExecutionPhase,
 } from "./authorization.js";
+import type { LiveEvaluationRuntime } from "./runtime.js";
 
 export interface LiveEvaluationCliEnvironment {
   readonly root?: string;
@@ -55,6 +56,7 @@ export interface LiveEvaluationCliEnvironment {
   readonly now?: () => Date;
   readonly runId?: () => string;
   readonly env?: Record<string, string | undefined>;
+  readonly runtime?: LiveEvaluationRuntime;
   readonly getSession?: (
     context: LiveEvaluationSessionContext,
   ) => Promise<LiveEvaluationSession>;
@@ -353,10 +355,21 @@ export async function runLiveEvaluationCli(
         now(),
       );
 
+      if (!environment.runtime) {
+        throw new Error(
+          "No live evaluation runtime configured for probe execution",
+        );
+      }
+      const probe = await environment.runtime.probe({
+        campaignId: flags.campaign,
+        profileId: flags.profile,
+        phase: "probe",
+      });
+
       return {
         exitCode: 0,
         artifactPath: null,
-        message: `Live probe passed for profile "${flags.profile}" (campaign: ${flags.campaign})`,
+        message: `Live probe passed for profile "${flags.profile}" (campaign: ${flags.campaign}, calls: ${probe.calls.length})`,
       };
     } catch (error) {
       return cliError(error, 1);
@@ -396,8 +409,6 @@ export async function runLiveEvaluationCli(
     }
 
     try {
-      validateEvalDatabaseUrl(env.AI_EVAL_DATABASE_URL, env.DATABASE_URL);
-
       const rawApproval = JSON.parse(
         await readFile(resolve(flags.approval), "utf8"),
       );
@@ -421,10 +432,22 @@ export async function runLiveEvaluationCli(
         now(),
       );
 
+      validateEvalDatabaseUrl(env.AI_EVAL_DATABASE_URL, env.DATABASE_URL);
+      if (!environment.runtime) {
+        throw new Error(
+          "No live evaluation runtime configured for index execution",
+        );
+      }
+      const indexed = await environment.runtime.index({
+        campaignId: flags.campaign,
+        profileId: flags.profile,
+        phase: "index",
+      });
+
       return {
         exitCode: 0,
         artifactPath: null,
-        message: `Tool index built and activated for profile "${flags.profile}"`,
+        message: `Tool index built and activated for profile "${flags.profile}" (index: ${indexed.index.id}, rows: ${indexed.rowCount})`,
       };
     } catch (error) {
       return cliError(error, 1);
@@ -584,12 +607,6 @@ export async function runLiveEvaluationCli(
         campaignLimitMicros: approval.budgetMicros,
       });
 
-      if (!environment.getSession) {
-        throw new Error(
-          "No live evaluation session provider available in CLI environment",
-        );
-      }
-
       const casesMap = new Map<string, ParsedLiveCase>();
       for (const c of parsedDataset.cases) {
         casesMap.set(c.input.id, c);
@@ -609,7 +626,14 @@ export async function runLiveEvaluationCli(
         ledger,
         campaignId,
         runId: currentRunId,
-        getSession: environment.getSession,
+        getSession:
+          environment.getSession ??
+          environment.runtime?.createSession.bind(environment.runtime) ??
+          (async () => {
+            throw new Error(
+              "No live evaluation session provider available in CLI environment",
+            );
+          }),
         journalWriter,
       });
 

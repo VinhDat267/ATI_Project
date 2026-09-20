@@ -104,6 +104,7 @@ export {
   InMemoryProviderCallLedger,
   JournaledProviderCallLedger,
   restoreProviderCallRecords,
+  createLiveEvaluationRuntime,
   ProviderAccountingError,
   ProviderClientError,
   AiApprovalError,
