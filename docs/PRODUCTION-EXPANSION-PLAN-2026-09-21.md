@@ -17,6 +17,7 @@
 - Runtime AI có kill switch `AI_PROVIDER_CALLS_ENABLED=0|off` chặn authorization trước credential lookup, ledger reservation và network fetch; mặc định bật nhưng durable authorization/accounting vẫn bắt buộc.
 - API có `POST /auth/logout` để revoke bearer session hiện tại; đây là revocation trong process, chưa thay thế P2 durable identity/session hoặc OIDC.
 - API hiện tách `SessionAuthority` injectable khỏi `SessionStore`; memory implementation vẫn là mặc định, nên durable implementation có thể được kiểm thử riêng mà không đổi route contract.
+- API đã có technical guards cho boundary: JSON body streaming cap 64 KiB, login schema strict với field length bounds, in-process login/session rate limits và provider call timeout/budget controls. Các guard này không thay thế durable identity, CSRF/cookie policy hoặc production authorization.
 - API có `/health/live` và `/health/ready`; readiness kiểm tra DB, không gọi provider và không bị bearer auth chặn. Đây là probe contract, chưa phải deployment/restore/incident evidence.
 - `npm run check:full` đã pass trên code commit `a0a0ae4`: backend DSL 43, engine unit 341 + 1 skipped, API unit 54, web unit 128, MCP integration 64, engine integration 102, API integration 40; web có 6/6 gate pass, NFR-03 p95 1,975 ms và cleanup không rò rỉ. Backend gate tiếp theo trên `0b3ff41` nâng API unit lên 57 và vẫn pass các integration count nêu trên.
 - `npm run ai:eval:live -- preflight --offline` pass; đây chỉ là preflight network-free, không phải live provider evaluation.
