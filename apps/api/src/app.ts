@@ -29,6 +29,11 @@ import type { WorkerControl } from "./worker.js";
 import type { MaintenanceControl } from "./maintenance.js";
 import { decodeTraceCursor, encodeTraceCursor } from "./cursors.js";
 import { redact } from "./redaction.js";
+import {
+  createRequestLogEntry,
+  requestRouteTemplate,
+  type RequestLogEntry,
+} from "./observability.js";
 
 export interface ApiRuntime {
   server: Server;
@@ -53,12 +58,19 @@ export interface CreateApiOptions {
   /** Shared clock injection; also used by the in-memory session store. */
   now?: () => number;
   catalogCheck?: CatalogCheckOptions;
+  /** Structured request sink; it must not receive bodies, headers, or secrets. */
+  requestLogger?: (entry: RequestLogEntry) => void;
 }
 
 export function createApi(options: CreateApiOptions): ApiRuntime {
   const { config } = options;
   const catalogCheckNow = options.catalogCheck?.now ?? options.now ?? Date.now;
   const catalogCooldownMs = options.catalogCheck?.cooldownMs ?? 5_000;
+  const requestLogger =
+    options.requestLogger ??
+    ((entry: RequestLogEntry) => {
+      if (process.env.NODE_ENV !== "test") console.log(JSON.stringify(entry));
+    });
   if (!Number.isSafeInteger(catalogCooldownMs) || catalogCooldownMs < 0)
     throw new Error("Invalid catalog check cooldown");
   const principalExists =
@@ -141,8 +153,23 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       keepAliveTimeout: 5_000,
     },
     (request, response) => {
-      void handle(request, response).catch((error: unknown) => {
+      void handle(request, response).catch(() => {
         const requestId = randomUUID();
+        const route = (() => {
+          try {
+            const parsed = new URL(
+              request.url ?? "/",
+              baseOrigin ?? `http://${config.host}`,
+            );
+            return requestRouteTemplate(
+              parsed.pathname.startsWith("/api/v1")
+                ? parsed.pathname.slice("/api/v1".length) || "/"
+                : "/unknown",
+            );
+          } catch {
+            return "/unknown";
+          }
+        })();
         writeJson(
           response,
           500,
@@ -155,10 +182,18 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           },
           requestId,
         );
-        if (error instanceof Error && process.env.NODE_ENV !== "test")
-          console.error(
-            JSON.stringify({ request_id: requestId, error: error.message }),
+        try {
+          requestLogger(
+            createRequestLogEntry(
+              request.method ?? "UNKNOWN",
+              route,
+              response.statusCode || 500,
+              requestId,
+            ),
           );
+        } catch {
+          // Observability must never replace the response or change lifecycle state.
+        }
       });
     },
   );
@@ -168,6 +203,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
     response: ServerResponse,
   ): Promise<void> {
     const requestId = randomUUID();
+    let route = "/unknown";
     try {
       if (closing)
         throw new HttpError(503, "SHUTTING_DOWN", "API is shutting down");
@@ -181,6 +217,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       if (!parsed.pathname.startsWith("/api/v1"))
         throw new HttpError(404, "NOT_FOUND", "Route not found");
       const path = parsed.pathname.slice("/api/v1".length) || "/";
+      route = requestRouteTemplate(path);
       if (path === "/auth/login") {
         if (request.method !== "POST") {
           response.setHeader("allow", "POST");
@@ -459,6 +496,19 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         },
         requestId,
       );
+    } finally {
+      try {
+        requestLogger(
+          createRequestLogEntry(
+            request.method ?? "UNKNOWN",
+            route,
+            response.statusCode || 500,
+            requestId,
+          ),
+        );
+      } catch {
+        // Observability must never replace the response or change lifecycle state.
+      }
     }
   }
 

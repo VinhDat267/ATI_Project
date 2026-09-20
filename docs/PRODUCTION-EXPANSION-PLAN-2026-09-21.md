@@ -12,6 +12,7 @@
 - PostgreSQL demo được migrate additive đến tổng 9 migrations, không reset volume.
 - Google probe 6 calls đã pass. Đây là connectivity/protocol evidence, không phải quality evaluation; OpenAI live probe và formal live evaluation chưa chạy.
 - Engine đã có preview/approval/reconciliation, durable PostgreSQL outbox và worker tuần tự. Session store vẫn là bộ nhớ tiến trình; filesystem mặc định tắt.
+- API hiện có structured request log tối thiểu (`method`, route template, status, `request_id`) với route/query/credential redaction; đây mới là nền tảng local, chưa phải dashboard/alert/incident evidence.
 
 ### OPEN / NOT_RUN
 
