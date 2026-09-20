@@ -1,6 +1,6 @@
 # AI backend implementation plan — AI-00 → AI-04
 
-**Status:** `AI-00_OFFLINE_SLICE_IMPLEMENTED / MAIN_VERIFIED / LIVE_GATE_OPEN`; runtime AI chưa được triển khai.
+**Status:** `AI-00_OFFLINE_SLICE_IMPLEMENTED / API_RUNTIME_WIRED / LIVE_GATE_OPEN`; native runtime composition and durable accounting are implemented, while live quality/evaluation remains gated.
 **Scope:** B/local; giữ nguyên engine/policy/approval/reconciliation contracts.
 
 ## AI-00 — design and gate
@@ -44,7 +44,10 @@ và pgvector reviewed-index adapter nằm trong `packages/engine/src/ai/`.
 Migration `0007` và tests engine dùng database tạm riêng; không ghi DB demo.
 Reviewer của foundation trước không chạy được vì usage limit; planner hardening
 và AI-01 đã có review độc lập. Đây không phải chứng nhận production-ready.
-Adapter được export nhưng chưa wire vào API hoặc engine lifecycle.
+Adapter đã được wire qua API AI runtime với explicit retrieval variant; semantic
+modes chỉ dùng active index đã chuẩn bị và không fallback sang `all_tools`.
+Native provider transport/codec và durable accounting đã có, nhưng không tự
+thay thế engine validator/policy và chưa đóng live quality/evaluation gate.
 
 1. Chuẩn hóa immutable reviewed catalog snapshot, canonical hash, kiểm duplicate
    tool/missing policy/catalog drift; không coi raw MCP DTO là reviewed policy.
@@ -125,7 +128,9 @@ selection.
 **Không sửa:** `PlannerResultSchema` để ép output provider.
 
 - [x] Implement fake `StructuredModelClient` trước live adapter.
-- [ ] Implement live provider adapter sau provider/model probe (LIVE GATE OPEN).
+- [x] Implement native live provider adapters/codecs sau provider/model contract
+      probe; live account access, budget approval and quality evaluation remain
+      separate gates.
 - [x] Nối retrieval output vào `buildPlanningPrompt`.
 - [x] Parse strict `PlannerResultSchema`; refusal/clarification không tạo
       version/approval.

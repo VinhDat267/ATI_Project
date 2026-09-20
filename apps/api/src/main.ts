@@ -132,6 +132,7 @@ const aiRuntime =
             runId: "api-runtime-bootstrap",
             profileId: "api-profile-v1",
           },
+          retrievalVariant: config.aiRetrievalVariant,
         });
       })()
     : undefined;

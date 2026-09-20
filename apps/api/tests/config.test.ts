@@ -36,4 +36,18 @@ describe("API configuration", () => {
       /Invalid configuration API_PLANNER_MODE/,
     );
   });
+
+  it("accepts an explicit AI retrieval variant and rejects unsupported values", async () => {
+    const env = await baseEnv();
+    expect(
+      loadConfig({ ...env, AI_RETRIEVAL_VARIANT: "semantic" }).aiRetrievalVariant,
+    ).toBe("semantic");
+    expect(
+      loadConfig({ ...env, AI_RETRIEVAL_VARIANT: "semantic_qe" }).aiRetrievalVariant,
+    ).toBe("semantic_qe");
+    expect(loadConfig(env).aiRetrievalVariant).toBe("all_tools");
+    expect(() =>
+      loadConfig({ ...env, AI_RETRIEVAL_VARIANT: "unsupported" }),
+    ).toThrow(/Invalid configuration AI_RETRIEVAL_VARIANT/);
+  });
 });

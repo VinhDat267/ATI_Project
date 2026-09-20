@@ -88,6 +88,8 @@ export interface CreateAiRuntimeOptions extends AiRuntimePortsOptions {
   readonly gateway: Gateway;
   readonly root: string;
   readonly userId: string;
+  /** Explicit retrieval mode; all_tools remains the safe default. */
+  readonly retrievalVariant?: RetrievalVariant;
 }
 
 export interface AiRuntime {
@@ -254,9 +256,9 @@ export function createAiRuntime(options: CreateAiRuntimeOptions): AiRuntime {
       modelClient: scopedPorts.model,
       createRetriever,
       createSession,
-      // Keep production composition explicit until T5 selects a live retrieval
-      // profile; all reviewed tools is fail-closed and requires no index.
-      variant: "all_tools" as const,
+      // The selected mode is explicit. Semantic modes require a prepared,
+      // provenance-matched active index and never fall back to all_tools.
+      variant: options.retrievalVariant ?? "all_tools",
       topK: 10,
       maxPlanningCalls: options.config.limits.maxPlanningCalls,
       maxRepairCalls: 3,

@@ -189,4 +189,52 @@ describe("provider-backed API replan wiring", () => {
     });
     expect(gatewayCalls.some((call) => call.sideEffect === "write")).toBe(false);
   });
+
+  it("does not fall back to all_tools when semantic retrieval has no active index", async () => {
+    const fixture = await makeApiFixture({
+      workerEnabled: true,
+      filesystemEnabled: true,
+    });
+    openFixtures.add(fixture);
+    let fetchCalls = 0;
+    const runtime = createAiRuntime({
+      db: fixture.db,
+      gateway: fixture.gateway!,
+      root,
+      userId: fixture.userId,
+      retrievalVariant: "semantic",
+      config: readAiProviderConfig({
+        AI_PLANNING_PROVIDER: "openai",
+        AI_PLANNING_MODEL: "gpt-5.6-terra",
+        AI_EMBEDDING_PROVIDER: "openai",
+        AI_EMBEDDING_MODEL: "text-embedding-3-large",
+      }),
+      credentials: { OPENAI_API_KEY: "integration-test-key" },
+      ledger: {
+        async reserve() {
+          throw new Error("provider call must not be reserved without an index");
+        },
+        async settle() {},
+      },
+      authorizeCall: async () => {},
+      fetchImpl: async () => {
+        fetchCalls++;
+        throw new Error("provider transport must not be reached without an index");
+      },
+    });
+
+    await expect(
+      runtime.planner.produce({
+        runId: "semantic-no-index",
+        userId: fixture.userId,
+        request: {
+          source_prompt: "List September cards",
+          inputs: {},
+          time_zone: "Asia/Ho_Chi_Minh",
+        },
+        runtime: { today: "2026-09-21" },
+      }),
+    ).rejects.toThrow(/active pgvector index|no active/i);
+    expect(fetchCalls).toBe(0);
+  });
 });

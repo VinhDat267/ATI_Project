@@ -11,6 +11,8 @@ export interface ApiConfig {
   sessionTtlMs: number;
   cursorKey: Buffer;
   plannerMode: "disabled" | "dev_fixture" | "ai";
+  /** Retrieval is explicit; all_tools remains the fail-safe default. */
+  readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -67,6 +69,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   )
     throw new Error("Invalid configuration API_PLANNER_MODE");
   const plannerMode = rawPlannerMode;
+  const rawRetrievalVariant = env.AI_RETRIEVAL_VARIANT ?? "all_tools";
+  if (
+    rawRetrievalVariant !== "all_tools" &&
+    rawRetrievalVariant !== "semantic" &&
+    rawRetrievalVariant !== "semantic_qe"
+  )
+    throw new Error("Invalid configuration AI_RETRIEVAL_VARIANT");
+  const aiRetrievalVariant = rawRetrievalVariant;
   return {
     host: "127.0.0.1",
     port: integer(env, "API_PORT", 3001),
@@ -76,5 +86,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     sessionTtlMs: sessionTtl(env),
     cursorKey: cursorKey(required(env, "API_CURSOR_KEY")),
     plannerMode,
+    aiRetrievalVariant,
   };
 }
