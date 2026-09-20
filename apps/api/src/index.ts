@@ -1,6 +1,6 @@
 export { createApi, type ApiRuntime } from "./app.js";
 export { loadConfig, type ApiConfig } from "./config.js";
-export { hashPassword, SessionStore } from "./auth.js";
+export { hashPassword, SessionStore, type SessionAuthority } from "./auth.js";
 export { loadDevPlanner, type DevPlanner } from "./dev-planner.js";
 export {
   loadAiPlanner,

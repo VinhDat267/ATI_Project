@@ -23,7 +23,7 @@ import {
   ServerCatalogSchema,
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
-import { AuthError, SessionStore } from "./auth.js";
+import { AuthError, SessionStore, type SessionAuthority } from "./auth.js";
 import { HttpError, readJson, writeEmpty, writeJson } from "./http.js";
 import type { WorkerControl } from "./worker.js";
 import type { MaintenanceControl } from "./maintenance.js";
@@ -64,6 +64,8 @@ export interface CreateApiOptions {
   now?: () => number;
   catalogCheck?: CatalogCheckOptions;
   health?: HealthOptions;
+  /** Optional durable/session implementation; memory SessionStore remains default. */
+  sessionStore?: SessionAuthority;
   /** Structured request sink; it must not receive bodies, headers, or secrets. */
   requestLogger?: (entry: RequestLogEntry) => void;
 }
@@ -87,14 +89,16 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         .client`SELECT id FROM users WHERE id=${config.userId} AND email=${config.email}`;
       return rows.length === 1;
     });
-  const sessions = new SessionStore({
-    userId: config.userId,
-    email: config.email,
-    passwordHash: config.passwordHash,
-    ttlMs: config.sessionTtlMs,
-    principalExists,
-    now: options.now,
-  });
+  const sessions: SessionAuthority =
+    options.sessionStore ??
+    new SessionStore({
+      userId: config.userId,
+      email: config.email,
+      passwordHash: config.passwordHash,
+      ttlMs: config.sessionTtlMs,
+      principalExists,
+      now: options.now,
+    });
   const configuredSecrets = [
     config.passwordHash,
     config.cursorKey.toString("base64"),
@@ -251,7 +255,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         if (path === "/auth/logout") {
-          sessions.revoke(request.headers.authorization);
+          await sessions.revoke(request.headers.authorization);
           writeEmpty(response, 204, requestId);
           return;
         }
@@ -274,7 +278,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        sessions.authenticate(request.headers.authorization);
+        await sessions.authenticate(request.headers.authorization);
         const servers = ServerSummaryListSchema.parse(
           projectOutput(
             options.engine
@@ -301,7 +305,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        sessions.authenticate(request.headers.authorization);
+        await sessions.authenticate(request.headers.authorization);
         const catalog = await readServerCatalog(false);
         writeJson(response, 200, catalog, requestId);
         return;
@@ -311,7 +315,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = sessions.authenticate(request.headers.authorization);
+        const userId = await sessions.authenticate(request.headers.authorization);
         if (!options.engine)
           throw new HttpError(
             501,
@@ -337,7 +341,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       }
       if (path === "/runs") {
         if (request.method === "GET") {
-          sessions.authenticate(request.headers.authorization);
+          await sessions.authenticate(request.headers.authorization);
           if (!options.engine)
             throw new HttpError(
               501,
@@ -358,7 +362,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET, POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = sessions.authenticate(request.headers.authorization);
+        const userId = await sessions.authenticate(request.headers.authorization);
         if (config.allowNewRuns === false)
           throw new HttpError(
             503,
@@ -396,7 +400,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", writeRoute ? "POST" : "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        const userId = sessions.authenticate(request.headers.authorization);
+        const userId = await sessions.authenticate(request.headers.authorization);
         parseInput(z.uuid(), id);
         if (!subpath) {
           writeJson(

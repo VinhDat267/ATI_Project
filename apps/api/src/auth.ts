@@ -82,7 +82,14 @@ export interface SessionStoreOptions {
   now?: () => number;
 }
 
-export class SessionStore {
+/** Authentication boundary; implementations may be in-memory or durable. */
+export interface SessionAuthority {
+  login(email: string, password: string, clientKey?: string): Promise<string>;
+  authenticate(header: string | undefined): string | Promise<string>;
+  revoke(header: string | undefined): void | Promise<void>;
+}
+
+export class SessionStore implements SessionAuthority {
   private readonly sessions = new Map<string, Session>();
   private readonly attempts = new Map<string, number[]>();
   private readonly now: () => number;
