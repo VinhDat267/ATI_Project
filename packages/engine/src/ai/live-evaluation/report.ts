@@ -395,8 +395,7 @@ export function buildLiveEvaluationReport(
       unknownCostCalls++;
     }
 
-    const usage =
-      ("usage" in call ? call.usage : undefined) ?? call.tokens;
+    const usage = ("usage" in call ? call.usage : undefined) ?? call.tokens;
     const inTok = usage?.inputTokens ?? 0;
     const outTok = usage?.outputTokens ?? 0;
     totalInputTokens += inTok;

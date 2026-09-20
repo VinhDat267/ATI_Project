@@ -7,11 +7,16 @@ import { openLiveCampaign } from "../src/ai/live-evaluation/campaign.js";
 const roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 async function root(): Promise<string> {
-  const value = join(tmpdir(), `ati-live-campaign-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const value = join(
+    tmpdir(),
+    `ati-live-campaign-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   await mkdir(value, { recursive: true });
   roots.push(value);
   return value;
@@ -129,5 +134,34 @@ describe("ai-live campaign coordinator", () => {
         budgetCapMicros: 100,
       }),
     ).rejects.toThrow(/cannot verify prior campaign run|missing/i);
+  });
+
+  it("blocks a campaign when a prior journal ends with a truncated event", async () => {
+    const outputRoot = await root();
+    const first = await openLiveCampaign({
+      outputRoot,
+      campaignId: "campaign-truncated-journal",
+      runId: "run-1",
+      profileId: "openai-only",
+      phase: "smoke",
+      budgetCapMicros: 100,
+    });
+    const journalPath = join(first.runDirectory, "journal.jsonl");
+    await first.close();
+    const before = await readFile(journalPath, "utf8");
+    const { appendFile } = await import("node:fs/promises");
+    await appendFile(journalPath, '{"version":1,"sequence":2', "utf8");
+
+    await expect(
+      openLiveCampaign({
+        outputRoot,
+        campaignId: "campaign-truncated-journal",
+        runId: "run-2",
+        profileId: "openai-only",
+        phase: "dev",
+        budgetCapMicros: 100,
+      }),
+    ).rejects.toThrow(/truncated|incomplete/i);
+    expect((await readFile(journalPath, "utf8")).startsWith(before)).toBe(true);
   });
 });

@@ -103,7 +103,9 @@ async function createDefaultLiveRuntime(options: {
   };
   const userId = options.env.AI_EVAL_USER_ID?.trim();
   if (!userId && options.phase !== "probe") {
-    throw new Error("AI_EVAL_USER_ID is required for database-backed live evaluation");
+    throw new Error(
+      "AI_EVAL_USER_ID is required for database-backed live evaluation",
+    );
   }
   return createLiveEvaluationRuntimeComposition({
     root: options.root,
@@ -120,7 +122,9 @@ async function createDefaultLiveRuntime(options: {
       }
       const expiresAt = Date.parse(options.approvalExpiresAt);
       if (!Number.isFinite(expiresAt) || options.now().getTime() >= expiresAt) {
-        throw new Error("live evaluation approval expired before provider dispatch");
+        throw new Error(
+          "live evaluation approval expired before provider dispatch",
+        );
       }
     },
   });
@@ -412,7 +416,8 @@ export async function runLiveEvaluationCli(
         now(),
       );
 
-      let ownedCampaign: Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
+      let ownedCampaign:
+        Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
       let ownedRuntime: LiveEvaluationRuntime | undefined;
       try {
         if (environment.runtime) {
@@ -516,7 +521,8 @@ export async function runLiveEvaluationCli(
       );
 
       validateEvalDatabaseUrl(env.AI_EVAL_DATABASE_URL, env.DATABASE_URL);
-      let ownedCampaign: Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
+      let ownedCampaign:
+        Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
       let ownedRuntime: LiveEvaluationRuntime | undefined;
       try {
         if (environment.runtime) {
@@ -694,7 +700,10 @@ export async function runLiveEvaluationCli(
       let caseIds: readonly string[];
       let repetitions = 3;
       let smokeCells:
-        | readonly { variant: "all_tools" | "semantic" | "semantic_qe"; topK: 10 }[]
+        | readonly {
+            variant: "all_tools" | "semantic" | "semantic_qe";
+            topK: 10;
+          }[]
         | undefined;
       if (flags.phase === "smoke") {
         caseIds = ["b01", "b05", "b06"];
@@ -725,9 +734,7 @@ export async function runLiveEvaluationCli(
         budgetCapMicros: approval.budgetMicros,
         evidenceKind:
           injectedEvidenceKind ??
-          (environment.getSession
-            ? "FAKE_TRANSPORT_TEST"
-            : "LIVE_PROVIDER"),
+          (environment.getSession ? "FAKE_TRANSPORT_TEST" : "LIVE_PROVIDER"),
         freezeHash: hashLiveFreeze(liveFreeze),
         fingerprints: liveFreeze.fingerprints,
       });
@@ -760,6 +767,14 @@ export async function runLiveEvaluationCli(
             ledger,
           });
         }
+        if (
+          ownedRuntime?.evidenceKind === "LIVE_PROVIDER" &&
+          !liveFreeze.execution
+        ) {
+          throw new Error(
+            "Native live runs require a complete execution freeze with budget, price, index, runtime, and source evidence",
+          );
+        }
         const sessionRuntime = ownedRuntime;
         runResult = await runLiveEvaluation({
           trials,
@@ -770,18 +785,16 @@ export async function runLiveEvaluationCli(
           ledger,
           campaignId,
           runId: currentRunId,
-          getSession:
-            environment.getSession
-              ? (context, variant) => environment.getSession!(context, variant)
-              :
-            (sessionRuntime
+          getSession: environment.getSession
+            ? (context, variant) => environment.getSession!(context, variant)
+            : sessionRuntime
               ? (context, variant) =>
                   sessionRuntime.createSession(context, ledger, variant)
               : async () => {
                   throw new Error(
                     "No live evaluation session provider available in CLI environment",
                   );
-                }),
+                },
           journalWriter: async (event) => {
             await campaign.journal.append(event);
           },
@@ -831,7 +844,9 @@ export async function runLiveEvaluationCli(
           ownedRuntime?.evidenceKind ??
           environment.runtime?.evidenceKind ??
           "FAKE_TRANSPORT_TEST",
-        ledgerRecords: ledger.records(),
+        ledgerRecords: ledger
+          .records()
+          .filter((record) => record.runId === currentRunId),
         haltReason: runResult.haltReason,
       });
 

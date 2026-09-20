@@ -42,7 +42,8 @@ export interface LiveCampaign {
 }
 
 function assertId(name: string, value: string): void {
-  if (!SAFE_ID.test(value)) throw new Error(`${name} contains an invalid identifier`);
+  if (!SAFE_ID.test(value))
+    throw new Error(`${name} contains an invalid identifier`);
 }
 
 function assertBudget(value: number): void {
@@ -51,10 +52,7 @@ function assertBudget(value: number): void {
   }
 }
 
-async function writeExclusiveJson(
-  path: string,
-  value: unknown,
-): Promise<void> {
+async function writeExclusiveJson(path: string, value: unknown): Promise<void> {
   const handle = await open(path, "wx");
   try {
     await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -87,13 +85,17 @@ export async function openLiveCampaign(
   let manifest: CampaignManifest;
   let journal: LiveJournal | undefined;
   try {
-    manifest = JSON.parse(await readFile(manifestPath, "utf8")) as CampaignManifest;
+    manifest = JSON.parse(
+      await readFile(manifestPath, "utf8"),
+    ) as CampaignManifest;
     if (
       manifest.format !== "ati-ai-live-campaign-v1" ||
       manifest.campaignId !== options.campaignId ||
       manifest.budgetCapMicros !== options.budgetCapMicros
     ) {
-      throw new Error("campaign manifest scope or budget does not match approval");
+      throw new Error(
+        "campaign manifest scope or budget does not match approval",
+      );
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -144,19 +146,34 @@ export async function openLiveCampaign(
       const priorJournalPath = join(runsDirectory, priorRunId, "journal.jsonl");
       try {
         const replay = await replayLiveJournal(priorJournalPath);
+        if (replay.truncatedFinalLine) {
+          throw new Error(
+            `cannot verify prior campaign run "${priorRunId}": journal has a truncated final event`,
+          );
+        }
         previousRecords.push(...restoreProviderCallRecords(replay.events));
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          throw new Error(`cannot verify prior campaign run "${priorRunId}": journal is missing`, {
-            cause: error,
-          });
+          throw new Error(
+            `cannot verify prior campaign run "${priorRunId}": journal is missing`,
+            {
+              cause: error,
+            },
+          );
         }
-        throw new Error(`cannot verify prior campaign run "${priorRunId}"`, {
-          cause: error,
-        });
+        throw new Error(
+          `cannot verify prior campaign run "${priorRunId}": ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          {
+            cause: error,
+          },
+        );
       }
     }
-    const runJournal = await createLiveJournal(join(runDirectory, "journal.jsonl"));
+    const runJournal = await createLiveJournal(
+      join(runDirectory, "journal.jsonl"),
+    );
     journal = runJournal;
     await runJournal.append({
       event: "run_started",
@@ -168,6 +185,7 @@ export async function openLiveCampaign(
         profileId: options.profileId,
         phase: options.phase,
         budgetCapMicros: options.budgetCapMicros,
+        ...(options.evidenceKind ? { evidenceKind: options.evidenceKind } : {}),
         ...(options.freezeHash ? { freezeHash: options.freezeHash } : {}),
         ...(options.fingerprints ? { fingerprints: options.fingerprints } : {}),
       },
@@ -216,7 +234,9 @@ export async function openLiveCampaign(
       }
     }
     if (runDirectoryCreated) {
-      await rm(runDirectory, { recursive: true, force: true }).catch(() => undefined);
+      await rm(runDirectory, { recursive: true, force: true }).catch(
+        () => undefined,
+      );
     }
     throw error;
   }

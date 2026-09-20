@@ -98,6 +98,7 @@ async function hashFiles(
 
 async function discoverBehaviorPaths(root: string): Promise<readonly string[]> {
   const roots = [
+    "packages/engine/src/ai",
     "packages/engine/src/ai/live-evaluation",
     "packages/engine/src/ai/providers",
     "packages/db/src",
@@ -109,9 +110,13 @@ async function discoverBehaviorPaths(root: string): Promise<readonly string[]> {
       withFileTypes: true,
     });
     for (const entry of entries) {
-      const relativePath = join(relativeDirectory, entry.name).replaceAll("\\", "/");
+      const relativePath = join(relativeDirectory, entry.name).replaceAll(
+        "\\",
+        "/",
+      );
       if (entry.isDirectory()) await visit(relativePath);
-      else if (entry.isFile() && entry.name.endsWith(".ts")) discovered.push(relativePath);
+      else if (entry.isFile() && entry.name.endsWith(".ts"))
+        discovered.push(relativePath);
     }
   };
   for (const directory of roots) await visit(directory);

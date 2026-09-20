@@ -226,12 +226,15 @@ export async function runLiveEvaluation(
       }
 
       const coldStart = now();
-      const session = await options.getSession({
-        campaignId: options.campaignId ?? "live-evaluation",
-        runId: options.runId ?? trial.trialId,
-        profileId: trial.profileId,
-        trialId: trial.trialId,
-      }, trial.cell.variant);
+      const session = await options.getSession(
+        {
+          campaignId: options.campaignId ?? "live-evaluation",
+          runId: options.runId ?? trial.trialId,
+          profileId: trial.profileId,
+          trialId: trial.trialId,
+        },
+        trial.cell.variant,
+      );
       coldSetupMs = Math.max(0, now() - coldStart);
 
       const observingRetriever: ToolRetriever = {
@@ -302,7 +305,7 @@ export async function runLiveEvaluation(
           callId: evidence.requestId ?? `${trial.trialId}-${evidence.attempt}`,
           provider: evidence.provider ?? profile.planning.provider,
           model: evidence.model ?? profile.planning.model,
-          purpose: "planning",
+          purpose: evidence.attempt > 1 ? "repair" : "planning",
           status: evidence.status,
           latencyMs: evidence.latencyMs,
           costMicros: null,

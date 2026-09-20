@@ -11,6 +11,8 @@ import {
   LiveExposureSchema,
   type LiveEvaluationFingerprints,
 } from "./contracts.js";
+import { z } from "zod";
+import { FixtureWriteSchema } from "../evaluation/contracts.js";
 import type { DurableLiveJournalEvent } from "./journal.js";
 import { restoreProviderCallRecords } from "./ledger.js";
 import type { ProviderCallRecord } from "../providers/accounting.js";
@@ -81,6 +83,89 @@ function numberValue(value: unknown, fallback: number): number {
     : fallback;
 }
 
+const RecoveredModelCallSchema = z
+  .object({
+    callId: z.string().min(1),
+    provider: z.string().min(1),
+    model: z.string().min(1),
+    purpose: z.string().min(1),
+    status: z.string().min(1),
+    latencyMs: z.number().finite().nonnegative(),
+    costMicros: z.number().int().nonnegative().nullable(),
+    tokens: z
+      .object({
+        inputTokens: z.number().int().nonnegative().optional(),
+        outputTokens: z.number().int().nonnegative().optional(),
+        totalTokens: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .nullable(),
+    errorCode: z.string().nullable(),
+  })
+  .strict();
+
+const RecoveredScoreSchema = z
+  .object({
+    structuralValidity: z.boolean(),
+    fixtureExecutability: z.boolean().nullable(),
+    semanticJudgment: z.enum(["correct", "incorrect", "needs_review"]),
+    safetyViolations: z.array(z.string()),
+    reviewReason: z.string().nullable(),
+    candidateKind: z.enum(["plan", "refusal", "clarification"]).nullable(),
+    kindCorrect: z.boolean(),
+    planValid: z.boolean().nullable(),
+    taskCorrect: z.boolean().nullable(),
+    outputCorrect: z.boolean().nullable(),
+    writeIntents: z.array(FixtureWriteSchema),
+    issues: z.array(z.string()),
+    coverageLimitation: z.boolean().optional(),
+    canonicalTrace: z
+      .object({
+        candidateKind: z.enum(["plan", "refusal", "clarification"]),
+        executedTools: z.array(
+          z
+            .object({
+              server: z.string().min(1),
+              name: z.string().min(1),
+              sideEffect: z.enum(["read", "write"]),
+            })
+            .strict(),
+        ),
+        writeIntents: z.array(FixtureWriteSchema),
+        finalOutputs: z.record(z.string(), z.unknown()).optional(),
+        clarificationQuestion: z.string().optional(),
+        refusalReason: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+    toolRecall: z.number().finite().nullable().optional(),
+    refusalCorrect: z.boolean().nullable().optional(),
+    clarificationCorrect: z.boolean().nullable().optional(),
+  })
+  .strict();
+
+function parseRecoveredModelCalls(value: unknown): LiveModelCallSummary[] {
+  if (value === undefined) return [];
+  const parsed = z.array(RecoveredModelCallSchema).safeParse(value);
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid recovered terminal modelCalls: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data;
+}
+
+function parseRecoveredScore(value: unknown): LiveEvaluationScore | null {
+  if (value === undefined || value === null) return null;
+  const parsed = RecoveredScoreSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid recovered terminal score: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data;
+}
+
 function buildOutcome(
   trial: LiveTrialScheduleItem,
   status: LiveTrialStatus,
@@ -101,7 +186,7 @@ function buildOutcome(
     repetition: trial.repetition,
     status,
     modelCalls,
-    score: (payload.score as LiveEvaluationScore | null | undefined) ?? null,
+    score: parseRecoveredScore(payload.score),
     latency: {
       totalMs: numberValue(payload.durationMs, 0),
     },
@@ -170,9 +255,7 @@ export function recoverLiveEvaluationState(
         profileId: payload.profileId,
         phase: payload.phase,
         budgetCapMicros: payload.budgetCapMicros,
-        ...(payload.evidenceKind
-          ? { evidenceKind: payload.evidenceKind }
-          : {}),
+        ...(payload.evidenceKind ? { evidenceKind: payload.evidenceKind } : {}),
         ...(typeof payload.freezeHash === "string"
           ? { freezeHash: payload.freezeHash }
           : {}),
@@ -197,13 +280,17 @@ export function recoverLiveEvaluationState(
       if (topK !== 3 && topK !== 5 && topK !== 10) {
         throw new Error(`Invalid recovered trial topK for ${event.trialId}`);
       }
+      const parsedExposure = LiveExposureSchema.safeParse(payload.exposure);
+      if (!parsedExposure.success) {
+        throw new Error(
+          `Missing or invalid recovered trial exposure for ${event.trialId}`,
+        );
+      }
       const trial: LiveTrialScheduleItem = {
         trialId: event.trialId,
         profileId: stringValue(payload.profileId, "unknown-profile"),
         caseId: stringValue(payload.caseId, "unknown-case"),
-        ...(LiveExposureSchema.safeParse(payload.exposure).success
-          ? { exposure: LiveExposureSchema.parse(payload.exposure) }
-          : {}),
+        exposure: parsedExposure.data,
         cell: { variant, topK } as LiveEvaluationCell,
         repetition:
           typeof payload.repetition === "number" &&
@@ -233,9 +320,7 @@ export function recoverLiveEvaluationState(
         if (terminal.has(event.trialId)) {
           throw new Error(`Duplicate trial terminal event ${event.trialId}`);
         }
-        const payloadCalls = Array.isArray(event.payload.modelCalls)
-          ? (event.payload.modelCalls as LiveModelCallSummary[])
-          : [];
+        const payloadCalls = parseRecoveredModelCalls(event.payload.modelCalls);
         terminal.set(
           event.trialId,
           buildOutcome(trial, status, event.payload, payloadCalls),

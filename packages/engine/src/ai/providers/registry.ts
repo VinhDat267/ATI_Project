@@ -152,20 +152,17 @@ function usageFromProvider(
     const record = usage as Record<string, unknown>;
     return {
       inputTokens:
-        typeof record.input_tokens === "number"
-          ? record.input_tokens
+        typeof (record.input_tokens ?? record.prompt_tokens) === "number"
+          ? ((record.input_tokens ?? record.prompt_tokens) as number)
           : undefined,
       cachedInputTokens:
         (record.input_tokens_details ?? record.prompt_tokens_details) &&
         typeof (record.input_tokens_details ?? record.prompt_tokens_details) ===
           "object" &&
         typeof (
-          (record.input_tokens_details ?? record.prompt_tokens_details) as Record<
-            string,
-            unknown
-          >
-        )
-          .cached_tokens === "number"
+          (record.input_tokens_details ??
+            record.prompt_tokens_details) as Record<string, unknown>
+        ).cached_tokens === "number"
           ? (
               (record.input_tokens_details ??
                 record.prompt_tokens_details) as Record<string, number>
@@ -422,6 +419,9 @@ async function invokeProvider(
         { provider: profile.provider },
       );
     }
+    // Recheck the approval/currentness boundary after reservation and immediately
+    // before transport. An approval can expire while the journal is syncing.
+    await options.authorizeCall(reservation);
     const init: RequestInit = {
       method: "POST",
       headers:

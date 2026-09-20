@@ -52,21 +52,30 @@ export function priceProviderCall(
   const cached = tokens(usage.cachedInputTokens, "usage.cachedInputTokens");
   const output = tokens(usage.outputTokens, "usage.outputTokens");
   const reasoning = tokens(usage.reasoningTokens, "usage.reasoningTokens");
-  if (cached > input) throw new Error("cached input tokens exceed input tokens");
+  if (cached > input)
+    throw new Error("cached input tokens exceed input tokens");
 
   const inputRate = rate(entry.inputMicrosPerMillion, "inputMicrosPerMillion");
   const cachedRate = rate(
     entry.cachedInputMicrosPerMillion ?? entry.inputMicrosPerMillion,
     "cachedInputMicrosPerMillion",
   );
-  const outputRate = rate(entry.outputMicrosPerMillion, "outputMicrosPerMillion");
+  const outputRate = rate(
+    entry.outputMicrosPerMillion,
+    "outputMicrosPerMillion",
+  );
 
   if (purpose === "embedding") {
-    if (usage.inputTokens === undefined || entry.inputMicrosPerMillion === undefined) return null;
+    if (
+      usage.inputTokens === undefined ||
+      entry.inputMicrosPerMillion === undefined
+    )
+      return null;
   } else if (
-    (usage.inputTokens !== undefined && entry.inputMicrosPerMillion === undefined) ||
-    (usage.outputTokens !== undefined && entry.outputMicrosPerMillion === undefined)
-    ||
+    (usage.inputTokens !== undefined &&
+      entry.inputMicrosPerMillion === undefined) ||
+    (usage.outputTokens !== undefined &&
+      entry.outputMicrosPerMillion === undefined) ||
     (usage.reasoningTokens !== undefined &&
       entry.reasoningMicrosPerMillion === undefined)
   ) {
@@ -77,10 +86,8 @@ export function priceProviderCall(
     (input - cached) * inputRate +
     cached * cachedRate +
     output * outputRate +
-    reasoning * rate(
-      entry.reasoningMicrosPerMillion,
-      "reasoningMicrosPerMillion",
-    );
+    reasoning *
+      rate(entry.reasoningMicrosPerMillion, "reasoningMicrosPerMillion");
   const micros = (numerator + 999_999n) / 1_000_000n;
   if (micros > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error("provider cost exceeds safe integer range");

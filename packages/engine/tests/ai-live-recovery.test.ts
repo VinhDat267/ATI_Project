@@ -25,6 +25,7 @@ describe("ai-live recovery", () => {
       event(1, "trial_scheduled", "trial-1", {
         profileId: "openai-only",
         caseId: "b01",
+        exposure: "dev",
         variant: "semantic",
         topK: 3,
         repetition: 1,
@@ -66,6 +67,7 @@ describe("ai-live recovery", () => {
       event(1, "trial_scheduled", "trial-2", {
         profileId: "openai-only",
         caseId: "b01",
+        exposure: "dev",
         variant: "all_tools",
         topK: 10,
         repetition: 1,
@@ -99,5 +101,40 @@ describe("ai-live recovery", () => {
       event(2, "trial_started", "legacy-trial", {}),
     ]);
     expect(state.outcomes[0]?.exposure).toBe("legacy_regression");
+  });
+
+  it("rejects a scheduled trial without exposure instead of defaulting it to dev", () => {
+    expect(() =>
+      recoverLiveEvaluationState([
+        event(1, "trial_scheduled", "missing-exposure", {
+          profileId: "openai-only",
+          caseId: "b07",
+          variant: "semantic",
+          topK: 3,
+          repetition: 1,
+        }),
+      ]),
+    ).toThrow(/exposure/i);
+  });
+
+  it("rejects malformed terminal evidence instead of trusting unchecked casts", () => {
+    expect(() =>
+      recoverLiveEvaluationState([
+        event(1, "trial_scheduled", "malformed-terminal", {
+          profileId: "openai-only",
+          caseId: "b07",
+          exposure: "dev",
+          variant: "semantic",
+          topK: 3,
+          repetition: 1,
+        }),
+        event(2, "trial_completed", "malformed-terminal", {
+          status: "completed",
+          score: { structuralValidity: "yes" },
+          modelCalls: [{ callId: 7 }],
+          durationMs: 42,
+        }),
+      ]),
+    ).toThrow(/terminal|score|model/i);
   });
 });

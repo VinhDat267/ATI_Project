@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { G1_DATABASE_URL, openDatabase, type Database } from "@wap/db";
 import { createOfflineReviewedCatalog } from "../local-catalog.js";
+import { buildCatalogEmbeddingRows } from "../catalog-embedding.js";
 import {
-  buildCatalogEmbeddingRows,
-} from "../catalog-embedding.js";
-import { PgvectorCatalogIndex, PgvectorToolRetriever } from "../pgvector-index.js";
+  PgvectorCatalogIndex,
+  PgvectorToolRetriever,
+} from "../pgvector-index.js";
 import { createAiPorts } from "../providers/registry.js";
 import type {
   AiProviderCallContext,
@@ -50,7 +51,10 @@ function sha256(value: unknown): string {
 function assertDatabaseIsolation(evalUrl: string, appUrl?: string): void {
   const effectiveAppUrl = appUrl?.trim() || G1_DATABASE_URL;
   const evaluation = parseEvaluationDatabaseIdentity(evalUrl);
-  const application = parseEvaluationDatabaseIdentity(effectiveAppUrl, "DATABASE_URL");
+  const application = parseEvaluationDatabaseIdentity(
+    effectiveAppUrl,
+    "DATABASE_URL",
+  );
   if (sameEvaluationDatabase(evaluation, application)) {
     throw new Error("AI_EVAL_DATABASE_URL must target a different database");
   }
@@ -100,13 +104,18 @@ function assertRoleScope(
       : request.purpose === "query_expansion"
         ? options.profile.queryExpansion
         : options.profile.planning;
-  if (request.provider !== expected.provider || request.model !== expected.model) {
+  if (
+    request.provider !== expected.provider ||
+    request.model !== expected.model
+  ) {
     throw new Error("provider call role does not match frozen profile");
   }
 }
 
 async function loadCatalog(root: string) {
-  const raw = JSON.parse(await readFile(join(root, "testdata/tools.json"), "utf8"));
+  const raw = JSON.parse(
+    await readFile(join(root, "testdata/tools.json"), "utf8"),
+  );
   return createOfflineReviewedCatalog(raw);
 }
 
@@ -158,9 +167,7 @@ export async function createLiveEvaluationRuntimeComposition(
     });
 
   const runtime = createLiveEvaluationRuntime({
-    evidenceKind: options.fetchImpl
-      ? "FAKE_TRANSPORT_TEST"
-      : "LIVE_PROVIDER",
+    evidenceKind: options.fetchImpl ? "FAKE_TRANSPORT_TEST" : "LIVE_PROVIDER",
     probe: async (request) => {
       const context = {
         campaignId: request.campaignId,

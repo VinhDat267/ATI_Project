@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` for direct implementation in the current checkout. Follow dependency order and obtain independent read-only review before closing readiness.
 >
-> **Status:** PLAN_ONLY — chưa triển khai. Baseline: `4106868` on `main`, worktree clean before this document. This plan supersedes optimistic completion claims for overlapping requirements, not the original evaluation scope.
+> **Status:** IMPLEMENTED_PARTIAL — remediation pass committed on `main`; native live execution remains fail-closed until a complete execution snapshot is populated and approved. Baseline: `4106868` on `main`. This plan supersedes optimistic completion claims for overlapping requirements, not the original evaluation scope.
 
 **Goal:** Đóng các lỗ hổng T6–T7 bằng regression offline và PostgreSQL cô lập, trước khi xin phép chạy live probe.
+
+**Implementation evidence:** R1/R2 are complete; R3/R4/R5/R6/R7 are partially complete with the remaining gates recorded in the SDD ledger at `.superpowers/sdd/2026-09-20-ai-live-readiness-remediation/progress.md`. The implementation does not authorize paid provider calls or claim `READY_FOR_LIVE_PROBE`.
 
 **Architecture:** Giữ composition root hiện tại. Campaign sở hữu lock, manifest và budget; journal là nguồn evidence bền vững; mỗi phase có snapshot và quyền thực thi riêng. Report được suy ra từ evidence, không từ flag do caller tự xác nhận.
 

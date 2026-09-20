@@ -128,6 +128,13 @@ describe("native provider clients with fake transport", () => {
         trialId: "trial-7",
         purpose: "planning",
       },
+      {
+        campaignId: "campaign-42",
+        runId: "run-99",
+        profileId: "openai-only",
+        trialId: "trial-7",
+        purpose: "planning",
+      },
     ]);
   });
 
@@ -333,6 +340,7 @@ describe("native provider clients with fake transport", () => {
     expect(result.model).toBe("text-embedding-3-large");
     expect(result.purpose).toBe("query");
     expect(result.embedding).toHaveLength(1536);
+    expect(result.usage).toMatchObject({ inputTokens: 3, totalTokens: 3 });
     expect(request?.url).toBe("https://api.openai.com/v1/embeddings");
     expect(JSON.parse(String(request?.init.body)).dimensions).toBe(1536);
   });
@@ -457,7 +465,11 @@ describe("native provider clients with fake transport", () => {
         }),
     });
 
-    await ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} });
+    await ports.model.complete({
+      systemPrompt: "s",
+      userPrompt: "u",
+      schema: {},
+    });
     expect(settlements.at(-1)).toMatchObject({
       status: "succeeded",
       costMicros: 4002,
@@ -489,6 +501,29 @@ describe("native provider clients with fake transport", () => {
       provider: "google",
       queries: ["append rows", "write sheet"],
     });
+  });
+
+  it("rechecks authorization after reservation and before transport", async () => {
+    let authorizeCalls = 0;
+    let fetchCalls = 0;
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      ledger: ledger(),
+      authorizeCall: async () => {
+        authorizeCalls++;
+        if (authorizeCalls === 2) throw new Error("approval expired");
+      },
+      fetchImpl: async () => {
+        fetchCalls++;
+        return response({});
+      },
+    });
+    await expect(
+      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
+    ).rejects.toMatchObject({ code: "PROVIDER_NETWORK_ERROR" });
+    expect(authorizeCalls).toBe(2);
+    expect(fetchCalls).toBe(0);
   });
 
   it("turns a transport deadline into an ambiguous settled call", async () => {
