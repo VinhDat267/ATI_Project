@@ -351,6 +351,54 @@ describe("ai-live-runner", () => {
     );
   });
 
+  it("passes full trial context and retains failed model-call evidence", async () => {
+    const { casesMap, profilesMap, catalog, rubric } =
+      await setupTestFixtures();
+    const trial = scheduleLiveTrials(["openai-only"], ["b01"], {
+      repetitions: 1,
+    })[0]!;
+    const baseSession = createMockSession(casesMap, catalog.tools);
+    const contexts: Array<Record<string, string>> = [];
+    const session: LiveEvaluationSession = {
+      ...baseSession,
+      model: {
+        async complete() {
+          throw new Error("transport failed after call evidence");
+        },
+      },
+    };
+    const ledger = new InMemoryProviderCallLedger({
+      campaignLimitMicros: 10_000_000,
+    });
+
+    const result = await runLiveEvaluation({
+      trials: [trial],
+      cases: casesMap,
+      profiles: profilesMap,
+      registry: catalog.tools,
+      rubric,
+      ledger,
+      campaignId: "campaign-context",
+      runId: "run-context",
+      getSession: async (context) => {
+        contexts.push(context);
+        return session;
+      },
+    });
+
+    expect(contexts).toEqual([
+      {
+        campaignId: "campaign-context",
+        runId: "run-context",
+        profileId: "openai-only",
+        trialId: trial.trialId,
+      },
+    ]);
+    expect(result.outcomes[0]?.status).toBe("failed");
+    expect(result.outcomes[0]?.modelCalls).toHaveLength(1);
+    expect(result.outcomes[0]?.modelCalls[0]?.status).toBe("failed");
+  });
+
   it("writes valid JSONL append-only events via createFileJournalWriter", async () => {
     const tempDir = resolve(root, ".artifacts", "test-runner-journal");
     await mkdir(tempDir, { recursive: true });

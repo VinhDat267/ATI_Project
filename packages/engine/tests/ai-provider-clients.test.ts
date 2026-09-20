@@ -62,7 +62,9 @@ describe("native provider clients with fake transport", () => {
     await expect(
       ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
     ).rejects.toMatchObject({ code: "AI_LIVE_NOT_READY" });
-    await expect(ports.queryExpansion.expand({ query: "q" })).rejects.toMatchObject({
+    await expect(
+      ports.queryExpansion.expand({ query: "q" }),
+    ).rejects.toMatchObject({
       code: "AI_LIVE_NOT_READY",
     });
     await expect(
@@ -73,7 +75,13 @@ describe("native provider clients with fake transport", () => {
   });
 
   it("uses explicit campaign and run context in every authorization reservation", async () => {
-    const reservations: Array<{ campaignId: string; runId: string; purpose: string }> = [];
+    const reservations: Array<{
+      campaignId: string;
+      runId: string;
+      profileId: string;
+      trialId?: string;
+      purpose: string;
+    }> = [];
     const ports = createAiPorts({
       config,
       credentials: { OPENAI_API_KEY: "openai-canary" },
@@ -82,10 +90,17 @@ describe("native provider clients with fake transport", () => {
         reservations.push({
           campaignId: reservation.campaignId,
           runId: reservation.runId,
+          profileId: reservation.profileId,
+          trialId: reservation.trialId,
           purpose: reservation.purpose,
         });
       },
-      callContext: { campaignId: "campaign-42", runId: "run-99" },
+      callContext: {
+        campaignId: "campaign-42",
+        runId: "run-99",
+        profileId: "openai-only",
+        trialId: "trial-7",
+      },
       fetchImpl: async () =>
         response({
           id: "resp_123",
@@ -100,9 +115,19 @@ describe("native provider clients with fake transport", () => {
           }),
         }),
     });
-    await ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} });
+    await ports.model.complete({
+      systemPrompt: "s",
+      userPrompt: "u",
+      schema: {},
+    });
     expect(reservations).toEqual([
-      { campaignId: "campaign-42", runId: "run-99", purpose: "planning" },
+      {
+        campaignId: "campaign-42",
+        runId: "run-99",
+        profileId: "openai-only",
+        trialId: "trial-7",
+        purpose: "planning",
+      },
     ]);
   });
 
@@ -122,16 +147,30 @@ describe("native provider clients with fake transport", () => {
       fetchImpl: async (_input, init) => {
         bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return response({
-          embedding: { values: Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0)) },
+          embedding: {
+            values: Array.from({ length: 1536 }, (_, index) =>
+              index === 0 ? 1 : 0,
+            ),
+          },
           model: "gemini-embedding-001",
         });
       },
     });
-    await ports.embedding.embed({ text: "unique tool description canary", purpose: "document" });
-    await ports.embedding.embed({ text: "unique query canary", purpose: "query" });
-    expect((bodies[0]!.content as any).parts[0].text).toBe("unique tool description canary");
+    await ports.embedding.embed({
+      text: "unique tool description canary",
+      purpose: "document",
+    });
+    await ports.embedding.embed({
+      text: "unique query canary",
+      purpose: "query",
+    });
+    expect((bodies[0]!.content as any).parts[0].text).toBe(
+      "unique tool description canary",
+    );
     expect(bodies[0]!.taskType).toBe("RETRIEVAL_DOCUMENT");
-    expect((bodies[1]!.content as any).parts[0].text).toBe("unique query canary");
+    expect((bodies[1]!.content as any).parts[0].text).toBe(
+      "unique query canary",
+    );
     expect(bodies[1]!.taskType).toBe("RETRIEVAL_QUERY");
   });
 

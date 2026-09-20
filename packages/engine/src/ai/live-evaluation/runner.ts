@@ -24,6 +24,13 @@ export interface LiveEvaluationSession {
   readonly retriever: ToolRetriever;
 }
 
+export interface LiveEvaluationSessionContext {
+  readonly campaignId: string;
+  readonly runId: string;
+  readonly profileId: string;
+  readonly trialId: string;
+}
+
 export interface LiveEvaluationRunnerOptions {
   readonly trials: readonly LiveTrialScheduleItem[];
   readonly cases: ReadonlyMap<string, ParsedLiveCase>;
@@ -31,7 +38,11 @@ export interface LiveEvaluationRunnerOptions {
   readonly registry: readonly TrustedTool[];
   readonly rubric?: LiveRubric;
   readonly ledger: ProviderCallLedger;
-  readonly getSession: (profileId: string) => Promise<LiveEvaluationSession>;
+  readonly campaignId?: string;
+  readonly runId?: string;
+  readonly getSession: (
+    context: LiveEvaluationSessionContext,
+  ) => Promise<LiveEvaluationSession>;
   readonly journalWriter?: (event: LiveJournalEvent) => Promise<void>;
   readonly signal?: AbortSignal;
   readonly canary?: string;
@@ -53,15 +64,15 @@ export interface LiveEvaluationRunResult {
 export function createFileJournalWriter(filePath: string): ((
   event: LiveJournalEvent,
 ) => Promise<void>) & {
-  readonly close: () => Promise<void>;
-  readonly replay: LiveJournal["replay"];
+  close: () => Promise<void>;
+  replay: LiveJournal["replay"];
 } {
   const journalPromise = createLiveJournal(filePath);
   const writer = (async (event: LiveJournalEvent): Promise<void> => {
     await (await journalPromise).append(event);
   }) as ((event: LiveJournalEvent) => Promise<void>) & {
-    readonly close: () => Promise<void>;
-    readonly replay: LiveJournal["replay"];
+    close: () => Promise<void>;
+    replay: LiveJournal["replay"];
   };
   writer.close = async () => (await journalPromise).close();
   writer.replay = async () => (await journalPromise).replay();
@@ -97,10 +108,6 @@ export async function runLiveEvaluation(
 
   const outcomes: LiveTrialOutcome[] = [];
   let haltReason: string | undefined;
-  let sessionCache: {
-    profileId: string;
-    session: LiveEvaluationSession;
-  } | null = null;
 
   for (let index = 0; index < options.trials.length; index++) {
     const trial = options.trials[index]!;
@@ -206,6 +213,7 @@ export async function runLiveEvaluation(
     let trialStatus: LiveTrialStatus = "completed";
     let coldSetupMs: number | undefined;
     const retrievalState: { result: RetrievalResult | null } = { result: null };
+    const capturedEvidences: ModelCallEvidence[] = [];
 
     try {
       // Canary leakage guard
@@ -213,26 +221,26 @@ export async function runLiveEvaluation(
         assertNoGoldCanaryInPayload(parsedCase.input, options.canary);
       }
 
-      // Sequential profile switch
-      if (!sessionCache || sessionCache.profileId !== trial.profileId) {
-        const coldStart = now();
-        const session = await options.getSession(trial.profileId);
-        sessionCache = { profileId: trial.profileId, session };
-        coldSetupMs = Math.max(0, now() - coldStart);
-      }
+      const coldStart = now();
+      const session = await options.getSession({
+        campaignId: options.campaignId ?? "live-evaluation",
+        runId: options.runId ?? trial.trialId,
+        profileId: trial.profileId,
+        trialId: trial.trialId,
+      });
+      coldSetupMs = Math.max(0, now() - coldStart);
 
       const observingRetriever: ToolRetriever = {
         async retrieve(request) {
-          const res = await sessionCache!.session.retriever.retrieve(request);
+          const res = await session.retriever.retrieve(request);
           retrievalState.result = res;
           return res;
         },
       };
 
-      const capturedEvidences: ModelCallEvidence[] = [];
       const planner = new AiPlannerAdapter({
         retriever: observingRetriever,
-        model: sessionCache.session.model,
+        model: session.model,
         variant: trial.cell.variant,
         topK: trial.cell.topK,
         maxPlanningCalls: (profile.limits?.maxPlanningCalls ?? 3) as 3,
@@ -264,8 +272,26 @@ export async function runLiveEvaluation(
         runtime: runtimeContext,
         signal: options.signal,
       });
-
-      // Transform captured model call evidence
+    } catch (error) {
+      trialError = safeErrorMessage(error);
+      if (
+        error instanceof ProviderAccountingError &&
+        error.code === "BUDGET_EXCEEDED"
+      ) {
+        trialStatus = "cancelled";
+        haltReason = `Budget exceeded: ${error.message}`;
+      } else if (
+        options.signal?.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        trialStatus = "cancelled";
+        haltReason = "Execution interrupted by abort signal";
+      } else {
+        trialStatus = "failed";
+      }
+    } finally {
+      // Provider evidence is retained even when planner.produce throws after a
+      // provider call has already emitted its failed/cancelled observation.
       for (const evidence of capturedEvidences) {
         modelCalls.push({
           callId: evidence.requestId ?? `${trial.trialId}-${evidence.attempt}`,
@@ -284,23 +310,6 @@ export async function runLiveEvaluation(
             : null,
           errorCode: evidence.status === "received" ? null : evidence.status,
         });
-      }
-    } catch (error) {
-      trialError = safeErrorMessage(error);
-      if (
-        error instanceof ProviderAccountingError &&
-        error.code === "BUDGET_EXCEEDED"
-      ) {
-        trialStatus = "cancelled";
-        haltReason = `Budget exceeded: ${error.message}`;
-      } else if (
-        options.signal?.aborted ||
-        (error instanceof Error && error.name === "AbortError")
-      ) {
-        trialStatus = "cancelled";
-        haltReason = "Execution interrupted by abort signal";
-      } else {
-        trialStatus = "failed";
       }
     }
 

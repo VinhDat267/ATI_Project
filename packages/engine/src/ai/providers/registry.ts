@@ -42,6 +42,9 @@ export type AuthorizeProviderCall = (
 export interface AiProviderCallContext {
   readonly campaignId: string;
   readonly runId: string;
+  /** Optional evaluator identity used to bind reservations to one trial. */
+  readonly profileId?: string;
+  readonly trialId?: string;
 }
 
 export interface AiProviderCredentials {
@@ -330,7 +333,9 @@ async function invokeProvider(
   const reservation: ProviderCallReservation = {
     campaignId: options.callContext?.campaignId ?? "live-evaluation",
     runId: options.callContext?.runId ?? "live-evaluation",
-    profileId: `${profile.provider}:${profile.model}`,
+    profileId:
+      options.callContext?.profileId ?? `${profile.provider}:${profile.model}`,
+    trialId: options.callContext?.trialId,
     provider: profile.provider,
     purpose,
     model: profile.model,
@@ -673,7 +678,10 @@ function createEmbeddingClient(
       const reservation: ProviderCallReservation = {
         campaignId: options.callContext?.campaignId ?? "live-evaluation",
         runId: options.callContext?.runId ?? "live-evaluation",
-        profileId: `${profile.provider}:${profile.model}`,
+        profileId:
+          options.callContext?.profileId ??
+          `${profile.provider}:${profile.model}`,
+        trialId: options.callContext?.trialId,
         provider: profile.provider,
         purpose: "embedding",
         model: profile.model,

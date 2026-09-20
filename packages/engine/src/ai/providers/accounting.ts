@@ -4,6 +4,8 @@ export interface ProviderCallReservation {
   readonly campaignId: string;
   readonly runId: string;
   readonly profileId: string;
+  /** Evaluation trial scope. Optional for ordinary API calls. */
+  readonly trialId?: string;
   readonly provider: AiProvider;
   readonly purpose: AiPurpose;
   readonly model: string;

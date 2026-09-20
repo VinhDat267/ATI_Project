@@ -31,6 +31,7 @@ import {
   runLiveEvaluation,
   createFileJournalWriter,
   type LiveEvaluationSession,
+  type LiveEvaluationSessionContext,
 } from "./runner.js";
 import {
   buildLiveEvaluationReport,
@@ -54,7 +55,9 @@ export interface LiveEvaluationCliEnvironment {
   readonly now?: () => Date;
   readonly runId?: () => string;
   readonly env?: Record<string, string | undefined>;
-  readonly getSession?: (profileId: string) => Promise<LiveEvaluationSession>;
+  readonly getSession?: (
+    context: LiveEvaluationSessionContext,
+  ) => Promise<LiveEvaluationSession>;
 }
 
 export interface LiveEvaluationCliResult {
@@ -604,6 +607,8 @@ export async function runLiveEvaluationCli(
         registry: catalog.tools,
         rubric: rawRubric,
         ledger,
+        campaignId,
+        runId: currentRunId,
         getSession: environment.getSession,
         journalWriter,
       });

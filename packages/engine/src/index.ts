@@ -102,6 +102,8 @@ export {
   assertProviderModel,
   readAiProviderConfig,
   InMemoryProviderCallLedger,
+  JournaledProviderCallLedger,
+  restoreProviderCallRecords,
   ProviderAccountingError,
   ProviderClientError,
   AiApprovalError,
