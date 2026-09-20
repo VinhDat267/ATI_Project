@@ -1,7 +1,8 @@
 import { openDatabase } from "@wap/db";
 import {
   WorkflowEngine,
-  InMemoryProviderCallLedger,
+  createPostgresProviderCallLedger,
+  ensurePostgresProviderCampaign,
   inspectLocalGateway,
   loadFilesystemLaunch,
   openLocalGateway,
@@ -14,6 +15,7 @@ import { createApi } from "./app.js";
 import { loadConfig } from "./config.js";
 import { loadDevPlanner } from "./dev-planner.js";
 import { createAiRuntime } from "./ai-runtime.js";
+import { createApiAuthorizeCall } from "./ai-runtime.js";
 import { createPrepareWorker } from "./worker.js";
 import { createExpiryMaintenance } from "./maintenance.js";
 import { createGatewayManager } from "./gateway-manager.js";
@@ -64,7 +66,7 @@ const gateway = createGatewayManager(
 
 const aiRuntime =
   config.plannerMode === "ai"
-    ? (() => {
+    ? await (async () => {
         const providerConfig = readAiProviderConfig();
         const selectedProviders = new Set<AiProvider>([
           providerConfig.planning.provider,
@@ -79,6 +81,28 @@ const aiRuntime =
             ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY }
             : {}),
         };
+        const campaignId = `api-local-v1:${config.userId}`;
+        const rawLimit = process.env.AI_CAMPAIGN_LIMIT_MICROS ?? "1000000";
+        if (!/^[1-9][0-9]*$/.test(rawLimit))
+          throw new Error("AI_CAMPAIGN_LIMIT_MICROS must be a positive integer");
+        const campaignLimitMicros = Number(rawLimit);
+        if (!Number.isSafeInteger(campaignLimitMicros))
+          throw new Error("AI_CAMPAIGN_LIMIT_MICROS is out of range");
+        let accountingReady = false;
+        try {
+          await ensurePostgresProviderCampaign(db, {
+            campaignId,
+            userId: config.userId,
+            limitMicros: campaignLimitMicros,
+          });
+          accountingReady = true;
+        } catch {
+          // Keep the API worker alive, but leave AI provider execution
+          // fail-closed until the durable accounting migration is available.
+          console.error(
+            "AI durable accounting is unavailable; AI planning remains disabled",
+          );
+        }
         return createAiRuntime({
           db,
           gateway,
@@ -86,15 +110,27 @@ const aiRuntime =
           userId: config.userId,
           config: providerConfig,
           credentials,
-          // Provide an in-memory ledger capped at 1 USD (1 000 000 micros) for
-          // dev/demo use.  The ledger enforces a hard budget ceiling; it does not
-          // persist across restarts.  A passthrough authorizeCall is used here
-          // because the ledger itself provides the accounting gate.
-          ledger: new InMemoryProviderCallLedger({
-            campaignLimitMicros: 1_000_000,
-          }),
-          authorizeCall: async () => {
-            // Passthrough — ledger.reserve() already enforces the budget ceiling.
+          ...(accountingReady
+            ? {
+                ledger: createPostgresProviderCallLedger(db, {
+                  campaignId,
+                  userId: config.userId,
+                }),
+                authorizeCall: createApiAuthorizeCall({
+                  db,
+                  userId: config.userId,
+                  campaignId,
+                  leaseTtlMs: Math.max(
+                    providerConfig.limits.trialDeadlineMs * 2,
+                    300_000,
+                  ),
+                }),
+              }
+            : {}),
+          callContext: {
+            campaignId,
+            runId: "api-runtime-bootstrap",
+            profileId: "api-profile-v1",
           },
         });
       })()

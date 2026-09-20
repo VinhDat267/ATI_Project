@@ -45,7 +45,10 @@ export class ProviderAccountingError extends Error {
     | "BUDGET_EXCEEDED"
     | "CALL_NOT_FOUND"
     | "CALL_ALREADY_SETTLED"
-    | "BUDGET_OVERRUN";
+    | "BUDGET_OVERRUN"
+    | "CAMPAIGN_NOT_FOUND"
+    | "CAMPAIGN_CONFIG_MISMATCH"
+    | "CAMPAIGN_HALTED";
 
   constructor(code: ProviderAccountingError["code"], message: string) {
     super(message);

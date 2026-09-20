@@ -40,8 +40,13 @@ export interface ProviderCallLedger {
   settle(callId: string, outcome: ProviderCallSettlement): Promise<void>;
 }
 
+export interface ProviderAuthorizationContext {
+  readonly phase: "preflight" | "transport";
+}
+
 export type AuthorizeProviderCall = (
   request: ProviderCallReservation,
+  context?: ProviderAuthorizationContext,
 ) => Promise<void>;
 
 export interface AiProviderCallContext {
@@ -89,7 +94,8 @@ export class ProviderClientError extends Error {
     | "PROVIDER_NETWORK_ERROR"
     | "PROVIDER_VECTOR_INVALID"
     | "PRICE_BOUND_UNPROVEN"
-    | "AI_LIVE_NOT_READY";
+    | "AI_LIVE_NOT_READY"
+    | "AI_CALL_UNAUTHORIZED";
   readonly provider: string;
   readonly requestId: string | null;
   readonly status: number | null;
@@ -494,21 +500,8 @@ async function invokeProvider(
 }> {
   const fetchImpl =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
-  let initialEstimate = options.config.limits.reservationEstimateMicros;
-  if (options.priceCard) {
-    const bound = calculateReservationBoundMicros({
-      purpose,
-      model: profile.model,
-      inputLimitTokens: 16_384,
-      outputCapTokens: profile.maxOutputTokens,
-      priceCard: options.priceCard,
-      context: { provider: profile.provider, apiMode: profile.apiMode },
-    });
-    if (bound !== null) {
-      initialEstimate = bound;
-    }
-  }
-  const initialReservation: ProviderCallReservation = {
+  const estimatedCostMicros = reservationEstimate(options, purpose, profile);
+  const reservation: ProviderCallReservation = {
     campaignId: options.callContext?.campaignId ?? "live-evaluation",
     runId: options.callContext?.runId ?? "live-evaluation",
     profileId:
@@ -519,14 +512,11 @@ async function invokeProvider(
     model: profile.model,
     requestHash: requestHash(body),
     outputCap: profile.maxOutputTokens,
-    estimatedCostMicros: initialEstimate,
-  };
-  await options.authorizeCall(initialReservation);
-  const estimatedCostMicros = reservationEstimate(options, purpose, profile);
-  const reservation: ProviderCallReservation = {
-    ...initialReservation,
     estimatedCostMicros,
   };
+  // The authorization boundary uses the final conservative estimate before
+  // resolving credentials; reserve() remains the atomic concurrent gate.
+  await options.authorizeCall(reservation);
   const key = requireKey(profile.provider, options.credentials);
   const callId = await options.ledger.reserve(reservation);
   const started = (options.now ?? Date.now)();
@@ -544,7 +534,7 @@ async function invokeProvider(
     }
     // Recheck the approval/currentness boundary after reservation and immediately
     // before transport. An approval can expire while the journal is syncing.
-    await options.authorizeCall(reservation);
+    await options.authorizeCall(reservation, { phase: "transport" });
     const init: RequestInit = {
       method: "POST",
       headers:
@@ -875,20 +865,12 @@ function createEmbeddingClient(
                   }
                 : {}),
             };
-      let initialEstimate = options.config.limits.reservationEstimateMicros;
-      if (options.priceCard) {
-        const bound = calculateReservationBoundMicros({
-          purpose: "embedding",
-          model: profile.model,
-          inputLimitTokens: 8_192,
-          priceCard: options.priceCard,
-          context: { provider: profile.provider, apiMode: profile.apiMode },
-        });
-        if (bound !== null) {
-          initialEstimate = bound;
-        }
-      }
-      const initialReservation: ProviderCallReservation = {
+      const estimatedCostMicros = reservationEstimate(
+        options,
+        "embedding",
+        profile,
+      );
+      const reservation: ProviderCallReservation = {
         campaignId: options.callContext?.campaignId ?? "live-evaluation",
         runId: options.callContext?.runId ?? "live-evaluation",
         profileId:
@@ -900,18 +882,9 @@ function createEmbeddingClient(
         model: profile.model,
         requestHash: requestHash(body),
         embeddingPurpose: input.purpose,
-        estimatedCostMicros: initialEstimate,
-      };
-      await options.authorizeCall(initialReservation);
-      const estimatedCostMicros = reservationEstimate(
-        options,
-        "embedding",
-        profile,
-      );
-      const reservation: ProviderCallReservation = {
-        ...initialReservation,
         estimatedCostMicros,
       };
+        await options.authorizeCall(reservation, { phase: "transport" });
       const key = requireKey(profile.provider, options.credentials);
       const callId = await options.ledger.reserve(reservation);
       const started = (options.now ?? Date.now)();
