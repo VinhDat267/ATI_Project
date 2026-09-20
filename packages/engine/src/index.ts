@@ -105,6 +105,7 @@ export {
   JournaledProviderCallLedger,
   restoreProviderCallRecords,
   createLiveEvaluationRuntime,
+  recoverLiveEvaluationState,
   ProviderAccountingError,
   ProviderClientError,
   AiApprovalError,

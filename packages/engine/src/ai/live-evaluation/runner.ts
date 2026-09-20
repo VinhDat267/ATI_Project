@@ -329,7 +329,9 @@ export async function runLiveEvaluation(
         timestamp: new Date(now()).toISOString(),
         trialId: trial.trialId,
         payload: {
+          status: "completed",
           score,
+          modelCalls,
           durationMs: trialDurationMs,
           modelCallsCount: modelCalls.length,
         },
@@ -358,7 +360,9 @@ export async function runLiveEvaluation(
         timestamp: new Date(now()).toISOString(),
         trialId: trial.trialId,
         payload: {
+          status: "cancelled",
           reason: trialError,
+          modelCalls,
           durationMs: trialDurationMs,
         },
       });
@@ -382,7 +386,9 @@ export async function runLiveEvaluation(
         timestamp: new Date(now()).toISOString(),
         trialId: trial.trialId,
         payload: {
+          status: "failed",
           error: trialError,
+          modelCalls,
           durationMs: trialDurationMs,
         },
       });

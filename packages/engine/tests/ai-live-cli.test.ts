@@ -443,8 +443,8 @@ describe("ai-live-cli", () => {
     const reportRes = await runLiveEvaluationCli(["report", "--run", runDir], {
       root,
     });
-    expect(reportRes.exitCode).toBe(0);
-    expect(reportRes.message).toContain("Report verified and rendered");
+    expect(reportRes.exitCode).toBe(1);
+    expect(reportRes.message).toContain("Report replayed and rendered");
   });
 
   it("rejects legacy-regression phase without --freeze flag", async () => {

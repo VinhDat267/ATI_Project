@@ -3,7 +3,8 @@
  * Strictly enforces zero credentials in journals/reports, deterministic trial scheduling,
  * tamper-evident freeze verification, budget reservation, and offline invariance.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOfflineReviewedCatalog } from "../local-catalog.js";
@@ -37,6 +38,8 @@ import {
   buildLiveEvaluationReport,
   renderLiveEvaluationMarkdown,
 } from "./report.js";
+import { replayLiveJournal } from "./journal.js";
+import { recoverLiveEvaluationState } from "./recovery.js";
 import {
   parseAiLiveApprovalRecord,
   assertAiLiveApproval,
@@ -160,6 +163,17 @@ function cliError(
 
 async function writeExclusive(path: string, content: string): Promise<void> {
   await writeFile(path, content, { encoding: "utf8", flag: "wx" });
+}
+
+async function writeAtomic(path: string, content: string): Promise<void> {
+  const temporary = `${path}.tmp-${randomUUID()}`;
+  try {
+    await writeFile(temporary, content, { encoding: "utf8", flag: "wx" });
+    await rename(temporary, path);
+  } catch (error) {
+    await unlink(temporary).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function readLiveConfig(root: string): Promise<{
@@ -636,6 +650,7 @@ export async function runLiveEvaluationCli(
           }),
         journalWriter,
       });
+      await journalWriter.close();
 
       const report = buildLiveEvaluationReport({
         runId: currentRunId,
@@ -684,20 +699,62 @@ export async function runLiveEvaluationCli(
 
     try {
       const runDir = resolve(flags.run);
+      const journal = await replayLiveJournal(join(runDir, "journal.jsonl"));
+      const recovered = recoverLiveEvaluationState(journal.events);
       const summaryJsonPath = join(runDir, "summary.json");
-      const report: LiveEvaluationReport = JSON.parse(
-        await readFile(summaryJsonPath, "utf8"),
-      );
-
-      const summaryMdPath = join(runDir, "summary.md");
-      await writeFile(summaryMdPath, renderLiveEvaluationMarkdown(report), {
-        encoding: "utf8",
+      let previous: Partial<LiveEvaluationReport> = {};
+      try {
+        previous = JSON.parse(
+          await readFile(summaryJsonPath, "utf8"),
+        ) as Partial<LiveEvaluationReport>;
+      } catch {
+        // Missing/partial summary is expected during crash recovery. Journal is
+        // the canonical source and no provider/database capability is created.
+      }
+      const zeroFingerprints = {
+        dataset: "0".repeat(64),
+        experimentManifest: "0".repeat(64),
+        rubric: "0".repeat(64),
+        catalog: "0".repeat(64),
+        prompts: "0".repeat(64),
+        evaluator: "0".repeat(64),
+        config: "0".repeat(64),
+        policiesAndArtifacts: "0".repeat(64),
+        lockfile: "0".repeat(64),
+      } as const;
+      const report = buildLiveEvaluationReport({
+        runId:
+          previous.runId ??
+          resolve(runDir).split(/[\\/]/).pop() ??
+          "recovered-run",
+        createdAt: now().toISOString(),
+        campaignId: previous.campaignId ?? "recovered-campaign",
+        freezeHash: previous.freezeHash ?? "0".repeat(64),
+        fingerprints: previous.fingerprints ?? zeroFingerprints,
+        plannedTrials: recovered.plannedTrials,
+        outcomes: recovered.outcomes,
+        ledgerRecords: recovered.ledgerRecords,
+        evidenceKind: "FAKE_TRANSPORT_TEST",
+        rubricStatus: "PROPOSED_EXPLORATORY",
+        freezeMatches: false,
+        indexCurrent: false,
+        accountingReconciled: false,
+        haltReason:
+          journal.truncatedFinalLine || recovered.retryTrialIds.length > 0
+            ? "Recovered from an interrupted journal; retry requires a new authorized run"
+            : undefined,
       });
+      const summaryMdPath = join(runDir, "summary.md");
+      await writeAtomic(
+        summaryJsonPath,
+        `${JSON.stringify(report, null, 2)}\n`,
+      );
+      await writeAtomic(summaryMdPath, renderLiveEvaluationMarkdown(report));
 
       return {
-        exitCode: 0,
+        exitCode: report.verdict === "LIVE_EVALUATION_PASS" ? 0 : 1,
         artifactPath: summaryJsonPath,
-        message: `Report verified and rendered for run: ${report.runId}`,
+        message: `Report replayed and rendered for run: ${report.runId}`,
         report,
       };
     } catch (error) {
