@@ -113,9 +113,7 @@ function sessionToken(input: SessionInput): string | null {
     credential.authorization ?? "",
   )?.[1];
   if (bearer) return bearer;
-  const cookie = credential.cookie?.match(
-    /(?:^|;\s*)wap_session=([^;]*)/,
-  )?.[1];
+  const cookie = credential.cookie?.match(/(?:^|;\s*)wap_session=([^;]*)/)?.[1];
   return cookie && /^[A-Za-z0-9_-]{43}$/.test(cookie) ? cookie : null;
 }
 

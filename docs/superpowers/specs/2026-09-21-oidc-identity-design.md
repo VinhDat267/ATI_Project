@@ -42,7 +42,11 @@ Alternatives considered:
 
 1. `GET /auth/oidc/start` creates a short-lived, single-use transaction with
    `state`, `nonce`, PKCE `code_verifier`, redirect URI and creation time. It
-   sets a pre-auth transaction cookie and redirects to the configured issuer.
+   stores hashes of the values in PostgreSQL and sets an `HttpOnly` pre-auth
+   transaction cookie containing the one-time state/nonce/verifier envelope.
+   The verifier must be recoverable for the code exchange; it is therefore
+   never treated as a password hash, and the cookie envelope is bounded and
+   cleared after callback.
 2. The provider redirects to `GET /auth/oidc/callback` with `code` and `state`.
    The API atomically consumes the transaction, verifies the state and nonce,
    exchanges the code using the verifier, validates the returned ID/access
@@ -89,9 +93,10 @@ Add additive migrations (without resetting the existing PostgreSQL volume):
 - `auth_sessions`: random session identifier hash, `user_id`, creation/expiry,
   `revoked_at`, last-seen metadata and an optional provider session reference.
   Only a hash of the cookie value is stored.
-- `oidc_transactions`: hashed state, nonce, PKCE verifier, issuer/client,
+- `oidc_transactions`: hashed state, nonce and PKCE verifier, issuer/client,
   redirect target, creation/expiry and consumed timestamp. State is single-use
-  and cleaned up by expiry.
+  and cleaned up by expiry; the raw verifier is only in the bounded, short-lived
+  `HttpOnly` transaction cookie so the server can perform the code exchange.
 
 The local user remains the authority for ownership. A provider subject is not
 used directly as a run owner, and changing an identity mapping does not change

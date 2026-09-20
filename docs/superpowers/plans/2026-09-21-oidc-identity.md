@@ -15,7 +15,7 @@
 - Use OIDC Authorization Code with PKCE; never accept an ID token as an API bearer token.
 - Browser authentication uses an opaque `HttpOnly`, `Secure` outside local HTTP, `SameSite=Lax` application-session cookie.
 - The OIDC client is provider-neutral; Keycloak is only a local reference issuer.
-- State, nonce and PKCE transactions are single-use, expiry-bounded and stored hashed where possible.
+- State, nonce and PKCE transactions are single-use and expiry-bounded; PostgreSQL stores their hashes while the raw verifier exists only in a bounded `HttpOnly` transaction cookie for the code exchange.
 - Validate exact issuer, audience/authorized party, signature/JWKS rotation, `exp`, `iat`, nonce and PKCE before creating a session.
 - Store only a hash of the application-session value; revoke and expiry must survive API restart.
 - Role mapping is deny-by-default; local user IDs remain the owner authority for all resources.
@@ -112,7 +112,7 @@ The following boundaries are fixed before implementation:
   Run: `npm run build -w @wap/db; npm run db:migrate:g1; npm run test:integration -w @wap/api -- durable-auth.integration.test.ts`
 
   Expected: missing tables/repository methods.
-- [ ] **Step 3: Add `0009_oidc_identity.sql`.** Create `auth_identities`, `auth_sessions`, and `oidc_transactions` with UUID foreign keys to `users`, unique issuer/subject, hash columns, expiry/revocation timestamps, and indexes. Keep `users.password_hash` intact for the local compatibility principal; OIDC-created users use the sentinel `OIDC_MANAGED` and cannot pass the password path.
+- [ ] **Step 3: Add `0009_oidc_identity.sql`.** Create `auth_identities`, `auth_sessions`, and `oidc_transactions` with UUID foreign keys to `users`, unique issuer/subject, hash columns, expiry/revocation timestamps, and indexes. Keep `users.password_hash` intact for the local compatibility principal; OIDC-created users use the sentinel `OIDC_MANAGED` and cannot pass the password path. The PKCE verifier column is a hash because the raw verifier is carried only by the bounded transaction cookie.
 - [ ] **Step 4: Implement repository transactions.** Hash session/state values with SHA-256 before persistence, issue 32-byte base64url session values, use `SELECT ... FOR UPDATE` for transaction consumption, and make revoke idempotent while returning an authentication error for an unknown credential.
 - [ ] **Step 5: Wire `DurableSessionAuthority` behind `CreateApiOptions.sessionStore`.** The in-memory `SessionStore` remains the fixture/default when OIDC is disabled; the main entrypoint selects durable authority only when `OIDC_ENABLED=1` and the database is available.
 - [ ] **Step 6: Run focused integration and restart tests.**

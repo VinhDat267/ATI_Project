@@ -8,6 +8,11 @@ export {
   type SessionInput,
   type SessionMetadata,
 } from "./auth.js";
+export {
+  createAuthRepository,
+  DurableSessionAuthority,
+  type AuthRepository,
+} from "./durable-auth.js";
 export { loadDevPlanner, type DevPlanner } from "./dev-planner.js";
 export {
   loadAiPlanner,

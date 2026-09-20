@@ -19,6 +19,10 @@ import { createApiAuthorizeCall } from "./ai-runtime.js";
 import { createPrepareWorker } from "./worker.js";
 import { createExpiryMaintenance } from "./maintenance.js";
 import { createGatewayManager } from "./gateway-manager.js";
+import {
+  createAuthRepository,
+  DurableSessionAuthority,
+} from "./durable-auth.js";
 
 const config = loadConfig();
 const databaseUrl = process.env.G1_DATABASE_URL;
@@ -84,7 +88,9 @@ const aiRuntime =
         const campaignId = `api-local-v1:${config.userId}`;
         const rawLimit = process.env.AI_CAMPAIGN_LIMIT_MICROS ?? "1000000";
         if (!/^[1-9][0-9]*$/.test(rawLimit))
-          throw new Error("AI_CAMPAIGN_LIMIT_MICROS must be a positive integer");
+          throw new Error(
+            "AI_CAMPAIGN_LIMIT_MICROS must be a positive integer",
+          );
         const campaignLimitMicros = Number(rawLimit);
         if (!Number.isSafeInteger(campaignLimitMicros))
           throw new Error("AI_CAMPAIGN_LIMIT_MICROS is out of range");
@@ -168,12 +174,19 @@ const maintenance = createExpiryMaintenance({
   onError: (code) =>
     console.error(JSON.stringify({ event: "maintenance_deferred", code })),
 });
+const sessionStore = config.oidc?.enabled
+  ? new DurableSessionAuthority(createAuthRepository(db), {
+      sessionTtlMs: config.oidc.sessionTtlMs,
+      cookieName: config.oidc.sessionCookieName,
+    })
+  : undefined;
 const api = createApi({
   db,
   config,
   engine,
   worker,
   maintenance,
+  ...(sessionStore ? { sessionStore } : {}),
   health: {
     readiness: async () => {
       try {
