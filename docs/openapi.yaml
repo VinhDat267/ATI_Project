@@ -80,6 +80,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke the current in-memory bearer session
+      responses:
+        "204":
+          description: Session revoked
+        "401": *a1
+        "404": *a2
   /servers:
     get:
       operationId: listServers

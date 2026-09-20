@@ -24,7 +24,7 @@ import {
 } from "./contracts.js";
 import type { ApiConfig } from "./config.js";
 import { AuthError, SessionStore } from "./auth.js";
-import { HttpError, readJson, writeJson } from "./http.js";
+import { HttpError, readJson, writeEmpty, writeJson } from "./http.js";
 import type { WorkerControl } from "./worker.js";
 import type { MaintenanceControl } from "./maintenance.js";
 import { decodeTraceCursor, encodeTraceCursor } from "./cursors.js";
@@ -218,10 +218,15 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         throw new HttpError(404, "NOT_FOUND", "Route not found");
       const path = parsed.pathname.slice("/api/v1".length) || "/";
       route = requestRouteTemplate(path);
-      if (path === "/auth/login") {
+      if (path === "/auth/login" || path === "/auth/logout") {
         if (request.method !== "POST") {
           response.setHeader("allow", "POST");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+        }
+        if (path === "/auth/logout") {
+          sessions.revoke(request.headers.authorization);
+          writeEmpty(response, 204, requestId);
+          return;
         }
         const body = parseInput(LoginRequestSchema, await readJson(request));
         const token = await sessions.login(

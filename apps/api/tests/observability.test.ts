@@ -17,6 +17,7 @@ afterEach(async () => {
 describe("request observability", () => {
   it("maps request paths to stable route templates without user data", () => {
     expect(requestRouteTemplate("/auth/login")).toBe("/auth/login");
+    expect(requestRouteTemplate("/auth/logout")).toBe("/auth/logout");
     expect(requestRouteTemplate("/servers")).toBe("/servers");
     expect(requestRouteTemplate("/runs")).toBe("/runs");
     expect(requestRouteTemplate("/runs/secret-value")).toBe("/runs/:runId");

@@ -153,6 +153,13 @@ export class SessionStore {
     return session.userId;
   }
 
+  revoke(header: string | undefined): void {
+    this.prune(this.now());
+    const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header ?? "");
+    if (!match || !this.sessions.delete(this.digest(match[1]!)))
+      throw new AuthError("UNAUTHENTICATED", "Authentication required");
+  }
+
   private digest(token: string): string {
     return createHash("sha256").update(token, "utf8").digest("hex");
   }

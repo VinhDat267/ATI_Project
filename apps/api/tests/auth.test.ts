@@ -37,4 +37,23 @@ describe("local password and session boundary", () => {
       expect.objectContaining({ code: "UNAUTHENTICATED" }),
     );
   });
+
+  it("revokes an active bearer token and rejects it afterwards", async () => {
+    const passwordHash = await hashPassword("demo-secret");
+    const store = new SessionStore({
+      userId: "00000000-0000-4000-8000-000000000001",
+      email: "demo@example.local",
+      passwordHash,
+      ttlMs: 60_000,
+      principalExists: async () => true,
+    });
+    const token = await store.login("demo@example.local", "demo-secret");
+    store.revoke(`Bearer ${token}`);
+    expect(() => store.authenticate(`Bearer ${token}`)).toThrowError(
+      expect.objectContaining({ code: "UNAUTHENTICATED" }),
+    );
+    expect(() => store.revoke(`Bearer ${token}`)).toThrowError(
+      expect.objectContaining({ code: "UNAUTHENTICATED" }),
+    );
+  });
 });

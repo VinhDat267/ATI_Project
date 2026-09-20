@@ -17,8 +17,12 @@ export function requestRouteTemplate(pathname: string): string {
     .filter((segment) => segment.length > 0);
   const [root, , subpath] = segments;
 
-  if (segments.length === 2 && root === "auth" && segments[1] === "login")
-    return "/auth/login";
+  if (
+    segments.length === 2 &&
+    root === "auth" &&
+    (segments[1] === "login" || segments[1] === "logout")
+  )
+    return `/auth/${segments[1]}`;
   if (segments.length === 1 && root === "servers") return "/servers";
   if (segments.length === 1 && root === "runs") return "/runs";
   if (root !== "runs" || segments.length < 2 || segments.length > 3)

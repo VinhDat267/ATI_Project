@@ -116,6 +116,16 @@ const spec = {
         },
       },
     },
+    "/auth/logout": {
+      post: {
+        operationId: "logout",
+        summary: "Revoke the current in-memory bearer session",
+        responses: {
+          "204": { description: "Session revoked" },
+          ...errors,
+        },
+      },
+    },
     "/servers": {
       get: {
         operationId: "listServers",

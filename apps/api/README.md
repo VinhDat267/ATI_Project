@@ -34,7 +34,7 @@ not a passing process exit. The runner consumes structured Vitest reports for
 the H01–H20 matrix and independently compares owned database, temp-root and
 project-process snapshots after every command.
 
-Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`. `API_PLANNER_MODE=disabled` giữ `POST /runs` ở trạng thái `503 PLANNER_UNAVAILABLE`; `dev_fixture` chỉ nhận đúng các prompt server-owned trong `testdata` và không phải AI evaluation. Trace snapshot hết hạn sau 15 phút; cursor sai owner/run, hết hạn hoặc bị sửa trả `400`.
+Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`. `POST /auth/logout` yêu cầu bearer hợp lệ, xoá session hiện tại và trả `204`; restart vẫn xoá toàn bộ session vì store hiện còn in-memory. `API_PLANNER_MODE=disabled` giữ `POST /runs` ở trạng thái `503 PLANNER_UNAVAILABLE`; `dev_fixture` chỉ nhận đúng các prompt server-owned trong `testdata` và không phải AI evaluation. Trace snapshot hết hạn sau 15 phút; cursor sai owner/run, hết hạn hoặc bị sửa trả `400`.
 
 Ở môi trường không phải test, API ghi một JSON log cho mỗi request với đúng
 `event`, method, route template, status và `request_id`. Route template không

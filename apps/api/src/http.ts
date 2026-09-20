@@ -65,3 +65,15 @@ export function writeJson(
   response.setHeader("x-request-id", requestId);
   response.end(body);
 }
+
+export function writeEmpty(
+  response: ServerResponse,
+  status: number,
+  requestId: string,
+): void {
+  response.statusCode = status;
+  response.setHeader("cache-control", "no-store");
+  response.setHeader("x-content-type-options", "nosniff");
+  response.setHeader("x-request-id", requestId);
+  response.end();
+}
