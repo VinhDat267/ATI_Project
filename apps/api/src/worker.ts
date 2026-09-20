@@ -20,9 +20,11 @@ export function createPrepareWorker(options: {
   planner?: PlannerPort;
   replan?: LocalReplanPort;
   intervalMs?: number;
+  shutdownTimeoutMs?: number;
   onError?: (code: string) => void;
 }): WorkerControl {
   const interval = options.intervalMs ?? 250;
+  const shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
   let timer: NodeJS.Timeout | undefined;
   let stopped = false;
   let needsRecovery = true;
@@ -105,7 +107,30 @@ export function createPrepareWorker(options: {
       stopped = true;
       if (timer) clearInterval(timer);
       timer = undefined;
-      await active;
+      const pending = active;
+      if (!pending) return;
+      if (shutdownTimeoutMs === Number.POSITIVE_INFINITY) {
+        await pending;
+        return;
+      }
+      let timeout: NodeJS.Timeout | undefined;
+      const result = await Promise.race([
+        pending.then(() => "drained" as const),
+        new Promise<"timeout">((resolve) => {
+          timeout = setTimeout(
+            () => resolve("timeout"),
+            Math.max(0, shutdownTimeoutMs),
+          );
+        }),
+      ]);
+      if (timeout) clearTimeout(timeout);
+      if (result === "timeout") {
+        try {
+          options.onError?.("WORKER_SHUTDOWN_TIMEOUT");
+        } catch {
+          /* Diagnostics cannot crash shutdown. */
+        }
+      }
     },
   };
 }

@@ -2,8 +2,41 @@ import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Database } from "@wap/db";
+import type { WorkflowEngine } from "@wap/engine";
+import { createPrepareWorker } from "../src/worker.js";
 
 describe("worker infrastructure failures", () => {
+  it("bounds shutdown and reports a timeout when an active tick is hung", async () => {
+    let markEntered!: () => void;
+    let releaseBlocked!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const blocked = new Promise<never[]>((resolve) => {
+      releaseBlocked = () => resolve([]);
+    });
+    const errors: string[] = [];
+    const worker = createPrepareWorker({
+      db: { client: async () => [] } as unknown as Database,
+      engine: {
+        recoverOrphans: async () => {
+          markEntered();
+          return blocked;
+        },
+      } as unknown as WorkflowEngine,
+      userId: "00000000-0000-4000-8000-000000000001",
+      intervalMs: 5,
+      shutdownTimeoutMs: 25,
+      onError: (code) => errors.push(code),
+    });
+    worker.start();
+    await entered;
+    await expect(worker.stop()).resolves.toBeUndefined();
+    expect(errors).toContain("WORKER_SHUTDOWN_TIMEOUT");
+    releaseBlocked();
+  });
+
   it("keeps its process alive and retries a transient outbox query failure", () => {
     const root = path.resolve(
       fileURLToPath(new URL("../../../", import.meta.url)),
