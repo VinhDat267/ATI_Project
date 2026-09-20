@@ -390,7 +390,7 @@ describe("ai-live-cli", () => {
       },
     );
 
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
     expect(result.artifactPath).toBeTruthy();
     expect(result.message).toContain("Live evaluation finished");
 
@@ -487,7 +487,7 @@ describe("ai-live-cli", () => {
       },
     );
 
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
     const summaryJson = JSON.parse(
       await readFile(result.artifactPath!, "utf8"),
     );

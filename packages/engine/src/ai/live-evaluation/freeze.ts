@@ -7,6 +7,7 @@ import {
   LiveEvaluationFingerprintsSchema,
   type FrozenLiveEvaluation,
   type LiveEvaluationFingerprints,
+  type LiveExecutionFingerprint,
   type LiveProfileConfig,
   type SealedHoldoutBundle,
 } from "./contracts.js";
@@ -109,6 +110,7 @@ export interface CreateLiveFreezeOptions {
   readonly createdAt?: string;
   readonly sealedHoldoutApproval?: SealedHoldoutBundle;
   readonly budgetCapMicros?: number;
+  readonly execution?: LiveExecutionFingerprint;
 }
 
 export async function createLiveFreeze(
@@ -176,6 +178,7 @@ export async function createLiveFreeze(
     ...(options.sealedHoldoutApproval
       ? { sealedHoldoutApproval: options.sealedHoldoutApproval }
       : {}),
+    ...(options.execution ? { execution: options.execution } : {}),
   };
 
   return FrozenLiveEvaluationSchema.parse(rawFreeze);
@@ -234,4 +237,35 @@ export function assertLiveFrozen(
       `Freeze embedding model mismatch: actual "${actual.profile.embedding.model}" vs expected "${expected.profile.embedding.model}"`,
     );
   }
+
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(canonical)
+      : value !== null && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([key, entry]) => [key, canonical(entry)]),
+          )
+        : value;
+  const withoutCreatedAt = (value: FrozenLiveEvaluation) => {
+    const { createdAt: _createdAt, ...semantic } = value;
+    return semantic;
+  };
+  if (
+    JSON.stringify(canonical(withoutCreatedAt(actual))) !==
+    JSON.stringify(canonical(withoutCreatedAt(expected)))
+  ) {
+    throw new Error(
+      "Freeze semantic execution mismatch: role configuration, budget, index, runtime, git, manifest, or approval scope drifted",
+    );
+  }
+}
+
+/** Backward-compatible descriptive alias used by the report/runtime gates. */
+export function assertLiveFreezeMatches(
+  actual: FrozenLiveEvaluation,
+  expected: FrozenLiveEvaluation,
+): void {
+  assertLiveFrozen(actual, expected);
 }

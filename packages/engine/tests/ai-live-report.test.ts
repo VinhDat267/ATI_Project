@@ -102,6 +102,11 @@ describe("ai-live-report", () => {
       fingerprints: mockFingerprints,
       plannedTrials,
       outcomes,
+      evidenceKind: "LIVE_PROVIDER",
+      rubricStatus: "APPROVED_FROZEN",
+      freezeMatches: true,
+      indexCurrent: true,
+      accountingReconciled: true,
     });
 
     expect(report.verdict).toBe("LIVE_EVALUATION_PASS");
@@ -211,6 +216,97 @@ describe("ai-live-report", () => {
     const md = renderLiveEvaluationMarkdown(report);
     expect(md).toContain("`LIVE_EVALUATION_PARTIAL`");
     expect(md).toContain("Budget exceeded");
+  });
+
+  it("blocks formal PASS for fake transport and proposed rubric evidence", () => {
+    const plannedTrials = scheduleLiveTrials(["openai-only"], ["b01"], {
+      repetitions: 1,
+    });
+    const outcomes: LiveTrialOutcome[] = plannedTrials.map((t) => ({
+      trialId: t.trialId,
+      profileId: t.profileId,
+      caseId: t.caseId,
+      exposure: "dev",
+      cell: t.cell,
+      repetition: t.repetition,
+      status: "completed",
+      modelCalls: [],
+      score: createMockScore(),
+      latency: { totalMs: 10 },
+      error: null,
+    }));
+    const base = {
+      runId: "run-blocked",
+      createdAt: "2026-09-19T00:00:00.000Z",
+      campaignId: "camp-blocked",
+      freezeHash: "f".repeat(64),
+      fingerprints: mockFingerprints,
+      plannedTrials,
+      outcomes,
+      rubricStatus: "APPROVED_FROZEN" as const,
+      freezeMatches: true,
+      indexCurrent: true,
+      accountingReconciled: true,
+    };
+
+    expect(
+      buildLiveEvaluationReport({
+        ...base,
+        evidenceKind: "FAKE_TRANSPORT_TEST",
+      }).verdict,
+    ).toBe("LIVE_EVALUATION_BLOCKED");
+    expect(
+      buildLiveEvaluationReport({
+        ...base,
+        evidenceKind: "LIVE_PROVIDER",
+        rubricStatus: "PROPOSED_EXPLORATORY",
+      }).verdict,
+    ).toBe("LIVE_EVALUATION_BLOCKED");
+  });
+
+  it("blocks formal PASS when pricing or reconciliation is unknown", () => {
+    const plannedTrials = scheduleLiveTrials(["openai-only"], ["b01"], {
+      repetitions: 1,
+    });
+    const outcomes: LiveTrialOutcome[] = plannedTrials.map((t) => ({
+      trialId: t.trialId,
+      profileId: t.profileId,
+      caseId: t.caseId,
+      exposure: "dev",
+      cell: t.cell,
+      repetition: t.repetition,
+      status: "completed",
+      modelCalls: [],
+      score: createMockScore(),
+      latency: { totalMs: 10 },
+      error: null,
+    }));
+    const report = buildLiveEvaluationReport({
+      runId: "run-unknown-cost",
+      createdAt: "2026-09-19T00:00:00.000Z",
+      campaignId: "camp-unknown-cost",
+      freezeHash: "f".repeat(64),
+      fingerprints: mockFingerprints,
+      plannedTrials,
+      outcomes,
+      evidenceKind: "LIVE_PROVIDER",
+      rubricStatus: "APPROVED_FROZEN",
+      freezeMatches: true,
+      indexCurrent: true,
+      accountingReconciled: true,
+      ledgerRecords: [
+        {
+          callId: "call-unknown",
+          provider: "openai",
+          model: "gpt-5.6-terra",
+          status: "ambiguous",
+          costMicros: null,
+        },
+      ],
+    });
+
+    expect(report.verdict).toBe("LIVE_EVALUATION_BLOCKED");
+    expect(report.blockedReasons).toContain("unknown_cost");
   });
 
   it("yields LIVE_EVALUATION_FAIL when all trials complete but semantic score fails", () => {

@@ -15,7 +15,11 @@ import {
 export type ReadFixture = z.infer<typeof ReadFixtureSchema>;
 export type { FixtureWrite, Split };
 
-export const LiveExposureSchema = z.enum(["dev", "legacy_regression", "sealed_holdout"]);
+export const LiveExposureSchema = z.enum([
+  "dev",
+  "legacy_regression",
+  "sealed_holdout",
+]);
 export type LiveExposure = z.infer<typeof LiveExposureSchema>;
 
 export const LiveCaseInputSchema = z
@@ -93,7 +97,46 @@ export const LiveRubricSchema = z
     approvalBlockReason: z.string().optional(),
     cases: z.record(z.string(), CaseRubricSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((rubric, ctx) => {
+    if (rubric.status === "APPROVED_FROZEN") {
+      if (!rubric.approvedBy?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["approvedBy"],
+          message: "APPROVED_FROZEN rubric requires a named approver",
+        });
+      }
+      if (!rubric.approvedAt) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["approvedAt"],
+          message: "APPROVED_FROZEN rubric requires approvedAt",
+        });
+      } else if (Number.isNaN(Date.parse(rubric.approvedAt))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["approvedAt"],
+          message: "approvedAt must be a valid timestamp",
+        });
+      }
+    } else {
+      if (rubric.approvedBy !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["approvedBy"],
+          message: "PROPOSED_EXPLORATORY rubric cannot carry approval metadata",
+        });
+      }
+      if (rubric.approvedAt !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["approvedAt"],
+          message: "PROPOSED_EXPLORATORY rubric cannot carry approval metadata",
+        });
+      }
+    }
+  });
 
 export type LiveRubric = z.infer<typeof LiveRubricSchema>;
 
@@ -140,7 +183,50 @@ export const LiveEvaluationFingerprintsSchema = z
     lockfile: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
-export type LiveEvaluationFingerprints = z.infer<typeof LiveEvaluationFingerprintsSchema>;
+export type LiveEvaluationFingerprints = z.infer<
+  typeof LiveEvaluationFingerprintsSchema
+>;
+
+export const LiveSourceManifestEntrySchema = z
+  .object({
+    path: z.string().min(1),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export const LiveExecutionFingerprintSchema = z
+  .object({
+    roleConfigs: z.record(z.string(), z.unknown()),
+    providerCapabilities: z.record(z.string(), z.unknown()),
+    priceCardHash: z.string().regex(/^[a-f0-9]{64}$/),
+    budgetCapMicros: z.number().int().positive(),
+    approvalScopeHash: z.string().regex(/^[a-f0-9]{64}$/),
+    activeIndex: z
+      .object({
+        id: z.string().min(1),
+        provenanceHash: z.string().regex(/^[a-f0-9]{64}$/),
+        vectorHash: z.string().regex(/^[a-f0-9]{64}$/),
+        policyHash: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict(),
+    runtime: z
+      .object({
+        nodeVersion: z.string().min(1),
+        packageLockHash: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict(),
+    git: z
+      .object({
+        head: z.string().regex(/^[0-9a-f]{7,64}$/),
+        statusDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict(),
+    sourceManifest: z.array(LiveSourceManifestEntrySchema),
+  })
+  .strict();
+export type LiveExecutionFingerprint = z.infer<
+  typeof LiveExecutionFingerprintSchema
+>;
 
 export const FrozenLiveEvaluationSchema = z
   .object({
@@ -177,10 +263,10 @@ export const FrozenLiveEvaluationSchema = z
     }),
     budgetCapMicros: z.number().int().positive().optional(),
     sealedHoldoutApproval: SealedHoldoutBundleSchema.optional(),
+    execution: LiveExecutionFingerprintSchema.optional(),
   })
   .strict();
 export type FrozenLiveEvaluation = z.infer<typeof FrozenLiveEvaluationSchema>;
-
 
 export type SemanticJudgment = "correct" | "incorrect" | "needs_review";
 
@@ -420,7 +506,11 @@ export interface LiveEvaluationReport {
   readonly verdict:
     | "LIVE_EVALUATION_PASS"
     | "LIVE_EVALUATION_FAIL"
-    | "LIVE_EVALUATION_PARTIAL";
+    | "LIVE_EVALUATION_PARTIAL"
+    | "LIVE_EVALUATION_BLOCKED";
+  readonly evidenceKind: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
+  readonly gateStatus: "FORMAL_PASS_ELIGIBLE" | "BLOCKED";
+  readonly blockedReasons: readonly string[];
   readonly freezeHash: string;
   readonly fingerprints: LiveEvaluationFingerprints;
   readonly trialAccounting: LiveTrialAccounting;
@@ -431,4 +521,3 @@ export interface LiveEvaluationReport {
   readonly observations: readonly LiveRedactedObservation[];
   readonly limitations: readonly string[];
 }
-

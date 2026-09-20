@@ -20,6 +20,11 @@ export interface BuildLiveEvaluationReportOptions {
   readonly fingerprints: LiveEvaluationFingerprints;
   readonly plannedTrials: readonly LiveTrialScheduleItem[];
   readonly outcomes: readonly LiveTrialOutcome[];
+  readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
+  readonly rubricStatus?: "PROPOSED_EXPLORATORY" | "APPROVED_FROZEN";
+  readonly freezeMatches?: boolean;
+  readonly indexCurrent?: boolean;
+  readonly accountingReconciled?: boolean;
   readonly ledgerRecords?: readonly {
     readonly callId: string;
     readonly provider: string;
@@ -301,7 +306,9 @@ export function buildLiveEvaluationReport(
     refusalAccuracy: {
       expected: refusalTrials.length,
       correct: correctRefusals,
-      rate: refusalTrials.length ? correctRefusals / refusalTrials.length : null,
+      rate: refusalTrials.length
+        ? correctRefusals / refusalTrials.length
+        : null,
     },
     clarificationAccuracy: {
       expected: clarificationTrials.length,
@@ -396,6 +403,37 @@ export function buildLiveEvaluationReport(
     byProvider,
   };
 
+  const evidenceKind = options.evidenceKind ?? "FAKE_TRANSPORT_TEST";
+  const blockedReasons: string[] = [];
+  if (evidenceKind !== "LIVE_PROVIDER") {
+    blockedReasons.push("evidence_kind_not_live_provider");
+  }
+  if (options.rubricStatus !== "APPROVED_FROZEN") {
+    blockedReasons.push("rubric_not_approved_frozen");
+  }
+  if (options.freezeMatches !== true) {
+    blockedReasons.push("freeze_mismatch_or_unverified");
+  }
+  if (options.indexCurrent !== true) {
+    blockedReasons.push("index_not_current_or_unverified");
+  }
+  if (options.accountingReconciled !== true) {
+    blockedReasons.push("accounting_not_reconciled");
+  }
+  if (unknownCostCalls > 0) {
+    blockedReasons.push("unknown_cost");
+  }
+  if (needsReviewCount > 0) {
+    blockedReasons.push("semantic_needs_review");
+  }
+  if (verdict === "LIVE_EVALUATION_PASS" && blockedReasons.length > 0) {
+    verdict = "LIVE_EVALUATION_BLOCKED";
+  }
+  const gateStatus: LiveEvaluationReport["gateStatus"] =
+    verdict === "LIVE_EVALUATION_PASS" && blockedReasons.length === 0
+      ? "FORMAL_PASS_ELIGIBLE"
+      : "BLOCKED";
+
   // Redacted observations (sanitized, no prompt or output text)
   const observations: LiveRedactedObservation[] = options.outcomes.map((o) => ({
     trialId: o.trialId,
@@ -439,6 +477,11 @@ export function buildLiveEvaluationReport(
       `${unknownCostCalls} provider call(s) did not report exact pricing; cost ledger contains calls with unknown cost.`,
     );
   }
+  if (blockedReasons.length > 0) {
+    limitations.push(
+      `Formal PASS is blocked by: ${blockedReasons.join(", ")}.`,
+    );
+  }
 
   return {
     format: "ati-ai-live-report-v1",
@@ -446,6 +489,9 @@ export function buildLiveEvaluationReport(
     createdAt: options.createdAt,
     campaignId: options.campaignId,
     verdict,
+    evidenceKind,
+    gateStatus,
+    blockedReasons,
     freezeHash: options.freezeHash,
     fingerprints: options.fingerprints,
     trialAccounting,
@@ -472,6 +518,11 @@ export function renderLiveEvaluationMarkdown(
   lines.push(`- **Campaign**: \`${report.campaignId}\``);
   lines.push(`- **Created At**: ${report.createdAt}`);
   lines.push(`- **Verdict**: **\`${report.verdict}\`**`);
+  lines.push(`- **Evidence Kind**: \`${report.evidenceKind}\``);
+  lines.push(`- **Gate Status**: \`${report.gateStatus}\``);
+  if (report.blockedReasons.length > 0) {
+    lines.push(`- **Blocked Reasons**: ${report.blockedReasons.join(", ")}`);
+  }
   lines.push(`- **Freeze Hash**: \`${report.freezeHash.slice(0, 16)}...\``);
   if (report.haltReason) {
     lines.push(`- **Halt Reason**: ${report.haltReason}`);
@@ -482,7 +533,9 @@ export function renderLiveEvaluationMarkdown(
   lines.push("");
   lines.push("| Status | Count | Percentage |");
   lines.push("| :--- | :--- | :--- |");
-  lines.push(`| **Planned** | **${report.trialAccounting.totalPlanned}** | 100.0% |`);
+  lines.push(
+    `| **Planned** | **${report.trialAccounting.totalPlanned}** | 100.0% |`,
+  );
   lines.push(
     `| Completed | ${report.trialAccounting.completed} | ${formatRatio(
       report.trialAccounting.totalPlanned
@@ -507,7 +560,8 @@ export function renderLiveEvaluationMarkdown(
   lines.push(
     `| Not Started | ${report.trialAccounting.notStarted} | ${formatRatio(
       report.trialAccounting.totalPlanned
-        ? report.trialAccounting.notStarted / report.trialAccounting.totalPlanned
+        ? report.trialAccounting.notStarted /
+            report.trialAccounting.totalPlanned
         : 0,
     )} |`,
   );
@@ -519,7 +573,9 @@ export function renderLiveEvaluationMarkdown(
     "| Profile | Planned | Completed | Failed | Cancelled | Not Started |",
   );
   lines.push("| :--- | :--- | :--- | :--- | :--- | :--- |");
-  for (const [profileId, b] of Object.entries(report.trialAccounting.byProfile)) {
+  for (const [profileId, b] of Object.entries(
+    report.trialAccounting.byProfile,
+  )) {
     lines.push(
       `| \`${profileId}\` | ${b.planned} | ${b.completed} | ${b.failed} | ${b.cancelled} | ${b.notStarted} |`,
     );
@@ -605,7 +661,9 @@ export function renderLiveEvaluationMarkdown(
 
   lines.push("### Cost by Provider");
   lines.push("");
-  lines.push("| Provider | Calls | Settled Cost ($) | Input Tokens | Output Tokens |");
+  lines.push(
+    "| Provider | Calls | Settled Cost ($) | Input Tokens | Output Tokens |",
+  );
   lines.push("| :--- | :--- | :--- | :--- | :--- |");
   for (const [provider, stat] of Object.entries(
     report.costReconciliation.byProvider,
