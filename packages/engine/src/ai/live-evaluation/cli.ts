@@ -30,7 +30,6 @@ import {
 import { scheduleLiveTrials } from "./schedule.js";
 import {
   runLiveEvaluation,
-  createFileJournalWriter,
   type LiveEvaluationSession,
   type LiveEvaluationSessionContext,
 } from "./runner.js";
@@ -45,7 +44,7 @@ import {
   assertAiLiveApproval,
   type AiLiveApprovalRecord,
 } from "../providers/approval.js";
-import { InMemoryProviderCallLedger } from "../providers/accounting.js";
+import { openLiveCampaign } from "./campaign.js";
 import {
   deriveLiveExecutionScope,
   hashLiveConfig,
@@ -612,14 +611,16 @@ export async function runLiveEvaluationCli(
       });
 
       const currentRunId = runId();
-      const dir = join(outputRoot, currentRunId);
-      await mkdir(dir, { recursive: true });
-
-      const journalPath = join(dir, "journal.jsonl");
-      const journalWriter = createFileJournalWriter(journalPath);
-      const ledger = new InMemoryProviderCallLedger({
-        campaignLimitMicros: approval.budgetMicros,
+      const campaign = await openLiveCampaign({
+        outputRoot,
+        campaignId,
+        runId: currentRunId,
+        profileId: flags.profile,
+        phase: flags.phase,
+        budgetCapMicros: approval.budgetMicros,
       });
+      const dir = campaign.runDirectory;
+      const ledger = campaign.ledger;
 
       const casesMap = new Map<string, ParsedLiveCase>();
       for (const c of parsedDataset.cases) {
@@ -631,26 +632,33 @@ export async function runLiveEvaluationCli(
         profilesMap.set(id, prof);
       }
 
-      const runResult = await runLiveEvaluation({
-        trials,
-        cases: casesMap,
-        profiles: profilesMap,
-        registry: catalog.tools,
-        rubric: rawRubric,
-        ledger,
-        campaignId,
-        runId: currentRunId,
-        getSession:
-          environment.getSession ??
-          environment.runtime?.createSession.bind(environment.runtime) ??
-          (async () => {
-            throw new Error(
-              "No live evaluation session provider available in CLI environment",
-            );
-          }),
-        journalWriter,
-      });
-      await journalWriter.close();
+      let runResult: Awaited<ReturnType<typeof runLiveEvaluation>>;
+      try {
+        runResult = await runLiveEvaluation({
+          trials,
+          cases: casesMap,
+          profiles: profilesMap,
+          registry: catalog.tools,
+          rubric: rawRubric,
+          ledger,
+          campaignId,
+          runId: currentRunId,
+          getSession:
+            environment.getSession ??
+            (environment.runtime
+              ? (context) => environment.runtime!.createSession(context, ledger)
+              : async () => {
+                  throw new Error(
+                    "No live evaluation session provider available in CLI environment",
+                  );
+                }),
+          journalWriter: async (event) => {
+            await campaign.journal.append(event);
+          },
+        });
+      } finally {
+        await campaign.close();
+      }
 
       const report = buildLiveEvaluationReport({
         runId: currentRunId,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLiveEvaluationRuntime } from "../src/ai/live-evaluation/runtime.js";
+import type { ProviderCallLedger } from "../src/ai/providers/registry.js";
 
 describe("ai-live runtime lifecycle", () => {
   it("executes probe/index through owned boundaries and closes once", async () => {
@@ -67,5 +68,48 @@ describe("ai-live runtime lifecycle", () => {
         phase: "probe",
       }),
     ).rejects.toThrow(/closed/i);
+  });
+
+  it("passes the campaign ledger into the session factory", async () => {
+    const ledger: ProviderCallLedger = {
+      reserve: vi.fn(async () => "call-1"),
+      settle: vi.fn(async () => undefined),
+    };
+    const createSession = vi.fn(async () => ({
+      model: { complete: vi.fn() },
+      retriever: { retrieve: vi.fn() },
+    }));
+    const runtime = createLiveEvaluationRuntime({
+      probe: async () => ({
+        calls: [
+          { role: "planning", provider: "openai", model: "model-1" },
+        ],
+      }),
+      index: async () => ({
+        index: {
+          id: "index-1",
+          provenanceHash: "a".repeat(64),
+          vectorHash: "b".repeat(64),
+          policyHash: "c".repeat(64),
+        },
+        rowCount: 1,
+      }),
+      createSession,
+    });
+
+    await runtime.createSession(
+      {
+        campaignId: "camp-1",
+        runId: "run-1",
+        profileId: "openai-only",
+        trialId: "trial-1",
+      },
+      ledger,
+    );
+
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ trialId: "trial-1" }),
+      ledger,
+    );
   });
 });
