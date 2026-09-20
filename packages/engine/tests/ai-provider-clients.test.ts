@@ -427,7 +427,7 @@ describe("native provider clients with fake transport", () => {
       priceCard: {
         version: "test-price-v1",
         entries: {
-          "gpt-5.6-terra": {
+          "openai:responses:planning:gpt-5.6-terra": {
             inputMicrosPerMillion: 2_000_000,
             outputMicrosPerMillion: 4_000_000,
           },

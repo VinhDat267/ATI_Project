@@ -8,6 +8,7 @@ import type {
 } from "./contracts.js";
 import {
   LiveEvaluationFingerprintsSchema,
+  LiveExposureSchema,
   type LiveEvaluationFingerprints,
 } from "./contracts.js";
 import type { DurableLiveJournalEvent } from "./journal.js";
@@ -89,7 +90,12 @@ function buildOutcome(
     trialId: trial.trialId,
     profileId: trial.profileId,
     caseId: trial.caseId,
-    exposure: "dev",
+    exposure:
+      (typeof payload.exposure === "string"
+        ? LiveExposureSchema.safeParse(payload.exposure).data
+        : undefined) ??
+      trial.exposure ??
+      "dev",
     cell: trial.cell,
     repetition: trial.repetition,
     status,
@@ -184,6 +190,9 @@ export function recoverLiveEvaluationState(
         trialId: event.trialId,
         profileId: stringValue(payload.profileId, "unknown-profile"),
         caseId: stringValue(payload.caseId, "unknown-case"),
+        ...(LiveExposureSchema.safeParse(payload.exposure).success
+          ? { exposure: LiveExposureSchema.parse(payload.exposure) }
+          : {}),
         cell: { variant, topK } as LiveEvaluationCell,
         repetition:
           typeof payload.repetition === "number" &&

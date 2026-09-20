@@ -721,19 +721,19 @@ export async function runLiveEvaluationCli(
         profilesMap.set(id, prof);
       }
 
-      const ownedRuntime =
-        environment.runtime ??
-        (environment.getSession
-          ? undefined
-          : await createDefaultLiveRuntime({
-              root,
-              env,
-              campaignId,
-              profile,
-              ledger,
-            }));
+      let ownedRuntime: LiveEvaluationRuntime | undefined = environment.runtime;
       let runResult: Awaited<ReturnType<typeof runLiveEvaluation>>;
       try {
+        if (!ownedRuntime && !environment.getSession) {
+          ownedRuntime = await createDefaultLiveRuntime({
+            root,
+            env,
+            campaignId,
+            profile,
+            ledger,
+          });
+        }
+        const sessionRuntime = ownedRuntime;
         runResult = await runLiveEvaluation({
           trials,
           cases: casesMap,
@@ -747,9 +747,9 @@ export async function runLiveEvaluationCli(
             environment.getSession
               ? (context, variant) => environment.getSession!(context, variant)
               :
-            (ownedRuntime
+            (sessionRuntime
               ? (context, variant) =>
-                  ownedRuntime.createSession(context, ledger, variant)
+                  sessionRuntime.createSession(context, ledger, variant)
               : async () => {
                   throw new Error(
                     "No live evaluation session provider available in CLI environment",
@@ -761,8 +761,20 @@ export async function runLiveEvaluationCli(
           signal: environment.signal,
         });
       } finally {
-        if (!environment.runtime && ownedRuntime) await ownedRuntime.close();
-        await campaign.close();
+        let cleanupError: unknown;
+        if (!environment.runtime && ownedRuntime) {
+          try {
+            await ownedRuntime.close();
+          } catch (error) {
+            cleanupError = error;
+          }
+        }
+        try {
+          await campaign.close();
+        } catch (error) {
+          cleanupError ??= error;
+        }
+        if (cleanupError) throw cleanupError;
       }
 
       const report = buildLiveEvaluationReport({

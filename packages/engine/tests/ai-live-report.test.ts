@@ -218,6 +218,83 @@ describe("ai-live-report", () => {
     expect(md).toContain("Budget exceeded");
   });
 
+  it("reads durable usage fields and counts only repair purposes", () => {
+    const plannedTrials = scheduleLiveTrials(["openai-only"], ["b01"], {
+      repetitions: 1,
+      cells: [{ variant: "all_tools", topK: 10 }],
+    });
+    const outcomes = plannedTrials.map((trial) => ({
+      trialId: trial.trialId,
+      profileId: trial.profileId,
+      caseId: trial.caseId,
+      exposure: "dev" as const,
+      cell: trial.cell,
+      repetition: trial.repetition,
+      status: "completed" as const,
+      modelCalls: [
+        {
+          callId: `${trial.trialId}-planning`,
+          provider: "openai",
+          model: "m",
+          purpose: "planning",
+          status: "succeeded",
+          latencyMs: 10,
+          costMicros: 1,
+          tokens: null,
+          errorCode: null,
+        },
+        {
+          callId: `${trial.trialId}-qe`,
+          provider: "openai",
+          model: "m",
+          purpose: "query_expansion",
+          status: "succeeded",
+          latencyMs: 3,
+          costMicros: 1,
+          tokens: null,
+          errorCode: null,
+        },
+        {
+          callId: `${trial.trialId}-repair`,
+          provider: "openai",
+          model: "m",
+          purpose: "repair",
+          status: "succeeded",
+          latencyMs: 4,
+          costMicros: 1,
+          tokens: null,
+          errorCode: null,
+        },
+      ],
+      score: createMockScore(),
+      latency: { totalMs: 20, planningMs: 10 },
+      error: null,
+    }));
+    const report = buildLiveEvaluationReport({
+      runId: "run-usage",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      campaignId: "camp-usage",
+      freezeHash: "f".repeat(64),
+      fingerprints: mockFingerprints,
+      plannedTrials,
+      outcomes,
+      ledgerRecords: [
+        {
+          callId: "durable-call",
+          provider: "openai",
+          model: "m",
+          status: "succeeded",
+          costMicros: 7,
+          usage: { inputTokens: 11, outputTokens: 5, totalTokens: 16 },
+        },
+      ],
+    });
+    expect(report.qualityMetrics.totalRepairs).toBe(1);
+    expect(report.costReconciliation.totalInputTokens).toBe(11);
+    expect(report.costReconciliation.totalOutputTokens).toBe(5);
+    expect(report.latency.planning.sampleCount).toBe(1);
+  });
+
   it("blocks formal PASS for fake transport and proposed rubric evidence", () => {
     const plannedTrials = scheduleLiveTrials(["openai-only"], ["b01"], {
       repetitions: 1,

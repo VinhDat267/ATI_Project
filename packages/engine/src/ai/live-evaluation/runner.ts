@@ -102,6 +102,7 @@ export async function runLiveEvaluation(
       payload: {
         profileId: trial.profileId,
         caseId: trial.caseId,
+        exposure: options.cases.get(trial.caseId)?.exposure ?? "dev",
         variant: trial.cell.variant,
         topK: trial.cell.topK,
         repetition: trial.repetition,
@@ -334,6 +335,7 @@ export async function runLiveEvaluation(
         trialId: trial.trialId,
         payload: {
           status: "completed",
+          exposure: parsedCase.exposure,
           score,
           modelCalls,
           durationMs: trialDurationMs,
@@ -365,6 +367,7 @@ export async function runLiveEvaluation(
         trialId: trial.trialId,
         payload: {
           status: "cancelled",
+          exposure: parsedCase.exposure,
           reason: trialError,
           modelCalls,
           durationMs: trialDurationMs,
@@ -391,6 +394,7 @@ export async function runLiveEvaluation(
         trialId: trial.trialId,
         payload: {
           status: "failed",
+          exposure: parsedCase.exposure,
           error: trialError,
           modelCalls,
           durationMs: trialDurationMs,

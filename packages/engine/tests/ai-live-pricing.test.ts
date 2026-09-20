@@ -40,4 +40,34 @@ describe("ai-live price card accounting", () => {
       ),
     ).toThrow(/cached input tokens/i);
   });
+
+  it("requires a provider and API mode binding for an evaluated price entry", () => {
+    const card = {
+      version: "test-price-v2",
+      entries: {
+        "google:interactions:planning:model-1": {
+          inputMicrosPerMillion: 1_000_000,
+          outputMicrosPerMillion: 2_000_000,
+        },
+      },
+    };
+    expect(
+      priceProviderCall(
+        "planning",
+        "model-1",
+        { inputTokens: 2, outputTokens: 3 },
+        card,
+        { provider: "google", apiMode: "interactions" },
+      ),
+    ).toBe(8);
+    expect(
+      priceProviderCall(
+        "planning",
+        "model-1",
+        { inputTokens: 2, outputTokens: 3 },
+        card,
+        { provider: "openai", apiMode: "responses" },
+      ),
+    ).toBeNull();
+  });
 });

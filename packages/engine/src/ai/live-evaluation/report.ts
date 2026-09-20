@@ -31,6 +31,13 @@ export interface BuildLiveEvaluationReportOptions {
     readonly model: string;
     readonly status: string;
     readonly costMicros: number | null;
+    readonly usage?: {
+      readonly inputTokens?: number;
+      readonly cachedInputTokens?: number;
+      readonly outputTokens?: number;
+      readonly reasoningTokens?: number;
+      readonly totalTokens?: number;
+    } | null;
     readonly tokens?: {
       readonly inputTokens?: number;
       readonly outputTokens?: number;
@@ -293,7 +300,9 @@ export function buildLiveEvaluationReport(
 
   let totalRepairs = 0;
   for (const o of completedOutcomes) {
-    totalRepairs += Math.max(0, o.modelCalls.length - 1);
+    totalRepairs += o.modelCalls.filter(
+      (call) => call.purpose === "repair" || call.purpose === "replan",
+    ).length;
   }
 
   const qualityMetrics: LiveQualityMetrics = {
@@ -328,7 +337,7 @@ export function buildLiveEvaluationReport(
   // Latency breakdown
   const latency: LiveLatencyBreakdown = {
     planning: computeLatencyPercentiles(
-      options.outcomes.map((o) => o.latency.planningMs ?? o.latency.totalMs),
+      options.outcomes.map((o) => o.latency.planningMs),
     ),
     fullRetrieval: computeLatencyPercentiles(
       options.outcomes.map((o) => o.latency.retrievalMs),
@@ -386,8 +395,10 @@ export function buildLiveEvaluationReport(
       unknownCostCalls++;
     }
 
-    const inTok = call.tokens?.inputTokens ?? 0;
-    const outTok = call.tokens?.outputTokens ?? 0;
+    const usage =
+      ("usage" in call ? call.usage : undefined) ?? call.tokens;
+    const inTok = usage?.inputTokens ?? 0;
+    const outTok = usage?.outputTokens ?? 0;
     totalInputTokens += inTok;
     totalOutputTokens += outTok;
     byProvider[prov]!.inputTokens += inTok;

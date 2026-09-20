@@ -2,6 +2,7 @@ export interface EmbeddingUsage {
   readonly inputTokens?: number;
   readonly cachedInputTokens?: number;
   readonly outputTokens?: number;
+  readonly reasoningTokens?: number;
   readonly totalTokens?: number;
 }
 export interface EmbeddingResult {
@@ -27,6 +28,7 @@ export interface StructuredModelUsage {
   readonly inputTokens?: number;
   readonly cachedInputTokens?: number;
   readonly outputTokens?: number;
+  readonly reasoningTokens?: number;
   readonly totalTokens?: number;
 }
 export interface StructuredModelResponse {

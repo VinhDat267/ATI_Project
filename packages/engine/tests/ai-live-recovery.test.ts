@@ -85,4 +85,19 @@ describe("ai-live recovery", () => {
     });
     expect(state.retryTrialIds).toEqual([]);
   });
+
+  it("preserves the scheduled exposure during interrupted recovery", () => {
+    const state = recoverLiveEvaluationState([
+      event(1, "trial_scheduled", "legacy-trial", {
+        profileId: "openai-only",
+        caseId: "b07",
+        exposure: "legacy_regression",
+        variant: "semantic",
+        topK: 3,
+        repetition: 1,
+      }),
+      event(2, "trial_started", "legacy-trial", {}),
+    ]);
+    expect(state.outcomes[0]?.exposure).toBe("legacy_regression");
+  });
 });

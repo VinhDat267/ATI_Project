@@ -116,7 +116,13 @@ export async function createLiveEvaluationRuntimeComposition(
 ): Promise<LiveEvaluationRuntime> {
   assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
   const database = openDatabase(options.evalDatabaseUrl);
-  const catalog = await loadCatalog(options.root);
+  let catalog: Awaited<ReturnType<typeof loadCatalog>>;
+  try {
+    catalog = await loadCatalog(options.root);
+  } catch (error) {
+    await database.close().catch(() => undefined);
+    throw error;
+  }
   const index = new PgvectorCatalogIndex(database, options.userId);
   const config = providerConfig(options.profile);
   let closed = false;
@@ -148,19 +154,22 @@ export async function createLiveEvaluationRuntimeComposition(
       } satisfies AiProviderCallContext;
       const ports = portsFor(context, options.ledger);
       const calls = [];
-      const model = await ports.model.complete({
-        systemPrompt: "Return a refusal for this connectivity probe.",
-        userPrompt: "Probe the configured planning provider.",
-        schema: { type: "object", additionalProperties: true },
-        signal: request.signal,
-      });
-      calls.push({
-        role: "planning",
-        provider: model.provider,
-        model: model.model,
-        requestId: model.requestId,
-        usage: probeUsage(model.usage),
-      });
+      for (const purpose of ["planning", "repair", "replan"] as const) {
+        const model = await ports.model.complete({
+          purpose,
+          systemPrompt: "Return a refusal for this connectivity probe.",
+          userPrompt: `Probe the configured ${purpose} provider path.`,
+          schema: { type: "object", additionalProperties: true },
+          signal: request.signal,
+        });
+        calls.push({
+          role: purpose,
+          provider: model.provider,
+          model: model.model,
+          requestId: model.requestId,
+          usage: probeUsage(model.usage),
+        });
+      }
       const expanded = await ports.queryExpansion.expand({
         query: "probe",
         signal: request.signal,
@@ -172,18 +181,20 @@ export async function createLiveEvaluationRuntimeComposition(
         requestId: expanded.requestId,
         usage: probeUsage(expanded.usage),
       });
-      const embedding = await ports.embedding.embed({
-        text: "probe",
-        purpose: "query",
-        signal: request.signal,
-      });
-      calls.push({
-        role: "embedding",
-        provider: embedding.provider,
-        model: embedding.model,
-        requestId: embedding.requestId,
-        usage: probeUsage(embedding.usage),
-      });
+      for (const purpose of ["document", "query"] as const) {
+        const embedding = await ports.embedding.embed({
+          text: "probe",
+          purpose,
+          signal: request.signal,
+        });
+        calls.push({
+          role: `embedding:${purpose}`,
+          provider: embedding.provider,
+          model: embedding.model,
+          requestId: embedding.requestId,
+          usage: probeUsage(embedding.usage),
+        });
+      }
       return { calls };
     },
     index: async (request) => {

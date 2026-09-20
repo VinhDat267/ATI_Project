@@ -337,6 +337,7 @@ export interface LiveTrialScheduleItem {
   readonly trialId: string;
   readonly profileId: string;
   readonly caseId: string;
+  readonly exposure?: LiveExposure;
   readonly cell: LiveEvaluationCell;
   readonly repetition: number;
 }

@@ -156,16 +156,28 @@ function usageFromProvider(
           ? record.input_tokens
           : undefined,
       cachedInputTokens:
-        record.prompt_tokens_details &&
-        typeof record.prompt_tokens_details === "object" &&
-        typeof (record.prompt_tokens_details as Record<string, unknown>)
+        (record.input_tokens_details ?? record.prompt_tokens_details) &&
+        typeof (record.input_tokens_details ?? record.prompt_tokens_details) ===
+          "object" &&
+        typeof (
+          (record.input_tokens_details ?? record.prompt_tokens_details) as Record<
+            string,
+            unknown
+          >
+        )
           .cached_tokens === "number"
-          ? (record.prompt_tokens_details as Record<string, number>)
-              .cached_tokens
+          ? (
+              (record.input_tokens_details ??
+                record.prompt_tokens_details) as Record<string, number>
+            ).cached_tokens
           : undefined,
       outputTokens:
         typeof record.output_tokens === "number"
           ? record.output_tokens
+          : undefined,
+      reasoningTokens:
+        typeof record.reasoning_tokens === "number"
+          ? record.reasoning_tokens
           : undefined,
       totalTokens:
         typeof record.total_tokens === "number"
@@ -187,18 +199,33 @@ function usageFromProvider(
     const outputTokens =
       typeof record.candidatesTokenCount === "number"
         ? record.candidatesTokenCount
-        : typeof record.thoughtsTokenCount === "number"
-          ? record.thoughtsTokenCount
-          : undefined;
+        : undefined;
     return {
       inputTokens,
       cachedInputTokens,
       outputTokens,
+      reasoningTokens:
+        typeof record.thoughtsTokenCount === "number"
+          ? record.thoughtsTokenCount
+          : undefined,
       totalTokens:
         typeof record.totalTokenCount === "number"
           ? record.totalTokenCount
           : undefined,
     };
+  }
+  const promptTokens = body.usage;
+  if (promptTokens && typeof promptTokens === "object") {
+    const record = promptTokens as Record<string, unknown>;
+    if (typeof record.prompt_tokens === "number") {
+      return {
+        inputTokens: record.prompt_tokens,
+        totalTokens:
+          typeof record.total_tokens === "number"
+            ? record.total_tokens
+            : record.prompt_tokens,
+      };
+    }
   }
   return null;
 }
@@ -212,11 +239,17 @@ function providerUsage(
 function providerCost(
   options: CreateAiPortsOptions,
   purpose: ProviderCallReservation["purpose"],
-  model: string,
+  profile: GenerationProfile | EmbeddingProfile,
   body: Record<string, unknown>,
 ): number | null {
   return options.priceCard
-    ? priceProviderCall(purpose, model, providerUsage(body), options.priceCard)
+    ? priceProviderCall(
+        purpose,
+        profile.model,
+        providerUsage(body),
+        options.priceCard,
+        { provider: profile.provider, apiMode: profile.apiMode },
+      )
     : null;
 }
 
@@ -516,7 +549,7 @@ function createModelClient(
           costMicros: providerCost(
             options,
             input.purpose ?? "planning",
-            profile.model,
+            profile,
             body,
           ),
           errorCode: "PROVIDER_RESPONSE_INVALID",
@@ -537,7 +570,7 @@ function createModelClient(
           costMicros: providerCost(
             options,
             input.purpose ?? "planning",
-            profile.model,
+            profile,
             body,
           ),
           errorCode: "PROVIDER_RESPONSE_INVALID",
@@ -554,7 +587,7 @@ function createModelClient(
         costMicros: providerCost(
           options,
           input.purpose ?? "planning",
-          profile.model,
+          profile,
           body,
         ),
       });
@@ -603,7 +636,7 @@ function createQueryExpansionClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: providerCost(options, "query_expansion", profile.model, body),
+          costMicros: providerCost(options, "query_expansion", profile, body),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -620,7 +653,7 @@ function createQueryExpansionClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: providerCost(options, "query_expansion", profile.model, body),
+          costMicros: providerCost(options, "query_expansion", profile, body),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -632,7 +665,7 @@ function createQueryExpansionClient(
       await options.ledger.settle(callId, {
         status: "succeeded",
         usage: providerUsage(body),
-        costMicros: providerCost(options, "query_expansion", profile.model, body),
+        costMicros: providerCost(options, "query_expansion", profile, body),
       });
       return {
         queries: (parsed as { queries: unknown[] }).queries
@@ -815,7 +848,7 @@ function createEmbeddingClient(
         await options.ledger.settle(callId, {
           status: "succeeded",
           usage: providerUsage(parsed),
-          costMicros: providerCost(options, "embedding", profile.model, parsed),
+          costMicros: providerCost(options, "embedding", profile, parsed),
         });
         const embeddingUsage: EmbeddingUsage | null = usageFromProvider(parsed);
         return {
@@ -834,7 +867,7 @@ function createEmbeddingClient(
           await options.ledger.settle(callId, {
             status: "invalid_output",
             usage: providerUsage(parsed),
-            costMicros: providerCost(options, "embedding", profile.model, parsed),
+            costMicros: providerCost(options, "embedding", profile, parsed),
             errorCode:
               error instanceof ProviderClientError
                 ? error.code
