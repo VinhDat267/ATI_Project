@@ -58,7 +58,8 @@ export function priceProviderCall(
   if (!usage) return null;
   validateProviderPriceCard(card);
   const entry = context
-    ? card.entries[`${context.provider}:${context.apiMode}:${purpose}:${model}`]
+    ? (card.entries[`${context.provider}:${context.apiMode}:${purpose}:${model}`] ??
+       card.entries[model])
     : card.entries[model];
   if (!entry) return null;
 
@@ -164,9 +165,9 @@ export function calculateReservationBoundMicros(
   if (!options.priceCard) return null;
   validateProviderPriceCard(options.priceCard);
   const entry = options.context
-    ? options.priceCard.entries[
+    ? (options.priceCard.entries[
         `${options.context.provider}:${options.context.apiMode}:${options.purpose}:${options.model}`
-      ]
+      ] ?? options.priceCard.entries[options.model])
     : options.priceCard.entries[options.model];
   if (!entry) return null;
 

@@ -152,36 +152,50 @@ function usageFromProvider(
   const usage = body.usage;
   if (usage && typeof usage === "object") {
     const record = usage as Record<string, unknown>;
-    return {
-      inputTokens:
-        typeof (record.input_tokens ?? record.prompt_tokens) === "number"
+    const inputTokens =
+      typeof record.total_input_tokens === "number"
+        ? (record.total_input_tokens as number)
+        : typeof (record.input_tokens ?? record.prompt_tokens) === "number"
           ? ((record.input_tokens ?? record.prompt_tokens) as number)
-          : undefined,
-      cachedInputTokens:
-        (record.input_tokens_details ?? record.prompt_tokens_details) &&
-        typeof (record.input_tokens_details ?? record.prompt_tokens_details) ===
-          "object" &&
-        typeof (
-          (record.input_tokens_details ??
-            record.prompt_tokens_details) as Record<string, unknown>
-        ).cached_tokens === "number"
+          : undefined;
+    const cachedInputTokens =
+      typeof record.total_cached_tokens === "number"
+        ? (record.total_cached_tokens as number)
+        : (record.input_tokens_details ?? record.prompt_tokens_details) &&
+            typeof (record.input_tokens_details ??
+              record.prompt_tokens_details) === "object" &&
+            typeof (
+              (record.input_tokens_details ??
+                record.prompt_tokens_details) as Record<string, unknown>
+            ).cached_tokens === "number"
           ? (
               (record.input_tokens_details ??
                 record.prompt_tokens_details) as Record<string, number>
             ).cached_tokens
-          : undefined,
-      outputTokens:
-        typeof record.output_tokens === "number"
-          ? record.output_tokens
-          : undefined,
-      reasoningTokens:
-        typeof record.reasoning_tokens === "number"
-          ? record.reasoning_tokens
-          : undefined,
-      totalTokens:
-        typeof record.total_tokens === "number"
-          ? record.total_tokens
-          : undefined,
+          : undefined;
+    const outputTokens =
+      typeof record.total_output_tokens === "number"
+        ? (record.total_output_tokens as number)
+        : typeof record.output_tokens === "number"
+          ? (record.output_tokens as number)
+          : undefined;
+    const reasoningTokens =
+      typeof record.total_thought_tokens === "number"
+        ? (record.total_thought_tokens as number)
+        : typeof record.reasoning_tokens === "number"
+          ? (record.reasoning_tokens as number)
+          : undefined;
+    const totalTokens =
+      typeof record.total_tokens === "number"
+        ? (record.total_tokens as number)
+        : undefined;
+
+    return {
+      inputTokens,
+      cachedInputTokens,
+      outputTokens,
+      reasoningTokens,
+      totalTokens,
     };
   }
   const usageMetadata = body.usageMetadata;
@@ -286,6 +300,55 @@ function textFromProviderResponse(
   provider: "openai" | "google",
 ): string {
   if (typeof body.output_text === "string") return body.output_text;
+  const steps = body.steps;
+  if (Array.isArray(steps)) {
+    const fragments: string[] = [];
+    for (const step of steps) {
+      if (!step || typeof step !== "object") continue;
+      const record = step as Record<string, unknown>;
+      if (record.type === "model_output" && Array.isArray(record.content)) {
+        for (const part of record.content) {
+          if (!part || typeof part !== "object") continue;
+          const p = part as Record<string, unknown>;
+          if (typeof p.text === "string") {
+            fragments.push(p.text);
+          }
+        }
+      }
+    }
+    if (fragments.length > 0) {
+      const combined = fragments.join("").trim();
+      const match = combined.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+      return match ? match[1]!.trim() : combined;
+    }
+  }
+  const candidates = body.candidates;
+  if (Array.isArray(candidates) && candidates.length > 0) {
+    const first = candidates[0];
+    if (first && typeof first === "object") {
+      const content = (first as Record<string, unknown>).content;
+      if (content && typeof content === "object") {
+        const parts = (content as Record<string, unknown>).parts;
+        if (Array.isArray(parts)) {
+          const fragments: string[] = [];
+          for (const part of parts) {
+            if (
+              part &&
+              typeof part === "object" &&
+              typeof (part as Record<string, unknown>).text === "string"
+            ) {
+              fragments.push((part as Record<string, unknown>).text as string);
+            }
+          }
+          if (fragments.length > 0) {
+            const combined = fragments.join("").trim();
+            const match = combined.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+            return match ? match[1]!.trim() : combined;
+          }
+        }
+      }
+    }
+  }
   const output = body.output;
   if (Array.isArray(output)) {
     const fragments: string[] = [];
@@ -342,9 +405,19 @@ async function parseResponse(
     body = null;
   }
   if (!response.ok) {
+    const errorDetails =
+      body && typeof body === "object" && "error" in body
+        ? (body as Record<string, unknown>).error
+        : undefined;
+    const detailMsg =
+      errorDetails &&
+      typeof errorDetails === "object" &&
+      "message" in errorDetails
+        ? `: ${(errorDetails as Record<string, unknown>).message}`
+        : "";
     throw new ProviderClientError(
       "PROVIDER_HTTP_ERROR",
-      `${provider} provider returned HTTP ${response.status}`,
+      `${provider} provider returned HTTP ${response.status}${detailMsg}`,
       { provider, status: response.status },
     );
   }
@@ -551,12 +624,8 @@ function generationBody(
   }
   return {
     model: profile.model,
-    input: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_schema", schema },
-    max_output_tokens: profile.maxOutputTokens,
+    input: `${systemPrompt}\n\n${userPrompt}`,
+    response_format: schema,
   };
 }
 
