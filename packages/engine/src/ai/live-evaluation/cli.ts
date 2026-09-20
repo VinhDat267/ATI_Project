@@ -746,6 +746,7 @@ export async function runLiveEvaluationCli(
 
       let ownedRuntime: LiveEvaluationRuntime | undefined = environment.runtime;
       let runResult: Awaited<ReturnType<typeof runLiveEvaluation>>;
+      let runError: unknown;
       try {
         if (!ownedRuntime && !environment.getSession) {
           ownedRuntime = await createDefaultLiveRuntime({
@@ -786,6 +787,8 @@ export async function runLiveEvaluationCli(
           },
           signal: environment.signal,
         });
+      } catch (error) {
+        runError = error;
       } finally {
         let cleanupError: unknown;
         if (!environment.runtime && ownedRuntime) {
@@ -800,7 +803,20 @@ export async function runLiveEvaluationCli(
         } catch (error) {
           cleanupError ??= error;
         }
+        if (runError !== undefined) {
+          if (cleanupError !== undefined) {
+            throw new AggregateError(
+              [runError, cleanupError],
+              "live evaluation failed and cleanup also failed",
+            );
+          }
+          throw runError;
+        }
         if (cleanupError) throw cleanupError;
+      }
+
+      if (!runResult!) {
+        throw new Error("live evaluation did not produce a run result");
       }
 
       const report = buildLiveEvaluationReport({
