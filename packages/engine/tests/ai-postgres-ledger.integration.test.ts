@@ -119,8 +119,9 @@ describe("PostgreSQL provider call ledger", () => {
       status: "succeeded" as const,
       usage: {
         inputTokens: 4,
-        cachedInputTokens: 1,
+        cachedInputTokens: undefined,
         outputTokens: 7,
+        reasoningTokens: undefined,
         totalTokens: 12,
       },
       costMicros: 60,

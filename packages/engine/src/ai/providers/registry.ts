@@ -301,6 +301,27 @@ function reservationEstimate(
   return options.config.limits.reservationEstimateMicros;
 }
 
+function initialReservationEstimate(
+  options: CreateAiPortsOptions,
+  purpose: ProviderCallReservation["purpose"],
+  profile: GenerationProfile | EmbeddingProfile,
+): number {
+  let estimate = options.config.limits.reservationEstimateMicros;
+  if (options.priceCard) {
+    const bound = calculateReservationBoundMicros({
+      purpose,
+      model: profile.model,
+      inputLimitTokens: purpose === "embedding" ? 8_192 : 16_384,
+      outputCapTokens:
+        "maxOutputTokens" in profile ? profile.maxOutputTokens : undefined,
+      priceCard: options.priceCard,
+      context: { provider: profile.provider, apiMode: profile.apiMode },
+    });
+    if (bound !== null) estimate = bound;
+  }
+  return estimate;
+}
+
 function textFromProviderResponse(
   body: Record<string, unknown>,
   provider: "openai" | "google",
@@ -500,8 +521,8 @@ async function invokeProvider(
 }> {
   const fetchImpl =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
-  const estimatedCostMicros = reservationEstimate(options, purpose, profile);
-  const reservation: ProviderCallReservation = {
+  const initialEstimate = initialReservationEstimate(options, purpose, profile);
+  const initialReservation: ProviderCallReservation = {
     campaignId: options.callContext?.campaignId ?? "live-evaluation",
     runId: options.callContext?.runId ?? "live-evaluation",
     profileId:
@@ -512,11 +533,20 @@ async function invokeProvider(
     model: profile.model,
     requestHash: requestHash(body),
     outputCap: profile.maxOutputTokens,
+    estimatedCostMicros: initialEstimate,
+  };
+  // Keep the fail-closed authorization boundary ahead of any pricing failure.
+  await options.authorizeCall(initialReservation);
+  const estimatedCostMicros = reservationEstimate(options, purpose, profile);
+  const reservation: ProviderCallReservation = {
+    ...initialReservation,
     estimatedCostMicros,
   };
-  // The authorization boundary uses the final conservative estimate before
-  // resolving credentials; reserve() remains the atomic concurrent gate.
-  await options.authorizeCall(reservation);
+  if (estimatedCostMicros !== initialEstimate) {
+    // The final bound is the budget preflight before credential resolution;
+    // reserve() remains the atomic concurrent gate.
+    await options.authorizeCall(reservation);
+  }
   const key = requireKey(profile.provider, options.credentials);
   const callId = await options.ledger.reserve(reservation);
   const started = (options.now ?? Date.now)();
@@ -865,12 +895,12 @@ function createEmbeddingClient(
                   }
                 : {}),
             };
-      const estimatedCostMicros = reservationEstimate(
+      const initialEstimate = initialReservationEstimate(
         options,
         "embedding",
         profile,
       );
-      const reservation: ProviderCallReservation = {
+      const initialReservation: ProviderCallReservation = {
         campaignId: options.callContext?.campaignId ?? "live-evaluation",
         runId: options.callContext?.runId ?? "live-evaluation",
         profileId:
@@ -882,9 +912,20 @@ function createEmbeddingClient(
         model: profile.model,
         requestHash: requestHash(body),
         embeddingPurpose: input.purpose,
+        estimatedCostMicros: initialEstimate,
+      };
+      await options.authorizeCall(initialReservation);
+      const estimatedCostMicros = reservationEstimate(
+        options,
+        "embedding",
+        profile,
+      );
+      const reservation: ProviderCallReservation = {
+        ...initialReservation,
         estimatedCostMicros,
       };
-        await options.authorizeCall(reservation, { phase: "transport" });
+      if (estimatedCostMicros !== initialEstimate)
+        await options.authorizeCall(reservation);
       const key = requireKey(profile.provider, options.credentials);
       const callId = await options.ledger.reserve(reservation);
       const started = (options.now ?? Date.now)();
@@ -894,6 +935,7 @@ function createEmbeddingClient(
         options.config.limits.requestTimeoutMs,
       );
       try {
+        await options.authorizeCall(reservation, { phase: "transport" });
         if (input.signal?.aborted) {
           throw new ProviderClientError(
             "PROVIDER_TIMEOUT",

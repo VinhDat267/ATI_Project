@@ -95,6 +95,26 @@ describe("native provider clients with fake transport", () => {
     });
   });
 
+  it("checks default denial before an unproven pricing bound", async () => {
+    let authorizeCalls = 0;
+    const denial = Object.assign(new Error("live execution is not enabled"), {
+      code: "AI_LIVE_NOT_READY",
+    });
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      ledger: ledger(),
+      authorizeCall: async () => {
+        authorizeCalls += 1;
+        throw denial;
+      },
+    });
+    await expect(
+      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
+    ).rejects.toMatchObject({ code: "AI_LIVE_NOT_READY" });
+    expect(authorizeCalls).toBe(1);
+  });
+
   it("uses explicit campaign and run context in every authorization reservation", async () => {
     const reservations: Array<{
       campaignId: string;

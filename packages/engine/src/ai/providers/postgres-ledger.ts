@@ -69,6 +69,7 @@ function canonicalJson(value: unknown): string {
   const object = value as Record<string, unknown>;
   return `{${Object.keys(object)
     .sort()
+    .filter((key) => object[key] !== undefined)
     .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
     .join(",")}}`;
 }
