@@ -1,6 +1,7 @@
 import { openDatabase } from "@wap/db";
 import {
   WorkflowEngine,
+  InMemoryProviderCallLedger,
   inspectLocalGateway,
   loadFilesystemLaunch,
   openLocalGateway,
@@ -85,6 +86,16 @@ const aiRuntime =
           userId: config.userId,
           config: providerConfig,
           credentials,
+          // Provide an in-memory ledger capped at 1 USD (1 000 000 micros) for
+          // dev/demo use.  The ledger enforces a hard budget ceiling; it does not
+          // persist across restarts.  A passthrough authorizeCall is used here
+          // because the ledger itself provides the accounting gate.
+          ledger: new InMemoryProviderCallLedger({
+            campaignLimitMicros: 1_000_000,
+          }),
+          authorizeCall: async () => {
+            // Passthrough — ledger.reserve() already enforces the budget ceiling.
+          },
         });
       })()
     : undefined;

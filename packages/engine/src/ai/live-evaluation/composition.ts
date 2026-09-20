@@ -206,7 +206,8 @@ export async function createLiveEvaluationRuntimeComposition(
       for (const purpose of ["planning", "repair", "replan"] as const) {
         const model = await ports.model.complete({
           purpose,
-          systemPrompt: "Return a refusal for this connectivity probe.",
+          systemPrompt:
+            "Return a refusal for this connectivity probe. Set result.kind to 'refusal', set result.refusal to { reason: string }, and set result.plan and result.clarification to null.",
           userPrompt: `Probe the configured ${purpose} provider path.`,
           schema: { type: "object", additionalProperties: true },
           signal: request.signal,

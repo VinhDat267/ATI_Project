@@ -72,3 +72,5 @@ CLAUDE.md
 # Codegraph
 .codegraph/
 .gitnexus/
+.playwright-mcp/
+.artifacts/

@@ -119,7 +119,7 @@ const GEMINI_INTERACTIONS_URL =
 const GEMINI_EMBEDDING_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
 const PLANNER_WIRE_PROMPT_SUFFIX =
-  "Return a closed JSON object with a required `result` field. The result uses the tagged planner branch and map entries; preserve literal nulls and references exactly. Do not add execution, retry, timeout, or hidden tool fields.";
+  "Return a closed JSON object with a required `result` field. The result uses the tagged planner branch: when `kind` is 'plan', `refusal` and `clarification` must be null; when `kind` is 'refusal', `plan` and `clarification` must be null; when `kind` is 'clarification', `plan` and `refusal` must be null. Preserve literal nulls and references exactly. Do not add execution, retry, timeout, or hidden tool fields.";
 
 function providerKey(
   provider: "openai" | "google",
