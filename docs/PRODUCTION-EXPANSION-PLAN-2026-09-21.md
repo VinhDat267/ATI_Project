@@ -6,8 +6,8 @@
 
 ### CONFIRMED
 
-- Checkout hiện tại kết thúc ở `0a42cc8`; worktree sạch.
-- Full integrated gate đã pass trên commit `6237334`; latest backend gate trên code commit `b957e2d` cũng pass: DSL 43, engine unit 341 (1 skipped), API unit 54, web unit 128; MCP integration 64, engine integration 102, API integration 40. WEB-03 pass đủ 6 browser/build gates trên code commit `20dc8bd`.
+- Checkout hiện tại kết thúc ở `ddb59ad`; worktree sạch trước khi cập nhật tài liệu này.
+- Full integrated gate đã pass trên commit `a0a0ae4`; backend gate trên code commit `ddb59ad` cũng pass: DSL 43, engine unit 341 (1 skipped), API unit 55, web unit 128; MCP integration 64, engine integration 102, API integration 40. WEB-03 pass đủ 6 browser/build gates trên code commit `20dc8bd`.
 - Manifest browser sạch mới nhất là `docs/web-evidence/WEB-03/20260920200046-3f2db4d3-f0df-494b-aa17-8ded6d759f47/manifest.json`.
 - PostgreSQL demo được migrate additive đến tổng 9 migrations, không reset volume.
 - Google probe 6 calls đã pass. Đây là connectivity/protocol evidence, không phải quality evaluation; OpenAI live probe và formal live evaluation chưa chạy.
@@ -18,7 +18,7 @@
 - API có `POST /auth/logout` để revoke bearer session hiện tại; đây là revocation trong process, chưa thay thế P2 durable identity/session hoặc OIDC.
 - API hiện tách `SessionAuthority` injectable khỏi `SessionStore`; memory implementation vẫn là mặc định, nên durable implementation có thể được kiểm thử riêng mà không đổi route contract.
 - API có `/health/live` và `/health/ready`; readiness kiểm tra DB, không gọi provider và không bị bearer auth chặn. Đây là probe contract, chưa phải deployment/restore/incident evidence.
-- `npm run check:full` đã pass trên code commit `a0a0ae4`: backend DSL 43, engine unit 341 + 1 skipped, API unit 54, web unit 128, MCP integration 64, engine integration 102, API integration 40; web có 6/6 gate pass, NFR-03 p95 1,975 ms và cleanup không rò rỉ.
+- `npm run check:full` đã pass trên code commit `a0a0ae4`: backend DSL 43, engine unit 341 + 1 skipped, API unit 54, web unit 128, MCP integration 64, engine integration 102, API integration 40; web có 6/6 gate pass, NFR-03 p95 1,975 ms và cleanup không rò rỉ. Backend gate tiếp theo trên `ddb59ad` nâng API unit lên 55 và vẫn pass các integration count nêu trên.
 - `npm run ai:eval:live -- preflight --offline` pass; đây chỉ là preflight network-free, không phải live provider evaluation.
 
 ### OPEN / NOT_RUN
