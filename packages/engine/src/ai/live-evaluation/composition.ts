@@ -34,7 +34,7 @@ export interface LiveEvaluationCompositionOptions {
   readonly campaignId: string;
   readonly profile: LiveProfileConfig;
   readonly userId: string;
-  readonly evalDatabaseUrl: string;
+  readonly evalDatabaseUrl?: string;
   readonly appDatabaseUrl?: string;
   readonly credentials: AiProviderCredentials;
   readonly ledger: ProviderCallLedger;
@@ -114,16 +114,26 @@ async function loadCatalog(root: string) {
 export async function createLiveEvaluationRuntimeComposition(
   options: LiveEvaluationCompositionOptions,
 ): Promise<LiveEvaluationRuntime> {
-  assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
-  const database = openDatabase(options.evalDatabaseUrl);
   let catalog: Awaited<ReturnType<typeof loadCatalog>>;
   try {
     catalog = await loadCatalog(options.root);
   } catch (error) {
-    await database.close().catch(() => undefined);
     throw error;
   }
-  const index = new PgvectorCatalogIndex(database, options.userId);
+  let database: Database | undefined;
+  let index: PgvectorCatalogIndex | undefined;
+  const getIndex = (): PgvectorCatalogIndex => {
+    if (index) return index;
+    if (!options.evalDatabaseUrl?.trim()) {
+      throw new Error(
+        "AI_EVAL_DATABASE_URL is required for index and semantic session phases",
+      );
+    }
+    assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
+    database = openDatabase(options.evalDatabaseUrl);
+    index = new PgvectorCatalogIndex(database, options.userId);
+    return index;
+  };
   const config = providerConfig(options.profile);
   let closed = false;
 
@@ -210,7 +220,7 @@ export async function createLiveEvaluationRuntimeComposition(
         ports.embedding,
         request.signal,
       );
-      const active = await index.activate({ catalog, rows });
+      const active = await getIndex().activate({ catalog, rows });
       return {
         index: {
           id: active.id,
@@ -229,7 +239,7 @@ export async function createLiveEvaluationRuntimeComposition(
       const ports = portsFor(context, ledger);
       const base = new PgvectorToolRetriever({
         catalog,
-        index,
+        index: getIndex(),
         embeddingPort: ports.embedding,
         queryExpansionPort: ports.queryExpansion,
         expectedEmbeddingProfile: options.profile.embedding,
@@ -244,7 +254,7 @@ export async function createLiveEvaluationRuntimeComposition(
     close: async () => {
       if (closed) return;
       closed = true;
-      await database.close();
+      await database?.close();
     },
   });
   return runtime;

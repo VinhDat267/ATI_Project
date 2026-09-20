@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createOfflineReviewedCatalog } from "../local-catalog.js";
 import {
@@ -96,6 +96,28 @@ async function hashFiles(
   return sha256(JSON.stringify(entries));
 }
 
+async function discoverBehaviorPaths(root: string): Promise<readonly string[]> {
+  const roots = [
+    "packages/engine/src/ai/live-evaluation",
+    "packages/engine/src/ai/providers",
+    "packages/db/src",
+    "packages/dsl/src",
+  ];
+  const discovered: string[] = [...LIVE_EVALUATION_BEHAVIOR_PATHS];
+  const visit = async (relativeDirectory: string): Promise<void> => {
+    const entries = await readdir(join(root, relativeDirectory), {
+      withFileTypes: true,
+    });
+    for (const entry of entries) {
+      const relativePath = join(relativeDirectory, entry.name).replaceAll("\\", "/");
+      if (entry.isDirectory()) await visit(relativePath);
+      else if (entry.isFile() && entry.name.endsWith(".ts")) discovered.push(relativePath);
+    }
+  };
+  for (const directory of roots) await visit(directory);
+  return [...new Set(discovered)].sort();
+}
+
 export async function computeLiveFingerprints(
   root: string,
   options?: {
@@ -105,7 +127,7 @@ export async function computeLiveFingerprints(
 ): Promise<LiveEvaluationFingerprints> {
   const configPath = options?.configPath ?? "testdata/ai-live-eval-config.json";
   const behaviorPaths =
-    options?.behaviorPaths ?? LIVE_EVALUATION_BEHAVIOR_PATHS;
+    options?.behaviorPaths ?? (await discoverBehaviorPaths(root));
 
   const catalogJson = JSON.parse(
     await readFile(join(root, "testdata/tools.json"), "utf8"),

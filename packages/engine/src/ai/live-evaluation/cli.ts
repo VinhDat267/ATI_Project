@@ -77,6 +77,9 @@ async function createDefaultLiveRuntime(options: {
   readonly root: string;
   readonly env: Record<string, string | undefined>;
   readonly campaignId: string;
+  readonly phase: "probe" | "index" | "smoke" | "dev" | "legacy-regression";
+  readonly approvalExpiresAt: string;
+  readonly now: () => Date;
   readonly profile: LiveProfileConfig;
   readonly ledger: import("../providers/registry.js").ProviderCallLedger;
 }): Promise<LiveEvaluationRuntime> {
@@ -99,12 +102,14 @@ async function createDefaultLiveRuntime(options: {
       : {}),
   };
   const userId = options.env.AI_EVAL_USER_ID?.trim();
-  if (!userId) throw new Error("AI_EVAL_USER_ID is required for live evaluation");
+  if (!userId && options.phase !== "probe") {
+    throw new Error("AI_EVAL_USER_ID is required for database-backed live evaluation");
+  }
   return createLiveEvaluationRuntimeComposition({
     root: options.root,
     campaignId: options.campaignId,
     profile: options.profile,
-    userId,
+    userId: userId ?? "eval-probe-user",
     evalDatabaseUrl: options.env.AI_EVAL_DATABASE_URL ?? "",
     credentials,
     ledger: options.ledger,
@@ -112,6 +117,10 @@ async function createDefaultLiveRuntime(options: {
     authorizeCall: async (request) => {
       if (request.campaignId !== options.campaignId) {
         throw new Error("provider call campaign does not match approval");
+      }
+      const expiresAt = Date.parse(options.approvalExpiresAt);
+      if (!Number.isFinite(expiresAt) || options.now().getTime() >= expiresAt) {
+        throw new Error("live evaluation approval expired before provider dispatch");
       }
     },
   });
@@ -411,15 +420,18 @@ export async function runLiveEvaluationCli(
           ownedCampaign = await openLiveCampaign({
             outputRoot,
             campaignId: flags.campaign,
+            phase: "probe",
             runId: runId(),
             profileId: flags.profile,
-            phase: "probe",
             budgetCapMicros: approval.budgetMicros,
           });
           ownedRuntime = await createDefaultLiveRuntime({
             root,
             env: environment.env ?? process.env,
             campaignId: flags.campaign,
+            phase: "probe",
+            approvalExpiresAt: approval.expiresAt,
+            now,
             profile,
             ledger: ownedCampaign.ledger,
           });
@@ -520,6 +532,9 @@ export async function runLiveEvaluationCli(
             root,
             env,
             campaignId: flags.campaign,
+            phase: "index",
+            approvalExpiresAt: approval.expiresAt,
+            now,
             profile,
             ledger: ownedCampaign.ledger,
           });
@@ -729,6 +744,9 @@ export async function runLiveEvaluationCli(
             root,
             env,
             campaignId,
+            phase: flags.phase as "smoke" | "dev" | "legacy-regression",
+            approvalExpiresAt: approval.expiresAt,
+            now,
             profile,
             ledger,
           });
