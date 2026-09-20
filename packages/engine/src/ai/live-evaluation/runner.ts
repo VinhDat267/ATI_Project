@@ -44,6 +44,7 @@ export interface LiveEvaluationRunnerOptions {
   readonly runId?: string;
   readonly getSession: (
     context: LiveEvaluationSessionContext,
+    variant?: LiveEvaluationCell["variant"],
   ) => Promise<LiveEvaluationSession>;
   readonly journalWriter?: (event: LiveJournalEvent) => Promise<void>;
   readonly signal?: AbortSignal;
@@ -229,8 +230,7 @@ export async function runLiveEvaluation(
         runId: options.runId ?? trial.trialId,
         profileId: trial.profileId,
         trialId: trial.trialId,
-        variant: trial.cell.variant,
-      });
+      }, trial.cell.variant);
       coldSetupMs = Math.max(0, now() - coldStart);
 
       const observingRetriever: ToolRetriever = {

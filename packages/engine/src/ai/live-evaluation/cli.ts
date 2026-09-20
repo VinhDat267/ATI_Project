@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { G1_DATABASE_URL } from "@wap/db";
 import { createOfflineReviewedCatalog } from "../local-catalog.js";
 import {
   parseLiveDataset,
@@ -52,6 +53,10 @@ import {
   type LiveExecutionPhase,
 } from "./authorization.js";
 import type { LiveEvaluationRuntime } from "./runtime.js";
+import {
+  parseEvaluationDatabaseIdentity,
+  sameEvaluationDatabase,
+} from "./database-identity.js";
 
 export interface LiveEvaluationCliEnvironment {
   readonly root?: string;
@@ -98,9 +103,9 @@ async function createDefaultLiveRuntime(options: {
     profile: options.profile,
     userId,
     evalDatabaseUrl: options.env.AI_EVAL_DATABASE_URL ?? "",
-    appDatabaseUrl: options.env.DATABASE_URL,
     credentials,
     ledger: options.ledger,
+    appDatabaseUrl: options.env.DATABASE_URL ?? G1_DATABASE_URL,
     authorizeCall: async (request) => {
       if (request.campaignId !== options.campaignId) {
         throw new Error("provider call campaign does not match approval");
@@ -129,34 +134,15 @@ export function validateEvalDatabaseUrl(
       "AI_EVAL_DATABASE_URL environment variable is required for database operations but was not provided",
     );
   }
-  const trimmedEval = evalUrl.trim();
-  if (appUrl) {
-    const trimmedApp = appUrl.trim();
-    if (trimmedEval === trimmedApp) {
-      throw new Error(
-        "AI_EVAL_DATABASE_URL must not point to the normal application database (DATABASE_URL)",
-      );
-    }
-    try {
-      const evalParsed = new URL(trimmedEval);
-      const appParsed = new URL(trimmedApp);
-      if (
-        evalParsed.host.toLowerCase() === appParsed.host.toLowerCase() &&
-        evalParsed.pathname.toLowerCase() === appParsed.pathname.toLowerCase()
-      ) {
-        throw new Error(
-          "AI_EVAL_DATABASE_URL must not point to the normal application database (DATABASE_URL)",
-        );
-      }
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message.includes("AI_EVAL_DATABASE_URL must not point")
-      ) {
-        throw err;
-      }
-      // If URL parsing fails for non-standard connection strings, exact check above already ran
-    }
+  const evaluation = parseEvaluationDatabaseIdentity(evalUrl.trim());
+  const application = parseEvaluationDatabaseIdentity(
+    appUrl?.trim() || G1_DATABASE_URL,
+    "DATABASE_URL",
+  );
+  if (sameEvaluationDatabase(evaluation, application)) {
+    throw new Error(
+      "AI_EVAL_DATABASE_URL must not point to the normal application database (DATABASE_URL)",
+    );
   }
 }
 
@@ -753,7 +739,8 @@ export async function runLiveEvaluationCli(
           getSession:
             environment.getSession ??
             (ownedRuntime
-              ? (context) => ownedRuntime.createSession(context, ledger)
+              ? (context, variant) =>
+                  ownedRuntime.createSession(context, ledger, variant)
               : async () => {
                   throw new Error(
                     "No live evaluation session provider available in CLI environment",

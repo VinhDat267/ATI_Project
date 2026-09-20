@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { openDatabase, type Database } from "@wap/db";
+import { G1_DATABASE_URL, openDatabase, type Database } from "@wap/db";
 import { createOfflineReviewedCatalog } from "../local-catalog.js";
 import {
   buildCatalogEmbeddingRows,
@@ -19,6 +19,10 @@ import type {
 import type { AiProviderConfig } from "../providers/config.js";
 import type { ProviderPriceCard } from "./pricing.js";
 import type { LiveProfileConfig } from "./contracts.js";
+import {
+  parseEvaluationDatabaseIdentity,
+  sameEvaluationDatabase,
+} from "./database-identity.js";
 import {
   createLiveEvaluationRuntime,
   type LiveEvaluationRuntime,
@@ -44,28 +48,11 @@ function sha256(value: unknown): string {
 }
 
 function assertDatabaseIsolation(evalUrl: string, appUrl?: string): void {
-  if (!evalUrl.trim()) throw new Error("AI_EVAL_DATABASE_URL is required");
-  if (appUrl?.trim() && evalUrl.trim() === appUrl.trim()) {
-    throw new Error("AI_EVAL_DATABASE_URL must not equal DATABASE_URL");
-  }
-  try {
-    const evalParsed = new URL(evalUrl);
-    if (evalParsed.protocol !== "postgres:" && evalParsed.protocol !== "postgresql:") {
-      throw new Error("AI_EVAL_DATABASE_URL must use PostgreSQL");
-    }
-    if (appUrl) {
-      const appParsed = new URL(appUrl);
-      if (
-        evalParsed.hostname.toLowerCase() === appParsed.hostname.toLowerCase() &&
-        (evalParsed.port || "5432") === (appParsed.port || "5432") &&
-        evalParsed.pathname.toLowerCase() === appParsed.pathname.toLowerCase()
-      ) {
-        throw new Error("AI_EVAL_DATABASE_URL must target a different database");
-      }
-    }
-  } catch (error) {
-    if (error instanceof Error && /AI_EVAL_DATABASE_URL/.test(error.message)) throw error;
-    throw new Error("AI_EVAL_DATABASE_URL is not a valid PostgreSQL URL");
+  const effectiveAppUrl = appUrl?.trim() || G1_DATABASE_URL;
+  const evaluation = parseEvaluationDatabaseIdentity(evalUrl);
+  const application = parseEvaluationDatabaseIdentity(effectiveAppUrl, "DATABASE_URL");
+  if (sameEvaluationDatabase(evaluation, application)) {
+    throw new Error("AI_EVAL_DATABASE_URL must target a different database");
   }
 }
 
@@ -214,7 +201,11 @@ export async function createLiveEvaluationRuntimeComposition(
         rowCount: rows.length,
       };
     },
-    createSession: async (context, ledger = options.ledger) => {
+    createSession: async (
+      context,
+      ledger = options.ledger,
+      variant = "all_tools",
+    ) => {
       const ports = portsFor(context, ledger);
       const base = new PgvectorToolRetriever({
         catalog,
@@ -223,7 +214,7 @@ export async function createLiveEvaluationRuntimeComposition(
         queryExpansionPort: ports.queryExpansion,
         expectedEmbeddingProfile: options.profile.embedding,
       });
-      const retrievalSession = await base.createSession(context.variant ?? "all_tools");
+      const retrievalSession = await base.createSession(variant);
       return {
         model: ports.model,
         retriever: retrievalSession.retriever,

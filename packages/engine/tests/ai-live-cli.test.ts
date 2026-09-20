@@ -236,6 +236,29 @@ describe("ai-live-cli", () => {
     expect(() =>
       validateEvalDatabaseUrl("postgres://test/eval", "postgres://prod/app"),
     ).not.toThrow();
+
+    expect(() =>
+      validateEvalDatabaseUrl(
+        "postgresql://127.0.0.1:5432/app",
+        "postgres://localhost/app",
+      ),
+    ).toThrow(
+      /AI_EVAL_DATABASE_URL must not point to the normal application database/,
+    );
+    expect(() =>
+      validateEvalDatabaseUrl(
+        "postgresql://localhost:5433/app",
+        "postgres://127.0.0.1:5432/app",
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateEvalDatabaseUrl("postgresql://127.0.0.1:55532/wap_g1", undefined),
+    ).toThrow(
+      /AI_EVAL_DATABASE_URL must not point to the normal application database/,
+    );
+    expect(() =>
+      validateEvalDatabaseUrl("https://example.test/eval", "postgres://prod/app"),
+    ).toThrow(/must use PostgreSQL/);
   });
 
   it("rejects probe/index/run when --execute flag is omitted", async () => {

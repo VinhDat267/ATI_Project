@@ -3,6 +3,7 @@ import type {
   LiveEvaluationSessionContext,
 } from "./runner.js";
 import type { ProviderCallLedger } from "../providers/registry.js";
+import type { RetrievalVariant } from "../retrieval.js";
 
 export interface LiveProbeRequest {
   readonly campaignId: string;
@@ -44,6 +45,7 @@ export interface LiveEvaluationRuntime {
   readonly createSession: (
     context: LiveEvaluationSessionContext,
     ledger?: ProviderCallLedger,
+    variant?: RetrievalVariant,
   ) => Promise<LiveEvaluationSession>;
   readonly close: () => Promise<void>;
 }
@@ -54,6 +56,7 @@ export interface LiveEvaluationRuntimeImplementation {
   readonly createSession?: (
     context: LiveEvaluationSessionContext,
     ledger?: ProviderCallLedger,
+    variant?: RetrievalVariant,
   ) => Promise<LiveEvaluationSession>;
   readonly close?: () => Promise<void>;
 }
@@ -106,12 +109,14 @@ export function createLiveEvaluationRuntime(
       assertOpen();
       return assertIndexResult(await implementation.index(request));
     },
-    createSession: async (context, ledger) => {
+    createSession: async (context, ledger, variant) => {
       assertOpen();
       if (!implementation.createSession) {
         throw new Error("live evaluation session factory is not configured");
       }
-      return implementation.createSession(context, ledger);
+      return variant === undefined
+        ? implementation.createSession(context, ledger)
+        : implementation.createSession(context, ledger, variant);
     },
     close: async () => {
       if (closed) return;
