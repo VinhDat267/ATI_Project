@@ -468,6 +468,8 @@ describe("ai-live-cli", () => {
     });
     expect(reportRes.exitCode).toBe(1);
     expect(reportRes.message).toContain("Report replayed and rendered");
+    expect(reportRes.report?.campaignId).toBe("camp-cli-test");
+    expect(reportRes.report?.freezeHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("rejects legacy-regression phase without --freeze flag", async () => {

@@ -22,6 +22,14 @@ export const LIVE_EVALUATION_BEHAVIOR_PATHS = [
   "packages/engine/src/ai/live-evaluation/scorer.ts",
   "packages/engine/src/ai/live-evaluation/schedule.ts",
   "packages/engine/src/ai/live-evaluation/freeze.ts",
+  "packages/engine/src/ai/live-evaluation/journal.ts",
+  "packages/engine/src/ai/live-evaluation/ledger.ts",
+  "packages/engine/src/ai/live-evaluation/campaign.ts",
+  "packages/engine/src/ai/live-evaluation/composition.ts",
+  "packages/engine/src/ai/live-evaluation/database-identity.ts",
+  "packages/engine/src/ai/live-evaluation/pricing.ts",
+  "packages/engine/src/ai/live-evaluation/runtime.ts",
+  "packages/engine/src/ai/live-evaluation/authorization.ts",
   "packages/engine/src/ai/live-evaluation/runner.ts",
   "packages/engine/src/ai/live-evaluation/report.ts",
   "packages/engine/src/ai/live-evaluation/cli.ts",
@@ -35,6 +43,9 @@ export const LIVE_EVALUATION_BEHAVIOR_PATHS = [
   "packages/engine/src/ai/providers/config.ts",
   "packages/engine/src/ai/providers/accounting.ts",
   "packages/engine/src/ai/providers/registry.ts",
+  "packages/engine/src/ai/providers/wire-schema.ts",
+  "packages/db/src/connection.ts",
+  "packages/db/src/schema.ts",
   "packages/dsl/src/condition.ts",
   "packages/dsl/src/contracts.ts",
   "packages/dsl/src/graph.ts",
@@ -53,6 +64,23 @@ export const POLICIES_AND_ARTIFACTS_PATHS = [
 
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function canonical(value: unknown): unknown {
+  return Array.isArray(value)
+    ? value.map(canonical)
+    : value !== null && typeof value === "object"
+      ? Object.fromEntries(
+          Object.entries(value as Record<string, unknown>)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, entry]) => [key, canonical(entry)]),
+        )
+      : value;
+}
+
+/** Hashes the complete immutable freeze, not one individual fingerprint. */
+export function hashLiveFreeze(freeze: FrozenLiveEvaluation): string {
+  return sha256(JSON.stringify(canonical(freeze)));
 }
 
 async function hashFiles(
@@ -238,16 +266,6 @@ export function assertLiveFrozen(
     );
   }
 
-  const canonical = (value: unknown): unknown =>
-    Array.isArray(value)
-      ? value.map(canonical)
-      : value !== null && typeof value === "object"
-        ? Object.fromEntries(
-            Object.entries(value as Record<string, unknown>)
-              .sort(([left], [right]) => left.localeCompare(right))
-              .map(([key, entry]) => [key, canonical(entry)]),
-          )
-        : value;
   const withoutCreatedAt = (value: FrozenLiveEvaluation) => {
     const { createdAt: _createdAt, ...semantic } = value;
     return semantic;

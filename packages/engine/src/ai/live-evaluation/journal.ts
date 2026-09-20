@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { LiveJournalEvent } from "./contracts.js";
 
 const JOURNAL_EVENTS = [
+  "run_started",
   "trial_scheduled",
   "trial_started",
   "provider_call_reserved",

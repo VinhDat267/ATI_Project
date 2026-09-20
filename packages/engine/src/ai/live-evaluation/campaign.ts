@@ -10,6 +10,7 @@ import {
   replayLiveJournal,
   type LiveJournal,
 } from "./journal.js";
+import type { LiveEvaluationFingerprints } from "./contracts.js";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -20,6 +21,8 @@ export interface OpenLiveCampaignOptions {
   readonly profileId: string;
   readonly phase: string;
   readonly budgetCapMicros: number;
+  readonly freezeHash?: string;
+  readonly fingerprints?: LiveEvaluationFingerprints;
 }
 
 interface CampaignManifest {
@@ -81,6 +84,7 @@ export async function openLiveCampaign(
 
   const manifestPath = join(campaignDirectory, "campaign.json");
   let manifest: CampaignManifest;
+  let journal: LiveJournal | undefined;
   try {
     manifest = JSON.parse(await readFile(manifestPath, "utf8")) as CampaignManifest;
     if (
@@ -143,10 +147,25 @@ export async function openLiveCampaign(
         });
       }
     }
-    const journal = await createLiveJournal(join(runDirectory, "journal.jsonl"));
+    const runJournal = await createLiveJournal(join(runDirectory, "journal.jsonl"));
+    journal = runJournal;
+    await runJournal.append({
+      event: "run_started",
+      timestamp: new Date().toISOString(),
+      trialId: options.runId,
+      payload: {
+        campaignId: options.campaignId,
+        runId: options.runId,
+        profileId: options.profileId,
+        phase: options.phase,
+        budgetCapMicros: options.budgetCapMicros,
+        ...(options.freezeHash ? { freezeHash: options.freezeHash } : {}),
+        ...(options.fingerprints ? { fingerprints: options.fingerprints } : {}),
+      },
+    });
     const ledger = new JournaledProviderCallLedger({
       campaignLimitMicros: manifest.budgetCapMicros,
-      journal,
+      journal: runJournal,
       initialRecords: previousRecords,
     });
     let closed = false;
@@ -154,12 +173,12 @@ export async function openLiveCampaign(
       campaignId: options.campaignId,
       runId: options.runId,
       runDirectory,
-      journal,
+      journal: runJournal,
       ledger,
       close: async () => {
         if (closed) return;
         closed = true;
-        await journal.close();
+        await runJournal.close();
         await lock.close();
         // The lock file is removed only after the owning handle is closed.
         const { unlink } = await import("node:fs/promises");
@@ -167,6 +186,7 @@ export async function openLiveCampaign(
       },
     };
   } catch (error) {
+    await journal?.close().catch(() => undefined);
     await lock.close();
     const { unlink, rm } = await import("node:fs/promises");
     await unlink(lockPath).catch(() => undefined);

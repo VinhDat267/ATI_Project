@@ -27,6 +27,7 @@ import {
   createLiveFreeze,
   assertLiveFrozen,
   computeLiveFingerprints,
+  hashLiveFreeze,
 } from "./freeze.js";
 import { scheduleLiveTrials } from "./schedule.js";
 import {
@@ -64,9 +65,11 @@ export interface LiveEvaluationCliEnvironment {
   readonly now?: () => Date;
   readonly runId?: () => string;
   readonly env?: Record<string, string | undefined>;
+  readonly signal?: AbortSignal;
   readonly runtime?: LiveEvaluationRuntime;
   readonly getSession?: (
     context: LiveEvaluationSessionContext,
+    variant?: LiveTrialScheduleItem["cell"]["variant"],
   ) => Promise<LiveEvaluationSession>;
 }
 
@@ -425,6 +428,7 @@ export async function runLiveEvaluationCli(
           campaignId: flags.campaign,
           profileId: flags.profile,
           phase: "probe",
+          signal: environment.signal,
         });
 
         return {
@@ -524,6 +528,7 @@ export async function runLiveEvaluationCli(
           campaignId: flags.campaign,
           profileId: flags.profile,
           phase: "index",
+          signal: environment.signal,
         });
 
         return {
@@ -700,6 +705,8 @@ export async function runLiveEvaluationCli(
         profileId: flags.profile,
         phase: flags.phase,
         budgetCapMicros: approval.budgetMicros,
+        freezeHash: hashLiveFreeze(liveFreeze),
+        fingerprints: liveFreeze.fingerprints,
       });
       const dir = campaign.runDirectory;
       const ledger = campaign.ledger;
@@ -737,7 +744,9 @@ export async function runLiveEvaluationCli(
           campaignId,
           runId: currentRunId,
           getSession:
-            environment.getSession ??
+            environment.getSession
+              ? (context, variant) => environment.getSession!(context, variant)
+              :
             (ownedRuntime
               ? (context, variant) =>
                   ownedRuntime.createSession(context, ledger, variant)
@@ -749,6 +758,7 @@ export async function runLiveEvaluationCli(
           journalWriter: async (event) => {
             await campaign.journal.append(event);
           },
+          signal: environment.signal,
         });
       } finally {
         if (!environment.runtime && ownedRuntime) await ownedRuntime.close();
@@ -759,7 +769,7 @@ export async function runLiveEvaluationCli(
         runId: currentRunId,
         createdAt: now().toISOString(),
         campaignId,
-        freezeHash: liveFreeze.fingerprints.dataset,
+        freezeHash: hashLiveFreeze(liveFreeze),
         fingerprints: liveFreeze.fingerprints,
         plannedTrials: trials,
         outcomes: runResult.outcomes,
@@ -827,13 +837,23 @@ export async function runLiveEvaluationCli(
       } as const;
       const report = buildLiveEvaluationReport({
         runId:
+          recovered.runMetadata?.runId ??
           previous.runId ??
           resolve(runDir).split(/[\\/]/).pop() ??
           "recovered-run",
         createdAt: now().toISOString(),
-        campaignId: previous.campaignId ?? "recovered-campaign",
-        freezeHash: previous.freezeHash ?? "0".repeat(64),
-        fingerprints: previous.fingerprints ?? zeroFingerprints,
+        campaignId:
+          recovered.runMetadata?.campaignId ??
+          previous.campaignId ??
+          "recovered-campaign",
+        freezeHash:
+          recovered.runMetadata?.freezeHash ??
+          previous.freezeHash ??
+          "0".repeat(64),
+        fingerprints:
+          recovered.runMetadata?.fingerprints ??
+          previous.fingerprints ??
+          zeroFingerprints,
         plannedTrials: recovered.plannedTrials,
         outcomes: recovered.outcomes,
         ledgerRecords: recovered.ledgerRecords,
@@ -878,11 +898,16 @@ if (
   process.argv[1] &&
   fileURLToPath(import.meta.url) === resolve(process.argv[1])
 ) {
-  runLiveEvaluationCli(process.argv.slice(2)).then((result) => {
-    console.log(result.message);
-    if (result.artifactPath) {
-      console.log(`Artifact: ${result.artifactPath}`);
-    }
-    process.exit(result.exitCode);
-  });
+  const controller = new AbortController();
+  const abort = () => controller.abort(new Error("SIGINT"));
+  process.once("SIGINT", abort);
+  runLiveEvaluationCli(process.argv.slice(2), { signal: controller.signal })
+    .then((result) => {
+      console.log(result.message);
+      if (result.artifactPath) {
+        console.log(`Artifact: ${result.artifactPath}`);
+      }
+      process.exit(result.exitCode);
+    })
+    .finally(() => process.removeListener("SIGINT", abort));
 }

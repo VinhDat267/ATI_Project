@@ -51,6 +51,8 @@ describe("ai-live campaign coordinator", () => {
       requestHash: "request-1",
       estimatedCostMicros: 80,
     });
+    const replay = await first.journal.replay();
+    expect(replay.events[0]?.event).toBe("run_started");
     await first.close();
 
     const second = await openLiveCampaign({

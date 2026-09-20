@@ -6,15 +6,30 @@ import type {
   LiveTrialStatus,
   LiveEvaluationScore,
 } from "./contracts.js";
+import {
+  LiveEvaluationFingerprintsSchema,
+  type LiveEvaluationFingerprints,
+} from "./contracts.js";
 import type { DurableLiveJournalEvent } from "./journal.js";
 import { restoreProviderCallRecords } from "./ledger.js";
 import type { ProviderCallRecord } from "../providers/accounting.js";
 
 export interface RecoveredLiveEvaluationState {
+  readonly runMetadata?: RecoveredLiveRunMetadata;
   readonly plannedTrials: readonly LiveTrialScheduleItem[];
   readonly outcomes: readonly LiveTrialOutcome[];
   readonly ledgerRecords: readonly ProviderCallRecord[];
   readonly retryTrialIds: readonly string[];
+}
+
+export interface RecoveredLiveRunMetadata {
+  readonly campaignId: string;
+  readonly runId: string;
+  readonly profileId: string;
+  readonly phase: string;
+  readonly budgetCapMicros: number;
+  readonly freezeHash?: string;
+  readonly fingerprints?: LiveEvaluationFingerprints;
 }
 
 function recordToModelCall(record: ProviderCallRecord): LiveModelCallSummary {
@@ -103,9 +118,52 @@ export function recoverLiveEvaluationState(
   const planned = new Map<string, LiveTrialScheduleItem>();
   const started = new Set<string>();
   const terminal = new Map<string, LiveTrialOutcome>();
+  let runMetadata: RecoveredLiveRunMetadata | undefined;
 
   for (const event of events) {
-    if (event.event === "trial_scheduled") {
+    if (event.event === "run_started") {
+      if (runMetadata) throw new Error("Duplicate live run_started event");
+      const payload = event.payload;
+      if (
+        typeof payload.campaignId !== "string" ||
+        typeof payload.runId !== "string" ||
+        typeof payload.profileId !== "string" ||
+        typeof payload.phase !== "string" ||
+        typeof payload.budgetCapMicros !== "number" ||
+        !Number.isSafeInteger(payload.budgetCapMicros) ||
+        payload.budgetCapMicros <= 0 ||
+        event.trialId !== payload.runId
+      ) {
+        throw new Error("Invalid live run_started metadata");
+      }
+      if (
+        payload.freezeHash !== undefined &&
+        (typeof payload.freezeHash !== "string" ||
+          !/^[a-f0-9]{64}$/.test(payload.freezeHash))
+      ) {
+        throw new Error("Invalid live run_started freeze hash");
+      }
+      const parsedFingerprints =
+        payload.fingerprints === undefined
+          ? undefined
+          : LiveEvaluationFingerprintsSchema.safeParse(payload.fingerprints);
+      if (parsedFingerprints && !parsedFingerprints.success) {
+        throw new Error("Invalid live run_started fingerprints");
+      }
+      runMetadata = {
+        campaignId: payload.campaignId,
+        runId: payload.runId,
+        profileId: payload.profileId,
+        phase: payload.phase,
+        budgetCapMicros: payload.budgetCapMicros,
+        ...(typeof payload.freezeHash === "string"
+          ? { freezeHash: payload.freezeHash }
+          : {}),
+        ...(parsedFingerprints && parsedFingerprints.success
+          ? { fingerprints: parsedFingerprints.data }
+          : {}),
+      };
+    } else if (event.event === "trial_scheduled") {
       const payload = event.payload;
       if (planned.has(event.trialId)) {
         throw new Error(`Duplicate scheduled trial ${event.trialId}`);
@@ -214,6 +272,7 @@ export function recoverLiveEvaluationState(
   }
 
   return {
+    ...(runMetadata ? { runMetadata } : {}),
     plannedTrials: [...planned.values()],
     outcomes,
     ledgerRecords,

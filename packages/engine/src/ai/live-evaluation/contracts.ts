@@ -389,6 +389,7 @@ export interface LiveTrialOutcome {
 
 export interface LiveJournalEvent {
   readonly event:
+    | "run_started"
     | "trial_scheduled"
     | "trial_started"
     | "provider_call_reserved"

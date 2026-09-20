@@ -5,6 +5,7 @@ import {
   createLiveFreeze,
   assertLiveFrozen,
   computeLiveFingerprints,
+  hashLiveFreeze,
 } from "../src/ai/live-evaluation/freeze.js";
 import {
   LiveRubricSchema,
@@ -202,6 +203,7 @@ describe("ai-live-freeze", () => {
     expect(() => assertLiveFrozen(freeze, changedIndex)).toThrow(
       /Freeze semantic execution mismatch/,
     );
+    expect(hashLiveFreeze(changedIndex)).not.toBe(hashLiveFreeze(freeze));
   });
 
   it("rejects non-human approver in sealed holdout bundle", async () => {

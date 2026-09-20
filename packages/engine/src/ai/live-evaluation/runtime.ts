@@ -9,6 +9,7 @@ export interface LiveProbeRequest {
   readonly campaignId: string;
   readonly profileId: string;
   readonly phase: "probe";
+  readonly signal?: AbortSignal;
 }
 
 export interface LiveProbeCallEvidence {
@@ -27,6 +28,7 @@ export interface LiveIndexRequest {
   readonly campaignId: string;
   readonly profileId: string;
   readonly phase: "index";
+  readonly signal?: AbortSignal;
 }
 
 export interface LiveIndexResult {

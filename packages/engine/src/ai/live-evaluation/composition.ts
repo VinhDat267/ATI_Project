@@ -152,6 +152,7 @@ export async function createLiveEvaluationRuntimeComposition(
         systemPrompt: "Return a refusal for this connectivity probe.",
         userPrompt: "Probe the configured planning provider.",
         schema: { type: "object", additionalProperties: true },
+        signal: request.signal,
       });
       calls.push({
         role: "planning",
@@ -160,7 +161,10 @@ export async function createLiveEvaluationRuntimeComposition(
         requestId: model.requestId,
         usage: probeUsage(model.usage),
       });
-      const expanded = await ports.queryExpansion.expand({ query: "probe" });
+      const expanded = await ports.queryExpansion.expand({
+        query: "probe",
+        signal: request.signal,
+      });
       calls.push({
         role: "query_expansion",
         provider: expanded.provider,
@@ -171,6 +175,7 @@ export async function createLiveEvaluationRuntimeComposition(
       const embedding = await ports.embedding.embed({
         text: "probe",
         purpose: "query",
+        signal: request.signal,
       });
       calls.push({
         role: "embedding",
@@ -189,7 +194,11 @@ export async function createLiveEvaluationRuntimeComposition(
         trialId: `index-${request.profileId}`,
       } satisfies AiProviderCallContext;
       const ports = portsFor(context, options.ledger);
-      const rows = await buildCatalogEmbeddingRows(catalog, ports.embedding);
+      const rows = await buildCatalogEmbeddingRows(
+        catalog,
+        ports.embedding,
+        request.signal,
+      );
       const active = await index.activate({ catalog, rows });
       return {
         index: {
