@@ -327,6 +327,12 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         const userId = sessions.authenticate(request.headers.authorization);
+        if (config.allowNewRuns === false)
+          throw new HttpError(
+            503,
+            "NEW_RUNS_DISABLED",
+            "New runs are temporarily disabled",
+          );
         if (!options.engine || config.plannerMode === "disabled")
           throw new HttpError(
             503,

@@ -14,6 +14,7 @@ describe("API configuration", () => {
     expect(config.host).toBe("127.0.0.1");
     expect(config.port).toBe(3001);
     expect(config.cursorKey).toHaveLength(32);
+    expect(config.allowNewRuns).toBe(true);
   });
 
   it("rejects missing secrets and non-canonical cursor keys", async () => {
@@ -49,5 +50,21 @@ describe("API configuration", () => {
     expect(() =>
       loadConfig({ ...env, AI_RETRIEVAL_VARIANT: "unsupported" }),
     ).toThrow(/Invalid configuration AI_RETRIEVAL_VARIANT/);
+  });
+
+  it("parses the production new-run kill switch without changing the default", async () => {
+    const env = await baseEnv();
+    expect(loadConfig({ ...env, API_NEW_RUNS_ENABLED: "0" }).allowNewRuns).toBe(
+      false,
+    );
+    expect(loadConfig({ ...env, API_NEW_RUNS_ENABLED: "off" }).allowNewRuns).toBe(
+      false,
+    );
+    expect(loadConfig({ ...env, API_NEW_RUNS_ENABLED: "yes" }).allowNewRuns).toBe(
+      true,
+    );
+    expect(() =>
+      loadConfig({ ...env, API_NEW_RUNS_ENABLED: "maybe" }),
+    ).toThrow(/Invalid boolean configuration API_NEW_RUNS_ENABLED/);
   });
 });

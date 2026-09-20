@@ -143,6 +143,7 @@ afterEach(async () => {
 
 async function startApi(options: {
   plannerMode: "disabled" | "dev_fixture" | "ai";
+  allowNewRuns?: boolean;
   engine?: WorkflowEngine;
   worker?: WorkerControl;
 }) {
@@ -155,6 +156,7 @@ async function startApi(options: {
     sessionTtlMs: 60_000,
     cursorKey: Buffer.alloc(32, 23),
     plannerMode: options.plannerMode,
+    allowNewRuns: options.allowNewRuns,
   };
   const api = createApi({
     db: {} as Database,
@@ -244,6 +246,39 @@ describe("AI-02: API Mode Selection & AI Planner Wiring", () => {
       expect(data.run_id).toBe("run-ai-1");
       expect(data.status).toBe("planning");
       expect(woken).toBe(true);
+    });
+
+    it("fails closed on the new-run kill switch before accepting durable state", async () => {
+      let accepted = 0;
+      const mockEngine = {
+        accept: async () => {
+          accepted++;
+          return { run_id: "must-not-be-created", status: "planning" as const };
+        },
+      } as unknown as WorkflowEngine;
+
+      const { baseUrl, token } = await startApi({
+        plannerMode: "ai",
+        allowNewRuns: false,
+        engine: mockEngine,
+      });
+      const res = await fetch(`${baseUrl}/runs`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          source_prompt: "Liệt kê task Done của board board_a",
+          time_zone: "Asia/Ho_Chi_Minh",
+        }),
+      });
+
+      expect(res.status).toBe(503);
+      expect((await res.json()) as { error: { code: string } }).toMatchObject({
+        error: { code: "NEW_RUNS_DISABLED" },
+      });
+      expect(accepted).toBe(0);
     });
 
     it("supports WAP_PLANNER_MODE and API_PLANNER_MODE in loadConfig", async () => {

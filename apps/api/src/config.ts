@@ -11,6 +11,8 @@ export interface ApiConfig {
   sessionTtlMs: number;
   cursorKey: Buffer;
   plannerMode: "disabled" | "dev_fixture" | "ai";
+  /** Production kill switch; omitted in older fixtures means enabled. */
+  readonly allowNewRuns?: boolean;
   /** Retrieval is explicit; all_tools remains the fail-safe default. */
   readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
 }
@@ -54,6 +56,17 @@ function cursorKey(value: string): Buffer {
   return decoded;
 }
 
+function boolean(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: boolean,
+): boolean {
+  const raw = (env[name] ?? (fallback ? "1" : "0")).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  throw new Error(`Invalid boolean configuration ${name}`);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const userId = env.G1_USER_ID ?? DEMO_USER_ID;
   z.uuid().parse(userId);
@@ -69,6 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   )
     throw new Error("Invalid configuration API_PLANNER_MODE");
   const plannerMode = rawPlannerMode;
+  const allowNewRuns = boolean(env, "API_NEW_RUNS_ENABLED", true);
   const rawRetrievalVariant = env.AI_RETRIEVAL_VARIANT ?? "all_tools";
   if (
     rawRetrievalVariant !== "all_tools" &&
@@ -86,6 +100,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     sessionTtlMs: sessionTtl(env),
     cursorKey: cursorKey(required(env, "API_CURSOR_KEY")),
     plannerMode,
+    allowNewRuns,
     aiRetrievalVariant,
   };
 }

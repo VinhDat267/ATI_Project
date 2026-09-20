@@ -13,6 +13,7 @@
 - Google probe 6 calls đã pass. Đây là connectivity/protocol evidence, không phải quality evaluation; OpenAI live probe và formal live evaluation chưa chạy.
 - Engine đã có preview/approval/reconciliation, durable PostgreSQL outbox và worker tuần tự. Session store vẫn là bộ nhớ tiến trình; filesystem mặc định tắt.
 - API hiện có structured request log tối thiểu (`method`, route template, status, `request_id`) với route/query/credential redaction; đây mới là nền tảng local, chưa phải dashboard/alert/incident evidence.
+- API có kill switch `API_NEW_RUNS_ENABLED=0|off` trả `503 NEW_RUNS_DISABLED` sau auth và trước khi parse/accept run; mặc định vẫn bật để giữ tương thích B/local.
 
 ### OPEN / NOT_RUN
 
