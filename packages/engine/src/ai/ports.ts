@@ -1,5 +1,6 @@
 export interface EmbeddingUsage {
   readonly inputTokens?: number;
+  readonly cachedInputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
 }
@@ -24,6 +25,7 @@ export interface EmbeddingPort {
 }
 export interface StructuredModelUsage {
   readonly inputTokens?: number;
+  readonly cachedInputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
 }
@@ -47,6 +49,7 @@ export interface StructuredModelClient {
 
 export interface QueryExpansionUsage {
   readonly inputTokens?: number;
+  readonly cachedInputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
 }

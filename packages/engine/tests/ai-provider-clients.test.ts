@@ -419,6 +419,51 @@ describe("native provider clients with fake transport", () => {
     });
   });
 
+  it("settles a usage-bearing planner call with the pinned price card", async () => {
+    const settlements: unknown[] = [];
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      priceCard: {
+        version: "test-price-v1",
+        entries: {
+          "gpt-5.6-terra": {
+            inputMicrosPerMillion: 2_000_000,
+            outputMicrosPerMillion: 4_000_000,
+          },
+        },
+      },
+      ledger: {
+        async reserve() {
+          return "priced-call";
+        },
+        async settle(_callId, outcome) {
+          settlements.push(outcome);
+        },
+      },
+      authorizeCall: async () => {},
+      fetchImpl: async () =>
+        response({
+          output_text: JSON.stringify({
+            result: {
+              kind: "refusal",
+              plan: null,
+              refusal: { reason: "not allowed" },
+              clarification: null,
+            },
+          }),
+          model: "gpt-5.6-terra",
+          usage: { input_tokens: 1001, output_tokens: 500, total_tokens: 1501 },
+        }),
+    });
+
+    await ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} });
+    expect(settlements.at(-1)).toMatchObject({
+      status: "succeeded",
+      costMicros: 4002,
+    });
+  });
+
   it("routes query expansion to its selected provider and keeps the key boundary", async () => {
     const ports = createAiPorts({
       config,

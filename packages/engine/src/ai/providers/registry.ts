@@ -24,6 +24,10 @@ import {
   decodePlannerWire,
   openAiPlannerWireJsonSchema,
 } from "./wire-schema.js";
+import {
+  priceProviderCall,
+  type ProviderPriceCard,
+} from "../live-evaluation/pricing.js";
 
 export type {
   ProviderCallReservation,
@@ -63,6 +67,8 @@ export interface CreateAiPortsOptions {
   readonly callContext?: AiProviderCallContext;
   readonly fetchImpl?: FetchLike;
   readonly now?: () => number;
+  /** Operator-supplied immutable price evidence for paid evaluation. */
+  readonly priceCard?: ProviderPriceCard;
 }
 
 export interface AiPorts {
@@ -149,6 +155,14 @@ function usageFromProvider(
         typeof record.input_tokens === "number"
           ? record.input_tokens
           : undefined,
+      cachedInputTokens:
+        record.prompt_tokens_details &&
+        typeof record.prompt_tokens_details === "object" &&
+        typeof (record.prompt_tokens_details as Record<string, unknown>)
+          .cached_tokens === "number"
+          ? (record.prompt_tokens_details as Record<string, number>)
+              .cached_tokens
+          : undefined,
       outputTokens:
         typeof record.output_tokens === "number"
           ? record.output_tokens
@@ -166,6 +180,10 @@ function usageFromProvider(
       typeof record.promptTokenCount === "number"
         ? record.promptTokenCount
         : undefined;
+    const cachedInputTokens =
+      typeof record.cachedContentTokenCount === "number"
+        ? record.cachedContentTokenCount
+        : undefined;
     const outputTokens =
       typeof record.candidatesTokenCount === "number"
         ? record.candidatesTokenCount
@@ -174,6 +192,7 @@ function usageFromProvider(
           : undefined;
     return {
       inputTokens,
+      cachedInputTokens,
       outputTokens,
       totalTokens:
         typeof record.totalTokenCount === "number"
@@ -188,6 +207,17 @@ function providerUsage(
   body: Record<string, unknown>,
 ): ProviderCallUsage | null {
   return usageFromProvider(body);
+}
+
+function providerCost(
+  options: CreateAiPortsOptions,
+  purpose: ProviderCallReservation["purpose"],
+  model: string,
+  body: Record<string, unknown>,
+): number | null {
+  return options.priceCard
+    ? priceProviderCall(purpose, model, providerUsage(body), options.priceCard)
+    : null;
 }
 
 function textFromProviderResponse(
@@ -483,7 +513,12 @@ function createModelClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: null,
+          costMicros: providerCost(
+            options,
+            input.purpose ?? "planning",
+            profile.model,
+            body,
+          ),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -499,7 +534,12 @@ function createModelClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: null,
+          costMicros: providerCost(
+            options,
+            input.purpose ?? "planning",
+            profile.model,
+            body,
+          ),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -511,7 +551,12 @@ function createModelClient(
       await options.ledger.settle(callId, {
         status: "succeeded",
         usage: providerUsage(body),
-        costMicros: null,
+        costMicros: providerCost(
+          options,
+          input.purpose ?? "planning",
+          profile.model,
+          body,
+        ),
       });
       return {
         output,
@@ -558,7 +603,7 @@ function createQueryExpansionClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: null,
+          costMicros: providerCost(options, "query_expansion", profile.model, body),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -575,7 +620,7 @@ function createQueryExpansionClient(
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
-          costMicros: null,
+          costMicros: providerCost(options, "query_expansion", profile.model, body),
           errorCode: "PROVIDER_RESPONSE_INVALID",
         });
         throw new ProviderClientError(
@@ -587,7 +632,7 @@ function createQueryExpansionClient(
       await options.ledger.settle(callId, {
         status: "succeeded",
         usage: providerUsage(body),
-        costMicros: null,
+        costMicros: providerCost(options, "query_expansion", profile.model, body),
       });
       return {
         queries: (parsed as { queries: unknown[] }).queries
@@ -770,7 +815,7 @@ function createEmbeddingClient(
         await options.ledger.settle(callId, {
           status: "succeeded",
           usage: providerUsage(parsed),
-          costMicros: null,
+          costMicros: providerCost(options, "embedding", profile.model, parsed),
         });
         const embeddingUsage: EmbeddingUsage | null = usageFromProvider(parsed);
         return {
@@ -789,7 +834,7 @@ function createEmbeddingClient(
           await options.ledger.settle(callId, {
             status: "invalid_output",
             usage: providerUsage(parsed),
-            costMicros: null,
+            costMicros: providerCost(options, "embedding", profile.model, parsed),
             errorCode:
               error instanceof ProviderClientError
                 ? error.code
