@@ -358,9 +358,12 @@ export function buildLiveEvaluationReport(
   };
 
   // Cost reconciliation
-  const runRecords = options.ledgerRecords?.filter(
-    (record) => !options.runId || !record.runId || record.runId === options.runId,
-  );
+  const hasTaggedRecords = options.ledgerRecords?.some((r) => Boolean(r.runId));
+  const runRecords = options.ledgerRecords?.filter((record) => {
+    if (!options.runId) return true;
+    if (record.runId) return record.runId === options.runId;
+    return !hasTaggedRecords;
+  });
   const allCalls = runRecords ?? options.outcomes.flatMap((o) => o.modelCalls);
 
   let settledCostMicros = 0;

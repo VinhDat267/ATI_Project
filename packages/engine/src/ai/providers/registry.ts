@@ -421,6 +421,20 @@ async function invokeProvider(
 }> {
   const fetchImpl =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  let initialEstimate = options.config.limits.reservationEstimateMicros;
+  if (options.priceCard) {
+    const bound = calculateReservationBoundMicros({
+      purpose,
+      model: profile.model,
+      inputLimitTokens: 16_384,
+      outputCapTokens: profile.maxOutputTokens,
+      priceCard: options.priceCard,
+      context: { provider: profile.provider, apiMode: profile.apiMode },
+    });
+    if (bound !== null) {
+      initialEstimate = bound;
+    }
+  }
   const initialReservation: ProviderCallReservation = {
     campaignId: options.callContext?.campaignId ?? "live-evaluation",
     runId: options.callContext?.runId ?? "live-evaluation",
@@ -432,7 +446,7 @@ async function invokeProvider(
     model: profile.model,
     requestHash: requestHash(body),
     outputCap: profile.maxOutputTokens,
-    estimatedCostMicros: options.config.limits.reservationEstimateMicros,
+    estimatedCostMicros: initialEstimate,
   };
   await options.authorizeCall(initialReservation);
   const estimatedCostMicros = reservationEstimate(options, purpose, profile);
@@ -789,6 +803,19 @@ function createEmbeddingClient(
                   }
                 : {}),
             };
+      let initialEstimate = options.config.limits.reservationEstimateMicros;
+      if (options.priceCard) {
+        const bound = calculateReservationBoundMicros({
+          purpose: "embedding",
+          model: profile.model,
+          inputLimitTokens: 8_192,
+          priceCard: options.priceCard,
+          context: { provider: profile.provider, apiMode: profile.apiMode },
+        });
+        if (bound !== null) {
+          initialEstimate = bound;
+        }
+      }
       const initialReservation: ProviderCallReservation = {
         campaignId: options.callContext?.campaignId ?? "live-evaluation",
         runId: options.callContext?.runId ?? "live-evaluation",
@@ -801,10 +828,14 @@ function createEmbeddingClient(
         model: profile.model,
         requestHash: requestHash(body),
         embeddingPurpose: input.purpose,
-        estimatedCostMicros: options.config.limits.reservationEstimateMicros,
+        estimatedCostMicros: initialEstimate,
       };
       await options.authorizeCall(initialReservation);
-      const estimatedCostMicros = reservationEstimate(options, "embedding", profile);
+      const estimatedCostMicros = reservationEstimate(
+        options,
+        "embedding",
+        profile,
+      );
       const reservation: ProviderCallReservation = {
         ...initialReservation,
         estimatedCostMicros,

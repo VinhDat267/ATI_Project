@@ -187,6 +187,9 @@ export function calculateReservationBoundMicros(
     if (entry.inputMicrosPerMillion === undefined) return null;
     const numerator = inputCap * inputRate;
     const micros = (numerator + 999_999n) / 1_000_000n;
+    if (micros > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("provider reservation bound exceeds safe integer range");
+    }
     return Number(micros);
   }
 

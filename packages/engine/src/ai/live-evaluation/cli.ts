@@ -532,6 +532,7 @@ export async function runLiveEvaluationCli(
       "campaign",
       "approval",
       "execute",
+      "price-card",
     ]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
@@ -586,6 +587,15 @@ export async function runLiveEvaluationCli(
         Awaited<ReturnType<typeof openLiveCampaign>> | undefined;
       let ownedRuntime: LiveEvaluationRuntime | undefined;
       try {
+        let priceCard: ProviderPriceCard | undefined;
+        if (
+          typeof flags["price-card"] === "string" &&
+          flags["price-card"].trim()
+        ) {
+          priceCard = validateProviderPriceCard(
+            JSON.parse(await readFile(resolve(flags["price-card"]), "utf8")),
+          );
+        }
         if (environment.runtime) {
           ownedRuntime = environment.runtime;
         } else {
@@ -607,6 +617,7 @@ export async function runLiveEvaluationCli(
             now,
             profile,
             ledger: ownedCampaign.ledger,
+            ...(priceCard ? { priceCard } : {}),
           });
         }
         const indexed = await ownedRuntime.index({
@@ -639,6 +650,7 @@ export async function runLiveEvaluationCli(
       "approval",
       "execute",
       "freeze",
+      "price-card",
     ]);
     for (const f of Object.keys(flags)) {
       if (!allowedFlags.has(f)) {
@@ -744,6 +756,16 @@ export async function runLiveEvaluationCli(
         now(),
       );
 
+      let priceCard: ProviderPriceCard | undefined;
+      if (
+        typeof flags["price-card"] === "string" &&
+        flags["price-card"].trim()
+      ) {
+        priceCard = validateProviderPriceCard(
+          JSON.parse(await readFile(resolve(flags["price-card"]), "utf8")),
+        );
+      }
+
       let liveFreeze = await createLiveFreeze({
         root,
         profileId: flags.profile,
@@ -756,12 +778,25 @@ export async function runLiveEvaluationCli(
           JSON.parse(await readFile(resolve(flags.freeze), "utf8")),
         );
         if (savedFreeze.execution) {
+          if (!priceCard) {
+            throw new Error(
+              "Saved freeze includes execution fingerprint; --price-card is required to verify execution environment",
+            );
+          }
+          const currentExecution = await buildLiveExecutionFingerprint({
+            root,
+            profile,
+            campaignId,
+            budgetCapMicros: approval.budgetMicros,
+            priceCard,
+            activeIndex: savedFreeze.execution.activeIndex,
+          });
           liveFreeze = await createLiveFreeze({
             root,
             profileId: flags.profile,
             campaignId,
             createdAt: now().toISOString(),
-            execution: savedFreeze.execution,
+            execution: currentExecution,
           });
         }
         assertLiveFrozen(liveFreeze, savedFreeze);
@@ -827,15 +862,6 @@ export async function runLiveEvaluationCli(
       let runError: unknown;
       try {
         if (!ownedRuntime && !environment.getSession) {
-          let priceCard: ProviderPriceCard | undefined;
-          if (
-            typeof flags["price-card"] === "string" &&
-            flags["price-card"].trim()
-          ) {
-            priceCard = validateProviderPriceCard(
-              JSON.parse(await readFile(resolve(flags["price-card"]), "utf8")),
-            );
-          }
           ownedRuntime = await createDefaultLiveRuntime({
             root,
             env,

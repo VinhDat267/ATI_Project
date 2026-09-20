@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -221,20 +222,23 @@ export async function buildLiveExecutionFingerprint(
       let statusDigest = options.gitStatusDigest;
       if (!head || !statusDigest) {
         try {
-          const { execSync } = require("node:child_process");
           if (!head) {
-            head = execSync("git rev-parse HEAD", {
+            head = execFileSync("git", ["rev-parse", "HEAD"], {
               cwd: options.root,
               encoding: "utf8",
               stdio: ["ignore", "pipe", "ignore"],
             }).trim();
           }
           if (!statusDigest) {
-            const statusOutput = execSync("git status --porcelain", {
-              cwd: options.root,
-              encoding: "utf8",
-              stdio: ["ignore", "pipe", "ignore"],
-            });
+            const statusOutput = execFileSync(
+              "git",
+              ["status", "--porcelain"],
+              {
+                cwd: options.root,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"],
+              },
+            );
             statusDigest = sha256(statusOutput);
           }
         } catch {

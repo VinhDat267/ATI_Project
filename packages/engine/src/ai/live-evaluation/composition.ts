@@ -134,30 +134,43 @@ export async function createLiveEvaluationRuntimeComposition(
     throw error;
   }
   let database: Database | undefined;
-  let index: PgvectorCatalogIndex | undefined;
-  const getIndex = async (): Promise<PgvectorCatalogIndex> => {
-    if (index) return index;
-    if (!options.evalDatabaseUrl?.trim()) {
-      throw new Error(
-        "AI_EVAL_DATABASE_URL is required for index and semantic session phases",
+  let indexPromise: Promise<PgvectorCatalogIndex> | undefined;
+  const getIndex = (): Promise<PgvectorCatalogIndex> => {
+    if (indexPromise) return indexPromise;
+    indexPromise = (async () => {
+      if (!options.evalDatabaseUrl?.trim()) {
+        throw new Error(
+          "AI_EVAL_DATABASE_URL is required for index and semantic session phases",
+        );
+      }
+      assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
+      const evalId = parseEvaluationDatabaseIdentity(options.evalDatabaseUrl);
+      const effectiveAppUrl =
+        options.appDatabaseUrl?.trim() || G1_DATABASE_URL;
+      const appId = parseEvaluationDatabaseIdentity(
+        effectiveAppUrl,
+        "DATABASE_URL",
       );
-    }
-    assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
-    const evalId = parseEvaluationDatabaseIdentity(options.evalDatabaseUrl);
-    const appId = options.appDatabaseUrl?.trim()
-      ? parseEvaluationDatabaseIdentity(options.appDatabaseUrl, "DATABASE_URL")
-      : undefined;
-    database = openDatabase(options.evalDatabaseUrl);
-    try {
-      await verifyConnectedEvaluationDatabaseIdentity(database, evalId, appId);
-    } catch (error) {
-      const db = database;
-      database = undefined;
-      await db.close().catch(() => {});
-      throw error;
-    }
-    index = new PgvectorCatalogIndex(database, options.userId);
-    return index;
+      database = openDatabase(options.evalDatabaseUrl);
+      try {
+        await verifyConnectedEvaluationDatabaseIdentity(
+          database,
+          evalId,
+          appId,
+        );
+      } catch (error) {
+        const db = database;
+        database = undefined;
+        indexPromise = undefined;
+        await db.close().catch(() => {});
+        throw error;
+      }
+      return new PgvectorCatalogIndex(database, options.userId);
+    })().catch((err) => {
+      indexPromise = undefined;
+      throw err;
+    });
+    return indexPromise;
   };
   const config = providerConfig(options.profile);
   let closed = false;
