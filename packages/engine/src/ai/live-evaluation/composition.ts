@@ -23,6 +23,7 @@ import type { LiveProfileConfig } from "./contracts.js";
 import {
   parseEvaluationDatabaseIdentity,
   sameEvaluationDatabase,
+  verifyConnectedEvaluationDatabaseIdentity,
 } from "./database-identity.js";
 import {
   createLiveEvaluationRuntime,
@@ -134,7 +135,7 @@ export async function createLiveEvaluationRuntimeComposition(
   }
   let database: Database | undefined;
   let index: PgvectorCatalogIndex | undefined;
-  const getIndex = (): PgvectorCatalogIndex => {
+  const getIndex = async (): Promise<PgvectorCatalogIndex> => {
     if (index) return index;
     if (!options.evalDatabaseUrl?.trim()) {
       throw new Error(
@@ -142,7 +143,19 @@ export async function createLiveEvaluationRuntimeComposition(
       );
     }
     assertDatabaseIsolation(options.evalDatabaseUrl, options.appDatabaseUrl);
+    const evalId = parseEvaluationDatabaseIdentity(options.evalDatabaseUrl);
+    const appId = options.appDatabaseUrl?.trim()
+      ? parseEvaluationDatabaseIdentity(options.appDatabaseUrl, "DATABASE_URL")
+      : undefined;
     database = openDatabase(options.evalDatabaseUrl);
+    try {
+      await verifyConnectedEvaluationDatabaseIdentity(database, evalId, appId);
+    } catch (error) {
+      const db = database;
+      database = undefined;
+      await db.close().catch(() => {});
+      throw error;
+    }
     index = new PgvectorCatalogIndex(database, options.userId);
     return index;
   };
@@ -233,7 +246,8 @@ export async function createLiveEvaluationRuntimeComposition(
         ports.embedding,
         request.signal,
       );
-      const active = await getIndex().activate({ catalog, rows });
+      const targetIndex = await getIndex();
+      const active = await targetIndex.activate({ catalog, rows });
       return {
         index: {
           id: active.id,
@@ -252,7 +266,7 @@ export async function createLiveEvaluationRuntimeComposition(
       const ports = portsFor(context, ledger);
       const base = new PgvectorToolRetriever({
         catalog,
-        index: getIndex(),
+        index: await getIndex(),
         embeddingPort: ports.embedding,
         queryExpansionPort: ports.queryExpansion,
         expectedEmbeddingProfile: options.profile.embedding,

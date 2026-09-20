@@ -137,4 +137,56 @@ describe("ai-live recovery", () => {
       ]),
     ).toThrow(/terminal|score|model/i);
   });
+  it("recovers valid execution snapshot from run_started", () => {
+    const execution = {
+      roleConfigs: { planning: { provider: "openai", model: "gpt-5.6-terra" } },
+      providerCapabilities: { openai: { generationModels: ["gpt-5.6-terra"] } },
+      priceCardHash: "1".repeat(64),
+      budgetCapMicros: 100_000,
+      approvalScopeHash: "2".repeat(64),
+      activeIndex: {
+        id: "idx-1",
+        provenanceHash: "3".repeat(64),
+        vectorHash: "4".repeat(64),
+        policyHash: "5".repeat(64),
+      },
+      runtime: {
+        nodeVersion: "v24.0.0",
+        packageLockHash: "6".repeat(64),
+      },
+      git: { head: "abcdef1234567", statusDigest: "7".repeat(64) },
+      sourceManifest: [
+        { path: "packages/engine/src/index.ts", sha256: "8".repeat(64) },
+      ],
+    };
+
+    const state = recoverLiveEvaluationState([
+      event(1, "run_started", "run-1", {
+        campaignId: "camp-1",
+        runId: "run-1",
+        profileId: "openai-only",
+        phase: "smoke",
+        budgetCapMicros: 100_000,
+        execution,
+      }),
+    ]);
+
+    expect(state.runMetadata?.execution).toEqual(execution);
+  });
+
+  it("rejects invalid execution snapshot in run_started", () => {
+    expect(() =>
+      recoverLiveEvaluationState([
+        event(1, "run_started", "run-1", {
+          campaignId: "camp-1",
+          runId: "run-1",
+          profileId: "openai-only",
+          phase: "smoke",
+          budgetCapMicros: 100_000,
+          execution: { invalid: true },
+        }),
+      ]),
+    ).toThrow(/execution snapshot/i);
+  });
+
 });

@@ -9,7 +9,9 @@ import type {
 import {
   LiveEvaluationFingerprintsSchema,
   LiveExposureSchema,
+  LiveExecutionFingerprintSchema,
   type LiveEvaluationFingerprints,
+  type LiveExecutionFingerprint,
 } from "./contracts.js";
 import { z } from "zod";
 import { FixtureWriteSchema } from "../evaluation/contracts.js";
@@ -34,6 +36,7 @@ export interface RecoveredLiveRunMetadata {
   readonly evidenceKind?: "LIVE_PROVIDER" | "FAKE_TRANSPORT_TEST";
   readonly freezeHash?: string;
   readonly fingerprints?: LiveEvaluationFingerprints;
+  readonly execution?: LiveExecutionFingerprint;
 }
 
 function recordToModelCall(record: ProviderCallRecord): LiveModelCallSummary {
@@ -249,6 +252,13 @@ export function recoverLiveEvaluationState(
       if (parsedFingerprints && !parsedFingerprints.success) {
         throw new Error("Invalid live run_started fingerprints");
       }
+      const parsedExecution =
+        payload.execution === undefined
+          ? undefined
+          : LiveExecutionFingerprintSchema.safeParse(payload.execution);
+      if (parsedExecution && !parsedExecution.success) {
+        throw new Error("Invalid live run_started execution snapshot");
+      }
       runMetadata = {
         campaignId: payload.campaignId,
         runId: payload.runId,
@@ -261,6 +271,9 @@ export function recoverLiveEvaluationState(
           : {}),
         ...(parsedFingerprints && parsedFingerprints.success
           ? { fingerprints: parsedFingerprints.data }
+          : {}),
+        ...(parsedExecution && parsedExecution.success
+          ? { execution: parsedExecution.data }
           : {}),
       };
     } else if (event.event === "trial_scheduled") {

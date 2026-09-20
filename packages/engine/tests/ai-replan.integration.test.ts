@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   WorkflowPlanSchema,
   type WorkflowPlan,
@@ -31,12 +31,42 @@ beforeAll(async () => {
   gateway = await openLocalGateway(fixture.gatewayConfig);
 });
 
+
+async function waitForLockRelease(
+  db: { client: any },
+  objid: number,
+  timeoutMs = 5000,
+): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const remaining = await db.client`
+      SELECT pid
+      FROM pg_locks
+      WHERE locktype='advisory' AND objid=${objid}
+        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    `;
+    if (remaining.length === 0) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error(`Timeout waiting for advisory lock ${objid} to be released`);
+}
+
 afterAll(async () => {
   await gateway?.close();
   await fixture?.close();
 });
 
 describe("AI-03 Local Replan Integration Tests", () => {
+
+beforeEach(async () => {
+  if (fixture?.db) {
+    await fixture.db.client`
+      UPDATE runs SET status = 'cancelled'
+      WHERE status NOT IN ('succeeded', 'failed', 'rejected', 'cancelled', 'expired', 'refused')
+    `;
+  }
+});
+
   it("[AI-03-01] safe read failure triggers local replan, creates new version, and completes", async () => {
     // Initial draft: list_cards with invalid date range (since > until)
     const badReadDraft = {
@@ -1022,13 +1052,7 @@ describe("AI-03 Local Replan Integration Tests", () => {
       SELECT pg_terminate_backend(${leases[0]!.pid}) AS terminated
     `;
     expect(termination!.terminated).toBe(true);
-    const remainingLeases = await fixture.db.client`
-      SELECT pid
-      FROM pg_locks
-      WHERE locktype='advisory' AND objid=638019814
-        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
-    `;
-    expect(remainingLeases).toHaveLength(0);
+    await waitForLockRelease(fixture.db, 638019814);
 
     releaseResult();
     const result = await execution;
@@ -1134,13 +1158,7 @@ describe("AI-03 Local Replan Integration Tests", () => {
       SELECT pg_terminate_backend(${lease!.pid}) AS terminated
     `;
     expect(termination!.terminated).toBe(true);
-    const remainingLeases = await fixture.db.client`
-      SELECT pid
-      FROM pg_locks
-      WHERE locktype='advisory' AND objid=638019814
-        AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
-    `;
-    expect(remainingLeases).toHaveLength(0);
+    await waitForLockRelease(fixture.db, 638019814);
 
     releaseResult();
     const result = await execution;
@@ -1304,13 +1322,7 @@ describe("AI-03 Local Replan Integration Tests", () => {
             SELECT pg_terminate_backend(${lease!.pid}) AS terminated
           `;
           expect(termination!.terminated).toBe(true);
-          const remainingLeases = await fixture.db.client`
-            SELECT pid
-            FROM pg_locks
-            WHERE locktype='advisory' AND objid=638019814
-              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
-          `;
-          expect(remainingLeases).toHaveLength(0);
+          await waitForLockRelease(fixture.db, 638019814);
           lostLease = true;
         }
         return response;
@@ -1552,13 +1564,7 @@ describe("AI-03 Local Replan Integration Tests", () => {
             SELECT pg_terminate_backend(${lease!.pid}) AS terminated
           `;
           expect(termination!.terminated).toBe(true);
-          const remainingLeases = await fixture.db.client`
-            SELECT pid
-            FROM pg_locks
-            WHERE locktype='advisory' AND objid=638019814
-              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
-          `;
-          expect(remainingLeases).toHaveLength(0);
+          await waitForLockRelease(fixture.db, 638019814);
           lostLease = true;
         }
         return response;

@@ -6,6 +6,8 @@ import {
   assertLiveFrozen,
   computeLiveFingerprints,
   hashLiveFreeze,
+  buildLiveSourceManifest,
+  buildLiveExecutionFingerprint,
 } from "../src/ai/live-evaluation/freeze.js";
 import {
   LiveRubricSchema,
@@ -255,4 +257,50 @@ describe("ai-live-freeze", () => {
       }),
     ).rejects.toThrow(/Profile "non-existent-profile" not found in config/);
   });
+  it("builds a complete execution snapshot and source manifest", async () => {
+    const manifest = await buildLiveSourceManifest(root);
+    expect(manifest.length).toBeGreaterThan(10);
+    expect(manifest[0]).toHaveProperty("path");
+    expect(manifest[0]).toHaveProperty("sha256");
+
+    const execution = await buildLiveExecutionFingerprint({
+      root,
+      profile: {
+        id: "openai-only",
+        description: "OpenAI only",
+        planning: { provider: "openai", model: "gpt-5.6-terra", apiMode: "responses", maxOutputTokens: 4096 },
+        queryExpansion: { provider: "openai", model: "gpt-5.6-terra", apiMode: "responses", maxOutputTokens: 1024 },
+        embedding: {
+          provider: "openai",
+          model: "text-embedding-3-small",
+          apiMode: "embeddings",
+          dimensions: 1536,
+          preprocessingVersion: "v1",
+          documentTask: "doc",
+          queryTask: "query",
+          normalize: false,
+        },
+      },
+      campaignId: "test-camp",
+      budgetCapMicros: 50_000,
+      priceCard: {
+        version: "price-v1",
+        entries: {
+          "openai:responses:planning:gpt-5.6-terra": { inputMicrosPerMillion: 1_000_000, outputMicrosPerMillion: 2_000_000 },
+        },
+      },
+      activeIndex: {
+        id: "idx-real",
+        provenanceHash: "a".repeat(64),
+        vectorHash: "b".repeat(64),
+        policyHash: "c".repeat(64),
+      },
+    });
+
+    expect(execution.priceCardHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(execution.budgetCapMicros).toBe(50_000);
+    expect(execution.activeIndex.id).toBe("idx-real");
+    expect(execution.sourceManifest.length).toBe(manifest.length);
+  });
+
 });

@@ -10,7 +10,7 @@ import {
   replayLiveJournal,
   type LiveJournal,
 } from "./journal.js";
-import type { LiveEvaluationFingerprints } from "./contracts.js";
+import type { LiveEvaluationFingerprints, LiveExecutionFingerprint } from "./contracts.js";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -24,6 +24,7 @@ export interface OpenLiveCampaignOptions {
   readonly budgetCapMicros: number;
   readonly freezeHash?: string;
   readonly fingerprints?: LiveEvaluationFingerprints;
+  readonly execution?: LiveExecutionFingerprint;
 }
 
 interface CampaignManifest {
@@ -188,6 +189,7 @@ export async function openLiveCampaign(
         ...(options.evidenceKind ? { evidenceKind: options.evidenceKind } : {}),
         ...(options.freezeHash ? { freezeHash: options.freezeHash } : {}),
         ...(options.fingerprints ? { fingerprints: options.fingerprints } : {}),
+        ...(options.execution ? { execution: options.execution } : {}),
       },
     });
     const ledger = new JournaledProviderCallLedger({

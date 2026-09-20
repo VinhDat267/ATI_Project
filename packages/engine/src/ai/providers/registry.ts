@@ -26,6 +26,7 @@ import {
 } from "./wire-schema.js";
 import {
   priceProviderCall,
+  calculateReservationBoundMicros,
   type ProviderPriceCard,
 } from "../live-evaluation/pricing.js";
 
@@ -87,6 +88,7 @@ export class ProviderClientError extends Error {
     | "PROVIDER_TIMEOUT"
     | "PROVIDER_NETWORK_ERROR"
     | "PROVIDER_VECTOR_INVALID"
+    | "PRICE_BOUND_UNPROVEN"
     | "AI_LIVE_NOT_READY";
   readonly provider: string;
   readonly requestId: string | null;
@@ -250,6 +252,35 @@ function providerCost(
     : null;
 }
 
+
+function reservationEstimate(
+  options: CreateAiPortsOptions,
+  purpose: ProviderCallReservation["purpose"],
+  profile: GenerationProfile | EmbeddingProfile,
+): number {
+  const bound = options.priceCard
+    ? calculateReservationBoundMicros({
+        purpose,
+        model: profile.model,
+        inputLimitTokens: purpose === "embedding" ? 8_192 : 16_384,
+        outputCapTokens:
+          "maxOutputTokens" in profile ? profile.maxOutputTokens : undefined,
+        priceCard: options.priceCard,
+        context: { provider: profile.provider, apiMode: profile.apiMode },
+      })
+    : null;
+
+  if (bound !== null) return bound;
+  if (!options.fetchImpl) {
+    throw new ProviderClientError(
+      "PRICE_BOUND_UNPROVEN",
+      `cannot prove conservative reservation bound for ${purpose} call on ${profile.provider}:${profile.model}`,
+      { provider: profile.provider },
+    );
+  }
+  return options.config.limits.reservationEstimateMicros;
+}
+
 function textFromProviderResponse(
   body: Record<string, unknown>,
   provider: "openai" | "google",
@@ -390,7 +421,7 @@ async function invokeProvider(
 }> {
   const fetchImpl =
     options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
-  const reservation: ProviderCallReservation = {
+  const initialReservation: ProviderCallReservation = {
     campaignId: options.callContext?.campaignId ?? "live-evaluation",
     runId: options.callContext?.runId ?? "live-evaluation",
     profileId:
@@ -403,7 +434,12 @@ async function invokeProvider(
     outputCap: profile.maxOutputTokens,
     estimatedCostMicros: options.config.limits.reservationEstimateMicros,
   };
-  await options.authorizeCall(reservation);
+  await options.authorizeCall(initialReservation);
+  const estimatedCostMicros = reservationEstimate(options, purpose, profile);
+  const reservation: ProviderCallReservation = {
+    ...initialReservation,
+    estimatedCostMicros,
+  };
   const key = requireKey(profile.provider, options.credentials);
   const callId = await options.ledger.reserve(reservation);
   const started = (options.now ?? Date.now)();
@@ -753,7 +789,7 @@ function createEmbeddingClient(
                   }
                 : {}),
             };
-      const reservation: ProviderCallReservation = {
+      const initialReservation: ProviderCallReservation = {
         campaignId: options.callContext?.campaignId ?? "live-evaluation",
         runId: options.callContext?.runId ?? "live-evaluation",
         profileId:
@@ -767,7 +803,12 @@ function createEmbeddingClient(
         embeddingPurpose: input.purpose,
         estimatedCostMicros: options.config.limits.reservationEstimateMicros,
       };
-      await options.authorizeCall(reservation);
+      await options.authorizeCall(initialReservation);
+      const estimatedCostMicros = reservationEstimate(options, "embedding", profile);
+      const reservation: ProviderCallReservation = {
+        ...initialReservation,
+        estimatedCostMicros,
+      };
       const key = requireKey(profile.provider, options.credentials);
       const callId = await options.ledger.reserve(reservation);
       const started = (options.now ?? Date.now)();

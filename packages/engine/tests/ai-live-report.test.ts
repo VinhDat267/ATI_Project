@@ -541,4 +541,72 @@ describe("ai-live-report", () => {
     const md = renderLiveEvaluationMarkdown(report);
     expect(md).toContain("Cold Setup");
   });
+  it("isolates ledger cost reconciliation to the current runId", () => {
+    const plannedTrials = scheduleLiveTrials(["openai-only"], ["b01"]);
+    const outcomes: LiveTrialOutcome[] = plannedTrials.map((t) => ({
+      trialId: t.trialId,
+      profileId: t.profileId,
+      caseId: t.caseId,
+      exposure: (t.exposure ?? "dev") as "dev",
+      cell: t.cell,
+      repetition: t.repetition,
+      status: "completed",
+      modelCalls: [],
+      score: createMockScore(),
+      latency: { totalMs: 50 },
+      error: null,
+    }));
+
+    const ledgerRecords = [
+      {
+        callId: "call-run-1",
+        campaignId: "camp-1",
+        runId: "prior-run",
+        profileId: "openai-only",
+        provider: "openai" as const,
+        purpose: "planning" as const,
+        model: "gpt-5.6-terra",
+        requestHash: "hash-1",
+        status: "succeeded" as const,
+        estimatedCostMicros: 100,
+        costMicros: 100,
+        reservationHeld: false,
+        usage: { inputTokens: 50, outputTokens: 25, totalTokens: 75 },
+        errorCode: null,
+      },
+      {
+        callId: "call-run-2",
+        campaignId: "camp-1",
+        runId: "current-run",
+        profileId: "openai-only",
+        provider: "openai" as const,
+        purpose: "planning" as const,
+        model: "gpt-5.6-terra",
+        requestHash: "hash-2",
+        status: "succeeded" as const,
+        estimatedCostMicros: 200,
+        costMicros: 200,
+        reservationHeld: false,
+        usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        errorCode: null,
+      },
+    ];
+
+    const report = buildLiveEvaluationReport({
+      runId: "current-run",
+      createdAt: "2026-09-19T00:00:00.000Z",
+      campaignId: "camp-1",
+      freezeHash: "f".repeat(64),
+      fingerprints: mockFingerprints,
+      plannedTrials,
+      outcomes,
+      ledgerRecords,
+    });
+
+    expect(report.costReconciliation.totalCalls).toBe(1);
+    expect(report.costReconciliation.settledCostMicros).toBe(200);
+    expect(report.costReconciliation.totalInputTokens).toBe(100);
+    expect(report.costReconciliation.totalOutputTokens).toBe(50);
+  });
+
 });

@@ -27,6 +27,7 @@ export interface BuildLiveEvaluationReportOptions {
   readonly accountingReconciled?: boolean;
   readonly ledgerRecords?: readonly {
     readonly callId: string;
+    readonly runId?: string;
     readonly provider: string;
     readonly model: string;
     readonly status: string;
@@ -357,9 +358,10 @@ export function buildLiveEvaluationReport(
   };
 
   // Cost reconciliation
-  const allCalls = options.ledgerRecords
-    ? options.ledgerRecords
-    : options.outcomes.flatMap((o) => o.modelCalls);
+  const runRecords = options.ledgerRecords?.filter(
+    (record) => !options.runId || !record.runId || record.runId === options.runId,
+  );
+  const allCalls = runRecords ?? options.outcomes.flatMap((o) => o.modelCalls);
 
   let settledCostMicros = 0;
   let unknownCostCalls = 0;

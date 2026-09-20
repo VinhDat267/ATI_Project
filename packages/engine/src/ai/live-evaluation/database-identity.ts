@@ -1,3 +1,5 @@
+import type { Database } from "@wap/db";
+
 export interface EvaluationDatabaseIdentity {
   readonly host: string;
   readonly port: string;
@@ -5,8 +7,16 @@ export interface EvaluationDatabaseIdentity {
 }
 
 function canonicalHost(hostname: string): string {
-  const host = hostname.trim().toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+  let host = hostname.trim().toLowerCase();
+  if (host.startsWith("[") && host.endsWith("]")) {
+    host = host.slice(1, -1);
+  }
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0"
+  ) {
     return "loopback";
   }
   return host;
@@ -26,7 +36,7 @@ export function parseEvaluationDatabaseIdentity(
   if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") {
     throw new Error(`${label} must use PostgreSQL`);
   }
-  if (!parsed.hostname || parsed.pathname === "/") {
+  if (!parsed.hostname || parsed.pathname === "/" || !parsed.pathname) {
     throw new Error(`${label} must include a database name`);
   }
   const database = decodeURIComponent(parsed.pathname.slice(1));
@@ -60,4 +70,49 @@ export function assertEvaluationDatabaseIsolation(
       "AI_EVAL_DATABASE_URL must target a different database from DATABASE_URL",
     );
   }
+}
+
+export interface ConnectedDatabaseIdentity {
+  readonly currentDatabase: string;
+  readonly currentUser: string;
+}
+
+/**
+ * Queries connected database and user to verify runtime identity matches expected evaluation DB
+ * and does not collide with the application database before any mutations.
+ */
+export async function verifyConnectedEvaluationDatabaseIdentity(
+  database: Database,
+  expectedEvalIdentity: EvaluationDatabaseIdentity,
+  appIdentity?: EvaluationDatabaseIdentity,
+): Promise<ConnectedDatabaseIdentity> {
+  const rows = await (database.client as any)`SELECT current_database(), current_user;`;
+  const row = (rows as any)?.[0];
+  if (!row || typeof row.current_database !== "string") {
+    throw new Error("Unable to query connected database identity");
+  }
+  if (row.current_database !== expectedEvalIdentity.database) {
+    throw new Error(
+      `Connected database mismatch: connected to "${row.current_database}", expected "${expectedEvalIdentity.database}"`,
+    );
+  }
+  if (
+    appIdentity &&
+    sameEvaluationDatabase(
+      {
+        host: expectedEvalIdentity.host,
+        port: expectedEvalIdentity.port,
+        database: row.current_database,
+      },
+      appIdentity,
+    )
+  ) {
+    throw new Error(
+      `Connected database "${row.current_database}" matches forbidden application database`,
+    );
+  }
+  return {
+    currentDatabase: row.current_database,
+    currentUser: row.current_user ?? "unknown",
+  };
 }

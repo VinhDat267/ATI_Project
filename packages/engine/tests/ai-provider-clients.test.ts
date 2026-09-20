@@ -74,6 +74,27 @@ describe("native provider clients with fake transport", () => {
     expect(fetchCalls).toBe(0);
   });
 
+
+  it("rejects live provider call when conservative reservation bound cannot be proven", async () => {
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      ledger: {
+        async reserve() {
+          return "test-call";
+        },
+        async settle() {},
+      },
+      authorizeCall: async () => {},
+      // note: no fetchImpl, so treated as live provider dispatch
+    });
+    await expect(
+      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
+    ).rejects.toMatchObject({
+      code: "PRICE_BOUND_UNPROVEN",
+    });
+  });
+
   it("uses explicit campaign and run context in every authorization reservation", async () => {
     const reservations: Array<{
       campaignId: string;
@@ -579,4 +600,32 @@ describe("native provider clients with fake transport", () => {
       ports.embedding.embed({ text: "tool", purpose: "query" }),
     ).rejects.toMatchObject({ code: "PROVIDER_HTTP_ERROR" });
   });
+  it("rejects immediately with zero fetch when request signal is pre-aborted", async () => {
+    let fetchCalls = 0;
+    const ports = createAiPorts({
+      config,
+      credentials: { OPENAI_API_KEY: "openai-canary" },
+      ledger: ledger(),
+      authorizeCall: async () => {},
+      fetchImpl: async () => {
+        fetchCalls++;
+        return response({});
+      },
+    });
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      ports.model.complete({
+        systemPrompt: "s",
+        userPrompt: "u",
+        schema: {},
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({
+      code: "PROVIDER_TIMEOUT",
+      message: expect.stringContaining("cancelled before dispatch"),
+    });
+    expect(fetchCalls).toBe(0);
+  });
+
 });

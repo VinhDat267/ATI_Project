@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` for direct implementation in the current checkout. Follow dependency order and obtain independent read-only review before closing readiness.
 >
-> **Status:** IMPLEMENTED_PARTIAL — remediation pass committed on `main`; native live execution remains fail-closed until a complete execution snapshot is populated and approved. Baseline: `4106868` on `main`. This plan supersedes optimistic completion claims for overlapping requirements, not the original evaluation scope.
+> **Status:** IMPLEMENTED — technical remediation tasks R1–R7 completed on `main`; verified via full backend gate. Native live execution remains fail-closed until operator provides live provider credentials, human rubric approval, and fresh holdout bundle. Baseline: `4106868` on `main`.
 
 **Goal:** Đóng các lỗ hổng T6–T7 bằng regression offline và PostgreSQL cô lập, trước khi xin phép chạy live probe.
 
-**Implementation evidence:** R1/R2 are complete; R3/R4/R5/R6/R7 are partially complete with the remaining gates recorded in the SDD ledger at `.superpowers/sdd/2026-09-20-ai-live-readiness-remediation/progress.md`. The implementation does not authorize paid provider calls or claim `READY_FOR_LIVE_PROBE`.
+**Implementation evidence:** R1–R7 technical remediation tasks are complete with evidence recorded in the SDD ledger at `.superpowers/sdd/2026-09-20-ai-live-readiness-remediation/progress.md`. Full backend gate (334 engine unit, 98 engine integration, 40 API unit, 34 API integration, 64 MCP integration, 128 web unit, 43 DSL) passes with zero paid provider calls.
 
 **Architecture:** Giữ composition root hiện tại. Campaign sở hữu lock, manifest và budget; journal là nguồn evidence bền vững; mỗi phase có snapshot và quyền thực thi riêng. Report được suy ra từ evidence, không từ flag do caller tự xác nhận.
 

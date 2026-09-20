@@ -211,6 +211,46 @@ describe("ai-live-cli", () => {
     expect(content.format).toBe("ati-ai-live-freeze-v1");
     expect(content.profileId).toBe("openai-only");
   });
+  it("executes freeze command with --price-card and writes execution snapshot", async () => {
+    const tempDir = await createTempDir("freeze-price-test");
+    const priceCardPath = join(tempDir, "price-card.json");
+    await writeFile(
+      priceCardPath,
+      JSON.stringify({
+        version: "price-test-v1",
+        entries: {
+          "openai:responses:planning:gpt-5.6-terra": {
+            inputMicrosPerMillion: 2_000_000,
+            outputMicrosPerMillion: 4_000_000,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const result = await runLiveEvaluationCli(
+      [
+        "freeze",
+        "--profile",
+        "openai-only",
+        "--campaign",
+        "camp-cli-test",
+        "--price-card",
+        priceCardPath,
+      ],
+      {
+        root,
+        outputRoot: tempDir,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const content = JSON.parse(await readFile(result.artifactPath!, "utf8"));
+    expect(content.execution).toBeDefined();
+    expect(content.execution.priceCardHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(content.execution.sourceManifest.length).toBeGreaterThan(5);
+  });
+
 
   it("validates database URL isolation", () => {
     expect(() =>

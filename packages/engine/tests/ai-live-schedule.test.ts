@@ -26,6 +26,21 @@ describe("ai-live-schedule", () => {
     expect(multiProfileTrials).toHaveLength(252);
   });
 
+
+  it("produces exact trial counts for smoke phase (9 trials)", () => {
+    const smokeCases = ["b01", "b05", "b06"];
+    const smokeCells = [
+      { variant: "all_tools" as const, topK: 10 as const },
+      { variant: "semantic" as const, topK: 10 as const },
+      { variant: "semantic_qe" as const, topK: 10 as const },
+    ];
+    const smokeTrials = scheduleLiveTrials(["openai-only"], smokeCases, {
+      cells: smokeCells,
+      repetitions: 1,
+    });
+    expect(smokeTrials).toHaveLength(9);
+  });
+
   it("contains the standard 7 evaluation cells", () => {
     expect(LIVE_EVALUATION_CELLS).toEqual([
       { variant: "all_tools", topK: 10 },

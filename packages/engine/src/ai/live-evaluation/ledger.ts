@@ -261,6 +261,21 @@ export class JournaledProviderCallLedger implements ProviderCallLedger {
         payload: { callId, outcome: normalized },
       });
       this.store.set(callId, applySettlement(current, normalized));
+      const committed = [...this.store.values()].reduce(
+        (sum, record) =>
+          sum +
+          (record.costMicros ??
+            (record.reservationHeld ? record.estimatedCostMicros : 0)),
+        0,
+      );
+      if (committed > this.limitMicros) {
+        const overrunError = new ProviderAccountingError(
+          "BUDGET_OVERRUN",
+          `provider call settlement caused campaign spend of ${committed} micros to exceed cap of ${this.limitMicros} micros`,
+        );
+        this.failure = overrunError;
+        throw overrunError;
+      }
     });
   }
 

@@ -41,7 +41,11 @@ export interface ProviderCallRecord extends ProviderCallReservation {
 }
 
 export class ProviderAccountingError extends Error {
-  readonly code: "BUDGET_EXCEEDED" | "CALL_NOT_FOUND" | "CALL_ALREADY_SETTLED";
+  readonly code:
+    | "BUDGET_EXCEEDED"
+    | "CALL_NOT_FOUND"
+    | "CALL_ALREADY_SETTLED"
+    | "BUDGET_OVERRUN";
 
   constructor(code: ProviderAccountingError["code"], message: string) {
     super(message);
@@ -121,6 +125,19 @@ export class InMemoryProviderCallLedger {
       reservationHeld:
         outcome.status === "ambiguous" || outcome.costMicros === null,
     });
+    const committed = [...this.store.values()].reduce(
+      (sum, record) =>
+        sum +
+        (record.costMicros ??
+          (record.reservationHeld ? record.estimatedCostMicros : 0)),
+      0,
+    );
+    if (committed > this.limitMicros) {
+      throw new ProviderAccountingError(
+        "BUDGET_OVERRUN",
+        `provider call settlement caused campaign spend of ${committed} micros to exceed cap of ${this.limitMicros} micros`,
+      );
+    }
   }
 
   records(): ProviderCallRecord[] {

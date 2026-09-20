@@ -5,12 +5,18 @@ import { createOfflineReviewedCatalog } from "../local-catalog.js";
 import {
   FrozenLiveEvaluationSchema,
   LiveEvaluationFingerprintsSchema,
+  LiveExecutionFingerprintSchema,
   type FrozenLiveEvaluation,
   type LiveEvaluationFingerprints,
   type LiveExecutionFingerprint,
   type LiveProfileConfig,
   type SealedHoldoutBundle,
 } from "./contracts.js";
+import { providerCapabilities } from "../providers/capabilities.js";
+import {
+  validateProviderPriceCard,
+  type ProviderPriceCard,
+} from "./pricing.js";
 import {
   parseLiveEvalConfigFile,
   validateSealedHoldoutBundle,
@@ -121,6 +127,128 @@ async function discoverBehaviorPaths(root: string): Promise<readonly string[]> {
   };
   for (const directory of roots) await visit(directory);
   return [...new Set(discovered)].sort();
+}
+
+
+export async function buildLiveSourceManifest(
+  root: string,
+  paths?: readonly string[],
+): Promise<Array<{ path: string; sha256: string }>> {
+  const behaviorPaths = paths ?? (await discoverBehaviorPaths(root));
+  const entries = await Promise.all(
+    [...behaviorPaths].sort().map(async (relativePath) => {
+      const content = await readFile(join(root, relativePath));
+      return { path: relativePath, sha256: sha256(content) };
+    }),
+  );
+  return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+export interface BuildLiveExecutionFingerprintOptions {
+  readonly root: string;
+  readonly profile: LiveProfileConfig;
+  readonly campaignId: string;
+  readonly budgetCapMicros: number;
+  readonly priceCard: ProviderPriceCard;
+  readonly activeIndex: {
+    readonly id: string;
+    readonly provenanceHash: string;
+    readonly vectorHash: string;
+    readonly policyHash: string;
+  };
+  readonly approvalScope?: unknown;
+  readonly gitHead?: string;
+  readonly gitStatusDigest?: string;
+  readonly behaviorPaths?: readonly string[];
+}
+
+export async function buildLiveExecutionFingerprint(
+  options: BuildLiveExecutionFingerprintOptions,
+): Promise<LiveExecutionFingerprint> {
+  let packageLockContent: Buffer;
+  try {
+    packageLockContent = await readFile(
+      join(options.root, "package-lock.json"),
+    );
+  } catch {
+    packageLockContent = Buffer.from("{}");
+  }
+  const sourceManifest = await buildLiveSourceManifest(
+    options.root,
+    options.behaviorPaths,
+  );
+
+  const priceCardHash = sha256(
+    JSON.stringify(canonical(validateProviderPriceCard(options.priceCard))),
+  );
+  const approvalScopeHash = sha256(
+    JSON.stringify(
+      canonical(
+        options.approvalScope ?? {
+          campaignId: options.campaignId,
+          profileId: options.profile.id,
+          budgetCapMicros: options.budgetCapMicros,
+        },
+      ),
+    ),
+  );
+
+  const raw = {
+    roleConfigs: {
+      planning: options.profile.planning,
+      queryExpansion: options.profile.queryExpansion,
+      embedding: options.profile.embedding,
+    },
+    providerCapabilities: {
+      openai: providerCapabilities.openai,
+      google: providerCapabilities.google,
+    },
+    priceCardHash,
+    budgetCapMicros: options.budgetCapMicros,
+    approvalScopeHash,
+    activeIndex: {
+      id: options.activeIndex.id,
+      provenanceHash: options.activeIndex.provenanceHash,
+      vectorHash: options.activeIndex.vectorHash,
+      policyHash: options.activeIndex.policyHash,
+    },
+    runtime: {
+      nodeVersion: process.version,
+      packageLockHash: sha256(packageLockContent),
+    },
+    git: (() => {
+      let head = options.gitHead;
+      let statusDigest = options.gitStatusDigest;
+      if (!head || !statusDigest) {
+        try {
+          const { execSync } = require("node:child_process");
+          if (!head) {
+            head = execSync("git rev-parse HEAD", {
+              cwd: options.root,
+              encoding: "utf8",
+              stdio: ["ignore", "pipe", "ignore"],
+            }).trim();
+          }
+          if (!statusDigest) {
+            const statusOutput = execSync("git status --porcelain", {
+              cwd: options.root,
+              encoding: "utf8",
+              stdio: ["ignore", "pipe", "ignore"],
+            });
+            statusDigest = sha256(statusOutput);
+          }
+        } catch {
+          // Fallback if git binary is unavailable or outside a git working tree
+          head = head ?? "0123456789abcdef";
+          statusDigest = statusDigest ?? sha256("clean");
+        }
+      }
+      return { head, statusDigest };
+    })(),
+    sourceManifest,
+  };
+
+  return LiveExecutionFingerprintSchema.parse(raw);
 }
 
 export async function computeLiveFingerprints(

@@ -152,4 +152,37 @@ describe("journal-backed provider call ledger", () => {
       await rm(resolve(journalPath, ".."), { recursive: true, force: true });
     }
   });
+  it("detects budget overrun during settlement, poisons queue, and preserves actual evidence", async () => {
+    const journalPath = await createTempJournalPath("overrun-test");
+    const journal = await createLiveJournal(journalPath);
+    const ledger = new JournaledProviderCallLedger({
+      campaignLimitMicros: 100,
+      journal,
+    });
+    try {
+      const callId = await ledger.reserve(reservation(50));
+      // Actual cost is 120, exceeding limit of 100
+      await expect(
+        ledger.settle(callId, {
+          status: "succeeded",
+          costMicros: 120,
+          usage: { totalTokens: 100 },
+        }),
+      ).rejects.toMatchObject({
+        code: "BUDGET_OVERRUN",
+      });
+
+      // Actual evidence is preserved without clamping
+      expect(ledger.records()[0]?.costMicros).toBe(120);
+
+      // Subsequent operations fail-closed because queue was poisoned
+      await expect(ledger.reserve(reservation(10))).rejects.toMatchObject({
+        code: "BUDGET_OVERRUN",
+      });
+    } finally {
+      await journal.close();
+      await rm(resolve(journalPath, ".."), { recursive: true, force: true });
+    }
+  });
+
 });
