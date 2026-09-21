@@ -325,11 +325,16 @@ The following boundaries are fixed before implementation:
   Result: `technical=PASS`, `overall=OPEN`; the current environment has no explicit OIDC provider configuration, and no secret values were written.
 
 - [x] **Step 3: Implement the sanitized gate runner.** The runner executes focused API/web/release-contract gates, records bounded scrubbed output and source fingerprints, and exits non-zero when technical gates fail or provider configuration is absent.
-- [ ] **Step 4: Run the complete verification suite.**
+- [x] **Step 4: Run the complete verification suite.**
 
   Run: `npm run typecheck; npm run build; npm run check:full; node scripts/check-oidc.mjs`
 
-  Expected: all existing B/local gates plus OIDC gate pass on one release commit, with cleanup delta equal to zero.
+  Result: `npm run check:full` exit `0` on commit `d174101`; DSL 44, engine
+  unit 341 + 1 skipped, API unit 67, web unit 132, MCP integration 64,
+  engine integration 102 and API integration 46 passed. WEB-03 ran 6/6
+  gates, bundle/cleanup/NFR-03 passed. `npm run check:oidc` remains exit `2`
+  with technical PASS/overall OPEN because provider/live acceptance inputs are
+  not supplied.
 
 - [x] **Step 5: Update docs from evidence.** Recorded the OIDC configuration boundary, route/migration evidence, `npm run check:oidc` command and remaining provider, live acceptance, restore and UX-owned inputs without changing Baseline B/local scope.
 - [x] **Step 6: Commit the release evidence.** Commits `ea4dd18` (runner,
