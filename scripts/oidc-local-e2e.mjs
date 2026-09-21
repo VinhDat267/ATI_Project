@@ -244,47 +244,68 @@ const issuer = await startIssuer();
 const apiPort = await freePort();
 const apiOrigin = `http://127.0.0.1:${apiPort}`;
 const apiBase = `${apiOrigin}/api/v1`;
-const api = spawn(
-  process.execPath,
-  [path.join(root, "apps/api/dist/main.js")],
-  {
-    cwd: root,
-    env: {
-      ...process.env,
-      G1_DATABASE_URL: database.url,
-      API_PORT: String(apiPort),
-      API_DEMO_EMAIL: "demo@local.invalid",
-      API_DEMO_PASSWORD_HASH: demoPasswordHash,
-      API_CURSOR_KEY: Buffer.alloc(32, 7).toString("base64"),
-      WAP_PLANNER_MODE: "dev_fixture",
-      API_NEW_RUNS_ENABLED: "1",
-      AI_PROVIDER_CALLS_ENABLED: "0",
-      G1_FILESYSTEM_ENABLED: "0",
-      API_LEGACY_PASSWORD_AUTH_ENABLED: "0",
-      OIDC_ENABLED: "1",
-      OIDC_ISSUER_URL: issuer.issuer,
-      OIDC_CLIENT_ID: clientId,
-      OIDC_CLIENT_SECRET: clientSecret,
-      OIDC_REDIRECT_URI: `${apiBase}/auth/oidc/callback`,
-      OIDC_AUDIENCE: "wap-api",
-      OIDC_SCOPES: "openid,profile,email",
-      OIDC_WEB_ORIGIN: webOrigin,
-      OIDC_SESSION_COOKIE_NAME: "wap_session",
-      OIDC_TRANSACTION_TTL_MS: "600000",
-      OIDC_SESSION_TTL_MS: "3600000",
-      OIDC_CLOCK_SKEW_SECONDS: "60",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  },
-);
 let apiOutput = "";
-api.stdout.on("data", (chunk) => (apiOutput += chunk.toString()));
-api.stderr.on("data", (chunk) => (apiOutput += chunk.toString()));
+const apiEnv = {
+  ...process.env,
+  G1_DATABASE_URL: database.url,
+  API_PORT: String(apiPort),
+  API_DEMO_EMAIL: "demo@local.invalid",
+  API_DEMO_PASSWORD_HASH: demoPasswordHash,
+  API_CURSOR_KEY: Buffer.alloc(32, 7).toString("base64"),
+  WAP_PLANNER_MODE: "dev_fixture",
+  API_NEW_RUNS_ENABLED: "1",
+  AI_PROVIDER_CALLS_ENABLED: "0",
+  G1_FILESYSTEM_ENABLED: "0",
+  API_LEGACY_PASSWORD_AUTH_ENABLED: "0",
+  OIDC_ENABLED: "1",
+  OIDC_ISSUER_URL: issuer.issuer,
+  OIDC_CLIENT_ID: clientId,
+  OIDC_CLIENT_SECRET: clientSecret,
+  OIDC_REDIRECT_URI: `${apiBase}/auth/oidc/callback`,
+  OIDC_AUDIENCE: "wap-api",
+  OIDC_SCOPES: "openid,profile,email",
+  OIDC_WEB_ORIGIN: webOrigin,
+  OIDC_SESSION_COOKIE_NAME: "wap_session",
+  OIDC_TRANSACTION_TTL_MS: "600000",
+  OIDC_SESSION_TTL_MS: "3600000",
+  OIDC_CLOCK_SKEW_SECONDS: "60",
+};
+function startApi() {
+  const child = spawn(
+    process.execPath,
+    [path.join(root, "apps/api/dist/main.js")],
+    {
+      cwd: root,
+      env: apiEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  child.stdout.on("data", (chunk) => (apiOutput += chunk.toString()));
+  child.stderr.on("data", (chunk) => (apiOutput += chunk.toString()));
+  return child;
+}
+async function stopApi(child) {
+  if (child.exitCode !== null) return;
+  child.kill("SIGTERM");
+  await new Promise((resolve) => child.once("exit", resolve));
+}
+let api = startApi();
 
 try {
   await waitReady(apiBase);
   const alice = await login(apiBase, issuer, users.alice);
   const bob = await login(apiBase, issuer, users.bob);
+
+  await stopApi(api);
+  api = startApi();
+  await waitReady(apiBase);
+  const afterRestart = await fetch(`${apiBase}/auth/me`, {
+    headers: { origin: webOrigin, cookie: `wap_session=${bob.session}` },
+  });
+  assert(
+    afterRestart.status === 200,
+    `OIDC_E2E_RESTART_${afterRestart.status}`,
+  );
 
   const createRun = await fetch(`${apiBase}/runs`, {
     method: "POST",
@@ -352,10 +373,12 @@ try {
           callback_state_nonce_pkce: "PASS",
           jwks_id_token_validation: "PASS",
           durable_identity_session: "PASS",
+          restart_session: "PASS",
           two_user_owner_matrix: "PASS",
           csrf_logout_and_revoke: "PASS",
         },
         cross_owner_status: crossOwner.status,
+        restart_session_status: afterRestart.status,
         revoked_session_status: revoked.status,
         secrets_in_manifest: false,
       },
@@ -373,6 +396,7 @@ try {
         provider: "local-fake-oidc",
         identities: [alice.identity.email, bob.identity.email],
         cross_owner_status: crossOwner.status,
+        restart_session_status: afterRestart.status,
         revoked_session_status: revoked.status,
         manifest: path.relative(root, evidencePath).replaceAll("\\", "/"),
         secrets_in_output: false,
@@ -382,8 +406,7 @@ try {
     ),
   );
 } finally {
-  api.kill("SIGTERM");
-  await new Promise((resolve) => api.once("exit", resolve));
+  await stopApi(api);
   await issuer.close();
   await database.close();
   if (apiOutput.includes(clientSecret) || apiOutput.includes(demoPasswordHash))

@@ -1,0 +1,21 @@
+{
+  "schema": "ati-oidc-local-e2e-1",
+  "task": "OIDC-01",
+  "created_at": "2026-09-21T07:15:03.495Z",
+  "status": "PASS",
+  "technical": "PASS",
+  "commit": "6e840062a79141245984f1d5d2b7d61430738b67",
+  "provider": "local-fake-oidc",
+  "acceptance": {
+    "callback_state_nonce_pkce": "PASS",
+    "jwks_id_token_validation": "PASS",
+    "durable_identity_session": "PASS",
+    "restart_session": "PASS",
+    "two_user_owner_matrix": "PASS",
+    "csrf_logout_and_revoke": "PASS"
+  },
+  "cross_owner_status": 404,
+  "restart_session_status": 200,
+  "revoked_session_status": 401,
+  "secrets_in_manifest": false
+}
