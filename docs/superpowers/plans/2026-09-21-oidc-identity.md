@@ -332,7 +332,9 @@ The following boundaries are fixed before implementation:
   Expected: all existing B/local gates plus OIDC gate pass on one release commit, with cleanup delta equal to zero.
 
 - [x] **Step 5: Update docs from evidence.** Recorded the OIDC configuration boundary, route/migration evidence, `npm run check:oidc` command and remaining provider, live acceptance, restore and UX-owned inputs without changing Baseline B/local scope.
-- [ ] **Step 6: Commit the release evidence.**
+- [x] **Step 6: Commit the release evidence.** Commits `ea4dd18` (runner,
+  contract test and documentation) and `0e4bf9f` (sanitized OIDC-01 manifest)
+  record the technical gate; migration-test alignment is in `4e5a4c3`.
 
   ```powershell
   git diff --check
