@@ -10,6 +10,20 @@ node scripts/check-oidc.mjs
 
 The command writes a timestamped `manifest.json` containing only commit, file fingerprints, gate exit codes, bounded scrubbed tails, and status fields. It never writes provider URLs, client secrets, bearer values, cookies, prompts, or token payloads.
 
+For a local technical end-to-end run, with the existing G1 PostgreSQL
+container available, use:
+
+```powershell
+npm run check:oidc:local
+```
+
+This starts an ephemeral PostgreSQL database and an in-process fake OIDC
+issuer, then exercises discovery, authorization-code + PKCE exchange, JWKS
+ID-token validation, durable identity/session creation, `/auth/me`, logout,
+session revocation, and a two-user owner-isolation check. A `PASS` here is
+local technical evidence only; it does not replace an authorized production
+issuer, staging acceptance, or UX/Design System approval.
+
 Current technical evidence:
 
 - Authorization Code + PKCE state/nonce/verifier binding, discovery, ID-token/JWKS validation and rotation: API unit tests.
