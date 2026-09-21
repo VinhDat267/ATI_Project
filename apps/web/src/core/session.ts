@@ -1,8 +1,12 @@
 import { createStore, type Store } from "./store.js";
+import type { AuthMe } from "./contracts.js";
 
 export interface Session {
   generation: number;
   token: string | null;
+  /** Cookie-backed identity; deliberately contains no provider token. */
+  authenticated?: boolean;
+  identity?: AuthMe;
 }
 
 export interface RequestScope {
@@ -16,8 +20,10 @@ export interface RequestScope {
 export interface SessionController {
   store: Store<Session>;
   setToken(token: string): void;
+  setIdentity(identity: AuthMe): void;
   clear(): void;
   getToken(): string | null;
+  getIdentity(): AuthMe | null;
   beginRequest(): RequestScope;
 }
 
@@ -55,14 +61,36 @@ export function createSession(): SessionController {
       }
       changeToken(token);
     },
+    setIdentity(identity) {
+      const current = store.getSnapshot();
+      if (
+        current.authenticated === true &&
+        current.identity?.user_id === identity.user_id
+      ) {
+        return;
+      }
+      invalidateRequests();
+      store.set({
+        generation: current.generation + 1,
+        token: null,
+        authenticated: true,
+        identity,
+      });
+    },
     clear() {
       const current = store.getSnapshot();
       const invalidatedCount = invalidateRequests();
-      if (current.token !== null || invalidatedCount > 0) {
+      if (
+        current.token !== null ||
+        current.authenticated === true ||
+        current.identity !== undefined ||
+        invalidatedCount > 0
+      ) {
         store.set({ generation: current.generation + 1, token: null });
       }
     },
     getToken: () => store.getSnapshot().token,
+    getIdentity: () => store.getSnapshot().identity ?? null,
     beginRequest() {
       const controller = new AbortController();
       const generation = store.getSnapshot().generation;

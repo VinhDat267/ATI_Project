@@ -9,9 +9,21 @@ import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../shell/Logo";
 
 const POINTS: Array<{ icon: IconName; title: string; body: string }> = [
-  { icon: "message", title: "Mô tả việc cần làm", body: "Bằng tiếng Việt hoặc tiếng Anh." },
-  { icon: "eye", title: "Xem trước đích và nội dung sẽ ghi", body: "Dữ liệu được đọc trước, chưa có gì bị ghi." },
-  { icon: "shield-check", title: "Duyệt, rồi xem kết quả và chứng cứ", body: "Chỉ bản xem trước bạn duyệt mới được thực hiện." },
+  {
+    icon: "message",
+    title: "Mô tả việc cần làm",
+    body: "Bằng tiếng Việt hoặc tiếng Anh.",
+  },
+  {
+    icon: "eye",
+    title: "Xem trước đích và nội dung sẽ ghi",
+    body: "Dữ liệu được đọc trước, chưa có gì bị ghi.",
+  },
+  {
+    icon: "shield-check",
+    title: "Duyệt, rồi xem kết quả và chứng cứ",
+    body: "Chỉ bản xem trước bạn duyệt mới được thực hiện.",
+  },
 ];
 
 const inputClass =
@@ -38,7 +50,11 @@ export function LoginView({
     mutationFn: async (input: { email: string; password: string }) => {
       const scope = session.beginRequest();
       try {
-        const token = await transport.login(input.email, input.password, scope.signal);
+        const token = await transport.login(
+          input.email,
+          input.password,
+          scope.signal,
+        );
         return { token, current: scope.isCurrent() };
       } finally {
         scope.dispose();
@@ -58,6 +74,14 @@ export function LoginView({
     event.preventDefault();
     if (login.isPending) return;
     login.mutate({ email, password });
+  };
+
+  const startOidc = (): void => {
+    const returnTo =
+      typeof window !== "undefined"
+        ? window.location.hash.slice(1) || "/overview"
+        : "/overview";
+    transport.startOidcLogin(returnTo);
   };
 
   const failed = login.isError;
@@ -100,11 +124,18 @@ export function LoginView({
           noValidate
           className="flex flex-col gap-5 rounded-md border border-hairline p-6 shadow-card desk:col-start-2 desk:row-start-1 desk:p-8"
         >
-          <h1 id="login-title" className="m-0 text-display-md-mobile desk:text-display-md">
+          <h1
+            id="login-title"
+            className="m-0 text-display-md-mobile desk:text-display-md"
+          >
             Đăng nhập
           </h1>
           {failed && errorMessage ? (
-            <p id={errorId} role="alert" className="m-0 rounded-sm bg-danger-subtle p-3 text-body-md text-danger">
+            <p
+              id={errorId}
+              role="alert"
+              className="m-0 rounded-sm bg-danger-subtle p-3 text-body-md text-danger"
+            >
               {errorMessage}
             </p>
           ) : null}
@@ -121,7 +152,10 @@ export function LoginView({
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               aria-invalid={failed || undefined}
-              aria-describedby={cn(failed && errorId, mode === "fixture" && "email-hint") || undefined}
+              aria-describedby={
+                cn(failed && errorId, mode === "fixture" && "email-hint") ||
+                undefined
+              }
               className={cn(inputClass, failed && "border-danger")}
             />
             {mode === "fixture" ? (
@@ -144,7 +178,12 @@ export function LoginView({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 aria-invalid={failed || undefined}
-                aria-describedby={cn(failed && errorId, mode === "fixture" && "password-hint") || undefined}
+                aria-describedby={
+                  cn(
+                    failed && errorId,
+                    mode === "fixture" && "password-hint",
+                  ) || undefined
+                }
                 className={cn(inputClass, "pr-14", failed && "border-danger")}
               />
               <button
@@ -163,20 +202,32 @@ export function LoginView({
               </span>
             ) : null}
           </div>
-          <Button type="submit" block disabled={login.isPending} aria-busy={login.isPending}>
+          {mode === "live" ? (
+            <Button type="button" block variant="secondary" onClick={startOidc}>
+              SSO qua tổ chức
+            </Button>
+          ) : null}
+          <Button
+            type="submit"
+            block
+            disabled={login.isPending}
+            aria-busy={login.isPending}
+          >
             {login.isPending ? "Đang đăng nhập…" : "Đăng nhập"}
           </Button>
         </form>
 
         <section className="flex max-w-measure-sm flex-col gap-5 desk:col-start-1 desk:row-start-1">
           <span className="text-body-sm text-muted">
-            Chạy cục bộ trên máy này{mode === "fixture" ? " · Kế hoạch mẫu" : ""}
+            Chạy cục bộ trên máy này
+            {mode === "fixture" ? " · Kế hoạch mẫu" : ""}
           </span>
           <h2 className="m-0 text-headline-sm-mobile desk:text-display-md">
             Lập kế hoạch tự động, ghi dữ liệu chỉ khi bạn duyệt
           </h2>
           <p className="m-0 text-body-lg text-muted">
-            ATI biến mô tả công việc thành kế hoạch gọi công cụ local, cho bạn xem trước từng thao tác ghi rồi mới thực hiện.
+            ATI biến mô tả công việc thành kế hoạch gọi công cụ local, cho bạn
+            xem trước từng thao tác ghi rồi mới thực hiện.
           </p>
           <ul className="m-0 flex list-none flex-col gap-4 p-0">
             {POINTS.map((point) => (

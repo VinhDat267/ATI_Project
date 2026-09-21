@@ -62,5 +62,22 @@ describe("createSession", () => {
     // Disposing should remove it from active controllers so it's not leaked
     expect(scope.signal.aborted).toBe(false);
   });
-});
 
+  it("supports an OIDC identity without retaining a provider bearer token", () => {
+    const session = createSession();
+    session.setIdentity({
+      user_id: "00000000-0000-4000-8000-000000000001",
+      email: "oidc@example.test",
+      display_name: "OIDC User",
+      roles: ["user"],
+    });
+
+    expect(session.getToken()).toBeNull();
+    expect(session.getIdentity()?.email).toBe("oidc@example.test");
+    expect(session.store.getSnapshot().authenticated).toBe(true);
+
+    session.clear();
+    expect(session.getIdentity()).toBeNull();
+    expect(session.store.getSnapshot().authenticated).toBeUndefined();
+  });
+});

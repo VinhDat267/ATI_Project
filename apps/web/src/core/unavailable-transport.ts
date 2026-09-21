@@ -7,6 +7,9 @@ const unavailable = async (): Promise<never> => {
 export function createUnavailableTransport(): Transport {
   return {
     login: unavailable,
+    me: unavailable,
+    logout: unavailable,
+    startOidcLogin: unavailable,
     list: unavailable,
     servers: unavailable,
     create: unavailable,

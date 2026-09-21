@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ApiErrorSchema,
+  AuthMeSchema,
   EventPageSchema,
   LoginResponseSchema,
   ReconciliationSchema,
@@ -25,11 +26,26 @@ import { ClientError } from "./errors.js";
 export interface HttpTransportOptions {
   baseUrl?: string;
   getToken?: () => string | null;
+  mode?: "bearer" | "cookie" | "hybrid";
+  getCsrfToken?: () => string | null;
 }
 
-export function createHttpTransport(options: HttpTransportOptions = {}): Transport {
+export function createHttpTransport(
+  options: HttpTransportOptions = {},
+): Transport {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
   const getToken = options.getToken ?? (() => null);
+  const mode = options.mode ?? "bearer";
+  const getCsrfToken =
+    options.getCsrfToken ??
+    (() =>
+      typeof document === "undefined"
+        ? null
+        : (document.cookie
+            .split(";")
+            .map((part) => part.trim())
+            .find((part) => part.startsWith("wap_csrf="))
+            ?.slice("wap_csrf=".length) ?? null));
 
   async function request<T>(
     method: "GET" | "POST",
@@ -47,7 +63,10 @@ export function createHttpTransport(options: HttpTransportOptions = {}): Transpo
       accept: "application/json",
     };
 
-    if (reqOptions?.authenticated !== false) {
+    if (
+      (mode === "bearer" || mode === "hybrid") &&
+      reqOptions?.authenticated !== false
+    ) {
       const token = getToken();
       if (token) {
         headers["authorization"] = `Bearer ${token}`;
@@ -61,6 +80,11 @@ export function createHttpTransport(options: HttpTransportOptions = {}): Transpo
     }
 
     const url = `${baseUrl}${path}`;
+
+    if (mode !== "bearer" && isWrite) {
+      const csrf = getCsrfToken();
+      if (csrf) headers["x-csrf-token"] = csrf;
+    }
 
     if (signal.aborted) {
       throw new ClientError({
@@ -79,9 +103,13 @@ export function createHttpTransport(options: HttpTransportOptions = {}): Transpo
         body: bodyString,
         signal,
         cache: "no-store",
+        ...(mode !== "bearer" ? { credentials: "include" as const } : {}),
       });
     } catch (err: unknown) {
-      if (signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+      if (
+        signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      ) {
         throw new ClientError({
           message: "Yêu cầu đã bị hủy",
           kind: "aborted",
@@ -179,6 +207,32 @@ export function createHttpTransport(options: HttpTransportOptions = {}): Transpo
       return res.token;
     },
 
+    me(signal) {
+      return request("GET", "/api/v1/auth/me", AuthMeSchema, signal, {
+        authenticated: false,
+        isWrite: false,
+      });
+    },
+
+    logout(signal) {
+      return request("POST", "/api/v1/auth/logout", null, signal, {
+        authenticated: mode === "cookie" ? false : undefined,
+        isWrite: true,
+      });
+    },
+
+    startOidcLogin(returnTo = "/overview") {
+      if (typeof window === "undefined") {
+        throw new Error("OIDC login requires a browser window");
+      }
+      const safeReturnTo =
+        returnTo.startsWith("/") && !returnTo.startsWith("//")
+          ? returnTo
+          : "/overview";
+      const url = `${baseUrl}/api/v1/auth/oidc/start?return_to=${encodeURIComponent(safeReturnTo)}`;
+      window.location.assign(url);
+    },
+
     list(signal) {
       return request("GET", "/api/v1/runs", z.array(RunDetailSchema), signal, {
         isWrite: false,
@@ -186,9 +240,15 @@ export function createHttpTransport(options: HttpTransportOptions = {}): Transpo
     },
 
     servers(signal) {
-      return request("GET", "/api/v1/servers", ServerSummaryListSchema, signal, {
-        isWrite: false,
-      });
+      return request(
+        "GET",
+        "/api/v1/servers",
+        ServerSummaryListSchema,
+        signal,
+        {
+          isWrite: false,
+        },
+      );
     },
 
     create(input: CreateInput, signal) {

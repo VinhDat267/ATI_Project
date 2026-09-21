@@ -24,6 +24,86 @@ describe("createHttpTransport", () => {
       getToken: () => token,
     });
 
+  it("cookie sessions send credentials and never forward a bearer token", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          user_id: "11111111-1111-4111-8111-111111111111",
+          email: "oidc-user@example.test",
+          display_name: "OIDC User",
+          roles: ["user"],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const transport = createHttpTransport({
+      baseUrl: "http://127.0.0.1:3001",
+      mode: "cookie",
+      getToken: () => "must-not-forward",
+    });
+
+    await expect(
+      transport.me(new AbortController().signal),
+    ).resolves.toMatchObject({
+      email: "oidc-user@example.test",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/auth/me",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+        headers: expect.not.objectContaining({
+          authorization: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it("cookie logout sends the readable double-submit CSRF token", async () => {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const transport = createHttpTransport({
+      mode: "cookie",
+      getCsrfToken: () => "csrf-token-123456",
+    });
+
+    await transport.logout(new AbortController().signal);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/v1/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          "x-csrf-token": "csrf-token-123456",
+        }),
+      }),
+    );
+  });
+
+  it("starts OIDC at the API and preserves a bounded return path", () => {
+    const assigned: string[] = [];
+    const previousWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { assign: (url: string) => assigned.push(url) } },
+    });
+    try {
+      const transport = createHttpTransport({
+        baseUrl: "http://127.0.0.1:3001",
+      });
+      transport.startOidcLogin("/history");
+      expect(assigned).toEqual([
+        "http://127.0.0.1:3001/api/v1/auth/oidc/start?return_to=%2Fhistory",
+      ]);
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: previousWindow,
+      });
+    }
+  });
+
   it("login sends POST /api/v1/auth/login and parses token", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ token: "auth-jwt-token" }), {
@@ -112,7 +192,11 @@ describe("createHttpTransport", () => {
     const transport = createTransport();
     let thrown: unknown;
     try {
-      await transport.login("bad@example.com", "wrong", new AbortController().signal);
+      await transport.login(
+        "bad@example.com",
+        "wrong",
+        new AbortController().signal,
+      );
     } catch (err) {
       thrown = err;
     }
@@ -175,7 +259,11 @@ describe("createHttpTransport", () => {
     const transport = createTransport();
     let thrown: unknown;
     try {
-      await transport.login("user@example.com", "pwd", new AbortController().signal);
+      await transport.login(
+        "user@example.com",
+        "pwd",
+        new AbortController().signal,
+      );
     } catch (err) {
       thrown = err;
     }
@@ -194,7 +282,10 @@ describe("createHttpTransport", () => {
 
     const transport = createTransport();
     await expect(
-      transport.cancel("00000000-0000-0000-0000-000000000001", new AbortController().signal),
+      transport.cancel(
+        "00000000-0000-0000-0000-000000000001",
+        new AbortController().signal,
+      ),
     ).resolves.toBeUndefined();
 
     expect(mockFetch).toHaveBeenCalledWith(

@@ -31,8 +31,11 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       host: "127.0.0.1",
-      port: process.env.WAP_PREVIEW_PORT ? Number(process.env.WAP_PREVIEW_PORT) : 4173,
-      strictPort: !process.env.WAP_PREVIEW_PORT || process.env.WAP_PREVIEW_PORT !== "0",
+      port: process.env.WAP_PREVIEW_PORT
+        ? Number(process.env.WAP_PREVIEW_PORT)
+        : 4173,
+      strictPort:
+        !process.env.WAP_PREVIEW_PORT || process.env.WAP_PREVIEW_PORT !== "0",
       cors: false,
       open: false,
     },
@@ -43,6 +46,7 @@ export default defineConfig(({ mode }) => {
         target: apiTarget,
         devOrigin: frontendOrigin,
         previewOrigin: previewOrigin || undefined,
+        sessionCookieName: process.env.OIDC_SESSION_COOKIE_NAME || undefined,
       }),
     ],
   };

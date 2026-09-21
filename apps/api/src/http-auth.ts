@@ -48,7 +48,7 @@ export function serializeCookie(
   return [
     `${name}=${value}`,
     "Path=/",
-    "HttpOnly",
+    ...(options.httpOnly === false ? [] : ["HttpOnly"]),
     `Max-Age=${options.maxAge}`,
     `SameSite=${options.sameSite ?? "Lax"}`,
     ...(options.secure ? ["Secure"] : []),

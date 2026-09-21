@@ -100,10 +100,7 @@ export function App({
   );
   // One query cache per session generation: a new session can never read the
   // previous one's server state, and the old cache is cancelled and dropped.
-  const queryClient = useMemo(
-    () => createQueryClient(),
-    [snapshot.generation],
-  );
+  const queryClient = useMemo(() => createQueryClient(), [snapshot.generation]);
   useEffect(
     () => () => {
       void queryClient.cancelQueries();
@@ -113,10 +110,41 @@ export function App({
   );
   const [drafts] = useState(() => providedDrafts ?? createDraftStore());
   const [email, setEmail] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(mode === "live");
 
   useEffect(() => {
-    if (!snapshot.token) drafts.clear();
-  }, [snapshot.token, drafts]);
+    if (mode !== "live") {
+      setHydrating(false);
+      return;
+    }
+    if (session.getIdentity()) {
+      setHydrating(false);
+      return;
+    }
+    const scope = session.beginRequest();
+    void transport
+      .me(scope.signal)
+      .then((identity) => {
+        if (!scope.isCurrent()) return;
+        session.setIdentity(identity);
+        setEmail(identity.email);
+      })
+      .catch(() => {
+        if (scope.isCurrent()) session.clear();
+      })
+      .finally(() => {
+        scope.dispose();
+        setHydrating(false);
+      });
+    return () => {
+      scope.abort();
+      scope.dispose();
+    };
+  }, [mode, session, transport]);
+
+  useEffect(() => {
+    if (!snapshot.token && snapshot.authenticated !== true) drafts.clear();
+  }, [snapshot.token, snapshot.authenticated, drafts]);
 
   const controllers = useMemo(
     () => createControllerRegistry(transport, session),
@@ -134,7 +162,7 @@ export function App({
       transport,
       session,
       generation: snapshot.generation,
-      email,
+      email: snapshot.identity?.email ?? email,
       drafts,
       hints,
       mode,
@@ -145,6 +173,7 @@ export function App({
       session,
       snapshot.generation,
       email,
+      snapshot.identity,
       drafts,
       hints,
       mode,
@@ -152,7 +181,7 @@ export function App({
     ],
   );
 
-  if (!snapshot.token) {
+  if (hydrating || (!snapshot.token && snapshot.authenticated !== true)) {
     return (
       <QueryClientProvider client={queryClient}>
         <LoginView
@@ -168,7 +197,8 @@ export function App({
     );
   }
 
-  const effective: Route = route.page === "login" ? { page: "overview" } : route;
+  const effective: Route =
+    route.page === "login" ? { page: "overview" } : route;
   return (
     <QueryClientProvider client={queryClient}>
       <AppProvider value={context}>

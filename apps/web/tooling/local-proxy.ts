@@ -6,6 +6,7 @@ export interface LocalProxyOptions {
   target: string;
   devOrigin?: string | (() => string);
   previewOrigin?: string | (() => string);
+  sessionCookieName?: string;
 }
 
 export function validateProxyTarget(target: string): URL {
@@ -24,7 +25,9 @@ export function validateProxyTarget(target: string): URL {
     throw new Error(`Invalid proxy target URL: "${target}"`);
   }
   if (url.protocol !== "http:") {
-    throw new Error(`Proxy target must use HTTP protocol, got "${url.protocol}"`);
+    throw new Error(
+      `Proxy target must use HTTP protocol, got "${url.protocol}"`,
+    );
   }
   if (url.hostname !== "127.0.0.1") {
     throw new Error(`Proxy target must be 127.0.0.1, got "${url.hostname}"`);
@@ -40,7 +43,9 @@ export function validateProxyTarget(target: string): URL {
     throw new Error("Proxy target must not contain user credentials");
   }
   if (url.pathname !== "" && url.pathname !== "/") {
-    throw new Error(`Proxy target must not specify a subpath, got "${url.pathname}"`);
+    throw new Error(
+      `Proxy target must not specify a subpath, got "${url.pathname}"`,
+    );
   }
   if (url.search !== "") {
     throw new Error("Proxy target must not specify search or query parameters");
@@ -56,7 +61,9 @@ export function validateFrontendOrigin(origin: string): URL {
   if (portMatch && portMatch[1]) {
     const p = Number(portMatch[1]);
     if (p <= 0 || p > 65535) {
-      throw new Error(`Frontend origin port is out of range: "${portMatch[1]}"`);
+      throw new Error(
+        `Frontend origin port is out of range: "${portMatch[1]}"`,
+      );
     }
   }
 
@@ -67,13 +74,17 @@ export function validateFrontendOrigin(origin: string): URL {
     throw new Error(`Invalid frontend origin URL: "${origin}"`);
   }
   if (url.protocol !== "http:") {
-    throw new Error(`Frontend origin must use HTTP protocol, got "${url.protocol}"`);
+    throw new Error(
+      `Frontend origin must use HTTP protocol, got "${url.protocol}"`,
+    );
   }
   if (url.hostname !== "127.0.0.1") {
     throw new Error(`Frontend origin must be 127.0.0.1, got "${url.hostname}"`);
   }
   if (!url.port) {
-    throw new Error(`Frontend origin must specify an explicit port: "${origin}"`);
+    throw new Error(
+      `Frontend origin must specify an explicit port: "${origin}"`,
+    );
   }
   const portNum = Number(url.port);
   if (!Number.isSafeInteger(portNum) || portNum <= 0 || portNum > 65535) {
@@ -83,7 +94,9 @@ export function validateFrontendOrigin(origin: string): URL {
     throw new Error("Frontend origin must not contain user credentials");
   }
   if (url.pathname !== "" && url.pathname !== "/") {
-    throw new Error(`Frontend origin must not specify a subpath, got "${url.pathname}"`);
+    throw new Error(
+      `Frontend origin must not specify a subpath, got "${url.pathname}"`,
+    );
   }
   if (url.search !== "" || url.hash !== "") {
     throw new Error("Frontend origin must not specify search or hash");
@@ -101,7 +114,7 @@ function sendForbidden(res: ServerResponse): void {
         code: "FORBIDDEN",
         message: "Request blocked by local proxy boundary",
       },
-    })
+    }),
   );
 }
 
@@ -114,7 +127,7 @@ export function createProxyGuard(options: {
   return function proxyGuard(
     req: IncomingMessage,
     res: ServerResponse,
-    next: () => void
+    next: () => void,
   ): void {
     const rawUrl = req.url ?? "/";
     if (!rawUrl.startsWith("/api/v1")) {
@@ -162,18 +175,43 @@ export function createProxyGuard(options: {
       }
     }
 
+    // Carry the validated browser origin through Vite/http-proxy. The proxy
+    // may rewrite the ordinary Origin header before its proxyReq hook runs.
+    req.headers["x-wap-frontend-origin"] = allowedOrigin;
+
     next();
   };
 }
 
 const FORBIDDEN_FORWARD_HEADERS = new Set([
-  "cookie",
   "sec-fetch",
   "sec-fetch-site",
   "sec-fetch-mode",
   "sec-fetch-dest",
   "sec-fetch-user",
 ]);
+
+const FORWARDED_COOKIE_NAMES = new Set([
+  "wap_session",
+  "wap_oidc_tx",
+  "wap_csrf",
+]);
+
+function filterForwardedCookies(
+  value: string | string[] | undefined,
+  allowedNames: ReadonlySet<string> = FORWARDED_COOKIE_NAMES,
+): string | undefined {
+  if (value === undefined) return undefined;
+  const raw = Array.isArray(value) ? value.join("; ") : value;
+  const kept = raw
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => {
+      const name = part.slice(0, part.indexOf("=")).trim();
+      return allowedNames.has(name);
+    });
+  return kept.length > 0 ? kept.join("; ") : undefined;
+}
 
 export function isForbiddenForwardHeader(headerName: string): boolean {
   const lower = headerName.toLowerCase();
@@ -188,15 +226,21 @@ export function isForbiddenForwardHeader(headerName: string): boolean {
 
 export function rewriteForwardHeaders(
   headers: Record<string, string | string[] | undefined>,
-  targetUrl: URL
+  targetUrl: URL,
+  frontendOrigin?: string | null,
+  allowedCookieNames?: ReadonlySet<string>,
 ): Record<string, string | string[]>;
 export function rewriteForwardHeaders(
   proxyReq: any,
-  targetUrl: URL
+  targetUrl: URL,
+  frontendOrigin?: string | null,
+  allowedCookieNames?: ReadonlySet<string>,
 ): void;
 export function rewriteForwardHeaders(
   target: any,
-  targetUrl: URL
+  targetUrl: URL,
+  frontendOrigin?: string | null,
+  allowedCookieNames?: ReadonlySet<string>,
 ): any {
   if (
     target &&
@@ -204,6 +248,22 @@ export function rewriteForwardHeaders(
     typeof target.removeHeader === "function"
   ) {
     const proxyReq = target;
+    const incomingOrigin =
+      frontendOrigin === null
+        ? null
+        : (frontendOrigin ??
+          (typeof proxyReq.getHeader === "function"
+            ? (proxyReq.getHeader("x-wap-frontend-origin") ??
+              proxyReq.getHeader("origin"))
+            : undefined));
+    const incomingCookie =
+      typeof proxyReq.getHeader === "function"
+        ? proxyReq.getHeader("cookie")
+        : undefined;
+    const forwardedCookie = filterForwardedCookies(
+      incomingCookie,
+      allowedCookieNames,
+    );
     proxyReq.removeHeader("cookie");
     proxyReq.removeHeader("sec-fetch-site");
     proxyReq.removeHeader("sec-fetch-mode");
@@ -219,37 +279,80 @@ export function rewriteForwardHeaders(
       }
     }
 
+    if (forwardedCookie) proxyReq.setHeader("cookie", forwardedCookie);
+
     proxyReq.setHeader("host", targetUrl.host);
     proxyReq.setHeader("origin", targetUrl.origin);
+    proxyReq.removeHeader("x-wap-frontend-origin");
+    if (typeof incomingOrigin === "string" && incomingOrigin.length > 0) {
+      proxyReq.setHeader("x-wap-frontend-origin", incomingOrigin);
+    }
     return;
   }
 
   const rewritten: Record<string, string | string[]> = {};
   for (const [key, value] of Object.entries(
-    (target ?? {}) as Record<string, string | string[] | undefined>
+    (target ?? {}) as Record<string, string | string[] | undefined>,
   )) {
     if (value === undefined) continue;
     const lower = key.toLowerCase();
-    if (isForbiddenForwardHeader(lower) || lower === "host" || lower === "origin") {
+    if (lower === "cookie") {
+      const forwardedCookie = filterForwardedCookies(value, allowedCookieNames);
+      if (forwardedCookie) rewritten.cookie = forwardedCookie;
+      continue;
+    }
+    if (
+      isForbiddenForwardHeader(lower) ||
+      lower === "host" ||
+      lower === "origin" ||
+      lower === "x-wap-frontend-origin"
+    ) {
       continue;
     }
     rewritten[lower] = value;
   }
   rewritten.host = targetUrl.host;
   rewritten.origin = targetUrl.origin;
+  if (typeof frontendOrigin === "string" && frontendOrigin.length > 0) {
+    rewritten["x-wap-frontend-origin"] = frontendOrigin;
+  } else {
+    const originalOrigin = (target as Record<string, unknown>).origin;
+    if (typeof originalOrigin === "string") {
+      rewritten["x-wap-frontend-origin"] = originalOrigin;
+    }
+  }
   return rewritten;
 }
 
 export function createProxyForwarder(options: {
   target: string;
   frontendOrigin: string | (() => string);
+  sessionCookieName?: string;
 }): (req: IncomingMessage, res: ServerResponse) => void {
   const targetUrl = validateProxyTarget(options.target);
+  const allowedCookieNames = new Set([
+    options.sessionCookieName ?? "wap_session",
+    "wap_oidc_tx",
+    "wap_csrf",
+  ]);
   const guard = createProxyGuard(options);
 
-  return function proxyForwarder(req: IncomingMessage, res: ServerResponse): void {
+  return function proxyForwarder(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): void {
     guard(req, res, () => {
-      const headers = rewriteForwardHeaders(req.headers, targetUrl);
+      const originStr =
+        typeof options.frontendOrigin === "function"
+          ? options.frontendOrigin()
+          : options.frontendOrigin;
+      const allowedOrigin = validateFrontendOrigin(originStr).origin;
+      const headers = rewriteForwardHeaders(
+        req.headers,
+        targetUrl,
+        allowedOrigin,
+        allowedCookieNames,
+      );
 
       const clientReq = httpRequest(
         {
@@ -262,7 +365,7 @@ export function createProxyForwarder(options: {
         (clientRes) => {
           res.writeHead(clientRes.statusCode ?? 500, clientRes.headers);
           clientRes.pipe(res);
-        }
+        },
       );
 
       clientReq.on("error", () => {
@@ -276,7 +379,7 @@ export function createProxyForwarder(options: {
                 code: "BAD_GATEWAY",
                 message: "Failed to forward request to API target",
               },
-            })
+            }),
           );
         }
       });
@@ -289,7 +392,7 @@ export function createProxyForwarder(options: {
 function resolveServerOrigin(
   server: ViteDevServer | PreviewServer,
   explicitOrigin: string | (() => string) | undefined,
-  fallbackPort: number
+  fallbackPort: number,
 ): string {
   if (typeof explicitOrigin === "function") {
     return explicitOrigin();
@@ -298,7 +401,11 @@ function resolveServerOrigin(
     return explicitOrigin;
   }
   const address = server.httpServer?.address();
-  if (address && typeof address === "object" && typeof address.port === "number") {
+  if (
+    address &&
+    typeof address === "object" &&
+    typeof address.port === "number"
+  ) {
     return `http://127.0.0.1:${address.port}`;
   }
   const configPort =
@@ -310,7 +417,7 @@ function resolveServerOrigin(
 
 export function localProxy(
   targetOrOptions: string | LocalProxyOptions,
-  legacyDevOrigin?: string
+  legacyDevOrigin?: string,
 ): Plugin {
   const options: LocalProxyOptions =
     typeof targetOrOptions === "string"
@@ -318,6 +425,15 @@ export function localProxy(
       : targetOrOptions;
 
   const targetUrl = validateProxyTarget(options.target);
+  const sessionCookieName = options.sessionCookieName ?? "wap_session";
+  if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(sessionCookieName)) {
+    throw new Error(`Invalid session cookie name: "${sessionCookieName}"`);
+  }
+  const allowedCookieNames = new Set([
+    sessionCookieName,
+    "wap_oidc_tx",
+    "wap_csrf",
+  ]);
 
   const proxyConfig = {
     "/api/v1": {
@@ -326,7 +442,10 @@ export function localProxy(
       ws: false,
       configure(proxy: any) {
         proxy.on("proxyReq", (proxyReq: any) => {
-          rewriteForwardHeaders(proxyReq, targetUrl);
+          // The guard validates the browser origin before forwarding. The API
+          // receives the rewritten loopback Origin, which is its configured
+          // base origin; do not forward a stale Vite listening port here.
+          rewriteForwardHeaders(proxyReq, targetUrl, null, allowedCookieNames);
         });
       },
     },
@@ -341,7 +460,7 @@ export function localProxy(
         createProxyGuard({
           target: targetUrl.origin,
           frontendOrigin: getDevOrigin,
-        })
+        }),
       );
     },
     configurePreviewServer(server) {
@@ -351,7 +470,7 @@ export function localProxy(
         createProxyGuard({
           target: targetUrl.origin,
           frontendOrigin: getPreviewOrigin,
-        })
+        }),
       );
     },
     config() {

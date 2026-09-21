@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createServer as createHttpServer, request as httpRequest, type Server } from "node:http";
+import {
+  createServer as createHttpServer,
+  request as httpRequest,
+  type Server,
+} from "node:http";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
@@ -24,62 +28,62 @@ describe("localProxy configuration validation", () => {
 
   it("rejects non-HTTP protocols", () => {
     expect(() => validateProxyTarget("https://127.0.0.1:3001")).toThrow(
-      /HTTP protocol/
+      /HTTP protocol/,
     );
     expect(() => validateProxyTarget("ws://127.0.0.1:3001")).toThrow(
-      /HTTP protocol/
+      /HTTP protocol/,
     );
   });
 
   it("rejects non-loopback hostnames", () => {
     expect(() => validateProxyTarget("http://localhost:3001")).toThrow(
-      /127\.0\.0\.1/
+      /127\.0\.0\.1/,
     );
     expect(() => validateProxyTarget("http://example.com:3001")).toThrow(
-      /127\.0\.0\.1/
+      /127\.0\.0\.1/,
     );
     expect(() => validateProxyTarget("http://0.0.0.0:3001")).toThrow(
-      /127\.0\.0\.1/
+      /127\.0\.0\.1/,
     );
   });
 
   it("rejects missing or out-of-range ports", () => {
     expect(() => validateProxyTarget("http://127.0.0.1")).toThrow(
-      /explicit port/
+      /explicit port/,
     );
     expect(() => validateProxyTarget("http://127.0.0.1:0")).toThrow(
-      /out of range/
+      /out of range/,
     );
     expect(() => validateProxyTarget("http://127.0.0.1:70000")).toThrow(
-      /out of range/
+      /out of range/,
     );
   });
 
   it("rejects user credentials", () => {
     expect(() =>
-      validateProxyTarget("http://user:pass@127.0.0.1:3001")
+      validateProxyTarget("http://user:pass@127.0.0.1:3001"),
     ).toThrow(/credentials/);
   });
 
   it("rejects subpaths, queries, and fragments", () => {
     expect(() => validateProxyTarget("http://127.0.0.1:3001/api")).toThrow(
-      /subpath/
+      /subpath/,
     );
     expect(() => validateProxyTarget("http://127.0.0.1:3001?query=1")).toThrow(
-      /query parameters/
+      /query parameters/,
     );
     expect(() => validateProxyTarget("http://127.0.0.1:3001#fragment")).toThrow(
-      /fragment/
+      /fragment/,
     );
   });
 
   it("validates frontend origins correctly", () => {
-    expect(
-      validateFrontendOrigin("http://127.0.0.1:5173").origin
-    ).toBe("http://127.0.0.1:5173");
-    expect(
-      validateFrontendOrigin("http://127.0.0.1:4173").origin
-    ).toBe("http://127.0.0.1:4173");
+    expect(validateFrontendOrigin("http://127.0.0.1:5173").origin).toBe(
+      "http://127.0.0.1:5173",
+    );
+    expect(validateFrontendOrigin("http://127.0.0.1:4173").origin).toBe(
+      "http://127.0.0.1:4173",
+    );
     expect(() => validateFrontendOrigin("https://127.0.0.1:5173")).toThrow();
     expect(() => validateFrontendOrigin("http://localhost:5173")).toThrow();
     expect(() => validateFrontendOrigin("http://127.0.0.1")).toThrow();
@@ -90,9 +94,9 @@ describe("rewriteForwardHeaders helper", () => {
   const targetUrl = new URL("http://127.0.0.1:3001");
 
   it("identifies forbidden forward headers case-insensitively", () => {
-    expect(isForbiddenForwardHeader("cookie")).toBe(true);
-    expect(isForbiddenForwardHeader("Cookie")).toBe(true);
-    expect(isForbiddenForwardHeader("COOKIE")).toBe(true);
+    expect(isForbiddenForwardHeader("cookie")).toBe(false);
+    expect(isForbiddenForwardHeader("Cookie")).toBe(false);
+    expect(isForbiddenForwardHeader("COOKIE")).toBe(false);
     expect(isForbiddenForwardHeader("sec-fetch-site")).toBe(true);
     expect(isForbiddenForwardHeader("Sec-Fetch-Mode")).toBe(true);
     expect(isForbiddenForwardHeader("SEC-FETCH-DEST")).toBe(true);
@@ -106,9 +110,10 @@ describe("rewriteForwardHeaders helper", () => {
     expect(isForbiddenForwardHeader("accept")).toBe(false);
   });
 
-  it("strips Cookie, Sec-Fetch-*, replaces Host and Origin, and preserves safe headers", () => {
+  it("forwards only OIDC cookies, strips Sec-Fetch-*, and preserves safe headers", () => {
     const incoming = {
-      cookie: "sid=secret123; admin=true",
+      cookie:
+        "sid=secret123; wap_session=session123; wap_csrf=csrf123; admin=true",
       "sec-fetch-site": "same-origin",
       "sec-fetch-mode": "cors",
       "sec-fetch-dest": "empty",
@@ -124,7 +129,7 @@ describe("rewriteForwardHeaders helper", () => {
 
     const result = rewriteForwardHeaders(incoming, targetUrl);
 
-    expect(result.cookie).toBeUndefined();
+    expect(result.cookie).toBe("wap_session=session123; wap_csrf=csrf123");
     expect(result["sec-fetch-site"]).toBeUndefined();
     expect(result["sec-fetch-mode"]).toBeUndefined();
     expect(result["sec-fetch-dest"]).toBeUndefined();
@@ -137,14 +142,30 @@ describe("rewriteForwardHeaders helper", () => {
     expect(result["content-type"]).toBe("application/json");
     expect(result["content-length"]).toBe("42");
     expect(result.accept).toBe("application/json");
+    expect(result["x-wap-frontend-origin"]).toBe(
+      "http://dev.evil.invalid:5173",
+    );
   });
 
   it("applies header stripping and target setting to ClientRequest-like objects", () => {
     const removed: string[] = [];
     const set: Record<string, string> = {};
     const mockProxyReq = {
+      getHeader(name: string) {
+        return name === "cookie"
+          ? "sid=secret; wap_session=session123; wap_csrf=csrf123"
+          : name === "origin"
+            ? "http://127.0.0.1:5173"
+            : undefined;
+      },
       getHeaderNames() {
-        return ["cookie", "sec-fetch-site", "sec-fetch-mode", "authorization", "host"];
+        return [
+          "cookie",
+          "sec-fetch-site",
+          "sec-fetch-mode",
+          "authorization",
+          "host",
+        ];
       },
       removeHeader(name: string) {
         removed.push(name.toLowerCase());
@@ -166,6 +187,8 @@ describe("rewriteForwardHeaders helper", () => {
 
     expect(set.host).toBe("127.0.0.1:3001");
     expect(set.origin).toBe("http://127.0.0.1:3001");
+    expect(set.cookie).toBe("wap_session=session123; wap_csrf=csrf123");
+    expect(set["x-wap-frontend-origin"]).toBe("http://127.0.0.1:5173");
   });
 });
 
@@ -327,28 +350,32 @@ describe("localProxy independent dev and preview boundaries", () => {
 
   it("dev server rejects preview Host (Host preview + Origin dev)", async () => {
     const devUrl = new URL(devOrigin);
-    const res = await new Promise<{ statusCode?: number }>((resolve, reject) => {
-      const clientReq = httpRequest(
-        {
-          hostname: devUrl.hostname,
-          port: devUrl.port,
-          path: "/api/v1/auth/login",
-          method: "POST",
-          headers: {
-            host: new URL(previewOrigin).host,
-            origin: devOrigin,
-            "content-type": "application/json",
+    const res = await new Promise<{ statusCode?: number }>(
+      (resolve, reject) => {
+        const clientReq = httpRequest(
+          {
+            hostname: devUrl.hostname,
+            port: devUrl.port,
+            path: "/api/v1/auth/login",
+            method: "POST",
+            headers: {
+              host: new URL(previewOrigin).host,
+              origin: devOrigin,
+              "content-type": "application/json",
+            },
           },
-        },
-        (clientRes) => {
-          clientRes.resume();
-          clientRes.on("end", () => resolve({ statusCode: clientRes.statusCode }));
-        }
-      );
-      clientReq.on("error", reject);
-      clientReq.write(JSON.stringify({ email: "test@local.invalid" }));
-      clientReq.end();
-    });
+          (clientRes) => {
+            clientRes.resume();
+            clientRes.on("end", () =>
+              resolve({ statusCode: clientRes.statusCode }),
+            );
+          },
+        );
+        clientReq.on("error", reject);
+        clientReq.write(JSON.stringify({ email: "test@local.invalid" }));
+        clientReq.end();
+      },
+    );
 
     expect(res.statusCode).toBe(403);
     expect(upstreamCalls).toHaveLength(0);
@@ -356,28 +383,32 @@ describe("localProxy independent dev and preview boundaries", () => {
 
   it("dev server rejects preview Host and preview Origin", async () => {
     const devUrl = new URL(devOrigin);
-    const res = await new Promise<{ statusCode?: number }>((resolve, reject) => {
-      const clientReq = httpRequest(
-        {
-          hostname: devUrl.hostname,
-          port: devUrl.port,
-          path: "/api/v1/auth/login",
-          method: "POST",
-          headers: {
-            host: new URL(previewOrigin).host,
-            origin: previewOrigin,
-            "content-type": "application/json",
+    const res = await new Promise<{ statusCode?: number }>(
+      (resolve, reject) => {
+        const clientReq = httpRequest(
+          {
+            hostname: devUrl.hostname,
+            port: devUrl.port,
+            path: "/api/v1/auth/login",
+            method: "POST",
+            headers: {
+              host: new URL(previewOrigin).host,
+              origin: previewOrigin,
+              "content-type": "application/json",
+            },
           },
-        },
-        (clientRes) => {
-          clientRes.resume();
-          clientRes.on("end", () => resolve({ statusCode: clientRes.statusCode }));
-        }
-      );
-      clientReq.on("error", reject);
-      clientReq.write(JSON.stringify({ email: "test@local.invalid" }));
-      clientReq.end();
-    });
+          (clientRes) => {
+            clientRes.resume();
+            clientRes.on("end", () =>
+              resolve({ statusCode: clientRes.statusCode }),
+            );
+          },
+        );
+        clientReq.on("error", reject);
+        clientReq.write(JSON.stringify({ email: "test@local.invalid" }));
+        clientReq.end();
+      },
+    );
 
     expect(res.statusCode).toBe(403);
     expect(upstreamCalls).toHaveLength(0);
@@ -412,26 +443,30 @@ describe("localProxy independent dev and preview boundaries", () => {
 
   it("preview server rejects dev Host (Host dev + Origin preview)", async () => {
     const previewUrl = new URL(previewOrigin);
-    const res = await new Promise<{ statusCode?: number }>((resolve, reject) => {
-      const clientReq = httpRequest(
-        {
-          hostname: previewUrl.hostname,
-          port: previewUrl.port,
-          path: "/api/v1/runs",
-          method: "GET",
-          headers: {
-            host: new URL(devOrigin).host,
-            origin: previewOrigin,
+    const res = await new Promise<{ statusCode?: number }>(
+      (resolve, reject) => {
+        const clientReq = httpRequest(
+          {
+            hostname: previewUrl.hostname,
+            port: previewUrl.port,
+            path: "/api/v1/runs",
+            method: "GET",
+            headers: {
+              host: new URL(devOrigin).host,
+              origin: previewOrigin,
+            },
           },
-        },
-        (clientRes) => {
-          clientRes.resume();
-          clientRes.on("end", () => resolve({ statusCode: clientRes.statusCode }));
-        }
-      );
-      clientReq.on("error", reject);
-      clientReq.end();
-    });
+          (clientRes) => {
+            clientRes.resume();
+            clientRes.on("end", () =>
+              resolve({ statusCode: clientRes.statusCode }),
+            );
+          },
+        );
+        clientReq.on("error", reject);
+        clientReq.end();
+      },
+    );
 
     expect(res.statusCode).toBe(403);
     expect(upstreamCalls).toHaveLength(0);
@@ -512,7 +547,7 @@ describe("Vite server integration with localProxy plugin", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ati-vite-proxy-test-"));
     fs.writeFileSync(
       path.join(tempDir, "index.html"),
-      "<!doctype html><html><body>Test</body></html>"
+      "<!doctype html><html><body>Test</body></html>",
     );
 
     upstreamServer = createHttpServer((req, res) => {
@@ -545,7 +580,9 @@ describe("Vite server integration with localProxy plugin", () => {
 
   afterEach(async () => {
     if (upstreamServer) {
-      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+      await new Promise<void>((resolve) =>
+        upstreamServer.close(() => resolve()),
+      );
     }
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -568,7 +605,10 @@ describe("Vite server integration with localProxy plugin", () => {
       await viteServer.listen();
       const vitePort = viteServer.httpServer.address().port;
       const viteOrigin = `http://127.0.0.1:${vitePort}`;
-      const validBody = JSON.stringify({ email: "real-vite@test.invalid", role: "admin" });
+      const validBody = JSON.stringify({
+        email: "real-vite@test.invalid",
+        role: "admin",
+      });
 
       // 1. Valid request to Vite dev server with browser metadata
       const validRes = await fetch(`${viteOrigin}/api/v1/auth/login`, {

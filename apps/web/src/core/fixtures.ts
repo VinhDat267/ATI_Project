@@ -219,7 +219,11 @@ export function createFixtureTransport(
   if (statusResult.success) {
     runs.unshift({
       detail: createFixtureScenario(statusResult.data),
-      trace: TraceSchema.parse({ run_id: FIXTURE_RUN_ID, attempts: [], next_cursor: null }),
+      trace: TraceSchema.parse({
+        run_id: FIXTURE_RUN_ID,
+        attempts: [],
+        next_cursor: null,
+      }),
       events: [],
       reconciliation: null,
     });
@@ -239,12 +243,33 @@ export function createFixtureTransport(
     runId: statusResult.success ? FIXTURE_RUN_ID : WORLD_IDS.approval,
     calls,
     suggestedPrompt(runId) {
-      return runs.find((run) => run.detail.run_id === runId)?.suggestedPrompt ?? null;
+      return (
+        runs.find((run) => run.detail.run_id === runId)?.suggestedPrompt ?? null
+      );
     },
     async login(email, password, signal) {
       record("POST", "/auth/login");
       LoginRequestSchema.parse({ email, password });
       return resolveWithSignal("fixture-session-token", signal);
+    },
+    async me(signal) {
+      record("GET", "/auth/me");
+      return resolveWithSignal(
+        {
+          user_id: "00000000-0000-4000-8000-000000000001",
+          email: "demo@local.invalid",
+          display_name: "Demo local",
+          roles: ["user"],
+        },
+        signal,
+      );
+    },
+    async logout(signal) {
+      record("POST", "/auth/logout");
+      await resolveWithSignal(undefined, signal);
+    },
+    startOidcLogin() {
+      throw new Error("OIDC chỉ dành cho live transport");
     },
     async list(signal) {
       record("GET", "/runs");
@@ -281,7 +306,11 @@ export function createFixtureTransport(
           created_at: now,
           read_outputs: {},
         }),
-        trace: TraceSchema.parse({ run_id: id, attempts: [], next_cursor: null }),
+        trace: TraceSchema.parse({
+          run_id: id,
+          attempts: [],
+          next_cursor: null,
+        }),
         events: [],
         reconciliation: null,
       });
@@ -293,7 +322,10 @@ export function createFixtureTransport(
     async detail(id, signal) {
       record("GET", `/runs/${id}`);
       const run = find(id);
-      return resolveFactoryWithSignal(() => RunDetailSchema.parse(run.detail), signal);
+      return resolveFactoryWithSignal(
+        () => RunDetailSchema.parse(run.detail),
+        signal,
+      );
     },
     async events(id, since, signal) {
       record("GET", `/runs/${id}/events?since_seq=${since}`);
@@ -331,13 +363,19 @@ export function createFixtureTransport(
     async cancel(id, signal) {
       record("POST", `/runs/${id}/cancel`);
       const run = find(id);
-      run.detail = RunDetailSchema.parse({ ...run.detail, status: "cancelled" });
+      run.detail = RunDetailSchema.parse({
+        ...run.detail,
+        status: "cancelled",
+      });
       await resolveWithSignal(undefined, signal);
     },
     async trace(id, cursor, signal) {
       record("GET", `/runs/${id}/trace${cursor ? `?cursor=${cursor}` : ""}`);
       const run = find(id);
-      return resolveFactoryWithSignal(() => TraceSchema.parse(run.trace), signal);
+      return resolveFactoryWithSignal(
+        () => TraceSchema.parse(run.trace),
+        signal,
+      );
     },
     async reconciliation(id, signal) {
       record("GET", `/runs/${id}/reconciliation`);
@@ -345,7 +383,11 @@ export function createFixtureTransport(
       return resolveFactoryWithSignal(
         () =>
           ReconciliationSchema.parse(
-            run.reconciliation ?? { run_id: id, read_only: true, operations: [] },
+            run.reconciliation ?? {
+              run_id: id,
+              read_only: true,
+              operations: [],
+            },
           ),
         signal,
       );

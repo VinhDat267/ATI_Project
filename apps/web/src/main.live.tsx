@@ -12,16 +12,13 @@ export function bootstrap(): void {
 
   const session = createSession();
   const transport = createHttpTransport({
+    mode: "hybrid",
     getToken: () => session.getToken(),
   });
 
   createRoot(rootElement).render(
     <StrictMode>
-      <App
-        transport={transport}
-        session={session}
-        mode="live"
-      />
+      <App transport={transport} session={session} mode="live" />
     </StrictMode>,
   );
 }

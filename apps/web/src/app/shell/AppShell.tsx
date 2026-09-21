@@ -47,14 +47,21 @@ export function AppShell({
   route: Route;
   children: ReactNode;
 }) {
-  const { session, email, mode } = useApp();
+  const { session, transport, email, mode } = useApp();
   const attention = useAttention().runs.length;
   const [menuOpen, setMenuOpen] = useState(false);
 
   const signOut = (): void => {
     setMenuOpen(false);
-    session.clear();
-    navigate({ page: "login" }, true);
+    const scope = session.beginRequest();
+    void transport
+      .logout(scope.signal)
+      .catch(() => undefined)
+      .finally(() => {
+        scope.dispose();
+        session.clear();
+        navigate({ page: "login" }, true);
+      });
   };
 
   const navLinks = (variant: "bar" | "sheet") =>
@@ -82,7 +89,9 @@ export function AppShell({
           )}
         >
           {label}
-          {item.page === "history" ? <AttentionBadge count={attention} /> : null}
+          {item.page === "history" ? (
+            <AttentionBadge count={attention} />
+          ) : null}
         </a>
       );
     });
@@ -170,7 +179,9 @@ export function AppShell({
                 <Dialog.Overlay className="fixed inset-0 z-20 bg-ink/40" />
                 <Dialog.Content className="fixed inset-y-0 right-0 z-30 flex w-80 max-w-full flex-col gap-2 bg-canvas p-6 shadow-card">
                   <div className="flex items-center justify-between">
-                    <Dialog.Title className="m-0 text-title-md">Menu</Dialog.Title>
+                    <Dialog.Title className="m-0 text-title-md">
+                      Menu
+                    </Dialog.Title>
                     <Dialog.Close asChild>
                       <button
                         type="button"
@@ -184,7 +195,10 @@ export function AppShell({
                   <Dialog.Description className="sr-only">
                     Điều hướng chính và tài khoản
                   </Dialog.Description>
-                  <nav aria-label="Điều hướng chính" className="flex flex-col gap-1">
+                  <nav
+                    aria-label="Điều hướng chính"
+                    className="flex flex-col gap-1"
+                  >
                     {navLinks("sheet")}
                   </nav>
                   <div className="mt-auto flex flex-col gap-2 border-t border-hairline pt-4">

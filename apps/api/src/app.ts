@@ -319,7 +319,13 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             maxAge: Math.ceil(config.oidc.transactionTtlMs / 1000),
             secure,
           }),
-          serializeCookie("wap_csrf", csrf, { maxAge: 900, secure }),
+          serializeCookie("wap_csrf", csrf, {
+            maxAge: 900,
+            secure,
+            // Double-submit CSRF requires the browser client to echo this
+            // nonce in a request header; it is not an authentication secret.
+            httpOnly: false,
+          }),
         ]);
         response.end();
         return;
@@ -379,7 +385,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        if (!config.oidc?.enabled)
+        if (!config.oidc?.enabled && !request.headers.authorization)
           throw new HttpError(
             503,
             "OIDC_NOT_CONFIGURED",
@@ -413,7 +419,11 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
                 maxAge: 0,
                 secure,
               }),
-              serializeCookie("wap_csrf", "", { maxAge: 0, secure }),
+              serializeCookie("wap_csrf", "", {
+                maxAge: 0,
+                secure,
+                httpOnly: false,
+              }),
             ]);
           }
           writeEmpty(response, 204, requestId);
