@@ -5,6 +5,19 @@ This environment uses `start-dev` and HTTP loopback. HTTPS staging, production
 database operations, provider session revocation propagation, and user acceptance
 remain separate gates.
 
+## Verified local checkpoint
+
+On 2026-09-21, after stopping and restarting Keycloak with its existing volume,
+the acceptance harness passed on clean commit `fe9e3fb`. See the
+[sanitized manifest](keycloak-local-20260921/manifest.json): two identities,
+PKCE authorization code login, API restart session persistence, owner isolation,
+application logout/revocation, and cleanup passed.
+The browser executes the callback, but initial transaction cookies are injected
+and subsequent API checks use Node fetch. Full ATI browser cookie policy,
+provider SSO logout, expiry, and HTTPS staging acceptance are not established.
+
+## Usage
+
 From the repository root:
 
 ```powershell
