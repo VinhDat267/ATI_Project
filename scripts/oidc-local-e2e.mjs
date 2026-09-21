@@ -1,6 +1,7 @@
 import http from "node:http";
 import { randomUUID, createHash } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
@@ -322,6 +323,48 @@ try {
   });
   assert(revoked.status === 401, `OIDC_E2E_REVOKE_${revoked.status}`);
 
+  const evidenceDir = path.join(
+    root,
+    "docs",
+    "auth-evidence",
+    "OIDC-01",
+    `local-${new Date().toISOString().replaceAll(/[-:.TZ]/g, "")}-${randomUUID()}`,
+  );
+  mkdirSync(evidenceDir, { recursive: true });
+  const evidencePath = path.join(evidenceDir, "manifest.json");
+  writeFileSync(
+    evidencePath,
+    `${JSON.stringify(
+      {
+        schema: "ati-oidc-local-e2e-1",
+        task: "OIDC-01",
+        created_at: new Date().toISOString(),
+        status: "PASS",
+        technical: "PASS",
+        commit:
+          spawnSync("git", ["rev-parse", "HEAD"], {
+            cwd: root,
+            encoding: "utf8",
+            windowsHide: true,
+          }).stdout?.trim() ?? "unknown",
+        provider: "local-fake-oidc",
+        acceptance: {
+          callback_state_nonce_pkce: "PASS",
+          jwks_id_token_validation: "PASS",
+          durable_identity_session: "PASS",
+          two_user_owner_matrix: "PASS",
+          csrf_logout_and_revoke: "PASS",
+        },
+        cross_owner_status: crossOwner.status,
+        revoked_session_status: revoked.status,
+        secrets_in_manifest: false,
+      },
+      null,
+      2,
+    )}\n`,
+    { flag: "wx" },
+  );
+
   console.log(
     JSON.stringify(
       {
@@ -331,6 +374,7 @@ try {
         identities: [alice.identity.email, bob.identity.email],
         cross_owner_status: crossOwner.status,
         revoked_session_status: revoked.status,
+        manifest: path.relative(root, evidencePath).replaceAll("\\", "/"),
         secrets_in_output: false,
       },
       null,
