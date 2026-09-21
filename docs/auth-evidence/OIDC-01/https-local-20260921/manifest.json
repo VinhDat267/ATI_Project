@@ -1,0 +1,39 @@
+{
+  "schema": "ati-keycloak-https-e2e-1",
+  "provider": "keycloak-local",
+  "status": "PASS",
+  "production_acceptance": "NOT_RUN",
+  "secrets_in_manifest": false,
+  "execution_surface": {
+    "ati_web_and_callback": "https_localhost_self_signed_certificate",
+    "browser_certificate_handling": "chromium_ignore_https_errors_local_test_only",
+    "provider_issuer": "http_loopback_keycloak_local",
+    "session_expiry": "short_lived_durable_session"
+  },
+  "acceptance": {
+    "invalid_callback_rejected": "PASS",
+    "https_secure_cookie_attributes": "PASS",
+    "expired_session_server_rejected": "PASS",
+    "expired_session_returns_to_login": "PASS",
+    "reauthentication_after_expiry": "PASS",
+    "https_ui_logout_revocation": "PASS"
+  },
+  "cleanup": {
+    "https_proxy": "PASS",
+    "web": "PASS",
+    "api": "PASS",
+    "browser": "PASS",
+    "certificate_file": "PASS",
+    "database": "PASS",
+    "admin_connection": "PASS",
+    "client_configuration": "PASS"
+  },
+  "provider_reauthentication": "provider_sso_session_reused",
+  "created_at": "2026-09-21T12:19:32.907Z",
+  "commit": "6df82351b6455135b95a0ff017c2a81592e00134",
+  "worktree_dirty": false,
+  "source_sha256": {
+    "scripts/oidc-keycloak-https-e2e.mjs": "c611e6055d501a776c441569c61f6f302e0bbcbb7760584b71f3a8f9ab28354a",
+    "apps/api/dist/main.js": "d471c1a5e5603b0eed3b6d19f3bbe7fe9ef75c8ff6721eb5636bc39788c070f4"
+  }
+}

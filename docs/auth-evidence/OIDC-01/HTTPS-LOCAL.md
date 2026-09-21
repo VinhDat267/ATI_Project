@@ -4,6 +4,8 @@
 evidence. It does not provide a trusted public certificate, DNS, or staging
 provider acceptance.
 
+The clean commit `6df8235` passed; see the [sanitized HTTPS manifest](https-local-20260921/manifest.json).
+
 ## What the check runs
 
 `npm run check:oidc:https` starts an isolated API database and live Vite app,
