@@ -47,6 +47,7 @@ it("applies SQL migrations exactly once and detects checksum drift", async () =>
     "0007_ai_reviewed_catalog_index.sql",
     "0008_ai_embedding_fingerprints.sql",
     "0008_ai_provider_accounting.sql",
+    "0009_oidc_identity.sql",
   ]);
   expect((await implementation.migrate(url)).applied).toEqual([]);
   const dir = mkdtempSync(path.join(tmpdir(), "ati-migration-test-"));
