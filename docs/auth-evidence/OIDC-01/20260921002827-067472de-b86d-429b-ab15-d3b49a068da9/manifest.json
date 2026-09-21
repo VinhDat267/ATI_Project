@@ -1,0 +1,89 @@
+{
+  "schema": "ati-oidc-evidence-1",
+  "task": "OIDC-01",
+  "created_at": "2026-09-21T00:28:40.384Z",
+  "commit": "ea4dd1852cc6d476ae8a16145ce1def5cc54bc71",
+  "status": "OPEN",
+  "verdict": {
+    "technical": "PASS",
+    "overall": "OPEN"
+  },
+  "provider": {
+    "enabled_flag_present": false,
+    "required_configuration_present": false,
+    "checked_names": [
+      "OIDC_ISSUER_URL",
+      "OIDC_CLIENT_ID",
+      "OIDC_CLIENT_SECRET",
+      "OIDC_REDIRECT_URI",
+      "OIDC_WEB_ORIGIN"
+    ]
+  },
+  "files": [
+    {
+      "path": "db/migrations/0009_oidc_identity.sql",
+      "present": true,
+      "sha256": "82daf157e93c56811e3e332f2de224b657ad84bc930c84bf2bf41a7824242dbf"
+    },
+    {
+      "path": "apps/api/src/oidc.ts",
+      "present": true,
+      "sha256": "8e8be124bd194bea10e134fea1e51b2a2ec0bcc779106b49871a2bd910e4e1d8"
+    },
+    {
+      "path": "apps/api/src/durable-auth.ts",
+      "present": true,
+      "sha256": "cdf03bc3376fe8f84478d307deb3dbfb82871125400fad6a4041f7da930abd13"
+    },
+    {
+      "path": "apps/web/src/core/api.ts",
+      "present": true,
+      "sha256": "df93faf46d63cf0dc8d294d3a1ef82802a050bab3f003cd739b5d1cec58806d5"
+    }
+  ],
+  "gates": [
+    {
+      "id": "api-oidc-unit",
+      "command": "npm.cmd run test:unit -w @wap/api -- --run oidc.test.ts oidc-flow.test.ts",
+      "exit_code": 0,
+      "duration_ms": 1737,
+      "output_tail": "\n> @wap/api@0.1.0 test:unit\n> vitest run --config vitest.unit.config.ts --run oidc.test.ts oidc-flow.test.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/api\n\n\n Test Files  2 passed (2)\n      Tests  5 passed (5)\n   Start at  07:28:28\n   Duration  784ms (transform 54ms, setup 0ms, import 179ms, tests 262ms, environment 0ms)\n\n\n"
+    },
+    {
+      "id": "api-oidc-http",
+      "command": "npm.cmd run test:integration -w @wap/api -- --run oidc-http.integration.test.ts durable-auth.integration.test.ts",
+      "exit_code": 0,
+      "duration_ms": 5743,
+      "output_tail": "\n> @wap/api@0.1.0 test:integration\n> vitest run --config vitest.integration.config.ts --run oidc-http.integration.test.ts durable-auth.integration.test.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/api\n\n\n Test Files  2 passed (2)\n      Tests  3 passed (3)\n   Start at  07:28:29\n   Duration  4.70s (transform 1.68s, setup 0ms, import 3.29s, tests 1.01s, environment 0ms)\n\n\n"
+    },
+    {
+      "id": "web-cookie-boundary",
+      "command": "npm.cmd run test:unit -w @wap/web -- --run api.test.ts session.test.ts local-proxy.test.ts",
+      "exit_code": 0,
+      "duration_ms": 4621,
+      "output_tail": "\n> pretest:unit\n> npm run prepare:dsl\n\n\n> prepare:dsl\n> npm run build -w @wap/dsl\n\n\n> @wap/dsl@0.1.0 build\n> tsc\n\n\n> test:unit\n> vitest run --config vitest.unit.config.ts --run api.test.ts session.test.ts local-proxy.test.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/web\n\n\n Test Files  3 passed (3)\n      Tests  40 passed (40)\n   Start at  07:28:38\n   Duration  768ms (transform 271ms, setup 0ms, import 636ms, tests 371ms, environment 0ms)\n\n\n"
+    },
+    {
+      "id": "api-release-contract",
+      "command": "npm.cmd run test:integration -w @wap/api -- --run auth-release-gate.integration.test.ts",
+      "exit_code": 0,
+      "duration_ms": 1133,
+      "output_tail": "\n> @wap/api@0.1.0 test:integration\n> vitest run --config vitest.integration.config.ts --run auth-release-gate.integration.test.ts\n\n\n RUN  v4.1.11 D:/Môn học/ATI/ATI_Project/apps/api\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  07:28:40\n   Duration  203ms (transform 21ms, setup 0ms, import 35ms, tests 7ms, environment 0ms)\n\n\n"
+    }
+  ],
+  "acceptance": {
+    "callback_state_nonce_pkce": "PASS",
+    "jwks_rotation": "PASS",
+    "durable_identity_session_revoke": "PASS",
+    "cookie_csrf_origin_proxy": "PASS",
+    "two_user_live_owner_matrix": "OPEN",
+    "restart_revoke": "OPEN",
+    "migration_restore_rehearsal": "OPEN"
+  },
+  "open_items": [
+    "OIDC_GATE_NOT_READY: provider/tenant credentials and explicit OIDC_ENABLED=1 were not supplied to this run",
+    "TWO_USER_LIVE_ACCEPTANCE_OPEN: no authorized external provider session and representative two-user acceptance evidence",
+    "UX_DESIGN_APPROVAL_OPEN: visual direction and Design System remain user-owned decisions"
+  ],
+  "secrets_in_manifest": false
+}
