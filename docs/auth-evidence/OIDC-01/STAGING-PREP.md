@@ -12,6 +12,8 @@ development realm does not satisfy the HTTPS staging deployment gate below.
 
 - Non-secret environment template:
   [`config/oidc-staging.env.example`](../../../config/oidc-staging.env.example)
+- HTTPS ingress and execution gate:
+  [HTTPS preparation](HTTPS-PREP.md)
 - Current local technical evidence:
   [`local-20260921071503494-6321629d-e85e-4efa-9e37-e057ad822183/manifest.json`](local-20260921071503494-6321629d-e85e-4efa-9e37-e057ad822183/manifest.json)
 - Current release gate:

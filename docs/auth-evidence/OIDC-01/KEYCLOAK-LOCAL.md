@@ -16,6 +16,25 @@ The browser executes the callback, but initial transaction cookies are injected
 and subsequent API checks use Node fetch. Full ATI browser cookie policy,
 provider SSO logout, expiry, and HTTPS staging acceptance are not established.
 
+## Full ATI browser checkpoint
+
+The separate `check:oidc:browser` harness starts an isolated API database and
+the live Vite application, then drives the visible ATI LoginView SSO button,
+the Keycloak credentials page, the ATI AppShell session, and UI logout in one
+headless Chromium context. Transaction and session cookies are created through
+the browser; no transaction cookie is injected. It restores the temporary
+Keycloak callback/web-origin registrations and removes the isolated database.
+
+Run it only after the local Keycloak service is ready:
+
+```powershell
+npm run check:oidc:browser
+```
+
+It is loopback HTTP evidence, so its session cookie correctly lacks `Secure`.
+The [HTTPS preparation gate](HTTPS-PREP.md) defines the separate staging
+contract and remaining browser acceptance work.
+
 ## Usage
 
 From the repository root:
@@ -24,6 +43,7 @@ From the repository root:
 node scripts/keycloak-local.mjs up
 npm run build -w @wap/api
 node scripts/oidc-keycloak-e2e.mjs
+npm run check:oidc:browser
 ```
 
 The setup starts Compose project `ati-keycloak-local`, with persistent volume

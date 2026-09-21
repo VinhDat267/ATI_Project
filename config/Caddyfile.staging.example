@@ -1,0 +1,36 @@
+# HTTPS ingress template for ATI staging. This is not a deployment: set the
+# environment values in the host service manager, provision DNS, and validate
+# the resulting certificate before exposing it. Caddy terminates TLS; the API
+# stays bound to 127.0.0.1:3001 and must not receive a public port mapping.
+{
+  email {$ATI_ACME_EMAIL:security@example.invalid}
+}
+
+{$ATI_WEB_HOST:staging.example.invalid} {
+  encode zstd gzip
+
+  header {
+    -Server
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), geolocation=(), microphone=()"
+  }
+
+  @api path /api/v1/*
+  handle @api {
+    reverse_proxy 127.0.0.1:3001 {
+      # The browser Origin remains intact for API CSRF/origin validation.
+      # Never trust a client-supplied proxy assertion of frontend origin.
+      header_up -X-Wap-Frontend-Origin
+      header_up Host {http.request.host}
+      header_up X-Forwarded-Proto {http.request.scheme}
+    }
+  }
+
+  handle {
+    root * /srv/ati-web
+    try_files {path} /index.html
+    file_server
+  }
+}
