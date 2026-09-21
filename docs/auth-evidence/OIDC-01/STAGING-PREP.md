@@ -4,6 +4,10 @@
 System is approved. OIDC remains disabled in the checked-in template because an
 authorized issuer, tenant, and secret references have not yet been provided.
 
+The project owner subsequently selected self-hosted Keycloak for local provider
+integration. See [Keycloak local setup](KEYCLOAK-LOCAL.md). Its HTTP loopback
+development realm does not satisfy the HTTPS staging deployment gate below.
+
 ## Tracked assets
 
 - Non-secret environment template:

@@ -1,0 +1,15 @@
+name: ati-keycloak-local
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    command: [start-dev, --import-realm]
+    ports:
+      - "127.0.0.1:18080:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?Use scripts/keycloak-local.mjs}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Use scripts/keycloak-local.mjs}
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./.cache/keycloak-local/import:/opt/keycloak/data/import:ro
+volumes:
+  keycloak_data:

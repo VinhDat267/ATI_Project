@@ -1,0 +1,44 @@
+# Keycloak local provider
+
+Keycloak is the selected self-hosted provider for local OIDC acceptance.
+This environment uses `start-dev` and HTTP loopback. HTTPS staging, production
+database operations, provider session revocation propagation, and user acceptance
+remain separate gates.
+
+From the repository root:
+
+```powershell
+node scripts/keycloak-local.mjs up
+npm run build -w @wap/api
+node scripts/oidc-keycloak-e2e.mjs
+```
+
+The setup starts Compose project `ati-keycloak-local`, with persistent volume
+`ati-keycloak-local_keycloak_data`, and binds only `127.0.0.1:18080`.
+Admin console: <http://127.0.0.1:18080/admin/>. Realm: `ati-local`.
+Confidential application client: `ati-web`, Authorization Code with PKCE S256;
+application password grants and self-registration are disabled.
+Test users: `alice` and `bob`.
+
+Generated local credentials are in ignored `.cache/keycloak-local/runtime.json`;
+the generated realm import also contains credentials. Treat both as local
+secrets, do not share or commit them. Stop without removing data:
+
+```powershell
+node scripts/keycloak-local.mjs stop
+```
+
+Startup import skips an existing realm, preserving its state. Keep the runtime
+file with its volume: deleting only the file regenerates credentials which will
+not match an existing realm. Do not delete the volume to troubleshoot login.
+
+The E2E script temporarily registers an exact ephemeral API callback, restores
+the original callback list, and uses an isolated application test database.
+It drives real Keycloak user login through a browser and checks the ATI session
+and ownership boundary. It does not leave an ATI API running or modify the
+normal application environment. Sanitized results are written to
+`.cache/keycloak-local/evidence.json`; the Keycloak service remains available.
+
+The initial setup is based on the official guides:
+[Docker](https://www.keycloak.org/getting-started/getting-started-docker) and
+[realm import](https://www.keycloak.org/server/importExport).
