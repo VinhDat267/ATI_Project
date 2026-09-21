@@ -1,0 +1,33 @@
+{
+  "schema": "ati-keycloak-browser-e2e-1",
+  "provider": "keycloak-local",
+  "status": "PASS",
+  "production_acceptance": "NOT_RUN",
+  "secrets_in_manifest": false,
+  "execution_surface": {
+    "ati_ui": "headless_chromium_login_view_to_app_shell",
+    "transaction_cookies": "browser_set_via_same_origin_vite_proxy",
+    "session_cookie": "browser_issued_and_used_by_ui",
+    "provider_sso_logout": "NOT_VERIFIED"
+  },
+  "acceptance": {
+    "browser_ui_authorization_code_pkce": "PASS",
+    "browser_session_cookie": "PASS",
+    "browser_ui_logout_revocation": "PASS"
+  },
+  "cleanup": {
+    "web": "PASS",
+    "api": "PASS",
+    "browser": "PASS",
+    "database": "PASS",
+    "admin_connection": "PASS",
+    "client_configuration": "PASS"
+  },
+  "created_at": "2026-09-21T09:29:21.391Z",
+  "commit": "e9e9bc1aca58fce04cf7d3f976b0360bbc8deee1",
+  "worktree_dirty": false,
+  "source_sha256": {
+    "scripts/oidc-keycloak-browser-e2e.mjs": "84a1377040ca9a8f8a323bd03dbb251dcab57cf7752366af9e2e5757f055703c",
+    "apps/api/dist/main.js": "d471c1a5e5603b0eed3b6d19f3bbe7fe9ef75c8ff6721eb5636bc39788c070f4"
+  }
+}

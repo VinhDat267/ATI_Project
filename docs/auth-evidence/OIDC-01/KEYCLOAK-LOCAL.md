@@ -18,6 +18,9 @@ provider SSO logout, expiry, and HTTPS staging acceptance are not established.
 
 ## Full ATI browser checkpoint
 
+On 2026-09-21, this passed from clean commit `e9e9bc1`; see the
+[sanitized browser manifest](keycloak-browser-local-20260921/manifest.json).
+
 The separate `check:oidc:browser` harness starts an isolated API database and
 the live Vite application, then drives the visible ATI LoginView SSO button,
 the Keycloak credentials page, the ATI AppShell session, and UI logout in one
