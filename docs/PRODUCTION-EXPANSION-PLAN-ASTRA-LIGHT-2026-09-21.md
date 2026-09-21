@@ -19,6 +19,11 @@ OIDC and production pilot readiness remain `OPEN`.
   `docs/auth-evidence/OIDC-01/20260921071316-825ab795-6bfe-4388-880f-6d73269143f8/manifest.json`.
 - The worktree is intentionally dirty with user-owned UI/DesignSystem changes;
   those changes are not silently reverted or treated as design approval.
+- The latest `npm run check:full` on HEAD `fb095d1` exited `0`: DSL 44,
+  engine unit 341 (+1 skipped), API unit 67, web unit 132, MCP integration 64,
+  engine integration 102, API integration 46; WEB-03 passed all 6 gates,
+  NFR-03 p95 was 1938 ms and cleanup passed. The generated web manifest is
+  `docs/web-evidence/WEB-03/20260921073613-4647b009-c0f2-4b02-850f-008aad3a1439/manifest.json`.
 - AI quality, production operations, restore/incident evidence, representative
   user acceptance, and visual direction/Design System approval remain open.
 
