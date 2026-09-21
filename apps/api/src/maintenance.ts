@@ -7,12 +7,12 @@ export interface MaintenanceControl {
 }
 
 export type MaintenanceErrorCode =
-  | "APPROVAL_EXPIRY_FAILED"
-  | "TRACE_SNAPSHOT_CLEANUP_FAILED";
+  "APPROVAL_EXPIRY_FAILED" | "TRACE_SNAPSHOT_CLEANUP_FAILED";
 
 /** Expires approvals and bounded trace snapshots independently from dispatch. */
 export function createExpiryMaintenance(options: {
   engine: WorkflowEngine;
+  engineFactory?: () => Iterable<WorkflowEngine>;
   intervalMs?: number;
   traceSnapshotBatchSize?: number;
   onError?: (code: MaintenanceErrorCode) => void;
@@ -34,23 +34,26 @@ export function createExpiryMaintenance(options: {
     if (stopped || running) return;
     running = true;
     active = (async () => {
-      try {
-        await options.engine.expireApprovals();
-      } catch {
-        report("APPROVAL_EXPIRY_FAILED");
+      const engines = new Set<WorkflowEngine>([
+        options.engine,
+        ...(options.engineFactory?.() ?? []),
+      ]);
+      for (const engine of engines) {
+        try {
+          await engine.expireApprovals();
+        } catch {
+          report("APPROVAL_EXPIRY_FAILED");
+        }
+        try {
+          await engine.cleanupExpiredTraceSnapshots(traceSnapshotBatchSize);
+        } catch {
+          report("TRACE_SNAPSHOT_CLEANUP_FAILED");
+        }
       }
-      try {
-        await options.engine.cleanupExpiredTraceSnapshots(
-          traceSnapshotBatchSize,
-        );
-      } catch {
-        report("TRACE_SNAPSHOT_CLEANUP_FAILED");
-      }
-    })()
-      .finally(() => {
-        running = false;
-        active = undefined;
-      });
+    })().finally(() => {
+      running = false;
+      active = undefined;
+    });
     await active;
   };
   return {

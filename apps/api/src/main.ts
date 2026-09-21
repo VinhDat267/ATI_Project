@@ -8,6 +8,7 @@ import {
   openLocalGateway,
   readAiProviderConfig,
   type AiProvider,
+  type Gateway,
 } from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -155,6 +156,62 @@ const engine = new WorkflowEngine(db, gateway, config.userId, {
   ].filter(Boolean),
   ...(aiRuntime ? { replan: aiRuntime.replan } : {}),
 });
+const principalGateways = new Map<string, Gateway>();
+const principalEngines = new Map<string, WorkflowEngine>([
+  [config.userId, engine],
+]);
+const engineFactory = config.oidc?.enabled
+  ? (userId: string): WorkflowEngine | undefined => {
+      const existing = principalEngines.get(userId);
+      if (existing) return existing;
+      // AI provider authorization/campaigns are currently bootstrapped for
+      // the configured pilot principal only. Fail closed for another OIDC
+      // principal instead of reusing that user's provider budget.
+      if (config.plannerMode === "ai") return undefined;
+      const principalGateway = createGatewayManager(
+        userId,
+        async () => {
+          const filesystem = await loadFilesystemLaunch(root, userId);
+          return openLocalGateway({
+            root,
+            databaseUrl,
+            userId,
+            ...(filesystem ? { filesystem } : {}),
+          });
+        },
+        async () => {
+          let filesystem;
+          try {
+            filesystem = await loadFilesystemLaunch(root, userId);
+          } catch {
+            filesystem = undefined;
+          }
+          return inspectLocalGateway(
+            {
+              root,
+              databaseUrl,
+              userId,
+              ...(filesystem ? { filesystem } : {}),
+            },
+            { filesystemConfigured },
+          );
+        },
+      );
+      principalGateways.set(userId, principalGateway);
+      const principalEngine = new WorkflowEngine(db, principalGateway, userId, {
+        secrets: [
+          config.passwordHash,
+          config.cursorKey.toString("base64"),
+          config.cursorKey.toString("hex"),
+          databaseUrl,
+          decodeURIComponent(new URL(databaseUrl).password),
+          ...(aiRuntime?.secrets ?? []),
+        ].filter(Boolean),
+      });
+      principalEngines.set(userId, principalEngine);
+      return principalEngine;
+    }
+  : undefined;
 const planner =
   config.plannerMode === "dev_fixture"
     ? loadDevPlanner(root)
@@ -165,6 +222,7 @@ const worker = createPrepareWorker({
   db,
   userId: config.userId,
   engine,
+  ...(engineFactory ? { engineFactory } : {}),
   planner,
   shutdownTimeoutMs: config.workerShutdownTimeoutMs ?? 30_000,
   onError: (code) =>
@@ -172,6 +230,7 @@ const worker = createPrepareWorker({
 });
 const maintenance = createExpiryMaintenance({
   engine,
+  engineFactory: () => principalEngines.values(),
   onError: (code) =>
     console.error(JSON.stringify({ event: "maintenance_deferred", code })),
 });
@@ -201,6 +260,7 @@ const api = createApi({
   maintenance,
   ...(sessionStore ? { sessionStore } : {}),
   ...(oidcFlow ? { oidcFlow } : {}),
+  ...(engineFactory ? { engineFactory } : {}),
   health: {
     readiness: async () => {
       try {
@@ -228,6 +288,8 @@ async function stop() {
   if (stopping) return;
   stopping = true;
   await api.close();
+  for (const principalGateway of principalGateways.values())
+    await principalGateway.close();
   await gateway?.close();
   await db.close();
 }

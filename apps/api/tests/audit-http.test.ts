@@ -7,7 +7,12 @@ import {
   type Gateway,
   type EngineTool,
 } from "@wap/engine";
-import { createApi, type ApiConfig, type ApiRuntime } from "../src/app.js";
+import {
+  createApi,
+  type ApiConfig,
+  type ApiRuntime,
+  type PrincipalEngineFactory,
+} from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import { redact } from "../src/redaction.js";
 
@@ -20,7 +25,10 @@ afterEach(async () => {
   openApis.clear();
 });
 
-async function startApi(engine?: WorkflowEngine) {
+async function startApi(
+  engine?: WorkflowEngine,
+  engineFactory?: PrincipalEngineFactory,
+) {
   const config: ApiConfig = {
     host: "127.0.0.1",
     port: 0,
@@ -36,6 +44,7 @@ async function startApi(engine?: WorkflowEngine) {
     config,
     principalExists: async () => true,
     engine,
+    engineFactory,
   });
   openApis.add(api);
   const baseUrl = await api.listen();
@@ -84,6 +93,30 @@ function gateway(options: {
 }
 
 describe("audit HTTP boundary fixes", () => {
+  it("authenticates before resolving a principal engine", async () => {
+    const calls: string[] = [];
+    const principalEngine = {
+      list: async () => [],
+      safeProjection: <T>(value: T): T => value,
+    } as unknown as WorkflowEngine;
+    const factory: PrincipalEngineFactory = (userId) => {
+      calls.push(userId);
+      return principalEngine;
+    };
+    const { baseUrl, token } = await startApi(undefined, factory);
+
+    const unauthenticated = await fetch(`${baseUrl}/runs`);
+    expect(unauthenticated.status).toBe(401);
+    expect(calls).toEqual([]);
+
+    const authenticated = await fetch(`${baseUrl}/runs`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(authenticated.status).toBe(200);
+    expect(await authenticated.json()).toEqual([]);
+    expect(calls).toEqual([USER_ID]);
+  });
+
   it("preserves schema property names while redacting sensitive data", () => {
     const projected = redact(
       {

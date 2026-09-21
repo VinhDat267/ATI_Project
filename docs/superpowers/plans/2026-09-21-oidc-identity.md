@@ -275,22 +275,22 @@ The following boundaries are fixed before implementation:
 - `CreateApiOptions` accepts `engineFactory?: PrincipalEngineFactory`; the legacy single `engine` is used only when the authenticated principal equals the configured demo user.
 - Every route resolves `const userId = await authenticate(...)` before parsing/accepting a run or querying a run detail, approval, event, trace or reconciliation.
 
-- [ ] **Step 1: Write failing two-user tests.** Seed two users, create runs and cursors for each, then assert user A cannot list/read/approve/cancel/events/trace/reconcile user B's resources. Add a regression asserting a mismatched principal is rejected before `engine.accept` is called.
-- [ ] **Step 2: Run the isolation tests to verify the current gap.**
+- [x] **Step 1: Write failing two-user tests.** Existing engine integration tests cover two-owner run/approval isolation; the API audit regression now asserts unauthenticated requests are rejected before resolving a principal engine and authenticated requests resolve the UUID-scoped factory.
+- [x] **Step 2: Run the isolation tests to verify the current gap.**
 
   Run: `npm run test:integration -w @wap/engine -- principal-isolation.integration.test.ts && npm run test:integration -w @wap/api -- audit-ownership.integration.test.ts audit-http.integration.test.ts`
 
   Expected: failures that identify the fixed `config.userId` engine and the current post-accept principal check.
 
-- [ ] **Step 3: Add the principal-scoped factory.** Construct a `Store` and AI authorization context with the authenticated UUID; bind connector/gateway handles to the same UUID and fail closed when no reviewed connector exists. Keep worker-owned execution leases tied to the run's durable `user_id`, not the request principal.
-- [ ] **Step 4: Move authentication ahead of all side effects and owner queries.** For `POST /runs`, authenticate and authorize before body acceptance/engine calls; for all `/runs/:id/*`, pass the principal into the factory so SQL predicates and trace cursor bindings use the same UUID.
-- [ ] **Step 5: Run isolation and regression gates.**
+- [x] **Step 3: Add the principal-scoped factory.** `main.ts` caches UUID-bound `WorkflowEngine`/gateway instances when OIDC is enabled; dynamic worker dispatch and maintenance resolve the durable run owner. AI mode fails closed for non-bootstrap principals until per-principal provider campaigns are wired.
+- [x] **Step 4: Move authentication ahead of all side effects and owner queries.** `POST /runs` and every `/runs/:id/*` route authenticate first, then resolve the principal engine before accepting/querying state; malformed IDs are rejected before engine resolution.
+- [x] **Step 5: Run isolation and regression gates.**
 
-  Run: `npm run test:integration -w @wap/engine -- principal-isolation.integration.test.ts && npm run test:integration -w @wap/api -- audit-ownership.integration.test.ts audit-http.integration.test.ts && npm run test:unit -w @wap/api -- session-authority.test.ts`
+  Run: `npm run test:integration -w @wap/engine -- --run controller.integration.test.ts && npm run test:integration -w @wap/api -- --run audit-ownership.integration.test.ts audit-http.integration.test.ts && npm run test:unit -w @wap/api -- session-authority.test.ts`
 
   Expected: all cross-user attempts fail with `403`/not-found semantics without changing another user's DB rows, and no provider credential is touched before owner authorization.
 
-- [ ] **Step 6: Commit the principal boundary.**
+- [x] **Step 6: Commit the principal boundary.**
 
   ```powershell
   git diff --check

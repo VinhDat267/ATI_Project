@@ -51,6 +51,11 @@ export interface ApiRuntime {
   close(): Promise<void>;
 }
 
+/** Builds an engine whose Store and reviewed gateway are bound to one UUID. */
+export type PrincipalEngineFactory = (
+  userId: string,
+) => WorkflowEngine | undefined;
+
 export interface CatalogCheckOptions {
   /** Clock injection for deterministic active-check rate-limit tests. */
   now?: () => number;
@@ -76,6 +81,8 @@ export interface CreateApiOptions {
   health?: HealthOptions;
   /** Optional durable/session implementation; memory SessionStore remains default. */
   sessionStore?: SessionAuthority;
+  /** Optional principal-scoped engine registry used when OIDC is enabled. */
+  engineFactory?: PrincipalEngineFactory;
   /** OIDC flow is injected so provider/network behavior is testable and replaceable. */
   oidcFlow?: OidcFlow;
   /** Principal profile lookup kept outside the HTTP router. */
@@ -139,9 +146,24 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
     config.passwordHash,
     config.cursorKey.toString("base64"),
   ];
-  const projectOutput = <T>(value: T): T =>
-    options.engine
-      ? options.engine.safeProjection(value)
+  const engineFor = (userId: string): WorkflowEngine | undefined => {
+    const principalEngine = options.engineFactory?.(userId);
+    if (principalEngine) return principalEngine;
+    return userId === config.userId ? options.engine : undefined;
+  };
+  const requireEngine = (userId: string): WorkflowEngine => {
+    const engine = engineFor(userId);
+    if (!engine)
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "Principal is not enabled for this API",
+      );
+    return engine;
+  };
+  const projectOutput = <T>(value: T, engine = options.engine): T =>
+    engine
+      ? engine.safeProjection(value)
       : (redact(value, configuredSecrets) as T);
   const parseInput = <T>(schema: z.ZodType<T>, value: unknown): T => {
     const parsed = schema.safeParse(value);
@@ -176,16 +198,10 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
     );
   }
 
-  async function readServerCatalog(connect: boolean) {
-    if (!options.engine)
-      throw new HttpError(
-        501,
-        "NOT_IMPLEMENTED",
-        "Server catalog is not enabled",
-      );
+  async function readServerCatalog(engine: WorkflowEngine, connect: boolean) {
     try {
       return ServerCatalogSchema.parse(
-        projectOutput(await options.engine.serverCatalog({ connect })),
+        projectOutput(await engine.serverCatalog({ connect }), engine),
       );
     } catch (error) {
       if (error instanceof EngineError) throw error;
@@ -454,11 +470,12 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        await sessions.authenticate(sessionCredential(request));
+        const userId = await sessions.authenticate(sessionCredential(request));
+        const engine = engineFor(userId);
         const servers = ServerSummaryListSchema.parse(
           projectOutput(
-            options.engine
-              ? await options.engine.serverSummaries()
+            engine
+              ? await engine.serverSummaries()
               : [
                   {
                     slug: "task_hub",
@@ -471,6 +488,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
                     policy_version: "b-local-fs-1",
                   },
                 ],
+            engine,
           ),
         );
         writeJson(response, 200, servers, requestId);
@@ -481,8 +499,8 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           response.setHeader("allow", "GET");
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
-        await sessions.authenticate(sessionCredential(request));
-        const catalog = await readServerCatalog(false);
+        const userId = await sessions.authenticate(sessionCredential(request));
+        const catalog = await readServerCatalog(requireEngine(userId), false);
         writeJson(response, 200, catalog, requestId);
         return;
       }
@@ -492,12 +510,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
           throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
         }
         const userId = await sessions.authenticate(sessionCredential(request));
-        if (!options.engine)
-          throw new HttpError(
-            501,
-            "NOT_IMPLEMENTED",
-            "Server catalog is not enabled",
-          );
+        const engine = requireEngine(userId);
         const retryAfter = claimCatalogCheck(userId);
         if (retryAfter !== null) {
           response.setHeader("retry-after", String(retryAfter));
@@ -511,25 +524,22 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         // and ignore an optional body so executable-looking JSON cannot affect
         // the fixed reviewed presets selected by the engine.
         if (requestHasBody(request)) await readJson(request);
-        const catalog = await readServerCatalog(true);
+        const catalog = await readServerCatalog(engine, true);
         writeJson(response, 200, catalog, requestId);
         return;
       }
       if (path === "/runs") {
         if (request.method === "GET") {
-          await sessions.authenticate(sessionCredential(request));
-          if (!options.engine)
-            throw new HttpError(
-              501,
-              "NOT_IMPLEMENTED",
-              "Run history is not enabled",
-            );
+          const userId = await sessions.authenticate(
+            sessionCredential(request),
+          );
+          const engine = requireEngine(userId);
           writeJson(
             response,
             200,
             z
               .array(RunDetailSchema)
-              .parse(projectOutput(await options.engine.list())),
+              .parse(projectOutput(await engine.list(), engine)),
             requestId,
           );
           return;
@@ -545,27 +555,20 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             "NEW_RUNS_DISABLED",
             "New runs are temporarily disabled",
           );
-        if (!options.engine || config.plannerMode === "disabled")
+        const engine = requireEngine(userId);
+        if (config.plannerMode === "disabled")
           throw new HttpError(
             503,
             "PLANNER_UNAVAILABLE",
             "Planner is not enabled",
           );
         const body = parseInput(CreateRunSchema, await readJson(request));
-        const accepted = await options.engine.accept(body);
+        const accepted = await engine.accept(body);
         options.worker?.wake();
-        if (userId !== config.userId)
-          throw new HttpError(403, "FORBIDDEN", "Principal mismatch");
         writeJson(response, 202, RunAcceptedSchema.parse(accepted), requestId);
         return;
       }
       if (path.startsWith("/runs/")) {
-        if (!options.engine)
-          throw new HttpError(
-            501,
-            "NOT_IMPLEMENTED",
-            "Run detail is not enabled",
-          );
         const segments = path.slice("/runs/".length).split("/");
         const id = segments.shift() ?? "";
         const subpath = segments.join("/");
@@ -578,12 +581,13 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         }
         const userId = await sessions.authenticate(sessionCredential(request));
         parseInput(z.uuid(), id);
+        const engine = requireEngine(userId);
         if (!subpath) {
           writeJson(
             response,
             200,
             RunDetailSchema.parse(
-              projectOutput(await options.engine.detail(id)),
+              projectOutput(await engine.detail(id), engine),
             ),
             requestId,
           );
@@ -594,18 +598,18 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             ApprovalDecisionSchema,
             await readJson(request),
           );
-          const detail = await options.engine.decide(id, body);
+          const detail = await engine.decide(id, body);
           options.worker?.wake();
           writeJson(
             response,
             200,
-            RunDetailSchema.parse(projectOutput(detail)),
+            RunDetailSchema.parse(projectOutput(detail, engine)),
             requestId,
           );
           return;
         }
         if (subpath === "cancel") {
-          await options.engine.cancel(id, { strictTerminal: true });
+          await engine.cancel(id, { strictTerminal: true });
           options.worker?.wake();
           response.statusCode = 202;
           response.setHeader("cache-control", "no-store");
@@ -628,7 +632,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             response,
             200,
             EventPageSchema.parse(
-              projectOutput(await options.engine.events(id, since, 200)),
+              projectOutput(await engine.events(id, since, 200), engine),
             ),
             requestId,
           );
@@ -657,7 +661,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
               );
             }
           }
-          const page = await options.engine.tracePage(id, cursor);
+          const page = await engine.tracePage(id, cursor);
           const nextCursor =
             page.next_offset === null
               ? null
@@ -674,11 +678,14 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             response,
             200,
             TraceSchema.parse(
-              projectOutput({
-                run_id: id,
-                attempts: page.attempts,
-                next_cursor: nextCursor,
-              }),
+              projectOutput(
+                {
+                  run_id: id,
+                  attempts: page.attempts,
+                  next_cursor: nextCursor,
+                },
+                engine,
+              ),
             ),
             requestId,
           );
@@ -689,7 +696,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
             response,
             200,
             ReconciliationSchema.parse(
-              projectOutput(await options.engine.reconcile(id)),
+              projectOutput(await engine.reconcile(id), engine),
             ),
             requestId,
           );

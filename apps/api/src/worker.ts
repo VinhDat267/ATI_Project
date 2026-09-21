@@ -17,6 +17,7 @@ export function createPrepareWorker(options: {
   db: Database;
   userId: string;
   engine: WorkflowEngine;
+  engineFactory?: (userId: string) => WorkflowEngine | undefined;
   planner?: PlannerPort;
   replan?: LocalReplanPort;
   intervalMs?: number;
@@ -34,27 +35,49 @@ export function createPrepareWorker(options: {
 
   async function tick() {
     if (needsRecovery) {
-      await options.engine.recoverOrphans();
+      if (options.engineFactory) {
+        const users = await options.db.client<{ user_id: string }[]>`
+          SELECT DISTINCT user_id FROM runs WHERE status IN ('planning','replanning','running')`;
+        for (const row of users) {
+          const engine = options.engineFactory(row.user_id);
+          if (engine) await engine.recoverOrphans();
+        }
+      } else {
+        await options.engine.recoverOrphans();
+      }
       needsRecovery = false;
     }
     if (stopped) return;
-    const rows = await options.db.client`
-      SELECT o.run_id,o.job_kind FROM run_outbox o JOIN runs r ON r.id=o.run_id
-      WHERE r.user_id=${options.userId} AND o.job_kind IN ('prepare','execute')
-        AND o.delivered_at IS NULL ORDER BY o.id LIMIT 1`;
+    const rows = options.engineFactory
+      ? await options.db.client`
+          SELECT o.run_id,o.job_kind,r.user_id FROM run_outbox o JOIN runs r ON r.id=o.run_id
+          WHERE o.job_kind IN ('prepare','execute')
+            AND o.delivered_at IS NULL ORDER BY o.id LIMIT 1`
+      : await options.db.client`
+          SELECT o.run_id,o.job_kind,r.user_id FROM run_outbox o JOIN runs r ON r.id=o.run_id
+          WHERE r.user_id=${options.userId} AND o.job_kind IN ('prepare','execute')
+            AND o.delivered_at IS NULL ORDER BY o.id LIMIT 1`;
     if (stopped || !rows[0]) return;
     const job = rows[0];
+    const jobEngine = options.engineFactory
+      ? options.engineFactory(job.user_id)
+      : options.engine;
+    if (!jobEngine)
+      throw new EngineError(
+        "CONFIG",
+        "No principal-scoped engine is available for the pending job",
+      );
     try {
       if (job.job_kind === "prepare") {
         if (!options.planner)
           throw new EngineError("CONFIG", "Planner is unavailable");
-        await options.engine.prepareAccepted(
+        await jobEngine.prepareAccepted(
           job.run_id,
           options.planner,
           options.replan ? { replan: options.replan } : undefined,
         );
       } else {
-        await options.engine.execute(
+        await jobEngine.execute(
           job.run_id,
           options.replan ? { replanPort: options.replan } : undefined,
         );
@@ -66,7 +89,7 @@ export function createPrepareWorker(options: {
       )
         throw error;
       // No writes to lifecycle state outside the engine lease/transaction boundary.
-      await options.engine.settleDispatchFailure(job.run_id, job.job_kind);
+      await jobEngine.settleDispatchFailure(job.run_id, job.job_kind);
     }
   }
 
