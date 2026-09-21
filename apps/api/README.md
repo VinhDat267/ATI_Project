@@ -13,6 +13,24 @@ Không có mật khẩu hay secret mặc định trong mã nguồn. Trước khi
 
 Tuỳ chọn: `API_PORT` (mặc định `3001`), `API_SESSION_TTL_MS` (mặc định 8 giờ), `G1_USER_ID`, `API_PLANNER_MODE` (`disabled` hoặc `dev_fixture`), `API_NEW_RUNS_ENABLED` (`1` mặc định; đặt `0`/`off` để tạm ngắt nhận run mới), và `AI_PROVIDER_CALLS_ENABLED` (`1` mặc định; đặt `0`/`off` để chặn provider call trước credential/ledger/fetch). Tạo hash/key trong một phiên shell riêng hoặc secret manager; không truyền mật khẩu như command-line argument.
 
+### OIDC cookie session (feature-gated)
+
+OIDC mặc định tắt để giữ Baseline B/local. Chỉ bật trong môi trường cô lập sau khi
+đã đăng ký redirect URI và scope với issuer:
+
+- `OIDC_ENABLED=1`
+- `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`
+- `OIDC_REDIRECT_URI` và `OIDC_WEB_ORIGIN` (HTTPS ngoài loopback)
+- tuỳ chọn `OIDC_AUDIENCE`, `OIDC_SCOPES`, `OIDC_SESSION_COOKIE_NAME`,
+  `OIDC_TRANSACTION_TTL_MS`, `OIDC_SESSION_TTL_MS`, `OIDC_CLOCK_SKEW_SECONDS`
+
+Khi bật, API dùng Authorization Code + PKCE, lưu identity/session/transaction
+ở PostgreSQL dạng hash cần thiết, và đặt cookie session HttpOnly/SameSite. Cookie
+CSRF double-submit là giá trị riêng, không chứa provider token. Password login bị
+tắt bởi cấu hình OIDC; provider secret không bao giờ đi qua browser. Chạy
+`npm run check:oidc` để tạo manifest bằng chứng đã scrub; manifest `OPEN` không
+phải production approval.
+
 ## Lệnh
 
 Từ root workspace:
@@ -23,6 +41,7 @@ npm run test:unit -w @wap/api
 npm run test:integration -w @wap/api
 npm run api:generate
 npm run check:api
+npm run check:oidc
 npm run api:dev
 ```
 

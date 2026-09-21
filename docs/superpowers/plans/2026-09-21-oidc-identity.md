@@ -317,21 +317,21 @@ The following boundaries are fixed before implementation:
 - `scripts/check-oidc.mjs` runs the fake-issuer flow, migration-from-0008, restart/revoke, two-user owner matrix, cookie/CSRF checks and redaction canary, then writes a sanitized manifest containing commit, migration checksum, test counts and verdict.
 - Documentation status values remain `CONFIRMED`, `TECHNICAL_PARTIAL`, `OPEN`, or `NOT_RUN`; no fixture evidence is labeled production readiness.
 
-- [ ] **Step 1: Write the release-gate test and manifest assertions.** Require the exact acceptance cases from the spec: callback rejection matrix, JWKS rotation, two-user isolation, restart/revoke, CSRF/origin, role deny-by-default, migration and restore rehearsal, and absence of token material in the manifest.
-- [ ] **Step 2: Run the gate before implementation is called complete.**
+- [x] **Step 1: Write the release-gate test and manifest assertions.** Added the release-contract integration test and a manifest contract that records the technical gates and keeps provider/live/UX acceptance explicitly `OPEN`.
+- [x] **Step 2: Run the gate before implementation is called complete.**
 
   Run: `node scripts/check-oidc.mjs`
 
-  Expected before wiring: a deterministic `OIDC_GATE_NOT_READY` manifest identifying missing evidence; no secret values written.
+  Result: `technical=PASS`, `overall=OPEN`; the current environment has no explicit OIDC provider configuration, and no secret values were written.
 
-- [ ] **Step 3: Implement the sanitized gate runner.** Use isolated temporary database names and exact cleanup, reuse the existing integration harness, redact values matching configured secrets/session patterns, and exit non-zero for any missing or failed case.
+- [x] **Step 3: Implement the sanitized gate runner.** The runner executes focused API/web/release-contract gates, records bounded scrubbed output and source fingerprints, and exits non-zero when technical gates fail or provider configuration is absent.
 - [ ] **Step 4: Run the complete verification suite.**
 
   Run: `npm run typecheck; npm run build; npm run check:full; node scripts/check-oidc.mjs`
 
   Expected: all existing B/local gates plus OIDC gate pass on one release commit, with cleanup delta equal to zero.
 
-- [ ] **Step 5: Update docs from evidence.** Record migration 0009, route contracts, compatibility switch, exact test counts, restore command/output and remaining production-owned inputs. Update Baseline B/local only to describe the approved expansion boundary; do not claim provider quality, UX approval or production rollout without their evidence.
+- [x] **Step 5: Update docs from evidence.** Recorded the OIDC configuration boundary, route/migration evidence, `npm run check:oidc` command and remaining provider, live acceptance, restore and UX-owned inputs without changing Baseline B/local scope.
 - [ ] **Step 6: Commit the release evidence.**
 
   ```powershell
