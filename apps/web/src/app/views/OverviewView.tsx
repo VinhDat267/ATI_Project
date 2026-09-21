@@ -11,6 +11,7 @@ import { Icon } from "../components/Icon";
 import { RunRow } from "../components/RunRow";
 import { EmptyState, ErrorState, LoadingState } from "../components/States";
 import { StatusPill } from "../components/StatusPill";
+import { cn } from "@/lib/cn";
 import { useAttention, useNow, useRuns } from "../hooks";
 
 function AttentionCard({
@@ -47,7 +48,12 @@ function AttentionCard({
     <li>
       <a
         href={routeToHash({ page: "run", id: run.run_id })}
-        className="flex h-full flex-col gap-3 rounded-md border border-hairline p-6 no-underline hover:border-ink"
+        className={cn(
+          "flex h-full flex-col gap-3 rounded-md bg-surface-soft p-6 no-underline shadow-card transition-all duration-200 hover:shadow-lg",
+          awaiting
+            ? "border-2 border-action bg-surface-soft hover:border-action"
+            : "border border-hairline hover:border-ink"
+        )}
       >
         <span className="flex flex-wrap items-center gap-3">
           <StatusPill status={run.status} />
@@ -55,7 +61,12 @@ function AttentionCard({
         </span>
         <h3 className="m-0 text-title-md">{run.source_prompt}</h3>
         <span className="text-body-md text-muted">{detail}</span>
-        <span className="mt-1 inline-flex items-center gap-1.5 self-start text-button-sm underline underline-offset-3">
+        <span
+          className={cn(
+            "mt-1 inline-flex items-center gap-1.5 self-start text-button-sm font-semibold underline underline-offset-3",
+            awaiting ? "text-action" : "text-ink"
+          )}
+        >
           {action}
           <Icon name="arrow-right" />
         </span>
@@ -131,9 +142,35 @@ export function OverviewView() {
     .slice(0, 6);
   const hasActive = runs.some((run) => !isTerminal(run.status));
 
+  const totalRuns = runs.length;
+  const awaitingCount = runs.filter((r) => r.status === "awaiting_approval").length;
+  const successCount = runs.filter((r) => r.status === "succeeded").length;
+  const reconcileCount = runs.filter((r) => r.status === "reconciliation_required").length;
+
   return (
     <>
       {header}
+
+      <div className="grid grid-cols-2 gap-3.5 desk:grid-cols-4">
+        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <span className="text-overline uppercase tracking-wider text-muted">Tổng lần chạy</span>
+          <span className="text-display-md-mobile font-bold tabular text-ink desk:text-display-md">{totalRuns}</span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <span className="text-overline uppercase tracking-wider text-action">Chờ phê duyệt</span>
+          <span className="text-display-md-mobile font-bold tabular text-action desk:text-display-md">{awaitingCount}</span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <span className="text-overline uppercase tracking-wider text-success">Đã hoàn tất</span>
+          <span className="text-display-md-mobile font-bold tabular text-success desk:text-display-md">{successCount}</span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <span className="text-overline uppercase tracking-wider text-muted">Cần đối chiếu</span>
+          <span className={cn("text-display-md-mobile font-bold tabular desk:text-display-md", reconcileCount > 0 ? "text-danger" : "text-muted")}>
+            {reconcileCount}
+          </span>
+        </div>
+      </div>
 
       {attention.runs.length > 0 ? (
         <section aria-labelledby="attention-title" className="flex flex-col gap-4">

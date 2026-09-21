@@ -54,7 +54,7 @@ export function RunRow({
     <li>
       <a
         href={routeToHash({ page: "run", id: run.run_id })}
-        className="grid gap-x-6 gap-y-2 border-b border-hairline py-4 no-underline hover:bg-surface-soft desk:grid-cols-[minmax(0,1fr)_auto] desk:px-3"
+        className="grid gap-x-6 gap-y-2 border-b border-hairline py-4 no-underline rounded-md transition-colors duration-150 hover:bg-surface-soft desk:grid-cols-[minmax(0,1fr)_auto] desk:px-4"
       >
         <span className="flex min-w-0 flex-col gap-1.5">
           <StatusPill status={run.status} className="self-start" />

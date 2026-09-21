@@ -80,7 +80,7 @@ export function ToolsView() {
             const meta = SERVERS[server.slug] ?? { name: server.slug, body: "", off: "" };
             const status = STATUS[server.status];
             return (
-              <li key={server.slug} className="flex flex-col gap-3 rounded-md border border-hairline p-6">
+              <li key={server.slug} className="flex flex-col gap-3 rounded-md border border-hairline bg-surface-soft p-6 shadow-card transition-shadow duration-150 hover:shadow-lg">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex flex-col gap-0.5">
                     <h2 className="m-0 text-headline-sm">

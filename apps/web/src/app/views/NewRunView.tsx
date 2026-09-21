@@ -113,15 +113,15 @@ function Capabilities() {
   const status = (slug: string) => servers.data?.find((s) => s.slug === slug)?.status;
   const hub = status("task_hub") === "connected";
   const files = status("filesystem") === "connected";
-  const items: Array<{ icon: IconName; title: string; body: string; on: boolean }> = [
-    { icon: "table", title: "Bảng tính", body: "Đọc vùng dữ liệu · thêm dòng", on: hub },
-    { icon: "kanban", title: "Thẻ công việc", body: "Xem thẻ, thành viên · tạo và chuyển thẻ", on: hub },
-    { icon: "message", title: "Tin nhắn", body: "Gửi thông báo vào kênh", on: hub },
-    { icon: "file", title: "Tệp", body: "Đọc và ghi tệp", on: files },
+  const items: Array<{ icon: IconName; title: string; body: string; on: boolean; badgeColor: string }> = [
+    { icon: "table", title: "Bảng tính", body: "Đọc vùng dữ liệu · thêm dòng", on: hub, badgeColor: "bg-success-subtle text-success" },
+    { icon: "kanban", title: "Thẻ công việc", body: "Xem thẻ, thành viên · tạo và chuyển thẻ", on: hub, badgeColor: "bg-planner-subtle text-planner" },
+    { icon: "message", title: "Tin nhắn", body: "Gửi thông báo vào kênh", on: hub, badgeColor: "bg-progress-subtle text-progress" },
+    { icon: "file", title: "Tệp", body: "Đọc và ghi tệp", on: files, badgeColor: "bg-action-subtle text-action" },
   ];
   return (
     <aside aria-labelledby="capabilities-title" className="flex flex-col gap-6">
-      <section className="flex flex-col gap-4 rounded-md border border-hairline p-6">
+      <section className="flex flex-col gap-4 rounded-md border border-hairline bg-surface-soft p-6 shadow-card">
         <h2 id="capabilities-title" className="m-0 text-title-md">
           Hệ thống làm được gì
         </h2>
@@ -133,7 +133,7 @@ function Capabilities() {
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {items.map((item) => (
               <li key={item.title} className="flex gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-strong">
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full", item.badgeColor)}>
                   <Icon name={item.icon} />
                 </span>
                 <span className="flex flex-col">
@@ -152,11 +152,11 @@ function Capabilities() {
             Kiểm tra lúc {formatClock(new Date(servers.dataUpdatedAt).toISOString(), "Asia/Ho_Chi_Minh")}
           </p>
         ) : null}
-        <a href={routeToHash({ page: "tools" })} className="inline-flex min-h-11 items-center self-start text-button-sm">
+        <a href={routeToHash({ page: "tools" })} className="inline-flex min-h-11 items-center self-start text-button-sm text-primary font-semibold underline underline-offset-3">
           Xem Công cụ &amp; kết nối
         </a>
       </section>
-      <section className="flex flex-col gap-3 px-2">
+      <section className="flex flex-col gap-3 rounded-md border border-hairline bg-surface-soft p-6 shadow-card">
         <h2 className="m-0 text-title-md">Trước khi có gì bị ghi</h2>
         <ol className="m-0 flex flex-col gap-2 pl-5 text-body-md text-muted">
           <li>Bạn xem kế hoạch và dữ liệu đã đọc</li>
@@ -277,8 +277,8 @@ export function NewRunView() {
           </div>
           <div
             className={cn(
-              "rounded-sm border bg-canvas focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring",
-              promptError ? "border-danger" : "border-border-control",
+              "rounded-md border bg-surface-soft shadow-card focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring transition-shadow",
+              promptError ? "border-danger" : "border-hairline hover:border-border-control",
             )}
           >
             <textarea
@@ -290,7 +290,7 @@ export function NewRunView() {
               disabled={isLocked}
               aria-describedby={describedBy}
               aria-invalid={promptError ? true : undefined}
-              className="block min-h-38 w-full resize-y rounded-sm border-0 bg-transparent p-4 text-body-lg caret-primary outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="block min-h-38 w-full resize-y rounded-md border-0 bg-transparent p-4 text-body-lg caret-primary outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
           {promptError ? (
@@ -317,7 +317,7 @@ export function NewRunView() {
                   setPrompt(item.text);
                   document.getElementById("request")?.focus();
                 }}
-                className="inline-flex min-h-11 items-center rounded-full border border-hairline px-4 text-button-sm hover:border-ink disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex min-h-11 items-center rounded-full border border-hairline bg-surface-soft px-4 text-button-sm text-ink shadow-card transition-all hover:border-ink hover:shadow-lg disabled:pointer-events-none disabled:opacity-50"
               >
                 {item.label}
               </button>
@@ -325,7 +325,7 @@ export function NewRunView() {
           </div>
         </section>
 
-        <details className="group rounded-md border border-hairline">
+        <details className="group rounded-md border border-hairline bg-surface-soft shadow-card">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 [&::-webkit-details-marker]:hidden">
             <span className="text-button-sm">Tuỳ chọn nâng cao</span>
             <span className="flex items-center gap-2 text-body-sm text-muted">

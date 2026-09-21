@@ -67,7 +67,7 @@ export function WriteCard({
 }) {
   const payload = <WritePayload write={write} />;
   return (
-    <article className="overflow-hidden rounded-md border border-hairline">
+    <article className="overflow-hidden rounded-md border border-hairline bg-surface-soft shadow-card">
       <div className="flex flex-col gap-0.5 px-5 py-4">
         <h3 className="m-0 text-title-md">{write.sentence}</h3>
         <span className="font-mono text-mono-sm text-muted">

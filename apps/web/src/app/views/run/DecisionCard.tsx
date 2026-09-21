@@ -112,7 +112,7 @@ export function DecisionCard({ run }: { run: RunDetail }) {
   return (
     <section
       aria-label="Quyết định ghi"
-      className="flex flex-col gap-5 rounded-md border border-hairline bg-canvas p-6 shadow-card"
+      className="flex flex-col gap-5 rounded-md border border-hairline border-t-4 border-t-action bg-surface-soft p-6 shadow-lg"
     >
       <div id="write-summary" className="flex flex-col gap-3.5">
         <span className="text-body-md text-muted">Bạn sắp ghi</span>
@@ -122,7 +122,7 @@ export function DecisionCard({ run }: { run: RunDetail }) {
               <span className="flex size-10 items-center justify-center rounded-full bg-action-subtle text-action">
                 <Icon name={writeIcon(write)} size={18} />
               </span>
-              <span className="text-headline-sm-mobile desk:text-headline-sm">{write.sentence}</span>
+              <span className="text-headline-sm-mobile font-semibold text-ink desk:text-headline-sm">{write.sentence}</span>
             </li>
           ))}
         </ul>
@@ -143,14 +143,16 @@ export function DecisionCard({ run }: { run: RunDetail }) {
         <div
           id="expiry"
           className={cn(
-            "flex items-center gap-2.5 rounded-sm px-0.5",
-            remaining.urgent && !remaining.expired && "bg-action-subtle px-3 py-2 text-action",
+            "flex items-center gap-2.5 rounded-md p-3 border",
+            remaining.urgent && !remaining.expired
+              ? "border-action bg-action-subtle text-action"
+              : "border-hairline bg-surface-strong text-ink",
           )}
         >
           <span
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-full",
-              remaining.urgent ? "bg-canvas" : "bg-surface-strong",
+              remaining.urgent ? "bg-surface-soft text-action" : "bg-surface-soft text-muted",
             )}
           >
             <Icon name={remaining.urgent ? "hourglass" : "clock"} />

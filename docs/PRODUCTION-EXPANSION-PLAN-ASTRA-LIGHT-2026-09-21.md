@@ -17,7 +17,7 @@ OIDC and production pilot readiness remain `OPEN`.
 - The release manifest is `technical=PASS` but `overall=OPEN` because no
   authorized provider configuration or live two-user acceptance was supplied:
   `docs/auth-evidence/OIDC-01/20260921071316-825ab795-6bfe-4388-880f-6d73269143f8/manifest.json`.
-- The worktree is intentionally dirty with user-owned UI/DesignSystem changes;
+- The worktree is intentionally dirty with user-owned UI/System Design changes;
   those changes are not silently reverted or treated as design approval.
 - The latest `npm run check:full` on HEAD `fb095d1` exited `0`: DSL 44,
   engine unit 341 (+1 skipped), API unit 67, web unit 132, MCP integration 64,
