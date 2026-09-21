@@ -32,6 +32,7 @@ Run it only after the local Keycloak service is ready:
 
 ```powershell
 npm run check:oidc:browser
+npm run check:oidc:https
 ```
 
 It is loopback HTTP evidence, so its session cookie correctly lacks `Secure`.

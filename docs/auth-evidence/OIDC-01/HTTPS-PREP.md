@@ -5,6 +5,10 @@ certificate, or externally authorized provider configuration has been supplied.
 This checkpoint prepares the exact ingress and OIDC contract; it is not HTTPS
 acceptance evidence.
 
+The local HTTPS transport/cookie check is recorded separately in
+[HTTPS local acceptance](HTTPS-LOCAL.md). It does not replace the public
+staging gate below.
+
 ## Prepared deployment contract
 
 - [Caddy ingress template](../../../config/Caddyfile.staging.example) terminates
