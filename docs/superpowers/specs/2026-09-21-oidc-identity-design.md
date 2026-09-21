@@ -1,6 +1,8 @@
 # OIDC identity and session design
 
-**Status:** PROPOSED — user review required; no OIDC runtime is enabled by this document.
+**Status:** SELECTED — OIDC BFF is the chosen identity path; production
+activation still requires deployment-owned issuer, client, redirect and
+two-user acceptance inputs. OIDC runtime remains disabled by default.
 
 **Date:** 2026-09-21
 
