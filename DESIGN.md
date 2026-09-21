@@ -1,6 +1,9 @@
 ---
 version: beta
 name: ATI Warm Workshop (Airtable Style)
+approval_status: approved
+approved_at: "2026-09-21"
+approval_scope: "Current web visual Design System"
 description: "Airtable-inspired warm workspace with color-coded chapters: parchment cream canvas (#FAF5E8), pure white card surfaces (#FFFFFF) with subtle elevation, midnight indigo ink (#040E20), silver hairline dividers (#E0E2E6), 8/16/24px radii, layered subtle shadow, sticky decision card, and color-coded chapters: Cobalt Blue for AI planning, Terracotta for writes/approvals, Forest Ink for reads/success."
 colors:
   primary: "#181D26"

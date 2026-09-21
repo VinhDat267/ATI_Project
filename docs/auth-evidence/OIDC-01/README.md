@@ -38,6 +38,6 @@ The release gate must remain `OPEN` until all of these are supplied and rerun in
 
 - an authorized real OIDC issuer/tenant with exact redirect/client/scope/role configuration;
 - a representative two-user live owner matrix, restart/revoke evidence, migration/restore rehearsal and operator sign-off;
-- UX direction and Design System approval.
+- representative-user UX acceptance for sign-in, callback failure, expiry and logout.
 
 `OPEN` or `NOT_RUN` is an evidence status, not a production-readiness claim.

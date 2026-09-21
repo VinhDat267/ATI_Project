@@ -158,5 +158,6 @@ document alone is not production approval.
 - approved audience, scopes, role claim and redirect origins;
 - session TTL, idle timeout, RPO/RTO and incident owner;
 - staging credentials and a fresh two-user acceptance dataset;
-- final UX/design-system approval for sign-in, callback failure, expiry and
-  logout states.
+- representative-user UX acceptance for sign-in, callback failure, expiry and
+  logout states; the visual Design System is approved separately at
+  `System Design/DESIGN.md`.

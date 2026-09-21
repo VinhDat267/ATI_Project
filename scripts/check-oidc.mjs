@@ -83,6 +83,11 @@ function fileCheck(relativePath) {
   };
 }
 
+function hasMarker(relativePath, marker) {
+  const absolute = path.join(root, relativePath);
+  return existsSync(absolute) && readFileSync(absolute, "utf8").includes(marker);
+}
+
 const gates = [
   runGate("api-oidc-unit", [
     "run",
@@ -139,12 +144,18 @@ const providerEnabled = ["1", "true", "yes", "on"].includes(
 const providerReady =
   providerEnabled &&
   providerRequired.every((name) => Boolean(process.env[name]));
+const designSystemPath = "System Design/DESIGN.md";
+const designSystemApproved = hasMarker(
+  designSystemPath,
+  "APPROVED_BY_PROJECT_OWNER",
+);
 
 const files = [
   fileCheck("db/migrations/0009_oidc_identity.sql"),
   fileCheck("apps/api/src/oidc.ts"),
   fileCheck("apps/api/src/durable-auth.ts"),
   fileCheck("apps/web/src/core/api.ts"),
+  fileCheck(designSystemPath),
 ];
 const technicalFailures = gates.filter((gate) => gate.exit_code !== 0);
 const openItems = [];
@@ -155,8 +166,12 @@ if (!providerReady)
 openItems.push(
   "TWO_USER_LIVE_ACCEPTANCE_OPEN: no authorized external provider session and representative two-user acceptance evidence",
 );
+if (!designSystemApproved)
+  openItems.push(
+    "DESIGN_SYSTEM_APPROVAL_OPEN: System Design/DESIGN.md does not record project-owner approval",
+  );
 openItems.push(
-  "UX_DESIGN_APPROVAL_OPEN: visual direction and Design System remain user-owned decisions",
+  "REPRESENTATIVE_UX_ACCEPTANCE_OPEN: sign-in, callback failure, expiry, and logout flows require representative-user acceptance",
 );
 
 const manifest = {
@@ -192,7 +207,9 @@ const manifest = {
     jwks_rotation: "PASS",
     durable_identity_session_revoke: "PASS",
     cookie_csrf_origin_proxy: "PASS",
+    design_system_approval: designSystemApproved ? "PASS" : "OPEN",
     two_user_live_owner_matrix: "OPEN",
+    representative_user_ux: "OPEN",
     restart_revoke: "OPEN",
     migration_restore_rehearsal: "OPEN",
   },

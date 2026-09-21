@@ -31,6 +31,11 @@ tắt bởi cấu hình OIDC; provider secret không bao giờ đi qua browser. 
 `npm run check:oidc` để tạo manifest bằng chứng đã scrub; manifest `OPEN` không
 phải production approval.
 
+Mẫu biến môi trường staging không chứa secret ở
+[`config/oidc-staging.env.example`](../../config/oidc-staging.env.example); quy
+trình nạp secret và acceptance evidence ở
+[`docs/auth-evidence/OIDC-01/STAGING-PREP.md`](../../docs/auth-evidence/OIDC-01/STAGING-PREP.md).
+
 ## Lệnh
 
 Từ root workspace:

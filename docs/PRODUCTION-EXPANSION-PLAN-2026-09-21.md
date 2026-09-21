@@ -26,7 +26,7 @@
 
 ### OPEN / NOT_RUN
 
-Provider quality/cost/latency, fresh sealed holdout, human rubric, independent AI safety review, representative-user acceptance, visual direction/Design System và production identity vẫn chưa được duyệt. Không được suy ra production readiness từ fixture/browser pass hoặc Google probe.
+Provider quality/cost/latency, fresh sealed holdout, human rubric, independent AI safety review, representative-user acceptance và production identity vẫn chưa được duyệt. Visual Design System đã được người dùng chốt tại [System Design](../System%20Design/DESIGN.md). Không được suy ra production readiness từ fixture/browser pass hoặc Google probe.
 
 - P3 shutdown evidence hiện **TECHNICAL PARTIAL**: code commit `0b3ff41` thêm `shutdownTimeoutMs`, cấu hình được qua `API_WORKER_SHUTDOWN_TIMEOUT_MS` (mặc định 30 giây), production entrypoint truyền deadline, và unit regression test cho hung tick pass. Probe SIGTERM trên Windows bị OS terminate trực tiếp thay vì chạy Node handler, nên không được tính là graceful process-level evidence; crash trước/sau dispatch, restore drill và incident evidence vẫn `OPEN`.
 - P3 backup/restore evidence hiện **TECHNICAL PARTIAL**: local drill đã `pg_dump` database demo `wap_g1`, restore vào database tạm, khớp `schema_migrations=9`, `users=1`, `runs=11`, `run_outbox=14`, rồi xoá đúng database/dump tạm; database gốc giữ nguyên counts. Repository vẫn chưa có command/script backup–restore production, nên RPO/RTO, lịch backup, restore rehearsal cô lập và incident evidence vẫn `OPEN`.
@@ -93,7 +93,7 @@ Correlation phải xuyên suốt request/run/version/operation/attempt/campaign/
 
 ### P6 — UX/design approval và pilot acceptance
 
-Chốt UX cho identity, approval, latency, cancel, uncertainty và reconciliation. Xin quyết định visual direction/Design System trước khi thay visual foundation; browser/accessibility/bundle gate không thay thế design approval. Người dùng đại diện chạy workflow thật, đo correctness, thời gian, hiểu approval và xử lý failure.
+Áp dụng [System Design](../System%20Design/DESIGN.md) đã được người dùng chốt cho identity, approval, latency, cancel, uncertainty và reconciliation. Browser/accessibility/bundle gate vẫn không thay thế acceptance của người dùng đại diện. Người dùng đại diện chạy workflow thật, đo correctness, thời gian, hiểu approval và xử lý failure.
 
 **Exit:** design approval và user acceptance được ghi riêng với technical pass.
 

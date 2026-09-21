@@ -1,6 +1,13 @@
 # Airtable — Style Reference
 > warm workshop with color-coded chapters
 
+**Status:** `APPROVED_BY_PROJECT_OWNER` (2026-09-21)
+
+**Scope:** Visual Design System for the current ATI web application. This
+approval covers the tokens, typography, spacing, surfaces, and component
+direction in this folder. Representative-user acceptance of identity, expiry,
+approval, cancellation, and recovery flows remains a separate production gate.
+
 **Theme:** light
 
 Source measurements are normalized; roles and recommendations are interpreted. Font summary lists are independent, not paired by position. HTML examples are reconstructions, not source components.
