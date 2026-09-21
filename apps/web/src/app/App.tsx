@@ -30,6 +30,7 @@ export interface AppProps {
   transport: Transport;
   session: SessionController;
   mode: "fixture" | "live";
+  demoLogin?: { email: string; password: string };
   drafts?: DraftStore;
   hints?: AppHints;
 }
@@ -89,6 +90,7 @@ export function App({
   transport,
   session,
   mode,
+  demoLogin,
   drafts: providedDrafts,
   hints = NO_HINTS,
 }: AppProps): ReactNode {
@@ -188,6 +190,7 @@ export function App({
           transport={transport}
           session={session}
           mode={mode}
+          demoLogin={demoLogin}
           onSignedIn={(signedInEmail) => {
             setEmail(signedInEmail);
             if (route.page === "login") navigate({ page: "overview" }, true);

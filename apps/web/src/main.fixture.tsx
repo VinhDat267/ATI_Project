@@ -26,6 +26,7 @@ export function bootstrap(): void {
         transport={transport}
         session={session}
         mode="fixture"
+        demoLogin={{ email: "demo@local", password: "synthetic-password" }}
         hints={transport}
       />
     </StrictMode>,

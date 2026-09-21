@@ -96,7 +96,7 @@ Khi bật, launcher tự dẫn xuất `runtime/filesystem/<G1_USER_ID>` từ pri
 npm run check:engine
 ```
 
-Lệnh chạy typecheck, build bốn package, DSL/schema/OpenAPI, DB/MCP receiver và engine integration. FS-05 đạt **TECHNICAL PASS** cho E01–E14. Fresh FS-06 gate chạy **258 tests passed, 1 skipped**: 39 DSL, 92 engine unit pass + 1 skip, 64 PostgreSQL/MCP receiver và 63 engine integration. Tests tạo rồi dọn DB `g1_it_*`/`engine_it_*` riêng; không reset `wap_g1`. Evidence nằm trong [FS-05 report](../../docs/task-hub-evidence/batch-02/FS-05/FS-05.md) và [FS-06 final gate](../../docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/output.log).
+Lệnh chạy typecheck, build bốn package, DSL/schema/OpenAPI, DB/MCP receiver và engine integration. FS-05 đạt **TECHNICAL PASS** cho E01–E14. Fresh FS-06 gate chạy **258 tests passed, 1 skipped**: 39 DSL, 92 engine unit pass + 1 skip, 64 PostgreSQL/MCP receiver và 63 engine integration. Tests tạo rồi dọn DB `g1_it_*`/`engine_it_*` riêng; không reset `wap_g1`. Evidence nằm trong [FS-05 report](../../docs/task-hub-evidence/batch-02/FS-05/FS-05.md) và [FS-06 final gate](../../docs/task-hub-evidence/batch-02/FS-06/1789384630165-final-check/output.log). Engine integration mặc định dành 120 giây cho mỗi test/hook do các case filesystem khởi động MCP/CLI thật; có thể override bằng `ATI_ENGINE_INTEGRATION_TIMEOUT_MS`.
 
 Facade `WorkflowEngine(db, gateway, userId)` dùng cho prepare/decide/execute; inspector có thể truyền `undefined` thay gateway. PostgreSQL lưu status, events, outbox, snapshot và attempts. Native SQL transaction và Drizzle dùng các pool riêng vì Drizzle thay JSON/date codecs; không trộn hai handle vào một transaction.
 
