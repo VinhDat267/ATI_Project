@@ -20,9 +20,12 @@ npm run check:oidc:local
 This starts an ephemeral PostgreSQL database and an in-process fake OIDC
 issuer, then exercises discovery, authorization-code + PKCE exchange, JWKS
 ID-token validation, durable identity/session creation, `/auth/me`, logout,
-session revocation, and a two-user owner-isolation check. A `PASS` here is
-local technical evidence only; it does not replace an authorized production
-issuer, staging acceptance, or UX/Design System approval.
+session revocation, API restart session recovery, and a two-user
+owner-isolation check. The latest local manifest is
+`local-20260921071503494-6321629d-e85e-4efa-9e37-e057ad822183/manifest.json`.
+A `PASS` here is local technical evidence only; it does not replace an
+authorized production issuer, staging acceptance, or UX/Design System
+approval.
 
 Current technical evidence:
 
