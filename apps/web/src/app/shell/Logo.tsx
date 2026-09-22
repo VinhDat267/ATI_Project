@@ -1,8 +1,8 @@
-/** ATI wordmark with its node-graph mark (from the design canvas). */
+/** AI Automation Platform wordmark with its approved node-graph mark. */
 export function Logo() {
   return (
     <span className="flex items-center gap-2.5 text-primary">
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <svg className="shrink-0" width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <rect width="32" height="32" rx="9" fill="currentColor" />
         <circle cx="10" cy="11" r="2.6" fill="#FFFFFF" />
         <circle cx="22" cy="11" r="2.6" fill="#FFFFFF" />
@@ -15,7 +15,7 @@ export function Logo() {
           strokeLinecap="round"
         />
       </svg>
-      <span className="text-wordmark">ATI</span>
+      <span className="max-w-44 text-wordmark">AI Automation Platform</span>
     </span>
   );
 }

@@ -21,6 +21,18 @@ import type {
   TracePage,
   Transport,
 } from "./contracts.js";
+import {
+  PilotCreateRunResponseSchema,
+  PilotRunDetailResponseSchema,
+  PilotApproveResponseSchema,
+  PilotCatalogResponseSchema,
+  type PilotCreateRunInput,
+  type PilotCreateRunResponse,
+  type PilotRunDetailResponse,
+  type PilotApproveInput,
+  type PilotApproveResponse,
+  type PilotCatalogResponse,
+} from "./pilot-contracts.js";
 import { ClientError } from "./errors.js";
 
 export interface HttpTransportOptions {
@@ -305,6 +317,52 @@ export function createHttpTransport(
         "GET",
         `/api/v1/runs/${id}/reconciliation`,
         ReconciliationSchema,
+        signal,
+        { isWrite: false },
+      );
+    },
+
+    createPilotRun(input: PilotCreateRunInput, signal: AbortSignal): Promise<PilotCreateRunResponse> {
+      return request(
+        "POST",
+        "/pilot/v2/runs",
+        PilotCreateRunResponseSchema,
+        signal,
+        {
+          body: input,
+          isWrite: true,
+        },
+      );
+    },
+
+    getPilotRun(id: string, signal: AbortSignal): Promise<PilotRunDetailResponse> {
+      return request(
+        "GET",
+        `/pilot/v2/runs/${encodeURIComponent(id)}`,
+        PilotRunDetailResponseSchema,
+        signal,
+        { isWrite: false },
+      );
+    },
+
+    approvePilotRun(id: string, input: PilotApproveInput, signal: AbortSignal): Promise<PilotApproveResponse> {
+      return request(
+        "POST",
+        `/pilot/v2/runs/${encodeURIComponent(id)}/approve`,
+        PilotApproveResponseSchema,
+        signal,
+        {
+          body: input,
+          isWrite: true,
+        },
+      );
+    },
+
+    getPilotCatalog(signal: AbortSignal): Promise<PilotCatalogResponse> {
+      return request(
+        "GET",
+        "/pilot/v2/catalog",
+        PilotCatalogResponseSchema,
         signal,
         { isWrite: false },
       );

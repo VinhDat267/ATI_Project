@@ -24,6 +24,8 @@ import { NewRunView } from "./views/NewRunView";
 import { OverviewView } from "./views/OverviewView";
 import { RunView } from "./views/run/RunView";
 import { ToolsView } from "./views/ToolsView";
+import { PilotNewRunView } from "./views/pilot/PilotNewRunView";
+import { PilotRunView } from "./views/pilot/PilotRunView";
 import "./theme.css";
 
 export interface AppProps {
@@ -73,12 +75,16 @@ function RouteView({ route }: { route: Route }): ReactNode {
       return <OverviewView />;
     case "new":
       return <NewRunView />;
+    case "pilot-new":
+      return <PilotNewRunView />;
     case "history":
       return <HistoryView />;
     case "tools":
       return <ToolsView />;
     case "run":
       return <RunView key={route.id} runId={route.id} />;
+    case "pilot-run":
+      return <PilotRunView key={route.id} runId={route.id} />;
     default: {
       const exhaustive: never = route;
       return exhaustive;

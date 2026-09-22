@@ -14,6 +14,24 @@ import type { Store } from "./store.js";
 import type { Session } from "./session.js";
 import type { Route } from "./navigation.js";
 
+import type {
+  PilotCreateRunInput,
+  PilotCreateRunResponse,
+  PilotRunDetailResponse,
+  PilotApproveInput,
+  PilotApproveResponse,
+  PilotCatalogResponse,
+} from "./pilot-contracts.js";
+
+export type {
+  PilotCreateRunInput,
+  PilotCreateRunResponse,
+  PilotRunDetailResponse,
+  PilotApproveInput,
+  PilotApproveResponse,
+  PilotCatalogResponse,
+};
+
 export type RunDetail = z.infer<typeof RunDetailSchema>;
 export type EventPage = z.infer<typeof EventPageSchema>;
 export type TracePage = z.infer<typeof TraceSchema>;
@@ -46,6 +64,19 @@ export interface Transport {
     signal: AbortSignal,
   ): Promise<TracePage>;
   reconciliation(id: string, signal: AbortSignal): Promise<Reconciliation>;
+
+  // Pilot v2 methods
+  createPilotRun?(
+    input: PilotCreateRunInput,
+    signal: AbortSignal,
+  ): Promise<PilotCreateRunResponse>;
+  getPilotRun?(id: string, signal: AbortSignal): Promise<PilotRunDetailResponse>;
+  approvePilotRun?(
+    id: string,
+    input: PilotApproveInput,
+    signal: AbortSignal,
+  ): Promise<PilotApproveResponse>;
+  getPilotCatalog?(signal: AbortSignal): Promise<PilotCatalogResponse>;
 }
 
 export interface FixtureCall {

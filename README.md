@@ -1,6 +1,17 @@
-# ATI Workflow Automation Platform
+# AI Automation Platform
 
-Prototype nghiên cứu lập kế hoạch tool MCP có kiểm soát. **Cấu hình B/local đã được người dùng chọn ngày 13/09/2026**: retrieval + query expansion, replan cục bộ, polling 2 giây, task_hub dữ liệu local.
+Tên sản phẩm hiện tại là **AI Automation Platform**. Các định danh kỹ thuật
+`ATI_Project`, `ati-*` và `@wap/*` được giữ nguyên để tương thích với môi trường
+hiện có; tên ATI trong báo cáo và evidence cũ là tên lịch sử.
+
+**Scope đích đã duyệt ngày 21/09/2026:** hỗ trợ điều phối nhóm dịch vụ thiết kế/web,
+Google Sheets chỉ đọc → AI lập kế hoạch → người dùng duyệt → tạo card Trello.
+Xem [baseline MVP v2](docs/BASELINE.md) và [kế hoạch batch nền tảng](docs/superpowers/plans/2026-09-21-mvp-v2-foundation-connectors.md).
+Đây là phạm vi sắp triển khai, chưa phải tích hợp SaaS hoạt động.
+
+Prototype đang triển khai theo **B/local được chọn ngày 13/09/2026**:
+retrieval + query expansion, replan cục bộ, polling 2 giây, task_hub dữ liệu local.
+Các kết quả kiểm thử phía dưới là evidence của cấu hình này, không phải MVP v2.
 
 Đọc [bắt đầu](docs/00-BAT-DAU.md), [baseline](docs/BASELINE.md), [kế hoạch 6 tuần](docs/KE-HOACH-6-TUAN.md) và [kết quả sửa audit](docs/FIX-REPORT-2026-09-13.md).
 

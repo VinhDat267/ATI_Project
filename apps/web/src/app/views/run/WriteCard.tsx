@@ -44,7 +44,7 @@ export function WritePayload({ write }: { write: WriteSummary }) {
         </span>
         <div className="flex flex-col gap-1.5">
           <span className="text-body-sm">
-            <span className="font-semibold">ATI bot</span> <span className="text-muted">· {write.target}</span>
+            <span className="font-semibold">AI Automation Platform bot</span> <span className="text-muted">· {write.target}</span>
           </span>
           <div className="whitespace-pre-wrap rounded-md rounded-tl-xs bg-surface-soft px-4 py-3 text-body-md">
             {write.text}

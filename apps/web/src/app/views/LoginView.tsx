@@ -332,7 +332,7 @@ export function LoginView({
       {/* Page Footer */}
       <footer className="relative z-10 border-t border-hairline/60 py-3 text-center text-caption text-muted">
         <div className="mx-auto flex max-w-content flex-col items-center justify-center gap-1 sm:flex-row sm:gap-4 px-4">
-          <span>© 2026 ATI Platform</span>
+          <span>© 2026 AI Automation Platform</span>
           <span className="hidden sm:inline text-hairline-soft">·</span>
           <span>Local-first Architecture</span>
           <span className="hidden sm:inline text-hairline-soft">·</span>

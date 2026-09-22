@@ -11,6 +11,7 @@ import { Logo } from "./Logo";
 const NAV: Array<{ route: Route; label: string }> = [
   { route: { page: "overview" }, label: "Tổng quan" },
   { route: { page: "new" }, label: "Tạo yêu cầu" },
+  { route: { page: "pilot-new" }, label: "Điều phối Pilot v2" },
   { route: { page: "history" }, label: "Lần chạy" },
   { route: { page: "tools" }, label: "Công cụ & kết nối" },
 ];
@@ -18,7 +19,8 @@ const NAV: Array<{ route: Route; label: string }> = [
 function isActive(route: Route, item: Route): boolean {
   return (
     route.page === item.page ||
-    (route.page === "run" && item.page === "history")
+    (route.page === "run" && item.page === "history") ||
+    (route.page === "pilot-run" && item.page === "pilot-new")
   );
 }
 
@@ -113,7 +115,7 @@ export function AppShell({
           <a
             href={routeToHash({ page: "overview" })}
             className="flex min-h-11 min-w-11 items-center no-underline"
-            aria-label="ATI — Tổng quan"
+            aria-label="AI Automation Platform — Tổng quan"
           >
             <Logo />
           </a>
