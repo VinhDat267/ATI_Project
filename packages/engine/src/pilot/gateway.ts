@@ -149,6 +149,8 @@ const PILOT_TOOLS: PilotToolEntry[] = [
   },
 ];
 
+export const PILOT_TOOL_CATALOG: readonly PilotToolEntry[] = PILOT_TOOLS;
+
 export function getPilotCatalog(): PilotToolEntry[] {
   return [...PILOT_TOOLS];
 }

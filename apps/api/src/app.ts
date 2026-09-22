@@ -68,6 +68,9 @@ export interface HealthOptions {
   readiness?: () => Promise<boolean>;
 }
 
+import { createPilotRouter } from "./pilot-router.js";
+import type { PilotConfig, PilotPolicy, ReadSheetsRequestResult } from "@wap/engine";
+
 export interface CreateApiOptions {
   db: Database;
   config: ApiConfig;
@@ -89,6 +92,22 @@ export interface CreateApiOptions {
   identityLookup?: (userId: string) => Promise<z.infer<typeof AuthMeSchema>>;
   /** Structured request sink; it must not receive bodies, headers, or secrets. */
   requestLogger?: (entry: RequestLogEntry) => void;
+  pilotRouter?: (
+    request: IncomingMessage,
+    response: ServerResponse,
+    path: string,
+    requestId: string,
+  ) => Promise<void>;
+  pilotConfig?: PilotConfig;
+  pilotPolicy?: PilotPolicy;
+  readSheetsRequestFn?: (params: {
+    config: PilotConfig;
+    policy: PilotPolicy;
+    principalId: string;
+    spreadsheetId: string;
+    tabId: string;
+    requestId: string;
+  }) => Promise<ReadSheetsRequestResult>;
 }
 
 export function createApi(options: CreateApiOptions): ApiRuntime {
@@ -119,6 +138,16 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       ttlMs: config.sessionTtlMs,
       principalExists,
       now: options.now,
+    });
+  const pilotRouter =
+    options.pilotRouter ??
+    createPilotRouter({
+      db: options.db,
+      sessions,
+      worker: options.worker,
+      pilotConfig: options.pilotConfig,
+      pilotPolicy: options.pilotPolicy,
+      readSheetsRequestFn: options.readSheetsRequestFn,
     });
   const identityLookup =
     options.identityLookup ??
@@ -225,7 +254,9 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
               baseOrigin ?? `http://${config.host}`,
             );
             return requestRouteTemplate(
-              parsed.pathname.startsWith("/api/v1")
+              parsed.pathname.startsWith("/pilot/v2")
+                ? parsed.pathname.slice("/pilot/v2".length) || "/"
+                : parsed.pathname.startsWith("/api/v1")
                 ? parsed.pathname.slice("/api/v1".length) || "/"
                 : "/unknown",
             );
@@ -286,6 +317,12 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
         request.url ?? "/",
         baseOrigin ?? `http://${config.host}`,
       );
+      if (parsed.pathname.startsWith("/pilot/v2")) {
+        const pilotPath = parsed.pathname.slice("/pilot/v2".length) || "/";
+        route = requestRouteTemplate(pilotPath);
+        await pilotRouter(request, response, pilotPath, requestId);
+        return;
+      }
       if (!parsed.pathname.startsWith("/api/v1"))
         throw new HttpError(404, "NOT_FOUND", "Route not found");
       const path = parsed.pathname.slice("/api/v1".length) || "/";

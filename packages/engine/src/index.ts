@@ -178,3 +178,22 @@ export {
   type EvalConfig,
   type FrozenEvaluation,
 } from "./ai/evaluation/contracts.js";
+
+// Pilot MVP v2
+export * from "./pilot/identity.js";
+export * from "./pilot/source.js";
+export * from "./pilot/policy.js";
+export * from "./pilot/checklist.js";
+export * from "./pilot/schemas.js";
+export * from "./pilot/config.js";
+export * from "./pilot/http-client.js";
+export * from "./pilot/gateway.js";
+export * from "./pilot/dispatch.js";
+export * from "./pilot/postgres-store.js";
+export * from "./pilot/adapters/sheets.js";
+export * from "./pilot/adapters/trello-read.js";
+export * from "./pilot/adapters/trello-write.js";
+export * from "./pilot/planner-context.js";
+export * from "./pilot/accounting.js";
+export * from "./pilot/decision-engine.js";
+

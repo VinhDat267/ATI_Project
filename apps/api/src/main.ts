@@ -9,6 +9,9 @@ import {
   readAiProviderConfig,
   type AiProvider,
   type Gateway,
+  loadPilotConfig,
+  type PilotConfig,
+  type PilotPolicy,
 } from "@wap/engine";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -160,14 +163,35 @@ const principalGateways = new Map<string, Gateway>();
 const principalEngines = new Map<string, WorkflowEngine>([
   [config.userId, engine],
 ]);
+let pilotConfig: PilotConfig | undefined;
+let pilotPolicy: PilotPolicy | undefined;
+try {
+  pilotConfig = loadPilotConfig();
+  if (pilotConfig.enabled) {
+    pilotPolicy = {
+      enabled: pilotConfig.enabled,
+      principals: pilotConfig.principals,
+      spreadsheetId: pilotConfig.spreadsheetId,
+      tabId: pilotConfig.tabId,
+      boardId: pilotConfig.boardId,
+    };
+  }
+} catch {
+  pilotConfig = undefined;
+  pilotPolicy = undefined;
+}
+
 const engineFactory = config.oidc?.enabled
   ? (userId: string): WorkflowEngine | undefined => {
       const existing = principalEngines.get(userId);
       if (existing) return existing;
+      const isPilotPrincipal = Boolean(
+        pilotConfig?.enabled && pilotConfig.principals.includes(userId),
+      );
       // AI provider authorization/campaigns are currently bootstrapped for
-      // the configured pilot principal only. Fail closed for another OIDC
-      // principal instead of reusing that user's provider budget.
-      if (config.plannerMode === "ai") return undefined;
+      // the configured pilot principal only. Fail closed for unlisted OIDC
+      // principals instead of reusing that user's provider budget.
+      if (config.plannerMode === "ai" && !isPilotPrincipal) return undefined;
       const principalGateway = createGatewayManager(
         userId,
         async () => {
@@ -207,6 +231,7 @@ const engineFactory = config.oidc?.enabled
           decodeURIComponent(new URL(databaseUrl).password),
           ...(aiRuntime?.secrets ?? []),
         ].filter(Boolean),
+        ...(aiRuntime ? { replan: aiRuntime.replan } : {}),
       });
       principalEngines.set(userId, principalEngine);
       return principalEngine;
@@ -261,6 +286,8 @@ const api = createApi({
   ...(sessionStore ? { sessionStore } : {}),
   ...(oidcFlow ? { oidcFlow } : {}),
   ...(engineFactory ? { engineFactory } : {}),
+  ...(pilotConfig ? { pilotConfig } : {}),
+  ...(pilotPolicy ? { pilotPolicy } : {}),
   health: {
     readiness: async () => {
       try {

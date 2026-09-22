@@ -8,6 +8,7 @@ import {
 } from "@wap/dsl";
 import type { CreateRun } from "../planner-port.js";
 import { parsePlannerResult } from "../planner-port.js";
+import type { PilotPlannerContext } from "../pilot/planner-context.js";
 import { EngineError, validateManualPlan } from "../snapshot.js";
 import type { ToolCandidate, ValidationIssue } from "@wap/dsl";
 import type { ReviewedCatalogTool } from "./catalog.js";
@@ -185,6 +186,7 @@ export class AiPlannerAdapter {
     userId: string;
     request: CreateRun;
     runtime: Record<string, string>;
+    pilotContext?: PilotPlannerContext;
     signal?: AbortSignal;
   }): Promise<PlannerResult> {
     throwIfAborted(input.signal, 0);
@@ -223,8 +225,8 @@ export class AiPlannerAdapter {
       );
       throwIfAborted(input.signal, 0);
       const tools = retrieval.tools.map(asPromptTool);
-      const systemPrompt = buildSystemPrompt();
-      const originalPrompt = buildPlanningPrompt({
+      const systemPrompt = input.pilotContext?.systemPrompt ?? buildSystemPrompt();
+      const originalPrompt = input.pilotContext?.userPrompt ?? buildPlanningPrompt({
         userPrompt: input.request.source_prompt,
         tools,
         runtime: input.runtime,

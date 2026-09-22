@@ -4,6 +4,7 @@ import {
   PlannerResultSchema,
   type PlannerResult,
 } from "@wap/dsl";
+import type { PilotPlannerContext } from "./pilot/planner-context.js";
 
 export type CreateRun = z.infer<typeof CreateRunSchema>;
 
@@ -14,6 +15,8 @@ export interface PlannerPort {
     userId: string;
     request: CreateRun;
     runtime: Record<string, string>;
+    pilotContext?: PilotPlannerContext;
+    signal?: AbortSignal;
   }): Promise<PlannerResult>;
 }
 

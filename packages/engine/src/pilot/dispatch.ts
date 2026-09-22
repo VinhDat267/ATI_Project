@@ -1,15 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { PilotConfig } from './config.js';
 import type { PilotPolicy } from './policy.js';
-import { TrelloReceiptSchema, type TrelloReceipt } from './schemas.js';
+import {
+  TrelloReceiptSchema,
+  type TrelloReceipt,
+  type ReservationStatus,
+} from './schemas.js';
 import { dispatchPilotTool } from './gateway.js';
-
-export type ReservationStatus =
-  | 'reserved'
-  | 'dispatched'
-  | 'confirmed'
-  | 'unknown'
-  | 'cancelled';
 
 export type ReservationRecord = {
   id: string;
