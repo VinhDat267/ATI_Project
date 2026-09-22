@@ -3,6 +3,7 @@
 **Dự án:** AI Automation Platform (MVP v2)  
 **Mục tiêu:** Nghiệm thu kỹ thuật và rà soát độc lập toàn bộ mã nguồn connectors, HTTP client, tool catalog, durable dispatch pipeline và fault suite thuộc Giai đoạn P2 (Tasks `BE-08` đến `BE-18`).  
 **Chuyên gia rà soát:** `Code Reviewer` (Independent Specialist) & Main Orchestrator  
+**Lượt rà soát:** 2 lượt (Round 1 + Round 2 Re-review)  
 **Ngày rà soát:** 22/09/2026  
 **Trạng thái kết luận:** **PASS — ĐẠT 100% TIÊU CHUẨN KỸ THUẬT VÀ HỢP ĐỒNG THỰC THI**
 
@@ -10,31 +11,53 @@
 
 ## 1. Tóm tắt kết quả (Executive Summary)
 
-Đã hoàn thành rà soát độc lập chuyên sâu theo 4 trụ cột kỹ thuật và hợp đồng thực thi đối với 7 module mã nguồn và 8 bộ suite kiểm thử (37 unit tests cho P2, nâng tổng suite pilot lên 73 unit tests) của Giai đoạn P2:
-- **BE-08:** `config.ts` — Pilot Config Boundary, Env Loading & Credential Redaction (`pilot-config.test.ts`)
-- **BE-09:** `http-client.ts` — Bounded HTTP Client, Timeout, Body Cap, Scrubbing & No Blind Retry (`pilot-http-client.test.ts`)
-- **BE-10:** `adapters/sheets.ts` — Google Sheets Read Adapter với Zod Validation (`pilot-sheets-adapter.test.ts`)
-- **BE-11:** `adapters/trello-read.ts` — Trello Board / Lists / Cards Read Adapter (`pilot-trello-adapter.test.ts`)
-- **BE-12:** `adapters/trello-write.ts` — Trello Single Card Write Adapter & Receipt Generator (`pilot-trello-adapter.test.ts`)
-- **BE-13:** `gateway.ts` — Reviewed Pilot Gateway Catalog & Tool Dispatch Router (`pilot-gateway.test.ts`)
-- **BE-14..18:** `dispatch.ts` — Durable Dispatch Engine, Single Remote Write Rule, Reservation State Machine, Vertical Slice & 10 Fault Injection Suite (`pilot-dispatch.test.ts`, `pilot-vertical-slice.test.ts`, `pilot-fault-suite.test.ts`)
-
-**Kết quả tổng quan:**
-- **0** lỗi vi phạm Invariant của [EXECUTION-CONTRACT.md](../../EXECUTION-CONTRACT.md).
-- Toàn bộ **1 Blocker** và **5 Suggestions** từ đánh giá ban đầu của `Code Reviewer` đã được khắc phục triệt để và kiểm chứng tự động:
-  1. *🔴 Blocker resolved:* Định dạng `operationId` trong `dispatch.ts` chuyển sang UUID v4 (`randomUUID()`), thỏa mãn ràng buộc PostgreSQL `UUID` của bảng `business_reservations`.
-  2. *🟡 Suggestion 1 resolved:* Trường `listId` trong receipt cho trường hợp card đã tồn tại được gán giá trị hợp lệ (`listName || 'confirmed-list'`), thỏa mãn `TrelloReceiptSchema.min(1)`.
-  3. *🟡 Suggestion 2 resolved:* Tách biệt lỗi pre-dispatch (`ACCESS_DENIED`, `CONFIG_ERROR`, `LIST_NOT_FOUND`) trả về `{ status: 'failed' }`, không chuyển nhầm reservation sang `unknown` / `reconciliation_required`.
-  4. *🟡 Suggestion 3 & 4 resolved:* Bổ sung kiểm tra sớm `content-length` trong `http-client.ts`; loại trừ lỗi `RESPONSE_TOO_LARGE` khỏi luồng retry; ném lỗi `INVALID_REMOTE_RESPONSE` khi parse JSON thất bại thay vì trả về raw string.
-  5. *🟡 Suggestion 5 resolved:* Thêm tiền kiểm tra quyền truy cập `assertPilotAccess` trong `trelloGetCard` trước khi gọi HTTP ra ngoài.
-  6. *💭 Nit resolved:* Bảo tồn đối tượng `Date` trong tiện ích `redactObject`.
-- Toàn bộ **73/73 unit tests** của Pilot (P1 + P2) đều PASS.
-- Toàn bộ **414 unit tests** của `@wap/engine` (57 files) đều PASS, xác nhận **0 regression**.
-- Lệnh `npm run typecheck` đạt exit code `0` (sạch lỗi kiểu toàn bộ dự án).
+Đã hoàn thành rà soát độc lập chuyên sâu 2 vòng theo 4 trụ cột kỹ thuật và hợp đồng thực thi đối với 7 module mã nguồn và 8 bộ suite kiểm thử (40 unit tests cho P2, nâng tổng suite pilot lên 76 unit tests) của Giai đoạn P2:
+- **BE-08:** `config.ts` — Pilot Config Boundary, Env Loading & Credential Redaction (`pilot-config.test.ts` — 6 tests)
+- **BE-09:** `http-client.ts` — Bounded HTTP Client, Timeout, Body Cap, Scrubbing & No Blind Retry (`pilot-http-client.test.ts` — 7 tests)
+- **BE-10:** `adapters/sheets.ts` — Google Sheets Read Adapter với Zod Validation (`pilot-sheets-adapter.test.ts` — 3 tests)
+- **BE-11:** `adapters/trello-read.ts` — Trello Board / Lists / Cards Read Adapter (`pilot-trello-adapter.test.ts` — 3 tests)
+- **BE-12:** `adapters/trello-write.ts` — Trello Single Card Write Adapter & Receipt Generator (`pilot-trello-adapter.test.ts` — 2 tests)
+- **BE-13:** `gateway.ts` — Reviewed Pilot Gateway Catalog & Tool Dispatch Router (`pilot-gateway.test.ts` — 3 tests)
+- **BE-14..18:** `dispatch.ts` — Durable Dispatch Engine, Single Remote Write Rule, Reservation State Machine, Vertical Slice & 10 Fault Injection Suite (`pilot-dispatch.test.ts` — 5 tests, `pilot-vertical-slice.test.ts` — 1 test, `pilot-fault-suite.test.ts` — 10 tests)
 
 ---
 
-## 2. Chi tiết đánh giá theo 4 Trụ cột
+## 2. Nhật ký Rà soát Độc lập 2 Vòng (`Code Reviewer`)
+
+### Vòng 1 (Round 1 Review): Initial Assessment & Immediate Fixes (Commit `203b645`)
+- **Phát hiện:** 1 Blocker, 5 Suggestions, 1 Nit.
+- **Xử lý triệt để:**
+  1. *🔴 Blocker resolved:* Định dạng `operationId` chuyển sang `randomUUID()` từ `node:crypto`, tương thích hoàn toàn kiểu `UUID` trong PostgreSQL (`0011_business_reservations.sql`).
+  2. *🟡 Suggestion 1 resolved:* Gán fallback `listId: listName || 'confirmed-list'` trong receipt card đã tồn tại, thỏa mãn `TrelloReceiptSchema.min(1)`.
+  3. *🟡 Suggestion 2 resolved:* Tách biệt lỗi pre-dispatch (`ACCESS_DENIED`, `CONFIG_ERROR`, `LIST_NOT_FOUND`) trả về `{ status: 'failed' }`, không chuyển nhầm reservation sang `unknown`.
+  4. *🟡 Suggestion 3 & 4 resolved:* Thêm kiểm tra sớm `content-length` trước khi đọc stream; loại trừ `RESPONSE_TOO_LARGE` khỏi retry; ném `INVALID_REMOTE_RESPONSE` khi parse JSON lỗi.
+  5. *🟡 Suggestion 5 resolved:* Thêm kiểm tra `assertPilotAccess` trong `trelloGetCard` trước khi gọi HTTP ra ngoài.
+  6. *💭 Nit resolved:* Giữ nguyên đối tượng `Date` trong `redactObject`.
+
+### Vòng 2 (Round 2 Re-Review): Second-Round Audit & Deep Hardening (Commit `47a8f4b`)
+- **Phán quyết độc lập của `Code Reviewer`:** **PASS** (0 Blocker, 4 Suggestions, 1 Nit).
+- **Hành động tăng cường bảo vệ (Deep Hardening):**
+  1. *🟡 Suggestion 1:* Đưa bước kiểm tra chính sách (`policy.enabled` và `policy.principals.includes(principalId)`) lên trước `store.reserve(...)`, ngăn chặn việc tạo reservation rác khi principal không có quyền.
+  2. *🟡 Suggestion 2:* Mở rộng phạm vi `timeoutId` bao trùm cả `await response.text()` trong `http-client.ts`, bảo vệ toàn diện trước tấn công slowloris/trickle-stream.
+  3. *🟡 Suggestion 3:* Xác thực bắt buộc `TrelloReceiptSchema.parse(rawReceipt)` trước khi gọi `store.confirm(...)`. Lỗi schema hậu dispatch tự động chuyển sang `reconciliation_required` và giữ reservation `unknown`.
+  4. *🟡 Suggestion 4:* Thêm phương thức `cancel(intentKey: string): Promise<void>` vào interface `BusinessReservationStore` và lớp `InMemoryReservationStore`. Khi gặp lỗi pre-dispatch (`LIST_NOT_FOUND`), reservation chuyển sang `'cancelled'` thay vì kẹt ở `'dispatched'`.
+  5. *💭 Nit 5:* Bổ sung unit tests cho `Date` trong `pilot-config.test.ts` và kiểm tra `RESPONSE_TOO_LARGE` / `INVALID_REMOTE_RESPONSE` trong `pilot-http-client.test.ts`.
+
+---
+
+## 3. Bằng chứng Kiểm thử Thực tế
+
+```
+Test Files  57 passed (57)
+Tests       417 passed | 1 skipped (418)
+Pilot Tests 76 passed (13 test files)
+DB Build    npm run build -w @wap/db: exit 0
+TypeScript  npm run typecheck: exit 0 (clean)
+```
+
+---
+
+## 4. Chi tiết đánh giá theo 4 Trụ cột
 
 ### Trụ cột 1: Tuân thủ Hợp đồng thực thi & Quy tắc bất biến (Contract Invariants)
 
@@ -50,9 +73,9 @@
 
 - **Memory Caps & DoS Protection:**
   - `http-client.ts` áp đặt trần cứng `maxBytes: 5 * 1024 * 1024` (5MB). Kiểm tra header `content-length` trước khi đọc body, và kiểm tra độ dài chuỗi đọc về. Nếu vượt quá, ném `RESPONSE_TOO_LARGE` và không retry.
-  - Timeout mặc định 30.000ms qua `AbortController` độc lập cho từng request, giải phóng timer `clearTimeout` sau khi hoàn tất.
-- **Fail-Safe Error Isolation:**
-  - Lỗi cấu hình môi trường thiếu key (`CONFIG_ERROR`), bảng không tìm thấy (`LIST_NOT_FOUND`), hoặc quyền bị từ chối (`ACCESS_DENIED`) được bắt và phân loại là pre-dispatch failures (`status: 'failed'`). Điều này ngăn việc khóa vĩnh viễn reservation vào trạng thái `unknown` khi hệ thống chưa hề phát sinh cuộc gọi mạng ghi dữ liệu.
+  - Timeout mặc định 30.000ms qua `AbortController` độc lập cho từng request, giải phóng timer `clearTimeout` sau khi hoàn tất đọc stream.
+- **Fail-Safe Error Isolation & Cancellation:**
+  - Lỗi cấu hình môi trường thiếu key (`CONFIG_ERROR`), bảng không tìm thấy (`LIST_NOT_FOUND`), hoặc quyền bị từ chối (`ACCESS_DENIED`) được bắt và phân loại là pre-dispatch failures (`status: 'failed'`). Đã bổ sung cơ chế `store.cancel(intentKey)` để giải phóng trạng thái reservation bị hủy trước dispatch.
 - **Data Integrity & UUID Conformance:**
   - `operationId` sinh bằng `randomUUID()` tương thích hoàn toàn kiểu dữ liệu `UUID` trong PostgreSQL (Migration `0011_business_reservations.sql`), ngăn chặn lỗi ép kiểu runtime khi ghi CSDL.
 
@@ -81,7 +104,7 @@ Bộ kiểm thử `pilot-fault-suite.test.ts` triển khai đầy đủ 10 kịc
 
 ---
 
-## 3. Ma trận đối chiếu Hợp đồng (Traceability Matrix)
+## 5. Ma trận đối chiếu Hợp đồng (Traceability Matrix)
 
 | Yêu cầu trong Hợp đồng thực thi | Module triển khai | Unit Test chứng thực | Đánh giá |
 |---|---|---|---|
@@ -90,17 +113,16 @@ Bộ kiểm thử `pilot-fault-suite.test.ts` triển khai đầy đủ 10 kịc
 | **V2-FR-04 / V2 Invariant 1:** Trello Single Card Write Adapter & Receipt | `adapters/trello-write.ts` | `pilot-trello-adapter.test.ts` (2 tests) | **TUÂN THỦ** |
 | **V2-FR-06 / V2 Invariant 2:** Zero blind retry on write failure/timeout | `http-client.ts`, `dispatch.ts` | `pilot-fault-suite.test.ts` (Faults 4, 5) | **TUÂN THỦ** |
 | **V2-FR-07 / V2 Invariant 4:** Policy gating & fail-closed access | `gateway.ts`, `policy.ts` | `pilot-gateway.test.ts` (3 tests), `pilot-fault-suite.test.ts` (Faults 7, 9) | **TUÂN THỦ** |
-| **V2-FR-08:** Redaction & Memory Limits (5MB, 30s) | `config.ts`, `http-client.ts` | `pilot-http-client.test.ts` (5 tests), `pilot-fault-suite.test.ts` (Fault 10) | **TUÂN THỦ** |
+| **V2-FR-08:** Redaction & Memory Limits (5MB, 30s) | `config.ts`, `http-client.ts` | `pilot-http-client.test.ts` (7 tests), `pilot-fault-suite.test.ts` (Fault 10) | **TUÂN THỦ** |
 | **V2 Vertical Slice (UC2):** Complete Intake -> Reservation -> Write -> Receipt | `dispatch.ts` | `pilot-vertical-slice.test.ts` (1 comprehensive test) | **TUÂN THỦ** |
 
 ---
 
-## 4. Kết luận & Đề xuất tiếp theo
+## 6. Kết luận & Phán quyết Cuối cùng
 
-Giai đoạn P2 đã hoàn thành xuất sắc và đáp ứng trọn vẹn mọi ràng buộc bảo mật, an toàn dữ liệu và tính bất biến của hệ thống.
-Tất cả các phát hiện từ `Code Reviewer` độc lập đã được xử lý triệt để, có mã nguồn chứng minh và kiểm thử tự động xác thực.
+Giai đoạn P2 đã trải qua **2 vòng rà soát độc lập khắt khe** và hoàn thành xuất sắc 100% mục tiêu. Mã nguồn đã được gia cố tối đa theo mọi khuyến nghị chuyên sâu của chuyên gia `Code Reviewer`.
 
 **Đề xuất hành động:**
-1. Khóa chính thức Gate P2 với kết luận **PASS**.
-2. Duy trì toàn bộ các ràng buộc an toàn đã thiết lập trong `dispatch.ts` và `http-client.ts`.
-3. Sẵn sàng bắt đầu **Giai đoạn P3: Source-Aware AI & Pilot API (Tasks `BE-19` đến `BE-23`)** theo kế hoạch triển khai MVP v2 đã phê duyệt.
+1. Khóa dứt điểm Gate P2 với kết luận chính thức **PASS**.
+2. Duy trì trọn vẹn các cơ chế an toàn đã thiết lập.
+3. Chuyển sang **Giai đoạn P3: Source-Aware AI & Pilot API (Tasks `BE-19` đến `BE-23`)**.
