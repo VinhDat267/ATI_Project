@@ -106,4 +106,38 @@ describe('pilot/http-client', () => {
       expect(httpErr.statusCode).toBe(0);
     }
   });
+
+  it('rejects immediately with RESPONSE_TOO_LARGE when content-length exceeds maxResponseBytes', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('small text', {
+        status: 200,
+        headers: {
+          'Content-Length': String(10 * 1024 * 1024), // 10MB
+        },
+      }),
+    );
+
+    const promise = pilotFetch(
+      'https://api.trello.com/1/large',
+      {},
+      { maxResponseBytes: 5 * 1024 * 1024 },
+    );
+
+    await expect(promise).rejects.toThrow(PilotHttpError);
+    await expect(promise).rejects.toThrow('RESPONSE_TOO_LARGE');
+  });
+
+  it('throws PilotHttpError with INVALID_REMOTE_RESPONSE when JSON is malformed', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{ invalid json body ...', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const promise = pilotFetch('https://api.trello.com/1/bad-json');
+
+    await expect(promise).rejects.toThrow(PilotHttpError);
+    await expect(promise).rejects.toThrow('INVALID_REMOTE_RESPONSE');
+  });
 });

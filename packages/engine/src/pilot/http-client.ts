@@ -67,14 +67,16 @@ export async function pilotFetch<T = unknown>(
         ...init,
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       const contentLength = Number(response.headers.get('content-length'));
       if (contentLength && contentLength > maxBytes) {
+        clearTimeout(timeoutId);
         throw new Error('RESPONSE_TOO_LARGE: Exceeded max allowed bytes');
       }
 
       const rawText = await response.text();
+      clearTimeout(timeoutId);
+
       if (rawText.length > maxBytes) {
         throw new Error('RESPONSE_TOO_LARGE: Exceeded max allowed bytes');
       }

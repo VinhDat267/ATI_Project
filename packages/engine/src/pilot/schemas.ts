@@ -37,7 +37,7 @@ export type ReservationStatus = z.infer<typeof ReservationStatusEnum>;
 
 export const BusinessReservationSchema = z.object({
   id: z.string().uuid().optional(),
-  intentKey: z.string().length(64),
+  intentKey: z.string().min(1),
   sourceKey: z.string().min(1),
   boardId: z.string().min(1),
   runId: z.string().uuid(),
@@ -57,7 +57,7 @@ export const TrelloReceiptSchema = z.object({
   listId: z.string().min(1),
   boardId: z.string().min(1),
   title: z.string().min(1),
-  intentKey: z.string().length(64),
+  intentKey: z.string().min(1),
 });
 
 export type TrelloReceipt = z.infer<typeof TrelloReceiptSchema>;

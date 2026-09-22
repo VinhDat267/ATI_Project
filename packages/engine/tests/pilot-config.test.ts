@@ -89,4 +89,16 @@ describe('pilot/config', () => {
     expect(cleaned.nested.headers.Authorization).toBe('Bearer [REDACTED]');
     expect(cleaned.nested.safe).toBe(42);
   });
+
+  it('preserves Date instances during object redaction', () => {
+    const now = new Date();
+    const obj = {
+      createdAt: now,
+      secret: 'secret-token-123',
+    };
+    const cleaned = redactObject(obj, ['secret-token-123']) as typeof obj;
+    expect(cleaned.createdAt).toBeInstanceOf(Date);
+    expect(cleaned.createdAt.getTime()).toBe(now.getTime());
+    expect(cleaned.secret).toBe('[REDACTED]');
+  });
 });

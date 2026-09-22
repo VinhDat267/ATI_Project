@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PilotConfig } from './config.js';
 import type { PilotPolicy } from './policy.js';
-import type { TrelloReceipt } from './schemas.js';
+import { TrelloReceiptSchema, type TrelloReceipt } from './schemas.js';
 import { dispatchPilotTool } from './gateway.js';
 
 export type ReservationStatus =
@@ -36,6 +36,7 @@ export interface BusinessReservationStore {
   claimDispatched(intentKey: string, operationId: string): Promise<void>;
   confirm(intentKey: string, remoteId: string, remoteUrl: string): Promise<void>;
   markUnknown(intentKey: string): Promise<void>;
+  cancel(intentKey: string): Promise<void>;
 }
 
 export class InMemoryReservationStore implements BusinessReservationStore {
@@ -56,13 +57,20 @@ export class InMemoryReservationStore implements BusinessReservationStore {
       if (existing.status === 'confirmed') {
         return existing;
       }
-      throw new Error(
-        `INTENT_ALREADY_RESERVED: Intent ${data.intentKey} is already in state "${existing.status}"`,
-      );
+      if (existing.status === 'unknown') {
+        throw new Error(
+          `INTENT_IN_UNKNOWN_STATE: Intent ${data.intentKey} has unknown status and requires reconciliation`,
+        );
+      }
+      if (existing.status === 'dispatched' || existing.status === 'reserved') {
+        throw new Error(
+          `INTENT_ALREADY_RESERVED: Intent ${data.intentKey} is already in state "${existing.status}"`,
+        );
+      }
     }
 
     const record: ReservationRecord = {
-      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: randomUUID(),
       intentKey: data.intentKey,
       sourceKey: data.sourceKey,
       boardId: data.boardId,
@@ -76,39 +84,70 @@ export class InMemoryReservationStore implements BusinessReservationStore {
   }
 
   async claimDispatched(intentKey: string, operationId: string): Promise<void> {
-    const rec = this.map.get(intentKey);
-    if (!rec) throw new Error(`NOT_FOUND: Reservation ${intentKey} not found`);
-    rec.status = 'dispatched';
-    rec.operationId = operationId;
-    rec.updatedAt = new Date();
+    const existing = this.map.get(intentKey);
+    if (!existing) {
+      throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
+    }
+    existing.status = 'dispatched';
+    existing.operationId = operationId;
+    existing.updatedAt = new Date();
   }
 
   async confirm(intentKey: string, remoteId: string, remoteUrl: string): Promise<void> {
-    const rec = this.map.get(intentKey);
-    if (!rec) throw new Error(`NOT_FOUND: Reservation ${intentKey} not found`);
-    rec.status = 'confirmed';
-    rec.remoteId = remoteId;
-    rec.remoteUrl = remoteUrl;
-    rec.updatedAt = new Date();
+    const existing = this.map.get(intentKey);
+    if (!existing) {
+      throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
+    }
+    existing.status = 'confirmed';
+    existing.remoteId = remoteId;
+    existing.remoteUrl = remoteUrl;
+    existing.updatedAt = new Date();
   }
 
   async markUnknown(intentKey: string): Promise<void> {
-    const rec = this.map.get(intentKey);
-    if (!rec) throw new Error(`NOT_FOUND: Reservation ${intentKey} not found`);
-    rec.status = 'unknown';
-    rec.updatedAt = new Date();
+    const existing = this.map.get(intentKey);
+    if (!existing) {
+      throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
+    }
+    existing.status = 'unknown';
+    existing.updatedAt = new Date();
+  }
+
+  async cancel(intentKey: string): Promise<void> {
+    const existing = this.map.get(intentKey);
+    if (existing) {
+      existing.status = 'cancelled';
+      existing.updatedAt = new Date();
+    }
   }
 }
 
 export type PilotApprovalContext = {
-  approvalId: string;
+  approvalId?: string;
   ownerId: string;
   expiresAt: Date;
   snapshotHash: string;
   decision: 'approved' | 'rejected';
 };
 
-export type PilotWorkflowParams = {
+export type PilotWorkflowResult = {
+  status: 'succeeded' | 'expired' | 'rejected' | 'reconciliation_required' | 'failed';
+  receipt?: TrelloReceipt;
+  error?: string;
+};
+
+/**
+ * Executes the pilot workflow with all safety gates:
+ * 1. Owner & Decision matching
+ * 2. Snapshot hash matching
+ * 3. 10-minute server TTL
+ * 4. Policy access check (fail-closed before reservation)
+ * 5. Deduplication reservation
+ * 6. Claim dispatched
+ * 7. Single remote write (UC2)
+ * 8. Zero blind retry (transitions to unknown on failure)
+ */
+export async function executePilotWorkflow(params: {
   runId: string;
   principalId: string;
   config: PilotConfig;
@@ -118,22 +157,12 @@ export type PilotWorkflowParams = {
   expectedHash: string;
   cardTitle: string;
   listName: string;
-  intentKey: string;
-  sourceKey: string;
   description?: string;
   dueDate?: string;
   assigneeId?: string;
-};
-
-export type PilotWorkflowResult = {
-  status: 'succeeded' | 'expired' | 'rejected' | 'reconciliation_required' | 'failed';
-  receipt?: TrelloReceipt;
-  error?: string;
-};
-
-export async function executePilotWorkflow(
-  params: PilotWorkflowParams,
-): Promise<PilotWorkflowResult> {
+  intentKey: string;
+  sourceKey: string;
+}): Promise<PilotWorkflowResult> {
   const {
     runId,
     principalId,
@@ -144,11 +173,11 @@ export async function executePilotWorkflow(
     expectedHash,
     cardTitle,
     listName,
-    intentKey,
-    sourceKey,
     description,
     dueDate,
     assigneeId,
+    intentKey,
+    sourceKey,
   } = params;
 
   // 1. Owner & Decision Check
@@ -170,7 +199,15 @@ export async function executePilotWorkflow(
     return { status: 'expired', error: 'APPROVAL_EXPIRED: 10-minute TTL has elapsed' };
   }
 
-  // 4. Reserve Business Intent (Deduplication across runs)
+  // 4. Pre-reservation Policy Check: verify policy before creating reservation
+  if (!policy.enabled || !policy.principals.includes(principalId)) {
+    return {
+      status: 'failed',
+      error: 'ACCESS_DENIED: Pilot policy is disabled or principal is unauthorized',
+    };
+  }
+
+  // 5. Reserve Business Intent (Deduplication across runs)
   let reservation: ReservationRecord;
   try {
     reservation = await store.reserve({
@@ -198,21 +235,13 @@ export async function executePilotWorkflow(
     };
   }
 
-  // 5. Pre-dispatch check: verify policy before claiming dispatched
-  if (!policy.enabled || !policy.principals.includes(principalId)) {
-    return {
-      status: 'failed',
-      error: 'ACCESS_DENIED: Pilot policy is disabled or principal is unauthorized',
-    };
-  }
-
   // 6. Claim Dispatched
   const operationId = randomUUID();
   await store.claimDispatched(intentKey, operationId);
 
   // 7. Dispatch Remote Write
   try {
-    const receipt = (await dispatchPilotTool(
+    const rawReceipt = await dispatchPilotTool(
       'trello.create_card',
       {
         boardId: policy.boardId,
@@ -224,7 +253,10 @@ export async function executePilotWorkflow(
         intentKey,
       },
       { config, policy, principalId },
-    )) as TrelloReceipt;
+    );
+
+    // Validate receipt strictly against schema before confirming
+    const receipt = TrelloReceiptSchema.parse(rawReceipt);
 
     // 8. Success: Confirm Reservation atomically
     await store.confirm(intentKey, receipt.cardId, receipt.url);
@@ -241,13 +273,18 @@ export async function executePilotWorkflow(
       msg.includes('LIST_NOT_FOUND');
 
     if (isPreDispatchError) {
+      try {
+        await store.cancel(intentKey);
+      } catch {
+        // Safeguard against secondary store error
+      }
       return {
         status: 'failed',
         error: msg,
       };
     }
 
-    // 9. Remote write error / timeout / network failure:
+    // 9. Remote write error / timeout / network failure / post-dispatch schema error:
     // Mark as UNKNOWN and require reconciliation. CẤM BLIND RETRY!
     try {
       await store.markUnknown(intentKey);
