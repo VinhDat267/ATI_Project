@@ -59,7 +59,8 @@ function isValidGregorianDate(dateStr: string): boolean {
     30,
     31,
   ];
-  return day <= daysInMonth[month - 1];
+  const maxDays = daysInMonth[month - 1];
+  return maxDays !== undefined && day <= maxDays;
 }
 
 const CONFIRMED_STATUSES = new Set([
