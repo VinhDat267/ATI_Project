@@ -69,6 +69,11 @@ export async function pilotFetch<T = unknown>(
       });
       clearTimeout(timeoutId);
 
+      const contentLength = Number(response.headers.get('content-length'));
+      if (contentLength && contentLength > maxBytes) {
+        throw new Error('RESPONSE_TOO_LARGE: Exceeded max allowed bytes');
+      }
+
       const rawText = await response.text();
       if (rawText.length > maxBytes) {
         throw new Error('RESPONSE_TOO_LARGE: Exceeded max allowed bytes');
@@ -93,11 +98,22 @@ export async function pilotFetch<T = unknown>(
 
       let data: T;
       const contentType = response.headers.get('content-type') ?? '';
-      if (contentType.includes('application/json') || rawText.trim().startsWith('{') || rawText.trim().startsWith('[')) {
+      const looksLikeJson =
+        contentType.includes('application/json') ||
+        rawText.trim().startsWith('{') ||
+        rawText.trim().startsWith('[');
+
+      if (looksLikeJson) {
         try {
           data = JSON.parse(rawText) as T;
-        } catch {
-          data = rawText as unknown as T;
+        } catch (jsonErr: unknown) {
+          const safeUrl = redactSecrets(url, secrets);
+          throw new PilotHttpError({
+            message: `INVALID_REMOTE_RESPONSE: Failed to parse JSON response from ${safeUrl}: ${(jsonErr as Error).message}`,
+            statusCode: response.status,
+            url: safeUrl,
+            responseBody: redactSecrets(rawText, secrets),
+          });
         }
       } else {
         data = rawText as unknown as T;
@@ -120,8 +136,9 @@ export async function pilotFetch<T = unknown>(
       const isAbort =
         (err as Error)?.name === 'AbortError' ||
         controller.signal.aborted;
+      const isTooLarge = (err as Error)?.message?.includes('RESPONSE_TOO_LARGE');
 
-      if (isIdempotent && attempt <= maxRetries && !isAbort) {
+      if (isIdempotent && attempt <= maxRetries && !isAbort && !isTooLarge) {
         await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
         continue;
       }

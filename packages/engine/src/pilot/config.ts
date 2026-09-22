@@ -107,6 +107,10 @@ export function redactObject<T>(
     return target;
   }
 
+  if (target instanceof Date) {
+    return target;
+  }
+
   if (Array.isArray(target)) {
     return target.map((item) => redactObject(item, secrets)) as unknown as T;
   }

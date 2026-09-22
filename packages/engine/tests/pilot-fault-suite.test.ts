@@ -232,7 +232,7 @@ describe('pilot/fault-suite (10 Fault Injection & Safety Gate Tests)', () => {
       sourceKey: 'source-f8',
     });
 
-    expect(result.status).toBe('reconciliation_required');
+    expect(result.status).toBe('failed');
     expect(result.error).toContain('LIST_NOT_FOUND');
   });
 
@@ -255,7 +255,7 @@ describe('pilot/fault-suite (10 Fault Injection & Safety Gate Tests)', () => {
       sourceKey: 'source-f9',
     });
 
-    expect(result.status).toBe('reconciliation_required');
+    expect(result.status).toBe('failed');
     expect(result.error).toContain('ACCESS_DENIED');
   });
 

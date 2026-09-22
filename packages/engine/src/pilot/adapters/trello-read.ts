@@ -71,6 +71,12 @@ export async function trelloGetCard(params: {
   url: string;
 }> {
   const { config, policy, principalId, cardId } = params;
+
+  // Preliminary access check (enforce policy enabled and principal allowed before network egress)
+  if (!policy.enabled || !principalId || !policy.principals.includes(principalId)) {
+    throw new Error('ACCESS_DENIED');
+  }
+
   const auth = getTrelloAuth(config);
   const url = `https://api.trello.com/1/cards/${encodeURIComponent(cardId)}?${auth.query}`;
 

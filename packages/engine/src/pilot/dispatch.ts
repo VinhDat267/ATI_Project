@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { PilotConfig } from './config.js';
 import type { PilotPolicy } from './policy.js';
 import type { TrelloReceipt } from './schemas.js';
@@ -189,7 +190,7 @@ export async function executePilotWorkflow(
       receipt: {
         cardId: reservation.remoteId,
         url: reservation.remoteUrl,
-        listId: '',
+        listId: listName || 'confirmed-list',
         boardId: policy.boardId,
         title: cardTitle,
         intentKey,
@@ -197,11 +198,19 @@ export async function executePilotWorkflow(
     };
   }
 
-  // 5. Claim Dispatched
-  const operationId = `op-${Date.now()}`;
+  // 5. Pre-dispatch check: verify policy before claiming dispatched
+  if (!policy.enabled || !policy.principals.includes(principalId)) {
+    return {
+      status: 'failed',
+      error: 'ACCESS_DENIED: Pilot policy is disabled or principal is unauthorized',
+    };
+  }
+
+  // 6. Claim Dispatched
+  const operationId = randomUUID();
   await store.claimDispatched(intentKey, operationId);
 
-  // 6. Dispatch Remote Write
+  // 7. Dispatch Remote Write
   try {
     const receipt = (await dispatchPilotTool(
       'trello.create_card',
@@ -217,7 +226,7 @@ export async function executePilotWorkflow(
       { config, policy, principalId },
     )) as TrelloReceipt;
 
-    // 7. Success: Confirm Reservation atomically
+    // 8. Success: Confirm Reservation atomically
     await store.confirm(intentKey, receipt.cardId, receipt.url);
 
     return {
@@ -225,13 +234,30 @@ export async function executePilotWorkflow(
       receipt,
     };
   } catch (err: unknown) {
-    // 8. Remote write error / timeout / network failure:
+    const msg = (err as Error)?.message ?? String(err);
+    const isPreDispatchError =
+      msg.includes('ACCESS_DENIED') ||
+      msg.includes('CONFIG_ERROR') ||
+      msg.includes('LIST_NOT_FOUND');
+
+    if (isPreDispatchError) {
+      return {
+        status: 'failed',
+        error: msg,
+      };
+    }
+
+    // 9. Remote write error / timeout / network failure:
     // Mark as UNKNOWN and require reconciliation. CẤM BLIND RETRY!
-    await store.markUnknown(intentKey);
+    try {
+      await store.markUnknown(intentKey);
+    } catch {
+      // Safeguard against secondary store failure
+    }
 
     return {
       status: 'reconciliation_required',
-      error: `REMOTE_WRITE_UNKNOWN: ${(err as Error).message}`,
+      error: `REMOTE_WRITE_UNKNOWN: ${msg}`,
     };
   }
 }
