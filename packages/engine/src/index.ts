@@ -196,4 +196,5 @@ export * from "./pilot/adapters/trello-write.js";
 export * from "./pilot/planner-context.js";
 export * from "./pilot/accounting.js";
 export * from "./pilot/decision-engine.js";
+export * from "./pilot/dataset-schema.js";
 

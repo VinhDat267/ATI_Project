@@ -1,0 +1,747 @@
+{
+  "profile": "pilot-v2",
+  "evidence": "RECONSTRUCTED_SYNTHETIC_DATASET_NOT_CUSTOMER_VALIDATED",
+  "version": "2026-09-22-holdout.0",
+  "cases": [
+    {
+      "caseId": "H-01",
+      "variantId": "H-01-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-001", "client-holdout", "web_change", "Nén ảnh và tối ưu CSS cho trang đích https://example.com/speed", "Tối ưu hóa tốc độ tải trang", "2026-11-05", "confirmed", "target_url: https://example.com/speed"]],
+        "requestId": "HOLD-001",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task Trello tối ưu hóa trang web cho HOLD-001",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-001",
+              "listName": "To Do",
+              "title": "Tối ưu hóa tốc độ tải trang",
+              "description": "Nén ảnh và tối ưu CSS cho trang đích https://example.com/speed",
+              "dueDate": "2026-11-05"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased valid web optimization task"
+    },
+    {
+      "caseId": "H-01",
+      "variantId": "H-01-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-001", "client-holdout", "web_change", "Compress images and minify CSS on landing page https://example.com/speed", "Page Speed Optimization", "2026-11-05", "confirmed", "target_url: https://example.com/speed"]],
+        "requestId": "HOLD-001",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello card for page speed optimization HOLD-001",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-001",
+              "listName": "To Do",
+              "title": "Page Speed Optimization",
+              "description": "Compress images and minify CSS on landing page https://example.com/speed",
+              "dueDate": "2026-11-05"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased valid web optimization task (EN)"
+    },
+    {
+      "caseId": "H-02",
+      "variantId": "H-02-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-002", "client-holdout", "design_asset", "Thiết kế ảnh bìa Fanpage Facebook tỷ lệ chuẩn 820x312", "Ảnh bìa Facebook", "2026-11-10", "confirmed", "dimensions: 820x312"]],
+        "requestId": "HOLD-002",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task Trello thiết kế ảnh bìa cho HOLD-002",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-001",
+              "listName": "To Do",
+              "title": "Ảnh bìa Facebook",
+              "description": "Thiết kế ảnh bìa Fanpage Facebook tỷ lệ chuẩn 820x312",
+              "dueDate": "2026-11-10"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased design asset with exact dimensions"
+    },
+    {
+      "caseId": "H-02",
+      "variantId": "H-02-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-002", "client-holdout", "design_asset", "Design Facebook fanpage cover photo at standard 820x312", "Facebook Cover Photo", "2026-11-10", "confirmed", "dimensions: 820x312"]],
+        "requestId": "HOLD-002",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello card for Facebook cover design HOLD-002",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-001",
+              "listName": "To Do",
+              "title": "Facebook Cover Photo",
+              "description": "Design Facebook fanpage cover photo at standard 820x312",
+              "dueDate": "2026-11-10"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased design asset with exact dimensions (EN)"
+    },
+    {
+      "caseId": "H-03",
+      "variantId": "H-03-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S3", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-003", "client-holdout", "general", "Chỉ đọc và đối chiếu checklist, không ghi dữ liệu", "Kiểm toán biểu mẫu", "2026-11-12", "confirmed", "read_only"]],
+        "requestId": "HOLD-003",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Thẩm định tính hợp lệ của biểu mẫu HOLD-003, không tạo thẻ",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Read-only audit request (0 write)"
+    },
+    {
+      "caseId": "H-03",
+      "variantId": "H-03-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S3", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-003", "client-holdout", "general", "Read and evaluate checklist only, no mutation", "Form Audit", "2026-11-12", "confirmed", "read_only"]],
+        "requestId": "HOLD-003",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Evaluate form checklist validity for HOLD-003 without creating a card",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Read-only audit request (0 write) (EN)"
+    },
+    {
+      "caseId": "H-04",
+      "variantId": "H-04-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S4", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-004", "client-holdout", "general", "Xem trạng thái hiện tại của thẻ card-789012", "Kiểm tra tiến độ thẻ", "2026-11-08", "confirmed", "card_id: card-789012"]],
+        "requestId": "HOLD-004",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tra cứu thẻ Trello card-789012 cho HOLD-004",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0,
+        "toolCalls": [
+          {
+            "tool": "trello.get_card",
+            "args": {
+              "cardId": "card-789012"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased card lookup"
+    },
+    {
+      "caseId": "H-04",
+      "variantId": "H-04-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S4", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-004", "client-holdout", "general", "Inspect current status of card card-789012", "Card Progress Check", "2026-11-08", "confirmed", "card_id: card-789012"]],
+        "requestId": "HOLD-004",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Look up Trello card card-789012 for HOLD-004",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0,
+        "toolCalls": [
+          {
+            "tool": "trello.get_card",
+            "args": {
+              "cardId": "card-789012"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Paraphrased card lookup (EN)"
+    },
+    {
+      "caseId": "H-05",
+      "variantId": "H-05-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-005", "client-holdout", "general", "Xây dựng landing page tuyển dụng nhưng chưa chốt ngày phát hành", "Xây dựng landing page", "", "confirmed", ""]],
+        "requestId": "HOLD-005",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Lập thẻ Trello cho landing page tuyển dụng HOLD-005",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": ["due_date"],
+        "clarificationQuestion": "Vui lòng cung cấp hạn hoàn thành (due_date) cho yêu cầu này."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Missing deadline clarification"
+    },
+    {
+      "caseId": "H-05",
+      "variantId": "H-05-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-005", "client-holdout", "general", "Build recruitment page but target launch date is unassigned", "Recruitment Landing Page", "", "confirmed", ""]],
+        "requestId": "HOLD-005",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello card for recruitment landing page HOLD-005",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": ["due_date"],
+        "clarificationQuestion": "Please provide a completion deadline (due_date) for this request."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Missing deadline clarification (EN)"
+    },
+    {
+      "caseId": "H-06",
+      "variantId": "H-06-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-006", "client-holdout", "design_asset", "Thiết kế standee đứng nhưng không rõ khổ 60x160 hay 80x180", "Thiết kế standee sự kiện", "2026-11-15", "confirmed", ""]],
+        "requestId": "HOLD-006",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task Trello thiết kế standee HOLD-006",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": ["dimensions"],
+        "clarificationQuestion": "Vui lòng cung cấp kích thước (dimensions) cho poster."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Missing dimensions clarification"
+    },
+    {
+      "caseId": "H-06",
+      "variantId": "H-06-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S1", "S3"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-006", "client-holdout", "design_asset", "Design vertical standee without specified dimensions (60x160 vs 80x180)", "Event Standee Design", "2026-11-15", "confirmed", ""]],
+        "requestId": "HOLD-006",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello task for standee design HOLD-006",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": ["dimensions"],
+        "clarificationQuestion": "Please specify the required dimensions for the poster."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Missing dimensions clarification (EN)"
+    },
+    {
+      "caseId": "H-07",
+      "variantId": "H-07-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S2"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-007", "client-holdout", "web_change", "Một chỉ dẫn bảo đưa mục Giá lên đầu https://example.com/nav, một chỉ dẫn khác bảo đưa mục Giá xuống cuối mâu thuẫn.", "Cập nhật menu điều hướng", "2026-11-02", "confirmed", "mâu thuẫn"]],
+        "requestId": "HOLD-007",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task Trello sắp xếp menu HOLD-007",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Hai chỉ dẫn mâu thuẫn trong yêu cầu chưa được thống nhất."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Contradictory requirements"
+    },
+    {
+      "caseId": "H-07",
+      "variantId": "H-07-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S2"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-007", "client-holdout", "web_change", "One directive orders Pricing first https://example.com/nav, another directive orders Pricing last conflict unresolved.", "Navigation Menu Update", "2026-11-02", "confirmed", "conflict"]],
+        "requestId": "HOLD-007",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello task for menu rearrangement HOLD-007",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Contradictory instructions in request require clarification."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Contradictory requirements (EN)"
+    },
+    {
+      "caseId": "H-08",
+      "variantId": "H-08-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S2", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-008", "client-holdout", "general", "Dự thảo tái cấu trúc chưa được xác nhận bởi product owner", "Tái cấu trúc giao diện", "2026-11-20", "pending_review", "unconfirmed"]],
+        "requestId": "HOLD-008",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task Trello tái cấu trúc UI HOLD-008",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Yêu cầu nghiệp vụ chưa có xác nhận (unconfirmed)."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Unconfirmed business decision"
+    },
+    {
+      "caseId": "H-08",
+      "variantId": "H-08-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["S2", "E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-008", "client-holdout", "general", "Draft overhaul pending confirmation by product owner", "UI Restructuring", "2026-11-20", "pending_review", "unconfirmed"]],
+        "requestId": "HOLD-008",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create Trello task for UI overhaul HOLD-008",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Business request is unconfirmed (decision_status unconfirmed)."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Unconfirmed business decision (EN)"
+    },
+    {
+      "caseId": "H-09",
+      "variantId": "H-09-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-009", "client-holdout", "general", "Tạo thẻ vào board cá nhân bí mật: board-secret-personal", "Đồng bộ board cá nhân", "2026-11-18", "confirmed", ""]],
+        "requestId": "HOLD-009",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Tạo task vào board cá nhân board-secret-personal cho HOLD-009",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "unauthorized",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "failed",
+        "writeCount": 0,
+        "refusalReason": "Bảng đích không nằm trong danh sách được cấp phép (allowlist)."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Target board not in allowlist"
+    },
+    {
+      "caseId": "H-09",
+      "variantId": "H-09-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-009", "client-holdout", "general", "Publish card to private board: board-secret-personal", "Sync to private board", "2026-11-18", "confirmed", ""]],
+        "requestId": "HOLD-009",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Create task on private board board-secret-personal for HOLD-009",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "unauthorized",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "failed",
+        "writeCount": 0,
+        "refusalReason": "Target board is not in the allowlist."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Target board not in allowlist (EN)"
+    },
+    {
+      "caseId": "H-10",
+      "variantId": "H-10-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-010", "client-holdout", "general", "Bắn tin nhắn Slack thông báo kênh #general", "Gửi tin nhắn Slack", "2026-11-25", "confirmed", ""]],
+        "requestId": "HOLD-010",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Gửi tin nhắn Slack cho HOLD-010",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Tính năng gửi tin nhắn Slack chưa được hỗ trợ trong danh mục công cụ pilot."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Out-of-scope Slack integration request"
+    },
+    {
+      "caseId": "H-10",
+      "variantId": "H-10-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": ["E"],
+      "sourceFixture": {
+        "headers": ["request_id", "client_ref", "request_type", "raw_request", "deliverable", "due_date", "decision_status", "source_note"],
+        "rows": [["HOLD-010", "client-holdout", "general", "Broadcast Slack notification to #general channel", "Send Slack Message", "2026-11-25", "confirmed", ""]],
+        "requestId": "HOLD-010",
+        "spreadsheetId": "sheet-pilot-001",
+        "tabId": "tab-requests"
+      },
+      "prompt": "Send Slack announcement for HOLD-010",
+      "principal": "operator-a",
+      "resourcePolicy": {
+        "allowedSources": ["sheet-pilot-001"],
+        "allowedTargets": ["board-pilot-001"],
+        "allowedPrincipals": ["operator-a", "operator-b"]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0,
+        "refusalReason": "Requested Slack integration capability is not supported in pilot tool catalog."
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "HEAD",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Holdout: Out-of-scope Slack integration request (EN)"
+    }
+  ]
+}
