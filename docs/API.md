@@ -1,4 +1,20 @@
-# API B/local
+# API — wire hiện có và delta MVP v2
+
+**Scope v2 đã duyệt 21/09/2026; wire v2 chưa triển khai.** OpenAPI/type sinh hiện
+có không được sửa tay chỉ để phản ánh mong muốn. P1–P2 tập trung schema/profile
+gateway và plan tay; P3 mới bổ sung source selection/pre-planning context cho
+HTTP. Mọi delta phải qua shared Zod schema, generation và compatibility tests.
+
+- Catalog v2 phải phân biệt `b-local` và `pilot-v2`; không thêm tool SaaS vào
+  response giả local. Principal chỉ nhận connection/tool được phép, không secret.
+- Run/approval vẫn owner-only và một active run/DB. API 202 không là kết quả ghi.
+- `needs_input` tiếp tục kết thúc run; bổ sung tạo run mới, source revision mới.
+- Business dedupe mới không làm POST /runs thành HTTP idempotent tự động.
+- V2-01–20 và [dataset contract](MVP-V2-DATASET.md) là tiêu chí cho API delta.
+
+## Hợp đồng B/local hiện có (ảnh chụp trước delta v2)
+
+Các nhận xét readiness trong phần này là lịch sử, không phải kết quả kiểm lại.
 
 [OpenAPI 3.1](openapi.yaml) là artifact sinh từ packages/dsl/scripts/emit-openapi.ts và schema Zod dùng chung. Chạy npm run api:generate. File type sinh ở packages/dsl/generated/api.d.ts. Không dùng đường dẫn api/openapi.yaml.
 

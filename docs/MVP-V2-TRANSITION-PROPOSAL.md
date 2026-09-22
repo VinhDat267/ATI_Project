@@ -1,10 +1,10 @@
 # Lộ trình chuyển đổi B/local → MVP v2
 
-**PROPOSED — tài liệu định hướng chuyển đổi, chưa là lệnh triển khai.**
+**DESIGN_APPROVED / EXECUTION_NOT_AUTHORIZED — 21/09/2026.**
 
 Ngày: 21/09/2026. Đọc trước:
 [đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
-Baseline đang có vẫn là nguồn chuẩn cho đến khi chủ project duyệt thay đổi.
+Chủ project đã duyệt đặc tả; baseline được đồng bộ phạm vi đích MVP v2.
 Đây không phải implementation plan đã chốt symbol/schema/patch; bước đó cần
 đặc tả được duyệt và phân tích impact mới trước sửa code.
 
@@ -14,7 +14,7 @@ Baseline đang có vẫn là nguồn chuẩn cho đến khi chủ project duyệ
 - Một bản đồ phần giữ lại/phần mới dựa trên source, không suy ra từ tên tool.
 - Thứ tự chuyển đổi và gate kiểm chứng; không hứa thời gian khi chưa biết hạn
   nộp/quỹ giờ còn lại.
-- Không đổi code, config, DB, dataset đang chạy, Design System hoặc baseline.
+- Đã đồng bộ baseline đích; không đổi code, config, DB, dataset đang chạy hoặc Design System.
 - Không tạo tài khoản SaaS, connection, live run hay đánh giá AI có tính phí.
 
 ## 2. Mốc bằng chứng
@@ -59,7 +59,13 @@ chứng minh SaaS auth, AI quality hoặc correctness nghiệp vụ của MVP v2
 
 ## 4. Thứ tự chuyển đổi và cổng ra
 
-### P0 — Duyệt và đồng bộ scope (chưa làm)
+### P0 — Duyệt và đồng bộ scope
+
+Spec approval và đồng bộ docs: hoàn tất trong batch tài liệu ngày 21/09/2026.
+Implementation plan P1a (nền tảng thuần, chưa trọn P1/P2): xem [kế hoạch giai đoạn đầu](superpowers/plans/2026-09-21-mvp-v2-foundation-connectors.md).
+Schema tích hợp engine, reservation DB và adapter được tách thành batch kế tiếp;
+không coi bản đồ P2 trong plan này là lệnh thực thi P2.
+Phần dưới là thứ tự gate; không có nghĩa code P1–P5 đã được triển khai.
 
 Chủ project duyệt đặc tả, cặp tích hợp và giới hạn một nhóm/two operators nhưng
 chỉ một active run. Sau đó mới lập implementation plan chi tiết bằng workflow
@@ -205,5 +211,5 @@ dependency schema/approval chưa chốt.
 4. Thực hiện từng batch, verify và commit sạch; chỉ đi qua gate tiếp theo khi
    có bằng chứng. Source map này cần refresh nếu HEAD/working tree thay đổi.
 
-**Điểm dừng của đợt hiện tại:** người dùng xem và duyệt đặc tả. Không còn yêu
+**Điểm dừng hiện tại:** người dùng xem implementation plan và chọn cách thực hiện. Không còn yêu
 cầu phải tự tìm người quen để project được phép tiến triển.

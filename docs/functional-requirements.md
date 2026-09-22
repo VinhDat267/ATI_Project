@@ -1,4 +1,29 @@
-# Yêu cầu chức năng — profile B/local
+# Yêu cầu chức năng — scope MVP v2 / đối chiếu B/local
+
+**SCOPE_APPROVED 21/09/2026; IMPLEMENTATION_NOT_VERIFIED.**
+[Đặc tả](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md) có ưu
+tiên khi khác profile B cũ bên dưới. 78 ID cũ giữ nguyên, không cộng với 11 ID
+delta để tuyên bố tỷ lệ hoàn thành. Mọi ID v2 sau là MUST của phạm vi đích.
+
+| ID | Yêu cầu v2 | Đối chiếu / nghiệm thu |
+|---|---|---|
+| V2-FR-01 | Sheets read-only + Trello read/create qua reviewed profile riêng; không giả SaaS bằng task_hub | Mở rộng FR-CON-02/03/04/06; UC2 live |
+| V2-FR-02 | Đọc nguồn có giới hạn trước planning; snapshot/revision/checklist/provenance thống nhất | Mở rộng FR-PLN-11/12; V2-05–08/11/16/20 |
+| V2-FR-03 | Planner chọn tool theo NL, có clarification/refusal; không template cố định giả AI | Giữ FR-PLN-01–03/05/09/10; UC1–3 |
+| V2-FR-04 | Business confirmation tách platform approval; write phải qua cả hai | Mở rộng FR-APR-01–06; V2-09/15 |
+| V2-FR-05 | Business intent key xuyên run/operator, lưu unknown để ngăn create trùng | Mở rộng FR-EXE-06; V2-17–19 |
+| V2-FR-06 | Remote receipt/link có schema; read-only đối chiếu, không claim local atomic receipt áp cho SaaS | Giữ FR-EXE-05/15; UC3/V2-19 |
+| V2-FR-07 | Hai principal pilot; owner-only read/approve; giữ một active run/DB | Thay scope demo FR-USR-01, giữ FR-USR-02; V2-14/18 |
+| V2-FR-08 | Credential server-only, connection/target/principal allowlist, revocation chặn dispatch; redact lỗi | Mở NFR-10 cho SaaS; self-service vault FR-CON-07/USR-03 vẫn OUT; V2-12/13 |
+| V2-FR-09 | Live mode rõ, không fallback fixture; source/preview/result/unknown dễ hiểu | Mở FR-TRC/UI; P4 review interaction riêng |
+| V2-FR-10 | 20 case tổng hợp có nguồn và oracle, holdout riêng; đo manual/script/AI và semantic/QE | Mở FR-TRC-08; giữ evidence NOT_RUN tới khi đo |
+| V2-FR-11 | Sau needs_input bổ sung bằng run mới; link source/run, không resume terminal | Giữ FR-PLN-12 và no-auto-resume |
+
+V2 dùng adapter API được policy kiểm soát; giao thức nội bộ gateway có thể bọc
+REST thay vì giả định mọi connector thật là subprocess MCP. FR-EXE-02 của B
+vẫn áp cho tool local; không buộc cài arbitrary MCP server cho SaaS.
+
+## Profile B/local trước v2 (yêu cầu nền và evidence lịch sử)
 
 Nguồn scope: [BASELINE](BASELINE.md). Giữ 78 ID cũ để truy vết; cột B thay độ ưu tiên cũ, không cộng tất cả thành MVP. M = mục tiêu bắt buộc của B, S = tùy quỹ, OUT = ngoài scope. Đây là yêu cầu, không trạng thái implementation.
 

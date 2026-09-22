@@ -2,6 +2,33 @@
 
 <!-- impeccable:product-schema 1 -->
 
+## Product direction — approved 21/09/2026
+
+Tên hiện hành: **AI Automation Platform**. Loại sản phẩm: AI Automation Workflow
+Platform; giữ định danh kỹ thuật `ATI_Project`, `ati-*`, `@wap/*`.
+
+Người dùng đích: điều phối viên nhóm dịch vụ thiết kế/web. Bài toán: biến yêu
+cầu thiếu rõ ràng thành công việc đủ thông tin, được xác nhận và truy vết được.
+Pilot gồm Sheets read-only + Trello; kiểm yêu cầu, tạo task sau approval và tra
+task đã tạo. Hai operator riêng nhưng run owner-only và một active run/DB;
+board ngoài là nơi cộng tác. Không đồng nghĩa đã có multi-tenant platform.
+
+Đặc tả đã được user duyệt; adapter/source preflight/dedupe v2 chưa được nghiệm
+thu. Nghiên cứu web là bằng chứng thứ cấp về vấn đề, không thay phỏng vấn,
+customer adoption hay doanh thu. Không cần người quen để làm prototype; nếu
+rubric yêu cầu nghiên cứu sơ cấp thì ghi rõ phần còn thiếu.
+
+[BASELINE](docs/BASELINE.md) điều khiển scope;
+[đặc tả](docs/superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md)
+ghi chi tiết; [System Design](System%20Design/DESIGN.md) vẫn là visual đã duyệt.
+Code/lịch sử evidence B/local tiếp tục được giữ; không nâng nhãn live vì đổi docs.
+
+## Hồ sơ B/local lịch sử — không dùng làm positioning hiện hành
+
+Các section phía dưới là snapshot cũ để truy vết. Đặc biệt các dòng ATI branding,
+trưởng nhóm môn học, UI/AI chưa có và hướng DESIGN.md cũ không phải trạng thái
+hiện hành. Không diễn giải phạm vi OUT của profile B thành lệnh cấm scope v2.
+
 ## Platform
 
 web

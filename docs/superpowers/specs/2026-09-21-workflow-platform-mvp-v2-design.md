@@ -1,9 +1,13 @@
 # MVP v2 — Quy trình yêu cầu khách hàng có kiểm soát
 
-**Trạng thái: PROPOSED — chờ chủ project duyệt đặc tả.**
+**Trạng thái: APPROVED_BY_PROJECT_OWNER — 21/09/2026.**
 
-Ngày lập: 21/09/2026. Đây là tài liệu đề xuất, không thay thế
-[BASELINE.md](../../BASELINE.md), không cấp quyền triển khai, gọi dịch vụ,
+Chủ project trả lời “duyệt” sau khi được trình đặc tả và đề nghị lập kế hoạch
+sửa code giai đoạn đầu. Approval này xác nhận thiết kế/scope và cho phép lập
+implementation plan; không phải phê duyệt thực thi plan chưa được xem.
+
+Ngày lập: 21/09/2026. Phạm vi đã được đồng bộ vào
+[BASELINE.md](../../BASELINE.md); chưa cấp quyền triển khai, gọi dịch vụ,
 tạo tài khoản hoặc chi tiền. Tài liệu đi cùng:
 [lộ trình chuyển đổi](../../MVP-V2-TRANSITION-PROPOSAL.md).
 
@@ -318,7 +322,7 @@ không sửa prompt/ngưỡng theo kết quả rồi gọi cùng bộ là unseen
 
 | Cổng | Đề xuất mặc định / điều kiện | Có chặn việc gì? |
 |---|---|---|
-| Chủ project duyệt spec | Nhóm dịch vụ, Sheets read-only + Trello, UC1–3 và ranh giới trên | Chặn cập nhật baseline và implementation plan chi tiết |
+| Chủ project duyệt spec | APPROVED 21/09/2026: nhóm dịch vụ, Sheets read-only + Trello, UC1–3 | Đã mở bước đồng bộ baseline và lập plan; execution vẫn chờ duyệt plan |
 | Tài khoản/quyền SaaS | Tài khoản thử riêng, resource allowlist, credential server-side | Chặn smoke/live integration; không chặn soạn test hợp đồng |
 | AI provider và ngân sách | Dùng provider đã được người dùng cho phép; kiểm lại quyền/budget thực | Chặn live AI evaluation; không chọn/mua thay người dùng |
 | Quỹ thời gian còn lại | Lịch cũ là giả định hai người, không chứng minh năng lực hiện tại | Chặn cam kết ngày hoàn tất; lộ trình hiện chỉ có thứ tự gate |
@@ -330,11 +334,11 @@ xác nhận với giảng viên; không tự coi nghiên cứu web là đáp ứ
 
 ## 11. Tự rà soát tài liệu
 
-- Mọi thay đổi là PROPOSED, không nâng trạng thái live/market acceptance.
+- Thiết kế đã APPROVED; implementation và live/market acceptance chưa được nâng trạng thái.
 - Không ghi link về Sheet trong cùng run; không dùng output write làm input
   bước sau; không thêm loop hoặc resume để vượt giới hạn hiện tại.
 - Bổ sung pre-planning read và dedupe xuyên run được ghi là việc mới, không
   gán nhầm cho khả năng đã có.
 - Nhóm sử dụng không được suy ra từ việc chia sẻ một login; operator và owner
   check có tiêu chí riêng, không hứa multi-tenant.
-- Tài liệu này chờ người dùng duyệt trước khi chuyển sang implementation plan.
+- Spec đã được duyệt để lập implementation plan; chỉ triển khai sau khi user xem plan và chọn cách thực hiện.

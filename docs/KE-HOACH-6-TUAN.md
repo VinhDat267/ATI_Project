@@ -1,5 +1,26 @@
 # Kế hoạch 6 tuần — cấu hình B/local
 
+## Lộ trình hiện hành sau duyệt MVP v2 — 21/09/2026
+
+Lịch sáu tuần phía dưới được giữ làm lịch sử, **không còn là cam kết giao v2**.
+Chưa có quỹ giờ/hạn nộp mới được xác nhận; không tự đặt ngày hoàn tất.
+
+| Giai đoạn | Cổng ra | Trạng thái |
+|---|---|---|
+| P0 | Duyệt spec, đồng bộ scope/FR/API/dataset/lịch | Docs đã đồng bộ; execution plan chờ review |
+| P1 | Data/checklist/schema/profile và reservation có test cô lập | Chưa triển khai v2 |
+| P2 | Adapter và plan tay preview → approve → một card thật; unknown an toàn | Chưa triển khai; live cần tài khoản/quyền riêng |
+| P3 | AI nhận source snapshot, NL planning và cost/quality evidence | Sau gate P2, plan riêng |
+| P4 | Interaction được duyệt; browser live UC1–3 và owner isolation | Sau gate P3, plan riêng |
+| P5 | Bộ nghiệm thu/holdout, đánh giá, báo cáo và defense | Sau P4, không đồng nghĩa customer validation |
+
+[Kế hoạch P1a và ranh giới P1b/P2](superpowers/plans/2026-09-21-mvp-v2-foundation-connectors.md)
+ghi file/test/gate; [lộ trình](MVP-V2-TRANSITION-PROPOSAL.md) ghi cắt scope.
+Thiếu quỹ thì đề nghị cắt UC3/biến thể trước, không bỏ safety hoặc giả local là
+live. Cần xác nhận quỹ giờ trước khi chuyển task thành lịch có ngày.
+
+## Lịch B/local trước v2
+
 B đã được người dùng chọn ngày 13/09/2026. Hai thành viên: A chịu backend/engine/storage; B chịu MCP local/data/UI/AI experiments; cả hai phải giải thích được luồng và cross-review. Đây là phân công vai trò, chưa gán tên người thật.
 
 ## Quỹ giờ và phạm vi

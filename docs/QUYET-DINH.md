@@ -1,5 +1,21 @@
 # Quyết định hiện hành
 
+## Quyết định có hiệu lực mới nhất
+
+| ID | Quyết định | Trạng thái |
+|---|---|---|
+| QĐ-11 | Đặc tả MVP v2: nhóm dịch vụ thiết kế/web, Sheets read-only + Trello, UC1–3, hai principal owner-only, một active run/DB | APPROVED_BY_PROJECT_OWNER 21/09/2026 qua phản hồi “duyệt”; chưa cho phép execution plan hoặc live spend |
+| QĐ-12 | Nghiên cứu nguồn công khai + tình huống tái dựng; customer validation vẫn NOT_RUN | Phương pháp prototype đã duyệt; không giả lập kết quả phỏng vấn |
+| QĐ-13 | Giữ AI Automation Platform và System Design đã duyệt 21/09; không chọn lại visual | Đồng bộ quyết định branding/visual hiện có, không là thiết kế mới |
+
+Nguồn: [đặc tả v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md),
+[baseline](BASELINE.md), [System Design](../System%20Design/DESIGN.md).
+Phạm vi OUT của QĐ-03/04 trước đó chỉ là B/local; giới hạn preview, unknown,
+owner, không auto-resume vẫn giữ. QĐ-10 hướng Airbnb bên dưới đã bị thay bằng
+visual đã approved tại System Design, không dùng để triển khai UI mới.
+
+## Sổ quyết định B/local trước v2 — snapshot lịch sử
+
 Nguồn scope: [BASELINE](BASELINE.md). Thay thế các quyết định A/B chưa chốt trong bản trước ngày 13/09.
 
 | ID | Quyết định | Trạng thái / lý do |

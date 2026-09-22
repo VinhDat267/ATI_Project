@@ -1,5 +1,19 @@
 # Thiết kế đánh giá
 
+## Phạm vi v2 đã duyệt — 21/09/2026
+
+Dùng [dataset contract v2](MVP-V2-DATASET.md) và 20 tình huống trong đặc tả.
+Đây là yêu cầu đã duyệt, dataset code/test results vẫn chưa được tạo/chạy.
+Giữ nguyên `testdata/test-cases.json`, `tools.json`, `experiment-manifest.json`
+của B; không trộn denominator giữa hai profile hay sửa holdout cũ trong batch docs.
+
+Tách CONTRACT_TESTED, SAAS_LIVE_EXERCISED, AI_QUALITY_MEASURED,
+CUSTOMER_VALIDATED. Nhóm đóng vai chỉ là thử nghiệm mô phỏng; nhãn cuối vẫn
+NOT_RUN. 20 case công khai là acceptance set; holdout mới phải được đóng băng
+riêng trước đo. Giữ đối chứng semantic/semantic+QE và tính mọi call/budget.
+
+## Phương pháp và evidence B/local lịch sử
+
 **NOT_RUN:** chưa có thí nghiệm AI so sánh model/retrieval/query expansion/replan. FS-05 đã đạt **TECHNICAL PASS** cho controller hai server với 8 public `task_hub` tools và 2 public `filesystem` tools; fresh FS-06 gate đạt **258 passed, 1 skipped**. Đây là bằng chứng plan tay/runtime trên fixture local, không phải kết quả thực nghiệm AI. 10 fixture B/local là bộ kiểm tính biểu diễn và oracle ban đầu, chưa đủ quy mô kết luận accuracy tổng quát. Xem [filesystem status](G1-FILESYSTEM-STATUS-2026-09-13.md).
 
 ## Đo đúng câu hỏi

@@ -1,4 +1,39 @@
-# Baseline B/local — nguồn chuẩn về phạm vi
+# Baseline hiện hành — MVP v2
+
+**SCOPE_APPROVED — 21/09/2026:** chủ project duyệt
+[đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
+Đây là thay đổi phạm vi đích, không phải xác nhận code hoặc live integration đã
+xong. Kế hoạch thực thi còn chờ review; SaaS/AI live cần quyền tài nguyên và
+ngân sách riêng. Không thực thi chỉ vì đặc tả được duyệt.
+
+| Thành phần | Phạm vi đích đã duyệt | Trạng thái thực thi v2 |
+|---|---|---|
+| Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Chưa nghiệm thu pilot |
+| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | NOT_IMPLEMENTED_AS_V2 |
+| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | SAAS_LIVE_NOT_RUN |
+| AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Phần mở rộng nguồn dữ liệu chưa triển khai |
+| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Kế thừa invariant B/local, v2 phải regression |
+| Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Chưa có cross-run business reservation |
+| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | Chưa duyệt interaction delta v2 |
+| Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | DATASET_PLANNED; CUSTOMER_VALIDATED=NOT_RUN |
+
+Không mở: email/Slack/WhatsApp thật, ghi ngược Sheet, scheduler/batch/loop,
+workflow editor/reuse, arbitrary tool, shared run history/approval chéo,
+workspace CRUD/multi-tenant, automatic resume, public staging/enterprise.
+OIDC đăng nhập không thay authorization Google/Trello. Credential bắt buộc ở
+server, không vào prompt/browser/trace/git; không xây self-service vault ở MVP.
+
+FR v2 được ghi ở [functional requirements](functional-requirements.md),
+wire-format hiện có và delta ở [API](API.md), dataset ở
+[MVP-V2-DATASET](MVP-V2-DATASET.md), gate ở [lịch](KE-HOACH-6-TUAN.md).
+Quy tắc bất biến của [execution contract](EXECUTION-CONTRACT.md) vẫn bắt buộc.
+
+## Baseline triển khai B/local — giữ để đối chiếu, không còn là scope đích
+
+Các mục B/local bên dưới mô tả hợp đồng/ảnh chụp trước v2. Những dòng loại SaaS,
+một tài khoản demo hoặc người dùng trưởng nhóm môn học chỉ áp cho profile cũ;
+phạm vi đích ở bảng trên có ưu tiên. Các số test là evidence lịch sử, không phải
+kết quả chạy lại trong batch tài liệu này.
 
 **CONFIRMED — 13/09/2026:** người dùng chọn B: ưu tiên AI, polling, task_hub local. Các lựa chọn A trong tài liệu cũ không còn là công việc của kế hoạch hiện hành. Đổi scope cần cập nhật file này, FR, API, dataset và lịch cùng lúc.
 

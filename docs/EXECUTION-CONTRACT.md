@@ -1,5 +1,27 @@
 # Hợp đồng thực thi B/local
 
+## Delta v2 đã duyệt — yêu cầu, chưa là implementation
+
+Ngày 21/09/2026, [đặc tả v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md)
+được duyệt. Hợp đồng B bên dưới vẫn là nền an toàn; không suy rộng receiver
+receipt local sang SaaS. Delta bắt buộc:
+
+1. Source snapshot được kiểm policy trước planning, có schema/checklist/revision
+   và trace; preview không trộn revision. Không thêm LLM transform vào DSL.
+2. Business confirmation không thay owner approval; hash/TTL 10 phút vẫn bắt buộc.
+3. Create intent xuyên run dùng nhóm + source_key + board, không dùng source
+   revision/run ID để vượt dedupe. Unknown reservation không được giải phóng
+   chỉ vì timeout/không thấy card. Database dùng chung vẫn chỉ một active run.
+4. Credential/connection/target/principal được kiểm trước call và khi thu hồi;
+   không đưa credential vào snapshot/model/trace hoặc backend error gửi client.
+5. UC2 một remote write; không write-output dataflow giữa steps; final outputs
+   được dùng để hiển thị receipt ID/link đã xác nhận. Không ghi URL về Sheet.
+6. Sai schema sau dispatch hoặc mất response là unknown cho remote write, không
+   biến thành known_not_applied. Reconciliation read-only không tự resume/retry.
+
+P1–P2 phải mở rộng và kiểm các delta này trước khi bật pilot adapter. Các status
+và số test sau đây là evidence B/local lịch sử, không phải v2 acceptance.
+
 Controller/engine CLI cho plan tay và toàn bộ 8 tool local của server `task_hub` đã triển khai preview/decision/claim, trace, cancel, orphan recovery, receipt inspection, card create/move flows, date boundary/timezone và active workload. Filesystem local có 2 public tools với approval guard và durable dispatch reservation. FS-05 đạt **TECHNICAL PASS** cho controller hai server, CLI thật và toàn bộ E01–E14, gồm E08 reservation-window crash và hai mode E10 hậu dispatch. Fresh FS-06 gate đạt **258 passed, 1 skipped**. API-01–05 có evidence loopback cho HTTP/session/lifecycle với planner fixture; browser UI, frontend polling, LLM/replan và scheduler/BullMQ vẫn chưa chạy. Xem [API status](API-STATUS-2026-09-15.md), [filesystem status](G1-FILESYSTEM-STATUS-2026-09-13.md) và [report FS-05](task-hub-evidence/batch-02/FS-05/FS-05.md). DB/receiver được kiểm chứng bằng PostgreSQL 16 và MCP thật. G1 overall vẫn **PARTIAL** vì rubric chính thức và công việc nhóm đại diện còn `OPEN`. Các đoạn HTTP/planner dưới đây mô tả contract/implementation hiện hành; frontend và AI quality vẫn là phần kế tiếp.
 
 ## Vòng đời
