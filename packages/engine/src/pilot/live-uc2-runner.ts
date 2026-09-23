@@ -144,7 +144,7 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
       sourceRevision: checklist.sourceRevision,
       preview,
       error: 'SNAPSHOT_MISMATCH: Snapshot hash has drifted or was tampered',
-      reservationStatus: 'reserved',
+      reservationStatus: 'cancelled',
       writeCount: 0,
     };
   }
@@ -160,7 +160,7 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
       sourceRevision: checklist.sourceRevision,
       preview,
       error: 'TTL_EXPIRED: Operator approval exceeded 10-minute server TTL',
-      reservationStatus: 'reserved',
+      reservationStatus: 'cancelled',
       writeCount: 0,
     };
   }
@@ -179,6 +179,9 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
   // 8. Execute Single Remote Write
   let rawReceipt: unknown;
   try {
+    if (options.simulatedNetworkFault === '401') {
+      throw new Error('UNAUTHORIZED: Invalid API credentials (HTTP 401)');
+    }
     if (options.simulatedNetworkFault === 'timeout') {
       throw new Error('TIMEOUT: Network request timed out while waiting for Trello response');
     }
@@ -192,10 +195,30 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
       { config, policy, principalId },
     );
   } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    const isPreDispatchError =
+      errorMsg.includes('ACCESS_DENIED') ||
+      errorMsg.includes('CONFIG_ERROR') ||
+      errorMsg.includes('LIST_NOT_FOUND');
+
+    if (isPreDispatchError) {
+      await reservationStore.cancel(intentKey);
+      return {
+        runId,
+        status: 'failed',
+        intentKey,
+        sourceKey: sKey,
+        sourceRevision: checklist.sourceRevision,
+        preview,
+        error: errorMsg,
+        reservationStatus: 'cancelled',
+        writeCount: 0,
+      };
+    }
+
     // ZERO BLIND RETRY INVARIANT:
     // When a post-dispatch error occurs, transition reservation to unknown and halt at reconciliation_required.
     await reservationStore.markUnknown(intentKey);
-    const errorMsg = err instanceof Error ? err.message : String(err);
     return {
       runId,
       status: 'reconciliation_required',
