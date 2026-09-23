@@ -14,7 +14,7 @@ ghi các lỗi chặn. SaaS/AI live vẫn cần tài nguyên, quyền và ngân 
 | AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; `AI_QUALITY_NOT_RUN` |
 | Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; live write mặc định tắt và SaaS thật chưa chạy |
 | Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Reservation PostgreSQL có; `claimDispatched` chỉ nhận `reserved`, runner không POST lại intent `confirmed`; integration test PostgreSQL đạt |
-| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | UI pilot có code; browser v2 acceptance và review interaction delta `OPEN` |
+| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | UC2 browser local đã qua 4 ca với API/PostgreSQL cô lập và Sheets/Trello giả; review interaction delta và nghiệm thu đại diện vẫn `OPEN` |
 | Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | Dataset 40 biến thể + 20 holdout có; mô phỏng không phải AI quality; `CUSTOMER_VALIDATED=NOT_RUN` |
 
 Không mở: email/Slack/WhatsApp thật, ghi ngược Sheet, scheduler/batch/loop,

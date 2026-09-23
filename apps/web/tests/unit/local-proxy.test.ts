@@ -669,4 +669,41 @@ describe("Vite server integration with localProxy plugin", () => {
       }
     }
   });
+
+  it("forwards pilot routes through the same origin guard", async () => {
+    let viteServer: any;
+    try {
+      viteServer = await createViteDevServer({
+        root: tempDir,
+        configFile: false,
+        server: { host: "127.0.0.1", port: 0 },
+        plugins: [localProxy({ target: upstreamOrigin })],
+      });
+      await viteServer.listen();
+      const origin = `http://127.0.0.1:${viteServer.httpServer.address().port}`;
+      const accepted = await fetch(`${origin}/pilot/v2/runs`, {
+        method: "POST",
+        headers: {
+          origin, "sec-fetch-site": "same-origin",
+          authorization: "Bearer pilot-test", "content-type": "application/json",
+        },
+        body: JSON.stringify({ requestId: "pilot-1" }),
+      });
+      expect(accepted.status).toBe(200);
+      expect(upstreamCalls).toHaveLength(1);
+      expect(upstreamCalls[0]?.url).toBe("/pilot/v2/runs");
+      expect(upstreamCalls[0]?.headers.authorization).toBe("Bearer pilot-test");
+      expect(upstreamCalls[0]?.headers.origin).toBe(upstreamOrigin);
+
+      const forbidden = await fetch(`${origin}/pilot/v2/runs`, {
+        method: "POST",
+        headers: { origin: "https://foreign.invalid", "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(forbidden.status).toBe(403);
+      expect(upstreamCalls).toHaveLength(1);
+    } finally {
+      await viteServer?.close();
+    }
+  });
 });

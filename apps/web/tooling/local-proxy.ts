@@ -130,7 +130,11 @@ export function createProxyGuard(options: {
     next: () => void,
   ): void {
     const rawUrl = req.url ?? "/";
-    if (!rawUrl.startsWith("/api/v1")) {
+    const path = rawUrl.split("?", 1)[0] ?? "/";
+    const isApiRoute = ["/api/v1", "/pilot/v2"].some(
+      (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+    );
+    if (!isApiRoute) {
       return next();
     }
 
@@ -435,20 +439,22 @@ export function localProxy(
     "wap_csrf",
   ]);
 
-  const proxyConfig = {
-    "/api/v1": {
-      target: targetUrl.origin,
-      changeOrigin: true,
-      ws: false,
-      configure(proxy: any) {
-        proxy.on("proxyReq", (proxyReq: any) => {
-          // The guard validates the browser origin before forwarding. The API
-          // receives the rewritten loopback Origin, which is its configured
-          // base origin; do not forward a stale Vite listening port here.
-          rewriteForwardHeaders(proxyReq, targetUrl, null, allowedCookieNames);
-        });
-      },
+  const proxyRule = () => ({
+    target: targetUrl.origin,
+    changeOrigin: true,
+    ws: false,
+    configure(proxy: any) {
+      proxy.on("proxyReq", (proxyReq: any) => {
+        // The guard validates the browser origin before forwarding. The API
+        // receives the rewritten loopback Origin, which is its configured
+        // base origin; do not forward a stale Vite listening port here.
+        rewriteForwardHeaders(proxyReq, targetUrl, null, allowedCookieNames);
+      });
     },
+  });
+  const proxyConfig = {
+    "^/api/v1(?:/|$)": proxyRule(),
+    "^/pilot/v2(?:/|$)": proxyRule(),
   };
 
   return {

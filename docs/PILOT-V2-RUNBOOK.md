@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 23/09/2026:** `APPROVAL_API_DB_TESTED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live.
+**Trạng thái 23/09/2026:** `APPROVAL_API_DB_TESTED / UC2_BROWSER_LOCAL_TESTED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -10,7 +10,7 @@ Các điều kiện trước live write còn **BLOCKED**:
 
 - Approval HTTP đã lưu PostgreSQL, gắn owner/run/version/hash/list ID/hạn 10 phút và kiểm trước dispatch. Cờ ghi Trello vẫn tắt mặc định; chưa có evidence live để nâng trạng thái vận hành.
 - Cấp nguồn approval bền vững cho runner UC2 độc lập trước khi dùng nó trong sản phẩm; runner hiện từ chối thiếu approval và chưa nối vào API/CLI.
-- Kiểm end-to-end đường API bằng PostgreSQL/HTTP và browser pilot; kiểm owner isolation, preview, từ chối, timeout, dedupe và receipt.
+- Mở rộng kiểm chứng browser/API trên PostgreSQL cô lập cho owner isolation và các nhánh UC2 còn thiếu; kiểm thử hiện có chỉ xác nhận owner isolation ở tầng API.
 - Có nguồn/board thử nghiệm được allowlist, tài khoản và quyền cần thiết, người duyệt, ngân sách/price card cho AI, rubric và kế hoạch đối chiếu. Live read, live write và live AI cần evidence riêng.
 
 ## 2. Cấu hình hiện có và giới hạn
@@ -34,6 +34,8 @@ Chưa có lệnh operator được kiểm chứng để gọi `runPilotLivePrefl
 Trên đường API hiện có, `POST /pilot/v2/runs` đọc nguồn và lưu snapshot, workflow version, approval pending cùng hạn 10 phút trong PostgreSQL. `GET /pilot/v2/runs/:id` trả preview gồm `approvalId`, `versionId`, `snapshotHash`, `expiresAt` và action có list ID. `POST /pilot/v2/runs/:id/approve` yêu cầu đúng ba định danh đó và quyết định. Server khóa row, kiểm owner/version/hash/hạn bằng đồng hồ DB, ghi quyết định và trạng thái trước dispatch; replay trả 409. `PILOT_V2_WRITE_ENABLED` mặc định tắt nên `approved` trả `503 LIVE_WRITE_BLOCKED` và không thay approval. Khi cờ bật mà chưa có list ID, API trả `503 TARGET_NOT_BOUND`.
 
 HTTP integration đã kiểm trên PostgreSQL cô lập với Trello `fetch` giả: duyệt một lần, đồng thời, replay, version/source/list drift, hết hạn, từ chối, cờ tắt và kết quả không chắc chắn. Approval hết hạn được đóng khi có yêu cầu API tiếp theo; run `running` cũ hơn 15 phút được chuyển `reconciliation_required` theo hướng không tự gửi lại. Đây là xử lý theo yêu cầu, chưa có cron sweep hay bằng chứng crash ở tiến trình thật. Không dùng runner P6 độc lập để tạo card: nó chưa nối vào approval store sản phẩm.
+
+Browser Chromium đã qua 4 ca tại `apps/web/tests/live/pilot-approval.spec.ts` với API HTTP và PostgreSQL cô lập: tạo run/preview/từ chối trên UI; cờ ghi tắt trả `503` và giữ approval pending; approval hết hạn bị khóa; receipt chỉ hiện sau duyệt và một POST Trello giả, còn replay trả `409` kể cả sau khi tải lại trang. Test dùng nguồn Sheets giả và chặn mọi HTTPS ngoài Trello giả trong ca write; không chứng minh Google Sheets/Trello thật hoặc AI provider. Lệnh tái chạy: `npm run test:live -w @wap/web -- pilot-approval.spec.ts`.
 
 Receipt chỉ hiện trên GET sau khi chính run đó đạt `succeeded`; `business_reservations` lưu list ID Trello thật để trả receipt khi một run được duyệt và tái sử dụng intent đã xác nhận. Dữ liệu confirmed cũ thiếu list ID được giữ để đối chiếu, không dựng list ID giả hoặc gửi lại card. Nếu run bị chuyển sang `reconciliation_required` trong lúc POST còn chờ, HTTP không báo `succeeded` dù Trello trả receipt muộn.
 
