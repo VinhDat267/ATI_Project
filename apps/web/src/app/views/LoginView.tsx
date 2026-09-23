@@ -353,7 +353,7 @@ export function LoginView({
           >
             <h2
               id="intro-title"
-              className="m-0 text-[32px] font-semibold leading-[40px] tracking-[-0.03em] text-ink desk:text-[40px] desk:leading-[50px]"
+              className="m-0 text-display-md-mobile font-semibold text-ink desk:text-display-md"
             >
               Tự động hoá quy trình làm việc thông minh và an toàn
             </h2>

@@ -157,11 +157,11 @@ function Capabilities() {
         </a>
       </section>
       <section className="flex flex-col gap-3 rounded-md border border-hairline bg-surface-soft p-6 shadow-card">
-        <h2 className="m-0 text-title-md">Trước khi có gì bị ghi</h2>
+        <h2 className="m-0 text-title-md">Cam kết an toàn dữ liệu</h2>
         <ol className="m-0 flex flex-col gap-2 pl-5 text-body-md text-muted">
-          <li>Bạn xem kế hoạch và dữ liệu đã đọc</li>
-          <li>Bạn thấy đích và nội dung sẽ ghi</li>
-          <li>Bạn duyệt trong thời hạn máy chủ đặt</li>
+          <li>Xem trước kế hoạch và dữ liệu liên quan</li>
+          <li>Kiểm tra chi tiết nội dung và hệ thống đích</li>
+          <li>Bạn trực tiếp phê duyệt trước khi tiến hành</li>
         </ol>
       </section>
     </aside>
@@ -434,8 +434,8 @@ export function NewRunView() {
           </div>
           <p className="m-0 max-w-measure-sm text-body-sm text-muted">
             {createSnapshot.status === "confirming"
-              ? "Trạng thái chưa rõ. Kiểm tra Lần chạy hoặc chờ hệ thống xác nhận trước khi tiếp tục."
-              : "Chưa có dữ liệu nào bị ghi ở bước này. Kế hoạch có thể hiểu sai, hỏi lại hoặc từ chối yêu cầu — bạn luôn xem trước khi duyệt. Nháp không được lưu khi rời trang."}
+              ? "Trạng thái đang được xác nhận. Kiểm tra Danh sách công việc hoặc chờ hệ thống trước khi gửi tiếp."
+              : "Dữ liệu của bạn được bảo vệ an toàn. Trợ lý AI chỉ đề xuất kế hoạch thực hiện — bạn luôn xem trước và phê duyệt trước khi có bất kỳ thay đổi nào diễn ra."}
           </p>
         </div>
       </form>

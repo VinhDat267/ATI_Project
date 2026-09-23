@@ -17,7 +17,7 @@ test.describe("StrictMode development effect replay", () => {
     expect(detailCalls.length).toBeGreaterThan(0);
 
     // 2. Navigate away to history via back button in RunView
-    await page.getByRole("link", { name: "Quay lại Lần chạy" }).click();
+    await page.getByRole("link", { name: /Quay lại (Lần chạy|Danh sách công việc)/i }).click();
     await expect(page).toHaveURL(/#\/runs$/);
 
     const historyCalls = await fixtureCalls(page);

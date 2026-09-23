@@ -32,7 +32,7 @@ export function StepList({
     <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
       {steps.map((step, index) => {
         const state = STATE[step.state];
-        const kind = step.write ? "ghi" : "đọc";
+        const kind = step.write ? "Cập nhật dữ liệu" : "Đọc dữ liệu";
         const when = step.startedAt ? ` · lúc ${formatClock(step.startedAt, timeZone)}` : "";
         return (
           <li
@@ -40,8 +40,8 @@ export function StepList({
             className={cn(
               "grid-step rounded-md border bg-surface-soft p-4 shadow-card transition-all duration-150 hover:shadow-lg",
               step.write
-                ? "border-hairline border-l-4 border-l-action"
-                : "border-hairline border-l-4 border-l-forest-ink/40"
+                ? "border-action/30"
+                : "border-hairline"
             )}
           >
             <span className={cn("flex size-11 items-center justify-center rounded-full shadow-xs", state.bubble)}>

@@ -112,10 +112,10 @@ export function DecisionCard({ run }: { run: RunDetail }) {
   return (
     <section
       aria-label="Quyết định ghi"
-      className="flex flex-col gap-5 rounded-md border border-hairline border-t-4 border-t-action bg-surface-soft p-6 shadow-lg"
+      className="flex flex-col gap-5 rounded-md border-2 border-action/70 bg-surface-soft p-6 shadow-card"
     >
       <div id="write-summary" className="flex flex-col gap-3.5">
-        <span className="text-body-md text-muted">Bạn sắp ghi</span>
+        <span className="text-body-md text-muted">Dữ liệu sắp được cập nhật</span>
         <ul className="m-0 flex list-none flex-col gap-3.5 p-0">
           {writes.map((write, index) => (
             <li key={write.operationId ?? index} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3">
@@ -184,7 +184,7 @@ export function DecisionCard({ run }: { run: RunDetail }) {
           {pendingDecision === "rejected" ? "Đang gửi…" : "Từ chối ghi"}
         </Button>
         <span className="text-center text-body-sm text-muted">
-          Bạn sẽ thấy kết quả từng bước sau khi duyệt
+          Hệ thống chỉ cập nhật khi nhận được sự đồng ý của bạn
         </span>
       </div>
 

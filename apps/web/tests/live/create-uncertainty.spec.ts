@@ -83,7 +83,7 @@ test.describe("Create Run — Uncertainty Fence E2E", () => {
     // 7. Click "Mở Lần chạy để kiểm tra" to navigate to HistoryView (SPA navigation)
     await page.getByRole("link", { name: "Mở Lần chạy để kiểm tra" }).click();
     await expect(page).toHaveURL(/#\/runs$/);
-    await expect(page.getByRole("heading", { name: "Lần chạy" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /danh sách công việc|lần chạy/i })).toBeVisible();
 
     // History list loads and contains the precreated run with the identical prompt
     await expect(

@@ -330,7 +330,7 @@ export function RunView({ runId }: { runId: string }) {
   const back = (
     <a
       href={routeToHash({ page: "history" })}
-      aria-label="Quay lại Lần chạy"
+      aria-label="Quay lại Danh sách công việc"
       className="flex size-11 items-center justify-center rounded-full bg-surface-strong text-ink"
     >
       <Icon name="arrow-left" />
@@ -394,12 +394,12 @@ export function RunView({ runId }: { runId: string }) {
             <>
               <span aria-hidden="true">·</span>
               <span>
-                {counts.steps} bước, {counts.writes} thao tác ghi
+                {counts.steps} bước · {counts.writes > 0 ? `${counts.writes} cập nhật dữ liệu` : "Chỉ tổng hợp thông tin"}
               </span>
             </>
           ) : null}
           <span aria-hidden="true">·</span>
-          <span className="font-mono text-mono-md">{shortId(run.run_id)}</span>
+          <span className="font-mono text-mono-md">#{shortId(run.run_id)}</span>
         </div>
       </div>
 
@@ -414,7 +414,7 @@ export function RunView({ runId }: { runId: string }) {
           {run.status === "needs_input" ? (
             <Section title="Việc tiếp theo">
               <p className="m-0 max-w-measure text-body-lg">
-                Lần chạy này đã kết thúc và không tạo kế hoạch nào, nên không có gì bị ghi. Hãy gửi lại yêu cầu có bổ sung thông tin còn thiếu.
+                Yêu cầu này đã kết thúc và không tạo kế hoạch nào, nên không có dữ liệu nào bị thay đổi. Hãy gửi lại yêu cầu có bổ sung thông tin còn thiếu.
               </p>
               {suggestion ? (
                 <div className="flex flex-col gap-1.5 rounded-md bg-surface-soft p-4 text-body-lg">
@@ -428,7 +428,7 @@ export function RunView({ runId }: { runId: string }) {
           {run.status === "refused" ? (
             <Section title="Vì sao">
               <p className="m-0 max-w-measure text-body-lg">
-                Hệ thống chỉ dùng các công cụ local đã được duyệt: bảng tính, thẻ công việc, tin nhắn và tệp. Việc nằm ngoài các công cụ này sẽ bị từ chối thay vì đoán cách làm.
+                Hệ thống chỉ dùng các công cụ đã được duyệt an toàn: bảng tính, thẻ công việc, tin nhắn và tệp. Yêu cầu nằm ngoài các công cụ này sẽ được từ chối để bảo vệ hệ thống.
               </p>
               <a href={routeToHash({ page: "tools" })} className="inline-flex min-h-11 items-center self-start text-button-sm">
                 Xem Công cụ &amp; kết nối
@@ -437,15 +437,15 @@ export function RunView({ runId }: { runId: string }) {
           ) : null}
 
           {run.plan ? (
-            <Section title={run.status === "awaiting_approval" ? `Kế hoạch gồm ${steps.length} bước` : "Kết quả từng bước"}>
+            <Section title={run.status === "awaiting_approval" ? `Kế hoạch gồm ${steps.length} bước thực hiện` : "Kết quả từng bước"}>
               <StepList steps={steps} timeZone={run.time_zone} />
             </Section>
           ) : null}
 
           {writes.length > 0 && (run.status === "awaiting_approval" || run.status === "expired" || run.status === "rejected") ? (
-            <Section title={run.status === "awaiting_approval" ? "Những gì sẽ được ghi" : "Bản xem trước (không được thực hiện)"}>
+            <Section title={run.status === "awaiting_approval" ? "Chi tiết thay đổi dữ liệu dự kiến" : "Kế hoạch đã huỷ (chưa có dữ liệu nào bị thay đổi)"}>
               {run.status === "awaiting_approval" ? (
-                <p className="-mt-3 m-0 text-body-md text-muted">Đúng nội dung dưới đây sẽ được gửi đi. Không thể sửa trên giao diện.</p>
+                <p className="-mt-3 m-0 text-body-md text-muted">Nội dung dưới đây sẽ được gửi đến hệ thống đích sau khi bạn phê duyệt.</p>
               ) : null}
               {writes.map(({ action, write }) => (
                 <WriteCard key={action.operation_id} write={write} args={action.resolved_args} />

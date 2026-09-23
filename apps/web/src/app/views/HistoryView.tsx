@@ -69,10 +69,10 @@ export function HistoryView() {
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-display-md-mobile desk:text-display-md">Lần chạy</h1>
+        <h1 className="m-0 text-display-md-mobile desk:text-display-md">Danh sách công việc</h1>
         {loadedAt ? (
           <p className="m-0 text-body-md text-muted">
-            <span className="tabular">Tải lúc {loadedAt}</span> · thời gian hiển thị là lúc tạo yêu cầu
+            <span className="tabular">Tải lúc {loadedAt}</span> · thời gian hiển thị theo lúc tạo yêu cầu
           </p>
         ) : null}
       </div>
@@ -98,7 +98,7 @@ export function HistoryView() {
     return (
       <>
         {header}
-        <LoadingState label="Đang tải các lần chạy…" />
+        <LoadingState label="Đang tải danh sách công việc…" />
       </>
     );
   }
@@ -118,10 +118,10 @@ export function HistoryView() {
         {header}
         <EmptyState
           icon="history"
-          title="Chưa có lần chạy nào"
+          title="Chưa có công việc nào"
           action={<ButtonLink href={routeToHash({ page: "new" })}>Tạo yêu cầu đầu tiên</ButtonLink>}
         >
-          Mỗi yêu cầu bạn gửi sẽ xuất hiện ở đây, kèm kết quả và chứng cứ.
+          Mỗi yêu cầu bạn gửi sẽ xuất hiện ở đây, kèm kết quả và chứng cứ thực thi.
         </EmptyState>
       </>
     );
@@ -231,7 +231,7 @@ export function HistoryView() {
           </ul>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 text-body-sm text-muted">
-              Đang hiển thị {visible.length} / {matches.length} lần chạy đã tải · mới nhất trước
+              Đang hiển thị {visible.length} / {matches.length} công việc đã tải · mới nhất trước
             </p>
             {visible.length < matches.length ? (
               <Button

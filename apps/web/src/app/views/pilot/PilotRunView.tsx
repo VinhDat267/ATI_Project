@@ -42,10 +42,10 @@ function CountdownTimer({ expiresAt, onExpired }: { expiresAt: string; onExpired
     <div
       className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-body-sm font-semibold ${
         isExpired
-          ? "bg-red-100 text-red-700"
+          ? "bg-danger-subtle text-danger"
           : isUrgent
-            ? "bg-amber-100 text-amber-800 animate-pulse"
-            : "bg-blue-50 text-blue-700"
+            ? "bg-action-subtle text-action animate-pulse"
+            : "bg-surface-strong text-ink"
       }`}
     >
       <Icon name="clock-alert" size={16} />
