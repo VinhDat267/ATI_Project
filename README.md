@@ -10,7 +10,7 @@
 2. [Đặc tả MVP v2](docs/superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md): UC1–UC3, safety và tiêu chí đánh giá.
 3. [Runbook pilot](docs/PILOT-V2-RUNBOOK.md): cấu hình, approval, xử lý kết quả ghi không chắc chắn.
 4. [Kế hoạch SaaS live và AI quality](docs/plans/2026-09-22-mvp-v2-backend/07-SAAS-LIVE-AI-QUALITY-PLAN.md): thứ tự cổng, điều kiện dừng và bằng chứng cần có trước handoff.
-5. [AGENTS.md](AGENTS.md) và [execution contract](docs/EXECUTION-CONTRACT.md) trước khi sửa mã liên quan đến quyền, side effect hoặc recovery.
+5. [Execution contract](docs/EXECUTION-CONTRACT.md) trước khi sửa mã liên quan đến quyền, side effect hoặc recovery. Quy tắc agent cục bộ (nếu có) nằm ngoài Git và không thay thế hợp đồng này.
 
 ## Sản phẩm làm gì?
 
