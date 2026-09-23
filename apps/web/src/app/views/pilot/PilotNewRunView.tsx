@@ -166,11 +166,11 @@ export function PilotNewRunView() {
         <div className="flex items-center gap-2 text-primary">
           <Icon name="refresh-cw" size={20} />
           <span className="text-overline uppercase tracking-wider">
-            MVP v2 · Hợp đồng Thực thi An toàn
+            Tự động hoá quy trình · Hợp đồng thực thi an toàn
           </span>
         </div>
         <h1 className="m-0 text-headline-md font-bold text-ink">
-          Điều phối Pilot v2 — Google Sheets → Trello
+          Điều phối theo mẫu — Google Sheets → Trello
         </h1>
         <p className="m-0 text-body-md text-muted max-w-3xl">
           Đọc dữ liệu yêu cầu từ Google Sheets, đánh giá danh mục kiểm tra

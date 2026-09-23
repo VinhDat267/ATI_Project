@@ -240,6 +240,29 @@ export function NewRunView() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <div className="flex items-center gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-strong text-ink">
+              <Icon name="sparkles" size={16} />
+            </span>
+            <div className="flex flex-col">
+              <span className="text-body-md font-medium text-ink">
+                Tự động hoá theo mẫu từ Google Sheets sang Trello?
+              </span>
+              <span className="text-body-sm text-muted">
+                Sử dụng các kịch bản mẫu có sẵn để tạo thẻ công việc có kiểm soát an toàn.
+              </span>
+            </div>
+          </div>
+          <a
+            href={routeToHash({ page: "pilot-new" })}
+            className="inline-flex min-h-11 items-center gap-1.5 text-button-sm font-semibold text-primary underline underline-offset-3 hover:text-ink"
+          >
+            Mở bộ điều phối theo mẫu
+            <Icon name="arrow-right" size={14} />
+          </a>
+        </div>
+
         {createSnapshot.status === "confirming" ? (
           <Banner tone="unknown" icon="triangle-alert" title="Chưa xác nhận được lần chạy đã được tạo hay chưa" live>
             <span className="flex flex-col gap-2">

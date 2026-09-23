@@ -49,7 +49,7 @@ test.describe("overview and history", () => {
     await expect(
       page
         .getByRole("navigation", { name: "Điều hướng chính" })
-        .getByRole("link", { name: "Lần chạy cần xử lý: 3" }),
+        .getByRole("link", { name: "Danh sách công việc cần xử lý: 3" }),
     ).toBeVisible();
     await attention.getByRole("link", { name: /tuần 38/ }).click();
     await expect(page).toHaveURL(/#\/runs\/7c1e2a90/);
