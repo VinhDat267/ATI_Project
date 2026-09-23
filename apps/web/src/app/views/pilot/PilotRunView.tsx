@@ -94,15 +94,16 @@ export function PilotRunView({ runId }: { runId: string }) {
   });
 
   const effectiveRunId = run?.id || run?.runId || runId;
-  const snapshotHash =
-    run?.preview?.snapshotHash || run?.sourceRevision || run?.snapshotHash;
+  const snapshotHash = run?.preview?.snapshotHash;
+  const approvalId = run?.preview?.approvalId;
+  const versionId = run?.preview?.versionId;
   const expiresAt = run?.preview?.expiresAt || run?.expiresAt;
   const isEffectivelyExpired =
     isExpired || (expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false);
 
   const handleDecision = async (decision: "approved" | "rejected") => {
-    if (!snapshotHash) {
-      setDecisionError("Không tìm thấy mã băm xác thực để phê duyệt");
+    if (!snapshotHash || !approvalId || !versionId) {
+      setDecisionError("Không tìm thấy approval hợp lệ để phê duyệt");
       return;
     }
 
@@ -120,6 +121,8 @@ export function PilotRunView({ runId }: { runId: string }) {
         effectiveRunId,
         {
           snapshotHash,
+          approvalId,
+          versionId,
           decision,
         },
         scope.signal,

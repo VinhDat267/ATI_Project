@@ -17,6 +17,7 @@ export type ReservationRecord = {
   status: ReservationStatus;
   remoteId?: string;
   remoteUrl?: string;
+  remoteListId?: string;
   operationId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +32,7 @@ export interface BusinessReservationStore {
     runId: string;
   }): Promise<ReservationRecord>;
   claimDispatched(intentKey: string, operationId: string): Promise<void>;
-  confirm(intentKey: string, remoteId: string, remoteUrl: string): Promise<void>;
+  confirm(intentKey: string, remoteId: string, remoteUrl: string, remoteListId?: string): Promise<void>;
   markUnknown(intentKey: string): Promise<void>;
   cancel(intentKey: string): Promise<void>;
 }
@@ -85,12 +86,15 @@ export class InMemoryReservationStore implements BusinessReservationStore {
     if (!existing) {
       throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
     }
+    if (existing.status !== 'reserved') {
+      throw new Error(`RESERVATION_NOT_CLAIMABLE: Intent ${intentKey} is in state "${existing.status}"`);
+    }
     existing.status = 'dispatched';
     existing.operationId = operationId;
     existing.updatedAt = new Date();
   }
 
-  async confirm(intentKey: string, remoteId: string, remoteUrl: string): Promise<void> {
+  async confirm(intentKey: string, remoteId: string, remoteUrl: string, remoteListId?: string): Promise<void> {
     const existing = this.map.get(intentKey);
     if (!existing) {
       throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
@@ -98,6 +102,7 @@ export class InMemoryReservationStore implements BusinessReservationStore {
     existing.status = 'confirmed';
     existing.remoteId = remoteId;
     existing.remoteUrl = remoteUrl;
+    existing.remoteListId = remoteListId;
     existing.updatedAt = new Date();
   }
 
@@ -154,6 +159,7 @@ export async function executePilotWorkflow(params: {
   expectedHash: string;
   cardTitle: string;
   listName: string;
+  listId?: string;
   description?: string;
   dueDate?: string;
   assigneeId?: string;
@@ -170,6 +176,7 @@ export async function executePilotWorkflow(params: {
     expectedHash,
     cardTitle,
     listName,
+    listId,
     description,
     dueDate,
     assigneeId,
@@ -197,7 +204,12 @@ export async function executePilotWorkflow(params: {
   }
 
   // 4. Pre-reservation Policy Check: verify policy before creating reservation
-  if (!policy.enabled || !policy.principals.includes(principalId)) {
+  if (
+    !policy.enabled || !config.enabled ||
+    !policy.principals.includes(principalId) || !config.principals.includes(principalId) ||
+    policy.spreadsheetId !== config.spreadsheetId ||
+    policy.tabId !== config.tabId || policy.boardId !== config.boardId
+  ) {
     return {
       status: 'failed',
       error: 'ACCESS_DENIED: Pilot policy is disabled or principal is unauthorized',
@@ -219,12 +231,15 @@ export async function executePilotWorkflow(params: {
 
   // If already confirmed, reuse existing card receipt without dispatching again
   if (reservation.status === 'confirmed' && reservation.remoteId && reservation.remoteUrl) {
+    if (!reservation.remoteListId) {
+      return { status: 'reconciliation_required', error: 'RECEIPT_INCOMPLETE: Confirmed intent lacks Trello list ID' };
+    }
     return {
       status: 'succeeded',
       receipt: {
         cardId: reservation.remoteId,
         url: reservation.remoteUrl,
-        listId: listName || 'confirmed-list',
+        listId: reservation.remoteListId,
         boardId: policy.boardId,
         title: cardTitle,
         intentKey,
@@ -243,20 +258,21 @@ export async function executePilotWorkflow(params: {
       {
         boardId: policy.boardId,
         listName,
+        listId,
         title: cardTitle,
         description,
         dueDate,
         assigneeId,
         intentKey,
       },
-      { config, policy, principalId },
+      { config, policy, principalId, approvalExpiresAt: approval.expiresAt },
     );
 
     // Validate receipt strictly against schema before confirming
     const receipt = TrelloReceiptSchema.parse(rawReceipt);
 
     // 8. Success: Confirm Reservation atomically
-    await store.confirm(intentKey, receipt.cardId, receipt.url);
+    await store.confirm(intentKey, receipt.cardId, receipt.url, receipt.listId);
 
     return {
       status: 'succeeded',
@@ -264,34 +280,18 @@ export async function executePilotWorkflow(params: {
     };
   } catch (err: unknown) {
     const msg = (err as Error)?.message ?? String(err);
-    const isPreDispatchError =
-      msg.includes('ACCESS_DENIED') ||
-      msg.includes('CONFIG_ERROR') ||
-      msg.includes('LIST_NOT_FOUND');
-
-    if (isPreDispatchError) {
-      try {
-        await store.cancel(intentKey);
-      } catch {
-        // Safeguard against secondary store error
-      }
-      return {
-        status: 'failed',
-        error: msg,
-      };
-    }
-
-    // 9. Remote write error / timeout / network failure / post-dispatch schema error:
-    // Mark as UNKNOWN and require reconciliation. CẤM BLIND RETRY!
+    // A string in an error cannot prove the POST was never accepted remotely.
+    // Conservatively quarantine every failure after dispatch invocation.
+    let storeErrorDetail = '';
     try {
       await store.markUnknown(intentKey);
-    } catch {
-      // Safeguard against secondary store failure
+    } catch (storeError: unknown) {
+      storeErrorDetail = `; MARK_UNKNOWN_FAILED: ${storeError instanceof Error ? storeError.message : String(storeError)}`;
     }
 
     return {
       status: 'reconciliation_required',
-      error: `REMOTE_WRITE_UNKNOWN: ${msg}`,
+      error: `REMOTE_WRITE_UNKNOWN: ${msg}${storeErrorDetail}`,
     };
   }
 }

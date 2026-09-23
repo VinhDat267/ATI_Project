@@ -209,7 +209,7 @@ describe('pilot/fault-suite (10 Fault Injection & Safety Gate Tests)', () => {
   });
 
   // FAULT 8: Target list not found on board
-  it('Fault 8: Target list missing on board fails closed', async () => {
+  it('Fault 8: Target list missing after dispatch claim requires reconciliation', async () => {
     const store = new InMemoryReservationStore();
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify([{ id: 'l1', name: 'Archive', closed: false }]), {
@@ -232,8 +232,9 @@ describe('pilot/fault-suite (10 Fault Injection & Safety Gate Tests)', () => {
       sourceKey: 'source-f8',
     });
 
-    expect(result.status).toBe('failed');
+    expect(result.status).toBe('reconciliation_required');
     expect(result.error).toContain('LIST_NOT_FOUND');
+    expect((await store.getReservation('intent-f8'))?.status).toBe('unknown');
   });
 
   // FAULT 9: Policy disabled dynamically before dispatch

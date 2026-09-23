@@ -2,20 +2,20 @@
 
 **SCOPE_APPROVED — 21/09/2026:** chủ project duyệt
 [đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
-Đây là thay đổi phạm vi đích, không phải xác nhận code hoặc live integration đã
-xong. Kế hoạch thực thi còn chờ review; SaaS/AI live cần quyền tài nguyên và
-ngân sách riêng. Không thực thi chỉ vì đặc tả được duyệt.
+Đây là phạm vi đích đã duyệt, không phải xác nhận live integration. Code/test
+pilot v2 đã được thêm sau ngày duyệt; [audit P6 ngày 23/09](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
+ghi các lỗi chặn. SaaS/AI live vẫn cần tài nguyên, quyền và ngân sách riêng.
 
 | Thành phần | Phạm vi đích đã duyệt | Trạng thái thực thi v2 |
 |---|---|---|
-| Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Chưa nghiệm thu pilot |
-| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | NOT_IMPLEMENTED_AS_V2 |
-| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | SAAS_LIVE_NOT_RUN |
-| AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Phần mở rộng nguồn dữ liệu chưa triển khai |
-| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Kế thừa invariant B/local, v2 phải regression |
-| Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Chưa có cross-run business reservation |
-| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | Chưa duyệt interaction delta v2 |
-| Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | DATASET_PLANNED; CUSTOMER_VALIDATED=NOT_RUN |
+| Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Mã và test owner-scope có; nghiệm thu với người dùng đại diện `OPEN` |
+| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | `PARTIAL_CODE`: API/UI pilot có; UC1 refusal, UC3 lookup và luồng AI chưa chứng minh end-to-end |
+| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | Adapter/test giả lập có; `SAAS_LIVE_NOT_RUN` |
+| AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; `AI_QUALITY_NOT_RUN` |
+| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; live write mặc định tắt và SaaS thật chưa chạy |
+| Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Reservation PostgreSQL có; `claimDispatched` chỉ nhận `reserved`, runner không POST lại intent `confirmed`; integration test PostgreSQL đạt |
+| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | UI pilot có code; browser v2 acceptance và review interaction delta `OPEN` |
+| Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | Dataset 40 biến thể + 20 holdout có; mô phỏng không phải AI quality; `CUSTOMER_VALIDATED=NOT_RUN` |
 
 Không mở: email/Slack/WhatsApp thật, ghi ngược Sheet, scheduler/batch/loop,
 workflow editor/reuse, arbitrary tool, shared run history/approval chéo,

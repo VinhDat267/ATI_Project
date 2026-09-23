@@ -288,6 +288,9 @@ const api = createApi({
   ...(engineFactory ? { engineFactory } : {}),
   ...(pilotConfig ? { pilotConfig } : {}),
   ...(pilotPolicy ? { pilotPolicy } : {}),
+  pilotLiveWriteEnabled: Boolean(
+    pilotConfig?.enabled && process.env.PILOT_V2_WRITE_ENABLED === "true",
+  ),
   health: {
     readiness: async () => {
       try {

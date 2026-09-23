@@ -12,6 +12,7 @@ export type PilotConfig = {
   trello?: {
     apiKey?: string;
     apiToken?: string;
+    listId?: string;
   };
 };
 
@@ -42,6 +43,7 @@ export function loadPilotConfig(config?: Partial<PilotConfig>): PilotConfig {
   const trello = {
     apiKey: config?.trello?.apiKey ?? process.env.TRELLO_API_KEY ?? '',
     apiToken: config?.trello?.apiToken ?? process.env.TRELLO_API_TOKEN ?? '',
+    listId: config?.trello?.listId ?? process.env.PILOT_TRELLO_LIST_ID ?? '',
   };
 
   const result: PilotConfig = {

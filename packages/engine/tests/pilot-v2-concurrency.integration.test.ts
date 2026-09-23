@@ -157,7 +157,7 @@ describe('Pilot V2 PostgreSQL Concurrency & Invariants Integration (BE-25)', () 
       expect(dispatched?.operationId).toBe(operationId);
 
       // 3. Confirm
-      await store.confirm(intentKey, 'c-card-999', 'https://trello.com/c/card-999');
+      await store.confirm(intentKey, 'c-card-999', 'https://trello.com/c/card-999', 'list-todo');
       const confirmed = await store.getReservation(intentKey);
       expect(confirmed?.status).toBe('confirmed');
       expect(confirmed?.remoteId).toBe('c-card-999');
@@ -173,6 +173,10 @@ describe('Pilot V2 PostgreSQL Concurrency & Invariants Integration (BE-25)', () 
       });
       expect(replayed.status).toBe('confirmed');
       expect(replayed.remoteId).toBe('c-card-999');
+
+      await expect(store.claimDispatched(intentKey, randomUUID()))
+        .rejects.toThrow(/RESERVATION_NOT_CLAIMABLE/);
+      expect((await store.getReservation(intentKey))?.status).toBe('confirmed');
     });
 
     it('halts at unknown and prevents re-reservation when write outcome is unknown', async () => {

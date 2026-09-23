@@ -1,107 +1,52 @@
-# Sổ tay Vận hành Hệ thống Điều phối Pilot V2 (Operator Runbook)
+# Pilot MVP v2 — Runbook và cổng vận hành
 
-Tài liệu này hướng dẫn chi tiết quy trình cấu hình, tiền kiểm tra kết nối (preflight), vận hành phê duyệt có con người kiểm soát (Human-in-the-loop), và quy trình ứng phó sự cố đối chiếu dữ liệu cho nền tảng **AI Automation Platform — Pilot MVP v2**.
+**Trạng thái 23/09/2026:** `APPROVAL_API_DB_TESTED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live.
 
----
+## 1. Phạm vi và những gì đang chạy
 
-## 1. Tổng quan Kiến trúc & Cơ chế An toàn
+Mục tiêu đã duyệt: Google Sheets chỉ đọc → kiểm yêu cầu → AI lập kế hoạch → người dùng duyệt preview → tối đa một lệnh tạo card Trello → receipt/tra cứu. Có mã adapter, API `/pilot/v2`, UI pilot, dataset và unit test. Đường API hiện tạo run theo checklist và preview tạo card; chưa chứng minh đủ các nhánh UC1 refusal, UC3 lookup hoặc AI source-aware. Ba runner P6 (`live-preflight`, `live-uc2-runner`, `live-eval-runner`) chưa nối vào API/CLI vận hành.
 
-Hệ thống điều phối Pilot V2 tự động hóa luồng tiếp nhận công việc giữa hai nền tảng SaaS ngoại vi:
-- **Nguồn tiếp nhận (Read-Only Source):** Google Sheets (bảng tính theo dõi yêu cầu thiết kế/web).
-- **Đích thực thi (Single-Write Destination):** Trello (bảng kanban quản lý công việc của đội ngũ).
+Các điều kiện trước live write còn **BLOCKED**:
 
-### Bất biến Hợp đồng Cốt lõi (Non-negotiable Invariants):
-1. **Đúng 1 thao tác ghi (Single Remote Write):** Chỉ thực hiện đúng một lệnh ghi `trello.create_card` khi yêu cầu hợp lệ (UC2). Trong giai đoạn tiền kiểm (preflight) hoặc xem trước (preview), số thao tác ghi luôn là **0**.
-2. **Không bao giờ thử lại mù quáng (Zero Blind Retry):** Khi xảy ra timeout mạng hoặc lỗi 5xx sau khi đã gửi lệnh ghi tới Trello, hệ thống chuyển giao dịch sang trạng thái `unknown` và dừng lại ở `reconciliation_required`. Tuyệt đối không tự động gửi lại lệnh ghi để chống trùng lặp thẻ.
-3. **Phê duyệt gắn kết bất biến (Immutable Approval Binding):** Lệnh ghi chỉ được thực thi khi người vận hành (`principalId`) phê duyệt đúng mã băm SHA-256 của bản xem trước kế hoạch trong thời hạn hiệu lực **10 phút (Server TTL)**.
-4. **Cô lập bí mật (Secret Isolation & Redaction):** 100% token, API key và mật khẩu được che giấu (`[REDACTED]`) trước khi ghi vào log, database, hoặc trả về trình duyệt.
+- Approval HTTP đã lưu PostgreSQL, gắn owner/run/version/hash/list ID/hạn 10 phút và kiểm trước dispatch. Cờ ghi Trello vẫn tắt mặc định; chưa có evidence live để nâng trạng thái vận hành.
+- Cấp nguồn approval bền vững cho runner UC2 độc lập trước khi dùng nó trong sản phẩm; runner hiện từ chối thiếu approval và chưa nối vào API/CLI.
+- Kiểm end-to-end đường API bằng PostgreSQL/HTTP và browser pilot; kiểm owner isolation, preview, từ chối, timeout, dedupe và receipt.
+- Có nguồn/board thử nghiệm được allowlist, tài khoản và quyền cần thiết, người duyệt, ngân sách/price card cho AI, rubric và kế hoạch đối chiếu. Live read, live write và live AI cần evidence riêng.
 
----
+## 2. Cấu hình hiện có và giới hạn
 
-## 2. Thiết lập Môi trường & Cấu hình (.env.pilot)
+`packages/engine/src/pilot/config.ts` đọc biến môi trường **của tiến trình API**: `PILOT_V2_ENABLED`, `PILOT_PRINCIPALS`, `PILOT_SPREADSHEET_ID`, `PILOT_TAB_ID`, `PILOT_BOARD_ID`, `PILOT_TRELLO_LIST_ID`, `GOOGLE_SHEETS_API_KEY`, `TRELLO_API_KEY`, `TRELLO_API_TOKEN`; nó cũng nhận `GOOGLE_SHEETS_CLIENT_EMAIL` và `GOOGLE_SHEETS_PRIVATE_KEY`. `PILOT_V2_WRITE_ENABLED=true` là cờ riêng cho dispatch Trello; không đặt cờ này chỉ để chạy preflight đọc. Repository hiện **không tự nạp `.env.pilot`**. Tạo file đó đơn thuần không cấu hình API; không commit credential vào Git.
 
-Tạo tệp cấu hình `.env.pilot` tại thư mục gốc với các tham số sau:
+Adapter Sheets hiện chỉ gắn API key vào URL. Nhánh service account chưa tạo token hoặc header `Authorization`, nên **chưa hỗ trợ xác thực Sheet riêng tư bằng service account**. Chưa xác nhận phương thức credential nào dùng được với nguồn thật. Router hiện từ chối khi thiếu/tắt config hoặc policy và không còn cấu hình pilot mặc định bật; unit HTTP đã kiểm các nhánh này. Chưa có xác nhận bằng môi trường SaaS thật.
 
-```bash
-# Kích hoạt tính năng Pilot v2
-PILOT_V2_ENABLED=true
+## 3. Kiểm thử offline và preflight live
 
-# Danh sách mã định danh người vận hành được phép duyệt (ngăn cách bằng dấu phẩy)
-PILOT_PRINCIPALS=operator-a,operator-b
-
-# Cấu hình Bảng tính Google Sheets (Nguồn đọc chỉ định)
-PILOT_SPREADSHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
-PILOT_TAB_ID=Requests
-GOOGLE_SHEETS_API_KEY=AIzaSy...your_google_api_key_here
-# Hoặc sử dụng Service Account:
-# GOOGLE_SHEETS_CLIENT_EMAIL=service-account@project.iam.gserviceaccount.com
-# GOOGLE_SHEETS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
-
-# Cấu hình Bảng Trello (Đích tạo thẻ chỉ định)
-PILOT_BOARD_ID=60b8d29f8c4e2b0015abc123
-TRELLO_API_KEY=your_trello_api_key_here
-TRELLO_API_TOKEN=your_trello_api_token_here
-```
-
-> [!CAUTION]
-> Tuyệt đối không commit tệp `.env.pilot` hoặc bất kỳ API key nào vào Git repository.
-
----
-
-## 3. Quy trình Tiền kiểm tra Kết nối (Live Read Preflight)
-
-Trước khi bắt đầu ca vận hành, điều phối viên chạy lệnh tiền kiểm tra để xác nhận kết nối mạng và tính toàn vẹn của dữ liệu đọc:
+Lệnh dưới đây **chỉ chạy unit test với `fetch` giả**, không đọc Google Sheets/Trello thật và không chứng minh zero write trên SaaS:
 
 ```powershell
-# Chạy kiểm tra preflight
-npm run test:unit -w @wap/engine -- tests/pilot-live-preflight.test.ts
+npm run test:unit -w @wap/engine -- tests/pilot-live-preflight.test.ts tests/pilot-live-uc2.test.ts tests/pilot-live-eval.test.ts
 ```
 
-### Các bước kiểm tra tự động của Preflight:
-1. **Kiểm tra Cấu hình:** Xác nhận sự hiện diện của `PILOT_SPREADSHEET_ID`, `PILOT_BOARD_ID` và credentials. Nếu thiếu, hệ thống tự động ngắt kết nối an toàn với nhãn `BLOCKED_EXTERNAL`.
-2. **Đọc Thử Google Sheets:** Đọc hàng tiêu chuẩn và kiểm tra cấu trúc 8 cột bắt buộc (`request_id`, `client_ref`, `request_type`, `raw_request`, `deliverable`, `due_date`, `decision_status`, `source_note`).
-3. **Đọc Thử Trello:** Truy vấn danh sách cột (`trello.list_lists`) và thành viên (`trello.list_members`) trên bảng để nạp danh mục ánh xạ.
-4. **Xác thực 0 Ghi:** Kiểm tra và khẳng định không có bất kỳ thao tác ghi nào được thực hiện trong quá trình tiền kiểm.
+Chưa có lệnh operator được kiểm chứng để gọi `runPilotLivePreflight` trên cấu hình live; vì vậy **BE-26 live read preflight = NOT_RUN**. Sau khi cổng an toàn được sửa, một preflight hợp lệ phải lưu thời điểm, commit, nguồn/board allowlisted, principal, kết quả đọc Sheet và Trello, lỗi đã redact, cùng bằng chứng **0 remote write**. Unit test pass không thay thế artifact này.
 
----
+## 4. Duyệt và thực thi UC2 — chưa mở live
 
-## 4. Quy trình Phê duyệt Công việc (Human-in-the-Loop)
+Trên đường API hiện có, `POST /pilot/v2/runs` đọc nguồn và lưu snapshot, workflow version, approval pending cùng hạn 10 phút trong PostgreSQL. `GET /pilot/v2/runs/:id` trả preview gồm `approvalId`, `versionId`, `snapshotHash`, `expiresAt` và action có list ID. `POST /pilot/v2/runs/:id/approve` yêu cầu đúng ba định danh đó và quyết định. Server khóa row, kiểm owner/version/hash/hạn bằng đồng hồ DB, ghi quyết định và trạng thái trước dispatch; replay trả 409. `PILOT_V2_WRITE_ENABLED` mặc định tắt nên `approved` trả `503 LIVE_WRITE_BLOCKED` và không thay approval. Khi cờ bật mà chưa có list ID, API trả `503 TARGET_NOT_BOUND`.
 
-```text
-[Yêu cầu mới] ──► [Đọc Bảng tính] ──► [Kiểm tra Điều kiện] ──► [Tạo Bản xem trước]
-                                                                        │
-                                                                        ▼
-[Ghi thẻ Trello] ◄── [Duyệt trong 10m] ◄── [Người vận hành xem xét] ◄───┘
-```
+HTTP integration đã kiểm trên PostgreSQL cô lập với Trello `fetch` giả: duyệt một lần, đồng thời, replay, version/source/list drift, hết hạn, từ chối, cờ tắt và kết quả không chắc chắn. Approval hết hạn được đóng khi có yêu cầu API tiếp theo; run `running` cũ hơn 15 phút được chuyển `reconciliation_required` theo hướng không tự gửi lại. Đây là xử lý theo yêu cầu, chưa có cron sweep hay bằng chứng crash ở tiến trình thật. Không dùng runner P6 độc lập để tạo card: nó chưa nối vào approval store sản phẩm.
 
-### 4 Nhánh Quyết định của Trợ lý AI:
-1. **UC1 Từ chối (Refusal):** Khi yêu cầu vi phạm chính sách, nguồn không nằm trong allowlist, hoặc chứa prompt injection $\rightarrow$ Trạng thái `refused`, **0 ghi**.
-2. **UC1 Yêu cầu làm rõ (Clarification):** Khi thiếu thông tin bắt buộc (kích thước banner, đường dẫn website, người phụ trách) hoặc trạng thái chưa được chốt $\rightarrow$ Trạng thái `needs_input`, **0 ghi**. Người dùng bổ sung thông tin trên bảng tính trước khi chạy lại.
-3. **UC2 Kế hoạch Khả thi (Executable Plan):** Khi toàn bộ điều kiện checklist đạt chuẩn $\rightarrow$ Trạng thái `awaiting_approval`. Trợ lý hiển thị thẻ xem trước kế hoạch chi tiết (Tên thẻ, danh sách đích, người nhận, hạn hoàn thành).
-4. **UC3 Tra cứu Đối chiếu (Lookup):** Khi người dùng muốn tra cứu trạng thái thẻ đã tạo $\rightarrow$ Gọi lệnh đọc `trello.get_card`, trạng thái `succeeded`, **0 ghi**.
+Receipt chỉ hiện trên GET sau khi chính run đó đạt `succeeded`; `business_reservations` lưu list ID Trello thật để trả receipt khi một run được duyệt và tái sử dụng intent đã xác nhận. Dữ liệu confirmed cũ thiếu list ID được giữ để đối chiếu, không dựng list ID giả hoặc gửi lại card. Nếu run bị chuyển sang `reconciliation_required` trong lúc POST còn chờ, HTTP không báo `succeeded` dù Trello trả receipt muộn.
 
-### Thao tác Phê duyệt:
-- Bấm **`Phê duyệt & Thực hiện ngay`** nếu bản xem trước chính xác.
-- Nếu không đồng ý, bấm **`Từ chối ghi`**. Bản xem trước chuyển sang trạng thái `Kế hoạch đã hủy (chưa có dữ liệu nào bị thay đổi)`.
-- **Hết hạn sau 10 phút:** Nếu không bấm duyệt trong 10 phút, kế hoạch tự động hết hạn (`expired`), ngăn chặn việc vô tình kích hoạt các kế hoạch cũ.
+Khi các cổng ở mục 1 được đóng và một buổi live write được cho phép, người vận hành cần đối chiếu **nguồn, board/list, nội dung card, owner, snapshot hash và hạn 10 phút** trước quyết định. Ghi lại request/run/intent ID và receipt Trello; `succeeded` hoặc HTTP 200 riêng lẻ không chứng minh đúng nghiệp vụ. Nếu preview sai hoặc hết hạn, không duyệt và không cố tạo card bằng đường khác.
 
----
+## 5. Timeout, kết quả không chắc chắn và đối chiếu
 
-## 5. Xử lý Sự cố & Đối chiếu Ngoại lệ (Reconciliation Runbook)
+Nếu POST có thể đã tới Trello nhưng response, receipt hoặc DB confirm thất bại, coi kết quả là **unknown**, dừng mọi lần gửi tiếp theo cho cùng intent. Không tự retry, không xóa reservation và không tạo run mới chỉ vì chưa thấy card ngay trên UI Trello.
 
-Khi xảy ra lỗi mất kết nối mạng, timeout hoặc Trello phản hồi lỗi 5xx trong lúc đang gửi lệnh tạo thẻ:
+Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã redact và operation ID nếu có; đọc board đích theo `request_id`/`client_ref`, lưu card ID/URL ứng viên và thời điểm quan sát. Việc không tìm thấy card **chưa chứng minh** Trello không tạo card. Giữ trạng thái cần đối chiếu cho đến khi có quy trình xử lý được review và bằng chứng đủ mạnh; không tự gán `confirmed` hoặc `cancelled` từ một lần tìm kiếm thủ công.
 
-### Dấu hiệu nhận biết:
-- Công việc hiển thị cảnh báo: **`Cần kiểm tra lại (reconciliation_required)`**.
-- Thẻ giao dịch trong cơ sở dữ liệu chuyển thành: `status = 'unknown'`.
-- Nút duyệt bị khóa, hệ thống kiên quyết **không tự động gửi lại lệnh ghi**.
+## 6. Đánh giá AI và bàn giao
 
-### Các bước xử lý của Điều phối viên:
-1. **Bước 1: Không cố gắng tạo lại yêu cầu ngay lập tức.** Tránh tạo thẻ rác bị trùng lặp trên Trello.
-2. **Bước 2: Mở bảng Trello đích trên trình duyệt.**
-   - Kiểm tra cột mục tiêu (ví dụ: cột "To Do") xem thẻ tương ứng đã được tạo hay chưa.
-   - Tìm kiếm theo `client_ref` hoặc `request_id` (ví dụ `#REQ-002`).
-3. **Bước 3: Đối chiếu kết quả:**
-   - **Trường hợp A (Thẻ đã được tạo trên Trello):** Ghi nhận URL của thẻ Trello. Thẻ đã an toàn trên bảng kanban.
-   - **Trường hợp B (Thẻ chưa xuất hiện):** Sau khi xác nhận chắc chắn Trello không có thẻ, điều phối viên mới tạo một yêu cầu mới trên hệ thống để hoàn tất việc phân công.
-4. **Bước 4: Lưu trữ bằng chứng:** Ghi chép mã phiếu và kết quả đối chiếu vào nhật ký vận hành để đảm bảo tính minh bạch.
+`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật. Google connectivity probe lịch sử cũng không thay thế đánh giá ứng dụng MVP v2.
+
+Trước khi nâng `AI_QUALITY_MEASURED`, khóa dataset/holdout, prompt, model, catalog, price card, ngân sách và rubric; chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot vẫn `HANDOFF_BLOCKED` cho đến khi có review và evidence cho từng cổng liên quan.

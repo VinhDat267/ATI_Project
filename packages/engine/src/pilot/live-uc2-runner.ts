@@ -23,14 +23,23 @@ export interface LiveUc2Options {
   sourceRow: SourceRow;
   checklist?: ChecklistResult;
   reservationStore: BusinessReservationStore;
-  runId?: string;
+  runId: string;
+  approvalStore: {
+    getApproval(runId: string): Promise<LiveUc2Approval | null>;
+  };
   targetListName?: string;
   customDueDate?: string;
-  previewCreatedAt?: Date;
   now?: Date;
-  operatorDecision?: 'approved' | 'rejected';
-  tamperSnapshotHash?: string;
   simulatedNetworkFault?: 'timeout' | '401' | '500';
+}
+
+/** Approval must be loaded from a trusted, durable store for the same run. */
+export interface LiveUc2Approval {
+  runId: string;
+  ownerId: string;
+  decision: 'approved' | 'rejected';
+  snapshotHash: string;
+  previewCreatedAt: Date;
 }
 
 export interface LiveUc2Result {
@@ -61,9 +70,9 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
     principalId,
     sourceRow,
     reservationStore,
-    runId = randomUUID(),
+    runId,
+    approvalStore,
     targetListName = 'To Do',
-    operatorDecision = 'approved',
     now = new Date(),
   } = options;
 
@@ -106,7 +115,8 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
     sourceRevision: checklist.sourceRevision,
   });
   const snapshotHash = createHash('sha256').update(canonicalPayload).digest('hex');
-  const previewCreatedTime = options.previewCreatedAt ?? now;
+  const approval = await approvalStore.getApproval(runId);
+  const previewCreatedTime = approval?.previewCreatedAt ?? now;
   const expiresAt = new Date(previewCreatedTime.getTime() + 10 * 60 * 1000).toISOString();
 
   const preview: PilotPreview = {
@@ -118,7 +128,7 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
   };
 
   // 5. Handle Operator Decision
-  if (operatorDecision === 'rejected') {
+  if (approval?.runId === runId && approval.ownerId === principalId && approval.decision === 'rejected') {
     return {
       runId,
       status: 'rejected',
@@ -134,8 +144,16 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
   // 6. Verify Approval Binding (Principal, Hash match, TTL)
   assertPilotAccess(policy, principalId, { kind: 'board', boardId: config.boardId });
 
-  const providedHash = options.tamperSnapshotHash ?? preview.snapshotHash;
-  if (providedHash !== preview.snapshotHash) {
+  if (!approval || approval.runId !== runId || approval.ownerId !== principalId || approval.decision !== 'approved') {
+    return {
+      runId, status: 'failed', intentKey, sourceKey: sKey,
+      sourceRevision: checklist.sourceRevision, preview,
+      error: 'APPROVAL_REQUIRED: No matching approved decision for this run and owner',
+      reservationStatus: 'cancelled', writeCount: 0,
+    };
+  }
+
+  if (approval.snapshotHash !== preview.snapshotHash) {
     return {
       runId,
       status: 'failed',
@@ -149,9 +167,22 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
     };
   }
 
+  if (
+    !config.enabled || !config.principals.includes(principalId) ||
+    config.spreadsheetId !== policy.spreadsheetId ||
+    config.tabId !== policy.tabId || config.boardId !== policy.boardId
+  ) {
+    return {
+      runId, status: 'failed', intentKey, sourceKey: sKey,
+      sourceRevision: checklist.sourceRevision, preview,
+      error: 'CONFIG_ERROR: Pilot configuration is disabled or differs from policy',
+      reservationStatus: 'cancelled', writeCount: 0,
+    };
+  }
+
   // TTL verification
-  const currentIso = now.toISOString();
-  if (currentIso > preview.expiresAt) {
+  const approvalTime = previewCreatedTime.getTime();
+  if (!Number.isFinite(approvalTime) || now.getTime() < approvalTime || now.getTime() >= approvalTime + 10 * 60 * 1000) {
     return {
       runId,
       status: 'failed',
@@ -166,18 +197,27 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
   }
 
   // 7. Business Reservation (prevents duplicate execution)
-  await reservationStore.reserve({
+  const reservation = await reservationStore.reserve({
     intentKey,
     sourceKey: sKey,
     boardId: config.boardId,
     runId,
   });
 
+  if (reservation.status === 'confirmed') {
+    return {
+      runId, status: 'succeeded', intentKey, sourceKey: sKey,
+      sourceRevision: checklist.sourceRevision, preview,
+      reservationStatus: 'confirmed', writeCount: 0,
+    };
+  }
+
   const operationId = randomUUID();
   await reservationStore.claimDispatched(intentKey, operationId);
 
   // 8. Execute Single Remote Write
   let rawReceipt: unknown;
+  let receipt: TrelloReceipt;
   try {
     if (options.simulatedNetworkFault === '401') {
       throw new Error('UNAUTHORIZED: Invalid API credentials (HTTP 401)');
@@ -194,31 +234,20 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
       action.args,
       { config, policy, principalId },
     );
+    receipt = TrelloReceiptSchema.parse(rawReceipt);
+    await reservationStore.confirm(intentKey, receipt.cardId, receipt.url, receipt.listId);
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    const isPreDispatchError =
-      errorMsg.includes('ACCESS_DENIED') ||
-      errorMsg.includes('CONFIG_ERROR') ||
-      errorMsg.includes('LIST_NOT_FOUND');
-
-    if (isPreDispatchError) {
-      await reservationStore.cancel(intentKey);
-      return {
-        runId,
-        status: 'failed',
-        intentKey,
-        sourceKey: sKey,
-        sourceRevision: checklist.sourceRevision,
-        preview,
-        error: errorMsg,
-        reservationStatus: 'cancelled',
-        writeCount: 0,
-      };
+    // Once dispatch has been invoked, an error message cannot prove Trello did not write.
+    // Keep the intent blocked until an operator reconciles the remote outcome.
+    let reservationStatus: ReservationStatus = 'unknown';
+    let reconciliationError = errorMsg;
+    try {
+      await reservationStore.markUnknown(intentKey);
+    } catch (storeError: unknown) {
+      reservationStatus = 'dispatched';
+      reconciliationError += `; MARK_UNKNOWN_FAILED: ${storeError instanceof Error ? storeError.message : String(storeError)}`;
     }
-
-    // ZERO BLIND RETRY INVARIANT:
-    // When a post-dispatch error occurs, transition reservation to unknown and halt at reconciliation_required.
-    await reservationStore.markUnknown(intentKey);
     return {
       runId,
       status: 'reconciliation_required',
@@ -226,16 +255,13 @@ export async function executeLiveUc2Intake(options: LiveUc2Options): Promise<Liv
       sourceKey: sKey,
       sourceRevision: checklist.sourceRevision,
       preview,
-      error: errorMsg,
-      reservationStatus: 'unknown',
-      writeCount: 1, // Write was dispatched
+      error: reconciliationError,
+      reservationStatus,
+      writeCount: 1, // Conservatively count the claimed write attempt
     };
   }
 
-  // 9. Validate Receipt & Confirm
-  const receipt = TrelloReceiptSchema.parse(rawReceipt);
-  await reservationStore.confirm(intentKey, receipt.cardId, receipt.url);
-
+  // 9. Return the validated, confirmed receipt
   return {
     runId,
     status: 'succeeded',

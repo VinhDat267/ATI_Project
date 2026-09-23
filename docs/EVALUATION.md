@@ -3,7 +3,9 @@
 ## Phạm vi v2 đã duyệt — 21/09/2026
 
 Dùng [dataset contract v2](MVP-V2-DATASET.md) và 20 tình huống trong đặc tả.
-Đây là yêu cầu đã duyệt, dataset code/test results vẫn chưa được tạo/chạy.
+Dataset tái dựng (40 biến thể) và holdout (20 biến thể) đã có cùng contract tests.
+Runner P6 hiện chỉ kiểm luật mô phỏng, không gọi AI provider; chất lượng AI v2,
+SaaS live và customer validation vẫn `NOT_RUN`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md).
 Giữ nguyên `testdata/test-cases.json`, `tools.json`, `experiment-manifest.json`
 của B; không trộn denominator giữa hai profile hay sửa holdout cũ trong batch docs.
 

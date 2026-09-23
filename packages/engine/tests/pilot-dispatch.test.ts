@@ -55,7 +55,7 @@ describe('pilot/dispatch', () => {
         boardId: 'board-456',
         runId: 'run-1',
       });
-      await store.confirm('k2', 'card-existing', 'https://trello.com/c/card-existing');
+      await store.confirm('k2', 'card-existing', 'https://trello.com/c/card-existing', 'list-todo');
 
       // Next run checks intentKey and gets existing confirmed card without creating new
       const check = await store.reserve({
@@ -66,10 +66,57 @@ describe('pilot/dispatch', () => {
       });
       expect(check.status).toBe('confirmed');
       expect(check.remoteId).toBe('card-existing');
+      await expect(store.claimDispatched('k2', 'new-operation'))
+        .rejects.toThrow(/RESERVATION_NOT_CLAIMABLE/);
+      expect((await store.getReservation('k2'))?.status).toBe('confirmed');
     });
   });
 
   describe('executePilotWorkflow', () => {
+    it('does not release an intent when a POST error body resembles a preflight error', async () => {
+      const store = new InMemoryReservationStore();
+      const post = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'l1', name: 'To Do', closed: false }]), { status: 200 }))
+        .mockResolvedValueOnce(new Response('CONFIG_ERROR: ambiguous remote response', { status: 500 }));
+      const params = {
+        runId: 'run-ambiguous', principalId: 'operator-a',
+        config: sampleConfig, policy: samplePolicy, store,
+        approval: {
+          ownerId: 'operator-a', decision: 'approved' as const, snapshotHash: 'hash-abc',
+          expiresAt: new Date(Date.now() + 600_000),
+        },
+        expectedHash: 'hash-abc', cardTitle: 'Task', listName: 'To Do',
+        intentKey: 'intent-ambiguous', sourceKey: 'source-ambiguous',
+      };
+      const result = await executePilotWorkflow(params);
+      expect(result.status).toBe('reconciliation_required');
+      expect((await store.getReservation(params.intentKey))?.status).toBe('unknown');
+      expect(post).toHaveBeenCalledTimes(2);
+      const replay = await executePilotWorkflow({ ...params, runId: 'run-replay' });
+      expect(replay.status).toBe('failed');
+      expect(replay.error).toContain('INTENT_IN_UNKNOWN_STATE');
+      expect(post).toHaveBeenCalledTimes(2);
+    });
+
+    it('refuses a disabled config before reservation or network access', async () => {
+      const store = new InMemoryReservationStore();
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const result = await executePilotWorkflow({
+        runId: 'run-disabled', principalId: 'operator-a',
+        config: { ...sampleConfig, enabled: false }, policy: samplePolicy,
+        store,
+        approval: {
+          ownerId: 'operator-a', decision: 'approved', snapshotHash: 'hash-abc',
+          expiresAt: new Date(Date.now() + 600_000),
+        },
+        expectedHash: 'hash-abc', cardTitle: 'Task', listName: 'To Do',
+        intentKey: 'intent-disabled', sourceKey: 'source-disabled',
+      });
+      expect(result.status).toBe('failed');
+      expect(await store.getReservation('intent-disabled')).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it('executes read and write steps, confirms reservation and returns receipt', async () => {
       const store = new InMemoryReservationStore();
 

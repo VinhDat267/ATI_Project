@@ -22,11 +22,13 @@ export type TrelloCreateCardParams = {
   principalId: string;
   boardId: string;
   listName: string;
+  listId?: string;
   title: string;
   description?: string;
   assigneeId?: string;
   dueDate?: string;
   intentKey: string;
+  approvalExpiresAt?: Date;
 };
 
 export async function trelloCreateCard(
@@ -38,11 +40,13 @@ export async function trelloCreateCard(
     principalId,
     boardId,
     listName,
+    listId,
     title,
     description,
     assigneeId,
     dueDate,
     intentKey,
+    approvalExpiresAt,
   } = params;
 
   // 1. Policy check
@@ -56,9 +60,12 @@ export async function trelloCreateCard(
     boardId,
   });
 
-  const matchingList = lists.find(
+  const candidates = lists.filter(
     (l) => l.name.trim().toLowerCase() === listName.trim().toLowerCase() && !l.closed,
   );
+  const matchingList = listId
+    ? candidates.find((l) => l.id === listId)
+    : candidates.length === 1 ? candidates[0] : undefined;
 
   if (!matchingList) {
     throw new Error(`LIST_NOT_FOUND: List "${listName}" not found on board`);
@@ -84,6 +91,10 @@ export async function trelloCreateCard(
   }
 
   // 4. POST to Trello (write request -> retries = 0)
+  // List lookup and reservation can take time; recheck immediately before egress.
+  if (approvalExpiresAt && Date.now() >= approvalExpiresAt.getTime()) {
+    throw new Error('APPROVAL_EXPIRED: Pilot approval expired before Trello POST');
+  }
   const res = await pilotFetch<{ id: string; url: string }>(
     url,
     {

@@ -126,6 +126,7 @@ const PILOT_TOOLS: PilotToolEntry[] = [
       properties: {
         boardId: { type: 'string' },
         listName: { type: 'string' },
+        listId: { type: 'string' },
         title: { type: 'string' },
         description: { type: 'string' },
         assigneeId: { type: 'string' },
@@ -159,6 +160,7 @@ export type PilotCallContext = {
   config: PilotConfig;
   policy: PilotPolicy;
   principalId: string;
+  approvalExpiresAt?: Date;
 };
 
 export async function dispatchPilotTool(
@@ -210,11 +212,13 @@ export async function dispatchPilotTool(
         principalId,
         boardId: String(args.boardId ?? ''),
         listName: String(args.listName ?? ''),
+        listId: args.listId ? String(args.listId) : undefined,
         title: String(args.title ?? ''),
         description: args.description ? String(args.description) : undefined,
         assigneeId: args.assigneeId ? String(args.assigneeId) : undefined,
         dueDate: args.dueDate ? String(args.dueDate) : undefined,
         intentKey: String(args.intentKey ?? ''),
+        approvalExpiresAt: context.approvalExpiresAt,
       });
 
     default:

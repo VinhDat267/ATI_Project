@@ -116,7 +116,7 @@ describe('Pilot V2 Fault Injection Acceptance Suite (BE-25)', () => {
       boardId: 'board-pilot-001',
       runId: randomUUID(),
     });
-    await store.confirm(intentKey, 'c-remote-123', 'https://trello.com/c/123');
+    await store.confirm(intentKey, 'c-remote-123', 'https://trello.com/c/123', 'list-todo');
 
     // Second run tries to reserve the same intent
     const result = await executePilotWorkflow({

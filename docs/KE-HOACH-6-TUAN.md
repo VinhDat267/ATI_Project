@@ -7,12 +7,15 @@ Chưa có quỹ giờ/hạn nộp mới được xác nhận; không tự đặt
 
 | Giai đoạn | Cổng ra | Trạng thái |
 |---|---|---|
-| P0 | Duyệt spec, đồng bộ scope/FR/API/dataset/lịch | Docs đã đồng bộ; execution plan chờ review |
-| P1 | Data/checklist/schema/profile và reservation có test cô lập | Chưa triển khai v2 |
-| P2 | Adapter và plan tay preview → approve → một card thật; unknown an toàn | Chưa triển khai; live cần tài khoản/quyền riêng |
-| P3 | AI nhận source snapshot, NL planning và cost/quality evidence | Sau gate P2, plan riêng |
-| P4 | Interaction được duyệt; browser live UC1–3 và owner isolation | Sau gate P3, plan riêng |
-| P5 | Bộ nghiệm thu/holdout, đánh giá, báo cáo và defense | Sau P4, không đồng nghĩa customer validation |
+| P0 | Duyệt spec, đồng bộ scope/FR/API/dataset/lịch | Scope đã duyệt; roadmap gốc là ảnh chụp ngày 22/09 |
+| P1 | Data/checklist/schema/profile và reservation có test cô lập | Code và test đã có; không suy nghiệm thu live |
+| P2 | Adapter và plan tay preview → approve → một card thật; unknown an toàn | Adapter/đường API có code; nhánh approved HTTP trả `503 LIVE_WRITE_BLOCKED` đến khi có approval bền vững; SaaS live `NOT_RUN` |
+| P3 | AI nhận source snapshot, NL planning và cost/quality evidence | Module AI pilot có; đường API và đánh giá provider thật chưa hoàn tất |
+| P4 | Interaction được duyệt; browser live UC1–3 và owner isolation | UI pilot có code; browser v2 acceptance và review interaction `OPEN` |
+| P5 | Bộ nghiệm thu/holdout, đánh giá, báo cáo và defense | Dataset 40 biến thể + 20 biến thể holdout có; live/AI quality/customer validation `NOT_RUN` |
+
+Trạng thái này cập nhật sau [audit P6 ngày 23/09](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md).
+Các số test lịch sử bên dưới không nâng các cổng live của MVP v2.
 
 [Kế hoạch P1a và ranh giới P1b/P2](superpowers/plans/2026-09-21-mvp-v2-foundation-connectors.md)
 ghi file/test/gate; [lộ trình](MVP-V2-TRANSITION-PROPOSAL.md) ghi cắt scope.

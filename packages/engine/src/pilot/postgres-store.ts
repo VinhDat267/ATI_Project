@@ -19,12 +19,13 @@ export class PostgresReservationStore implements BusinessReservationStore {
         status: ReservationStatus;
         remote_id: string | null;
         remote_url: string | null;
+        remote_list_id: string | null;
         operation_id: string | null;
         created_at: Date;
         updated_at: Date;
       }>
     >`
-      SELECT id, intent_key, source_key, board_id, run_id, status, remote_id, remote_url, operation_id, created_at, updated_at
+      SELECT id, intent_key, source_key, board_id, run_id, status, remote_id, remote_url, remote_list_id, operation_id, created_at, updated_at
       FROM business_reservations
       WHERE intent_key = ${intentKey}
       LIMIT 1
@@ -41,6 +42,7 @@ export class PostgresReservationStore implements BusinessReservationStore {
       status: r.status,
       remoteId: r.remote_id ?? undefined,
       remoteUrl: r.remote_url ?? undefined,
+      remoteListId: r.remote_list_id ?? undefined,
       operationId: r.operation_id ?? undefined,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
@@ -81,6 +83,7 @@ export class PostgresReservationStore implements BusinessReservationStore {
           status: ReservationStatus;
           remote_id: string | null;
           remote_url: string | null;
+          remote_list_id: string | null;
           operation_id: string | null;
           created_at: Date;
           updated_at: Date;
@@ -88,7 +91,7 @@ export class PostgresReservationStore implements BusinessReservationStore {
       >`
         INSERT INTO business_reservations (intent_key, source_key, board_id, run_id, status)
         VALUES (${data.intentKey}, ${data.sourceKey}, ${data.boardId}, ${data.runId}, 'reserved')
-        RETURNING id, intent_key, source_key, board_id, run_id, status, remote_id, remote_url, operation_id, created_at, updated_at
+        RETURNING id, intent_key, source_key, board_id, run_id, status, remote_id, remote_url, remote_list_id, operation_id, created_at, updated_at
       `;
       const r = rows[0];
       if (!r) {
@@ -103,6 +106,7 @@ export class PostgresReservationStore implements BusinessReservationStore {
         status: r.status,
         remoteId: r.remote_id ?? undefined,
         remoteUrl: r.remote_url ?? undefined,
+        remoteListId: r.remote_list_id ?? undefined,
         operationId: r.operation_id ?? undefined,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
@@ -119,17 +123,18 @@ export class PostgresReservationStore implements BusinessReservationStore {
     const result = await this.db.client`
       UPDATE business_reservations
       SET status = 'dispatched', operation_id = ${operationId}, updated_at = NOW()
-      WHERE intent_key = ${intentKey}
+      WHERE intent_key = ${intentKey} AND status = 'reserved'
     `;
     if (result.count === 0) {
-      throw new Error(`RESERVATION_NOT_FOUND: Intent ${intentKey}`);
+      throw new Error(`RESERVATION_NOT_CLAIMABLE: Intent ${intentKey} is not reserved`);
     }
   }
 
-  async confirm(intentKey: string, remoteId: string, remoteUrl: string): Promise<void> {
+  async confirm(intentKey: string, remoteId: string, remoteUrl: string, remoteListId?: string): Promise<void> {
     const result = await this.db.client`
       UPDATE business_reservations
-      SET status = 'confirmed', remote_id = ${remoteId}, remote_url = ${remoteUrl}, updated_at = NOW()
+      SET status = 'confirmed', remote_id = ${remoteId}, remote_url = ${remoteUrl},
+          remote_list_id = ${remoteListId ?? null}, updated_at = NOW()
       WHERE intent_key = ${intentKey}
     `;
     if (result.count === 0) {

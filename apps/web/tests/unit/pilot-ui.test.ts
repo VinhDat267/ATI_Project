@@ -38,6 +38,8 @@ describe("Pilot v2 Frontend Contracts & Transport (Web UI)", () => {
 
   it("validates PilotApproveInputSchema correctly", () => {
     const valid = {
+      approvalId: "11111111-1111-4111-8111-111111111112",
+      versionId: "11111111-1111-4111-8111-111111111113",
       snapshotHash: "a".repeat(64),
       decision: "approved",
     };
@@ -243,7 +245,11 @@ describe("Pilot v2 Frontend Contracts & Transport (Web UI)", () => {
     // 3. Approve Pilot Run
     const approved = await transport.approvePilotRun!(
       "11111111-1111-4111-8111-111111111111",
-      { snapshotHash: "a".repeat(64), decision: "approved" },
+      {
+        approvalId: "11111111-1111-4111-8111-111111111112",
+        versionId: "11111111-1111-4111-8111-111111111113",
+        snapshotHash: "a".repeat(64), decision: "approved",
+      },
       ac.signal,
     );
     expect(approved.status).toBe("succeeded");
@@ -258,4 +264,3 @@ describe("Pilot v2 Frontend Contracts & Transport (Web UI)", () => {
     vi.unstubAllGlobals();
   });
 });
-

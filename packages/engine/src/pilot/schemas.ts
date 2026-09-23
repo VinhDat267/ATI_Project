@@ -109,6 +109,8 @@ export const PilotStepActionSchema = z.object({
 export type PilotStepAction = z.infer<typeof PilotStepActionSchema>;
 
 export const PilotPreviewSchema = z.object({
+  approvalId: z.string().uuid().optional(),
+  versionId: z.string().uuid().optional(),
   snapshotHash: z.string().length(64),
   expiresAt: z.string(),
   actions: z.array(PilotStepActionSchema),
@@ -157,6 +159,8 @@ export type PilotRunDetailResponse = z.infer<typeof PilotRunDetailResponseSchema
 // 3. POST /pilot/v2/runs/:runId/approve
 // ==========================================
 export const PilotApproveBodySchema = z.object({
+  approvalId: z.string().uuid(),
+  versionId: z.string().uuid(),
   decision: z.enum(['approved', 'rejected']),
   snapshotHash: z.string().length(64),
 }).strict();
@@ -184,4 +188,3 @@ export const PilotCatalogResponseSchema = z.object({
 }).strict();
 
 export type PilotCatalogResponse = z.infer<typeof PilotCatalogResponseSchema>;
-

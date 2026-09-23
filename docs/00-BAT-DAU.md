@@ -1,5 +1,9 @@
 # Bắt đầu với cấu hình B/local
 
+Tài liệu này dẫn vào nền B/local lịch sử. Trạng thái MVP v2 ngày 23/09/2026
+nằm ở [README](../README.md), [baseline](BASELINE.md) và [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md);
+các nhãn WEB/AI cũ bên dưới không phải verdict MVP v2.
+
 Quyết định B/local đã được người dùng xác nhận 13/09/2026. Thứ tự đọc:
 
 1. [BASELINE](BASELINE.md): phạm vi và các điều kiện không được vi phạm.

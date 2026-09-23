@@ -1,10 +1,15 @@
 # Backend MVP v2 — Roadmap và chỉ mục 30 task
 
-Ngày lập: 22/09/2026. Trạng thái: **PROPOSED / READY_FOR_REVIEW / NOT_EXECUTED**.
+Ngày lập: 22/09/2026. Cập nhật trạng thái 23/09/2026 tại commit `9335620`:
+**PLAN_RECORDED / CODE_PRESENT / LIVE_NOT_RUN / FULL_ACCEPTANCE_OPEN**.
 
-Đây là kế hoạch triển khai, không phải báo cáo hoàn thành. Việc viết tài liệu không
-cấp quyền gọi API trả phí, tạo tài khoản hoặc tạo card thật. Toàn bộ task BE-00…BE-29
-đang `TODO`; chưa task nào được tính DONE từ kết quả của backend B/local.
+Đây là kế hoạch gốc, không phải bảng nghiệm thu. Sau ngày lập đã có code/test
+cho nhiều task BE-01…29 và giao diện pilot. [Review P1](P1-REVIEW.md),
+[P2](P2-REVIEW.md), [P3](P3-REVIEW.md), [P4](P4-REVIEW.md) ghi kết quả tại thời
+điểm tương ứng; [audit P6](P6-REVIEW.md) rút lại verdict live `PASS`.
+Không suy `SAAS_LIVE_EXERCISED`, `AI_QUALITY_MEASURED` hay `FULL_PRODUCT_ACCEPTANCE`
+từ commit hoặc unit test. Tài liệu/code không cấp quyền gọi API trả phí hoặc tạo
+card thật.
 
 ## 1. Mục tiêu và cách dùng
 
@@ -12,11 +17,9 @@ Triển khai backend cho điều phối viên nhóm thiết kế/web: một ngu�
 chỉ đọc → kiểm thông tin → AI chọn tool/lập kế hoạch → preview bất biến → owner
 duyệt → một card Trello → receipt và tra cứu. Giữ nguyên toàn bộ UI/UX hiện tại.
 
-Đọc file này trước, rồi mở batch tương ứng. Mỗi task có đầu vào/phụ thuộc, file dự
-kiến, checklist thực hiện, kiểm thử và Definition of Done. Đường dẫn ghi `NEW`
-là file sẽ tạo, không phải khả năng đang tồn tại. Tên interface mới là thiết kế
-đề xuất; phải kiểm va chạm tên lúc bắt đầu task. Đường dẫn trong các bảng là tương
-đối với root repo; liên kết tài liệu dùng đường dẫn tương đối từ file này.
+Đọc file này để hiểu dependency và DoD gốc, rồi đối chiếu source/commit/review
+mới nhất trước khi chọn việc tiếp theo. `NEW`, `TODO`, tên interface và đường dẫn
+trong phần kế hoạch là ảnh chụp ngày 22/09, không phản ánh trạng thái file hiện tại.
 
 Nguồn thẩm quyền:
 
@@ -29,14 +32,15 @@ Nguồn thẩm quyền:
 P1a vẫn là chi tiết có thẩm quyền cho BE-01/02/03; không thực hiện lại hai bộ task.
 Bộ tài liệu này mở rộng phần còn lại, không tự phê duyệt thay đổi scope.
 
-## 2. Hiện trạng đã kiểm tra
+## 2. Ảnh chụp hiện trạng ngày lập kế hoạch
 
 Evidence pin: HEAD `b4e97b6b386ccce8729d71029c85a60353b367f9` + working tree ngày lập.
 Working tree có scope docs chưa commit và các thay đổi branding/UI từ trước;
 đặc biệt plan P1a/dataset đang untracked. Không được tạo worktree từ HEAD rồi mặc
 định cho rằng các tài liệu này đã có trong đó.
 
-`[verified]` dưới đây nghĩa là đã đọc source/config, không phải chạy lại runtime.
+`[verified]` bên dưới chỉ nghĩa là đã đọc source/config **tại evidence pin cũ**,
+không phải trạng thái của commit `9335620` hoặc kết quả chạy lại runtime.
 
 | Source hiện có | Quan sát và tác động tới kế hoạch |
 |---|---|
@@ -116,16 +120,16 @@ không dùng làm chứng minh đầy đủ. Các điều kiện liên quan đư
 property flow; không phải security pass. Các task approval/dispatch vẫn cần review
 và fault test độc lập.
 
-## 6. Chỉ mục task và phụ thuộc
+## 6. Chỉ mục task và phụ thuộc (kế hoạch gốc)
 
 Owner A/B là vai trò đề xuất, chưa gán thành viên: A = engine/DB/API;
 B = connector/AI/QA. Một người cũng làm được theo thứ tự. Không đồng nghĩa hai
-worker trong ứng dụng. Mỗi task `TODO`, chọn một task ACTIVE tại một thời điểm
-nếu chưa có phân công file độc lập.
+worker trong ứng dụng. Cột dưới đây là danh mục và dependency gốc, **không phải
+trạng thái TODO hiện tại**. Xem review theo phase và bảng trạng thái P6.
 
 | ID | Task | Phụ thuộc kỹ thuật | Owner | Batch |
 |---|---|---|---|---|
-| BE-00 | Handoff tài liệu và baseline test | User duyệt execution | A | [01](01-FOUNDATION.md) |
+| BE-00 | Handoff tài liệu và baseline test | User duyệt execution | A | [P1 review](P1-REVIEW.md) |
 | BE-01 | Source/business identity | BE-00 | A | 01 |
 | BE-02 | Bounded source parser | BE-00 | A | 01 |
 | BE-03 | Pure resource policy | BE-00 | A | 01 |
@@ -133,30 +137,35 @@ nếu chưa có phân công file độc lập.
 | BE-05 | DB run profile/source snapshot | BE-04 | A | 01 |
 | BE-06 | DB business reservation/receipt | BE-01,05 | A | 01 |
 | BE-07 | Internal pilot schemas/profile | BE-04,05,06 | A | 01 |
-| BE-08 | Config/credential boundary | BE-03,07 | B | [02](02-CONNECTORS.md) |
+| BE-08 | Config/credential boundary | BE-03,07 | B | [P2 review](P2-REVIEW.md) |
 | BE-09 | Bounded HTTP và lỗi/redaction | BE-08 | B | 02 |
 | BE-10 | Sheets read-only adapter | BE-02,09 | B | 02 |
 | BE-11 | Trello read/target resolution | BE-03,09 | B | 02 |
 | BE-12 | Trello create contract adapter | BE-11 | B | 02 |
 | BE-13 | Reviewed pilot Gateway/catalog | BE-07,10,11,12 | A | 02 |
-| BE-14 | Manual source preflight | BE-04,05,13 | A | [03](03-EXECUTION-SAFETY.md) |
+| BE-14 | Manual source preflight | BE-04,05,13 | A | [P2 review](P2-REVIEW.md) |
 | BE-15 | Snapshot/preview/approval binding | BE-06,07,14 | A | 03 |
 | BE-16 | Dispatch + outcome transaction | BE-06,12,15 | A | 03 |
 | BE-17 | Recovery/reconcile/cancel/expiry | BE-16 | A | 03 |
 | BE-18 | Manual vertical slice + fault gate | BE-17 | B | 03 |
-| BE-19 | Pilot HTTP contracts/read models | BE-18 | A | [04](04-AI-API.md) |
+| BE-19 | Pilot HTTP contracts/read models | BE-18 | A | [P3 review](P3-REVIEW.md) |
 | BE-20 | Source-aware planner/evidence | BE-14,19 | B | 04 |
 | BE-21 | Retrieval/QE/replan/accounting | BE-13,16,20 | B | 04 |
 | BE-22 | UC1/UC3/new-run clarification | BE-17,19,20 | A | 04 |
 | BE-23 | Hai principal + security regression | BE-19,21,22 | A | 04 |
-| BE-24 | Dataset 20 case × vi/en + holdout | BE-04,07 | B | [05](05-TESTING.md) |
+| BE-24 | Dataset 20 case × vi/en + holdout | BE-04,07 | B | [P4 review](P4-REVIEW.md) |
 | BE-25 | Backend acceptance/regression gate | BE-18,23,24 | A+B | 05 |
 | BE-26 | SaaS setup và live read preflight | BE-13 + user consent/resources | User+B | [06](06-LIVE-HANDOFF.md) |
 | BE-27 | Live manual UC2 + receipt | BE-18,26 + write approval | A+B | 06 |
 | BE-28 | Live AI/quality evaluation | BE-25,27 + provider/budget approval | B | 06 |
 | BE-29 | Runbook/evidence/handoff | BE-25; BE-27/28 có verdict thật | A+B | 06 |
 
-## 7. Thứ tự triển khai và cổng dừng
+## 7. Thứ tự và cổng dừng đề xuất ngày 22/09
+
+Thứ tự bên dưới là kế hoạch lịch sử. Code/test P1–P4 đã được thêm trước khi có
+bằng chứng G2-live; **G2-live và G5-live/report vẫn `NOT_RUN`**. Ưu tiên hiện tại:
+sửa lỗi chặn trong [audit P6](P6-REVIEW.md), test đường API pilot thực tế,
+rồi mới xem xét preflight/live write/AI evaluation được phép.
 
 1. **G0:** BE-00. Clean execution checkout có đúng scope docs đã duyệt.
 2. **G1a:** BE-01…03, đúng P1a. Pure modules có test; chưa bật runtime.
@@ -270,12 +279,12 @@ re-anchor Git status, HEAD và source seams trước batch; không nạp bằng 
 | Mục | Quyết định mặc định của plan / cổng |
 |---|---|
 | Tài khoản Sheets/Trello | Chưa xác nhận sẵn; BE-26, user tự login/consent. Không chặn unit/contract. |
-| Credential Google | Đề xuất tài khoản service chỉ được share nguồn thử read-only nếu tổ chức cho phép; phương thức thực tế chốt BE-26. Không gắn với OIDC. |
+| Credential Google | Adapter hiện chưa tạo bearer token service account; phương thức truy cập nguồn thật vẫn OPEN. Không gắn với OIDC. |
 | Credential Trello | Chọn theo tài liệu API và tài khoản thử ở BE-26; không tự giả định bearer OAuth là tương thích. |
 | Date-only → deadline | BE-04 chốt chính sách pilot có timezone + giờ hiển thị; không để AI tự thêm giờ. |
 | Hạn nộp/quỹ giờ | Chưa có, không cam kết hoàn thành trong sáu tuần cũ. |
-| UI | Giữ nguyên; không có browser MVP v2 acceptance trong backend DoD. P4 cần quyết định riêng nếu sau này muốn nối UI. |
-| Backend API namespace | `/pilot/v2` đề xuất; review trước BE-19; không thay route UI cũ. |
+| UI | UI pilot đã có code; browser MVP v2 acceptance và review interaction delta còn OPEN. |
+| Backend API namespace | `/pilot/v2` đã có; chưa chứng minh đủ UC1–UC3/AI trên đường API này. |
 | Reconciliation không có remote ID | Giữ unknown, owner đưa candidate ID để read-only inspect; không force clear reservation. |
 | Full product acceptance | Backend pass chưa đủ frontend/live/customer/rubric acceptance. |
 

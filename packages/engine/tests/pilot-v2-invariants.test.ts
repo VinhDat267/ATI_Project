@@ -96,6 +96,8 @@ describe('Pilot V2 Invariant Regression Suite (BE-25)', () => {
       const forgedHash = createHash('sha256').update('canonical-snapshot-payload-v2-tampered').digest('hex');
 
       const approvalPayload: PilotApproveBody = {
+        approvalId: randomUUID(),
+        versionId: randomUUID(),
         snapshotHash: forgedHash,
         decision: 'approved',
       };

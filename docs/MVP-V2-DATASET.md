@@ -1,6 +1,8 @@
 # Dataset contract — MVP v2
 
-Status: SPEC_APPROVED / DATASET_NOT_CREATED / ALL_EXECUTION_NOT_RUN.
+Status (23/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
+CONTRACT_TESTS_PRESENT / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN /
+CUSTOMER_VALIDATED_NOT_RUN.
 
 Nguồn oracle: [đặc tả mục 8](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
 Giữ đủ V2-01 đến V2-20, mỗi case có biến thể tiếng Việt và tiếng Anh.
@@ -8,17 +10,23 @@ Các tình huống tái dựng do nhóm viết, không phải dữ liệu khách
 Không sửa `testdata/test-cases.json`, `testdata/tools.json` hoặc
 `testdata/experiment-manifest.json` để biến evidence B/local thành v2.
 
-## Dạng record cần tạo khi triển khai dataset
+`testdata/v2-dataset/cases.json` hiện có 20 case × vi/en = 40 records;
+`testdata/v2-dataset/holdout.json` có 10 case × vi/en = 20 records. Các test
+schema/acceptance dùng fixture tái dựng; [runner P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
+không gọi provider. Holdout chưa là bằng chứng đo chất lượng AI.
 
-Mỗi record phải có các trường sau; chưa có record nào được tính là đã chạy:
+## Dạng record và evidence cần giữ
+
+Mỗi record có dữ liệu fixture và oracle; `evidence.verdict: NOT_RUN` không được
+tự đổi thành live pass chỉ vì unit test đọc record:
 
 | Trường | Nội dung bắt buộc |
 |---|---|
-| case_id / variant_id | V2-01..V2-20 / định danh biến thể duy nhất |
+| caseId / variantId | V2-01..V2-20 / định danh biến thể duy nhất |
 | language / origin | vi hoặc en / reconstructed_synthetic |
-| source_refs | S1..S5 hoặc E theo đặc tả, không ghi nguồn là khách được phỏng vấn |
-| source_fixture | Header + hàng Sheets giả lập, request ID ổn định; không secret/PII thật |
-| prompt / principal / resource_policy | Prompt cụ thể, operator giả lập và allowlist |
+| sourceRefs | S1..S5 hoặc E theo đặc tả, không ghi nguồn là khách được phỏng vấn |
+| sourceFixture | Header + hàng Sheets giả lập, request ID ổn định; không secret/PII thật |
+| prompt / principal / resourcePolicy | Prompt cụ thể, operator giả lập và allowlist |
 | fault | none hoặc fault được định danh, thời điểm inject và transport giả lập |
 | expected | Kết quả, trường thiếu, tool/args, write count, trạng thái và nguồn bằng chứng |
 | evidence | Mode, commit, cấu hình đã redact, artifact path, observed và verdict |
@@ -40,5 +48,5 @@ Provider thật chạy trên nội dung giả lập vẫn là dữ liệu giả 
 - V2-19 fault injection chỉ ở môi trường test; không cố gây lỗi tài khoản thật.
 - Dữ liệu live, tài nguyên và ngân sách phải được duyệt riêng; thiếu thì NOT_RUN.
 
-Batch P1a chỉ có unit fixtures cho identity/source/policy; không thay thế
-20 acceptance cases, không tạo holdout và không tuyên bố đã đủ dataset.
+Batch P1a ban đầu chỉ có unit fixtures; dataset và holdout đã được thêm sau đó.
+Chưa có provider-backed run và nghiệm thu người dùng đại diện cho bộ v2.

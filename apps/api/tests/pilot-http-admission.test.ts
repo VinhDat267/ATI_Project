@@ -8,10 +8,13 @@ import {
   type PilotPolicy,
   type ReadSheetsRequestResult,
 } from "@wap/engine";
+import { buildPilotApproval } from "../src/pilot-approval.js";
 
 const USER_A = "00000000-0000-4000-8000-000000000001";
 const USER_B = "00000000-0000-4000-8000-000000000002";
 const STRANGER = "00000000-0000-4000-8000-000000000099";
+const VERSION_ID = "11111111-2222-4444-8888-000000000002";
+const APPROVAL_ID = "11111111-2222-4444-8888-000000000003";
 
 const openApis = new Set<ApiRuntime>();
 
@@ -36,7 +39,7 @@ const testConfig: PilotConfig = {
   tabId: "tab-1",
   boardId: "board-xyz",
   google: { apiKey: "key-123" },
-  trello: { apiKey: "key-123", apiToken: "token-123" },
+  trello: { apiKey: "key-123", apiToken: "token-123", listId: "list-todo" },
 };
 
 const mockIntakeResult: ReadSheetsRequestResult = {
@@ -67,7 +70,9 @@ const mockIntakeResult: ReadSheetsRequestResult = {
 async function createTestApi(options?: {
   activeRunExists?: boolean;
   intakeResult?: ReadSheetsRequestResult;
-  pilotPolicy?: PilotPolicy;
+  pilotPolicy?: PilotPolicy | null;
+  pilotConfig?: PilotConfig | null;
+  pilotLiveWriteEnabled?: boolean;
 }) {
   const config: ApiConfig = {
     host: "127.0.0.1",
@@ -86,6 +91,7 @@ async function createTestApi(options?: {
     profile: string;
     status: string;
     created_at: Date;
+    workflow_version_id: string;
   }> = [];
 
   const snapshotsDb: Array<{
@@ -94,6 +100,15 @@ async function createTestApi(options?: {
     source_revision: string;
     raw_data: Record<string, string>;
     checklist_result: Record<string, unknown>;
+  }> = [];
+  const approvalsDb: Array<{
+    id: string;
+    run_id: string;
+    owner_id: string;
+    version_id: string;
+    snapshot_hash: string;
+    decision: string;
+    expires_at: Date;
   }> = [];
 
   const sqlFn = async (strings: TemplateStringsArray, ...values: any[]) => {
@@ -109,11 +124,22 @@ async function createTestApi(options?: {
       const found = snapshotsDb.filter((s) => s.run_id === runId);
       return found;
     }
+    if (/FROM\s+pilot_approvals\s+WHERE\s+run_id\s*=/i.test(sql)) {
+      return approvalsDb.filter((a) => a.run_id === values[0] && a.owner_id === values[1])
+        .map((a) => ({ ...a, live: a.expires_at.getTime() > Date.now() }));
+    }
     if (/UPDATE\s+runs\s+SET\s+status\s*=/i.test(sql)) {
-      const status = values[0];
-      const runId = values[1];
+      const literalStatus = sql.match(/SET\s+status\s*=\s*'([^']+)'/i)?.[1];
+      const status = literalStatus ?? values[0];
+      const runId = literalStatus ? values[0] : values[1];
       const found = runsDb.find((r) => r.id === runId);
       if (found) found.status = status;
+      return [];
+    }
+    if (/UPDATE\s+pilot_approvals\s+SET\s+decision\s*=/i.test(sql)) {
+      const decision = sql.match(/SET\s+decision\s*=\s*'([^']+)'/i)?.[1];
+      const found = approvalsDb.find((a) => a.run_id === values[0]);
+      if (found && decision) found.decision = decision;
       return [];
     }
     if (/FROM\s+business_reservations\s+WHERE\s+intent_key\s*=/i.test(sql)) {
@@ -157,6 +183,7 @@ async function createTestApi(options?: {
               profile: "pilot-v2",
               status: values[8],
               created_at: new Date(),
+              workflow_version_id: values[3],
             });
             return [];
           }
@@ -170,10 +197,20 @@ async function createTestApi(options?: {
             });
             return [];
           }
+          if (sql.includes("INSERT INTO pilot_approvals")) {
+            const run = runsDb.find((r) => r.id === values[0]);
+            approvalsDb.push({
+              id: APPROVAL_ID,
+              run_id: values[0], owner_id: values[1], version_id: values[2], snapshot_hash: values[3],
+              decision: "pending",
+              expires_at: new Date((run?.created_at.getTime() ?? Date.now()) + 600_000),
+            });
+            return [];
+          }
           if (sql.includes("INSERT INTO run_events")) {
             return [];
           }
-          return [];
+          return sqlFn(strings, ...values);
         },
         {
           json: (val: any) => val,
@@ -191,8 +228,9 @@ async function createTestApi(options?: {
     db: mockDb,
     config,
     principalExists: async () => true,
-    pilotPolicy: options?.pilotPolicy ?? testPolicy,
-    pilotConfig: testConfig,
+    pilotPolicy: options?.pilotPolicy === null ? undefined : options?.pilotPolicy ?? testPolicy,
+    pilotConfig: options?.pilotConfig === null ? undefined : options?.pilotConfig ?? testConfig,
+    pilotLiveWriteEnabled: options?.pilotLiveWriteEnabled ?? true,
     readSheetsRequestFn: async () => options?.intakeResult ?? mockIntakeResult,
     pilotRouter: undefined, // uses createPilotRouter
   });
@@ -209,10 +247,24 @@ async function createTestApi(options?: {
   const { token: tokenA } = (await loginA.json()) as { token: string };
   const pilotUrl = baseUrl.replace(/\/api\/v1$/, "") + "/pilot/v2";
 
-  return { baseUrl, pilotUrl, tokenA, runsDb, snapshotsDb };
+  return { baseUrl, pilotUrl, tokenA, runsDb, snapshotsDb, approvalsDb };
 }
 
 describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
+  const closedCases: Array<[{ pilotPolicy?: PilotPolicy | null; pilotConfig?: PilotConfig | null }, string]> = [
+    [{ pilotPolicy: null }, "missing policy"],
+    [{ pilotConfig: null }, "missing config"],
+    [{ pilotConfig: { ...testConfig, enabled: false } }, "disabled config"],
+    [{ pilotPolicy: { ...testPolicy, enabled: false } }, "disabled policy"],
+  ];
+  it.each(closedCases)("fails closed with %s (%s)", async (options, _label) => {
+    const { pilotUrl, tokenA } = await createTestApi(options);
+    const response = await fetch(`${pilotUrl}/catalog`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+  });
+    expect(response.status).toBe(403);
+    });
+
   it("GET /pilot/v2/catalog returns 200 with reviewed pilot catalog", async () => {
     const { pilotUrl, tokenA } = await createTestApi();
 
@@ -278,6 +330,26 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
     expect(snapshotsDb[0]!.run_id).toBe(result.runId);
   });
 
+  it("blocks approval when the durable approval row is missing", async () => {
+    const { pilotUrl, tokenA, runsDb } = await createTestApi();
+    const runId = "11111111-2222-4444-8888-999999999998";
+    runsDb.push({
+      id: runId, user_id: USER_A, profile: "pilot-v2",
+      status: "awaiting_approval", created_at: new Date(), workflow_version_id: VERSION_ID,
+    });
+    const response = await fetch(`${pilotUrl}/runs/${runId}/approve`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenA}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        decision: "approved", approvalId: APPROVAL_ID, versionId: VERSION_ID,
+        snapshotHash: "r".repeat(64),
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("APPROVAL_NOT_PENDING");
+    expect(runsDb[0]?.status).toBe("awaiting_approval");
+  });
+
   it("POST /pilot/v2/runs returns 409 ACTIVE_RUN when another run is currently active", async () => {
     const { pilotUrl, tokenA } = await createTestApi({ activeRunExists: true });
 
@@ -311,6 +383,7 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
       profile: "pilot-v2",
       status: "awaiting_approval",
       created_at: new Date(),
+      workflow_version_id: VERSION_ID,
     });
 
     // USER_A requests USER_B's run
@@ -322,7 +395,7 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
   });
 
   it("GET /pilot/v2/runs/:runId returns 200 with normalized checklist and fixed TTL preview for owner", async () => {
-    const { pilotUrl, tokenA, runsDb, snapshotsDb } = await createTestApi();
+    const { pilotUrl, tokenA, runsDb, snapshotsDb, approvalsDb } = await createTestApi();
 
     const ownRunId = "11111111-2222-4444-8888-000000000001";
     const runCreatedAt = new Date();
@@ -332,13 +405,14 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
       profile: "pilot-v2",
       status: "awaiting_approval",
       created_at: runCreatedAt,
+      workflow_version_id: VERSION_ID,
     });
 
     snapshotsDb.push({
       run_id: ownRunId,
       source_key: "source-key-101",
       source_revision: "r".repeat(64),
-      raw_data: { deliverable: "Website update", raw_request: "Update home page" },
+      raw_data: { ...mockIntakeResult.row, deliverable: "Website update", raw_request: "Update home page" },
       checklist_result: {
         status: "pass",
         unconfirmedBusiness: false,
@@ -346,6 +420,18 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
         evidencePositions: { due_date: "row-2-col-6" },
         summary: "Valid",
       },
+    });
+
+    const snapshotHash = buildPilotApproval({
+      runId: ownRunId, ownerId: USER_A, versionId: VERSION_ID, sourceKey: "source-key-101",
+      sourceRevision: "r".repeat(64),
+      row: snapshotsDb[0]!.raw_data as typeof mockIntakeResult.row,
+      policy: testPolicy, targetListId: testConfig.trello?.listId,
+    }).snapshotHash;
+    approvalsDb.push({
+      id: APPROVAL_ID, run_id: ownRunId, owner_id: USER_A, version_id: VERSION_ID,
+      snapshot_hash: snapshotHash,
+      decision: "pending", expires_at: new Date(runCreatedAt.getTime() + 600_000),
     });
 
     const res = await fetch(`${pilotUrl}/runs/${ownRunId}`, {
@@ -359,7 +445,7 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
     expect(data.checklistResult.valid).toBe(true);
     expect(data.checklistResult.unconfirmedBusiness).toBe(false);
     expect(data.preview).toBeDefined();
-    expect(data.preview.snapshotHash).toBe("r".repeat(64));
+    expect(data.preview.snapshotHash).toBe(snapshotHash);
     expect(data.preview.actions).toHaveLength(1);
     expect(data.preview.actions[0].tool).toBe("trello.create_card");
 

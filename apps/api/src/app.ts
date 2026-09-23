@@ -100,6 +100,7 @@ export interface CreateApiOptions {
   ) => Promise<void>;
   pilotConfig?: PilotConfig;
   pilotPolicy?: PilotPolicy;
+  pilotLiveWriteEnabled?: boolean;
   readSheetsRequestFn?: (params: {
     config: PilotConfig;
     policy: PilotPolicy;
@@ -147,6 +148,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       worker: options.worker,
       pilotConfig: options.pilotConfig,
       pilotPolicy: options.pilotPolicy,
+      liveWriteEnabled: options.pilotLiveWriteEnabled,
       readSheetsRequestFn: options.readSheetsRequestFn,
     });
   const identityLookup =
