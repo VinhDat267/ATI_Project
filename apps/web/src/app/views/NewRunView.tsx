@@ -240,26 +240,31 @@ export function NewRunView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-strong text-ink">
-              <Icon name="sparkles" size={16} />
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-action/40 bg-surface-soft p-4.5 shadow-card">
+          <div className="flex items-center gap-3.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-action-subtle text-action">
+              <Icon name="kanban" size={20} />
             </span>
             <div className="flex flex-col">
-              <span className="text-body-md font-medium text-ink">
-                Tự động hoá theo mẫu từ Google Sheets sang Trello?
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-title-md font-semibold text-ink">
+                  Điều phối theo mẫu từ Google Sheets sang Trello
+                </span>
+                <span className="hidden sm:inline-flex rounded-full bg-action-subtle px-2 py-0.5 text-overline font-semibold text-action">
+                  Quy trình chuẩn
+                </span>
+              </div>
               <span className="text-body-sm text-muted">
-                Sử dụng các kịch bản mẫu có sẵn để tạo thẻ công việc có kiểm soát an toàn.
+                Dùng các kịch bản có sẵn để tự động đọc dữ liệu và tạo thẻ với checklist kiểm duyệt an toàn.
               </span>
             </div>
           </div>
           <a
             href={routeToHash({ page: "pilot-new" })}
-            className="inline-flex min-h-11 items-center gap-1.5 text-button-sm font-semibold text-primary underline underline-offset-3 hover:text-ink"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-action/60 bg-canvas px-4 text-button-sm font-semibold text-action no-underline shadow-xs transition-all hover:border-action hover:bg-action-subtle"
           >
-            Mở bộ điều phối theo mẫu
-            <Icon name="arrow-right" size={14} />
+            <span>Mở quy trình theo mẫu</span>
+            <Icon name="arrow-right" size={15} />
           </a>
         </div>
 

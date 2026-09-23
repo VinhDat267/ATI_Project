@@ -6,9 +6,9 @@ import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { LoadingState, ErrorState } from "../../components/States";
 import { StatusPill } from "../../components/StatusPill";
+import { TechDisclosure } from "../../components/TechDisclosure";
 import { routeToHash } from "../../../core/navigation.js";
 import { shortId } from "../../../core/presentation.js";
-import type { PilotRunDetailResponse } from "../../../core/pilot-contracts.js";
 
 function CountdownTimer({ expiresAt, onExpired }: { expiresAt: string; onExpired: () => void }) {
   const [secondsLeft, setSecondsLeft] = useState(() => {
@@ -50,7 +50,7 @@ function CountdownTimer({ expiresAt, onExpired }: { expiresAt: string; onExpired
     >
       <Icon name="clock-alert" size={16} />
       <span>
-        {isExpired ? "Hết hạn phê duyệt" : `Thời gian duyệt còn lại: ${formatted}`}
+        {isExpired ? "Đã hết thời hạn duyệt" : `Thời gian duyệt còn lại: ${formatted}`}
       </span>
     </div>
   );
@@ -73,7 +73,7 @@ export function PilotRunView({ runId }: { runId: string }) {
     queryKey: ["pilot-run", runId],
     queryFn: async ({ signal }) => {
       if (!transport.getPilotRun) {
-        throw new Error("Transport không hỗ trợ getPilotRun");
+        throw new Error("Hệ thống không hỗ trợ getPilotRun");
       }
       return transport.getPilotRun(runId, signal);
     },
@@ -102,12 +102,12 @@ export function PilotRunView({ runId }: { runId: string }) {
 
   const handleDecision = async (decision: "approved" | "rejected") => {
     if (!snapshotHash) {
-      setDecisionError("Không tìm thấy mã băm snapshot để xác thực phê duyệt");
+      setDecisionError("Không tìm thấy mã băm xác thực để phê duyệt");
       return;
     }
 
     if (!transport.approvePilotRun) {
-      setDecisionError("Transport không hỗ trợ approvePilotRun");
+      setDecisionError("Hệ thống không hỗ trợ thao tác phê duyệt");
       return;
     }
 
@@ -125,13 +125,12 @@ export function PilotRunView({ runId }: { runId: string }) {
         scope.signal,
       );
 
-      // Cập nhật lại cache query
       await queryClient.invalidateQueries({ queryKey: ["pilot-run", runId] });
       await refetch();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       setDecisionError(
-        err?.message ||
-          "Không thể gửi quyết định phê duyệt. Vui lòng kiểm tra lại kết nối và trạng thái lần chạy.",
+        msg || "Không thể gửi quyết định phê duyệt. Vui lòng kiểm tra lại kết nối.",
       );
     } finally {
       scope.dispose();
@@ -139,75 +138,91 @@ export function PilotRunView({ runId }: { runId: string }) {
     }
   };
 
-
   if (isLoading) {
-    return <LoadingState label="Đang tải thông tin lần chạy Pilot..." />;
+    return <LoadingState label="Đang tải thông tin quy trình điều phối…" />;
   }
 
   if (error || !run) {
     return (
       <ErrorState
-        title="Không thể tải lần chạy Pilot"
-        error={error ?? new Error("Lần chạy không tồn tại")}
+        error={error ?? new Error("Không tìm thấy thông tin lần chạy")}
+        onRetry={() => void refetch()}
       />
     );
   }
 
+  const primaryAction = run.preview?.actions?.[0];
+  const cardTitle = String(
+    primaryAction?.args?.title ?? primaryAction?.args?.name ?? "Không có tiêu đề",
+  );
+  const targetList = String(
+    primaryAction?.args?.listName ?? primaryAction?.args?.idList ?? "To Do",
+  );
+  const dueDate = String(
+    primaryAction?.args?.due ?? primaryAction?.args?.dueDate ?? "Chưa đặt hạn",
+  );
+  const assignee = String(
+    primaryAction?.args?.idMembers ?? primaryAction?.args?.assignee ?? "Chưa chỉ định",
+  );
+  const cardDesc = primaryAction?.args?.desc || primaryAction?.args?.description;
 
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-8 px-6 py-8 xl:px-0">
-      {/* Header */}
+    <div className="mx-auto flex w-full max-w-content flex-col gap-6 px-6 py-6 xl:px-0">
+      {/* Top Header */}
       <div className="flex flex-col gap-4 border-b border-hairline pb-6 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
             <span className="text-overline uppercase tracking-wider text-muted">
-              Pilot Run · {shortId(effectiveRunId)}
+              Quy trình tự động · {shortId(effectiveRunId)}
             </span>
             <StatusPill status={run.status} />
           </div>
-          <h1 className="m-0 text-headline-sm font-bold text-ink">
+          <h1 className="m-0 text-display-md-mobile desk:text-display-md font-semibold text-ink">
             {run.sourceSnapshot?.rawRequest
-              ? run.sourceSnapshot.rawRequest.slice(0, 80)
-              : (run.sourceKey ? `Yêu cầu điều phối ${run.sourceKey}` : `Yêu cầu điều phối ${shortId(effectiveRunId)}`)}
+              ? run.sourceSnapshot.rawRequest.slice(0, 90)
+              : (run.sourceKey ? `Điều phối yêu cầu ${run.sourceKey}` : `Điều phối yêu cầu ${shortId(effectiveRunId)}`)}
           </h1>
-          <span className="text-caption text-muted">ID: {effectiveRunId}</span>
+          <span className="text-caption text-muted">Mã định danh: {effectiveRunId}</span>
         </div>
 
         <div className="flex items-center gap-3">
           <a
             href={routeToHash({ page: "pilot-new" })}
-            className="inline-flex h-11 items-center gap-1.5 rounded-sm border border-hairline bg-canvas px-4 text-button-sm text-ink no-underline hover:bg-surface-soft"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-hairline bg-surface-soft px-4 text-button-sm text-ink no-underline shadow-card transition-all hover:border-ink hover:shadow-lg"
           >
-            <Icon name="refresh-cw" size={16} />
-            Tạo yêu cầu mới
+            <Icon name="plus" size={16} />
+            <span>Tạo yêu cầu mới</span>
           </a>
         </div>
       </div>
 
       {decisionError ? (
-        <Banner tone="danger" icon="circle-x" title="Lỗi phê duyệt">
+        <Banner tone="danger" icon="circle-x" title="Lỗi gửi quyết định">
           {decisionError}
         </Banner>
       ) : null}
 
       {/* Transient Processing Indicator */}
       {["planning", "validating", "dry_running", "running", "replanning"].includes(run.status) ? (
-        <div className="flex items-center gap-3 rounded-md border border-hairline bg-surface-soft p-5">
+        <div className="flex items-center gap-3.5 rounded-md border border-hairline bg-surface-soft p-5 shadow-card">
           <Icon name="loader-circle" className="animate-spin text-primary" size={24} />
           <div className="flex flex-col gap-0.5">
-            <span className="font-semibold text-body-sm text-ink">Hệ thống đang xử lý yêu cầu...</span>
-            <span className="text-caption text-muted">Dữ liệu đang được tự động cập nhật mỗi 2 giây.</span>
+            <span className="font-semibold text-body-md text-ink">Hệ thống đang chuẩn bị kế hoạch…</span>
+            <span className="text-caption text-muted">Dữ liệu đang được tự động đồng bộ và cập nhật mỗi 2 giây.</span>
           </div>
         </div>
       ) : null}
 
       {/* BRANCH 1: Awaiting Approval (UC2) */}
       {run.status === "awaiting_approval" && run.preview ? (
-        <section className="flex flex-col gap-6 rounded-md border-2 border-primary/30 bg-canvas p-6 shadow-card">
+        <section
+          aria-label="Cổng phê duyệt kế hoạch"
+          className="flex flex-col gap-5 rounded-md border-2 border-action/70 bg-surface-soft p-6 shadow-card"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-primary font-semibold text-title-md">
-              <Icon name="hand" />
-              <span>Bản xem trước kế hoạch tạo thẻ Trello (Awaiting Approval)</span>
+            <div className="flex items-center gap-2.5 text-action font-semibold text-headline-sm-mobile desk:text-headline-sm">
+              <Icon name="hand" size={22} />
+              <span>Kế hoạch đề xuất: Tạo thẻ công việc trên Trello</span>
             </div>
             {expiresAt ? (
               <CountdownTimer
@@ -220,87 +235,83 @@ export function PilotRunView({ runId }: { runId: string }) {
             ) : null}
           </div>
 
-          <p className="m-0 text-body-md text-muted">
-            Hệ thống đã đọc dữ liệu từ Google Sheets, xác thực checklist nghiệp vụ
-            và AI đã chuẩn bị kế hoạch với đúng <strong>1 thao tác ghi duy nhất</strong>.
-            Vui lòng kiểm tra thông tin dưới đây trước khi duyệt.
+          <p className="m-0 text-body-md text-muted max-w-measure">
+            Hệ thống đã đọc dữ liệu từ Google Sheets, xác thực đầy đủ các điều kiện nghiệp vụ và chuẩn bị kế hoạch với đúng <strong>1 thẻ mới trên Trello</strong>. Vui lòng kiểm tra nội dung trước khi bấm phê duyệt.
           </p>
 
           {/* Action Card Preview */}
-          <div className="flex flex-col gap-3 rounded-sm border border-hairline bg-surface-soft p-5">
+          <div className="flex flex-col gap-4 rounded-sm border border-hairline bg-canvas p-5">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
-              <span className="font-semibold text-body-sm text-ink">
-                Hành động:{" "}
-                <code className="text-primary">
-                  {run.preview.actions[0]?.tool ?? "trello.create_card"}
-                </code>
+              <span className="text-overline uppercase tracking-wider text-muted font-semibold">
+                Thao tác thực hiện: Tạo thẻ công việc
               </span>
-              <span className="rounded bg-green-100 px-2 py-0.5 text-overline font-medium text-green-800">
-                1 Remote Write
+              <span className="rounded-full bg-success-subtle px-2.5 py-0.5 text-overline font-semibold text-success">
+                Đúng 1 thao tác tạo mới
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-body-sm">
-              <div>
-                <span className="text-muted">Tiêu đề thẻ (Card Title):</span>
-                <p className="m-0 font-semibold text-ink">
-                  {String(run.preview.actions[0]?.args?.title ?? run.preview.actions[0]?.args?.name ?? "Không có tiêu đề")}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-body-md">
+              <div className="flex flex-col gap-1">
+                <span className="text-caption text-muted font-medium">Tên công việc:</span>
+                <p className="m-0 font-semibold text-ink text-title-md">
+                  {cardTitle}
                 </p>
               </div>
-              <div>
-                <span className="text-muted">Danh sách đích (Target List):</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-caption text-muted font-medium">Cột danh sách Trello:</span>
                 <p className="m-0 font-semibold text-ink">
-                  {String(run.preview.actions[0]?.args?.listName ?? run.preview.actions[0]?.args?.idList ?? "To Do")}
+                  {targetList}
                 </p>
               </div>
-              <div>
-                <span className="text-muted">Hạn chót (Due Date):</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-caption text-muted font-medium">Thời hạn hoàn thành:</span>
                 <p className="m-0 font-semibold text-ink">
-                  {String(run.preview.actions[0]?.args?.due ?? run.preview.actions[0]?.args?.dueDate ?? "Chưa đặt")}
+                  {dueDate}
                 </p>
               </div>
-              <div>
-                <span className="text-muted">Người nhận (Assignee):</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-caption text-muted font-medium">Người phụ trách:</span>
                 <p className="m-0 font-semibold text-ink">
-                  {String(run.preview.actions[0]?.args?.idMembers ?? run.preview.actions[0]?.args?.assignee ?? "Chưa chỉ định")}
+                  {assignee}
                 </p>
               </div>
             </div>
 
-            {(run.preview.actions[0]?.args?.desc || run.preview.actions[0]?.args?.description) ? (
-              <div className="mt-2 border-t border-hairline pt-3 text-body-sm">
-                <span className="text-muted">Mô tả chi tiết thẻ:</span>
-                <div className="mt-1 whitespace-pre-wrap rounded bg-canvas p-3 font-mono text-caption text-ink">
-                  {String(run.preview.actions[0]?.args?.desc ?? run.preview.actions[0]?.args?.description)}
+            {cardDesc ? (
+              <div className="border-t border-hairline pt-3 flex flex-col gap-1">
+                <span className="text-caption text-muted font-medium">Mô tả nội dung thẻ:</span>
+                <div className="rounded-sm bg-surface-soft p-3.5 text-body-sm text-ink whitespace-pre-wrap border border-hairline">
+                  {String(cardDesc)}
                 </div>
               </div>
             ) : null}
           </div>
 
           {/* Approval Controls */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
             <Button
               variant="secondary"
               disabled={submittingDecision}
               onClick={() => handleDecision("rejected")}
             >
               <Icon name="ban" />
-              Từ chối kế hoạch (Reject)
+              <span>Từ chối thực hiện</span>
             </Button>
             <Button
               variant="primary"
               disabled={submittingDecision || isEffectivelyExpired}
               onClick={() => handleDecision("approved")}
+              className="h-12 px-6"
             >
               {submittingDecision ? (
                 <>
                   <Icon name="loader-circle" className="animate-spin" />
-                  Đang xử lý tạo thẻ...
+                  <span>Đang xử lý tạo thẻ…</span>
                 </>
               ) : (
                 <>
                   <Icon name="circle-check" />
-                  Phê duyệt & Tạo thẻ Trello (Approve)
+                  <span>Phê duyệt &amp; Tạo thẻ ngay</span>
                 </>
               )}
             </Button>
@@ -308,43 +319,44 @@ export function PilotRunView({ runId }: { runId: string }) {
         </section>
       ) : null}
 
-
       {/* BRANCH 2: Needs Input (UC1 Clarification) */}
       {run.status === "needs_input" ? (
         <Banner
           tone="planner"
           icon="message-circle-question"
-          title="Yêu cầu cần làm rõ / Bổ sung thông tin (Checklist Needs Input)"
+          title="Cần bổ sung thêm thông tin trước khi thực hiện"
         >
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {run.clarificationQuestion ? (
-              <div className="rounded bg-canvas p-3 font-semibold text-ink border border-primary/20">
+              <div className="rounded-sm bg-canvas p-4 font-semibold text-ink border border-planner/30">
                 {run.clarificationQuestion}
               </div>
             ) : null}
             <p className="m-0 text-body-md">
-              Checklist nghiệp vụ phát hiện dữ liệu intake chưa đủ điều kiện để AI
-              lập kế hoạch tự động:
+              Hệ thống phát hiện dữ liệu yêu cầu từ Google Sheets chưa đủ điều kiện để tạo thẻ tự động:
             </p>
             {run.checklistResult?.missingFields &&
             run.checklistResult.missingFields.length > 0 ? (
               <ul className="m-0 pl-5 text-body-sm font-semibold text-ink">
                 {run.checklistResult.missingFields.map((field) => (
-                  <li key={field}>Trường thiếu thông tin: {field}</li>
+                  <li key={field}>
+                    Thông tin còn thiếu: {field === "due_date" ? "Thời hạn hoàn thành" : field === "dimensions" ? "Thông số kích thước" : field === "target_url" ? "Đường dẫn trang web" : field}
+                  </li>
                 ))}
               </ul>
             ) : null}
             {run.checklistResult?.summary ? (
               <p className="m-0 text-caption text-muted">
-                {run.checklistResult.summary}
+                Chi tiết: {run.checklistResult.summary}
               </p>
             ) : null}
             <div className="pt-2">
               <a
                 href={routeToHash({ page: "pilot-new" })}
-                className="inline-flex h-10 items-center rounded-sm bg-surface-soft px-3 text-button-sm text-ink no-underline hover:bg-surface-strong"
+                className="inline-flex h-11 items-center gap-1.5 rounded-sm bg-surface-soft px-4 text-button-sm text-ink no-underline border border-hairline hover:border-ink"
               >
-                Chỉnh sửa và gửi lại yêu cầu
+                <Icon name="refresh-cw" size={16} />
+                <span>Bổ sung thông tin &amp; gửi lại</span>
               </a>
             </div>
           </div>
@@ -355,59 +367,61 @@ export function PilotRunView({ runId }: { runId: string }) {
       {run.status === "refused" ? (
         <Banner
           tone="danger"
-          icon="message-circle-x"
-          title="Hệ thống từ chối lập kế hoạch (Refusal)"
+          icon="ban"
+          title="Không thể lập kế hoạch thực hiện"
         >
           <div className="flex flex-col gap-2">
             {run.refusalReason ? (
-              <div className="rounded bg-canvas p-3 font-semibold text-danger border border-danger/20">
+              <div className="rounded-sm bg-canvas p-4 font-semibold text-danger border border-danger/30">
                 {run.refusalReason}
               </div>
             ) : null}
             <p className="m-0 text-body-md">
-              Yêu cầu không thể thực thi tự động do không hợp lệ, thiếu Request ID,
-              chứa chỉ thị không được hỗ trợ hoặc vi phạm chính sách kiểm soát.
+              Yêu cầu không thể thực thi tự động do thiếu mã định danh hợp lệ, chỉ thị công việc chưa được hỗ trợ hoặc vi phạm quy tắc an toàn.
             </p>
             {run.checklistResult?.summary ? (
-              <p className="m-0 mt-2 text-caption text-muted">
+              <p className="m-0 text-caption text-muted">
                 Chi tiết: {run.checklistResult.summary}
               </p>
             ) : null}
+            <div className="pt-2">
+              <a
+                href={routeToHash({ page: "pilot-new" })}
+                className="inline-flex h-11 items-center gap-1.5 rounded-sm bg-surface-soft px-4 text-button-sm text-ink no-underline border border-hairline hover:border-ink"
+              >
+                <span>Thử lại với yêu cầu khác</span>
+              </a>
+            </div>
           </div>
         </Banner>
       ) : null}
 
       {/* BRANCH 4: Succeeded & Receipt */}
       {run.status === "succeeded" && run.receipt ? (
-        <section className="flex flex-col gap-4 rounded-md border border-green-300 bg-green-50/40 p-6 shadow-card">
-          <div className="flex items-center gap-2 text-green-800 font-semibold text-title-md">
-            <Icon name="circle-check" size={22} />
-            <span>Đã tạo thẻ Trello thành công (Confirmed Receipt)</span>
+        <section
+          aria-label="Xác nhận hoàn thành"
+          className="flex flex-col gap-4 rounded-md border border-success/30 bg-surface-soft p-6 shadow-card"
+        >
+          <div className="flex items-center gap-2.5 text-success font-semibold text-headline-sm-mobile desk:text-headline-sm">
+            <Icon name="circle-check" size={24} />
+            <span>Đã tạo thẻ công việc thành công trên Trello</span>
           </div>
 
-          <div className="flex flex-col gap-2 rounded-sm border border-green-200 bg-canvas p-4 text-body-sm">
+          <div className="flex flex-col gap-3 rounded-sm border border-hairline bg-canvas p-5 text-body-md">
             {run.receipt.title ? (
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Tiêu đề thẻ:</span>
+              <div className="flex items-center justify-between border-b border-hairline pb-2.5">
+                <span className="text-muted">Tên thẻ:</span>
                 <span className="font-semibold text-ink">
                   {run.receipt.title}
                 </span>
               </div>
             ) : null}
-            <div className="flex items-center justify-between">
-              <span className="text-muted">Mã thẻ Trello (Card ID):</span>
+            <div className="flex items-center justify-between border-b border-hairline pb-2.5">
+              <span className="text-muted">Mã thẻ Trello:</span>
               <span className="font-mono font-semibold text-ink">
                 {run.receipt.cardId}
               </span>
             </div>
-            {run.receipt.intentKey ? (
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Mã Intent Key:</span>
-                <span className="font-mono text-ink">
-                  {run.receipt.intentKey}
-                </span>
-              </div>
-            ) : null}
             <div className="flex items-center justify-between">
               <span className="text-muted">Thời điểm xác nhận:</span>
               <span className="text-ink">
@@ -416,15 +430,16 @@ export function PilotRunView({ runId }: { runId: string }) {
                   : (run.endedAt ? new Date(run.endedAt).toLocaleString("vi-VN") : "Đã xác nhận")}
               </span>
             </div>
+
             {(run.receipt.url || run.receipt.cardUrl) ? (
-              <div className="pt-3 border-t border-hairline flex justify-end">
+              <div className="pt-4 border-t border-hairline flex justify-end">
                 <a
                   href={run.receipt.url || run.receipt.cardUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-11 items-center gap-2 rounded-sm bg-primary px-4 text-button-sm text-on-primary no-underline hover:bg-primary-hover"
+                  className="inline-flex h-11 items-center gap-2 rounded-sm bg-primary px-5 text-button-sm text-on-primary no-underline hover:bg-primary-hover shadow-card"
                 >
-                  Mở thẻ trên Trello
+                  <span>Mở thẻ trên Trello</span>
                   <Icon name="arrow-right" size={16} />
                 </a>
               </div>
@@ -437,7 +452,7 @@ export function PilotRunView({ runId }: { runId: string }) {
       {run.status === "succeeded" && !run.receipt ? (
         <Banner tone="success" icon="circle-check" title="Thực thi hoàn tất">
           <p className="m-0 text-body-md">
-            Yêu cầu đã được thực thi thành công. Không có thao tác ghi dữ liệu phát sinh (0 remote writes).
+            Yêu cầu tra cứu đã hoàn thành thành công. Không có thao tác ghi dữ liệu nào phát sinh trên hệ thống đích.
           </p>
         </Banner>
       ) : null}
@@ -447,17 +462,14 @@ export function PilotRunView({ runId }: { runId: string }) {
         <Banner
           tone="unknown"
           icon="triangle-alert"
-          title="Cần đối chiếu an toàn (Reconciliation Required)"
+          title="Cần đối chiếu kết quả trên Trello"
         >
           <div className="flex flex-col gap-2">
             <p className="m-0 text-body-md">
-              Đã xảy ra sự cố mạng hoặc timeout sau khi gửi lệnh tạo thẻ đến
-              Trello. Trạng thái đặt trước được chuyển sang <strong>unknown</strong>.
+              Đã xảy ra sự cố mạng hoặc thời gian chờ sau khi gửi yêu cầu tạo thẻ đến Trello.
             </p>
             <p className="m-0 text-body-sm text-muted">
-              Để bảo vệ bạn khỏi nguy cơ tạo trùng lặp nhiều thẻ cho cùng một yêu
-              cầu, hệ thống <strong>tuyệt đối không tự động thử lại (Zero Blind Retry)</strong>.
-              Vui lòng mở bảng Trello của bạn để kiểm tra xem thẻ đã xuất hiện hay chưa.
+              Để bảo vệ bạn khỏi nguy cơ tạo trùng lặp thẻ công việc, hệ thống <strong>không tự động thử lại</strong>. Vui lòng mở bảng Trello của bạn để kiểm tra xem thẻ đã xuất hiện hay chưa.
             </p>
           </div>
         </Banner>
@@ -468,112 +480,114 @@ export function PilotRunView({ runId }: { runId: string }) {
         <Banner
           tone="neutral"
           icon="clock-alert"
-          title="Lần chạy đã hết hạn duyệt (Approval Expired)"
+          title="Kế hoạch đã hết thời hạn duyệt"
         >
           <p className="m-0 text-body-md">
-            Kế hoạch xem trước chỉ có hiệu lực trong vòng 10 phút Server TTL. Quá
-            thời hạn này, hệ thống tự động khóa kế hoạch để bảo đảm dữ liệu không bị
-            sai lệch so với Google Sheets.
+            Bản xem trước có hiệu lực trong vòng 10 phút. Quá thời hạn này, hệ thống tự động khóa kế hoạch để bảo đảm dữ liệu không bị sai lệch so với Google Sheets.
           </p>
         </Banner>
       ) : null}
 
       {/* BRANCH 7: Rejected */}
       {run.status === "rejected" ? (
-        <Banner tone="neutral" icon="ban" title="Đã từ chối kế hoạch">
+        <Banner tone="neutral" icon="ban" title="Đã từ chối thực hiện">
           <p className="m-0 text-body-md">
-            Người vận hành đã từ chối bản xem trước. Không có thao tác ghi nào được
-            thực hiện trên Trello.
+            Bạn đã từ chối bản xem trước này. Không có thao tác nào được thực hiện trên Trello.
           </p>
         </Banner>
       ) : null}
 
       {/* BRANCH 8: Failed */}
       {run.status === "failed" ? (
-        <Banner tone="danger" icon="circle-x" title="Lần chạy thất bại">
+        <Banner tone="danger" icon="circle-x" title="Quy trình gặp sự cố">
           <div className="flex flex-col gap-2">
             <p className="m-0 text-body-md">
-              {run.error ?? "Đã xảy ra sự cố trong quá trình thực thi lần chạy."}
+              {run.error ?? "Đã xảy ra sự cố trong quá trình thực thi."}
             </p>
             <div className="pt-2">
               <a
                 href={routeToHash({ page: "pilot-new" })}
-                className="inline-flex h-10 items-center rounded-sm bg-surface-soft px-3 text-button-sm text-ink no-underline hover:bg-surface-strong"
+                className="inline-flex h-11 items-center gap-1.5 rounded-sm bg-surface-soft px-4 text-button-sm text-ink no-underline border border-hairline hover:border-ink"
               >
-                Thử lại với yêu cầu mới
+                <span>Thử lại với yêu cầu mới</span>
               </a>
             </div>
           </div>
         </Banner>
       ) : null}
 
-
-      {/* Metadata Accordion / Tech Details */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Source Snapshot */}
-        {run.sourceSnapshot ? (
-          <div className="flex flex-col gap-3 rounded-md border border-hairline bg-canvas p-5">
-            <h3 className="m-0 text-title-sm font-semibold text-ink">
-              Dữ liệu nguồn (Google Sheets Intake)
-            </h3>
-            <div className="flex flex-col gap-2 text-body-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">Mã yêu cầu:</span>
-                <span className="font-semibold">{run.sourceSnapshot.requestId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Khách hàng:</span>
-                <span>{run.sourceSnapshot.clientRef ?? "Chưa có"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Loại yêu cầu:</span>
-                <span className="font-mono text-primary">
-                  {run.sourceSnapshot.requestType ?? "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Hạn hoàn thành:</span>
-                <span>{run.sourceSnapshot.dueDate ?? "Chưa có"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Trạng thái duyệt:</span>
-                <span>{run.sourceSnapshot.decisionStatus ?? "Chưa có"}</span>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* AI Model Accounting */}
-        {run.accounting ? (
-          <div className="flex flex-col gap-3 rounded-md border border-hairline bg-canvas p-5">
-            <h3 className="m-0 text-title-sm font-semibold text-ink">
-              Hạch toán Chi phí AI (AI Token Accounting)
-            </h3>
-            <div className="flex flex-col gap-2 text-body-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">Input Tokens:</span>
-                <span className="font-mono">{run.accounting.inputTokens}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Output Tokens:</span>
-                <span className="font-mono">{run.accounting.outputTokens}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Tổng token:</span>
-                <span className="font-mono">
-                  {run.accounting.inputTokens + run.accounting.outputTokens}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-hairline pt-2 font-semibold">
-                <span className="text-ink">Chi phí ước tính:</span>
-                <span className="text-primary font-mono">
-                  ${(run.accounting.costMicroUsd / 1_000_000).toFixed(6)} USD
-                </span>
+      {/* Technical Metadata & Audit Section (Wrapped cleanly in TechDisclosure) */}
+      <TechDisclosure
+        summary="Thông tin nguồn &amp; Chi phí AI"
+        hint="Chi tiết kỹ thuật"
+        className="rounded-md border border-hairline bg-surface-soft p-4 shadow-card"
+      >
+        <div className="grid grid-cols-1 gap-6 pt-3 md:grid-cols-2">
+          {/* Source Snapshot */}
+          {run.sourceSnapshot ? (
+            <div className="flex flex-col gap-2 rounded-sm border border-hairline bg-canvas p-4">
+              <h3 className="m-0 text-title-md font-semibold text-ink">
+                Dữ liệu Google Sheets
+              </h3>
+              <div className="flex flex-col gap-2 text-body-sm">
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Mã yêu cầu:</span>
+                  <span className="font-semibold">{run.sourceSnapshot.requestId}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Khách hàng:</span>
+                  <span>{run.sourceSnapshot.clientRef ?? "Chưa có"}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Loại yêu cầu:</span>
+                  <span className="font-mono text-primary font-medium">
+                    {run.sourceSnapshot.requestType ?? "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Hạn hoàn thành:</span>
+                  <span>{run.sourceSnapshot.dueDate ?? "Chưa có"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Trạng thái duyệt:</span>
+                  <span>{run.sourceSnapshot.decisionStatus ?? "Chưa có"}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+
+          {/* AI Model Accounting */}
+          {run.accounting ? (
+            <div className="flex flex-col gap-2 rounded-sm border border-hairline bg-canvas p-4">
+              <h3 className="m-0 text-title-md font-semibold text-ink">
+                Chi phí Token AI
+              </h3>
+              <div className="flex flex-col gap-2 text-body-sm">
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Token đầu vào:</span>
+                  <span className="font-mono">{run.accounting.inputTokens.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Token đầu ra:</span>
+                  <span className="font-mono">{run.accounting.outputTokens.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline pb-1.5">
+                  <span className="text-muted">Tổng token:</span>
+                  <span className="font-mono font-medium">
+                    {(run.accounting.inputTokens + run.accounting.outputTokens).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 font-semibold">
+                  <span className="text-ink">Chi phí ước tính:</span>
+                  <span className="text-action font-mono">
+                    ${(run.accounting.costMicroUsd / 1_000_000).toFixed(6)} USD
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </TechDisclosure>
     </div>
   );
 }

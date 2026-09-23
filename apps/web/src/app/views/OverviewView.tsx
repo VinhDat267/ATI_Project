@@ -207,6 +207,49 @@ export function OverviewView() {
         </div>
       </div>
 
+      {/* Quick Launch Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <a
+          href={routeToHash({ page: "new" })}
+          className="group flex items-center justify-between rounded-md border border-hairline bg-surface-soft p-4 no-underline shadow-card transition-all hover:border-ink hover:shadow-lg"
+        >
+          <div className="flex items-center gap-3.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
+              <Icon name="sparkles" size={18} />
+            </span>
+            <div className="flex flex-col">
+              <span className="text-title-md font-semibold text-ink group-hover:text-primary">
+                Tạo yêu cầu với Trợ lý AI
+              </span>
+              <span className="text-body-sm text-muted">
+                Nhập mô tả bằng ngôn ngữ tự nhiên để AI lập kế hoạch
+              </span>
+            </div>
+          </div>
+          <Icon name="arrow-right" size={16} className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-ink" />
+        </a>
+
+        <a
+          href={routeToHash({ page: "pilot-new" })}
+          className="group flex items-center justify-between rounded-md border border-hairline bg-surface-soft p-4 no-underline shadow-card transition-all hover:border-action hover:shadow-lg"
+        >
+          <div className="flex items-center gap-3.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-action text-on-primary">
+              <Icon name="kanban" size={18} />
+            </span>
+            <div className="flex flex-col">
+              <span className="text-title-md font-semibold text-ink group-hover:text-action">
+                Điều phối mẫu Google Sheets → Trello
+              </span>
+              <span className="text-body-sm text-muted">
+                Quy trình chuẩn hoá với bộ kiểm tra checklist tự động
+              </span>
+            </div>
+          </div>
+          <Icon name="arrow-right" size={16} className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-action" />
+        </a>
+      </div>
+
       {attention.runs.length > 0 ? (
         <section aria-labelledby="attention-title" className="flex flex-col gap-4">
           <h2 id="attention-title" className="m-0 text-headline-sm">
