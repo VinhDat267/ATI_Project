@@ -1,5 +1,7 @@
 import { test as base, expect } from "@playwright/test";
+import { randomBytes } from "node:crypto";
 import { createApi } from "../../../api/src/app.js";
+import type { SessionAuthority, SessionInput, SessionMetadata } from "../../../api/src/auth.js";
 import { makeApiFixture } from "../../../api/tests/fixture.js";
 import {
   evaluateChecklist,
@@ -24,7 +26,12 @@ const sourceRow: SourceRow = {
 export interface PilotLiveContext extends LiveFixtureContext {
   externalRequests: string[];
   trelloPosts: string[];
+  ownerB: { userId: string; email: string; password: string };
 }
+
+const OWNER_B_ID = "00000000-0000-4000-8000-000000000002";
+const OWNER_B_EMAIL = "owner-b@browser.local";
+const OWNER_B_PASSWORD = "owner-b-browser-fixture";
 
 async function createPilotLiveFixture(writeEnabled: boolean): Promise<PilotLiveContext> {
   const externalRequests: string[] = [];
@@ -54,9 +61,49 @@ async function createPilotLiveFixture(writeEnabled: boolean): Promise<PilotLiveC
     const fixture = await createLiveFixture({
       makeApiFixture: async () => {
         const baseApi = await makeApiFixture();
+        const ownerAToken = randomBytes(32).toString("base64url");
+        const ownerBToken = randomBytes(32).toString("base64url");
+        const tokenOwners = new Map<string, string>([
+          [ownerAToken, baseApi.userId],
+          [ownerBToken, OWNER_B_ID],
+        ]);
+        const tokenFor = (userId: string): string => {
+          if (userId === baseApi.userId) return ownerAToken;
+          if (userId === OWNER_B_ID) return ownerBToken;
+          throw new Error("Unknown browser fixture principal");
+        };
+        const sessionStore: SessionAuthority = {
+          async login(email: string, password: string) {
+            if (email === baseApi.email && password === baseApi.password)
+              return ownerAToken;
+            if (email === OWNER_B_EMAIL && password === OWNER_B_PASSWORD)
+              return ownerBToken;
+            throw new Error("Invalid browser fixture credentials");
+          },
+          async issue(userId: string, _metadata: SessionMetadata) {
+            return tokenFor(userId);
+          },
+          authenticate(input: SessionInput) {
+            const authorization = typeof input === "string"
+              ? input
+              : input?.authorization;
+            const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? "")?.[1];
+            const userId = token ? tokenOwners.get(token) : undefined;
+            if (!userId) throw new Error("Authentication required");
+            return userId;
+          },
+          revoke(input: SessionInput) {
+            const authorization = typeof input === "string"
+              ? input
+              : input?.authorization;
+            const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? "")?.[1];
+            if (!token || !tokenOwners.delete(token))
+              throw new Error("Authentication required");
+          },
+        };
         const policy: PilotPolicy = {
           enabled: true,
-          principals: [baseApi.userId],
+          principals: [baseApi.userId, OWNER_B_ID],
           spreadsheetId: "sheet-pilot-001",
           tabId: "tab-001",
           boardId: "board-pilot",
@@ -74,6 +121,30 @@ async function createPilotLiveFixture(writeEnabled: boolean): Promise<PilotLiveC
         const pilotApi = createApi({
           db: baseApi.db,
           config: baseApi.config,
+          sessionStore,
+          identityLookup: async (userId) => {
+            if (userId === OWNER_B_ID) {
+              return {
+                user_id: OWNER_B_ID,
+                email: OWNER_B_EMAIL,
+                display_name: "Browser owner B",
+                roles: ["user"],
+              };
+            }
+            const rows = await baseApi.db.client<Array<{
+              id: string; email: string; display_name: string | null; roles: string[];
+            }>>`SELECT id,email,display_name,roles FROM users WHERE id=${userId}`;
+            const user = rows[0];
+            if (!user) throw new Error("Authentication principal not found");
+            return {
+              user_id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              roles: user.roles?.length
+                ? user.roles.filter((role): role is "user" | "operator" => role === "user" || role === "operator")
+                : ["user"],
+            };
+          },
           pilotConfig,
           pilotPolicy: policy,
           pilotLiveWriteEnabled: writeEnabled,
@@ -106,7 +177,12 @@ async function createPilotLiveFixture(writeEnabled: boolean): Promise<PilotLiveC
         };
       },
     });
-    return { ...fixture, externalRequests, trelloPosts };
+    return {
+      ...fixture,
+      externalRequests,
+      trelloPosts,
+      ownerB: { userId: OWNER_B_ID, email: OWNER_B_EMAIL, password: OWNER_B_PASSWORD },
+    };
   } catch (error) {
     globalThis.fetch = realFetch;
     throw error;

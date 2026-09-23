@@ -21,6 +21,10 @@ import type {
   PilotApproveInput,
   PilotApproveResponse,
   PilotCatalogResponse,
+  PilotCheckInput,
+  PilotCheckResponse,
+  PilotLookupInput,
+  PilotLookupResponse,
 } from "./pilot-contracts.js";
 
 export type {
@@ -30,6 +34,10 @@ export type {
   PilotApproveInput,
   PilotApproveResponse,
   PilotCatalogResponse,
+  PilotCheckInput,
+  PilotCheckResponse,
+  PilotLookupInput,
+  PilotLookupResponse,
 };
 
 export type RunDetail = z.infer<typeof RunDetailSchema>;
@@ -77,6 +85,8 @@ export interface Transport {
     signal: AbortSignal,
   ): Promise<PilotApproveResponse>;
   getPilotCatalog?(signal: AbortSignal): Promise<PilotCatalogResponse>;
+  checkPilotRequest?(input: PilotCheckInput, signal: AbortSignal): Promise<PilotCheckResponse>;
+  lookupPilotCard?(input: PilotLookupInput, signal: AbortSignal): Promise<PilotLookupResponse>;
 }
 
 export interface FixtureCall {

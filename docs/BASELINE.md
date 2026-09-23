@@ -9,12 +9,12 @@ ghi các lỗi chặn. SaaS/AI live vẫn cần tài nguyên, quyền và ngân 
 | Thành phần | Phạm vi đích đã duyệt | Trạng thái thực thi v2 |
 |---|---|---|
 | Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Mã và test owner-scope có; nghiệm thu với người dùng đại diện `OPEN` |
-| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | `PARTIAL_CODE`: API/UI pilot có; UC1 refusal, UC3 lookup và luồng AI chưa chứng minh end-to-end |
+| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | UC1 checklist clarification/refusal và UC3 linked-card lookup đã qua API/PostgreSQL + Chromium browser tests với Sheets/Trello giả; AI source-aware và SaaS live chưa được chứng minh |
 | Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | Adapter/test giả lập có; `SAAS_LIVE_NOT_RUN` |
 | AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; `AI_QUALITY_NOT_RUN` |
 | Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; live write mặc định tắt và SaaS thật chưa chạy |
 | Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Reservation PostgreSQL có; `claimDispatched` chỉ nhận `reserved`, runner không POST lại intent `confirmed`; integration test PostgreSQL đạt |
-| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | UC2 browser local đã qua 4 ca với API/PostgreSQL cô lập và Sheets/Trello giả; review interaction delta và nghiệm thu đại diện vẫn `OPEN` |
+| UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | Owner isolation và UC1/UC3 browser local đã qua cùng 5 ca UC2 approval trên API/PostgreSQL cô lập; nghiệm thu với người dùng đại diện vẫn `OPEN` |
 | Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | Dataset 40 biến thể + 20 holdout có; mô phỏng không phải AI quality; `CUSTOMER_VALIDATED=NOT_RUN` |
 
 Không mở: email/Slack/WhatsApp thật, ghi ngược Sheet, scheduler/batch/loop,

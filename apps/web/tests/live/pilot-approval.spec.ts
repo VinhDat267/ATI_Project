@@ -50,6 +50,95 @@ async function createPilotRun(context: {
 }
 
 test.describe("Pilot approval with real API and isolated PostgreSQL", () => {
+  test("keeps the run preview private to its owner in Chromium", async ({
+    browser, page, pilotContext,
+  }) => {
+    test.setTimeout(60_000);
+    const { runId } = await createPilotRun(pilotContext);
+    const snapshot = async () => {
+      const rows = await pilotContext.api.db!.client<{
+        status: string;
+        next_event_seq: number;
+        decision: string;
+        decided_at: Date | null;
+        snapshot_hash: string;
+        reservations: number;
+      }>`SELECT r.status, r.next_event_seq, a.decision, a.decided_at, a.snapshot_hash,
+                (SELECT count(*)::int FROM business_reservations WHERE run_id = r.id) AS reservations
+         FROM runs r JOIN pilot_approvals a ON a.run_id = r.id WHERE r.id = ${runId}`;
+      expect(rows).toHaveLength(1);
+      return rows[0];
+    };
+    const before = await snapshot();
+    expect(before?.status).toBe("awaiting_approval");
+    expect(before?.decision).toBe("pending");
+
+    await signIn(page, pilotContext);
+    const ownerAResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/pilot/v2/runs/${runId}`) &&
+      response.request().method() === "GET",
+    );
+    await page.goto(`${pilotContext.previewUrl}/#/pilot/runs/${runId}`);
+    expect((await ownerAResponse).status()).toBe(200);
+    const ownerAGate = page.getByRole("region", { name: "Cổng phê duyệt kế hoạch" });
+    await expect(ownerAGate).toBeVisible();
+    await expect(ownerAGate).toContainText("Update /landing page");
+    await expect(ownerAGate.getByRole("button", { name: "Phê duyệt & Tạo thẻ ngay" })).toBeVisible();
+
+    const ownerBPage = await browser.newPage();
+    try {
+      await signIn(ownerBPage, {
+        previewUrl: pilotContext.previewUrl,
+        email: pilotContext.ownerB.email,
+        password: pilotContext.ownerB.password,
+      });
+      const ownerBResponse = ownerBPage.waitForResponse((response) =>
+        response.url().endsWith(`/pilot/v2/runs/${runId}`) &&
+        response.request().method() === "GET",
+      );
+      await ownerBPage.goto(`${pilotContext.previewUrl}/#/pilot/runs/${runId}`);
+      expect((await ownerBResponse).status()).toBe(404);
+      await expect(ownerBPage.getByText("Không tải được dữ liệu")).toBeVisible();
+      await expect(ownerBPage.getByRole("region", { name: "Cổng phê duyệt kế hoạch" })).toHaveCount(0);
+      await expect(ownerBPage.getByRole("button", { name: "Phê duyệt & Tạo thẻ ngay" })).toHaveCount(0);
+      await expect(ownerBPage.getByRole("button", { name: "Từ chối thực hiện" })).toHaveCount(0);
+
+      const ownerBLogin = await fetch(`${pilotContext.api.baseUrl}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: pilotContext.ownerB.email,
+          password: pilotContext.ownerB.password,
+        }),
+      });
+      expect(ownerBLogin.status).toBe(200);
+      const { token: ownerBToken } = await ownerBLogin.json() as { token: string };
+      const directApproval = await fetch(
+        `${pilotContext.api.baseUrl.replace(/\/api\/v1$/, "/pilot/v2")}/runs/${runId}/approve`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${ownerBToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            approvalId: "00000000-0000-4000-8000-000000000099",
+            versionId: "00000000-0000-4000-8000-000000000098",
+            snapshotHash: "0".repeat(64),
+            decision: "approved",
+          }),
+        },
+      );
+      expect(directApproval.status).toBe(404);
+    } finally {
+      await ownerBPage.context().close();
+    }
+
+    expect(await snapshot()).toEqual(before);
+    expect(pilotContext.externalRequests).toEqual([]);
+    expect(pilotContext.trelloPosts).toEqual([]);
+  });
+
   test("creates a run in the UI, displays durable preview, and rejects once", async ({
     page, pilotContext,
   }) => {

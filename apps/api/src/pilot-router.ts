@@ -9,6 +9,10 @@ import {
   executePilotWorkflow,
   PostgresReservationStore,
   PilotCreateRunBodySchema,
+  PilotCheckBodySchema,
+  PilotCheckResponseSchema,
+  PilotLookupBodySchema,
+  PilotLookupResponseSchema,
   PilotApproveBodySchema,
   PilotRunAcceptedResponseSchema,
   PilotRunDetailResponseSchema,
@@ -18,6 +22,8 @@ import {
   type ReadSheetsRequestResult,
   type SourceRow,
   type PilotToolEntry,
+  createIntentKey,
+  trelloGetCard,
 } from "@wap/engine";
 import { HttpError, readJson, writeJson } from "./http.js";
 import type { SessionAuthority } from "./auth.js";
@@ -139,6 +145,176 @@ export function createPilotRouter(options: PilotRouterOptions) {
       });
 
       writeJson(response, 200, catalogPayload, requestId);
+      return;
+    }
+
+    // Read-only UC1 intake check. This endpoint never creates a run or approval.
+    if (path === "/check") {
+      if (request.method !== "POST") {
+        response.setHeader("allow", "POST");
+        throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+      }
+
+      const parsedBody = PilotCheckBodySchema.safeParse(await readJson(request));
+      if (!parsedBody.success) throw new HttpError(400, "INVALID_BODY", "Invalid pilot check request");
+      const body = parsedBody.data;
+      assertPilotAccess(policy, userId, {
+        kind: "source",
+        spreadsheetId: body.spreadsheetId,
+        tabId: body.tabId,
+      });
+
+      let intake: ReadSheetsRequestResult;
+      try {
+        intake = await readSheetsFn({
+          config,
+          policy,
+          principalId: userId,
+          spreadsheetId: body.spreadsheetId,
+          tabId: body.tabId,
+          requestId: body.requestId,
+        });
+      } catch {
+        throw new HttpError(422, "INTAKE_UNAVAILABLE", "Không thể kiểm tra yêu cầu trong nguồn đã cho");
+      }
+
+      const directiveContext = [
+        body.userPrompt,
+        intake.row.raw_request,
+        intake.row.deliverable,
+        intake.row.source_note,
+      ].join("\n");
+      const unsafeDirective = /\b(ignore|bypass|skip|override)\b.{0,50}\b(approval|policy|instruction|check|safety)\b|\b(send|email|notify)\b.{0,50}\b(external|outside|smtp)\b|\b(reveal|print|share|expose)\b.{0,30}\b(api[ -]?key|token|password|secret|credential)\b|bỏ qua.{0,40}(kiểm tra|phê duyệt|quy trình|quy tắc)|tự động.{0,30}(gửi|tạo).{0,25}(thẻ|card)|không cần.{0,25}(duyệt|phê duyệt)/i.test(directiveContext);
+      const unsupportedAction = /\b(?:email|smtp|slack|whatsapp)\b.{0,60}\b(?:send|notify|message|post)\b|\b(?:send|notify|message|post)\b.{0,60}\b(?:email|smtp|slack|whatsapp)\b/i.test(directiveContext);
+      const refusalReason = unsafeDirective
+        ? "Yêu cầu có chỉ thị vượt qua phê duyệt hoặc tiết lộ thông tin nhạy cảm."
+        : unsupportedAction || intake.checklist.status === "refusal"
+          ? "Yêu cầu nằm ngoài các thao tác được hỗ trợ trong pilot."
+          : null;
+      const status = refusalReason
+        ? "refused"
+        : intake.checklist.status === "needs_input" || intake.checklist.unconfirmedBusiness
+          ? "needs_input"
+          : "checked";
+      const payload = PilotCheckResponseSchema.parse({
+        status,
+        sourceKey: intake.sourceKey,
+        sourceRevision: intake.sourceRevision,
+        checklistResult: {
+          valid: status === "checked",
+          unconfirmedBusiness: intake.checklist.unconfirmedBusiness,
+          missingFields: intake.checklist.missingFields,
+          conflicts: intake.checklist.conflicts,
+          evidences: intake.checklist.evidencePositions,
+          summary: intake.checklist.summary,
+        },
+        summary: status === "checked" ? intake.checklist.summary : null,
+        clarificationQuestion: status === "needs_input"
+          ? `Vui lòng bổ sung hoặc xác nhận: ${intake.checklist.missingFields.join(", ") || intake.checklist.conflicts.join(", ")}.`
+          : null,
+        refusalReason,
+      });
+      writeJson(response, 200, payload, requestId);
+      return;
+    }
+
+    // Read-only UC3 lookup. The browser supplies source identity only; the
+    // linked Trello card ID is resolved from a confirmed durable reservation.
+    if (path === "/lookup") {
+      if (request.method !== "POST") {
+        response.setHeader("allow", "POST");
+        throw new HttpError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+      }
+
+      const parsedBody = PilotLookupBodySchema.safeParse(await readJson(request));
+      if (!parsedBody.success) throw new HttpError(400, "INVALID_BODY", "Invalid pilot lookup request");
+      const body = parsedBody.data;
+      assertPilotAccess(policy, userId, {
+        kind: "source",
+        spreadsheetId: body.spreadsheetId,
+        tabId: body.tabId,
+      });
+
+      let intake: ReadSheetsRequestResult;
+      try {
+        intake = await readSheetsFn({
+          config,
+          policy,
+          principalId: userId,
+          spreadsheetId: body.spreadsheetId,
+          tabId: body.tabId,
+          requestId: body.requestId,
+        });
+      } catch {
+        throw new HttpError(422, "INTAKE_UNAVAILABLE", "Không thể tra cứu yêu cầu trong nguồn đã cho");
+      }
+
+      const createIntentKeyForSource = createIntentKey({
+        groupId: config.boardId,
+        spreadsheetId: body.spreadsheetId,
+        tabId: body.tabId,
+        requestId: intake.row.request_id,
+      }, policy.boardId);
+      const reservations = await db.client<Array<{
+        intent_key: string;
+        status: string;
+        remote_id: string | null;
+      }>>`
+        SELECT intent_key, status, remote_id
+        FROM business_reservations
+        WHERE source_key = ${intake.sourceKey} AND board_id = ${policy.boardId}
+          AND intent_key IN (${createIntentKeyForSource}, ${intake.sourceKey})
+        ORDER BY created_at
+        LIMIT 2
+      `;
+      let lookupStatus: "found" | "not_linked" | "unknown" | "reconciliation_required" = "not_linked";
+      let card: {
+        id: string; name: string; description: string; listId: string;
+        due: string | null; members: string[]; url: string;
+      } | null = null;
+
+      if (reservations.length > 1) {
+        lookupStatus = "unknown";
+      } else if (reservations[0]) {
+        const reservation = reservations[0];
+        if (reservation.status === "confirmed" && reservation.remote_id) {
+          try {
+            const current = await trelloGetCard({
+              config, policy, principalId: userId, cardId: reservation.remote_id,
+            });
+            lookupStatus = "found";
+            card = {
+              id: current.id,
+              name: current.name,
+              description: current.desc,
+              listId: current.idList,
+              due: current.due,
+              members: current.idMembers,
+              url: current.url,
+            };
+          } catch (err: unknown) {
+            if (err instanceof Error && (
+              err.message === "CARD_NOT_FOUND" ||
+              ("statusCode" in err && Number(err.statusCode) === 404)
+            )) {
+              lookupStatus = "unknown";
+            } else {
+              throw new HttpError(502, "LOOKUP_UNAVAILABLE", "Không thể xác minh trạng thái card đã liên kết");
+            }
+          }
+        } else if (["reserved", "dispatched", "unknown"].includes(reservation.status)) {
+          lookupStatus = "reconciliation_required";
+        } else if (reservation.status !== "cancelled") {
+          lookupStatus = "unknown";
+        }
+      }
+
+      const payload = PilotLookupResponseSchema.parse({
+        status: lookupStatus,
+        sourceKey: intake.sourceKey,
+        card,
+      });
+      writeJson(response, 200, payload, requestId);
       return;
     }
 
@@ -363,7 +539,18 @@ export function createPilotRouter(options: PilotRouterOptions) {
       };
 
       // Query reservation/receipt if available
-      const reservation = await store.getReservation(snapshot.source_key);
+      const snapshotRow = snapshot.raw_data as SourceRow;
+      const canonicalIntentKey = snapshotRow?.request_id
+        ? createIntentKey({
+            groupId: config.boardId,
+            spreadsheetId: config.spreadsheetId,
+            tabId: config.tabId,
+            requestId: snapshotRow.request_id,
+          }, policy.boardId)
+        : null;
+      const reservation = (canonicalIntentKey
+        ? await store.getReservation(canonicalIntentKey)
+        : null) ?? await store.getReservation(snapshot.source_key);
       let preview = null;
       if (run.status === "awaiting_approval") {
         if (!snapshotRows[0]) {
@@ -532,8 +719,15 @@ export function createPilotRouter(options: PilotRouterOptions) {
         `;
         // Commit the approval and non-retryable run state before any remote write.
         await setPilotRunStatus(tx, runId, "running", "awaiting_approval");
+        const sourceRow = snapshot.raw_data as SourceRow;
+        const intentKey = createIntentKey({
+          groupId: config.boardId,
+          spreadsheetId: config.spreadsheetId,
+          tabId: config.tabId,
+          requestId: sourceRow.request_id,
+        }, policy.boardId);
         return {
-          kind: "approved", plan, sourceKey: snapshot.source_key,
+          kind: "approved", plan, sourceKey: snapshot.source_key, intentKey,
           expiresAt: new Date(approval.expires_at),
         } as const;
       });
@@ -560,7 +754,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
           dueDate: claim.plan.dueDate,
           listName: claim.plan.listName,
           listId: claim.plan.listId,
-          intentKey: claim.sourceKey,
+          intentKey: claim.intentKey,
           sourceKey: claim.sourceKey,
         });
       } catch {

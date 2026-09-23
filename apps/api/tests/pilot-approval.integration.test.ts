@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createApi } from "../src/app.js";
 import { makeApiFixture } from "./fixture.js";
 import {
-  evaluateChecklist, sourceKey,
+  evaluateChecklist, sourceKey, createIntentKey,
   type PilotConfig, type PilotPolicy, type SourceRow,
 } from "@wap/engine";
 
@@ -36,6 +36,10 @@ async function harness(writeEnabled = true) {
     groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
     tabId: policy.tabId, requestId: row.request_id,
   });
+  const intentKey = createIntentKey({
+    groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
+    tabId: policy.tabId, requestId: row.request_id,
+  }, policy.boardId);
   const api = createApi({
     db: fixture.db, config: fixture.config,
     pilotConfig, pilotPolicy: policy,
@@ -85,7 +89,7 @@ async function harness(writeEnabled = true) {
       }),
     });
   return {
-    fixture, api, pilotUrl, headers, create, detail, decide, pilotConfig,
+    fixture, api, pilotUrl, headers, create, detail, decide, pilotConfig, intentKey,
     async close() { await api.close(); await fixture.close(); },
   };
 }
@@ -315,7 +319,7 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
       expect((await h.fixture.db.client`
         SELECT decision FROM pilot_approvals WHERE run_id = ${runId}`)[0]?.decision).toBe("approved");
       expect((await h.fixture.db.client`
-        SELECT status, remote_id FROM business_reservations WHERE intent_key = ${detail.sourceKey}`)[0])
+        SELECT status, remote_id FROM business_reservations WHERE intent_key = ${h.intentKey}`)[0])
         .toMatchObject({ status: "confirmed", remote_id: "card-pilot-1" });
 
       const replay = await h.decide(runId, "approved", detail.preview);
@@ -386,7 +390,7 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
       expect(response.status).toBe(200);
       expect((await response.json() as any).status).toBe("reconciliation_required");
       expect((await h.fixture.db.client`
-        SELECT status FROM business_reservations WHERE intent_key = ${detail.sourceKey}`)[0]?.status)
+        SELECT status FROM business_reservations WHERE intent_key = ${h.intentKey}`)[0]?.status)
         .toBe("unknown");
       expect((await h.detail(runId)).status).toBe("reconciliation_required");
       const replay = await h.decide(runId, "approved", detail.preview);

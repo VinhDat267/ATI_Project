@@ -32,6 +32,12 @@ import {
   type PilotApproveInput,
   type PilotApproveResponse,
   type PilotCatalogResponse,
+  type PilotCheckInput,
+  type PilotCheckResponse,
+  type PilotLookupInput,
+  type PilotLookupResponse,
+  PilotCheckResponseSchema,
+  PilotLookupResponseSchema,
 } from "./pilot-contracts.js";
 import { ClientError } from "./errors.js";
 
@@ -366,6 +372,20 @@ export function createHttpTransport(
         signal,
         { isWrite: false },
       );
+    },
+
+    checkPilotRequest(input: PilotCheckInput, signal: AbortSignal): Promise<PilotCheckResponse> {
+      return request("POST", "/pilot/v2/check", PilotCheckResponseSchema, signal, {
+        body: input,
+        isWrite: true,
+      });
+    },
+
+    lookupPilotCard(input: PilotLookupInput, signal: AbortSignal): Promise<PilotLookupResponse> {
+      return request("POST", "/pilot/v2/lookup", PilotLookupResponseSchema, signal, {
+        body: input,
+        isWrite: true,
+      });
     },
   };
 }

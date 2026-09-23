@@ -87,6 +87,54 @@ export const PilotCreateRunBodySchema = z.object({
 
 export type PilotCreateRunBody = z.infer<typeof PilotCreateRunBodySchema>;
 
+export const PilotCheckBodySchema = z.object({
+  spreadsheetId: z.string().min(1),
+  tabId: z.string().min(1),
+  requestId: z.string().min(1),
+  userPrompt: z.string().min(1).max(2000),
+}).strict();
+
+export const PilotCheckResponseSchema = z.object({
+  status: z.enum(['checked', 'needs_input', 'refused']),
+  sourceKey: z.string().min(1),
+  sourceRevision: z.string().length(64),
+  checklistResult: z.object({
+    valid: z.boolean(),
+    unconfirmedBusiness: z.boolean(),
+    missingFields: z.array(z.string()),
+    conflicts: z.array(z.string()),
+    evidences: z.record(z.string(), z.string()),
+    summary: z.string(),
+  }).strict(),
+  summary: z.string().nullable(),
+  clarificationQuestion: z.string().nullable(),
+  refusalReason: z.string().nullable(),
+}).strict();
+
+export type PilotCheckResponse = z.infer<typeof PilotCheckResponseSchema>;
+
+export const PilotLookupBodySchema = z.object({
+  spreadsheetId: z.string().min(1),
+  tabId: z.string().min(1),
+  requestId: z.string().min(1),
+}).strict();
+
+export const PilotLookupResponseSchema = z.object({
+  status: z.enum(['found', 'not_linked', 'unknown', 'reconciliation_required']),
+  sourceKey: z.string().min(1),
+  card: z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    description: z.string(),
+    listId: z.string().min(1),
+    due: z.string().nullable(),
+    members: z.array(z.string()),
+    url: z.string().url(),
+  }).strict().nullable(),
+}).strict();
+
+export type PilotLookupResponse = z.infer<typeof PilotLookupResponseSchema>;
+
 export const PilotRunAcceptedResponseSchema = z.object({
   runId: z.string().uuid(),
   status: z.literal('planning'),

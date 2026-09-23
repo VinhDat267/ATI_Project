@@ -143,9 +143,11 @@ thông tin thiếu/đích/preview và link thật vào luồng; không chọn vi
 mới. Làm needs_input → draft/run mới, busy, expiry, unknown và connection unavailable
 dễ hiểu. Không mở chức năng share history hoặc approval chéo.
 
-Gate: browser UC1–3; hai principal không truy cập run nhau; live không fallback;
-refresh/polling/relogin không tạo write mới. Dữ liệu giữ lại giữa các phiên pilot
-trừ khi user chủ động cho phép cleanup, khác fixture tự dọn của integration test.
+Gate: local browser UC1 checklist clarification/refusal, UC3 linked-card lookup và
+owner isolation đã qua với API/PostgreSQL cô lập cùng Sheets/Trello giả. Còn cần
+hoàn tất các biến thể UC2, kiểm live không fallback, và xác minh refresh/polling/
+relogin không tạo write mới trước khi đóng toàn bộ P4. Dữ liệu giữ lại giữa các
+phiên pilot trừ khi user chủ động cho phép cleanup, khác fixture tự dọn của integration test.
 
 ### P5 — Thực nghiệm và bàn giao môn học
 

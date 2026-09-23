@@ -4,6 +4,7 @@ import { Banner } from "../../components/Banner";
 import { Button } from "../../components/Button";
 import { Icon, type IconName } from "../../components/Icon";
 import { navigate, routeToHash } from "../../../core/navigation.js";
+import type { PilotCheckResponse, PilotLookupResponse } from "../../../core/pilot-contracts.js";
 
 type CategoryFilter = "all" | "uc2" | "uc1_clarification" | "uc3" | "uc1_refusal";
 
@@ -141,6 +142,10 @@ export function PilotNewRunView() {
   );
 
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [checkResult, setCheckResult] = useState<PilotCheckResponse | null>(null);
+  const [lookupResult, setLookupResult] = useState<PilotLookupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSelectPreset = (preset: PresetCase) => {
@@ -195,6 +200,56 @@ export function PilotNewRunView() {
     } finally {
       scope.dispose();
       setLoading(false);
+    }
+  };
+
+  const sourceIdentity = () => ({
+    spreadsheetId: spreadsheetId.trim() || "sheet-pilot-001",
+    tabId: tabId.trim() || "tab-001",
+    requestId: requestId.trim(),
+  });
+
+  const handleCheck = async () => {
+    if (!requestId.trim() || !userPrompt.trim() || !transport.checkPilotRequest) {
+      setError(!transport.checkPilotRequest
+        ? "Hệ thống hiện tại không hỗ trợ kiểm tra yêu cầu Pilot v2"
+        : "Vui lòng nhập mã và mô tả yêu cầu");
+      return;
+    }
+    setChecking(true);
+    setError(null);
+    setCheckResult(null);
+    const scope = session.beginRequest();
+    try {
+      setCheckResult(await transport.checkPilotRequest({
+        ...sourceIdentity(), userPrompt: userPrompt.trim(),
+      }, scope.signal));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      scope.dispose();
+      setChecking(false);
+    }
+  };
+
+  const handleLookup = async () => {
+    if (!requestId.trim() || !transport.lookupPilotCard) {
+      setError(!transport.lookupPilotCard
+        ? "Hệ thống hiện tại không hỗ trợ tra cứu card Pilot v2"
+        : "Vui lòng nhập mã yêu cầu");
+      return;
+    }
+    setLookingUp(true);
+    setError(null);
+    setLookupResult(null);
+    const scope = session.beginRequest();
+    try {
+      setLookupResult(await transport.lookupPilotCard(sourceIdentity(), scope.signal));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      scope.dispose();
+      setLookingUp(false);
     }
   };
 
@@ -420,6 +475,22 @@ export function PilotNewRunView() {
 
           <div className="flex items-center gap-3">
             <Button
+              type="button"
+              disabled={checking || loading || lookingUp}
+              onClick={handleCheck}
+              className="h-12 px-5"
+            >
+              {checking ? "Đang kiểm tra…" : "Kiểm tra yêu cầu"}
+            </Button>
+            <Button
+              type="button"
+              disabled={lookingUp || loading || checking}
+              onClick={handleLookup}
+              className="h-12 px-5"
+            >
+              {lookingUp ? "Đang tra cứu…" : "Tra cứu card đã tạo"}
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
               className="h-12 px-6"
@@ -439,6 +510,36 @@ export function PilotNewRunView() {
           </div>
         </div>
       </form>
+
+      {checkResult ? (
+        <section aria-label="Kết quả kiểm tra yêu cầu" className="rounded-md border border-hairline bg-surface-soft p-5 shadow-card">
+          <h2 className="m-0 text-title-md font-semibold text-ink">Kết quả kiểm tra yêu cầu</h2>
+          <p className="mt-2 text-body-md text-ink" role="status">
+            {checkResult.status === "needs_input" ? "Cần bổ sung thông tin" : checkResult.status === "refused" ? "Yêu cầu bị từ chối" : "Yêu cầu đạt checklist"}
+          </p>
+          <p className="text-body-sm text-muted">{checkResult.refusalReason ?? checkResult.clarificationQuestion ?? checkResult.summary ?? checkResult.checklistResult.summary}</p>
+          {checkResult.checklistResult.missingFields.length ? (
+            <p className="text-body-sm text-muted">Thiếu: {checkResult.checklistResult.missingFields.join(", ")}</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {lookupResult ? (
+        <section aria-label="Kết quả tra cứu card" className="rounded-md border border-hairline bg-surface-soft p-5 shadow-card">
+          <h2 className="m-0 text-title-md font-semibold text-ink">Kết quả tra cứu card</h2>
+          {lookupResult.status === "found" && lookupResult.card ? (
+            <div className="mt-2">
+              <p className="m-0 text-body-md font-semibold text-ink">{lookupResult.card.name}</p>
+              <p className="text-body-sm text-muted">Trạng thái hiện tại · danh sách {lookupResult.card.listId}</p>
+              <a href={lookupResult.card.url} target="_blank" rel="noreferrer" className="text-action underline">Mở card Trello</a>
+            </div>
+          ) : (
+            <p role="status" className="mt-2 text-body-sm text-muted">
+              {lookupResult.status === "not_linked" ? "Chưa có card được liên kết với yêu cầu này." : lookupResult.status === "reconciliation_required" ? "Kết quả tạo card đang cần đối soát; chưa thể xác nhận trạng thái." : "Chưa thể xác minh card đã liên kết."}
+            </p>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
