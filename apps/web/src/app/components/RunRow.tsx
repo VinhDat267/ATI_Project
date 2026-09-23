@@ -8,36 +8,43 @@ import {
 } from "../../core/presentation.js";
 import { StatusPill } from "./StatusPill";
 
+const SERVER_LABELS: Record<string, string> = {
+  sheets: "Google Sheets",
+  trello: "Trello",
+  "pilot-gateway": "Cổng kết nối",
+};
+
 /** Secondary line built only from data the list already has (spec V04). */
 export function runSubline(
   run: RunDetail,
   reconciliation?: Reconciliation,
 ): string {
   const planner = run.planner_result;
-  if (planner?.kind === "refusal") return `Hệ thống trả lời: “${planner.reason}”`;
-  if (planner?.kind === "clarification") return `Hệ thống hỏi: “${planner.question}”`;
-  if (!run.plan) return "Chưa có kế hoạch";
+  if (planner?.kind === "refusal") return `Trợ lý AI phản hồi: “${planner.reason}”`;
+  if (planner?.kind === "clarification") return `Trợ lý AI cần hỏi: “${planner.question}”`;
+  if (!run.plan) return "Đang phân tích yêu cầu…";
 
   const { steps, writes } = planCounts(run);
   const servers = [...new Set(run.plan.steps.map((step) => step.tool.server))];
+  const serverNames = servers.map((s) => SERVER_LABELS[s] || s).join(", ");
   const parts = [
     `${steps} bước`,
-    writes > 0 ? `${writes} thao tác ghi` : "chỉ đọc",
-    servers.join(", "),
+    writes > 0 ? `${writes} cập nhật dữ liệu` : "Chỉ tổng hợp thông tin",
+    serverNames,
   ];
   if (run.status === "awaiting_approval" && run.approval) {
-    parts.push(`Hết hạn duyệt lúc ${formatClock(run.approval.expires_at, run.time_zone).slice(0, 5)}`);
+    parts.push(`Hạn duyệt: ${formatClock(run.approval.expires_at, run.time_zone).slice(0, 5)}`);
   }
   if (run.status === "expired" && run.approval) {
-    parts.push(`hết hạn lúc ${formatClock(run.approval.expires_at, run.time_zone)}`);
+    parts.push(`Hết hạn lúc ${formatClock(run.approval.expires_at, run.time_zone)}`);
   }
   if (run.status === "reconciliation_required" && reconciliation) {
     const open = reconciliation.operations.filter((op) => op.receipt !== "confirmed").length;
     parts.push(
-      open > 0 ? `${open} thao tác ghi chưa rõ kết quả` : "đã xác nhận khi đối chiếu",
+      open > 0 ? `${open} thay đổi cần kiểm tra lại` : "Đã đồng bộ an toàn",
     );
   }
-  return parts.join(" · ");
+  return parts.filter(Boolean).join(" · ");
 }
 
 export function RunRow({
@@ -63,7 +70,7 @@ export function RunRow({
         </span>
         <span className="flex gap-3 text-body-sm text-muted desk:flex-col desk:items-end desk:gap-1">
           <span className="tabular">{created}</span>
-          <span className="font-mono text-mono-sm">{shortId(run.run_id)}</span>
+          <span className="font-mono text-mono-sm">#{shortId(run.run_id)}</span>
         </span>
       </a>
     </li>

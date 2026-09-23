@@ -1,7 +1,6 @@
 import type { Reconciliation, RunDetail } from "../../core/contracts.js";
 import { routeToHash } from "../../core/navigation.js";
 import {
-  formatClock,
   formatDateTime,
   formatRemaining,
   isTerminal,
@@ -32,26 +31,27 @@ function AttentionCard({
       : null;
   const when = awaiting
     ? remaining && !remaining.expired
-      ? `Hết hạn sau ${remaining.text}${run.approval ? ` (${formatClock(run.approval.expires_at, run.time_zone)})` : ""}`
-      : "Đã hết thời hạn duyệt"
+      ? `Còn ${remaining.text}`
+      : "Đã hết hạn"
     : run.created_at
-      ? `Tạo lúc ${formatDateTime(run.created_at, run.time_zone)}`
+      ? formatDateTime(run.created_at, run.time_zone)
       : "";
   const detail = awaiting
-    ? `${writes} thao tác ghi đang chờ quyết định.`
+    ? `${writes} thay đổi dữ liệu đang chờ bạn xem và phê duyệt.`
     : open === undefined
-      ? "Chưa tải được kết quả đối chiếu. Mở để kiểm tra bảng đích."
-      : `${open} thao tác ghi chưa thấy trên nơi nhận. Kiểm tra bảng đích trước khi tạo lại.`;
-  const action = awaiting ? "Xem và duyệt" : "Mở đối chiếu";
+      ? "Đang chờ đồng bộ kết quả. Mở để kiểm tra."
+      : `${open} cập nhật chưa thể xác nhận trên bảng đích. Vui lòng kiểm tra.`;
+  const action = awaiting ? "Xem & duyệt" : "Kiểm tra ngay";
 
   return (
     <li>
       <a
         href={routeToHash({ page: "run", id: run.run_id })}
+        aria-label={`${action}: ${run.source_prompt} (${awaiting ? "Chờ phê duyệt" : "Cần đối chiếu"}${when ? `, ${when}` : ""})`}
         className={cn(
           "flex h-full flex-col gap-3 rounded-md bg-surface-soft p-6 no-underline shadow-card transition-all duration-200 hover:shadow-lg",
           awaiting
-            ? "border-2 border-action bg-surface-soft hover:border-action"
+            ? "border-2 border-action/60 bg-surface-soft hover:border-action"
             : "border border-hairline hover:border-ink"
         )}
       >
@@ -59,7 +59,7 @@ function AttentionCard({
           <StatusPill status={run.status} />
           <span className="tabular text-body-sm text-muted">{when}</span>
         </span>
-        <h3 className="m-0 text-title-md">{run.source_prompt}</h3>
+        <h3 className="m-0 line-clamp-2 text-title-md">{run.source_prompt}</h3>
         <span className="text-body-md text-muted">{detail}</span>
         <span
           className={cn(
@@ -82,15 +82,8 @@ export function OverviewView() {
   const now = useNow(1000);
 
   const header = (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-display-md-mobile desk:text-display-md">Tổng quan</h1>
-        {list.data ? (
-          <p className="m-0 text-body-md text-muted">
-            {list.data.length} lần chạy đã tải · thời gian hiển thị là lúc tạo yêu cầu
-          </p>
-        ) : null}
-      </div>
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <h1 className="m-0 text-display-md-mobile desk:text-display-md">Tổng quan</h1>
       <ButtonLink href={routeToHash({ page: "new" })} size="sm">
         <Icon name="plus" />
         Tạo yêu cầu
@@ -122,12 +115,12 @@ export function OverviewView() {
         {header}
         <EmptyState
           icon="message"
-          title="Chưa có lần chạy nào"
+          title="Chưa có công việc nào"
           action={
             <ButtonLink href={routeToHash({ page: "new" })}>Tạo yêu cầu đầu tiên</ButtonLink>
           }
         >
-          Mô tả việc cần làm; hệ thống lập kế hoạch và cho bạn xem trước trước khi ghi.
+          Tạo yêu cầu đầu tiên để trợ lý AI bắt đầu tự động hoá công việc giúp bạn.
         </EmptyState>
       </>
     );
@@ -140,7 +133,6 @@ export function OverviewView() {
   const recent = runs
     .filter((run) => !attentionIds.has(run.run_id) && isTerminal(run.status))
     .slice(0, 6);
-  const hasActive = runs.some((run) => !isTerminal(run.status));
 
   const totalRuns = runs.length;
   const awaitingCount = runs.filter((r) => r.status === "awaiting_approval").length;
@@ -152,21 +144,64 @@ export function OverviewView() {
       {header}
 
       <div className="grid grid-cols-2 gap-3.5 desk:grid-cols-4">
-        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
-          <span className="text-overline uppercase tracking-wider text-muted">Tổng lần chạy</span>
-          <span className="text-display-md-mobile font-bold tabular text-ink desk:text-display-md">{totalRuns}</span>
+        {/* Tổng công việc */}
+        <div className="flex flex-col gap-2 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-overline uppercase tracking-wider text-muted">Tổng công việc</span>
+            <span className="flex size-7 items-center justify-center rounded-full bg-surface-strong text-muted">
+              <Icon name="file" size={14} />
+            </span>
+          </div>
+          <span className="text-display-md-mobile font-semibold tabular text-ink desk:text-display-md">
+            {totalRuns}
+          </span>
         </div>
-        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
-          <span className="text-overline uppercase tracking-wider text-action">Chờ phê duyệt</span>
-          <span className="text-display-md-mobile font-bold tabular text-action desk:text-display-md">{awaitingCount}</span>
+
+        {/* Chờ phê duyệt */}
+        <div className="flex flex-col gap-2 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-overline uppercase tracking-wider text-action">Chờ phê duyệt</span>
+            <span className="flex size-7 items-center justify-center rounded-full bg-action-subtle text-action">
+              <Icon name="shield-check" size={14} />
+            </span>
+          </div>
+          <span className="text-display-md-mobile font-semibold tabular text-action desk:text-display-md">
+            {awaitingCount}
+          </span>
         </div>
-        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
-          <span className="text-overline uppercase tracking-wider text-success">Đã hoàn tất</span>
-          <span className="text-display-md-mobile font-bold tabular text-success desk:text-display-md">{successCount}</span>
+
+        {/* Đã hoàn thành */}
+        <div className="flex flex-col gap-2 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-overline uppercase tracking-wider text-success">Đã hoàn thành</span>
+            <span className="flex size-7 items-center justify-center rounded-full bg-success-subtle text-success">
+              <Icon name="circle-check" size={14} />
+            </span>
+          </div>
+          <span className="text-display-md-mobile font-semibold tabular text-success desk:text-display-md">
+            {successCount}
+          </span>
         </div>
-        <div className="flex flex-col gap-1 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
-          <span className="text-overline uppercase tracking-wider text-muted">Cần đối chiếu</span>
-          <span className={cn("text-display-md-mobile font-bold tabular desk:text-display-md", reconcileCount > 0 ? "text-danger" : "text-muted")}>
+
+        {/* Cần kiểm tra lại */}
+        <div className="flex flex-col gap-2 rounded-md border border-hairline bg-surface-soft p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-overline uppercase tracking-wider text-muted">Cần kiểm tra lại</span>
+            <span
+              className={cn(
+                "flex size-7 items-center justify-center rounded-full",
+                reconcileCount > 0 ? "bg-danger-subtle text-danger" : "bg-surface-strong text-muted",
+              )}
+            >
+              <Icon name="triangle-alert" size={14} />
+            </span>
+          </div>
+          <span
+            className={cn(
+              "text-display-md-mobile font-semibold tabular desk:text-display-md",
+              reconcileCount > 0 ? "text-danger" : "text-muted",
+            )}
+          >
             {reconcileCount}
           </span>
         </div>
@@ -187,19 +222,13 @@ export function OverviewView() {
               />
             ))}
           </ul>
-          {hasActive ? (
-            <p className="m-0 flex items-start gap-2 text-body-sm text-muted">
-              <Icon name="info" className="mt-0.5" />
-              Mỗi lúc chỉ có một lần chạy hoạt động; yêu cầu mới được nhận sau khi lần chạy đang hoạt động kết thúc.
-            </p>
-          ) : null}
         </section>
       ) : null}
 
       {active.length > 0 ? (
         <section aria-labelledby="active-title" className="flex flex-col gap-2">
           <h2 id="active-title" className="m-0 text-headline-sm">
-            Đang chạy
+            Đang xử lý
           </h2>
           <ul className="m-0 list-none p-0">
             {active.map((run) => (
@@ -212,14 +241,14 @@ export function OverviewView() {
       <section aria-labelledby="recent-title" className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4">
           <h2 id="recent-title" className="m-0 text-headline-sm">
-            Lần chạy gần đây
+            Công việc gần đây
           </h2>
           <a href={routeToHash({ page: "history" })} className="inline-flex min-h-11 items-center text-button-sm">
             Xem tất cả
           </a>
         </div>
         {recent.length === 0 ? (
-          <p className="m-0 text-body-md text-muted">Chưa có lần chạy nào kết thúc.</p>
+          <p className="m-0 text-body-md text-muted">Chưa có công việc nào hoàn thành gần đây.</p>
         ) : (
           <ul className="m-0 list-none p-0">
             {recent.map((run) => (
