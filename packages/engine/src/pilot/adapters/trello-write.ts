@@ -60,12 +60,12 @@ export async function trelloCreateCard(
     boardId,
   });
 
-  const candidates = lists.filter(
+  const candidatesByName = lists.filter(
     (l) => l.name.trim().toLowerCase() === listName.trim().toLowerCase() && !l.closed,
   );
   const matchingList = listId
-    ? candidates.find((l) => l.id === listId)
-    : candidates.length === 1 ? candidates[0] : undefined;
+    ? lists.find((l) => l.id === listId && !l.closed)
+    : candidatesByName.length === 1 ? candidatesByName[0] : undefined;
 
   if (!matchingList) {
     throw new Error(`LIST_NOT_FOUND: List "${listName}" not found on board`);

@@ -128,6 +128,60 @@ describe('pilot/adapters/trello', () => {
     expect(receipt.intentKey).toBe('k'.repeat(64));
   });
 
+  it('creates card when listId matches even if listName differs (localized boards)', async () => {
+    const mockLists = [
+      { id: 'list-vn-1', name: 'Cần làm', closed: false },
+      { id: 'list-vn-2', name: 'Đang làm', closed: false },
+    ];
+    const mockCreatedCard = {
+      id: 'new-card-vn',
+      idList: 'list-vn-1',
+      name: 'Localized Task',
+      url: 'https://trello.com/c/new-card-vn',
+    };
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockLists), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockCreatedCard), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    const receipt = await trelloCreateCard({
+      config: sampleConfig,
+      policy: samplePolicy,
+      principalId: 'operator-a',
+      boardId: 'board-456',
+      listName: 'To Do',
+      listId: 'list-vn-1',
+      title: 'Localized Task',
+      intentKey: 'k'.repeat(64),
+    });
+
+    expect(receipt.cardId).toBe('new-card-vn');
+    expect(receipt.listId).toBe('list-vn-1');
+  });
+
+  it('throws error when explicit listId is absent from board even if listName matches another list', async () => {
+    const mockLists = [
+      { id: 'different-list-id', name: 'To Do', closed: false },
+    ];
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockLists), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+
+    await expect(
+      trelloCreateCard({
+        config: sampleConfig,
+        policy: samplePolicy,
+        principalId: 'operator-a',
+        boardId: 'board-456',
+        listName: 'To Do',
+        listId: 'disappeared-list-id',
+        title: 'Task',
+        intentKey: 'k'.repeat(64),
+      }),
+    ).rejects.toThrow('LIST_NOT_FOUND');
+  });
+
   it('throws error if target list name is not found on board', async () => {
     const mockLists = [{ id: 'list-1', name: 'In Progress', closed: false }];
 

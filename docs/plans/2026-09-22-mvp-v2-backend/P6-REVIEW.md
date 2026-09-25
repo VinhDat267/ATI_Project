@@ -1,8 +1,8 @@
 # P6 — Đính chính trạng thái sau audit
 
 **Dự án:** AI Automation Platform (MVP v2)  
-**Phạm vi:** BE-26..29, commit `9335620` ngày 23/09/2026
-**Kết luận:** **UNIT_TESTED / LIVE_NOT_RUN / HANDOFF_BLOCKED**
+**Phạm vi:** BE-26..29, cập nhật ngày 25/09/2026
+**Kết luận:** **APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED / SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED / AI_QUALITY_NOT_MEASURED / HANDOFF_BLOCKED**
 
 Báo cáo P6 trước đó ghi `PASS — 100%` và “sẵn sàng bàn giao”. Kết luận đó được rút lại sau audit đọc mã và kiểm thử ngày 23/09/2026. Có 11 unit test P6 pass (4 preflight, 5 UC2, 2 evaluation), nhưng test Sheets/Trello dùng `fetch` giả; runner đánh giá không gọi AI provider. `npm run check` ở commit trên cũng pass (DSL 44; engine 516 pass, 1 skip; API 79; web 138), chỉ chứng minh build và unit gate. Browser MVP v2, SaaS live và provider-backed quality vẫn `NOT_RUN` trong audit này.
 
@@ -44,3 +44,32 @@ Các runner P6 hiện không được export qua `packages/engine/src/index.ts` 
 Sau đoạn audit lịch sử ở trên, API approval production đã dùng intent key chuẩn `createIntentKey`; GET run tìm reservation theo intent key này và fallback đọc các reservation cũ theo `sourceKey`. Hai endpoint chỉ đọc được thêm: `/pilot/v2/check` trả checklist pass/clarification/refusal, còn `/pilot/v2/lookup` chỉ resolve card từ reservation `confirmed`, xác minh card qua Trello GET và không nhận `cardId` từ caller. Reservation chưa chắc chắn không gọi Trello; card không còn tìm thấy trả `unknown`.
 
 Đã chạy pass 21 API integration tests cho UC1/UC3 và durable approval; browser Chromium pass 7 ca trong `pilot-approval.spec.ts` và `pilot-use-cases.spec.ts`, gồm hai principal với owner-only run access và direct cross-owner approval attempt trả 404. Integration phủ source-row prompt injection, reservation sai intent, reservation thiếu/đang đối chiếu và card Trello trả 404. Sheets/Trello được giả lập; không có SaaS live hoặc AI provider call. Vì vậy các mục browser owner isolation và UC1/UC3 local contract được đóng, trong khi `SAAS_LIVE_NOT_RUN`, `AI_QUALITY_NOT_RUN`, nghiệm thu người dùng và `HANDOFF_BLOCKED` giữ nguyên.
+
+## Bằng chứng SaaS Live 25/09/2026 — `SAAS_READ_CONFIRMED` và `SAAS_LIVE_EXERCISED`
+
+Thực hiện theo kế hoạch `docs/superpowers/plans/2026-09-23-pilot-v2-saas-live.md`:
+
+1. **BE-26 Operator Read Preflight (`SAAS_READ_CONFIRMED`)**:
+   - Chạy lệnh CLI đọc SaaS thật: `node packages/engine/dist/pilot/live-preflight-cli.js --principal 00000000-0000-4000-8000-000000000001 --request-id REQ-SBX-001`.
+   - Kết quả: Đọc Google Sheets thật (Spreadsheet `1zqvWaShNfqQBUkypaGyFFlVBabW3qCrRqsdQg2mgSc0`, Tab `Requests`), đọc Trello board sandbox thật (`6ab4cce14cc901026198259b`), phát hiện 3 danh sách ("Cần làm", "Đang làm", "Đã xong").
+   - Số thao tác ghi từ xa: `writesAttempted: 0`.
+   - Bằng chứng đã được lưu và commit tại `docs/ai-evidence/PILOT-V2-LIVE/preflight-read-confirmed.json` (commit `becfd35`).
+
+2. **BE-27 & BE-29 Live SaaS Write & Reconciliation (`SAAS_LIVE_EXERCISED`)**:
+   - Sửa lỗi định danh list trên board tiếng Việt: `packages/engine/src/pilot/adapters/trello-write.ts` ưu tiên tìm kiếm `listId` trực tiếp trước khi fallback so khớp tên danh sách; bổ sung unit test kiểm chứng tại `packages/engine/tests/pilot-trello-adapter.test.ts`.
+   - Chạy runner phiên live có kiểm soát: `npx tsx scripts/execute-pilot-v2-live.ts`.
+   - Kết quả xác minh:
+     - **UC1 Intake Check**: Gọi `POST /pilot/v2/check` với Principal A, kết quả `checked`, `valid: true`, 0 thao tác ghi.
+     - **UC2 Run Creation & Preview**: Gọi `POST /pilot/v2/runs` tạo run `7709153c-9f2e-4472-912b-33f7c6a54c56`, `status: awaiting_approval`, snapshot hash `cc35d00be9004ff86d632f42592991787e9025eeb3cf831f5eafec505d182d1d`, hạn TTL 10 phút.
+     - **Owner B Isolation**: Principal B thực hiện `GET /pilot/v2/runs/:id` và `POST /pilot/v2/runs/:id/approve` trên run của Principal A đều nhận HTTP `404 Not Found`, 0 thao tác ghi.
+     - **Single Approved UC2 Write**: Principal A duyệt run hợp lệ. Hệ thống dispatch chính xác 1 lệnh POST tạo card lên Trello Sandbox (`6ab4cce14cc901026198259b`, list `6ab4cce14cc90102619825a1`), nhận receipt card ID `6ab66fc11dcefdad6a08389f` (`https://trello.com/c/gNm8pWyM/2-c%E1%BA%ADp-nh%E1%BA%ADt-trang-ch%E1%BB%A7`). `pilot_approvals` chuyển `approved`, `business_reservations` chuyển `confirmed`.
+     - **UC3 Remote Read-back & Reconciliation**: Đọc trực tiếp thẻ từ remote Trello API (`trelloGetCard`), đối chiếu thành công card ID `6ab66fc11dcefdad6a08389f`. Gọi `POST /pilot/v2/lookup` cho `REQ-SBX-001` trả về `status: "found"` cùng card ID liên kết.
+     - **Replay Protection**: Gửi lại yêu cầu approve trên cùng run trả về HTTP `409 Conflict`.
+     - **Tổng số lệnh ghi remote**: ĐÚNG 1 LỆNH DUY NHẤT.
+   - Bằng chứng đã được lưu và redact an toàn tại `docs/ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json`.
+
+3. **Trạng thái cổng Cổng G4 / G5 / G6**:
+   - **Cổng G4 (`SAAS_LIVE_EXERCISED`)**: **ĐẠT (PASSED)** — Đã có bằng chứng vận hành live thực tế.
+   - **Cổng G5 (`AI_QUALITY_MEASURED`)**: **TẠM DỪNG / CHƯA ĐO (`AI_QUALITY_NOT_MEASURED`)** — Provider probe gặp HTTP 503 từ upstream Google API, hệ thống dừng lại an toàn theo trần ngân sách $0, không retry mù (`docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`).
+   - **Cổng G6 (`CUSTOMER_VALIDATED`)**: **CHƯA CHẠY (`NOT_RUN`)**.
+   - **Bàn giao tổng thể**: **HANDOFF_BLOCKED** cho đến khi đo lường chất lượng AI và nghiệm thu khách hàng.
