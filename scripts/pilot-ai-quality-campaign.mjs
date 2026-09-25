@@ -202,7 +202,9 @@ async function report() {
   const complete = state.usedCalls === all.length && state.attempts.every((attempt) => attempt.status === 'succeeded' && !attempt.unsafeToGrade);
   const result = { status: complete ? 'PROVIDER_OBSERVED_REVIEW_PENDING' : 'PARTIAL_NOT_MEASURED',
     campaignId: inputs.campaignId, commit: inputs.commit, model, retrievalMode: 'fixed-catalog',
-    freezeHash: frozen.hash, sample: { public: publicCases.length, holdout: holdoutCases.length, attempted: state.usedCalls },
+    freezeHash: frozen.hash, sample: { public: publicCases.length, holdout: holdoutCases.length,
+      attempted: state.usedCalls, failedAttempts: state.attempts.filter((attempt) => attempt.status === 'failed').length,
+      unattempted: all.length - state.usedCalls },
     aggregate, grades, gradeScope: 'automatic structural match only; independent semantic adjudication pending',
     usageState: aggregate.missingUsage === 0 ? 'reported' : 'unknown',
     cost: { capUsd: 0, tier: 'Free Tier by project-owner attestation', actualInvoiceVerified: false },
@@ -212,7 +214,9 @@ async function report() {
   };
   await writeFile(output, JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ status: result.status, output, attempted: state.usedCalls, total: all.length,
-    passed: aggregate.passed, failed: aggregate.failed, missingUsage: aggregate.missingUsage }));
+    failedAttempts: result.sample.failedAttempts, unattempted: result.sample.unattempted,
+    passed: aggregate.passed, gradeFailuresIncludingUnattempted: aggregate.failed,
+    missingUsage: aggregate.missingUsage }));
 }
 
 try {

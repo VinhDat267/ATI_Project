@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
+**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / PROVIDER_PROBE_FAILED / AI_QUALITY_NOT_MEASURED / OWNER_CARD_REVIEW_CONFIRMED / HANDOFF_BLOCKED`. Xem [probe Gemini](ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md), [nghiệm thu chủ project](PILOT-V2-USER-ACCEPTANCE.md), [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -79,6 +79,6 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 
 ## 6. Đánh giá AI và bàn giao
 
-`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật. Contract runner mới tách oracle khỏi input, dùng nguồn/checklist và giữ output tại ranh giới model port trước validation/repair local để phát hiện write không an toàn; chưa chứng minh payload mạng thô của provider. Phase gate của nó chỉ cho chạy port mô phỏng và từ chối campaign measured. Chưa có pilot-specific retrieval index được duyệt, ledger bền vững, grader độc lập hoặc provider campaign. Google connectivity probe lịch sử cũng không thay thế đánh giá ứng dụng MVP v2.
+`runPilotQualityEvaluation` cũ kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`. Đường measured mới tách oracle khỏi input, khóa code/dataset/model, ghi reservation và observation vào journal bền vững trước khi chấm, chỉ dùng catalog pilot cố định và không thực thi Trello. Nó chưa so semantic với semantic+QE hoặc chứng minh payload mạng thô của provider. Probe Gemini thật ngày 25/09/2026 nhận HTTP 503 ở lời gọi đầu tiên; journal ghi một attempt failed với usage unknown và chiến dịch dừng. Xem [bằng chứng probe](ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md). Chưa có accuracy, latency phân phối hay chi phí thực tế được đo.
 
 Trước khi nâng `AI_QUALITY_MEASURED`, khóa dataset/holdout, prompt, model, catalog, price card, ngân sách và rubric; chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot vẫn `HANDOFF_BLOCKED` cho đến khi có review và evidence cho từng cổng liên quan.
