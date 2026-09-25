@@ -213,22 +213,12 @@ export function LoginView({
 
             {/* Email input */}
             <div className="flex flex-col gap-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <label
-                  htmlFor="email"
-                  className="text-body-md font-semibold text-ink"
-                >
-                  Email
-                </label>
-                {mode === "fixture" || demoLogin ? (
-                  <span id="email-hint" className="text-caption text-muted">
-                    Mặc định:{" "}
-                    <code className="font-mono text-ink">
-                      {demoLogin?.email ?? "demo@local"}
-                    </code>
-                  </span>
-                ) : null}
-              </div>
+              <label
+                htmlFor="email"
+                className="text-body-md font-semibold text-ink"
+              >
+                Email
+              </label>
               <input
                 id="email"
                 name="email"
@@ -239,38 +229,19 @@ export function LoginView({
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 aria-invalid={isFieldInvalid || undefined}
-                aria-describedby={
-                  cn(
-                    isFieldInvalid && errorId,
-                    (mode === "fixture" || demoLogin) && "email-hint",
-                  ) || undefined
-                }
+                aria-describedby={isFieldInvalid ? errorId : undefined}
                 className={cn(inputClass, isFieldInvalid && "border-danger")}
               />
             </div>
 
             {/* Password input */}
             <div className="flex flex-col gap-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <label
-                  htmlFor="password"
-                  className="text-body-md font-semibold text-ink"
-                >
-                  Mật khẩu
-                </label>
-                {mode === "fixture" ? (
-                  <span id="password-hint" className="text-caption text-muted">
-                    Chấp nhận mật khẩu bất kỳ
-                  </span>
-                ) : demoLogin ? (
-                  <span id="password-hint" className="text-caption text-muted">
-                    Mặc định:{" "}
-                    <code className="font-mono text-ink">
-                      {demoLogin.password}
-                    </code>
-                  </span>
-                ) : null}
-              </div>
+              <label
+                htmlFor="password"
+                className="text-body-md font-semibold text-ink"
+              >
+                Mật khẩu
+              </label>
               <div className="relative">
                 <input
                   id="password"
@@ -282,12 +253,7 @@ export function LoginView({
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   aria-invalid={isFieldInvalid || undefined}
-                  aria-describedby={
-                    cn(
-                      isFieldInvalid && errorId,
-                      (mode === "fixture" || demoLogin) && "password-hint",
-                    ) || undefined
-                  }
+                  aria-describedby={isFieldInvalid ? errorId : undefined}
                   className={cn(
                     inputClass,
                     "pr-12",
