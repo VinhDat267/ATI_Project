@@ -1,7 +1,17 @@
-import { loadPilotConfig, redactObject, redactSecrets, type PilotConfig } from './config.js';
-import type { PilotPolicy } from './policy.js';
-import { readSheetsRequest, type ReadSheetsRequestResult } from './adapters/sheets.js';
-import { trelloListLists, trelloListMembers } from './adapters/trello-read.js';
+import {
+  loadPilotConfig,
+  redactObject,
+  redactSecrets,
+  type PilotConfig,
+} from "./config.js";
+import { assertPilotAccess, type PilotPolicy } from "./policy.js";
+import { PilotHttpError } from "./http-client.js";
+import { createHash } from "node:crypto";
+import {
+  readSheetsRequest,
+  type ReadSheetsRequestResult,
+} from "./adapters/sheets.js";
+import { trelloListLists, trelloListMembers } from "./adapters/trello-read.js";
 
 export interface PreflightOptions {
   config?: Partial<PilotConfig>;
@@ -9,14 +19,23 @@ export interface PreflightOptions {
   principalId?: string;
   testRequestId?: string;
   allowSimulatedFallback?: boolean;
+  commit?: string;
+  workingTreeDirty?: boolean;
 }
 
 export interface PreflightCheckResult {
-  status: 'passed' | 'failed' | 'blocked_external';
+  status: "passed" | "failed" | "blocked_external";
   timestamp: string;
+  context: {
+    commit?: string;
+    workingTreeDirty?: boolean;
+    principalId?: string;
+    targetListId?: string;
+    configSha256: string;
+  };
   checks: {
     config: {
-      status: 'pass' | 'fail' | 'missing';
+      status: "pass" | "fail" | "missing";
       enabled: boolean;
       spreadsheetId?: string;
       tabId?: string;
@@ -26,7 +45,7 @@ export interface PreflightCheckResult {
       error?: string;
     };
     sheetsRead: {
-      status: 'pass' | 'fail' | 'skipped';
+      status: "pass" | "fail" | "skipped";
       error?: string;
       sampleResult?: {
         requestId: string;
@@ -36,20 +55,20 @@ export interface PreflightCheckResult {
       };
     };
     trelloRead: {
-      status: 'pass' | 'fail' | 'skipped';
+      status: "pass" | "fail" | "skipped";
       error?: string;
       listsCount?: number;
       membersCount?: number;
-      listsSample?: Array<{ id: string; name: string }>;
+      listsSample?: Array<{ id: string }>;
     };
     writeVerification: {
-      status: 'pass';
+      status: "pass";
       writesAttempted: 0;
       note: string;
     };
   };
   errors: string[];
-  evidenceLabel: 'CONFIRMED' | 'PROPOSED' | 'NOT_RUN' | 'BLOCKED_EXTERNAL';
+  evidenceLabel: "CONFIRMED" | "PROPOSED" | "NOT_RUN" | "BLOCKED_EXTERNAL";
 }
 
 /**
@@ -78,35 +97,40 @@ export async function runPilotLivePreflight(
     pilotConfig = {
       enabled: false,
       principals: options.config?.principals ?? [],
-      spreadsheetId: options.config?.spreadsheetId ?? '',
-      tabId: options.config?.tabId ?? '',
-      boardId: options.config?.boardId ?? '',
+      spreadsheetId: options.config?.spreadsheetId ?? "",
+      tabId: options.config?.tabId ?? "",
+      boardId: options.config?.boardId ?? "",
       google: options.config?.google,
       trello: options.config?.trello,
     };
   }
 
-  const hasGoogleCreds = Boolean(
-    (pilotConfig.google?.clientEmail && pilotConfig.google?.privateKey) ||
-      pilotConfig.google?.apiKey,
-  );
+  const hasGoogleCreds = Boolean(pilotConfig.google?.apiKey?.trim());
   const hasTrelloCreds = Boolean(
     pilotConfig.trello?.apiKey && pilotConfig.trello?.apiToken,
   );
 
   const secrets = [
     pilotConfig.google?.apiKey,
+    pilotConfig.google?.clientEmail,
     pilotConfig.google?.privateKey,
     pilotConfig.trello?.apiKey,
     pilotConfig.trello?.apiToken,
   ];
 
   const result: PreflightCheckResult = {
-    status: 'passed',
+    status: "passed",
     timestamp,
+    context: {
+      commit: options.commit,
+      workingTreeDirty: options.workingTreeDirty,
+      principalId: options.principalId?.trim() || undefined,
+      targetListId: pilotConfig.trello?.listId,
+      configSha256: createHash("sha256").update(JSON.stringify(pilotConfig)).digest("hex"),
+    },
     checks: {
       config: {
-        status: hasValidConfig ? 'pass' : configError ? 'fail' : 'missing',
+        status: hasValidConfig ? "pass" : configError ? "fail" : "missing",
         enabled: pilotConfig.enabled,
         spreadsheetId: pilotConfig.spreadsheetId || undefined,
         tabId: pilotConfig.tabId || undefined,
@@ -116,53 +140,85 @@ export async function runPilotLivePreflight(
         error: configError ? redactSecrets(configError, secrets) : undefined,
       },
       sheetsRead: {
-        status: 'skipped',
+        status: "skipped",
       },
       trelloRead: {
-        status: 'skipped',
+        status: "skipped",
       },
       writeVerification: {
-        status: 'pass',
+        status: "pass",
         writesAttempted: 0,
-        note: 'Verified 0 remote writes attempted during preflight inspection',
+        note: "Verified 0 remote writes attempted during preflight inspection",
       },
     },
     errors: [],
-    evidenceLabel: 'PROPOSED',
+    evidenceLabel: "PROPOSED",
   };
 
   // If live config is incomplete or disabled, fail-closed as BLOCKED_EXTERNAL
-  if (!hasValidConfig || !hasGoogleCreds || !hasTrelloCreds) {
-    result.status = 'blocked_external';
-    result.evidenceLabel = 'BLOCKED_EXTERNAL';
+  const principalId = options.principalId?.trim();
+  const testRequestId = options.testRequestId?.trim();
+  if (!principalId) errors.push("CONFIG_ERROR: Explicit principal is required");
+  if (!testRequestId)
+    errors.push("CONFIG_ERROR: Explicit request ID is required");
+  if (options.allowSimulatedFallback)
+    errors.push(
+      "CONFIG_ERROR: Simulated fallback is forbidden in live preflight",
+    );
+  if (!pilotConfig.trello?.listId?.trim())
+    errors.push("CONFIG_ERROR: Trello target list is required");
+  if (!hasGoogleCreds)
+    errors.push(
+      "AUTH_UNAVAILABLE: Google Sheets API key is required; service-account token flow is unavailable",
+    );
+  if (!hasTrelloCreds)
+    errors.push("CONFIG_ERROR: Trello credentials are required");
+
+  const policy: PilotPolicy = options.policy ?? {
+    enabled: pilotConfig.enabled,
+    principals: pilotConfig.principals,
+    spreadsheetId: pilotConfig.spreadsheetId,
+    tabId: pilotConfig.tabId,
+    boardId: pilotConfig.boardId,
+  };
+  if (hasValidConfig && principalId) {
+    try {
+      assertPilotAccess(policy, principalId, {
+        kind: "source",
+        spreadsheetId: pilotConfig.spreadsheetId,
+        tabId: pilotConfig.tabId,
+      });
+      assertPilotAccess(policy, principalId, {
+        kind: "board",
+        boardId: pilotConfig.boardId,
+      });
+      if (!pilotConfig.principals.includes(principalId))
+        throw new Error("ACCESS_DENIED");
+    } catch {
+      errors.push("ACCESS_DENIED: Principal or target differs from allowlist");
+    }
+  }
+
+  if (!hasValidConfig || errors.length > 0) {
+    result.status = "blocked_external";
+    result.evidenceLabel = "BLOCKED_EXTERNAL";
     result.errors = errors.map((e) => redactSecrets(e, secrets));
     return result;
   }
 
-  const principalId = options.principalId ?? pilotConfig.principals[0] ?? 'operator';
-  const policy: PilotPolicy =
-    options.policy ?? {
-      enabled: pilotConfig.enabled,
-      principals: pilotConfig.principals,
-      spreadsheetId: pilotConfig.spreadsheetId,
-      tabId: pilotConfig.tabId,
-      boardId: pilotConfig.boardId,
-    };
-
   // 2. Perform Live Google Sheets Read Preflight
-  const testRequestId = options.testRequestId ?? 'REQ-001';
   try {
     const sheetsResult: ReadSheetsRequestResult = await readSheetsRequest({
       config: pilotConfig,
       policy,
-      principalId,
+      principalId: principalId!,
       spreadsheetId: pilotConfig.spreadsheetId,
       tabId: pilotConfig.tabId,
-      requestId: testRequestId,
+      requestId: testRequestId!,
     });
 
     result.checks.sheetsRead = {
-      status: 'pass',
+      status: "pass",
       sampleResult: {
         requestId: sheetsResult.row.request_id,
         sourceKey: sheetsResult.sourceKey,
@@ -171,9 +227,9 @@ export async function runPilotLivePreflight(
       },
     };
   } catch (err: unknown) {
-    const msg = redactSecrets(err instanceof Error ? err.message : String(err), secrets);
+    const msg = safeReadError(err, secrets);
     result.checks.sheetsRead = {
-      status: 'fail',
+      status: "fail",
       error: msg,
     };
     errors.push(`Sheets read failed: ${msg}`);
@@ -185,27 +241,36 @@ export async function runPilotLivePreflight(
       trelloListLists({
         config: pilotConfig,
         policy,
-        principalId,
+        principalId: principalId!,
         boardId: pilotConfig.boardId,
       }),
       trelloListMembers({
         config: pilotConfig,
         policy,
-        principalId,
+        principalId: principalId!,
         boardId: pilotConfig.boardId,
       }),
     ]);
 
+    if (
+      !lists.some(
+        (list) => list.id === pilotConfig.trello!.listId && !list.closed,
+      )
+    ) {
+      throw new Error(
+        "ACCESS_DENIED: Target list is absent or closed on the allowlisted board",
+      );
+    }
     result.checks.trelloRead = {
-      status: 'pass',
+      status: "pass",
       listsCount: lists.length,
       membersCount: members.length,
-      listsSample: lists.slice(0, 5).map((l) => ({ id: l.id, name: l.name })),
+      listsSample: lists.slice(0, 5).map((l) => ({ id: l.id })),
     };
   } catch (err: unknown) {
-    const msg = redactSecrets(err instanceof Error ? err.message : String(err), secrets);
+    const msg = safeReadError(err, secrets);
     result.checks.trelloRead = {
-      status: 'fail',
+      status: "fail",
       error: msg,
     };
     errors.push(`Trello read failed: ${msg}`);
@@ -213,13 +278,28 @@ export async function runPilotLivePreflight(
 
   // 4. Conclude Status
   if (errors.length > 0) {
-    result.status = 'failed';
+    result.status = "failed";
     result.errors = errors;
-    result.evidenceLabel = 'PROPOSED';
+    result.evidenceLabel = "PROPOSED";
   } else {
-    result.status = 'passed';
-    result.evidenceLabel = 'CONFIRMED';
+    result.status = "passed";
+    result.evidenceLabel = "CONFIRMED";
   }
 
   return redactObject(result, secrets);
+}
+
+function safeReadError(
+  error: unknown,
+  secrets: readonly (string | undefined | null)[],
+): string {
+  if (error instanceof PilotHttpError)
+    return `HTTP ${error.statusCode || "network"} read failed`;
+  const message = error instanceof Error ? error.message : String(error);
+  // Error text can contain an arbitrary URL query; retain the path and
+  // remove query values before including it in the operator artifact.
+  return redactSecrets(
+    message.replace(/(https?:\/\/[^\s?]+)\?[^\s]+/gi, "$1?[REDACTED]"),
+    secrets,
+  );
 }

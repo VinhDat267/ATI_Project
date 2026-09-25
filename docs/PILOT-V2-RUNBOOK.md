@@ -1,10 +1,10 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 23/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live.
+**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_WRITE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live write.
 
 ## 1. Phạm vi và những gì đang chạy
 
-Mục tiêu đã duyệt: Google Sheets chỉ đọc → kiểm yêu cầu → AI lập kế hoạch → người dùng duyệt preview → tối đa một lệnh tạo card Trello → receipt/tra cứu. Có mã adapter, API `/pilot/v2`, UI pilot, dataset và unit test. `POST /pilot/v2/check` trả checklist pass/clarification/refusal mà không tạo run; `POST /pilot/v2/lookup` chỉ nhận định danh nguồn, tra reservation `confirmed` rồi đọc card hiện tại trên board allowlist. API và Chromium browser đã kiểm hai luồng này cùng owner isolation bằng PostgreSQL cô lập và Sheets/Trello giả. Đây không phải kiểm chứng AI source-aware hay SaaS live. Ba runner P6 (`live-preflight`, `live-uc2-runner`, `live-eval-runner`) chưa nối vào API/CLI vận hành.
+Mục tiêu đã duyệt: Google Sheets chỉ đọc → kiểm yêu cầu → AI lập kế hoạch → người dùng duyệt preview → tối đa một lệnh tạo card Trello → receipt/tra cứu. Có mã adapter, API `/pilot/v2`, UI pilot, dataset và unit test. `POST /pilot/v2/check` trả checklist pass/clarification/refusal mà không tạo run; `POST /pilot/v2/lookup` chỉ nhận định danh nguồn, tra reservation `confirmed` rồi đọc card hiện tại trên board allowlist. API và Chromium browser đã kiểm hai luồng này cùng owner isolation bằng PostgreSQL cô lập và Sheets/Trello giả. Đây không phải kiểm chứng AI source-aware hay SaaS live. `live-preflight` có CLI chỉ đọc; `live-uc2-runner` và `live-eval-runner` vẫn chưa nối vào API/CLI vận hành.
 
 Các điều kiện trước live write còn **BLOCKED**:
 
@@ -17,7 +17,7 @@ Các điều kiện trước live write còn **BLOCKED**:
 
 `packages/engine/src/pilot/config.ts` đọc biến môi trường **của tiến trình API**: `PILOT_V2_ENABLED`, `PILOT_PRINCIPALS`, `PILOT_SPREADSHEET_ID`, `PILOT_TAB_ID`, `PILOT_BOARD_ID`, `PILOT_TRELLO_LIST_ID`, `GOOGLE_SHEETS_API_KEY`, `TRELLO_API_KEY`, `TRELLO_API_TOKEN`; nó cũng nhận `GOOGLE_SHEETS_CLIENT_EMAIL` và `GOOGLE_SHEETS_PRIVATE_KEY`. `PILOT_V2_WRITE_ENABLED=true` là cờ riêng cho dispatch Trello; không đặt cờ này chỉ để chạy preflight đọc. Repository hiện **không tự nạp `.env.pilot`**. Tạo file đó đơn thuần không cấu hình API; không commit credential vào Git.
 
-Adapter Sheets hiện chỉ gắn API key vào URL. Nhánh service account chưa tạo token hoặc header `Authorization`, nên **chưa hỗ trợ xác thực Sheet riêng tư bằng service account**. Chưa xác nhận phương thức credential nào dùng được với nguồn thật. Router hiện từ chối khi thiếu/tắt config hoặc policy và không còn cấu hình pilot mặc định bật; unit HTTP đã kiểm các nhánh này. Chưa có xác nhận bằng môi trường SaaS thật.
+Adapter Sheets hiện chỉ gắn API key vào URL. Nhánh service account chưa tạo token hoặc header `Authorization`, nên **bị chặn trước GET**; Sheet riêng tư cần bearer-token path đã kiểm thử. API key đã đọc được Sheet sandbox được chia sẻ phù hợp trong preflight ngày 25/09/2026. Router hiện từ chối khi thiếu/tắt config hoặc policy và không còn cấu hình pilot mặc định bật; unit HTTP đã kiểm các nhánh này. Preflight CLI không xác nhận đường API sản phẩm end-to-end.
 
 ## 3. Kiểm thử offline và preflight live
 
@@ -27,13 +27,23 @@ Lệnh dưới đây **chỉ chạy unit test với `fetch` giả**, không đ�
 npm run test:unit -w @wap/engine -- tests/pilot-live-preflight.test.ts tests/pilot-live-uc2.test.ts tests/pilot-live-eval.test.ts
 ```
 
-Chưa có lệnh operator được kiểm chứng để gọi `runPilotLivePreflight` trên cấu hình live; vì vậy **BE-26 live read preflight = NOT_RUN**. Sau khi cổng an toàn được sửa, một preflight hợp lệ phải lưu thời điểm, commit, nguồn/board allowlisted, principal, kết quả đọc Sheet và Trello, lỗi đã redact, cùng bằng chứng **0 remote write**. Unit test pass không thay thế artifact này.
+CLI operator đã có kiểm thử với transport giả. Đặt biến môi trường cho đúng Sheet, board, list, principal và credential trong tiến trình; giữ `PILOT_V2_WRITE_ENABLED=false`. Từ root repo, chạy một lần với đường dẫn evidence mới, ngoài Git nếu chứa định danh riêng:
+
+```powershell
+npm run build -w @wap/engine
+$pilotPrincipal = Read-Host 'Exact allowlisted principal ID'
+$pilotRequestId = Read-Host 'Exact Sheet request ID'
+$evidencePath = Join-Path $env:TEMP ('pilot-v2-preflight-' + (Get-Date -Format 'yyyyMMddHHmmss') + '.json')
+node packages/engine/dist/pilot/live-preflight-cli.js --principal $pilotPrincipal --request-id $pilotRequestId --output $evidencePath
+```
+
+CLI yêu cầu Git HEAD, giữ độc quyền file output trước network, không ghi đè file cũ và thoát khác 0 khi config/read thất bại. Artifact gồm HEAD, trạng thái dirty của worktree (từ phiên bản CLI sau 25/09), principal, Sheet/tab/board/list, hash cấu hình, source revision, tóm tắt Trello và lỗi đã che query/secret; code path chỉ thực hiện GET. HEAD riêng lẻ không định danh chính xác mã đang chạy nếu worktree dirty. `writesAttempted: 0` là bằng chứng từ đường CLI/transport, chưa thay cho audit HTTP remote. **BE-26 live read preflight đã passed** lúc 01:04:40 UTC ngày 25/09/2026 trên Sheet `Requests`, request `REQ-SBX-001` và Trello sandbox; artifact cục bộ nằm ở `%TEMP%\pilot-v2-preflight-20260925080440.json` (ngoài Git, worktree dirty). Đây là bằng chứng đọc của CLI, chưa chứng minh live write hoặc luồng API end-to-end. API key chỉ dùng được khi Sheet được chia sẻ phù hợp; service account hiện bị chặn.
 
 ## 4. Duyệt và thực thi UC2 — chưa mở live
 
 Trên đường API hiện có, `POST /pilot/v2/runs` đọc nguồn và lưu snapshot, workflow version, approval pending cùng hạn 10 phút trong PostgreSQL. `GET /pilot/v2/runs/:id` trả preview gồm `approvalId`, `versionId`, `snapshotHash`, `expiresAt` và action có list ID. `POST /pilot/v2/runs/:id/approve` yêu cầu đúng ba định danh đó và quyết định. Server khóa row, kiểm owner/version/hash/hạn bằng đồng hồ DB, ghi quyết định và trạng thái trước dispatch; replay trả 409. `PILOT_V2_WRITE_ENABLED` mặc định tắt nên `approved` trả `503 LIVE_WRITE_BLOCKED` và không thay approval. Khi cờ bật mà chưa có list ID, API trả `503 TARGET_NOT_BOUND`.
 
-HTTP integration đã kiểm trên PostgreSQL cô lập với Trello `fetch` giả: duyệt một lần, đồng thời, replay, version/source/list drift, hết hạn, từ chối, cờ tắt và kết quả không chắc chắn. Approval hết hạn được đóng khi có yêu cầu API tiếp theo; run `running` cũ hơn 15 phút được chuyển `reconciliation_required` theo hướng không tự gửi lại. Đây là xử lý theo yêu cầu, chưa có cron sweep hay bằng chứng crash ở tiến trình thật. Không dùng runner P6 độc lập để tạo card: nó chưa nối vào approval store sản phẩm.
+HTTP integration đã kiểm trên PostgreSQL cô lập với Trello `fetch` giả: duyệt một lần, đồng thời, replay qua API instance mới, operator B không xem/duyệt run A, version/source/list drift, hết hạn, từ chối, cờ tắt, receipt Trello thiếu ID, DB confirm thất bại và kết quả không chắc chắn. Các nhánh không chắc chắn giữ `unknown` và tối đa một POST. Approval hết hạn được đóng khi có yêu cầu API tiếp theo; run `running` cũ hơn 15 phút được chuyển `reconciliation_required` theo hướng không tự gửi lại. Đây là xử lý theo yêu cầu, chưa có cron sweep hay bằng chứng crash ở tiến trình thật. Không dùng runner P6 độc lập để tạo card: nó chưa nối vào approval store sản phẩm.
 
 Browser Chromium đã qua 4 ca tại `apps/web/tests/live/pilot-approval.spec.ts` với API HTTP và PostgreSQL cô lập: tạo run/preview/từ chối trên UI; cờ ghi tắt trả `503` và giữ approval pending; approval hết hạn bị khóa; receipt chỉ hiện sau duyệt và một POST Trello giả, còn replay trả `409` kể cả sau khi tải lại trang. Test dùng nguồn Sheets giả và chặn mọi HTTPS ngoài Trello giả trong ca write; không chứng minh Google Sheets/Trello thật hoặc AI provider. Lệnh tái chạy: `npm run test:live -w @wap/web -- pilot-approval.spec.ts`.
 
@@ -51,6 +61,6 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 
 ## 6. Đánh giá AI và bàn giao
 
-`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật. Google connectivity probe lịch sử cũng không thay thế đánh giá ứng dụng MVP v2.
+`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật. Contract runner mới tách oracle khỏi input, dùng nguồn/checklist và giữ output tại ranh giới model port trước validation/repair local để phát hiện write không an toàn; chưa chứng minh payload mạng thô của provider. Phase gate của nó chỉ cho chạy port mô phỏng và từ chối campaign measured. Chưa có pilot-specific retrieval index được duyệt, ledger bền vững, grader độc lập hoặc provider campaign. Google connectivity probe lịch sử cũng không thay thế đánh giá ứng dụng MVP v2.
 
 Trước khi nâng `AI_QUALITY_MEASURED`, khóa dataset/holdout, prompt, model, catalog, price card, ngân sách và rubric; chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot vẫn `HANDOFF_BLOCKED` cho đến khi có review và evidence cho từng cổng liên quan.

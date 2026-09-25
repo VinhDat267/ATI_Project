@@ -1,6 +1,6 @@
 import type { SourceRow } from "./source.js";
 import type { ChecklistResult } from "./checklist.js";
-import { PILOT_TOOL_CATALOG } from "./gateway.js";
+import { PILOT_TOOL_CATALOG, type PilotToolEntry } from "./gateway.js";
 
 export interface BuildPilotPlannerContextParams {
   sourceRow: SourceRow;
@@ -9,6 +9,8 @@ export interface BuildPilotPlannerContextParams {
   timeZone?: string;
   secretsToRedact?: readonly string[];
   maxCharacters?: number;
+  /** The retrieved, reviewed pilot tools for this request. */
+  tools?: readonly PilotToolEntry[];
 }
 
 export interface PilotPlannerContext {
@@ -65,6 +67,7 @@ export function buildPilotPlannerContext(
     timeZone = "UTC",
     secretsToRedact = [],
     maxCharacters = 16000,
+    tools = PILOT_TOOL_CATALOG,
   } = params;
 
   // Sanitize and truncate fields of sourceRow
@@ -126,7 +129,7 @@ export function buildPilotPlannerContext(
     "Output must strictly follow the PlannerResult schema without markdown fences.",
   ].join("\n");
 
-  const toolCatalogPrompt = PILOT_TOOL_CATALOG.map((t) => {
+  const toolCatalogPrompt = tools.map((t) => {
     return `- ${t.name}: ${t.description} (sideEffect: ${t.sideEffect})`;
   }).join("\n");
 

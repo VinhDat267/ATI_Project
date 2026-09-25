@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createApi } from "../src/app.js";
+import { SessionStore } from "../src/auth.js";
 import { makeApiFixture } from "./fixture.js";
 import {
   evaluateChecklist, sourceKey, createIntentKey,
@@ -20,10 +21,18 @@ const row: SourceRow = {
 
 afterEach(() => vi.restoreAllMocks());
 
-async function harness(writeEnabled = true) {
+async function harness(writeEnabled = true, secondPrincipal = false) {
   const fixture = await makeApiFixture();
+  const otherEmail = `other-${randomUUID()}@local.invalid`;
+  const otherUserId = randomUUID();
+  if (secondPrincipal) {
+    await fixture.db.client`
+      INSERT INTO users (id, email, password_hash, display_name)
+      VALUES (${otherUserId}, ${otherEmail},
+        (SELECT password_hash FROM users WHERE id = ${fixture.userId}), 'Other operator')`;
+  }
   const policy: PilotPolicy = {
-    enabled: true, principals: [fixture.userId],
+    enabled: true, principals: secondPrincipal ? [fixture.userId, otherUserId] : [fixture.userId],
     spreadsheetId: "sheet-pilot", tabId: "requests", boardId: "board-pilot",
   };
   const pilotConfig: PilotConfig = {
@@ -40,10 +49,28 @@ async function harness(writeEnabled = true) {
     groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
     tabId: policy.tabId, requestId: row.request_id,
   }, policy.boardId);
+  const ownerSession = new SessionStore({
+    userId: fixture.userId, email: fixture.email,
+    passwordHash: fixture.config.passwordHash,
+    ttlMs: fixture.config.sessionTtlMs,
+    principalExists: async () => true,
+  });
+  const sessionStore = secondPrincipal ? {
+    login: ownerSession.login.bind(ownerSession),
+    issue: ownerSession.issue.bind(ownerSession),
+    authenticate(input: Parameters<SessionStore["authenticate"]>[0]) {
+      if (typeof input !== "string" && input?.authorization === "Bearer test-other-token") {
+        return otherUserId;
+      }
+      return ownerSession.authenticate(input);
+    },
+    revoke: ownerSession.revoke.bind(ownerSession),
+  } : undefined;
   const api = createApi({
     db: fixture.db, config: fixture.config,
     pilotConfig, pilotPolicy: policy,
     pilotLiveWriteEnabled: writeEnabled,
+    sessionStore,
     readSheetsRequestFn: async () => ({
       row, checklist, sourceKey: key, sourceRevision: checklist.sourceRevision,
     }),
@@ -90,6 +117,9 @@ async function harness(writeEnabled = true) {
     });
   return {
     fixture, api, pilotUrl, headers, create, detail, decide, pilotConfig, intentKey,
+    async otherHeaders() {
+      return { authorization: "Bearer test-other-token", "content-type": "application/json" };
+    },
     async close() { await api.close(); await fixture.close(); },
   };
 }
@@ -396,6 +426,141 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
       const replay = await h.decide(runId, "approved", detail.preview);
       expect(replay.status).toBe(409);
       expect(trello.writes()).toBe(1);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
+  it("quarantines a Trello response without a card ID and never replays the POST", async () => {
+    const h = await harness();
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      const realFetch = globalThis.fetch;
+      let posts = 0;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (!url.startsWith("https://api.trello.com/")) return realFetch(input, init);
+        if (init?.method === "POST") {
+          posts++;
+          return new Response(JSON.stringify({ url: "https://trello.com/c/unknown" }), {
+            status: 200, headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify([{ id: "list-todo", name: "To Do", closed: false }]), {
+          status: 200, headers: { "content-type": "application/json" },
+        });
+      });
+      const response = await h.decide(runId, "approved", preview);
+      expect(response.status).toBe(200);
+      expect((await response.json() as any).status).toBe("reconciliation_required");
+      expect((await h.fixture.db.client`
+        SELECT status FROM business_reservations WHERE intent_key = ${h.intentKey}`)[0]?.status)
+        .toBe("unknown");
+      expect((await h.decide(runId, "approved", preview)).status).toBe(409);
+      expect(posts).toBe(1);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
+  it("keeps the intent unknown when DB receipt confirmation fails after one POST", async () => {
+    const h = await harness();
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      await h.fixture.db.client.unsafe(`
+        CREATE FUNCTION block_pilot_confirmation() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.status = 'confirmed' THEN
+            RAISE EXCEPTION 'confirmation unavailable';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        CREATE TRIGGER block_pilot_confirmation
+        BEFORE UPDATE ON business_reservations
+        FOR EACH ROW EXECUTE FUNCTION block_pilot_confirmation();
+      `);
+      const trello = mockTrello();
+      const response = await h.decide(runId, "approved", preview);
+      expect(response.status).toBe(200);
+      expect((await response.json() as any).status).toBe("reconciliation_required");
+      expect((await h.fixture.db.client`
+        SELECT status, remote_id FROM business_reservations WHERE intent_key = ${h.intentKey}`)[0])
+        .toMatchObject({ status: "unknown", remote_id: null });
+      expect((await h.detail(runId)).status).toBe("reconciliation_required");
+      expect((await h.decide(runId, "approved", preview)).status).toBe(409);
+      expect(trello.writes()).toBe(1);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
+  it("rejects approval replay from a fresh API instance using the same database", async () => {
+    const h = await harness();
+    let nextApi: ReturnType<typeof createApi> | undefined;
+    let firstClosed = false;
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      const trello = mockTrello();
+      expect((await h.decide(runId, "approved", preview)).status).toBe(200);
+      expect(trello.writes()).toBe(1);
+
+      await h.api.close();
+      firstClosed = true;
+      nextApi = createApi({
+        db: h.fixture.db, config: h.fixture.config,
+        pilotConfig: h.pilotConfig, pilotPolicy: h.pilotConfig,
+        pilotLiveWriteEnabled: true,
+      });
+      const nextBase = await nextApi.listen();
+      const login = await fetch(`${nextBase}/auth/login`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: h.fixture.email, password: h.fixture.password }),
+      });
+      expect(login.status).toBe(200);
+      const { token } = await login.json() as { token: string };
+      const nextPilotUrl = nextBase.replace(/\/api\/v1$/, "") + "/pilot/v2";
+      const replay = await fetch(`${nextPilotUrl}/runs/${runId}/approve`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          decision: "approved", approvalId: preview.approvalId,
+          versionId: preview.versionId, snapshotHash: preview.snapshotHash,
+        }),
+      });
+      expect(replay.status).toBe(409);
+      expect(trello.writes()).toBe(1);
+      expect((await h.fixture.db.client`
+        SELECT status FROM runs WHERE id = ${runId}`)[0]?.status).toBe("succeeded");
+    } finally {
+      await nextApi?.close();
+      if (!firstClosed) await h.api.close();
+      await h.fixture.close();
+    }
+  }, 45_000);
+
+  it("conceals operator A's run and approval from another permitted operator", async () => {
+    const h = await harness(true, true);
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      const otherHeaders = await h.otherHeaders();
+      const trello = mockTrello();
+      const read = await fetch(`${h.pilotUrl}/runs/${runId}`, { headers: otherHeaders });
+      const approve = await fetch(`${h.pilotUrl}/runs/${runId}/approve`, {
+        method: "POST", headers: otherHeaders,
+        body: JSON.stringify({
+          decision: "approved", approvalId: preview.approvalId,
+          versionId: preview.versionId, snapshotHash: preview.snapshotHash,
+        }),
+      });
+      expect(read.status).toBe(404);
+      expect(approve.status, await approve.text()).toBe(404);
+      expect(trello.writes()).toBe(0);
+      expect((await h.detail(runId)).status).toBe("awaiting_approval");
     } finally {
       await h.close();
     }

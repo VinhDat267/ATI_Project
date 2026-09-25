@@ -2,7 +2,7 @@
 
 Đây là monorepo TypeScript cho prototype điều phối workflow có bước **xem trước → người dùng duyệt → thực thi → đối chiếu kết quả**. `ATI_Project`, `ati-*` và `@wap/*` là tên kỹ thuật/lịch sử được giữ để tương thích. Phạm vi sản phẩm hiện hành là **MVP v2 cho nhóm dịch vụ thiết kế/web**; nền B/local trước đó vẫn có trong repository để phát triển và đối chứng.
 
-> **Trạng thái 23/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Google Sheets/Trello thật, chất lượng AI provider trên bộ v2 và nghiệm thu người dùng đại diện **chưa chạy**. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
+> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Preflight chỉ đọc đã GET Google Sheets/Trello sandbox thật và trả `passed`; chưa tạo/đối chiếu card Trello thật, đo chất lượng AI provider trên bộ v2 hay nghiệm thu người dùng đại diện. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
 
 ## Team nên đọc gì trước?
 
@@ -23,7 +23,7 @@ MVP v2 **không** bao gồm ghi ngược Sheet, gửi Slack/email thật, schedu
 | Trục | Đã được kiểm | Còn thiếu |
 |---|---|---|
 | Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và SaaS thật trên đường sản phẩm |
-| SaaS live | Adapter, policy và test giả lập | `SAAS_LIVE_NOT_RUN`: chưa GET Sheet/Trello thật hoặc tạo/đối chiếu một card thật |
+| SaaS live | Adapter, policy, test giả lập và preflight GET Sheet/Trello sandbox thật ngày 25/09/2026 | `SAAS_LIVE_WRITE_NOT_RUN`: chưa tạo/đối chiếu một card thật hoặc xác nhận đường sản phẩm end-to-end |
 | AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; test mô phỏng | `AI_QUALITY_NOT_RUN`: runner P6 không gọi provider và còn dùng oracle để chọn một số kết quả |
 | Người dùng đại diện | Phạm vi và Design System đã được chủ project duyệt | `CUSTOMER_VALIDATED_NOT_RUN`; chưa có acceptance với người dùng đại diện |
 
@@ -46,7 +46,7 @@ System Design         Design System và quyết định giao diện đã duyệt
 
 Đường **B/local** là controller nhận plan tay hoặc planner fixture, đọc qua MCP local, lưu snapshot/approval trong PostgreSQL rồi gọi write local sau duyệt. Tên tool như `send_slack_message` hoặc `append_sheet_rows` ở `task_hub` là hành vi **local**, không gửi tới Slack/Google thật. [Engine CLI](packages/engine/README.md) và [task_hub](apps/mcp-task-hub/README.md) mô tả đường này.
 
-Đường **MVP v2** dùng `/pilot/v2` trong API, adapter Google Sheets/Trello và `business_reservations` trong PostgreSQL. UC2 dùng approval DB gắn owner, run, version, snapshot hash, list đích và TTL 10 phút; API chỉ cho dispatch khi cờ write riêng được bật. Timeout sau khả năng đã gửi POST được giữ ở `reconciliation_required`, không retry mù. Ba runner P6 (`live-preflight`, `live-uc2-runner`, `live-eval-runner`) hiện chưa là lệnh/API vận hành của sản phẩm; runner evaluation hiện chỉ mô phỏng.
+Đường **MVP v2** dùng `/pilot/v2` trong API, adapter Google Sheets/Trello và `business_reservations` trong PostgreSQL. UC2 dùng approval DB gắn owner, run, version, snapshot hash, list đích và TTL 10 phút; API chỉ cho dispatch khi cờ write riêng được bật. Timeout sau khả năng đã gửi POST được giữ ở `reconciliation_required`, không retry mù. `live-preflight` có CLI operator chỉ đọc; `live-uc2-runner` và `live-eval-runner` chưa là lệnh/API vận hành của sản phẩm. Runner quality mới hiện chỉ mô phỏng.
 
 Đường **AI B/local** có provider ports, retrieval semantic/QE, index pgvector và cơ chế approval/accounting. Pipeline đánh giá live của đường này có [runbook riêng](docs/ai-evidence/AI-LIVE/READINESS-RUNBOOK.md). Không dùng kết quả B/local để tuyên bố quality của MVP v2.
 
@@ -108,7 +108,7 @@ Các bước offline ở trên không cần Google/Trello/AI API key. Trước k
 | AI B/local | `OPENAI_API_KEY` hoặc `GEMINI_API_KEY` theo provider/profile | Cấu hình provider ở server; không đồng nghĩa runner quality v2 đã hoạt động |
 | AI evaluation | `AI_EVAL_DATABASE_URL`, approval, freeze, price card, budget | Evaluator B/local dùng DB riêng; v2 provider-backed evaluation còn nằm trong kế hoạch triển khai |
 
-Repository hiện **không tự nạp `.env.pilot`**. Chỉ tạo file đó không cấu hình API. Cổng và trình tự cho SaaS/AI nằm trong [plan tổng hợp](docs/plans/2026-09-22-mvp-v2-backend/07-SAAS-LIVE-AI-QUALITY-PLAN.md), [plan SaaS](docs/superpowers/plans/2026-09-23-pilot-v2-saas-live.md) và [plan AI quality](docs/superpowers/plans/2026-09-23-pilot-v2-ai-quality.md). Chưa có lệnh operator đã kiểm chứng cho BE-26 live preflight; đừng dùng unit test P6 làm lệnh live.
+Repository hiện **không tự nạp `.env.pilot`**. Chỉ tạo file đó không cấu hình API. Cổng và trình tự cho SaaS/AI nằm trong [plan tổng hợp](docs/plans/2026-09-22-mvp-v2-backend/07-SAAS-LIVE-AI-QUALITY-PLAN.md), [plan SaaS](docs/superpowers/plans/2026-09-23-pilot-v2-saas-live.md) và [plan AI quality](docs/superpowers/plans/2026-09-23-pilot-v2-ai-quality.md). CLI BE-26 chỉ đọc đã qua test giả và một lần đọc SaaS sandbox thật ngày 25/09/2026; lệnh, artifact và giới hạn nằm trong [runbook](docs/PILOT-V2-RUNBOOK.md).
 
 ## Kiểm thử và ý nghĩa kết quả
 
@@ -130,4 +130,4 @@ Repository hiện **không tự nạp `.env.pilot`**. Chỉ tạo file đó khô
 3. Viết test đúng tầng: unit/fixture cho hợp đồng, PostgreSQL/HTTP/browser cho runtime local, artifact remote riêng cho SaaS, ledger/provider thật riêng cho AI. Cập nhật nhãn `NOT_RUN` chỉ khi có bằng chứng tương ứng.
 4. Với UI, theo [System Design đã duyệt](System%20Design/DESIGN.md); thay đổi thiết kế cần chủ project review. Với thao tác live, theo [runbook pilot](docs/PILOT-V2-RUNBOOK.md) và không bật write trước khi qua các cổng.
 
-Mốc tiếp theo là hoàn thiện preflight chỉ đọc và các regression gate UC2, sau đó mới xác nhận tài nguyên thử nghiệm, một write SaaS có approval và phép đo AI provider có budget. **Không coi repository này đã sẵn sàng bàn giao SaaS live hoặc production.**
+Mốc tiếp theo là đối chiếu cổng UC2, chuẩn bị preview cụ thể cho một write SaaS có approval và phép đo AI provider có budget. **Không coi repository này đã sẵn sàng bàn giao SaaS live hoặc production.**
