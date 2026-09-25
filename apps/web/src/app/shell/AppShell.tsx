@@ -11,6 +11,7 @@ import { Logo } from "./Logo";
 const NAV: Array<{ route: Route; label: string }> = [
   { route: { page: "overview" }, label: "Tổng quan" },
   { route: { page: "new" }, label: "Tạo yêu cầu" },
+  { route: { page: "pilot-new" }, label: "Điều phối Pilot v2" },
   { route: { page: "history" }, label: "Danh sách công việc" },
   { route: { page: "tools" }, label: "Công cụ & kết nối" },
 ];
@@ -19,8 +20,7 @@ function isActive(route: Route, item: Route): boolean {
   return (
     route.page === item.page ||
     (route.page === "run" && item.page === "history") ||
-    (route.page === "pilot-run" && item.page === "history") ||
-    (route.page === "pilot-new" && item.page === "new")
+    (route.page === "pilot-run" && item.page === "history")
   );
 }
 
