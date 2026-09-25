@@ -69,7 +69,7 @@ Thực hiện theo kế hoạch `docs/superpowers/plans/2026-09-23-pilot-v2-saas
    - Bằng chứng đã được lưu và redact an toàn tại `docs/ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json`.
 
 3. **Trạng thái cổng Cổng G4 / G5 / G6**:
-   - **Cổng G4 (`SAAS_LIVE_EXERCISED`)**: **ĐẠT (PASSED)** — Đã có bằng chứng vận hành live thực tế.
-   - **Cổng G5 (`AI_QUALITY_MEASURED`)**: **TẠM DỪNG / CHƯA ĐO (`AI_QUALITY_NOT_MEASURED`)** — Provider probe gặp HTTP 503 từ upstream Google API, hệ thống dừng lại an toàn theo trần ngân sách $0, không retry mù (`docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`).
+   - **Cổng G4 (`SAAS_LIVE_EXERCISED`)**: **ĐẠT (PASSED)** — Đã có bằng chứng vận hành live thực tế trên Google Sheets và Trello Sandbox (commit `82d5e43`, artifact `live-session-confirmed.json`).
+   - **Cổng G5 (`AI_QUALITY_MEASURED`)**: **GIỚI HẠN BỞI NHÀ CUNG CẤP (`AI_QUALITY_NOT_MEASURED / PROVIDER_LIMITED`)** — Đã khóa manifest Free Tier 0 USD (`f38282245ce0...`), tối ưu `thinking_level: 'low'` (6.6s latency, output hoàn chỉnh). Tuy nhiên, Google áp hạn mức 20 RPD trên `gemini-3.8-flash` (HTTP 429) và quá tải tạm thời trên `gemini-3.7-flash` (HTTP 503). Hệ thống dừng an toàn, bảo lưu trung thực (`docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`).
    - **Cổng G6 (`CUSTOMER_VALIDATED`)**: **CHƯA CHẠY (`NOT_RUN`)**.
    - **Bàn giao tổng thể**: **HANDOFF_BLOCKED** cho đến khi đo lường chất lượng AI và nghiệm thu khách hàng.

@@ -66,6 +66,10 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 
 `runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật.
 
-Ngày 25/09/2026, đợt probe thật đầu tiên tới Google Gemini (`gemini-2.5-flash`) theo trần ngân sách $0 nhận HTTP 503 Service Unavailable từ upstream Google. Hệ thống đã dừng lại an toàn, không retry mù, không đổi key và ghi nhận vào `docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`. Trạng thái đo lường chất lượng AI giữ nguyên là **`PROVIDER_PROBE_FAILED / AI_QUALITY_NOT_MEASURED`**.
+Ngày 25/09/2026, hai đợt probe thật tới Google Gemini theo trần ngân sách Free Tier 0 USD đã ghi nhận các giới hạn hạ tầng thực tế từ phía nhà cung cấp:
+- **`gemini-3.7-flash`**: Nhận lỗi `HTTP 503 Service Unavailable` do máy chủ Google quá tải tạm thời (*"gemini-3.7-flash is currently experiencing high demand"*); có thời điểm phản hồi `HTTP 200` (6.0s) nhưng nhanh chóng quay lại trạng thái nghẽn tải.
+- **`gemini-3.8-flash`**: Đã xác thực giá Free Tier 0 USD và đóng băng manifest thành công (`f38282245ce0...`). Với cấu hình `thinking_level: 'low'`, mô hình phản hồi hợp lệ trong **6.6s** (trả về JSON chuẩn `PlannerResultSchema`). Tuy nhiên, Google áp đặt hạn mức Free Tier nghiêm ngặt là **chỉ 20 requests/ngày (20 RPD)** cho `gemini-3.8-flash` (`HTTP 429 Too Many Requests`), khiến không thể thực hiện đủ bộ 60 ca đánh giá trong 1 ngày mà không có tài khoản trả phí.
 
-Trước khi nâng `AI_QUALITY_MEASURED`, cần xử lý upstream quota/connectivity của Gemini, chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot tiếp tục duy trì **`HANDOFF_BLOCKED`** cho đến khi đo lường chất lượng AI và nghiệm thu hoàn tất.
+Chi tiết kỹ thuật được lưu tại `docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`. Trạng thái đo lường chất lượng AI được bảo lưu trung thực là **`PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED`**.
+
+Trước khi nâng `AI_QUALITY_MEASURED`, cần nâng cấp gói API hoặc đợi chu kỳ reset quota để chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot tiếp tục duy trì **`HANDOFF_BLOCKED`** cho đến khi đo lường chất lượng AI và nghiệm thu hoàn tất.
