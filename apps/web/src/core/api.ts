@@ -145,7 +145,20 @@ export function createHttpTransport(
 
     if (!response.ok) {
       let code = "HTTP_ERROR";
-      let message = `Máy chủ phản hồi mã lỗi ${response.status}`;
+      let message =
+        response.status === 502 || response.status === 503 || response.status === 504
+          ? "Dịch vụ xử lý trung tâm đang khởi động hoặc tạm thời chưa kết nối. Vui lòng đợi vài giây rồi thử lại."
+          : response.status === 401
+            ? "Email hoặc mật khẩu chưa chính xác, hoặc phiên làm việc đã hết hạn."
+            : response.status === 403
+              ? "Tài khoản của bạn chưa được cấp quyền thực hiện thao tác này."
+              : response.status === 404
+                ? "Không tìm thấy dữ liệu hoặc chức năng yêu cầu."
+                : response.status === 429
+                  ? "Bạn thao tác quá nhanh. Vui lòng đợi ít giây rồi thử lại."
+                  : response.status >= 500
+                    ? "Hệ thống gặp gián đoạn tạm thời khi xử lý yêu cầu. Vui lòng thử lại sau."
+                    : "Không thể hoàn tất yêu cầu. Vui lòng kiểm tra lại thông tin và thử lại.";
       let requestId = response.headers.get("x-request-id") ?? undefined;
 
       try {

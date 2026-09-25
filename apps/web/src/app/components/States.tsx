@@ -38,8 +38,15 @@ export function ErrorState({
   error: unknown;
   onRetry?: () => void;
 }) {
-  const message =
-    error instanceof Error ? error.message : "Lỗi không xác định";
+  const rawMessage =
+    error instanceof Error ? error.message : "Không thể tải dữ liệu vào lúc này.";
+  const message = /mã lỗi\s*(502|503|504)|Failed to fetch|ECONNREFUSED|NetworkError/i.test(
+    rawMessage,
+  )
+    ? "Dịch vụ xử lý trung tâm đang khởi động hoặc tạm thời chưa kết nối. Vui lòng đợi vài giây rồi bấm Thử lại."
+    : /mã lỗi\s*500/i.test(rawMessage)
+      ? "Hệ thống gặp gián đoạn tạm thời khi xử lý yêu cầu. Vui lòng thử lại sau."
+      : rawMessage;
   return (
     <div className="flex flex-col gap-3">
       <Banner tone="danger" icon="circle-x" title={title} live>

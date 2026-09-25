@@ -32,7 +32,7 @@
     "up": "node scripts/start-system.mjs",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
-    "api:dev": "npm run dev -w @wap/api",
+    "api:dev": "node scripts/run-api-live.mjs",
     "api:start": "npm run start -w @wap/api",
     "web:dev": "npm run dev -w @wap/web",
     "web:live": "npm run dev:live -w @wap/web",

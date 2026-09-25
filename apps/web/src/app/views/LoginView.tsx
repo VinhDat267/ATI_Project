@@ -97,8 +97,16 @@ export function LoginView({
       if (login.error.status === 429) {
         return "Quá nhiều lần thử đăng nhập. Vui lòng đợi và thử lại sau.";
       }
-      if (login.error.kind === "network") {
-        return "Không thể kết nối đến máy chủ. Kiểm tra kết nối mạng hoặc máy chủ.";
+      if (
+        login.error.kind === "network" ||
+        login.error.status === 502 ||
+        login.error.status === 503 ||
+        login.error.status === 504
+      ) {
+        return "Dịch vụ hệ thống đang khởi động hoặc tạm thời chưa kết nối. Vui lòng đợi vài giây rồi bấm Đăng nhập lại.";
+      }
+      if (login.error.status && login.error.status >= 500) {
+        return "Hệ thống đang bận xử lý. Vui lòng thử đăng nhập lại sau giây lát.";
       }
       return login.error.message;
     }
@@ -113,7 +121,7 @@ export function LoginView({
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface-soft px-3 py-0.5 text-caption font-medium text-muted">
             <span className="size-2 rounded-full bg-success" />
-            <span>Hệ thống nội bộ</span>
+            <span>{mode === "live" ? "Hệ thống vận hành (Live)" : "Hệ thống nội bộ"}</span>
           </span>
           {mode === "fixture" ? (
             <span className="inline-flex h-6 items-center rounded-full border border-demo/10 bg-demo-subtle px-2.5 text-badge text-demo">
@@ -160,8 +168,8 @@ export function LoginView({
               </p>
             ) : null}
 
-            {/* Quick Demo 1-Click Login Card (Fixture Mode) */}
-            {mode === "fixture" && demoLogin ? (
+            {/* Quick 1-Click Login Card */}
+            {demoLogin ? (
               <div className="flex flex-col gap-3">
                 <button
                   type="button"
@@ -176,10 +184,14 @@ export function LoginView({
                     </span>
                     <div className="flex flex-col">
                       <span className="text-title-md font-semibold text-ink transition-colors group-hover:text-progress">
-                        ⚡ Trải nghiệm nhanh 1-Click
+                        {mode === "live"
+                          ? "⚡ Đăng nhập nhanh tài khoản quản trị"
+                          : "⚡ Trải nghiệm nhanh 1-Click"}
                       </span>
                       <span className="text-caption text-muted">
-                        Đăng nhập ngay với tài khoản mẫu để dùng thử
+                        {mode === "live"
+                          ? "Tự động điền thông tin và vào ngay không gian làm việc"
+                          : "Đăng nhập ngay với tài khoản mẫu để dùng thử"}
                       </span>
                     </div>
                   </div>

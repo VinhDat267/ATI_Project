@@ -66,11 +66,7 @@ async function main() {
   const dbUrl =
     process.env.G1_DATABASE_URL ||
     "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
-  const hasAiKey = Boolean(
-    process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY,
-  );
-  const plannerMode =
-    process.env.API_PLANNER_MODE || (hasAiKey ? "ai" : "dev_fixture");
+  const plannerMode = process.env.API_PLANNER_MODE || "dev_fixture";
 
   const sharedEnv = {
     ...process.env,
@@ -80,6 +76,13 @@ async function main() {
     API_CURSOR_KEY: cursorKey,
     API_PORT: process.env.API_PORT || "3001",
     API_PLANNER_MODE: plannerMode,
+    AI_PLANNING_PROVIDER: process.env.AI_PLANNING_PROVIDER || "google",
+    AI_PLANNING_MODEL: process.env.AI_PLANNING_MODEL || "gemini-3.5-flash",
+    AI_QE_PROVIDER: process.env.AI_QE_PROVIDER || "google",
+    AI_QE_MODEL: process.env.AI_QE_MODEL || "gemini-3.5-flash",
+    AI_EMBEDDING_PROVIDER: process.env.AI_EMBEDDING_PROVIDER || "google",
+    AI_EMBEDDING_MODEL: process.env.AI_EMBEDDING_MODEL || "gemini-embedding-001",
+    AI_EMBEDDING_DIMENSIONS: process.env.AI_EMBEDDING_DIMENSIONS || "1536",
     WAP_API_TARGET: process.env.WAP_API_TARGET || "http://127.0.0.1:3001",
     WAP_FRONTEND_ORIGIN:
       process.env.WAP_FRONTEND_ORIGIN || "http://127.0.0.1:5173",
