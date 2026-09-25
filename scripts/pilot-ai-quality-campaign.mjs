@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAiPorts } from '../packages/engine/dist/ai/providers/registry.js';
+import { createAiPorts, safeProviderFailureDiagnostics } from '../packages/engine/dist/ai/providers/registry.js';
 import { InMemoryProviderCallLedger } from '../packages/engine/dist/ai/providers/accounting.js';
 import { createPilotQualityFreeze, assertPilotQualityFreeze } from '../packages/engine/dist/pilot/quality-freeze.js';
 import { openPilotQualityJournal } from '../packages/engine/dist/pilot/quality-journal.js';
@@ -227,6 +227,8 @@ try {
   else fail('USAGE: prepare|run|report');
 } catch (error) {
   // Do not print provider response bodies, request URLs, key values or prompts.
-  console.error(JSON.stringify({ status: 'STOPPED', reason: error instanceof Error ? error.message.split(':')[0] : 'UNKNOWN' }));
+  const failure = safeProviderFailureDiagnostics(error);
+  const reason = failure?.localCode ?? 'OPERATION_FAILED';
+  console.error(JSON.stringify({ status: 'STOPPED', reason, ...(failure ? { providerFailure: failure } : {}) }));
   process.exitCode = 1;
 }

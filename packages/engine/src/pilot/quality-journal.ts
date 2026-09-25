@@ -16,7 +16,17 @@ export interface PilotQualityOutcomeInput {
   readonly status: 'succeeded' | 'failed';
   readonly observation?: unknown;
   readonly error?: string;
+  readonly failure?: PilotQualityFailureDiagnostics;
   readonly durationMs: number;
+}
+
+/** Safe failure metadata only. No provider prose, URL, headers, or credentials. */
+export interface PilotQualityFailureDiagnostics {
+  readonly localCode: string;
+  readonly httpStatus: number | null;
+  readonly providerCode: number | string | null;
+  readonly providerStatus: string | null;
+  readonly retryAfterMs: number | null;
 }
 
 export interface PilotQualityMeasuredGate {
@@ -52,6 +62,7 @@ export interface PilotQualityAttemptState extends PilotQualityReservationInput {
   readonly redactionApplied?: boolean;
   readonly unsafeToGrade?: boolean;
   readonly errorSha256?: string;
+  readonly failure?: PilotQualityFailureDiagnostics;
 }
 
 export interface PilotQualityJournalState {
@@ -71,12 +82,45 @@ export interface PilotQualityJournal extends PilotQualityMeasuredGate {
 
 type MetaEvent = { type: 'campaign'; campaignId: string; freezeHash: string; provider: string; model: string; maxCalls: number; maxCostUsd: 0; freeTierAttested: true };
 type ReservedEvent = { type: 'reserved'; attemptId: string; input: PilotQualityReservationInput };
-type OutcomeEvent = { type: 'outcome'; attemptId: string; status: 'succeeded' | 'failed'; durationMs: number; usageState: 'unknown' | 'reported'; inputTokens?: number; outputTokens?: number; observationSha256?: string; observation?: unknown; redactionApplied?: boolean; unsafeToGrade?: boolean; errorSha256?: string };
+type OutcomeEvent = { type: 'outcome'; attemptId: string; status: 'succeeded' | 'failed'; durationMs: number; usageState: 'unknown' | 'reported'; inputTokens?: number; outputTokens?: number; observationSha256?: string; observation?: unknown; redactionApplied?: boolean; unsafeToGrade?: boolean; errorSha256?: string; failure?: PilotQualityFailureDiagnostics };
 type JournalEvent = MetaEvent | ReservedEvent | OutcomeEvent;
 type Envelope = { sequence: number; previousHash: string; event: JournalEvent; hash: string };
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const ZERO_HASH = '0'.repeat(64);
+const SAFE_LOCAL_CODES = new Set([
+  'PROVIDER_HTTP_ERROR', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_MODEL_MISMATCH',
+  'PROVIDER_SAFETY_BLOCK', 'PROVIDER_TIMEOUT', 'PROVIDER_NETWORK_ERROR',
+  'PROVIDER_VECTOR_INVALID', 'PROVIDER_CONFIG_MISSING_SECRET', 'PRICE_BOUND_UNPROVEN',
+  'AI_LIVE_NOT_READY', 'AI_CALL_UNAUTHORIZED', 'AI_PROVIDER_CALLS_DISABLED',
+]);
+const SAFE_PROVIDER_CODES = new Set([
+  'service_unavailable', 'rate_limit_exceeded', 'resource_exhausted',
+  'quota_exceeded', 'invalid_request', 'permission_denied', 'unauthorized',
+  'model_not_found', 'internal_error',
+]);
+const SAFE_PROVIDER_STATUSES = new Set([
+  'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'INTERNAL', 'DEADLINE_EXCEEDED',
+  'PERMISSION_DENIED', 'UNAUTHENTICATED', 'INVALID_ARGUMENT', 'FAILED_PRECONDITION',
+  'NOT_FOUND', 'UNKNOWN', 'ABORTED', 'CANCELLED', 'OUT_OF_RANGE',
+  'ALREADY_EXISTS', 'DATA_LOSS', 'UNIMPLEMENTED',
+]);
+
+function validFailure(value: unknown): value is PilotQualityFailureDiagnostics {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).some((field) => !['localCode', 'httpStatus', 'providerCode', 'providerStatus', 'retryAfterMs'].includes(field)) ||
+      typeof record.localCode !== 'string' || !SAFE_LOCAL_CODES.has(record.localCode)) return false;
+  const status = record.httpStatus;
+  const code = record.providerCode;
+  const providerStatus = record.providerStatus;
+  const retry = record.retryAfterMs;
+  return (status === null || (Number.isInteger(status) && Number(status) >= 100 && Number(status) <= 599)) &&
+    (code === null || (typeof code === 'number' && Number.isInteger(code) && code >= 100 && code <= 599) ||
+      (typeof code === 'string' && SAFE_PROVIDER_CODES.has(code))) &&
+    (providerStatus === null || (typeof providerStatus === 'string' && SAFE_PROVIDER_STATUSES.has(providerStatus))) &&
+    (retry === null || (Number.isSafeInteger(retry) && Number(retry) >= 0 && Number(retry) <= 3_600_000));
+}
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -158,12 +202,13 @@ function parseJournal(bytes: string, expected: MetaEvent): { events: Envelope[];
       const priorAttempt = attempts.get(event.attemptId);
       if (!priorAttempt || priorAttempt.status !== 'reserved' || !['succeeded', 'failed'].includes(event.status) ||
           !Number.isFinite(event.durationMs) || event.durationMs < 0 ||
-          !['unknown', 'reported'].includes(event.usageState)) throw new Error('QUALITY_JOURNAL_CORRUPT');
+          !['unknown', 'reported'].includes(event.usageState) ||
+          (event.failure !== undefined && (event.status !== 'failed' || !validFailure(event.failure)))) throw new Error('QUALITY_JOURNAL_CORRUPT');
       attempts.set(event.attemptId, { ...priorAttempt, status: event.status, usageState: event.usageState,
         inputTokens: event.inputTokens, outputTokens: event.outputTokens, durationMs: event.durationMs,
         observationSha256: event.observationSha256, observation: event.observation,
         redactionApplied: event.redactionApplied, unsafeToGrade: event.unsafeToGrade,
-        errorSha256: event.errorSha256 });
+        errorSha256: event.errorSha256, failure: event.failure });
     } else if (events.length > 0) {
       throw new Error('QUALITY_JOURNAL_CORRUPT');
     }
@@ -269,6 +314,9 @@ export async function openPilotQualityJournal(options: PilotQualityJournalOption
           if (!['succeeded', 'failed'].includes(input.status) || !Number.isFinite(input.durationMs) || input.durationMs < 0) {
             throw new Error('QUALITY_JOURNAL_INVALID_OUTCOME');
           }
+          if (input.failure !== undefined && (input.status !== 'failed' || !validFailure(input.failure))) {
+            throw new Error('QUALITY_JOURNAL_INVALID_FAILURE_DIAGNOSTICS');
+          }
           let observationSha256: string | undefined;
           let observation: unknown;
           let redactionApplied = false;
@@ -287,14 +335,15 @@ export async function openPilotQualityJournal(options: PilotQualityJournalOption
             durationMs: input.durationMs, ...usageFrom(input.observation),
             ...(observationSha256 ? { observationSha256, observation, redactionApplied, unsafeToGrade: redactionApplied }
               : { unsafeToGrade: true }),
-            ...(typeof input.error === 'string' ? { errorSha256: sha256(input.error) } : {}) };
+            ...(typeof input.error === 'string' ? { errorSha256: sha256(input.error) } : {}),
+            ...(input.failure ? { failure: { ...input.failure } } : {}) };
           await append(event);
           attempts = attempts.map((attempt) => attempt.attemptId === input.attemptId
             ? { ...attempt, status: event.status, durationMs: event.durationMs, usageState: event.usageState,
                 inputTokens: event.inputTokens, outputTokens: event.outputTokens,
                 observationSha256: event.observationSha256, observation: event.observation,
                 redactionApplied: event.redactionApplied, unsafeToGrade: event.unsafeToGrade,
-                errorSha256: event.errorSha256 }
+                errorSha256: event.errorSha256, failure: event.failure }
             : attempt);
         });
       },

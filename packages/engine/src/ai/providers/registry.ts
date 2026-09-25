@@ -100,6 +100,9 @@ export class ProviderClientError extends Error {
   readonly provider: string;
   readonly requestId: string | null;
   readonly status: number | null;
+  readonly providerCode: number | string | null;
+  readonly providerStatus: string | null;
+  readonly retryAfterMs: number | null;
 
   constructor(
     code: ProviderClientError["code"],
@@ -108,6 +111,9 @@ export class ProviderClientError extends Error {
       provider: string;
       requestId?: string | null;
       status?: number | null;
+      providerCode?: number | string | null;
+      providerStatus?: string | null;
+      retryAfterMs?: number | null;
     },
   ) {
     super(message);
@@ -116,7 +122,62 @@ export class ProviderClientError extends Error {
     this.provider = options.provider;
     this.requestId = options.requestId ?? null;
     this.status = options.status ?? null;
+    this.providerCode = options.providerCode ?? null;
+    this.providerStatus = options.providerStatus ?? null;
+    this.retryAfterMs = options.retryAfterMs ?? null;
   }
+}
+
+const SAFE_PROVIDER_STATUSES = new Set([
+  'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'INTERNAL', 'DEADLINE_EXCEEDED',
+  'PERMISSION_DENIED', 'UNAUTHENTICATED', 'INVALID_ARGUMENT', 'FAILED_PRECONDITION',
+  'NOT_FOUND', 'UNKNOWN', 'ABORTED', 'CANCELLED', 'OUT_OF_RANGE',
+  'ALREADY_EXISTS', 'DATA_LOSS', 'UNIMPLEMENTED',
+]);
+const SAFE_PROVIDER_CODES = new Set([
+  'service_unavailable', 'rate_limit_exceeded', 'resource_exhausted',
+  'quota_exceeded', 'invalid_request', 'permission_denied', 'unauthorized',
+  'model_not_found', 'internal_error',
+]);
+const SAFE_LOCAL_CODES = new Set([
+  'PROVIDER_CONFIG_MISSING_SECRET', 'PROVIDER_HTTP_ERROR', 'PROVIDER_RESPONSE_INVALID',
+  'PROVIDER_MODEL_MISMATCH', 'PROVIDER_SAFETY_BLOCK', 'PROVIDER_TIMEOUT',
+  'PROVIDER_NETWORK_ERROR', 'PROVIDER_VECTOR_INVALID', 'PRICE_BOUND_UNPROVEN',
+  'AI_LIVE_NOT_READY', 'AI_CALL_UNAUTHORIZED', 'AI_PROVIDER_CALLS_DISABLED',
+]);
+
+/** Copies only bounded diagnostic fields. Provider-supplied prose is never returned. */
+export function safeProviderFailureDiagnostics(error: unknown): {
+  localCode: ProviderClientError['code'];
+  httpStatus: number | null;
+  providerCode: number | string | null;
+  providerStatus: string | null;
+  retryAfterMs: number | null;
+} | null {
+  if (!(error instanceof ProviderClientError)) return null;
+  if (!SAFE_LOCAL_CODES.has(error.code)) return null;
+  return {
+    localCode: error.code,
+    httpStatus: Number.isInteger(error.status) && error.status! >= 100 && error.status! <= 599 ? error.status : null,
+    providerCode: typeof error.providerCode === 'number' && Number.isInteger(error.providerCode) &&
+      error.providerCode >= 100 && error.providerCode <= 599 ? error.providerCode :
+      typeof error.providerCode === 'string' && SAFE_PROVIDER_CODES.has(error.providerCode) ? error.providerCode : null,
+    providerStatus: error.providerStatus && SAFE_PROVIDER_STATUSES.has(error.providerStatus) ? error.providerStatus : null,
+    retryAfterMs: Number.isSafeInteger(error.retryAfterMs) && error.retryAfterMs! >= 0 && error.retryAfterMs! <= 3_600_000
+      ? error.retryAfterMs : null,
+  };
+}
+
+function safeRetryAfterMs(header: string | null): number | null {
+  if (!header || header.length > 80) return null;
+  if (/^\d{1,4}$/.test(header)) {
+    const seconds = Number(header);
+    return seconds <= 3600 ? seconds * 1000 : null;
+  }
+  const date = Date.parse(header);
+  if (!Number.isFinite(date)) return null;
+  const remaining = Math.max(0, date - Date.now());
+  return remaining <= 3_600_000 ? Math.ceil(remaining) : null;
 }
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -411,6 +472,28 @@ async function parseResponse(
   provider: "openai" | "google",
 ): Promise<Record<string, unknown>> {
   const text = await response.text();
+  if (!response.ok) {
+    let details: Record<string, unknown> | null = null;
+    if (text.length <= 2_000_000 && response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+      try {
+        const parsed = JSON.parse(text) as unknown;
+        const error = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>).error : null;
+        if (error && typeof error === 'object' && !Array.isArray(error)) details = error as Record<string, unknown>;
+      } catch { /* HTTP status remains authoritative. */ }
+    }
+    const providerCode = details && typeof details.code === 'number' && Number.isInteger(details.code) && details.code >= 100 && details.code <= 599
+      ? details.code : details && typeof details.code === 'string' && SAFE_PROVIDER_CODES.has(details.code)
+        ? details.code : null;
+    const providerStatus = details && typeof details.status === 'string' && SAFE_PROVIDER_STATUSES.has(details.status)
+      ? details.status : null;
+    throw new ProviderClientError(
+      'PROVIDER_HTTP_ERROR',
+      `${provider} provider returned HTTP ${response.status}`,
+      { provider, status: response.status, providerCode, providerStatus,
+        retryAfterMs: safeRetryAfterMs(response.headers.get('retry-after')) },
+    );
+  }
   if (text.length > 2_000_000) {
     throw new ProviderClientError(
       "PROVIDER_RESPONSE_INVALID",
@@ -431,23 +514,6 @@ async function parseResponse(
     body = JSON.parse(text);
   } catch {
     body = null;
-  }
-  if (!response.ok) {
-    const errorDetails =
-      body && typeof body === "object" && "error" in body
-        ? (body as Record<string, unknown>).error
-        : undefined;
-    const detailMsg =
-      errorDetails &&
-      typeof errorDetails === "object" &&
-      "message" in errorDetails
-        ? `: ${(errorDetails as Record<string, unknown>).message}`
-        : "";
-    throw new ProviderClientError(
-      "PROVIDER_HTTP_ERROR",
-      `${provider} provider returned HTTP ${response.status}${detailMsg}`,
-      { provider, status: response.status },
-    );
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new ProviderClientError(
@@ -589,6 +655,10 @@ async function invokeProvider(
       init,
     );
     const parsed = await parseResponse(response, profile.provider);
+    if (profile.provider === 'google' && parsed.status !== 'completed') {
+      throw new ProviderClientError('PROVIDER_RESPONSE_INVALID',
+        'google interaction did not complete', { provider: 'google', status: response.status });
+    }
     return {
       body: parsed,
       latencyMs: (options.now ?? Date.now)() - started,
@@ -646,10 +716,11 @@ function generationBody(
   return {
     model: profile.model,
     input: `${systemPrompt}\n\n${userPrompt}`,
-    response_format: schema,
+    response_format: { type: 'text', mime_type: 'application/json', schema },
     generation_config: {
       max_output_tokens: profile.maxOutputTokens,
     },
+    store: false,
   };
 }
 

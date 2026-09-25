@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createAiPorts,
+  safeProviderFailureDiagnostics,
   type ProviderCallLedger,
 } from "../src/ai/providers/registry.js";
 import { readAiProviderConfig } from "../src/ai/providers/config.js";
@@ -313,6 +314,10 @@ describe("native provider clients with fake transport", () => {
     expect(JSON.parse(String(request?.init.body)).generation_config).toEqual({
       max_output_tokens: 4096,
     });
+    expect(JSON.parse(String(request?.init.body)).response_format).toEqual({
+      type: 'text', mime_type: 'application/json', schema: expect.any(Object),
+    });
+    expect(JSON.parse(String(request?.init.body)).store).toBe(false);
     expect(JSON.stringify(request?.init.body)).not.toContain("OPENAI_API_KEY");
   });
 
@@ -411,6 +416,7 @@ describe("native provider clients with fake transport", () => {
           expect(headers["x-goog-api-key"]).toBe("google-canary");
           return response({
             model: "gemini-3.8-flash",
+            status: 'completed',
             output_text: JSON.stringify({
               result: {
                 kind: "clarification",
@@ -534,8 +540,13 @@ describe("native provider clients with fake transport", () => {
           (JSON.parse(String(init?.body)) as Record<string, unknown>)
             .generation_config,
         ).toEqual({ max_output_tokens: 1024 });
+        expect(JSON.parse(String(init?.body)).response_format).toEqual({
+          type: 'text', mime_type: 'application/json', schema: expect.any(Object),
+        });
+        expect(JSON.parse(String(init?.body)).store).toBe(false);
         return response({
           model: "gemini-3.8-flash",
+          status: 'completed',
           output_text: JSON.stringify({
             queries: ["append rows", "write sheet"],
           }),
@@ -626,6 +637,87 @@ describe("native provider clients with fake transport", () => {
     await expect(
       ports.embedding.embed({ text: "tool", purpose: "query" }),
     ).rejects.toMatchObject({ code: "PROVIDER_HTTP_ERROR" });
+  });
+  it('retains only bounded JSON HTTP 503 diagnostics and makes one request', async () => {
+    let fetchCalls = 0;
+    const settlements: unknown[] = [];
+    const ports = createAiPorts({ config: readAiProviderConfig({
+      AI_PLANNING_PROVIDER: 'google', AI_PLANNING_MODEL: 'gemini-3.8-flash',
+      AI_EMBEDDING_PROVIDER: 'google', AI_EMBEDDING_MODEL: 'gemini-embedding-2',
+    }), credentials: { GEMINI_API_KEY: 'google-canary' },
+    ledger: { async reserve() { return 'one-call'; }, async settle(_id, outcome) { settlements.push(outcome); } },
+    authorizeCall: async () => {},
+    fetchImpl: async () => {
+      fetchCalls++;
+      return new Response(JSON.stringify({ error: { code: 'service_unavailable', status: 'UNAVAILABLE',
+        message: 'secret=do-not-log https://evil.test/?key=top-secret',
+        details: [{ credential: 'secret-value' }] } }),
+      { status: 503, headers: { 'content-type': 'application/json', 'retry-after': '2' } });
+    } });
+    let caught: unknown;
+    try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+    catch (error) { caught = error; }
+    expect(fetchCalls).toBe(1);
+    expect(caught).toMatchObject({ code: 'PROVIDER_HTTP_ERROR', status: 503,
+      providerCode: 'service_unavailable', providerStatus: 'UNAVAILABLE', retryAfterMs: 2000 });
+    expect(safeProviderFailureDiagnostics(caught)).toEqual({ localCode: 'PROVIDER_HTTP_ERROR',
+      httpStatus: 503, providerCode: 'service_unavailable', providerStatus: 'UNAVAILABLE', retryAfterMs: 2000 });
+    expect(JSON.stringify(caught)).not.toContain('do-not-log');
+    expect((caught as Error).message).not.toContain('do-not-log');
+    expect(settlements).toMatchObject([{ status: 'failed', usage: null, costMicros: null,
+      errorCode: 'PROVIDER_HTTP_ERROR' }]);
+  });
+  it('classifies non-JSON HTTP 503 before content validation and drops hostile fields', async () => {
+    let fetchCalls = 0;
+    const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
+      ledger: ledger(), authorizeCall: async () => {},
+      fetchImpl: async () => { fetchCalls++; return new Response('<html>key=secret</html>',
+        { status: 503, headers: { 'content-type': 'text/html', 'retry-after': 'not-a-date' } }); } });
+    let caught: unknown;
+    try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+    catch (error) { caught = error; }
+    expect(fetchCalls).toBe(1);
+    expect(safeProviderFailureDiagnostics(caught)).toEqual({ localCode: 'PROVIDER_HTTP_ERROR',
+      httpStatus: 503, providerCode: null, providerStatus: null, retryAfterMs: null });
+    expect((caught as Error).message).not.toContain('secret');
+  });
+  it('drops unrecognized provider code/status and oversized Retry-After', async () => {
+    const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
+      ledger: ledger(), authorizeCall: async () => {},
+      fetchImpl: async () => new Response(JSON.stringify({ error: {
+        code: 'secret=never-print', status: 'SECRET_STATUS', message: 'Bearer do-not-print',
+      } }), { status: 503, headers: { 'content-type': 'application/json', 'retry-after': '99999' } }) });
+    let caught: unknown;
+    try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+    catch (error) { caught = error; }
+    expect(safeProviderFailureDiagnostics(caught)).toEqual({ localCode: 'PROVIDER_HTTP_ERROR',
+      httpStatus: 503, providerCode: null, providerStatus: null, retryAfterMs: null });
+    expect(JSON.stringify(caught)).not.toContain('never-print');
+    expect(JSON.stringify(caught)).not.toContain('SECRET_STATUS');
+  });
+  it.each(['incomplete', 'failed'])('rejects a Google %s interaction even with valid output text', async (status) => {
+    let fetchCalls = 0;
+    const settlements: unknown[] = [];
+    const googleConfig = readAiProviderConfig({
+      AI_PLANNING_PROVIDER: 'google', AI_PLANNING_MODEL: 'gemini-3.8-flash',
+      AI_EMBEDDING_PROVIDER: 'google', AI_EMBEDDING_MODEL: 'gemini-embedding-2',
+    });
+    const ports = createAiPorts({ config: googleConfig,
+      credentials: { GEMINI_API_KEY: 'google-canary' },
+      ledger: { async reserve() { return 'one-interaction'; }, async settle(_id, outcome) { settlements.push(outcome); } },
+      authorizeCall: async () => {},
+      fetchImpl: async () => {
+        fetchCalls++;
+        return response({ status, model: 'gemini-3.8-flash',
+          output_text: JSON.stringify({ result: { kind: 'refusal', plan: null,
+            clarification: null, refusal: { reason: 'irrelevant' } } }) });
+      },
+    });
+    await expect(ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }))
+      .rejects.toMatchObject({ code: 'PROVIDER_RESPONSE_INVALID' });
+    expect(fetchCalls).toBe(1);
+    expect(settlements).toMatchObject([{ status: 'failed', usage: null, costMicros: null,
+      errorCode: 'PROVIDER_RESPONSE_INVALID' }]);
   });
   it("rejects immediately with zero fetch when request signal is pre-aborted", async () => {
     let fetchCalls = 0;

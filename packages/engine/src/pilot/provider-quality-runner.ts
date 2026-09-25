@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type { StructuredModelClient, StructuredModelResponse } from '../ai/ports.js';
+import { safeProviderFailureDiagnostics } from '../ai/providers/registry.js';
 import type { PilotQualityMeasuredGate } from './quality-journal.js';
 import { evaluateChecklist } from './checklist.js';
 import { PILOT_TOOL_CATALOG, type PilotToolEntry } from './gateway.js';
@@ -330,6 +331,7 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
     try {
       await params.gate.recordOutcome({ attemptId, status: 'failed',
         error: error instanceof Error ? error.name : 'UnknownError',
+        ...(safeProviderFailureDiagnostics(error) ? { failure: safeProviderFailureDiagnostics(error)! } : {}),
         durationMs: performance.now() - started });
     } catch (journalError) {
       throw new Error('QUALITY_JOURNAL_SETTLEMENT_FAILED', { cause: journalError });

@@ -93,4 +93,34 @@ describe('pilot quality durable journal', () => {
     await writeFile(badRoot, 'occupied');
     await expect(openPilotQualityJournal({ ...settings, directory: badRoot })).rejects.toThrow();
   });
+
+  it('persists only bounded failure diagnostics across reopening the journal', async () => {
+    const settings = await options();
+    const journal = await openPilotQualityJournal(settings);
+    const { attemptId } = await journal.authorizeAndReserve(input);
+    const failure = { localCode: 'PROVIDER_HTTP_ERROR', httpStatus: 503,
+      providerCode: 'service_unavailable', providerStatus: 'UNAVAILABLE', retryAfterMs: 2000 };
+    await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 100,
+      error: 'secret=not-persisted', failure });
+    await journal.close();
+    const reopened = await openPilotQualityJournal(settings);
+    expect(reopened.readState().attempts[0]).toMatchObject({ status: 'failed', usageState: 'unknown', failure });
+    await reopened.close();
+    const filename = (await readdir(settings.directory)).find((name) => name.endsWith('.jsonl'))!;
+    const bytes = await readFile(join(settings.directory, filename), 'utf8');
+    expect(bytes).not.toContain('not-persisted');
+    expect(bytes).not.toContain('message');
+  });
+
+  it('rejects provider prose and unknown failure fields before persistence', async () => {
+    const settings = await options();
+    const journal = await openPilotQualityJournal(settings);
+    const { attemptId } = await journal.authorizeAndReserve(input);
+    await expect(journal.recordOutcome({ attemptId, status: 'failed', durationMs: 2,
+      failure: { localCode: 'PROVIDER_HTTP_ERROR', httpStatus: 503, providerCode: null,
+        providerStatus: null, retryAfterMs: null, message: 'key=secret' } as never }))
+      .rejects.toThrow('QUALITY_JOURNAL_INVALID_FAILURE_DIAGNOSTICS');
+    expect(journal.readState().attempts[0]?.status).toBe('reserved');
+    await journal.close();
+  });
 });

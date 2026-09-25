@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { StructuredModelClient } from '../src/ai/ports.js';
+import { ProviderClientError } from '../src/ai/providers/registry.js';
 import { PILOT_TOOL_CATALOG } from '../src/pilot/gateway.js';
 import { createPilotQualityFreeze, type PilotQualityFreezeInputs } from '../src/pilot/quality-freeze.js';
 import { createPilotSimulatedModel, createPilotSimulatedRetriever, runPilotMeasuredQualityCase, runPilotProviderQualityCase, type PilotQualityRetriever } from '../src/pilot/provider-quality-runner.js';
@@ -250,6 +251,24 @@ describe('pilot v2 measured provider boundary', () => {
     await expect(runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
       testCase: fixture, model, gate: failedGate, currentApiKeySha256: 'c'.repeat(64) })).rejects.toThrow('QUALITY_JOURNAL_SETTLEMENT_FAILED');
     expect(calls).toBe(2);
+  });
+  it('records only safe structured provider failure metadata', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const model: StructuredModelClient = { async complete() {
+      throw new ProviderClientError('PROVIDER_HTTP_ERROR', 'secret=never-store', {
+        provider: 'google', status: 503, providerCode: 'service_unavailable',
+        providerStatus: 'UNAVAILABLE', retryAfterMs: 2000,
+      });
+    } };
+    await expect(runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) }))
+      .rejects.toMatchObject({ code: 'PROVIDER_HTTP_ERROR' });
+    expect(journal.outcomes).toMatchObject([{ status: 'failed', failure: {
+      localCode: 'PROVIDER_HTTP_ERROR', httpStatus: 503, providerCode: 'service_unavailable',
+      providerStatus: 'UNAVAILABLE', retryAfterMs: 2000,
+    } }]);
+    expect(JSON.stringify(journal.outcomes)).not.toContain('never-store');
   });
   it('requires matching durable gate and explicit measured CLI mode', async () => {
     const frozen = await createPilotQualityFreeze(root, freeInputs());
