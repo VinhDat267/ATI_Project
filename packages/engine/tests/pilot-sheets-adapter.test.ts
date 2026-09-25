@@ -88,4 +88,50 @@ describe('pilot/adapters/sheets', () => {
       }),
     ).rejects.toThrow('NOT_FOUND');
   });
+
+  it('fails-closed and stops before GET when only privateKey is configured without bearer token', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const saConfig: PilotConfig = {
+      ...samplePolicy,
+      google: {
+        clientEmail: 'service-account@gserviceaccount.com',
+        privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgk...\n-----END PRIVATE KEY-----',
+      },
+    };
+
+    await expect(
+      readSheetsRequest({
+        config: saConfig,
+        policy: samplePolicy,
+        principalId: 'operator-a',
+        spreadsheetId: 'sheet-123',
+        tabId: 'Requests',
+        requestId: 'REQ-1',
+      }),
+    ).rejects.toThrow('CONFIG_ERROR: Service account private key authentication requires OAuth2 bearer token; use GOOGLE_SHEETS_API_KEY for API key authentication');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails-closed and stops before GET when Google credentials are missing', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const noCredsConfig: PilotConfig = {
+      ...samplePolicy,
+      google: {},
+    };
+
+    await expect(
+      readSheetsRequest({
+        config: noCredsConfig,
+        policy: samplePolicy,
+        principalId: 'operator-a',
+        spreadsheetId: 'sheet-123',
+        tabId: 'Requests',
+        requestId: 'REQ-1',
+      }),
+    ).rejects.toThrow('CONFIG_ERROR: Missing Google credentials');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
+
