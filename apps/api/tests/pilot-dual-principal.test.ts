@@ -38,7 +38,7 @@ const defaultTestConfig: PilotConfig = {
   tabId: "tab-dual",
   boardId: "board-dual",
   google: { apiKey: "mock-google" },
-  trello: { apiKey: "mock-trello", apiToken: "mock-token" },
+  trello: { apiKey: "mock-trello", apiToken: "mock-token", listId: "list-dual" },
 };
 
 const mockIntake: ReadSheetsRequestResult = {
@@ -208,6 +208,7 @@ async function setupDualPrincipalApi(policyOverride?: PilotPolicy) {
     pilotPolicy: policy,
     pilotConfig: defaultTestConfig,
     readSheetsRequestFn: async () => mockIntake,
+    readTrelloListsFn: async () => [{ id: "list-dual", name: "To Do", closed: false }],
   });
 
   openApis.add(api);

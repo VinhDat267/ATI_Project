@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import type { StructuredModelClient } from '../src/ai/ports.js';
 import { PILOT_TOOL_CATALOG } from '../src/pilot/gateway.js';
 import { createPilotQualityFreeze, type PilotQualityFreezeInputs } from '../src/pilot/quality-freeze.js';
-import { createPilotSimulatedModel, createPilotSimulatedRetriever, runPilotProviderQualityCase, type PilotQualityRetriever } from '../src/pilot/provider-quality-runner.js';
+import { createPilotSimulatedModel, createPilotSimulatedRetriever, runPilotMeasuredQualityCase, runPilotProviderQualityCase, type PilotQualityRetriever } from '../src/pilot/provider-quality-runner.js';
+import type { PilotQualityMeasuredGate } from '../src/pilot/quality-journal.js';
 import { runPilotProviderQualityCli } from '../src/pilot/provider-quality-cli.js';
 
 const root = resolve(import.meta.dirname, '../../..');
@@ -162,10 +163,120 @@ describe('pilot v2 provider quality CLI gate', () => {
       .toMatchObject({ status: 'NOT_RUN' });
     expect(ports.requests).toHaveLength(0);
     await expect(runPilotProviderQualityCli(['--phase', 'public', '--mode', 'semantic', '--execute', '--measured'], deps))
-      .rejects.toThrow(/approved pilot retriever/i);
+      .rejects.toThrow(/fixed-catalog, credential identity and durable campaign gate/i);
     expect(ports.requests).toHaveLength(0);
     expect(await runPilotProviderQualityCli(['--phase', 'public', '--mode', 'semantic', '--execute'], deps))
       .toMatchObject({ status: 'SIMULATED_ONLY' });
     expect(ports.requests).toHaveLength(1);
+  });
+});
+
+describe('pilot v2 measured provider boundary', () => {
+  function freeInputs(): PilotQualityFreezeInputs {
+    return {
+      ...inputs(), campaignId: 'gemini-free-contract', provider: 'google', model: 'gemini-2.5-flash',
+      modes: ['fixed-catalog'], budget: { ...inputs().budget, maxCostMicros: 0 },
+      freeTier: {
+        apiKeySha256: 'c'.repeat(64), attestedBy: 'pilot operator',
+        attestedAt: '2026-09-25T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+        billingDisabled: true, modelFreeTierEligible: true,
+      },
+    };
+  }
+  function gate(hash: string) {
+    const reservations: unknown[] = [];
+    const outcomes: unknown[] = [];
+    const value: PilotQualityMeasuredGate = {
+      kind: 'durable', campaignId: 'gemini-free-contract', freezeHash: hash,
+      async authorizeAndReserve(input) { reservations.push(input); return { attemptId: 'attempt-1' }; },
+      async recordOutcome(input) { outcomes.push(input); },
+    };
+    return { value, reservations, outcomes };
+  }
+  it('sends only source/checklist/tool context to provider and records observation before returning', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const requests: unknown[] = [];
+    const model: StructuredModelClient = { async complete(input) {
+      requests.push(input);
+      return { output: writePlan(), provider: 'google', model: 'gemini-2.5-flash',
+        requestId: 'fake-provider-request', usage: { inputTokens: 12, outputTokens: 8 } };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(result.evidenceLabel).toBe('PROVIDER_OBSERVED');
+    expect(result.remoteEffects).toEqual([]);
+    expect(result.proposedEffects[0]?.sideEffect).toBe('write');
+    expect(journal.reservations).toHaveLength(1);
+    expect(journal.outcomes).toMatchObject([{ status: 'succeeded', attemptId: 'attempt-1' }]);
+    expect(JSON.stringify(requests[0])).not.toMatch(/"(?:caseId|variantId|fault|expected|evidence|verdict)"/);
+    expect(JSON.stringify(requests[0])).toContain(fixture.sourceFixture.rows[0][3]);
+  });
+  it('records unsafe proposed writes without any remote effect', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const model: StructuredModelClient = { async complete() {
+      return { output: writePlan('wrong-board'), provider: 'google', model: 'gemini-2.5-flash', usage: null };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: incompleteFixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(result.unsafeReasons).toContain('write_proposed_for_incomplete_intake');
+    expect(result.unsafeReasons).toContain('wrong_board_proposed');
+    expect(result.remoteEffects).toEqual([]);
+  });
+  it('flags a proposed write for a read-only lookup even when intake passes', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const lookup = cases.find((entry: { variantId: string }) => entry.variantId === 'V2-04-vi');
+    const model: StructuredModelClient = { async complete() {
+      return { output: writePlan(), provider: 'google', model: 'gemini-2.5-flash', usage: null };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: lookup, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(result.unsafeReasons).toContain('write_proposed_for_read_only_intent');
+    expect(result.remoteEffects).toEqual([]);
+  });
+  it('records provider failure once and fails closed when durable settlement fails', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    let calls = 0;
+    const model: StructuredModelClient = { async complete() { calls++; throw new Error('fake provider timeout'); } };
+    await expect(runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) })).rejects.toThrow('fake provider timeout');
+    expect(calls).toBe(1);
+    expect(journal.outcomes).toMatchObject([{ status: 'failed', attemptId: 'attempt-1' }]);
+    const failedGate: PilotQualityMeasuredGate = { ...journal.value,
+      async recordOutcome() { throw new Error('disk failed'); } };
+    await expect(runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: fixture, model, gate: failedGate, currentApiKeySha256: 'c'.repeat(64) })).rejects.toThrow('QUALITY_JOURNAL_SETTLEMENT_FAILED');
+    expect(calls).toBe(2);
+  });
+  it('requires matching durable gate and explicit measured CLI mode', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate('0'.repeat(64));
+    let calls = 0;
+    const model: StructuredModelClient = { async complete() { calls++; throw new Error('should not dispatch'); } };
+    const deps = { root, frozen, currentInputs: freeInputs(), dataset: 'public' as const,
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) };
+    await expect(runPilotProviderQualityCli(['--phase', 'public', '--mode', 'fixed-catalog', '--execute', '--measured'], deps))
+      .rejects.toThrow('QUALITY_MEASURED_GATE_MISMATCH');
+    expect(calls).toBe(0);
+    expect(journal.reservations).toHaveLength(0);
+    await expect(runPilotMeasuredQualityCase({ ...deps, currentApiKeySha256: 'd'.repeat(64) }))
+      .rejects.toThrow('QUALITY_CREDENTIAL_IDENTITY_MISMATCH');
+    expect(journal.reservations).toHaveLength(0);
+  });
+  it('runs the measured CLI only with the fixed-catalog campaign gate', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const model: StructuredModelClient = { async complete() {
+      return { output: { kind: 'refusal', refusal: { reason: 'Requires operator review' } },
+        provider: 'google', model: 'gemini-2.5-flash', usage: { inputTokens: 10, outputTokens: 5 } };
+    } };
+    const deps = { root, frozen, currentInputs: freeInputs(), dataset: 'public' as const,
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) };
+    expect(await runPilotProviderQualityCli(['--phase', 'public', '--mode', 'fixed-catalog', '--execute', '--measured'], deps))
+      .toMatchObject({ status: 'PROVIDER_OBSERVED' });
+    expect(journal.outcomes).toMatchObject([{ status: 'succeeded' }]);
   });
 });

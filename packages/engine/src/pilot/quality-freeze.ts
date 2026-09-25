@@ -21,7 +21,17 @@ const BudgetSchema = z.object({
   maxCalls: positiveInteger,
   maxInputTokens: positiveInteger,
   maxOutputTokens: positiveInteger,
-  maxCostMicros: positiveInteger,
+  maxCostMicros: z.number().int().nonnegative().safe(),
+}).strict();
+
+const FreeTierAttestationSchema = z.object({
+  /** Credential identity only; this hash does not prove project tier or billing state. */
+  apiKeySha256: z.string().regex(SHA256),
+  attestedBy: nonempty,
+  attestedAt: z.iso.datetime({ offset: true }),
+  expiresAt: z.iso.datetime({ offset: true }),
+  billingDisabled: z.literal(true),
+  modelFreeTierEligible: z.literal(true),
 }).strict();
 
 const RubricSchema = z.object({
@@ -38,14 +48,23 @@ const InputsSchema = z.object({
   commit: z.string().regex(/^[a-f0-9]{40}$/i),
   provider: nonempty,
   model: nonempty,
-  modes: z.array(z.enum(['semantic', 'semantic+QE'])).min(1).max(2).refine(
+  modes: z.array(z.enum(['semantic', 'semantic+QE', 'fixed-catalog'])).min(1).max(3).refine(
     (modes) => new Set(modes).size === modes.length,
     'Comparison modes must be unique',
   ),
   priceEvidence: PriceEvidenceSchema,
   budget: BudgetSchema,
+  freeTier: FreeTierAttestationSchema.optional(),
   rubric: RubricSchema,
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.budget.maxCostMicros !== 0) return;
+  if (value.provider !== 'google' || !/^gemini-[a-z0-9][a-z0-9.-]*$/i.test(value.model)) {
+    context.addIssue({ code: 'custom', message: 'Zero-cost campaigns require a pinned Google Gemini model' });
+  }
+  if (!value.freeTier || Date.parse(value.freeTier.expiresAt) <= Date.parse(value.freeTier.attestedAt)) {
+    context.addIssue({ code: 'custom', message: 'Zero-cost campaigns require a valid free-tier project attestation' });
+  }
+});
 
 export type PilotQualityFreezeInputs = z.infer<typeof InputsSchema>;
 
@@ -84,11 +103,20 @@ const ARTIFACTS = {
     'testdata/tools.json',
   ],
   behavior: [
+    'packages/engine/src/pilot/quality-freeze.ts',
+    'packages/engine/src/pilot/quality-journal.ts',
+    'packages/engine/src/pilot/quality-grader.ts',
     'packages/engine/src/pilot/checklist.ts',
     'packages/engine/src/pilot/decision-engine.ts',
     'packages/engine/src/pilot/source.ts',
     'packages/engine/src/pilot/provider-quality-runner.ts',
     'packages/engine/src/pilot/provider-quality-cli.ts',
+    'packages/engine/src/ai/providers/registry.ts',
+    'packages/engine/src/ai/providers/accounting.ts',
+    'packages/engine/src/ai/providers/wire-schema.ts',
+    'packages/engine/src/ai/live-evaluation/pricing.ts',
+    'scripts/pilot-ai-quality-campaign.mjs',
+    'scripts/pilot-quality-pricing.mjs',
   ],
 } as const;
 
@@ -190,6 +218,10 @@ export async function assertPilotQualityFreeze(
     throw new Error('Quality freeze manifest hash mismatch');
   }
   const current = parseInputs(currentInputs);
+  if (manifest.budget.maxCostMicros === 0 &&
+      (!manifest.freeTier || Date.parse(manifest.freeTier.expiresAt) <= Date.now())) {
+    throw new Error('QUALITY_FREE_TIER_ATTESTATION_EXPIRED');
+  }
   const { format: _format, fingerprints: _fingerprints, safetyGates: _safetyGates, ...frozenInputs } = manifest;
   if (JSON.stringify(canonical(current)) !== JSON.stringify(canonical(frozenInputs))) {
     throw new Error('Quality freeze execution mismatch: campaign settings changed');

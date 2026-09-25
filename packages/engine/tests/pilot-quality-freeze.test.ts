@@ -15,10 +15,19 @@ const paths = [
   'testdata/v2-dataset/holdout.json',
   'packages/engine/src/pilot/planner-context.ts',
   'packages/engine/src/pilot/checklist.ts',
+  'packages/engine/src/pilot/quality-freeze.ts',
+  'packages/engine/src/pilot/quality-journal.ts',
+  'packages/engine/src/pilot/quality-grader.ts',
   'packages/engine/src/pilot/decision-engine.ts',
   'packages/engine/src/pilot/source.ts',
   'packages/engine/src/pilot/provider-quality-runner.ts',
   'packages/engine/src/pilot/provider-quality-cli.ts',
+  'packages/engine/src/ai/providers/registry.ts',
+  'packages/engine/src/ai/providers/accounting.ts',
+  'packages/engine/src/ai/providers/wire-schema.ts',
+  'packages/engine/src/ai/live-evaluation/pricing.ts',
+  'scripts/pilot-ai-quality-campaign.mjs',
+  'scripts/pilot-quality-pricing.mjs',
   'packages/engine/src/pilot/gateway.ts',
   'packages/dsl/src/prompts.ts',
   'testdata/tools.json',
@@ -122,5 +131,27 @@ describe('pilot v2 quality freeze', () => {
       createHash('sha256').update('fixture-0').digest('hex'),
     );
     await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, inputs())).resolves.toBeUndefined();
+  });
+
+  it('allows a zero-dollar Gemini campaign only with a current project attestation', async () => {
+    const root = await fixtureRoot();
+    const freeTier = {
+      apiKeySha256: 'c'.repeat(64), attestedBy: 'pilot operator',
+      attestedAt: '2026-09-25T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+      billingDisabled: true as const, modelFreeTierEligible: true as const,
+    };
+    const zero = { ...inputs(), provider: 'google', model: 'gemini-2.5-flash',
+      modes: ['fixed-catalog'] as PilotQualityFreezeInputs['modes'], budget: { ...inputs().budget, maxCostMicros: 0 } };
+    await expect(createPilotQualityFreeze(root, zero)).rejects.toThrow(/free-tier project attestation/i);
+    await expect(createPilotQualityFreeze(root, { ...zero, provider: 'openai', freeTier }))
+      .rejects.toThrow(/Google Gemini model/i);
+    await expect(createPilotQualityFreeze(root, { ...zero, model: 'unreviewed-model', freeTier }))
+      .rejects.toThrow(/Google Gemini model/i);
+    const frozen = await createPilotQualityFreeze(root, { ...zero, freeTier });
+    await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, { ...zero, freeTier }))
+      .resolves.toBeUndefined();
+    await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash,
+      { ...zero, freeTier: { ...freeTier, apiKeySha256: 'd'.repeat(64) } }))
+      .rejects.toThrow(/execution mismatch/i);
   });
 });
