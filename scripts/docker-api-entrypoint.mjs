@@ -53,6 +53,20 @@ const seed = spawnSync("node", ["packages/db/dist/cli.js", "seed"], {
 });
 if (seed.status !== 0) process.exit(seed.status ?? 1);
 
+const { openDatabase } = await import("@wap/db");
+const db = openDatabase(
+  process.env.G1_DATABASE_URL || "postgresql://wap:wap@postgres:5432/wap_g1",
+);
+const demoUserId =
+  process.env.API_DEMO_USER_ID || "00000000-0000-4000-8000-000000000001";
+await db.client`
+  INSERT INTO users (id, email, password_hash, display_name)
+  VALUES (${demoUserId}, ${demoEmail}, ${passwordHash}, 'Operator')
+  ON CONFLICT (id) DO UPDATE
+  SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash
+`;
+await db.close();
+
 console.log(
   `[DOCKER-API] Starting API server on ${env.API_HOST}:${env.API_PORT} (demo email: ${demoEmail})...`,
 );

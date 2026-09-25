@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 import { localProxy } from "./tooling/local-proxy.js";
 
 export default defineConfig(({ mode }) => {
+  // Support both 127.0.0.1:5173 and localhost:5173 through localProxy guard
   const apiTarget = process.env.WAP_API_TARGET || "http://127.0.0.1:3001";
   const frontendOrigin =
     process.env.WAP_FRONTEND_ORIGIN || "http://127.0.0.1:5173";

@@ -81,6 +81,17 @@ if (existsSync(path.join(ROOT, "packages/db/dist/cli.js"))) {
     env,
     stdio: "inherit",
   });
+  const { openDatabase } = await import("@wap/db");
+  const db = openDatabase(dbUrl);
+  const demoUserId =
+    process.env.API_DEMO_USER_ID || "00000000-0000-4000-8000-000000000001";
+  await db.client`
+    INSERT INTO users (id, email, password_hash, display_name)
+    VALUES (${demoUserId}, ${demoEmail}, ${passwordHash}, 'Operator')
+    ON CONFLICT (id) DO UPDATE
+    SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash
+  `;
+  await db.close();
 }
 
 console.log(

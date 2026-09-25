@@ -234,15 +234,17 @@ export function LoginView({
                 aria-describedby={
                   cn(
                     isFieldInvalid && errorId,
-                    mode === "fixture" && "email-hint",
+                    (mode === "fixture" || demoLogin) && "email-hint",
                   ) || undefined
                 }
                 className={cn(inputClass, isFieldInvalid && "border-danger")}
               />
-              {mode === "fixture" ? (
+              {mode === "fixture" || demoLogin ? (
                 <span id="email-hint" className="text-caption text-muted">
-                  Tài khoản dùng thử:{" "}
-                  <code className="font-mono text-ink">demo@local</code>
+                  Tài khoản quản trị mặc định:{" "}
+                  <code className="font-mono text-ink">
+                    {demoLogin?.email ?? "demo@local"}
+                  </code>
                 </span>
               ) : null}
             </div>
@@ -269,7 +271,7 @@ export function LoginView({
                   aria-describedby={
                     cn(
                       isFieldInvalid && errorId,
-                      mode === "fixture" && "password-hint",
+                      (mode === "fixture" || demoLogin) && "password-hint",
                     ) || undefined
                   }
                   className={cn(
@@ -291,6 +293,13 @@ export function LoginView({
               {mode === "fixture" ? (
                 <span id="password-hint" className="text-caption text-muted">
                   Chế độ dùng thử: Chấp nhận mật khẩu bất kỳ.
+                </span>
+              ) : demoLogin ? (
+                <span id="password-hint" className="text-caption text-muted">
+                  Mật khẩu mặc định:{" "}
+                  <code className="font-mono text-ink">
+                    {demoLogin.password}
+                  </code>
                 </span>
               ) : null}
             </div>
