@@ -2,7 +2,7 @@
 
 Đây là monorepo TypeScript cho prototype điều phối workflow có bước **xem trước → người dùng duyệt → thực thi → đối chiếu kết quả**. `ATI_Project`, `ati-*` và `@wap/*` là tên kỹ thuật/lịch sử được giữ để tương thích. Phạm vi sản phẩm hiện hành là **MVP v2 cho nhóm dịch vụ thiết kế/web**; nền B/local trước đó vẫn có trong repository để phát triển và đối chứng.
 
-> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Preflight chỉ đọc và một preview chờ duyệt đã dùng Google Sheets/Trello sandbox thật. Chưa tạo/đối chiếu card Trello thật, đo chất lượng AI provider trên bộ v2 hay nghiệm thu người dùng đại diện. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
+> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Một ca sandbox đã đọc Google Sheets/Trello thật, tạo đúng một card Trello sau approval, lưu receipt PostgreSQL và xác minh card bằng GET. AI quality provider và nghiệm thu người dùng đại diện **chưa chạy**. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
 
 ## Team nên đọc gì trước?
 
@@ -22,8 +22,8 @@ MVP v2 **không** bao gồm ghi ngược Sheet, gửi Slack/email thật, schedu
 
 | Trục | Đã được kiểm | Còn thiếu |
 |---|---|---|
-| Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và SaaS thật trên đường sản phẩm |
-| SaaS live | Adapter, policy, test giả lập, preflight GET và preview API từ Sheet/Trello sandbox thật ngày 25/09/2026 | `SAAS_LIVE_WRITE_NOT_RUN`: chưa tạo/đối chiếu một card thật hoặc xác nhận đường sản phẩm end-to-end |
+| Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và trải nghiệm người dùng đại diện với SaaS thật |
+| SaaS live | `SAAS_ONE_CARD_CONFIRMED`: một ca sandbox qua API, approval DB, Trello receipt và GET đối chiếu ngày 25/09/2026 | Chưa chứng minh đa ca, lỗi mạng thật, vận hành liên tục hoặc nghiệm thu khách hàng |
 | AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; test mô phỏng | `AI_QUALITY_NOT_RUN`: runner P6 không gọi provider và còn dùng oracle để chọn một số kết quả |
 | Người dùng đại diện | Phạm vi và Design System đã được chủ project duyệt | `CUSTOMER_VALIDATED_NOT_RUN`; chưa có acceptance với người dùng đại diện |
 
@@ -130,4 +130,4 @@ Repository hiện **không tự nạp `.env.pilot`**. Chỉ tạo file đó khô
 3. Viết test đúng tầng: unit/fixture cho hợp đồng, PostgreSQL/HTTP/browser cho runtime local, artifact remote riêng cho SaaS, ledger/provider thật riêng cho AI. Cập nhật nhãn `NOT_RUN` chỉ khi có bằng chứng tương ứng.
 4. Với UI, theo [System Design đã duyệt](System%20Design/DESIGN.md); thay đổi thiết kế cần chủ project review. Với thao tác live, theo [runbook pilot](docs/PILOT-V2-RUNBOOK.md) và không bật write trước khi qua các cổng.
 
-Mốc tiếp theo là đối chiếu cổng UC2, chuẩn bị preview cụ thể cho một write SaaS có approval và phép đo AI provider có budget. **Không coi repository này đã sẵn sàng bàn giao SaaS live hoặc production.**
+Mốc tiếp theo là đối chiếu evidence một card với tiêu chí UC2 và chuẩn bị phép đo AI provider có budget, price card, freeze và rubric. **Không coi repository này đã sẵn sàng bàn giao SaaS live hoặc production.**

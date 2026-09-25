@@ -4,15 +4,15 @@
 [đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
 Đây là phạm vi đích đã duyệt, không phải xác nhận live integration. Code/test
 pilot v2 đã được thêm sau ngày duyệt; [audit P6 ngày 23/09](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
-ghi các lỗi chặn. SaaS/AI live vẫn cần tài nguyên, quyền và ngân sách riêng.
+ghi các lỗi chặn tại thời điểm audit. Một card sandbox thật đã được tạo và đối chiếu ngày 25/09/2026; AI live vẫn cần provider, quyền và ngân sách riêng.
 
 | Thành phần | Phạm vi đích đã duyệt | Trạng thái thực thi v2 |
 |---|---|---|
 | Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Mã và test owner-scope có; nghiệm thu với người dùng đại diện `OPEN` |
-| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | UC1 checklist clarification/refusal và UC3 linked-card lookup đã qua API/PostgreSQL + Chromium browser tests với Sheets/Trello giả; AI source-aware và SaaS live chưa được chứng minh |
-| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | Adapter/test giả lập có; `SAAS_LIVE_NOT_RUN` |
+| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | UC1 checklist clarification/refusal và UC3 linked-card lookup đã qua API/PostgreSQL + Chromium với fixtures; UC2 có một ca sandbox thật đã được duyệt, tạo card và đối chiếu; AI source-aware chưa được chứng minh |
+| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | `SAAS_ONE_CARD_CONFIRMED` trên sandbox ngày 25/09/2026; chưa có acceptance nhiều ca hoặc vận hành liên tục |
 | AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; `AI_QUALITY_NOT_RUN` |
-| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; live write mặc định tắt và SaaS thật chưa chạy |
+| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL; một lần write sandbox đã qua receipt và GET đối chiếu. Cờ live write vẫn tắt mặc định |
 | Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Reservation PostgreSQL có; `claimDispatched` chỉ nhận `reserved`, runner không POST lại intent `confirmed`; integration test PostgreSQL đạt |
 | UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | Owner isolation và UC1/UC3 browser local đã qua cùng 5 ca UC2 approval trên API/PostgreSQL cô lập; nghiệm thu với người dùng đại diện vẫn `OPEN` |
 | Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | Dataset 40 biến thể + 20 holdout có; mô phỏng không phải AI quality; `CUSTOMER_VALIDATED=NOT_RUN` |
