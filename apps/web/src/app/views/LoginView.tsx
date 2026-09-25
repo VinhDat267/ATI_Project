@@ -118,17 +118,11 @@ export function LoginView({
       {/* Header Area */}
       <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between">
         <Logo />
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface-soft px-3 py-0.5 text-caption font-medium text-muted">
-            <span className="size-2 rounded-full bg-success" />
-            <span>{mode === "live" ? "Hệ thống vận hành (Live)" : "Hệ thống nội bộ"}</span>
+        {mode === "fixture" ? (
+          <span className="inline-flex h-6 items-center rounded-full border border-demo/10 bg-demo-subtle px-2.5 text-badge text-demo">
+            Dữ liệu mô phỏng
           </span>
-          {mode === "fixture" ? (
-            <span className="inline-flex h-6 items-center rounded-full border border-demo/10 bg-demo-subtle px-2.5 text-badge text-demo">
-              Dữ liệu mô phỏng
-            </span>
-          ) : null}
-        </div>
+        ) : null}
       </header>
 
       {/* Main 2-column Container */}
