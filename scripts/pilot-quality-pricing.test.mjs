@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { verifyExactFreeTierPrice } from './pilot-quality-pricing.mjs';
+import { verifyExactFreeTierPrice, pilotQualityModel } from './pilot-quality-pricing.mjs';
 
 const model = 'gemini-3.7-flash';
 const title = 'Gemini 3.7 Flash';
+test('requires an explicit allowlisted alternate and its own price section', () => {
+  assert.equal(pilotQualityModel().model, 'gemini-3.7-flash');
+  const alternate = pilotQualityModel('gemini-3.8-flash');
+  assert.equal(alternate.title, 'Gemini 3.8 Flash');
+  assert.throws(() => pilotQualityModel('gemini-unknown'), /QUALITY_MODEL_NOT_ALLOWLISTED/);
+  assert.throws(() => pilotQualityModel('__proto__'), /QUALITY_MODEL_NOT_ALLOWLISTED/);
+  assert.throws(() => verifyExactFreeTierPrice(page('Free of charge', 'Free of charge'),
+    alternate.model, alternate.title), /MODEL_PRICE_SECTION_NOT_FOUND/);
+  assert.doesNotThrow(() => verifyExactFreeTierPrice(
+    page('Free of charge', 'Free of charge').replaceAll('3.7', '3.8'), alternate.model, alternate.title));
+});
 function page(inputPrice, outputPrice) {
   return `<h2>${title}</h2><p>${model}</p><h3>Standard</h3><table>
     <tr><th>Free Tier</th><th>Paid Tier</th></tr>

@@ -9,10 +9,10 @@ import { createPilotQualityFreeze, assertPilotQualityFreeze } from '../packages/
 import { openPilotQualityJournal } from '../packages/engine/dist/pilot/quality-journal.js';
 import { runPilotMeasuredQualityCase } from '../packages/engine/dist/pilot/provider-quality-runner.js';
 import { gradePilotQualityCase, aggregatePilotQualityGrades } from '../packages/engine/dist/pilot/quality-grader.js';
-import { verifyExactFreeTierPrice } from './pilot-quality-pricing.mjs';
+import { verifyExactFreeTierPrice, pilotQualityModel } from './pilot-quality-pricing.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const model = 'gemini-3.7-flash';
+let model = 'gemini-3.7-flash';
 const pricingUrl = 'https://ai.google.dev/gemini-api/docs/pricing?hl=en';
 
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
@@ -80,7 +80,7 @@ async function prepare() {
   if (!pricingResponse.ok) fail('PRICE_SOURCE_UNAVAILABLE');
   const pricingBytes = Buffer.from(await pricingResponse.arrayBuffer());
   if (pricingBytes.length > 5_000_000) fail('PRICE_SOURCE_TOO_LARGE');
-  verifyExactFreeTierPrice(pricingBytes.toString('utf8'), model, 'Gemini 3.7 Flash');
+  verifyExactFreeTierPrice(pricingBytes.toString('utf8'), model, pilotQualityModel(model).title);
   const now = new Date();
   const freeTierExpiry = new Date(now.getTime() + 6 * 60 * 60_000);
   const inputs = {
@@ -104,6 +104,9 @@ async function loadManifest() {
   const frozen = JSON.parse(await readFile(manifestPath, 'utf8'));
   const inputs = inputsFromManifest(frozen.manifest);
   if (cleanHead() !== frozen.manifest.commit) fail('QUALITY_COMMIT_DRIFT');
+  if (!process.argv.includes('--model')) {
+    model = pilotQualityModel(frozen.manifest.model).model;
+  }
   if (frozen.manifest.model !== model || frozen.manifest.provider !== 'google' ||
       frozen.manifest.budget.maxCostMicros !== 0 || frozen.manifest.modes.join() !== 'fixed-catalog') fail('QUALITY_MANIFEST_SCOPE');
   if (sha256(key()) !== frozen.manifest.freeTier?.apiKeySha256) fail('QUALITY_CREDENTIAL_IDENTITY_MISMATCH');
@@ -220,6 +223,7 @@ async function report() {
 }
 
 try {
+  model = pilotQualityModel(process.argv.includes('--model') ? option('--model') : undefined).model;
   const action = process.argv[2];
   if (action === 'prepare') await prepare();
   else if (action === 'run') await execute();

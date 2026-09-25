@@ -1,3 +1,13 @@
+/** Explicit operator selection only; no automatic model fallback. */
+export function pilotQualityModel(model = 'gemini-3.7-flash') {
+  const titles = {
+    'gemini-3.7-flash': 'Gemini 3.7 Flash',
+    'gemini-3.8-flash': 'Gemini 3.8 Flash',
+  };
+  if (!Object.hasOwn(titles, model)) throw new Error('QUALITY_MODEL_NOT_ALLOWLISTED');
+  return { model, title: titles[model] };
+}
+
 /** Fail closed unless the exact model section lists free standard input and output. */
 export function verifyExactFreeTierPrice(html, modelId, modelTitle) {
   const headings = [...html.matchAll(/<h2\b[^>]*>/gi)].map((match) => match.index);
