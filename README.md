@@ -2,7 +2,7 @@
 
 Đây là monorepo TypeScript cho prototype điều phối workflow có bước **xem trước → người dùng duyệt → thực thi → đối chiếu kết quả**. `ATI_Project`, `ati-*` và `@wap/*` là tên kỹ thuật/lịch sử được giữ để tương thích. Phạm vi sản phẩm hiện hành là **MVP v2 cho nhóm dịch vụ thiết kế/web**; nền B/local trước đó vẫn có trong repository để phát triển và đối chứng.
 
-> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Preflight chỉ đọc đã GET Google Sheets/Trello sandbox thật và trả `passed`; chưa tạo/đối chiếu card Trello thật, đo chất lượng AI provider trên bộ v2 hay nghiệm thu người dùng đại diện. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
+> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Preflight chỉ đọc và một preview chờ duyệt đã dùng Google Sheets/Trello sandbox thật. Chưa tạo/đối chiếu card Trello thật, đo chất lượng AI provider trên bộ v2 hay nghiệm thu người dùng đại diện. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
 
 ## Team nên đọc gì trước?
 
@@ -23,7 +23,7 @@ MVP v2 **không** bao gồm ghi ngược Sheet, gửi Slack/email thật, schedu
 | Trục | Đã được kiểm | Còn thiếu |
 |---|---|---|
 | Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và SaaS thật trên đường sản phẩm |
-| SaaS live | Adapter, policy, test giả lập và preflight GET Sheet/Trello sandbox thật ngày 25/09/2026 | `SAAS_LIVE_WRITE_NOT_RUN`: chưa tạo/đối chiếu một card thật hoặc xác nhận đường sản phẩm end-to-end |
+| SaaS live | Adapter, policy, test giả lập, preflight GET và preview API từ Sheet/Trello sandbox thật ngày 25/09/2026 | `SAAS_LIVE_WRITE_NOT_RUN`: chưa tạo/đối chiếu một card thật hoặc xác nhận đường sản phẩm end-to-end |
 | AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; test mô phỏng | `AI_QUALITY_NOT_RUN`: runner P6 không gọi provider và còn dùng oracle để chọn một số kết quả |
 | Người dùng đại diện | Phạm vi và Design System đã được chủ project duyệt | `CUSTOMER_VALIDATED_NOT_RUN`; chưa có acceptance với người dùng đại diện |
 

@@ -126,6 +126,7 @@ async function createPilotUseCaseFixture(): Promise<PilotUseCaseContext> {
               sourceRevision: checklist.sourceRevision,
             };
           },
+          readTrelloListsFn: async () => [{ id: "list-todo", name: "To Do", closed: false }],
         });
         let pilotUrl: string;
         try {

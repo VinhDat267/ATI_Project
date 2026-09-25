@@ -159,6 +159,7 @@ async function createPilotLiveFixture(writeEnabled: boolean): Promise<PilotLiveC
             }),
             sourceRevision: checklist.sourceRevision,
           }),
+          readTrelloListsFn: async () => [{ id: "list-todo", name: "To Do", closed: false }],
         });
         let pilotUrl: string;
         try {

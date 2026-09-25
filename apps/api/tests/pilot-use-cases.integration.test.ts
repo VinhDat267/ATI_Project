@@ -73,6 +73,7 @@ async function harness(inputRow: SourceRow = row) {
       sourceKey: key,
       sourceRevision: checklist.sourceRevision,
     }),
+    readTrelloListsFn: async () => [{ id: "list-todo", name: "To Do", closed: false }],
   });
   const baseUrl = await api.listen();
   const pilotUrl = `${baseUrl.replace(/\/api\/v1$/, "")}/pilot/v2`;

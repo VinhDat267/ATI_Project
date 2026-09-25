@@ -9,7 +9,8 @@ export interface PilotApprovalSnapshot {
   sourceRevision: string;
   row: SourceRow;
   policy: PilotPolicy;
-  targetListId?: string;
+  targetListId: string;
+  targetListName: string;
 }
 
 const SOURCE_FIELDS = [
@@ -19,15 +20,18 @@ const SOURCE_FIELDS = [
 
 /** Bind owner, run, source bytes and the exact Trello write arguments. */
 export function buildPilotApproval(snapshot: PilotApprovalSnapshot) {
-  const { runId, ownerId, versionId, sourceKey, sourceRevision, row, policy, targetListId } = snapshot;
-  const listName = "To Do";
+  const { runId, ownerId, versionId, sourceKey, sourceRevision, row, policy, targetListId, targetListName } = snapshot;
+  if (!targetListId.trim() || !targetListName.trim()) {
+    throw new Error("TARGET_LIST_UNBOUND: approval requires a verified Trello list");
+  }
+  const listName = targetListName;
   const cardTitle = row.deliverable || "New Card";
   const description = row.raw_request || row.deliverable;
   const dueDate = row.due_date || undefined;
   const actionArgs = {
     boardId: policy.boardId,
     listName,
-    listId: targetListId ?? "",
+    listId: targetListId,
     title: cardTitle,
     description,
     dueDate,
@@ -38,7 +42,7 @@ export function buildPilotApproval(snapshot: PilotApprovalSnapshot) {
       "pilot-approval-v2", runId, ownerId, versionId, sourceKey, sourceRevision,
       policy.spreadsheetId, policy.tabId, policy.boardId,
       ...SOURCE_FIELDS.map((field) => row[field]),
-      listName, targetListId ?? "", cardTitle, description, dueDate ?? "",
+      listName, targetListId, cardTitle, description, dueDate ?? "",
     ]))
     .digest("hex");
 

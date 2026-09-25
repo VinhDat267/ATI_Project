@@ -21,7 +21,7 @@ const row: SourceRow = {
 
 afterEach(() => vi.restoreAllMocks());
 
-async function harness(writeEnabled = true, secondPrincipal = false) {
+async function harness(writeEnabled = true, secondPrincipal = false, targetListName = "To Do") {
   const fixture = await makeApiFixture();
   const otherEmail = `other-${randomUUID()}@local.invalid`;
   const otherUserId = randomUUID();
@@ -74,6 +74,7 @@ async function harness(writeEnabled = true, secondPrincipal = false) {
     readSheetsRequestFn: async () => ({
       row, checklist, sourceKey: key, sourceRevision: checklist.sourceRevision,
     }),
+    readTrelloListsFn: async () => [{ id: "list-todo", name: targetListName, closed: false }],
   });
   const baseUrl = await api.listen();
   const pilotUrl = baseUrl.replace(/\/api\/v1$/, "") + "/pilot/v2";
@@ -150,6 +151,36 @@ function mockTrello(
 }
 
 describe("pilot durable approval over PostgreSQL and HTTP", () => {
+  it("binds the verified localized list name and ID before one Trello write", async () => {
+    const h = await harness(true, false, "Cần làm");
+    try {
+      const trello = mockTrello(undefined, [{ id: "list-todo", name: "Cần làm", closed: false }]);
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      expect(preview.actions[0].args).toMatchObject({ listId: "list-todo", listName: "Cần làm" });
+      expect((await h.decide(runId, "approved", preview)).status).toBe(200);
+      expect((await h.detail(runId)).receipt.listId).toBe("list-todo");
+      expect(trello.writes()).toBe(1);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
+  it("does not POST if the bound list is renamed after preview", async () => {
+    const h = await harness(true, false, "Cần làm");
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      const trello = mockTrello(undefined, [{ id: "list-todo", name: "Đã đổi tên", closed: false }]);
+      const response = await h.decide(runId, "approved", preview);
+      expect(response.status).toBe(200);
+      expect((await response.json() as any).status).toBe("reconciliation_required");
+      expect(trello.writes()).toBe(0);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
   it("does not show a prior run receipt before approval and reuses the actual list ID", async () => {
     const h = await harness();
     try {

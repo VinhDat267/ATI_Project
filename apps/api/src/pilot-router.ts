@@ -24,6 +24,7 @@ import {
   type PilotToolEntry,
   createIntentKey,
   trelloGetCard,
+  trelloListLists,
 } from "@wap/engine";
 import { HttpError, readJson, writeJson } from "./http.js";
 import type { SessionAuthority } from "./auth.js";
@@ -47,6 +48,7 @@ export interface PilotRouterOptions {
     tabId: string;
     requestId: string;
   }) => Promise<ReadSheetsRequestResult>;
+  readTrelloListsFn?: typeof trelloListLists;
 }
 
 // Pilot dispatch is deliberately non-retryable. Expired pending approvals and
@@ -94,6 +96,15 @@ async function setPilotRunStatus(
   return Boolean(changed[0]);
 }
 
+function boundTargetListName(plan: unknown): string {
+  const name = plan && typeof plan === "object" && !Array.isArray(plan)
+    ? (plan as Record<string, unknown>).targetListName : undefined;
+  if (typeof name !== "string" || !name.trim()) {
+    throw new HttpError(409, "TARGET_LIST_UNBOUND", "Pilot target list was not bound to the workflow version");
+  }
+  return name;
+}
+
 export function createPilotRouter(options: PilotRouterOptions) {
   const { db, sessions, worker } = options;
 
@@ -101,6 +112,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
   const config = options.pilotConfig;
 
   const readSheetsFn = options.readSheetsRequestFn ?? readSheetsRequest;
+  const readTrelloListsFn = options.readTrelloListsFn ?? trelloListLists;
   const store = new PostgresReservationStore(db);
 
   return async function handlePilotV2Request(
@@ -359,10 +371,28 @@ export function createPilotRouter(options: PilotRouterOptions) {
       const isUnconfirmed = intake.checklist.unconfirmedBusiness;
       const isNeedsInput = intake.checklist.status === "needs_input" || isUnconfirmed;
       const initialStatus = isNeedsInput ? "needs_input" : "awaiting_approval";
+      let targetListName: string | undefined;
+      if (!isNeedsInput) {
+        const targetListId = config.trello?.listId?.trim();
+        if (!targetListId || config.trello?.listId !== targetListId) {
+          throw new HttpError(503, "TARGET_NOT_BOUND", "Pilot Trello list ID is not configured");
+        }
+        let lists: Awaited<ReturnType<typeof trelloListLists>>;
+        try {
+          lists = await readTrelloListsFn({ config, policy, principalId: userId, boardId: policy.boardId });
+        } catch {
+          throw new HttpError(503, "TARGET_LIST_UNAVAILABLE", "Could not verify pilot Trello list");
+        }
+        const target = lists.find((list) => list.id === targetListId && !list.closed && list.name.trim());
+        if (!target) {
+          throw new HttpError(503, "TARGET_LIST_UNAVAILABLE", "Pilot Trello list is missing or closed");
+        }
+        targetListName = target.name;
+      }
       const approvalPlan = !isNeedsInput ? buildPilotApproval({
         runId, ownerId: userId, versionId, sourceKey: intake.sourceKey,
         sourceRevision: intake.sourceRevision, row: intake.row, policy,
-        targetListId: config.trello?.listId,
+        targetListId: config.trello!.listId!, targetListName: targetListName!,
       }) : null;
 
       // Enforce single active run invariant across the database
@@ -388,7 +418,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
         await tx`
           INSERT INTO workflow_versions(id, workflow_id, version_no, plan, origin)
           VALUES (${versionId}, ${workflowId}, 1,
-            ${tx.json({ profile: "pilot-v2", sourceRevision: intake.sourceRevision })}, 'initial')
+            ${tx.json({ profile: "pilot-v2", sourceRevision: intake.sourceRevision, targetListName })}, 'initial')
         `;
 
         // Insert run
@@ -575,11 +605,15 @@ export function createPilotRouter(options: PilotRouterOptions) {
         if (approval.version_id !== run.workflow_version_id) {
           throw new HttpError(409, "VERSION_MISMATCH", "Pilot workflow version changed");
         }
+        const versionRows = await db.client<Array<{ plan: unknown }>>`
+          SELECT plan FROM workflow_versions WHERE id = ${approval.version_id} LIMIT 1
+        `;
+        const targetListName = boundTargetListName(versionRows[0]?.plan);
         const plan = buildPilotApproval({
           runId, ownerId: userId, versionId: approval.version_id, sourceKey: snapshot.source_key,
           sourceRevision: snapshot.source_revision,
           row: snapshot.raw_data as SourceRow, policy,
-          targetListId: config.trello?.listId,
+          targetListId: config.trello?.listId ?? "", targetListName,
         });
         if (plan.snapshotHash !== approval.snapshot_hash) {
           throw new HttpError(409, "SNAPSHOT_MISMATCH", "Pilot preview changed");
@@ -695,10 +729,14 @@ export function createPilotRouter(options: PilotRouterOptions) {
         if (!snapshot) {
           throw new HttpError(409, "MISSING_SNAPSHOT", "Source snapshot missing for run");
         }
+        const versionRows = await tx<Array<{ plan: unknown }>>`
+          SELECT plan FROM workflow_versions WHERE id = ${approval.version_id} LIMIT 1
+        `;
+        const targetListName = boundTargetListName(versionRows[0]?.plan);
         const plan = buildPilotApproval({
           runId, ownerId: userId, versionId: approval.version_id, sourceKey: snapshot.source_key,
           sourceRevision: snapshot.source_revision, row: snapshot.raw_data, policy,
-          targetListId: config.trello?.listId,
+          targetListId: config.trello?.listId ?? "", targetListName,
         });
         if (plan.snapshotHash !== approval.snapshot_hash || body.snapshotHash !== approval.snapshot_hash) {
           throw new HttpError(409, "SNAPSHOT_MISMATCH", "Pilot preview changed or approval hash differs");

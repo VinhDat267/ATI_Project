@@ -73,6 +73,7 @@ async function createTestApi(options?: {
   pilotPolicy?: PilotPolicy | null;
   pilotConfig?: PilotConfig | null;
   pilotLiveWriteEnabled?: boolean;
+  trelloLists?: Array<{ id: string; name: string; closed: boolean }>;
 }) {
   const config: ApiConfig = {
     host: "127.0.0.1",
@@ -113,6 +114,9 @@ async function createTestApi(options?: {
 
   const sqlFn = async (strings: TemplateStringsArray, ...values: any[]) => {
     const sql = strings.join("?");
+    if (/SELECT\s+plan\s+FROM\s+workflow_versions/i.test(sql)) {
+      return [{ plan: { targetListName: "To Do" } }];
+    }
     if (/FROM\s+runs\s+WHERE\s+id\s*=/i.test(sql)) {
       const runId = values[0];
       const userId = values[1];
@@ -232,6 +236,7 @@ async function createTestApi(options?: {
     pilotConfig: options?.pilotConfig === null ? undefined : options?.pilotConfig ?? testConfig,
     pilotLiveWriteEnabled: options?.pilotLiveWriteEnabled ?? true,
     readSheetsRequestFn: async () => options?.intakeResult ?? mockIntakeResult,
+    readTrelloListsFn: async () => options?.trelloLists ?? [{ id: "list-todo", name: "To Do", closed: false }],
     pilotRouter: undefined, // uses createPilotRouter
   });
 
@@ -330,6 +335,34 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
     expect(snapshotsDb[0]!.run_id).toBe(result.runId);
   });
 
+  it("does not create a run when the configured Trello list is closed", async () => {
+    const { pilotUrl, tokenA, runsDb, snapshotsDb } = await createTestApi({
+      trelloLists: [{ id: "list-todo", name: "Cần làm", closed: true }],
+    });
+    const response = await fetch(`${pilotUrl}/runs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenA}`, "content-type": "application/json" },
+      body: JSON.stringify({ spreadsheetId: "sheet-abc", tabId: "tab-1", requestId: "REQ-101", userPrompt: "Create reviewed card" }),
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("TARGET_LIST_UNAVAILABLE");
+    expect(runsDb).toHaveLength(0);
+    expect(snapshotsDb).toHaveLength(0);
+  });
+
+  it("does not create a run when the target list ID has surrounding whitespace", async () => {
+    const config = { ...testConfig, trello: { ...testConfig.trello!, listId: " list-todo " } };
+    const { pilotUrl, tokenA, runsDb } = await createTestApi({ pilotConfig: config });
+    const response = await fetch(`${pilotUrl}/runs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenA}`, "content-type": "application/json" },
+      body: JSON.stringify({ spreadsheetId: "sheet-abc", tabId: "tab-1", requestId: "REQ-101", userPrompt: "Create reviewed card" }),
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("TARGET_NOT_BOUND");
+    expect(runsDb).toHaveLength(0);
+  });
+
   it("blocks approval when the durable approval row is missing", async () => {
     const { pilotUrl, tokenA, runsDb } = await createTestApi();
     const runId = "11111111-2222-4444-8888-999999999998";
@@ -426,7 +459,7 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
       runId: ownRunId, ownerId: USER_A, versionId: VERSION_ID, sourceKey: "source-key-101",
       sourceRevision: "r".repeat(64),
       row: snapshotsDb[0]!.raw_data as typeof mockIntakeResult.row,
-      policy: testPolicy, targetListId: testConfig.trello?.listId,
+      policy: testPolicy, targetListId: testConfig.trello!.listId!, targetListName: "To Do",
     }).snapshotHash;
     approvalsDb.push({
       id: APPROVAL_ID, run_id: ownRunId, owner_id: USER_A, version_id: VERSION_ID,

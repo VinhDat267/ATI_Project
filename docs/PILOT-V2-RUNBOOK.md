@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_WRITE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live write.
+**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / API_PREVIEW_SANDBOX_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_WRITE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live write.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -40,6 +40,20 @@ node packages/engine/dist/pilot/live-preflight-cli.js --principal $pilotPrincipa
 CLI yêu cầu Git HEAD, giữ độc quyền file output trước network, không ghi đè file cũ và thoát khác 0 khi config/read thất bại. Artifact gồm HEAD, trạng thái dirty của worktree, principal, Sheet/tab/board/list, hash cấu hình, source revision, tóm tắt Trello và lỗi đã che query/secret; code path chỉ thực hiện GET. HEAD riêng lẻ không định danh chính xác mã đang chạy nếu worktree dirty. `writesAttempted: 0` là bằng chứng từ đường CLI/transport, chưa thay cho audit HTTP remote. **BE-26 live read preflight đã passed** lúc 01:28:47 UTC ngày 25/09/2026 trên Sheet `Requests`, request `REQ-SBX-001` và Trello sandbox. Artifact cục bộ `%TEMP%\pilot-v2-preflight-20260925082846.json` ghi HEAD `0d833c4`, `workingTreeDirty: false`, `writesAttempted: 0` (ngoài Git). Đây là bằng chứng đọc của CLI, chưa chứng minh live write hoặc luồng API end-to-end. API key chỉ dùng được khi Sheet được chia sẻ phù hợp; service account hiện bị chặn.
 
 ## 4. Duyệt và thực thi UC2 — chưa mở live
+
+### Tạo preview API từ sandbox thật, không ghi Trello
+
+`scripts/pilot-preview-sandbox.mjs` mở API loopback trong cùng tiến trình, tạo mật khẩu demo ngẫu nhiên trong bộ nhớ, đọc Sheet và list Trello thật, lưu run/approval vào PostgreSQL sandbox, GET preview rồi đóng API. Script **không** gọi endpoint approve, ép `pilotLiveWriteEnabled: false` và từ chối môi trường có `PILOT_V2_WRITE_ENABLED=true`. Dùng database riêng đã migrate và seed với tên `wap_pilot_preview_YYYYMMDD`; không dùng database production/demo chung. Nạp credential và ID sandbox vào tiến trình, rồi chạy từ root:
+
+```powershell
+$env:PILOT_TRELLO_LIST_ID = [Environment]::GetEnvironmentVariable('PILOT_TRELLO_LIST_ID', 'User')
+$env:PILOT_V2_WRITE_ENABLED = 'false'
+$env:PILOT_PREVIEW_DATABASE_URL = 'postgresql://wap:wap@127.0.0.1:55532/wap_pilot_preview_20260925'
+$evidencePath = Join-Path $env:TEMP ('pilot-v2-preview-' + (Get-Date -Format 'yyyyMMddHHmmss') + '.json')
+node scripts/pilot-preview-sandbox.mjs --request-id REQ-SBX-001 --output $evidencePath
+```
+
+Lần chạy ngày 25/09/2026 tạo một run `awaiting_approval` cho `REQ-SBX-001` với checklist pass, một action `trello.create_card` vào list `Cần làm`, `writesAttempted: 0`; artifact cục bộ `%TEMP%\pilot-v2-preview-20260925094801.json` ghi worktree dirty và hạn 10 phút. Preview hết hạn cần tạo lại và đối chiếu nguồn/snapshot mới; nó không cấp quyền ghi Trello. Trước run creation, API đọc list theo ID, gắn tên đã xác minh vào workflow version và snapshot. Nếu list đổi tên/đóng trước dispatch, adapter từ chối POST; cần preview/approval mới thay vì sửa snapshot cũ.
 
 Trên đường API hiện có, `POST /pilot/v2/runs` đọc nguồn và lưu snapshot, workflow version, approval pending cùng hạn 10 phút trong PostgreSQL. `GET /pilot/v2/runs/:id` trả preview gồm `approvalId`, `versionId`, `snapshotHash`, `expiresAt` và action có list ID. `POST /pilot/v2/runs/:id/approve` yêu cầu đúng ba định danh đó và quyết định. Server khóa row, kiểm owner/version/hash/hạn bằng đồng hồ DB, ghi quyết định và trạng thái trước dispatch; replay trả 409. `PILOT_V2_WRITE_ENABLED` mặc định tắt nên `approved` trả `503 LIVE_WRITE_BLOCKED` và không thay approval. Khi cờ bật mà chưa có list ID, API trả `503 TARGET_NOT_BOUND`.
 

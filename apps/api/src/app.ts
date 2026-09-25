@@ -68,7 +68,7 @@ export interface HealthOptions {
   readiness?: () => Promise<boolean>;
 }
 
-import { createPilotRouter } from "./pilot-router.js";
+import { createPilotRouter, type PilotRouterOptions } from "./pilot-router.js";
 import type { PilotConfig, PilotPolicy, ReadSheetsRequestResult } from "@wap/engine";
 
 export interface CreateApiOptions {
@@ -109,6 +109,7 @@ export interface CreateApiOptions {
     tabId: string;
     requestId: string;
   }) => Promise<ReadSheetsRequestResult>;
+  readTrelloListsFn?: PilotRouterOptions["readTrelloListsFn"];
 }
 
 export function createApi(options: CreateApiOptions): ApiRuntime {
@@ -150,6 +151,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       pilotPolicy: options.pilotPolicy,
       liveWriteEnabled: options.pilotLiveWriteEnabled,
       readSheetsRequestFn: options.readSheetsRequestFn,
+      readTrelloListsFn: options.readTrelloListsFn,
     });
   const identityLookup =
     options.identityLookup ??
