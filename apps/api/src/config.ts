@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parsePasswordHash } from "./auth.js";
 
 export interface ApiConfig {
-  host: "127.0.0.1";
+  host: "127.0.0.1" | "0.0.0.0";
   port: number;
   userId: string;
   email: string;
@@ -261,8 +261,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     "API_LEGACY_PASSWORD_AUTH_ENABLED",
     !oidc.enabled,
   );
+  const rawHost = env.API_HOST ?? "127.0.0.1";
+  if (rawHost !== "127.0.0.1" && rawHost !== "0.0.0.0")
+    throw new Error("Invalid configuration API_HOST");
   return {
-    host: "127.0.0.1",
+    host: rawHost,
     port: integer(env, "API_PORT", 3001),
     userId,
     email,

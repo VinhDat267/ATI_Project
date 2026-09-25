@@ -23,14 +23,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: "127.0.0.1",
+      host: process.env.WAP_WEB_HOST || "127.0.0.1",
       port: 5173,
       strictPort: true,
       cors: false,
       open: false,
     },
     preview: {
-      host: "127.0.0.1",
+      host: process.env.WAP_WEB_HOST || "127.0.0.1",
       port: process.env.WAP_PREVIEW_PORT
         ? Number(process.env.WAP_PREVIEW_PORT)
         : 4173,

@@ -1,27 +1,76 @@
-# Legacy infrastructure template. Current G1 uses: npm run db:up:g1
-# See compose.g1.yaml for dedicated ports/volume; do not reset existing data.
+# Full-stack Docker Compose (PostgreSQL + Redis + API Server + Live Web UI)
+# Start all 4 services: npm run docker:up  (or: docker compose up -d --build)
+# For DB-only infrastructure used by G1 tests: npm run db:up:g1 (see compose.g1.yaml)
+name: ati-platform
 services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: wap
       POSTGRES_PASSWORD: wap
-      POSTGRES_DB: wap
-    ports: ["5432:5432"]
+      POSTGRES_DB: wap_g1
+    ports:
+      - "127.0.0.1:55532:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wap"]
-      interval: 5s
-      retries: 10
+      test: ["CMD-SHELL", "pg_isready -U wap -d wap_g1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports:
+      - "127.0.0.1:56379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      G1_DATABASE_URL: postgresql://wap:wap@postgres:5432/wap_g1
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      API_DEMO_EMAIL: ${API_DEMO_EMAIL:-demo@local}
+      API_DEMO_PASSWORD: ${API_DEMO_PASSWORD:-synthetic-password}
+      API_PLANNER_MODE: ${API_PLANNER_MODE:-dev_fixture}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PILOT_V2_WRITE_ENABLED: ${PILOT_V2_WRITE_ENABLED:-0}
+    ports:
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/healthz || exit 1"]
       interval: 5s
-      retries: 10
+      timeout: 3s
+      retries: 15
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/apps/web
+    command: ["npx", "vite", "--mode", "live", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      WAP_WEB_HOST: 0.0.0.0
+      WAP_API_TARGET: http://api:3001
+      WAP_FRONTEND_ORIGIN: http://127.0.0.1:5173
+    ports:
+      - "127.0.0.1:5173:5173"
 
 volumes:
   pgdata:
