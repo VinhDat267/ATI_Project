@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHttpTransport } from "../../src/core/api.js";
-import { ClientError } from "../../src/core/errors.js";
+import {
+  ClientError,
+  formatBusinessFieldName,
+  formatChecklistSummary,
+  formatErrorClass,
+  toBusinessErrorMessage,
+} from "../../src/core/errors.js";
 import { createSession } from "../../src/core/session.js";
 import type { Transport } from "../../src/core/contracts.js";
 
@@ -70,6 +76,35 @@ describe("Login Flow & Error Mapping", () => {
     expect(netErr.kind).toBe("network");
   });
 
+  it("translates technical error codes, raw English server messages, and snake_case fields into business Vietnamese", () => {
+    expect(toBusinessErrorMessage("NOT_FOUND", "INTAKE_ERROR", 422)).toBe(
+      "Không tìm thấy mã yêu cầu này trong bảng dữ liệu nguồn. Vui lòng kiểm tra lại Mã yêu cầu hoặc Trang tính.",
+    );
+    expect(toBusinessErrorMessage("HEADERS", "INTAKE_ERROR", 422)).toBe(
+      "Bảng dữ liệu nguồn chưa đúng mẫu quy định (thiếu các cột thông tin bắt buộc).",
+    );
+    expect(toBusinessErrorMessage("A run is already active", "ACTIVE_RUN", 409)).toBe(
+      "Hệ thống đang xử lý một yêu cầu khác. Vui lòng hoàn tất hoặc phê duyệt yêu cầu đang chờ trước khi tạo yêu cầu mới.",
+    );
+    expect(toBusinessErrorMessage("Invalid credentials", "INVALID_CREDENTIALS", 401)).toBe(
+      "Email hoặc mật khẩu chưa chính xác. Vui lòng kiểm tra lại thông tin đăng nhập.",
+    );
+    expect(
+      toBusinessErrorMessage(
+        "CHANNEL_NOT_FOUND: Không tìm thấy nơi nhận thông báo.",
+        undefined,
+        400,
+      ),
+    ).toBe("Không tìm thấy nơi nhận thông báo.");
+
+    expect(formatBusinessFieldName("due_date")).toBe("Hạn hoàn thành");
+    expect(formatBusinessFieldName("dimensions")).toBe("Kích thước thiết kế");
+    expect(formatChecklistSummary("Checklist passed for design_asset", [], [])).toBe(
+      "Đầy đủ thông tin cho yêu cầu thiết kế ấn phẩm",
+    );
+    expect(formatErrorClass("bad_args")).toBe("Thông tin nơi nhận hoặc tham số chưa hợp lệ");
+  });
+
   it("createHttpTransport integrates with session.getToken()", async () => {
     const session = createSession();
     session.setToken("active-token-999");
@@ -103,3 +138,4 @@ describe("Login Flow & Error Mapping", () => {
     }
   });
 });
+

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import type { RequestDraft } from "../../core/draft.js";
+import { formatBusinessError } from "../../core/errors.js";
 import { navigate, routeToHash } from "../../core/navigation.js";
 import { formatClock, shortId } from "../../core/presentation.js";
 import { serversQuery } from "../../core/queries.js";
@@ -36,17 +37,17 @@ function parseInputs(rows: InputRow[]): {
   const errors = new Map<number, string>();
   for (const row of rows) {
     if (!KEY_PATTERN.test(row.key)) {
-      errors.set(row.id, "Khoá dùng chữ thường, số, gạch dưới và bắt đầu bằng chữ");
+      errors.set(row.id, "Khoá dùng chữ thường, chữ số hoặc dấu gạch dưới, bắt đầu bằng chữ cái");
       continue;
     }
     if (row.key in values) {
-      errors.set(row.id, "Khoá bị trùng");
+      errors.set(row.id, "Tên tham số này đã tồn tại");
       continue;
     }
     if (row.type === "number") {
       const n = Number(row.value);
       if (row.value.trim() === "" || !Number.isFinite(n)) {
-        errors.set(row.id, "Giá trị phải là số");
+        errors.set(row.id, "Vui lòng nhập giá trị số hợp lệ");
         continue;
       }
       values[row.key] = n;
@@ -287,8 +288,8 @@ export function NewRunView() {
             </span>
           </Banner>
         ) : createSnapshot.status === "error" && createSnapshot.error ? (
-          <Banner tone="danger" icon="triangle-alert" title="Không thể gửi yêu cầu">
-            <span>{createSnapshot.error.message}</span>
+          <Banner tone="danger" icon="triangle-alert" title="Chưa thể gửi yêu cầu">
+            <span>{formatBusinessError(createSnapshot.error)}</span>
           </Banner>
         ) : draft ? (
           <OriginBanner draft={draft} />

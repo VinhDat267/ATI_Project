@@ -514,12 +514,12 @@ export function createWorld(now: Date): FixtureWorld {
     const approval = approvalFor(id, versionId, "approved", at(created, 600), [
       { stepId: "post_overdue", tool: "send_slack_message", args: { channel: "#thong-bao-cu", text: "4 thẻ quá hạn trên board_a" } },
     ]);
-    const message = "Kênh “#thong-bao-cu” không có trong dữ liệu local.";
+    const message = "Kênh “#thong-bao-cu” không tồn tại hoặc đã ngừng hoạt động.";
     runs.push({
       detail: detail({ id, status: "failed", prompt, createdAt: created, plan: plan("Báo thẻ quá hạn", prompt, steps), approval, lastSeq: 5 }),
       trace: trace(id, versionId, [
         { stepId: "list_overdue", tool: "list_cards", args: steps[0]!.args, certainty: "confirmed", startedAt: "2026-09-14T10:05:22.000Z", endedAt: "2026-09-14T10:05:23.000Z", result: { count: 4 } },
-        { stepId: "post_overdue", tool: "send_slack_message", args: approval.actions[0]!.resolved_args, certainty: "known_not_applied", startedAt: "2026-09-14T10:05:29.000Z", endedAt: "2026-09-14T10:05:30.000Z", error: { cls: "bad_args", message: `CHANNEL_NOT_FOUND: ${message}` }, operationId: approval.actions[0]!.operation_id },
+        { stepId: "post_overdue", tool: "send_slack_message", args: approval.actions[0]!.resolved_args, certainty: "known_not_applied", startedAt: "2026-09-14T10:05:29.000Z", endedAt: "2026-09-14T10:05:30.000Z", error: { cls: "bad_args", message }, operationId: approval.actions[0]!.operation_id },
       ]),
       events: events([
         statusEvent(created, "planning", null),

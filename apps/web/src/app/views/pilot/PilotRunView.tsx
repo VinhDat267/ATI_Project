@@ -7,6 +7,15 @@ import { Icon } from "../../components/Icon";
 import { LoadingState, ErrorState } from "../../components/States";
 import { StatusPill } from "../../components/StatusPill";
 import { TechDisclosure } from "../../components/TechDisclosure";
+import {
+  formatBusinessError,
+  formatBusinessFieldName,
+  formatChecklistSummary,
+  formatClarificationQuestion,
+  formatDecisionStatus,
+  formatRequestType,
+  toBusinessErrorMessage,
+} from "../../../core/errors.js";
 import { routeToHash } from "../../../core/navigation.js";
 import { shortId } from "../../../core/presentation.js";
 
@@ -73,7 +82,7 @@ export function PilotRunView({ runId }: { runId: string }) {
     queryKey: ["pilot-run", runId],
     queryFn: async ({ signal }) => {
       if (!transport.getPilotRun) {
-        throw new Error("Hệ thống không hỗ trợ getPilotRun");
+        throw new Error("Không thể tải thông tin quy trình điều phối.");
       }
       return transport.getPilotRun(runId, signal);
     },
@@ -103,12 +112,12 @@ export function PilotRunView({ runId }: { runId: string }) {
 
   const handleDecision = async (decision: "approved" | "rejected") => {
     if (!snapshotHash || !approvalId || !versionId) {
-      setDecisionError("Không tìm thấy approval hợp lệ để phê duyệt");
+      setDecisionError("Bản xem trước của công việc này không còn hiệu lực hoặc đã được xử lý.");
       return;
     }
 
     if (!transport.approvePilotRun) {
-      setDecisionError("Hệ thống không hỗ trợ thao tác phê duyệt");
+      setDecisionError("Hệ thống hiện chưa sẵn sàng thực hiện thao tác phê duyệt.");
       return;
     }
 
@@ -131,9 +140,11 @@ export function PilotRunView({ runId }: { runId: string }) {
       await queryClient.invalidateQueries({ queryKey: ["pilot-run", runId] });
       await refetch();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
       setDecisionError(
-        msg || "Không thể gửi quyết định phê duyệt. Vui lòng kiểm tra lại kết nối.",
+        formatBusinessError(
+          err,
+          "Không thể gửi quyết định phê duyệt. Vui lòng kiểm tra lại kết nối.",
+        ),
       );
     } finally {
       scope.dispose();
@@ -148,7 +159,7 @@ export function PilotRunView({ runId }: { runId: string }) {
   if (error || !run) {
     return (
       <ErrorState
-        error={error ?? new Error("Không tìm thấy thông tin lần chạy")}
+        error={error ?? new Error("Không tìm thấy thông tin công việc này.")}
         onRetry={() => void refetch()}
       />
     );
@@ -159,7 +170,7 @@ export function PilotRunView({ runId }: { runId: string }) {
     primaryAction?.args?.title ?? primaryAction?.args?.name ?? "Không có tiêu đề",
   );
   const targetList = String(
-    primaryAction?.args?.listName ?? primaryAction?.args?.idList ?? "To Do",
+    primaryAction?.args?.listName ?? primaryAction?.args?.idList ?? "Cần làm",
   );
   const dueDate = String(
     primaryAction?.args?.due ?? primaryAction?.args?.dueDate ?? "Chưa đặt hạn",
@@ -200,7 +211,7 @@ export function PilotRunView({ runId }: { runId: string }) {
       </div>
 
       {decisionError ? (
-        <Banner tone="danger" icon="circle-x" title="Lỗi gửi quyết định">
+        <Banner tone="danger" icon="circle-x" title="Chưa thể thực hiện phê duyệt">
           {decisionError}
         </Banner>
       ) : null}
@@ -332,7 +343,10 @@ export function PilotRunView({ runId }: { runId: string }) {
           <div className="flex flex-col gap-3">
             {run.clarificationQuestion ? (
               <div className="rounded-sm bg-canvas p-4 font-semibold text-ink border border-planner/30">
-                {run.clarificationQuestion}
+                {formatClarificationQuestion(
+                  run.clarificationQuestion,
+                  run.checklistResult?.missingFields ?? [],
+                )}
               </div>
             ) : null}
             <p className="m-0 text-body-md">
@@ -343,14 +357,18 @@ export function PilotRunView({ runId }: { runId: string }) {
               <ul className="m-0 pl-5 text-body-sm font-semibold text-ink">
                 {run.checklistResult.missingFields.map((field) => (
                   <li key={field}>
-                    Thông tin còn thiếu: {field === "due_date" ? "Thời hạn hoàn thành" : field === "dimensions" ? "Thông số kích thước" : field === "target_url" ? "Đường dẫn trang web" : field}
+                    Thông tin còn thiếu: {formatBusinessFieldName(field)}
                   </li>
                 ))}
               </ul>
             ) : null}
             {run.checklistResult?.summary ? (
               <p className="m-0 text-caption text-muted">
-                Chi tiết: {run.checklistResult.summary}
+                Chi tiết:{" "}
+                {formatChecklistSummary(
+                  run.checklistResult.summary,
+                  run.checklistResult.missingFields ?? [],
+                )}
               </p>
             ) : null}
             <div className="pt-2">
@@ -376,7 +394,7 @@ export function PilotRunView({ runId }: { runId: string }) {
           <div className="flex flex-col gap-2">
             {run.refusalReason ? (
               <div className="rounded-sm bg-canvas p-4 font-semibold text-danger border border-danger/30">
-                {run.refusalReason}
+                {toBusinessErrorMessage(run.refusalReason)}
               </div>
             ) : null}
             <p className="m-0 text-body-md">
@@ -384,7 +402,11 @@ export function PilotRunView({ runId }: { runId: string }) {
             </p>
             {run.checklistResult?.summary ? (
               <p className="m-0 text-caption text-muted">
-                Chi tiết: {run.checklistResult.summary}
+                Chi tiết:{" "}
+                {formatChecklistSummary(
+                  run.checklistResult.summary,
+                  run.checklistResult.missingFields ?? [],
+                )}
               </p>
             ) : null}
             <div className="pt-2">
@@ -502,10 +524,10 @@ export function PilotRunView({ runId }: { runId: string }) {
 
       {/* BRANCH 8: Failed */}
       {run.status === "failed" ? (
-        <Banner tone="danger" icon="circle-x" title="Quy trình gặp sự cố">
+        <Banner tone="danger" icon="circle-x" title="Không thể hoàn tất quy trình">
           <div className="flex flex-col gap-2">
             <p className="m-0 text-body-md">
-              {run.error ?? "Đã xảy ra sự cố trong quá trình thực thi."}
+              {toBusinessErrorMessage(run.error)}
             </p>
             <div className="pt-2">
               <a
@@ -543,8 +565,8 @@ export function PilotRunView({ runId }: { runId: string }) {
                 </div>
                 <div className="flex justify-between border-b border-hairline pb-1.5">
                   <span className="text-muted">Loại yêu cầu:</span>
-                  <span className="font-mono text-primary font-medium">
-                    {run.sourceSnapshot.requestType ?? "N/A"}
+                  <span className="text-primary font-medium">
+                    {formatRequestType(run.sourceSnapshot.requestType)}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-hairline pb-1.5">
@@ -553,7 +575,7 @@ export function PilotRunView({ runId }: { runId: string }) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Trạng thái duyệt:</span>
-                  <span>{run.sourceSnapshot.decisionStatus ?? "Chưa có"}</span>
+                  <span>{formatDecisionStatus(run.sourceSnapshot.decisionStatus)}</span>
                 </div>
               </div>
             </div>
