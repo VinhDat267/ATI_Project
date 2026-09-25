@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createApi } from "../src/app.js";
+import { SessionStore } from "../src/auth.js";
 import { makeApiFixture } from "./fixture.js";
 import {
   evaluateChecklist, sourceKey, createIntentKey,
@@ -20,12 +21,13 @@ const row: SourceRow = {
 
 afterEach(() => vi.restoreAllMocks());
 
-async function harness(writeEnabled = true) {
+async function harness(writeEnabled = true, additionalPrincipals: string[] = []) {
   const fixture = await makeApiFixture();
   const policy: PilotPolicy = {
-    enabled: true, principals: [fixture.userId],
+    enabled: true, principals: [fixture.userId, ...additionalPrincipals],
     spreadsheetId: "sheet-pilot", tabId: "requests", boardId: "board-pilot",
   };
+
   const pilotConfig: PilotConfig = {
     ...policy,
     google: { apiKey: "fixture-google" },
@@ -40,14 +42,35 @@ async function harness(writeEnabled = true) {
     groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
     tabId: policy.tabId, requestId: row.request_id,
   }, policy.boardId);
+
+  const customPrincipalTokens = new Map<string, string>();
+  const sessions = new SessionStore({
+    userId: fixture.userId,
+    email: fixture.email,
+    passwordHash: fixture.config.passwordHash,
+    ttlMs: 60_000,
+    principalExists: async () => true,
+  });
+  const originalAuth = sessions.authenticate.bind(sessions);
+  sessions.authenticate = (input: any) => {
+    const cred = typeof input === "object" && input !== null ? (input.authorization ?? "") : "";
+    const bearer = typeof cred === "string" && cred.startsWith("Bearer ") ? cred.slice("Bearer ".length) : null;
+    if (bearer && customPrincipalTokens.has(bearer)) {
+      return customPrincipalTokens.get(bearer)!;
+    }
+    return originalAuth(input);
+  };
+
   const api = createApi({
     db: fixture.db, config: fixture.config,
+    sessionStore: sessions,
     pilotConfig, pilotPolicy: policy,
     pilotLiveWriteEnabled: writeEnabled,
     readSheetsRequestFn: async () => ({
       row, checklist, sourceKey: key, sourceRevision: checklist.sourceRevision,
     }),
   });
+
   const baseUrl = await api.listen();
   const pilotUrl = baseUrl.replace(/\/api\/v1$/, "") + "/pilot/v2";
   const login = await fetch(`${baseUrl}/auth/login`, {
@@ -88,8 +111,13 @@ async function harness(writeEnabled = true) {
         snapshotHash: preview.snapshotHash,
       }),
     });
+  const issueTokenFor = (userId: string): string => {
+    const t = "token-" + randomUUID();
+    customPrincipalTokens.set(t, userId);
+    return t;
+  };
   return {
-    fixture, api, pilotUrl, headers, create, detail, decide, pilotConfig, intentKey,
+    fixture, api, pilotUrl, headers, create, detail, decide, pilotConfig, intentKey, issueTokenFor,
     async close() { await api.close(); await fixture.close(); },
   };
 }
@@ -444,4 +472,106 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
       await h.close();
     }
   }, 45_000);
+
+  it("enforces owner isolation: Operator B cannot read or approve Operator A's run", async () => {
+    const userBId = randomUUID();
+    const h = await harness(true, [userBId]);
+    try {
+      // Create run with Operator A
+      const runIdA = await h.create();
+      const detailA = await h.detail(runIdA);
+      expect(detailA.status).toBe("awaiting_approval");
+
+      // Generate authorized token for Operator B
+      const tokenB = h.issueTokenFor(userBId);
+      const headersB = {
+        authorization: `Bearer ${tokenB}`,
+        "content-type": "application/json",
+      };
+
+      const trello = mockTrello();
+
+
+      // Operator B cannot read Operator A's run
+      const getResponse = await fetch(`${h.pilotUrl}/runs/${runIdA}`, { headers: headersB });
+      expect(getResponse.status).toBe(404);
+
+      // Operator B cannot approve Operator A's run
+      const approveResponse = await fetch(`${h.pilotUrl}/runs/${runIdA}/approve`, {
+        method: "POST",
+        headers: headersB,
+        body: JSON.stringify({
+          decision: "approved",
+          approvalId: detailA.preview.approvalId,
+          versionId: detailA.preview.versionId,
+          snapshotHash: detailA.preview.snapshotHash,
+        }),
+      });
+      expect(approveResponse.status).toBe(404);
+
+      // Verify ZERO remote writes were dispatched by Operator B's unauthorized attempt
+      expect(trello.writes()).toBe(0);
+
+      // Verify run is still pending for Operator A
+      const afterDetailA = await h.detail(runIdA);
+      expect(afterDetailA.status).toBe("awaiting_approval");
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
+  it("quarantines as reconciliation_required and records unknown reservation when Trello returns an invalid receipt", async () => {
+    const h = await harness();
+    try {
+      const runId = await h.create();
+      const detail = await h.detail(runId);
+
+      // Mock Trello returning 200 OK but with invalid/empty receipt payload
+      let writes = 0;
+      const realFetch = globalThis.fetch;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (!url.startsWith("https://api.trello.com/")) return realFetch(input, init);
+        if (init?.method === "POST" && url.includes("/1/cards")) {
+          writes++;
+          // Returns 200 OK but missing required id and url
+          return new Response(JSON.stringify({ id: "", url: "" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify([{ id: "list-todo", name: "To Do", closed: false }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      });
+
+      const response = await h.decide(runId, "approved", detail.preview);
+      expect(response.status).toBe(200);
+      expect((await response.json() as any).status).toBe("reconciliation_required");
+
+      // Verify DB reservation status is quarantined as unknown
+      const reservations = await h.fixture.db.client`
+        SELECT status FROM business_reservations WHERE intent_key = ${h.intentKey}
+      `;
+      expect(reservations[0]?.status).toBe("unknown");
+
+      // Verify run status in DB is reconciliation_required
+      const runRows = await h.fixture.db.client`
+        SELECT status FROM runs WHERE id = ${runId}
+      `;
+      expect(runRows[0]?.status).toBe("reconciliation_required");
+
+      // Verify single write and zero blind retry
+      expect(writes).toBe(1);
+
+      // Replay must be blocked with 409
+      const replay = await h.decide(runId, "approved", detail.preview);
+      expect(replay.status).toBe(409);
+      expect(writes).toBe(1);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
 });
+
