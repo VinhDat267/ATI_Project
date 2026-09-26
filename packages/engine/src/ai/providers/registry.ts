@@ -137,11 +137,20 @@ const SAFE_FAILURE_STAGES = new Set([
   'http_body_too_large', 'http_content_type', 'http_json_envelope',
   'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
   'output_wire_branch', 'output_wire_plan_shape', 'output_wire_value', 'output_wire_dsl',
+  'output_wire_dsl_steps', 'output_wire_dsl_args', 'output_wire_dsl_plan',
 ]);
 
 function safePlannerWireFailureStage(error: unknown): string {
   if (error instanceof PlannerWireSchemaError) return `output_wire_${error.safeCategory}`;
-  if (error instanceof ZodError) return 'output_wire_dsl';
+  if (error instanceof ZodError) {
+    const path = error.issues[0]?.path;
+    if (path?.[0] === 'plan' && path[1] === 'steps') {
+      if (path[3] === 'tool' && path[4] === 'args') return 'output_wire_dsl_args';
+      return 'output_wire_dsl_steps';
+    }
+    if (path?.[0] === 'plan') return 'output_wire_dsl_plan';
+    return 'output_wire_dsl';
+  }
   return 'output_wire';
 }
 

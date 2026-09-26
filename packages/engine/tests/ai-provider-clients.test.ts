@@ -515,7 +515,13 @@ describe("native provider clients with fake transport", () => {
       [{ result: { kind: 'plan', plan, refusal: { reason: 'CANARY_SECRET' }, clarification: null } }, 'output_wire_branch'],
       [{ result: { kind: 'plan', plan: { ...plan, inputs_present: true }, refusal: null, clarification: null } }, 'output_wire_plan_shape'],
       [{ result: { kind: 'plan', plan: { ...plan, steps: [step] }, refusal: null, clarification: null } }, 'output_wire_value'],
-      [{ result: { kind: 'plan', plan, refusal: null, clarification: null } }, 'output_wire_dsl'],
+      [{ result: { kind: 'plan', plan, refusal: null, clarification: null } }, 'output_wire_dsl_steps'],
+      [{ result: { kind: 'plan', plan: { ...plan, name: '', steps: [
+        { ...step, tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_plan'],
+      [{ result: { kind: 'plan', plan: { ...plan, steps: [
+        { ...step, tool: { ...step.tool, args: { kind: 'array', array_value: [] } } },
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_args'],
     ] as const) {
       const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
         ledger: ledger(), authorizeCall: async () => {},
