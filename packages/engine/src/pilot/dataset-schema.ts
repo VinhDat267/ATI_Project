@@ -77,7 +77,7 @@ export const V2FaultTypeSchema = z.enum([
 export type V2FaultType = z.infer<typeof V2FaultTypeSchema>;
 
 export const V2TestCaseSchema = z.object({
-  caseId: z.string().regex(/^(?:V2-(?:0[1-9]|1[0-9]|20)|H-(?:0[1-9]|10))$/),
+  caseId: z.string().regex(/^(?:V2-(?:0[1-9]|1[0-9]|20)|H-(?:0[1-9]|10)|H2-(?:0[1-9]|10))$/),
   variantId: z.string().min(1),
   language: z.enum(['vi', 'en']),
   origin: z.literal('reconstructed_synthetic'),

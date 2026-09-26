@@ -53,7 +53,7 @@ const InputsSchema = z.object({
     (modes) => new Set(modes).size === modes.length,
     'Comparison modes must be unique',
   ),
-  evaluationProfile: z.literal('model-only-v1').optional(),
+  evaluationProfile: z.enum(['model-only-v1', 'model-only-v2']).optional(),
   priceEvidence: PriceEvidenceSchema,
   budget: BudgetSchema,
   freeTier: FreeTierAttestationSchema.optional(),
@@ -108,6 +108,7 @@ const ARTIFACTS = {
     'packages/engine/src/pilot/quality-freeze.ts',
     'packages/engine/src/pilot/quality-journal.ts',
     'packages/engine/src/pilot/quality-grader.ts',
+    'packages/engine/src/pilot/dataset-schema.ts',
     'packages/engine/src/pilot/quality-plan-validator.ts',
     'packages/engine/src/pilot/quality-scope.ts',
     'packages/engine/src/pilot/checklist.ts',
@@ -169,7 +170,9 @@ async function computeFingerprints(root: string, profile?: string): Promise<z.in
     fingerprint(root, ARTIFACTS.prompt),
     fingerprint(root, ARTIFACTS.catalog),
     fingerprint(root, profile === 'model-only-v1'
-      ? [...ARTIFACTS.behavior, 'testdata/v2-dataset/ai-holdout-v1.meta.json'] : ARTIFACTS.behavior),
+      ? [...ARTIFACTS.behavior, 'testdata/v2-dataset/ai-holdout-v1.meta.json']
+      : profile === 'model-only-v2'
+        ? [...ARTIFACTS.behavior, 'testdata/v2-dataset/ai-holdout-v2.meta.json'] : ARTIFACTS.behavior),
   ]);
   return { publicDataset, holdoutDataset, prompt, catalog, behavior };
 }

@@ -10,7 +10,7 @@ import { evaluateChecklist } from './checklist.js';
 import { PILOT_TOOL_CATALOG, type PilotToolEntry } from './gateway.js';
 import { buildPilotPlannerContext } from './planner-context.js';
 import { parseRequest, type SourceRow } from './source.js';
-import { classifyPilotModelQualityCase, pilotQualityHoldoutFile } from './quality-scope.js';
+import { assertPilotModelFixtureCompatible, classifyPilotModelQualityCase, pilotQualityHoldoutFile } from './quality-scope.js';
 import {
   assertPilotQualityFreeze,
   type PilotQualityFreezeInputs,
@@ -32,6 +32,7 @@ export interface PilotQualityRetriever {
 export interface PilotQualityCase {
   readonly caseId?: unknown;
   readonly fault?: unknown;
+  readonly expected: { readonly kind: 'plan' | 'clarification' | 'refusal'; readonly writeCount: number };
   readonly sourceFixture: {
     readonly headers: readonly string[];
     readonly rows: readonly (readonly string[])[];
@@ -305,7 +306,7 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
   await assertPilotQualityFreeze(params.root, params.frozen.manifest, params.frozen.hash, params.currentInputs);
   const manifest = params.frozen.manifest;
   if (manifest.budget.maxCostMicros !== 0 || !manifest.freeTier || !manifest.modes.includes('fixed-catalog') ||
-      manifest.evaluationProfile !== 'model-only-v1') {
+      !['model-only-v1', 'model-only-v2'].includes(manifest.evaluationProfile ?? '')) {
     throw new Error('QUALITY_MEASURED_SCOPE_INVALID: zero-dollar fixed-catalog campaign required');
   }
   if (params.currentApiKeySha256 !== manifest.freeTier.apiKeySha256) {
@@ -321,6 +322,7 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
   if (!scope.eligible) {
     throw new Error('QUALITY_CASE_OUTSIDE_MODEL_SCOPE');
   }
+  assertPilotModelFixtureCompatible(params.testCase, params.dataset, params.frozen.manifest.evaluationProfile);
   const { sourceFixture, prompt, principal, resourcePolicy } = params.testCase;
   if (!resourcePolicy.allowedPrincipals.includes(principal) ||
       !resourcePolicy.allowedSources.includes(sourceFixture.spreadsheetId)) {

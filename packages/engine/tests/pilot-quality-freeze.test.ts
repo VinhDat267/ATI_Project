@@ -18,6 +18,7 @@ const paths = [
   'packages/engine/src/pilot/quality-freeze.ts',
   'packages/engine/src/pilot/quality-journal.ts',
   'packages/engine/src/pilot/quality-grader.ts',
+  'packages/engine/src/pilot/dataset-schema.ts',
   'packages/engine/src/pilot/quality-plan-validator.ts',
   'packages/engine/src/pilot/quality-scope.ts',
   'packages/engine/src/pilot/decision-engine.ts',
@@ -92,6 +93,21 @@ describe('pilot v2 quality freeze', () => {
       await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, profileInputs)).rejects.toThrow(/fingerprint mismatch/i);
       await writeFile(file!, contents!);
     }
+  });
+  it('binds model-only-v2 to its separate holdout and provenance bytes', async () => {
+    const root = await fixtureRoot();
+    const holdout = join(root, 'testdata/v2-dataset/ai-holdout-v2.json');
+    const provenance = join(root, 'testdata/v2-dataset/ai-holdout-v2.meta.json');
+    await mkdir(join(holdout, '..'), { recursive: true });
+    await writeFile(join(root, 'testdata/v2-dataset/ai-holdout-v1.json'), 'opened-v1-stub');
+    await writeFile(holdout, 'new-sealed-holdout');
+    await writeFile(provenance, 'new-sealed-provenance');
+    const profileInputs = { ...inputs(), evaluationProfile: 'model-only-v2' as const };
+    const frozen = await createPilotQualityFreeze(root, profileInputs);
+    await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, profileInputs)).resolves.toBeUndefined();
+    await writeFile(provenance, 'changed-provenance');
+    await expect(assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, profileInputs))
+      .rejects.toThrow(/fingerprint mismatch/i);
   });
   it('binds every input artifact to its raw bytes and rejects drift', async () => {
     const root = await fixtureRoot();

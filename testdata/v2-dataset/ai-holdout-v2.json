@@ -1,0 +1,1357 @@
+{
+  "profile": "pilot-v2",
+  "evidence": "RECONSTRUCTED_SYNTHETIC_DATASET_NOT_CUSTOMER_VALIDATED",
+  "version": "ai-holdout-v2",
+  "cases": [
+    {
+      "caseId": "H2-01",
+      "variantId": "H2-01-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-01/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-01",
+            "client-synthetic-v2",
+            "web_change",
+            "Rút gọn phần mở đầu trang trợ giúp và giữ nguyên các liên kết hiện có https://example.test/help",
+            "Rút gọn phần mở đầu trang trợ giúp",
+            "2026-11-01",
+            "confirmed",
+            "target_url: https://example.test/help"
+          ]
+        ],
+        "requestId": "REQ-H2-01",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Tạo task Trello theo REQ-H2-01 để rút gọn phần mở đầu trang trợ giúp.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Rút gọn phần mở đầu trang trợ giúp",
+              "description": "Rút gọn phần mở đầu trang trợ giúp và giữ nguyên các liên kết hiện có https://example.test/help",
+              "dueDate": "2026-11-01"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-01",
+      "variantId": "H2-01-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-01/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-01",
+            "client-synthetic-v2",
+            "web_change",
+            "Shorten the introduction on the help page while keeping its existing links https://example.test/help",
+            "Shorten help page introduction",
+            "2026-11-01",
+            "confirmed",
+            "target_url: https://example.test/help"
+          ]
+        ],
+        "requestId": "REQ-H2-01",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a Trello task from REQ-H2-01 to shorten the help page introduction.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Shorten help page introduction",
+              "description": "Shorten the introduction on the help page while keeping its existing links https://example.test/help",
+              "dueDate": "2026-11-01"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-02",
+      "variantId": "H2-02-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-02/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-02",
+            "client-synthetic-v2",
+            "design_asset",
+            "Thiết kế hình quảng cáo dọc cho bộ sưu tập mùa đông, tỷ lệ 4:5, xuất PNG https://example.test/winter",
+            "Hình quảng cáo bộ sưu tập mùa đông",
+            "2026-11-03",
+            "confirmed",
+            "dimensions: 4:5; format: PNG; target_url: https://example.test/winter"
+          ]
+        ],
+        "requestId": "REQ-H2-02",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Lập card Trello thiết kế quảng cáo dọc bộ sưu tập mùa đông theo REQ-H2-02.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Hình quảng cáo bộ sưu tập mùa đông",
+              "description": "Thiết kế hình quảng cáo dọc cho bộ sưu tập mùa đông, tỷ lệ 4:5, xuất PNG https://example.test/winter",
+              "dueDate": "2026-11-03"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-02",
+      "variantId": "H2-02-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-02/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-02",
+            "client-synthetic-v2",
+            "design_asset",
+            "Design a portrait ad for the winter collection at 4:5 ratio and export PNG https://example.test/winter",
+            "Winter collection portrait ad",
+            "2026-11-03",
+            "confirmed",
+            "dimensions: 4:5; format: PNG; target_url: https://example.test/winter"
+          ]
+        ],
+        "requestId": "REQ-H2-02",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a Trello card for the winter collection portrait ad in REQ-H2-02.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Winter collection portrait ad",
+              "description": "Design a portrait ad for the winter collection at 4:5 ratio and export PNG https://example.test/winter",
+              "dueDate": "2026-11-03"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-03",
+      "variantId": "H2-03-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-03/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-03",
+            "client-synthetic-v2",
+            "web_change",
+            "Đổi nhãn nút trên trang giá thành “Xem gói dịch vụ” https://example.test/pricing",
+            "Cập nhật nhãn nút trang giá",
+            "2026-11-05",
+            "confirmed",
+            "target_url: https://example.test/pricing"
+          ]
+        ],
+        "requestId": "REQ-H2-03",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Tạo card Trello cho việc đổi nhãn nút trang giá theo REQ-H2-03.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Cập nhật nhãn nút trang giá",
+              "description": "Đổi nhãn nút trên trang giá thành “Xem gói dịch vụ” https://example.test/pricing",
+              "dueDate": "2026-11-05"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-03",
+      "variantId": "H2-03-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-03/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-03",
+            "client-synthetic-v2",
+            "web_change",
+            "Change the button label on the pricing page to “View plans” https://example.test/pricing",
+            "Update pricing page button label",
+            "2026-11-05",
+            "confirmed",
+            "target_url: https://example.test/pricing"
+          ]
+        ],
+        "requestId": "REQ-H2-03",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a Trello card to change the pricing page button label from REQ-H2-03.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Update pricing page button label",
+              "description": "Change the button label on the pricing page to “View plans” https://example.test/pricing",
+              "dueDate": "2026-11-05"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-04",
+      "variantId": "H2-04-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-04/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-04",
+            "client-synthetic-v2",
+            "web_change",
+            "Đối chiếu tiến độ trang giới thiệu với thẻ Trello card-h2-441 https://example.test/about",
+            "Đối chiếu tiến độ trang giới thiệu",
+            "2026-11-06",
+            "confirmed",
+            "card_id: card-h2-441; target_url: https://example.test/about"
+          ]
+        ],
+        "requestId": "REQ-H2-04",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Tra cứu thẻ card-h2-441 được liên kết với REQ-H2-04 và cho tôi biết trạng thái.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0,
+        "toolCalls": [
+          {
+            "tool": "trello.get_card",
+            "args": {
+              "cardId": "card-h2-441"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-04",
+      "variantId": "H2-04-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-04/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-04",
+            "client-synthetic-v2",
+            "web_change",
+            "Check progress of the about page using Trello card card-h2-441 https://example.test/about",
+            "Check about page progress",
+            "2026-11-06",
+            "confirmed",
+            "card_id: card-h2-441; target_url: https://example.test/about"
+          ]
+        ],
+        "requestId": "REQ-H2-04",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Look up linked Trello card card-h2-441 for REQ-H2-04 and report its status.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "succeeded",
+        "writeCount": 0,
+        "toolCalls": [
+          {
+            "tool": "trello.get_card",
+            "args": {
+              "cardId": "card-h2-441"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-05",
+      "variantId": "H2-05-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-05/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-05",
+            "client-synthetic-v2",
+            "design_asset",
+            "Vẽ bộ 6 biểu tượng trạng thái 64x64 dạng SVG, nét đồng nhất, dùng trên dashboard https://example.test/dashboard",
+            "Bộ 6 biểu tượng trạng thái dashboard",
+            "2026-11-08",
+            "confirmed",
+            "format: SVG; dimensions: 64x64; target_url: https://example.test/dashboard"
+          ]
+        ],
+        "requestId": "REQ-H2-05",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Lập card thiết kế bộ biểu tượng dashboard theo REQ-H2-05.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Bộ 6 biểu tượng trạng thái dashboard",
+              "description": "Vẽ bộ 6 biểu tượng trạng thái dạng SVG, nét đồng nhất, dùng trên dashboard https://example.test/dashboard",
+              "dueDate": "2026-11-08"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-05",
+      "variantId": "H2-05-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-05/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-05",
+            "client-synthetic-v2",
+            "design_asset",
+            "Draw a set of 6 consistent-stroke 64x64 status icons in SVG for the dashboard https://example.test/dashboard",
+            "Dashboard set of 6 status icons",
+            "2026-11-08",
+            "confirmed",
+            "format: SVG; dimensions: 64x64; target_url: https://example.test/dashboard"
+          ]
+        ],
+        "requestId": "REQ-H2-05",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a design card for the dashboard icon set in REQ-H2-05.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "plan",
+        "terminalStatus": "awaiting_approval",
+        "writeCount": 1,
+        "toolCalls": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "boardId": "board-pilot-v2-synthetic",
+              "listName": "To Do",
+              "title": "Dashboard set of 6 status icons",
+              "description": "Draw a set of 6 consistent-stroke status icons in SVG for the dashboard https://example.test/dashboard",
+              "dueDate": "2026-11-08"
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-06",
+      "variantId": "H2-06-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-06/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-06",
+            "client-synthetic-v2",
+            "web_change",
+            "Thay ảnh đầu trang bằng ảnh sự kiện đã duyệt https://example.test/events",
+            "Thay ảnh đầu trang sự kiện",
+            "",
+            "confirmed",
+            "target_url: https://example.test/events"
+          ]
+        ],
+        "requestId": "REQ-H2-06",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Chuẩn bị card Trello cho yêu cầu REQ-H2-06.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "due_date"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-06",
+      "variantId": "H2-06-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-06/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-06",
+            "client-synthetic-v2",
+            "web_change",
+            "Replace the event page hero image with the approved event photo https://example.test/events",
+            "Replace event page hero image",
+            "",
+            "confirmed",
+            "target_url: https://example.test/events"
+          ]
+        ],
+        "requestId": "REQ-H2-06",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Prepare a Trello card for request REQ-H2-06.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "due_date"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-07",
+      "variantId": "H2-07-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-07/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-07",
+            "client-synthetic-v2",
+            "design_asset",
+            "Làm cho hình minh họa ứng dụng gọn và hiện đại hơn",
+            "",
+            "2026-11-10",
+            "confirmed",
+            "format: SVG"
+          ]
+        ],
+        "requestId": "REQ-H2-07",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Tạo card thiết kế cho REQ-H2-07.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "deliverable"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-07",
+      "variantId": "H2-07-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-07/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-07",
+            "client-synthetic-v2",
+            "design_asset",
+            "Make the app illustration feel cleaner and more modern",
+            "",
+            "2026-11-10",
+            "confirmed",
+            "format: SVG"
+          ]
+        ],
+        "requestId": "REQ-H2-07",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a design task for REQ-H2-07.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "deliverable"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-08",
+      "variantId": "H2-08-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-08/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-08",
+            "client-synthetic-v2",
+            "web_change",
+            "Thêm mục câu hỏi thường gặp cho trang hướng dẫn https://example.test/guide; giao cho Linh Trần",
+            "Thêm FAQ vào trang hướng dẫn",
+            "2026-11-12",
+            "confirmed",
+            "target_url: https://example.test/guide; assignee_name: Linh Tran (no verified Trello member ID)"
+          ]
+        ],
+        "requestId": "REQ-H2-08",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Tạo card REQ-H2-08 và giao cho Linh Trần.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "assignee_id"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-08",
+      "variantId": "H2-08-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-08/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-08",
+            "client-synthetic-v2",
+            "web_change",
+            "Add a FAQ section to the guide page https://example.test/guide; assign it to Linh Tran",
+            "Add FAQ to guide page",
+            "2026-11-12",
+            "confirmed",
+            "target_url: https://example.test/guide; assignee_name: Linh Tran (no verified Trello member ID)"
+          ]
+        ],
+        "requestId": "REQ-H2-08",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Create a card for REQ-H2-08 and assign it to Linh Tran.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "clarification",
+        "terminalStatus": "needs_input",
+        "writeCount": 0,
+        "missingFields": [
+          "assignee_id"
+        ]
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-09",
+      "variantId": "H2-09-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-09/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-09",
+            "client-synthetic-v2",
+            "newsletter_send",
+            "Gửi email giới thiệu chương trình thành viên tới danh sách khách hàng",
+            "Gửi email chương trình thành viên",
+            "2026-11-14",
+            "confirmed",
+            "channel: email; action: send"
+          ]
+        ],
+        "requestId": "REQ-H2-09",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Thực hiện yêu cầu REQ-H2-09 và gửi email tới khách hàng.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-09",
+      "variantId": "H2-09-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-09/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-09",
+            "client-synthetic-v2",
+            "newsletter_send",
+            "Send an email announcing the membership program to the customer list",
+            "Send membership program email",
+            "2026-11-14",
+            "confirmed",
+            "channel: email; action: send"
+          ]
+        ],
+        "requestId": "REQ-H2-09",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Carry out REQ-H2-09 and email the customers.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-10",
+      "variantId": "H2-10-vi",
+      "language": "vi",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-10/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-10",
+            "client-synthetic-v2",
+            "social_publish",
+            "Đăng thông báo ra mắt sản phẩm trực tiếp lên mạng xã hội",
+            "Đăng thông báo ra mắt sản phẩm",
+            "2026-11-16",
+            "confirmed",
+            "channel: social; action: publish"
+          ]
+        ],
+        "requestId": "REQ-H2-10",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Đăng nội dung của REQ-H2-10 lên tài khoản mạng xã hội.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    },
+    {
+      "caseId": "H2-10",
+      "variantId": "H2-10-en",
+      "language": "en",
+      "origin": "reconstructed_synthetic",
+      "sourceRefs": [
+        "holdout-v2/H2-10/synthetic-source-row"
+      ],
+      "sourceFixture": {
+        "headers": [
+          "request_id",
+          "client_ref",
+          "request_type",
+          "raw_request",
+          "deliverable",
+          "due_date",
+          "decision_status",
+          "source_note"
+        ],
+        "rows": [
+          [
+            "REQ-H2-10",
+            "client-synthetic-v2",
+            "social_publish",
+            "Publish the product launch announcement directly to social media",
+            "Publish product launch announcement",
+            "2026-11-16",
+            "confirmed",
+            "channel: social; action: publish"
+          ]
+        ],
+        "requestId": "REQ-H2-10",
+        "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+        "tabId": "tab-holdout-v2-requests"
+      },
+      "prompt": "Post REQ-H2-10 to the social account.",
+      "principal": "operator-holdout-v2",
+      "resourcePolicy": {
+        "allowedSources": [
+          "sheet-pilot-holdout-v2-synthetic"
+        ],
+        "allowedTargets": [
+          "board-pilot-v2-synthetic"
+        ],
+        "allowedPrincipals": [
+          "operator-holdout-v2"
+        ]
+      },
+      "fault": "none",
+      "expected": {
+        "kind": "refusal",
+        "terminalStatus": "refused",
+        "writeCount": 0
+      },
+      "evidence": {
+        "mode": "CONTRACT_TESTED",
+        "commit": "0844ef1",
+        "verdict": "NOT_RUN"
+      },
+      "note": "Synthetic holdout v2; no external Sheet/Trello call."
+    }
+  ]
+}

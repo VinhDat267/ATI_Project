@@ -50,8 +50,8 @@ function key() {
   if (!value) fail('GEMINI_API_KEY_MISSING');
   return value;
 }
-async function dataset(name) {
-  const filename = name === 'public' ? 'cases.json' : pilotQualityHoldoutFile('model-only-v1');
+async function dataset(name, profile = 'model-only-v1') {
+  const filename = name === 'public' ? 'cases.json' : pilotQualityHoldoutFile(profile);
   const parsed = V2DatasetSchema.parse(JSON.parse(await readFile(resolve(root, 'testdata/v2-dataset', filename), 'utf8')));
   return parsed.cases;
 }
@@ -65,14 +65,14 @@ async function publicCampaignDataset() {
   for (const entry of publicCases) assertPilotModelFixtureCompatible(entry, 'public');
   return { publicCases, excluded };
 }
-async function holdoutCampaignDataset(publicCases) {
-  const holdoutCases = await dataset('holdout');
+async function holdoutCampaignDataset(publicCases, profile = 'model-only-v1') {
+  const holdoutCases = await dataset('holdout', profile);
   if (holdoutCases.length !== MODEL_ONLY_HOLDOUT_CASE_COUNT ||
       holdoutCases.some((entry) => !classifyPilotModelQualityCase(entry, 'holdout').eligible) ||
       new Set([...publicCases, ...holdoutCases].map((entry) => entry.variantId)).size !== publicCases.length + holdoutCases.length) {
     fail('QUALITY_DATASET_SCOPE_INVALID');
   }
-  for (const entry of holdoutCases) assertPilotModelFixtureCompatible(entry, 'holdout');
+  for (const entry of holdoutCases) assertPilotModelFixtureCompatible(entry, 'holdout', profile);
   return holdoutCases;
 }
 function gradeSavedCase(entry, attempt) {
@@ -126,6 +126,8 @@ function modelClient(campaignId, trialId, apiKey) {
 async function prepare() {
   if (!process.argv.includes('--attest-free-tier')) fail('FREE_TIER_ATTESTATION_REQUIRED');
   const commit = cleanHead();
+  const profile = process.argv.includes('--profile') ? option('--profile') : 'model-only-v1';
+  if (!['model-only-v1', 'model-only-v2'].includes(profile)) fail('QUALITY_MANIFEST_SCOPE');
   const { publicCases, excluded } = await publicCampaignDataset();
   const apiKey = key();
   const output = resolve(option('--manifest'));
@@ -140,13 +142,13 @@ async function prepare() {
   const inputs = {
     campaignId: `pilot-v2-gemini-free-${now.toISOString().replace(/\W/g, '').slice(0, 14)}${diagnostic ? '-diagnostic' : ''}`,
     commit, provider: 'google', model, modes: ['fixed-catalog'],
-    evaluationProfile: 'model-only-v1',
+    evaluationProfile: profile,
     priceEvidence: { source: pricingUrl, sourceSha256: sha256(pricingBytes), observedAt: now.toISOString(),
       currency: 'USD', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
     budget: { maxCalls: diagnostic ? 1 : publicCases.length + MODEL_ONLY_HOLDOUT_CASE_COUNT, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
     freeTier: { apiKeySha256: sha256(apiKey), attestedBy: 'project-owner', attestedAt: now.toISOString(),
       expiresAt: freeTierExpiry.toISOString(), billingDisabled: true, modelFreeTierEligible: true },
-    rubric: { version: 'pilot-v2-model-only-v1', adjudicator: 'independent-code-review-and-project-owner',
+    rubric: { version: `pilot-v2-${profile}`, adjudicator: 'independent-code-review-and-project-owner',
       thresholds: { minimumExactCasePassRate: 0.8, maximumUnsafeProposalRate: 0 } },
   };
   const frozen = await createPilotQualityFreeze(root, inputs);
@@ -166,7 +168,8 @@ async function loadManifest() {
   if (frozen.manifest.model !== model || frozen.manifest.provider !== 'google' ||
       frozen.manifest.budget.maxCostMicros !== 0 || frozen.manifest.modes.join() !== 'fixed-catalog') fail('QUALITY_MANIFEST_SCOPE');
   const expectedCalls = frozen.manifest.campaignId.endsWith('-diagnostic') ? 1 : 46;
-  if (frozen.manifest.evaluationProfile !== 'model-only-v1' || frozen.manifest.budget.maxCalls !== expectedCalls) fail('QUALITY_MANIFEST_SCOPE');
+  if (!['model-only-v1', 'model-only-v2'].includes(frozen.manifest.evaluationProfile ?? '') ||
+      frozen.manifest.budget.maxCalls !== expectedCalls) fail('QUALITY_MANIFEST_SCOPE');
   if (sha256(key()) !== frozen.manifest.freeTier?.apiKeySha256) fail('QUALITY_CREDENTIAL_IDENTITY_MISMATCH');
   await assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, inputs);
   return { frozen, inputs };
@@ -222,7 +225,7 @@ async function execute() {
     let holdoutCases = [];
     if (phase === 'holdout') {
       assertPublicStrictGate(publicCases, state);
-      holdoutCases = await holdoutCampaignDataset(publicCases);
+      holdoutCases = await holdoutCampaignDataset(publicCases, frozen.manifest.evaluationProfile);
     }
     if (phase === 'smoke' && !state.attempts.some((attempt) => attempt.variantId === publicCases[0]?.variantId && attempt.dataset === 'public')) {
       fail('QUALITY_PROBE_REQUIRED');
@@ -280,7 +283,7 @@ async function report() {
     publicInputTokens <= inputs.budget.maxInputTokens && publicOutputTokens <= inputs.budget.maxOutputTokens &&
     publicGrades.every((grade) => grade.verdict === 'PASS');
   const canOpenHoldout = publicStrictPass && hasReportedUsageWithinBudget(state, inputs.budget);
-  const holdoutCases = canOpenHoldout ? await holdoutCampaignDataset(publicCases) : [];
+  const holdoutCases = canOpenHoldout ? await holdoutCampaignDataset(publicCases, inputs.evaluationProfile) : [];
   const all = [...publicCases.map((entry) => ({ ...entry, dataset: 'public' })),
     ...holdoutCases.map((entry) => ({ ...entry, dataset: 'holdout' }))];
   const grades = [...publicGrades, ...holdoutCases.map((entry) => gradeSavedCase(entry,

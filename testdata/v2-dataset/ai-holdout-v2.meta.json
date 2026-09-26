@@ -1,0 +1,33 @@
+{
+  "datasetId": "ai-holdout-v2",
+  "version": "ai-holdout-v2",
+  "authoredAt": "2026-09-26",
+  "authoredBy": "Codex evaluation task",
+  "independence": "New bilingual scenarios authored from approved use-case and safety requirements; no prompts, expected answers, or observations copied from public cases or the previously opened holdout.",
+  "caseCount": 10,
+  "variantCount": 20,
+  "caseIds": [
+    "H2-01",
+    "H2-02",
+    "H2-03",
+    "H2-04",
+    "H2-05",
+    "H2-06",
+    "H2-07",
+    "H2-08",
+    "H2-09",
+    "H2-10"
+  ],
+  "source": {
+    "kind": "synthetic-fixture",
+    "spreadsheetId": "sheet-pilot-holdout-v2-synthetic",
+    "tabId": "tab-holdout-v2-requests",
+    "realSaaSAccessed": false
+  },
+  "review": {
+    "schemaAndFixtureCompatibility": "PASS: 20/20 variants schema, bilingual pairing, unique IDs, and source contract",
+    "semanticOracle": "PRE_FROZEN_EXPECTATIONS: authored from new synthetic source rows and the approved decision policy before provider calls",
+    "independentAdjudication": "PENDING_PROVIDER_OBSERVATIONS"
+  },
+  "sha256": "c6f770a97272ff59fab9ed4ebd4dc9f4b5ebf08b685d77862ccb4dce110bd162"
+}
