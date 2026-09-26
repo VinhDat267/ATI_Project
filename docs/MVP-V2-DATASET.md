@@ -1,7 +1,7 @@
 # Dataset contract — MVP v2
 
 Status (26/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
-CONTRACT_TESTS_PRESENT / SAAS_ONE_CARD_CONFIRMED / AI_PUBLIC_25_OF_26_STRUCTURAL /
+CONTRACT_TESTS_PRESENT / SAAS_ONE_CARD_CONFIRMED / AI_PUBLIC_PREVIOUS_25_OF_26_STRUCTURAL /
 AI_QUALITY_PARTIAL_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_COMPLETE.
 
 Nguồn oracle: [đặc tả mục 8](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
@@ -60,3 +60,5 @@ Gemini 3.1 Flash-Lite đã chạy 26/26 ca public trong profile model-only mới
 nghiệm thu AI của người dùng đại diện chưa hoàn tất. Chủ project đã xác nhận
 nội dung của một Trello card sandbox thật. Xem
 [bằng chứng chiến dịch](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md).
+Freeze sau guard dừng ở public call thứ 9 vì plan không hợp lệ theo DSL;
+không gộp kết quả của hai freeze.

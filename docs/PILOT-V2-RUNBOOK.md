@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 26/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / AI_PUBLIC_25_OF_26_STRUCTURAL / AI_QUALITY_PARTIAL_NOT_MEASURED / OWNER_CARD_REVIEW_CONFIRMED / HANDOFF_BLOCKED`. Xem [điều tra Gemini và kết quả public](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md), [nghiệm thu chủ project](PILOT-V2-USER-ACCEPTANCE.md), [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
+**Trạng thái 26/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / AI_PUBLIC_PREVIOUS_25_OF_26_STRUCTURAL / AI_NEW_CAMPAIGN_STOPPED_9_OF_46 / AI_QUALITY_PARTIAL_NOT_MEASURED / OWNER_CARD_REVIEW_CONFIRMED / HANDOFF_BLOCKED`. Xem [điều tra Gemini và kết quả public](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md), [nghiệm thu chủ project](PILOT-V2-USER-ACCEPTANCE.md), [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -82,9 +82,10 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 **Gate mới 26/09/2026:** `model-only-v1` dùng 26 public phù hợp + 20 biến thể
 holdout độc lập mới, tối đa 46 calls. V2-13–19 vẫn là nghiệm thu hệ thống và không
 được tính vào tỷ lệ AI; holdout legacy đã bị loại khỏi bộ đo. Gemini 3.1
-Flash-Lite đã chạy hết 26 ca public ở một freeze mới: 25 ca structural PASS,
-V2-10-en FAIL vì đề xuất write thay vì hỏi lại về người được giao. Holdout
-20 ca chưa gọi provider; AI quality chưa đạt cổng nghiệm thu.
+Flash-Lite đã chạy hết 26 ca public ở freeze `c9df557`: 25 ca structural PASS,
+V2-10-en FAIL vì đề xuất write thay vì hỏi lại về người được giao. Một freeze
+mới trên mã guard dừng ở V2-03-vi sau 9 calls vì plan không hợp lệ theo DSL.
+Holdout 20 ca chưa gọi provider; AI quality chưa đạt cổng nghiệm thu.
 Xem [scope/dataset gate](ai-evidence/PILOT-V2-AI/MODEL-SCOPE-2026-09-26.md).
 Tạo manifest mới từ Git HEAD sạch, chọn model tường minh, rồi probe → smoke →
 public → holdout theo cùng manifest/journal. Scope, dataset và provenance thay

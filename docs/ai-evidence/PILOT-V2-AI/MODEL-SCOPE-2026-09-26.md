@@ -96,3 +96,7 @@ Không có failed provider attempt trong chiến dịch này. Report cục bộ 
 được gọi và vẫn niêm phong. Điểm public chỉ thuộc freeze này, không cộng với
 các lượt probe/smoke cũ. Chưa adjudicate nội dung độc lập và chưa đối soát
 hóa đơn, nên trạng thái vẫn `PARTIAL_NOT_MEASURED`. Xem [nhật ký điều tra](PROBE-2026-09-26.md).
+
+Freeze sau assignment guard (`efce519`) dừng tại V2-03-vi sau 9 public calls:
+8 structural PASS, 1 đầu ra plan/DSL không hợp lệ, 37 ca chưa gọi. Holdout vẫn
+niêm phong. Report cục bộ `%TEMP%\pilot-quality-report-public-20260926-122306.json`.
