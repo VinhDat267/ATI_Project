@@ -119,6 +119,7 @@ const ARTIFACTS = {
     'packages/engine/src/ai/providers/wire-schema.ts',
     'packages/engine/src/ai/live-evaluation/pricing.ts',
     'scripts/pilot-ai-quality-campaign.mjs',
+    'scripts/pilot-quality-diagnostic.mjs',
     'scripts/pilot-quality-pricing.mjs',
   ],
 } as const;

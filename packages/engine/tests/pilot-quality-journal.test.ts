@@ -20,6 +20,20 @@ const input = { variantId: 'V2-01-vi', mode: 'fixed-catalog' as const, dataset: 
   provider: 'google', model: 'gemini-test' };
 
 describe('pilot quality durable journal', () => {
+  it.each(['name', 'source_prompt', 'inputs', 'version', 'outputs'])('persists fixed plan %s failure category', async (field) => {
+    const settings = await options();
+    const journal = await openPilotQualityJournal(settings);
+    const { attemptId } = await journal.authorizeAndReserve(input);
+    const failureStage = `output_wire_dsl_plan_${field}`;
+    try {
+      await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 3,
+        failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
+          providerStatus: null, retryAfterMs: null, failureStage } });
+    } finally { await journal.close(); }
+    const reopened = await openPilotQualityJournal(settings);
+    expect(reopened.readState().attempts[0]?.failure?.failureStage).toBe(failureStage);
+    await reopened.close();
+  });
   it('settles and reopens a Gemini 429 too_many_requests diagnostic', async () => {
     const settings = await options();
     const journal = await openPilotQualityJournal(settings);

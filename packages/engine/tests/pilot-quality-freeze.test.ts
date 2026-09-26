@@ -28,6 +28,7 @@ const paths = [
   'packages/engine/src/ai/providers/wire-schema.ts',
   'packages/engine/src/ai/live-evaluation/pricing.ts',
   'scripts/pilot-ai-quality-campaign.mjs',
+  'scripts/pilot-quality-diagnostic.mjs',
   'scripts/pilot-quality-pricing.mjs',
   'packages/engine/src/pilot/gateway.ts',
   'packages/dsl/src/prompts.ts',

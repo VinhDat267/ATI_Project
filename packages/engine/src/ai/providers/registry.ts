@@ -140,6 +140,8 @@ const SAFE_FAILURE_STAGES = new Set([
   'output_wire_dsl_steps', 'output_wire_dsl_args', 'output_wire_dsl_plan',
   'output_wire_dsl_step_count', 'output_wire_dsl_step_id',
   'output_wire_dsl_step_tool', 'output_wire_dsl_step_field',
+  'output_wire_dsl_plan_name', 'output_wire_dsl_plan_source_prompt',
+  'output_wire_dsl_plan_inputs', 'output_wire_dsl_plan_version', 'output_wire_dsl_plan_outputs',
 ]);
 
 function safePlannerWireFailureStage(error: unknown): string {
@@ -153,7 +155,16 @@ function safePlannerWireFailureStage(error: unknown): string {
       if (path[3] === 'tool') return 'output_wire_dsl_step_tool';
       return 'output_wire_dsl_step_field';
     }
-    if (path?.[0] === 'plan') return 'output_wire_dsl_plan';
+    if (path?.[0] === 'plan') {
+      // Only fixed schema fields leave this boundary; nested keys, values and
+      // Zod messages may contain provider-controlled or sensitive content.
+      if (path[1] === 'name') return 'output_wire_dsl_plan_name';
+      if (path[1] === 'source_prompt') return 'output_wire_dsl_plan_source_prompt';
+      if (path[1] === 'inputs') return 'output_wire_dsl_plan_inputs';
+      if (path[1] === 'version') return 'output_wire_dsl_plan_version';
+      if (path[1] === 'outputs') return 'output_wire_dsl_plan_outputs';
+      return 'output_wire_dsl_plan';
+    }
     return 'output_wire_dsl';
   }
   return 'output_wire';

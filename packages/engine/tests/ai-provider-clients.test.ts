@@ -496,7 +496,7 @@ describe("native provider clients with fake transport", () => {
     }
   });
 
-  it('reports only fixed categories for invalid planner wires', async () => {
+  it.each(['openai', 'google'] as const)('reports only fixed categories for invalid %s planner wires', async (provider) => {
     const plan = {
       version: '1.0', name: 'canary', source_prompt: 'CANARY_SECRET',
       inputs: null, inputs_present: false, outputs: null, outputs_present: false,
@@ -527,14 +527,29 @@ describe("native provider clients with fake transport", () => {
       ] }, refusal: null, clarification: null } }, 'output_wire_dsl_step_field'],
       [{ result: { kind: 'plan', plan: { ...plan, name: '', steps: [
         { ...step, tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
-      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_plan'],
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_plan_name'],
+      ...[
+        [{ source_prompt: '' }, 'output_wire_dsl_plan_source_prompt'],
+        [{ source_prompt: 'CANARY_SECRET'.repeat(400) }, 'output_wire_dsl_plan_source_prompt'],
+        [{ name: 'CANARY_SECRET'.repeat(20) }, 'output_wire_dsl_plan_name'],
+        [{ inputs_present: true, inputs: [{ key: 'CANARY_SECRET', type: 'string',
+          required: true, default_present: true, default_value: { kind: 'string', string_value: 'CANARY_SECRET' },
+          description_present: false, description: null }] }, 'output_wire_dsl_plan_inputs'],
+      ].map(([fields, stage]) => [{ result: { kind: 'plan', plan: { ...plan, ...(fields as object), steps: [
+        { ...step, tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
+      ] }, refusal: null, clarification: null } }, stage]),
       [{ result: { kind: 'plan', plan: { ...plan, steps: [
         { ...step, tool: { ...step.tool, args: { kind: 'array', array_value: [] } } },
       ] }, refusal: null, clarification: null } }, 'output_wire_dsl_args'],
     ] as const) {
-      const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
+      const diagnosticConfig = provider === 'openai' ? config : readAiProviderConfig({
+        AI_PLANNING_PROVIDER: 'google', AI_PLANNING_MODEL: 'gemini-3.8-flash',
+        AI_EMBEDDING_PROVIDER: 'google', AI_EMBEDDING_MODEL: 'gemini-embedding-2',
+      });
+      const ports = createAiPorts({ config: diagnosticConfig,
+        credentials: { OPENAI_API_KEY: 'openai-canary', GEMINI_API_KEY: 'google-canary' },
         ledger: ledger(), authorizeCall: async () => {},
-        fetchImpl: async () => response({ output_text: JSON.stringify(wire) }) });
+        fetchImpl: async () => response({ status: 'completed', output_text: JSON.stringify(wire) }) });
       let caught: unknown;
       try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
       catch (error) { caught = error; }

@@ -12,6 +12,7 @@ import { gradePilotQualityCase, aggregatePilotQualityGrades } from '../packages/
 import { verifyExactFreeTierPrice, pilotQualityModel } from './pilot-quality-pricing.mjs';
 import { assertPilotModelFixtureCompatible, classifyPilotModelQualityCase, pilotQualityHoldoutFile } from '../packages/engine/dist/pilot/quality-scope.js';
 import { V2DatasetSchema } from '../packages/engine/dist/pilot/dataset-schema.js';
+import { selectDiagnosticCase, assertDiagnosticPhase } from './pilot-quality-diagnostic.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 let model = 'gemini-3.7-flash';
@@ -99,13 +100,14 @@ async function prepare() {
   verifyExactFreeTierPrice(pricingBytes.toString('utf8'), model, pilotQualityModel(model).title);
   const now = new Date();
   const freeTierExpiry = new Date(now.getTime() + 6 * 60 * 60_000);
+  const diagnostic = process.argv.includes('--diagnostic');
   const inputs = {
-    campaignId: `pilot-v2-gemini-free-${now.toISOString().replace(/\W/g, '').slice(0, 14)}`,
+    campaignId: `pilot-v2-gemini-free-${now.toISOString().replace(/\W/g, '').slice(0, 14)}${diagnostic ? '-diagnostic' : ''}`,
     commit, provider: 'google', model, modes: ['fixed-catalog'],
     evaluationProfile: 'model-only-v1',
     priceEvidence: { source: pricingUrl, sourceSha256: sha256(pricingBytes), observedAt: now.toISOString(),
       currency: 'USD', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    budget: { maxCalls: publicCases.length + holdoutCases.length, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
+    budget: { maxCalls: diagnostic ? 1 : publicCases.length + holdoutCases.length, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
     freeTier: { apiKeySha256: sha256(apiKey), attestedBy: 'project-owner', attestedAt: now.toISOString(),
       expiresAt: freeTierExpiry.toISOString(), billingDisabled: true, modelFreeTierEligible: true },
     rubric: { version: 'pilot-v2-model-only-v1', adjudicator: 'independent-code-review-and-project-owner',
@@ -127,7 +129,8 @@ async function loadManifest() {
   }
   if (frozen.manifest.model !== model || frozen.manifest.provider !== 'google' ||
       frozen.manifest.budget.maxCostMicros !== 0 || frozen.manifest.modes.join() !== 'fixed-catalog') fail('QUALITY_MANIFEST_SCOPE');
-  if (frozen.manifest.evaluationProfile !== 'model-only-v1' || frozen.manifest.budget.maxCalls !== 46) fail('QUALITY_MANIFEST_SCOPE');
+  const expectedCalls = frozen.manifest.campaignId.endsWith('-diagnostic') ? 1 : 46;
+  if (frozen.manifest.evaluationProfile !== 'model-only-v1' || frozen.manifest.budget.maxCalls !== expectedCalls) fail('QUALITY_MANIFEST_SCOPE');
   if (sha256(key()) !== frozen.manifest.freeTier?.apiKeySha256) fail('QUALITY_CREDENTIAL_IDENTITY_MISMATCH');
   await assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, inputs);
   return { frozen, inputs };
@@ -157,9 +160,10 @@ function selectedCases(phase, publicCases, holdoutCases) {
 }
 async function execute() {
   const phase = option('--phase');
-  if (!['probe', 'smoke', 'public', 'holdout'].includes(phase)) fail('QUALITY_PHASE_INVALID');
+  if (!['probe', 'smoke', 'public', 'holdout', 'diagnostic'].includes(phase)) fail('QUALITY_PHASE_INVALID');
   if (!process.argv.includes('--execute')) fail('EXPLICIT_EXECUTE_REQUIRED');
   const { frozen, inputs } = await loadManifest();
+  assertDiagnosticPhase(inputs.campaignId, phase);
   const journal = await openPilotQualityJournal({ directory: option('--journal-dir'), campaignId: inputs.campaignId,
     freezeHash: frozen.hash, provider: 'google', model, maxCalls: inputs.budget.maxCalls,
     freeTierAttested: true, maxCostUsd: 0 });
@@ -180,7 +184,10 @@ async function execute() {
       !state.attempts.some((attempt) => attempt.variantId === entry.variantId && attempt.dataset === 'public'))) {
       fail('QUALITY_PUBLIC_SET_INCOMPLETE');
     }
-    const selected = selectedCases(phase, publicCases, holdoutCases);
+    // A diagnostic run is one public observation, not a quality acceptance phase.
+    const selected = phase === 'diagnostic'
+      ? selectDiagnosticCase(publicCases, option('--variant'))
+      : selectedCases(phase, publicCases, holdoutCases);
     if (selected.some((entry) => !entry)) fail('QUALITY_SMOKE_SELECTION_INVALID');
     let newCalls = 0;
     for (const entry of selected) {
@@ -194,7 +201,7 @@ async function execute() {
       assertSafeState(journal.readState(), inputs.budget);
       console.log(JSON.stringify({ phase, completed: entry.variantId, usedCalls: journal.readState().usedCalls }));
     }
-    console.log(JSON.stringify({ status: 'PHASE_COMPLETED', phase, newCalls, usedCalls: journal.readState().usedCalls,
+    console.log(JSON.stringify({ status: phase === 'diagnostic' ? 'DIAGNOSTIC_COMPLETED' : 'PHASE_COMPLETED', phase, newCalls, usedCalls: journal.readState().usedCalls,
       journalDirectory: resolve(option('--journal-dir')) }));
   } finally {
     await journal.close();
