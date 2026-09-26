@@ -22,7 +22,7 @@ function writePlan() {
     ...plan.steps[0]!, id: 'create', description: 'Create task', side_effect: 'write',
     idempotency_key: 'pilot:${runtime.run_id}',
     tool: { server: 'trello', name: 'trello.create_card', args: {
-      boardId: 'board-1', listName: 'Todo', title: 'Design landing page', intentKey: 'intent-1',
+      boardId: 'board-1', listName: 'Todo', title: 'Design landing page',
     } },
   };
   plan.outputs = { lists: '${steps.create.output.cardId}' };
@@ -37,8 +37,13 @@ describe('strict Pilot quality plan validation', () => {
     expect(plan).toEqual(original);
   });
 
-  it('accepts a reviewed write plan with a nonempty DSL idempotency key', () => {
-    expect(validatePilotQualityPlan(writePlan())).toEqual([]);
+  it('accepts reviewed create-card planning args without runtime-managed intentKey', () => {
+    const plan = writePlan();
+    const original = structuredClone(plan);
+    expect(plan.steps[0]!.idempotency_key).toBe('pilot:${runtime.run_id}');
+    expect(plan.steps[0]!.tool.args).not.toHaveProperty('intentKey');
+    expect(validatePilotQualityPlan(plan)).toEqual([]);
+    expect(plan).toEqual(original);
   });
 
   it.each([null, ''])('rejects a write without a nonempty idempotency key: %s', (key) => {
@@ -141,7 +146,7 @@ describe('strict Pilot quality plan validation', () => {
     const plan = writePlan();
     plan.steps.unshift(readPlan().steps[0]!);
     plan.steps[1]!.depends_on = ['lists'];
-    plan.steps[1]!.tool.args.listId = '${steps.lists.output.0.id}';
+    plan.steps[1]!.tool.args.listName = '${steps.lists.output.0.name}';
     plan.steps[1]!.tool.args.title = 42;
     expect(validatePilotQualityPlan(plan)).toEqual(['tool_contract_invalid']);
   });
@@ -149,7 +154,7 @@ describe('strict Pilot quality plan validation', () => {
   it('rejects missing required args even when another argument is deferred', () => {
     const plan = writePlan();
     plan.steps[0]!.tool.args.title = '${runtime.today}';
-    delete plan.steps[0]!.tool.args.intentKey;
+    delete plan.steps[0]!.tool.args.boardId;
     expect(validatePilotQualityPlan(plan)).toEqual(['tool_contract_invalid']);
   });
 });

@@ -88,7 +88,7 @@ function createCardPlanningSchema(): Record<string, unknown> {
   return { type: "object", properties: selected, required: ["boardId", "listName", "title"], additionalProperties: false };
 }
 
-function reviewedPlanningSchema(tool: PilotToolEntry): Record<string, unknown> {
+export function reviewedPlanningSchema(tool: PilotToolEntry): Record<string, unknown> {
   const reviewed = PILOT_TOOL_CATALOG.find((entry) => entry.name === tool.name);
   if (!reviewed || JSON.stringify(tool) !== JSON.stringify(reviewed)) {
     throw new Error("PILOT_PLANNING_TOOL_UNREVIEWED");

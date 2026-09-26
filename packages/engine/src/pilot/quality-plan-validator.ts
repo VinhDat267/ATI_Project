@@ -10,6 +10,7 @@ import {
   type TrustedTool,
 } from '@wap/dsl';
 import { PILOT_TOOL_CATALOG } from './gateway.js';
+import { reviewedPlanningSchema } from './planner-context.js';
 
 export type PilotQualityPlanIssueCode =
   | 'workflow_schema_invalid'
@@ -23,7 +24,7 @@ const trustedTools: readonly TrustedTool[] = PILOT_TOOL_CATALOG.map((tool) => ({
   name: tool.name,
   sideEffect: tool.sideEffect,
   policyVersion: tool.policyVersion,
-  inputSchema: tool.inputSchema,
+  inputSchema: reviewedPlanningSchema(tool),
   outputSchema: tool.outputSchema,
 }));
 
