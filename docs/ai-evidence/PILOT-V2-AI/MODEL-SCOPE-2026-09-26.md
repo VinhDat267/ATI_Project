@@ -52,7 +52,7 @@ denominator và hai group; không đo execution outcome. Journal giữ diagnosti
   20 records và cặp vi/en, hợp đồng nguồn/args/hash hợp lệ. Không dùng các oracle
   holdout mới để điều chỉnh prompt.
 - Fresh holdout SHA256 trước provider:
-  `a9f53f23ae0ccf0858e36b608b86a7e7b2694b91d393654e0a1abc6311c07dcb`.
+  `28ca61d77bdbdb47a22da555c2fe8e181e61cfa2a1d65a38869af2c8714430c9`.
 
 ## Giới hạn và bước chạy
 
