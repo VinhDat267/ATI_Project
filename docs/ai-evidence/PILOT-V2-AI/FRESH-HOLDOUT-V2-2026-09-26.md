@@ -1,11 +1,11 @@
 # Fresh Holdout v2 Campaign — 2026-09-26
 
-**State:** `USER_ACCEPTANCE_PENDING`  
-**Evidence type:** provider-observed, fixed-catalog model evaluation on synthetic fixtures  
-**Model:** Gemini 3.1 Flash-Lite  
-**Campaign:** `pilot-v2-gemini-free-20260926T16050`  
-**Freeze hash:** `3c5c80b51b87f2ea7bdbb80303c34153eecdc7948a1ad03bf7e9d416a58bbbcf`  
-**Frozen code commit:** `a45cdc3`  
+**State:** `USER_ACCEPTANCE_PENDING`
+**Evidence type:** provider-observed, fixed-catalog model evaluation on synthetic fixtures
+**Model:** Gemini 3.1 Flash-Lite
+**Campaign:** `pilot-v2-gemini-free-20260926T16050`
+**Freeze hash:** `3c5c80b51b87f2ea7bdbb80303c34153eecdc7948a1ad03bf7e9d416a58bbbcf`
+**Frozen code commit:** `a45cdc3`
 **Holdout SHA-256:** `c6f770a97272ff59fab9ed4ebd4dc9f4b5ebf08b685d77862ccb4dce110bd162`
 
 ## Scope and safeguards
