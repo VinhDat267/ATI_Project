@@ -527,7 +527,10 @@ const wireInputSchema = {
     "default_present",
   ],
   properties: {
-    key: { type: "string" },
+    key: {
+      type: "string",
+      description: "Input variable name must match /^[a-z][a-z0-9_]{0,31}$/; use snake_case such as spreadsheet_id. Tool argument keys keep their reviewed tool schema names.",
+    },
     type: { type: "string", enum: ["string", "number", "boolean"] },
     description: { type: ["string", "null"] },
     description_present: { type: "boolean" },

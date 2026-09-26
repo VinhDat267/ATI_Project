@@ -184,6 +184,8 @@ export function buildPilotPlannerContext(
     "5. UC3 (Lookup): If the request asks to check card status, generate a read-only step calling 'trello.get_card'.",
     ...(sourceValidation ? ["6. Source validation: <source_validation> reports that the entire source snapshot was rejected with NOT_FOUND or REQUEST_TYPE. Return PlannerResult kind 'refusal' with a non-empty reason, no plan and no write. Do not claim an individual row has an invalid type or infer details from any other sheet row."] : []),
     "Every plan step id must match /^[a-z][a-z0-9_]{0,31}$/ (lowercase ASCII letters, digits and underscores only; start with a letter). For a one-step create-card plan use create_card; for a one-step lookup use get_card.",
+    "Every plan input key must match /^[a-z][a-z0-9_]{0,31}$/ (lowercase ASCII letters, digits and underscores only; start with a letter). If an input variable is needed, use names such as spreadsheet_id or request_id and the same name in ${inputs.spreadsheet_id} references. Tool argument keys such as spreadsheetId, tabId and requestId must keep their reviewed schema names; they are not DSL input variable names.",
+    "Use trusted source/target IDs as literal tool arguments when already supplied. Do not declare new user inputs for IDs already available from trusted runtime context. In wire format, an omitted inputs map is represented by inputs_present false and inputs null.",
     "",
     "Output must strictly follow the PlannerResult schema without markdown fences.",
   ].join("\n");

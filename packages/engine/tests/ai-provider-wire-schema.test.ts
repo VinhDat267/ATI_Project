@@ -38,6 +38,17 @@ const plan: PlannerResult = {
 };
 
 describe("provider wire codecs", () => {
+  it("advertises the DSL input-key rule to both providers and rejects camelCase keys", () => {
+    for (const schema of [googlePlannerWireJsonSchema, openAiPlannerWireJsonSchema]) {
+      expect(schema.$defs.wireInput.properties.key).toHaveProperty('description',
+        'Input variable name must match /^[a-z][a-z0-9_]{0,31}$/; use snake_case such as spreadsheet_id. Tool argument keys keep their reviewed tool schema names.');
+    }
+    const wire = JSON.parse(JSON.stringify(encodePlannerWire(plan)));
+    wire.result.plan.inputs[0].key = 'spreadsheetId';
+    expect(() => decodePlannerWire(wire)).toThrow();
+    wire.result.plan.inputs[0].key = 'spreadsheet_id';
+    expect(decodePlannerWire(wire).kind).toBe('plan');
+  });
   it("round-trips every canonical planner branch", () => {
     const values: PlannerResult[] = [
       plan,

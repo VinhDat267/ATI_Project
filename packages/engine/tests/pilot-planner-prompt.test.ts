@@ -29,6 +29,13 @@ const sampleChecklist: ChecklistResult = {
 };
 
 describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
+  it("distinguishes DSL input names from camelCase tool argument names", () => {
+    const { systemPrompt } = buildPilotPlannerContext({ sourceRow: sampleRow,
+      checklistResult: sampleChecklist, operatorPrompt: 'Check completeness' });
+    expect(systemPrompt).toContain('Every plan input key must match /^[a-z][a-z0-9_]{0,31}$/');
+    expect(systemPrompt).toContain('Tool argument keys such as spreadsheetId, tabId and requestId must keep their reviewed schema names');
+    expect(systemPrompt).toContain('Use trusted source/target IDs as literal tool arguments');
+  });
   it("wraps raw client intake in <client_untrusted_intake> and checklist in <checklist_summary>", () => {
     const context = buildPilotPlannerContext({
       sourceRow: sampleRow,
