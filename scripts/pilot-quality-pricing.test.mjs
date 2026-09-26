@@ -15,6 +15,18 @@ test('requires an explicit allowlisted alternate and its own price section', () 
   assert.doesNotThrow(() => verifyExactFreeTierPrice(
     page('Free of charge', 'Free of charge').replaceAll('3.7', '3.8'), alternate.model, alternate.title));
 });
+test('allowlists Gemini 3.1 Flash-Lite only with its exact free Standard prices', () => {
+  const alternate = pilotQualityModel('gemini-3.1-flash-lite');
+  assert.equal(alternate.title, 'Gemini 3.1 Flash-Lite');
+  const ownPage = page('Free of charge', 'Free of charge')
+    .replaceAll('Gemini 3.7 Flash', alternate.title).replaceAll(model, alternate.model);
+  assert.doesNotThrow(() => verifyExactFreeTierPrice(ownPage, alternate.model, alternate.title));
+  assert.throws(() => verifyExactFreeTierPrice(page('Free of charge', 'Free of charge'),
+    alternate.model, alternate.title), /MODEL_PRICE_SECTION_NOT_FOUND/);
+  assert.throws(() => verifyExactFreeTierPrice(ownPage.replace('Output price (including thinking tokens)</td><td>Free of charge',
+    'Output price (including thinking tokens)</td><td>$1'), alternate.model, alternate.title),
+  /MODEL_FREE_TIER_PRICE_NOT_FOUND/);
+});
 function page(inputPrice, outputPrice) {
   return `<h2>${title}</h2><p>${model}</p><h3>Standard</h3><table>
     <tr><th>Free Tier</th><th>Paid Tier</th></tr>
