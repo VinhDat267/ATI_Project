@@ -29,6 +29,16 @@ function option(name) {
   if (index < 0 || !process.argv[index + 1] || process.argv[index + 1].startsWith('--')) fail(`MISSING_${name.slice(2).toUpperCase().replaceAll('-', '_')}`);
   return process.argv[index + 1];
 }
+function optionValues(name) {
+  const values = [];
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== name) continue;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith('--')) fail(`MISSING_${name.slice(2).toUpperCase().replaceAll('-', '_')}`);
+    values.push(value);
+  }
+  return values;
+}
 function git(...args) { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim(); }
 function cleanHead() {
   const status = git('status', '--porcelain=v1');
@@ -182,8 +192,14 @@ function selectedCases(phase, publicCases, holdoutCases) {
   if (phase === 'probe') return [publicCases[0]];
   if (phase === 'smoke') {
     const kinds = ['plan', 'clarification', 'refusal'];
-    return ['vi', 'en'].flatMap((language) => kinds.map((kind) =>
+    const baseline = ['vi', 'en'].flatMap((language) => kinds.map((kind) =>
       publicCases.find((entry) => entry.language === language && entry.expected.kind === kind)));
+    const requested = optionValues('--smoke-variant').map((variantId) => {
+      const matches = publicCases.filter((entry) => entry.variantId === variantId);
+      if (matches.length !== 1) fail('QUALITY_SMOKE_SELECTION_INVALID');
+      return matches[0];
+    });
+    return [...new Map([...baseline, ...requested].map((entry) => [entry.variantId, entry])).values()];
   }
   if (phase === 'public') return publicCases;
   if (phase === 'holdout') return holdoutCases;
@@ -192,6 +208,7 @@ function selectedCases(phase, publicCases, holdoutCases) {
 async function execute() {
   const phase = option('--phase');
   if (!['probe', 'smoke', 'public', 'holdout', 'diagnostic'].includes(phase)) fail('QUALITY_PHASE_INVALID');
+  if (phase !== 'smoke' && optionValues('--smoke-variant').length > 0) fail('QUALITY_SMOKE_VARIANT_PHASE_INVALID');
   if (!process.argv.includes('--execute')) fail('EXPLICIT_EXECUTE_REQUIRED');
   const { frozen, inputs } = await loadManifest();
   assertDiagnosticPhase(inputs.campaignId, phase);
