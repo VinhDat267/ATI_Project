@@ -85,3 +85,14 @@ mới cho lần nghiệm thu cuối.
   vì code lúc gọi chưa có diagnostic này; không suy đoán là model trả JSON sai.
   Lượt chẩn đoán tiếp theo phải dùng manifest/commit mới, một lần gọi có trần
   và dừng nếu provider không hợp lệ. Không gộp với hai ca pass ở freeze cũ.
+
+## Kết quả sau các lượt chẩn đoán
+
+Tại freeze `80080bc0f86defdb50a19bfc5434b526332481b22a0515760c1ff2f64c028e8b`
+ở commit `c9df557`, Gemini 3.1 Flash-Lite hoàn tất 26/26 public calls:
+25 structural PASS, V2-10-en FAIL do đề xuất write khi người nhận mơ hồ.
+Không có failed provider attempt trong chiến dịch này. Report cục bộ là
+`%TEMP%\pilot-quality-report-public-20260926-103439.json`; 20 holdout chưa
+được gọi và vẫn niêm phong. Điểm public chỉ thuộc freeze này, không cộng với
+các lượt probe/smoke cũ. Chưa adjudicate nội dung độc lập và chưa đối soát
+hóa đơn, nên trạng thái vẫn `PARTIAL_NOT_MEASURED`. Xem [nhật ký điều tra](PROBE-2026-09-26.md).

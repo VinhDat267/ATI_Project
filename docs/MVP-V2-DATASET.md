@@ -1,8 +1,8 @@
 # Dataset contract — MVP v2
 
-Status (23/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
-CONTRACT_TESTS_PRESENT / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN /
-CUSTOMER_VALIDATED_NOT_RUN.
+Status (26/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
+CONTRACT_TESTS_PRESENT / SAAS_ONE_CARD_CONFIRMED / AI_PUBLIC_25_OF_26_STRUCTURAL /
+AI_QUALITY_PARTIAL_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_COMPLETE.
 
 Nguồn oracle: [đặc tả mục 8](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
 Giữ đủ V2-01 đến V2-20, mỗi case có biến thể tiếng Việt và tiếng Anh.
@@ -55,4 +55,8 @@ AI. Holdout cũ đã được xem khi chẩn đoán và không dùng làm unseen
 - Dữ liệu live, tài nguyên và ngân sách phải được duyệt riêng; thiếu thì NOT_RUN.
 
 Batch P1a ban đầu chỉ có unit fixtures; dataset và holdout đã được thêm sau đó.
-Chưa có provider-backed run và nghiệm thu người dùng đại diện cho bộ v2.
+Gemini 3.1 Flash-Lite đã chạy 26/26 ca public trong profile model-only mới,
+25 ca structural PASS và một ca FAIL phân công; holdout 20 ca chưa chạy và
+nghiệm thu AI của người dùng đại diện chưa hoàn tất. Chủ project đã xác nhận
+nội dung của một Trello card sandbox thật. Xem
+[bằng chứng chiến dịch](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md).
