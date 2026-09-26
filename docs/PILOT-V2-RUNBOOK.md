@@ -79,6 +79,15 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 
 ## 6. Đánh giá AI và bàn giao
 
+**Gate mới 26/09/2026:** `model-only-v1` dùng 26 public phù hợp + 20 biến thể
+holdout độc lập mới, tối đa 46 calls. V2-13–19 vẫn là nghiệm thu hệ thống và không
+được tính vào tỷ lệ AI; holdout legacy đã bị loại khỏi bộ đo. Gemini 3.1
+Flash-Lite đã gọi thành công ở probe trước sửa scope, chưa hoàn tất quality.
+Xem [scope/dataset gate](ai-evidence/PILOT-V2-AI/MODEL-SCOPE-2026-09-26.md).
+Tạo manifest mới từ Git HEAD sạch, chọn model tường minh, rồi probe → smoke →
+public → holdout theo cùng manifest/journal. Scope, dataset và provenance thay
+đổi làm manifest cũ không hợp lệ. Không gộp các chiến dịch khác freeze.
+
 `runPilotQualityEvaluation` cũ kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`. Đường measured mới tách oracle khỏi input, khóa code/dataset/model, ghi reservation và observation vào journal bền vững trước khi chấm, chỉ dùng catalog pilot cố định và không thực thi Trello. Nó chưa so semantic với semantic+QE hoặc chứng minh payload mạng thô của provider. Probe Gemini 3.7 ngày 25/09/2026 và sau sửa giao thức đều nhận HTTP 503; probe Gemini 3.8 ngày 26/09/2026 nhận HTTP 429. Mỗi chiến dịch dừng sau một attempt failed với usage unknown. Xem [bằng chứng mới nhất](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md). Chưa có accuracy, latency phân phối hay chi phí thực tế được đo.
 
 Trước khi nâng `AI_QUALITY_MEASURED`, khóa dataset/holdout, prompt, model, catalog, price card, ngân sách và rubric; chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot vẫn `HANDOFF_BLOCKED` cho đến khi có review và evidence cho từng cổng liên quan.

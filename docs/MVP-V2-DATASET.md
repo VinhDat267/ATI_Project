@@ -37,6 +37,12 @@ Provider thật chạy trên nội dung giả lập vẫn là dữ liệu giả 
 
 ## Quy tắc oracle và đóng băng
 
+**Điều chỉnh gate 26/09/2026:** bộ 40 public + 20 holdout cũ giữ nguyên là bộ
+nghiệm thu hệ thống. Runner model-only dùng 26 public phù hợp + 20 biến thể trong
+`ai-holdout-v1.json` độc lập mới; 14 public về quyền/execution không tính vào tỷ lệ
+AI. Holdout cũ đã được xem khi chẩn đoán và không dùng làm unseen. Xem
+[phạm vi đo và nguyên nhân](ai-evidence/PILOT-V2-AI/MODEL-SCOPE-2026-09-26.md).
+
 - UC2: tối đa một create; 0 trước approval; đúng board/list/member/nội dung;
   ID/link từ response hợp lệ. HTTP 200 hoặc run succeeded không đủ.
 - Case thiếu thông tin, ID trùng, sai quyền: 0 create; lý do phải khớp oracle.

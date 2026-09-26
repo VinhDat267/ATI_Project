@@ -24,7 +24,7 @@ MVP v2 **không** bao gồm ghi ngược Sheet, gửi Slack/email thật, schedu
 |---|---|---|
 | Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và trải nghiệm người dùng đại diện với SaaS thật |
 | SaaS live | `SAAS_ONE_CARD_CONFIRMED`: một ca sandbox qua API, approval DB, Trello receipt và GET đối chiếu ngày 25/09/2026 | Chưa chứng minh đa ca, lỗi mạng thật, vận hành liên tục hoặc nghiệm thu khách hàng |
-| AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; runner mới đã gửi probe Gemini thật | `AI_QUALITY_NOT_MEASURED`: 503/429, chưa có observation và usage để chấm; runner P6 cũ vẫn chỉ mô phỏng |
+| AI quality v2 | Gemini 3.1 Flash-Lite đã trả observation/usage, hai ca đạt chấm cấu trúc; [scope model-only](docs/ai-evidence/PILOT-V2-AI/MODEL-SCOPE-2026-09-26.md) dùng 26 public + 20 holdout mới | `AI_QUALITY_NOT_MEASURED`: bộ mới chưa hoàn tất, chưa chấm nội dung độc lập; 14 ca quyền/execution giữ trong bộ nghiệm thu hệ thống |
 | Người dùng đại diện | Chủ project đã xác nhận trực tiếp bốn thuộc tính của card sandbox | Nghiệm thu UI UC1/UC2/UC3 và người dùng đại diện ngoài chủ project chưa hoàn tất |
 
 `PASS` của unit/fixture không nâng trạng thái SaaS hoặc AI. Google connectivity probe của nền AI cũ chỉ chứng minh kết nối ở phạm vi probe, không đo chất lượng nghiệp vụ MVP v2. Chi tiết lỗi chặn và phần đã sửa nằm trong [audit P6](docs/plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md).
@@ -46,7 +46,7 @@ System Design         Design System và quyết định giao diện đã duyệt
 
 Đường **B/local** là controller nhận plan tay hoặc planner fixture, đọc qua MCP local, lưu snapshot/approval trong PostgreSQL rồi gọi write local sau duyệt. Tên tool như `send_slack_message` hoặc `append_sheet_rows` ở `task_hub` là hành vi **local**, không gửi tới Slack/Google thật. [Engine CLI](packages/engine/README.md) và [task_hub](apps/mcp-task-hub/README.md) mô tả đường này.
 
-Đường **MVP v2** dùng `/pilot/v2` trong API, adapter Google Sheets/Trello và `business_reservations` trong PostgreSQL. UC2 dùng approval DB gắn owner, run, version, snapshot hash, list đích và TTL 10 phút; API chỉ cho dispatch khi cờ write riêng được bật. Timeout sau khả năng đã gửi POST được giữ ở `reconciliation_required`, không retry mù. `live-preflight` có CLI operator chỉ đọc; `live-uc2-runner` và `live-eval-runner` chưa là lệnh/API vận hành của sản phẩm. Runner quality mới hiện chỉ mô phỏng.
+Đường **MVP v2** dùng `/pilot/v2` trong API, adapter Google Sheets/Trello và `business_reservations` trong PostgreSQL. UC2 dùng approval DB gắn owner, run, version, snapshot hash, list đích và TTL 10 phút; API chỉ cho dispatch khi cờ write riêng được bật. Timeout sau khả năng đã gửi POST được giữ ở `reconciliation_required`, không retry mù. `live-preflight` có CLI operator chỉ đọc; `live-uc2-runner` và `live-eval-runner` chưa là lệnh/API vận hành của sản phẩm. CLI quality `scripts/pilot-ai-quality-campaign.mjs` gọi provider thật trong manifest Free Tier được khóa; không thực thi Trello.
 
 Đường **AI B/local** có provider ports, retrieval semantic/QE, index pgvector và cơ chế approval/accounting. Pipeline đánh giá live của đường này có [runbook riêng](docs/ai-evidence/AI-LIVE/READINESS-RUNBOOK.md). Không dùng kết quả B/local để tuyên bố quality của MVP v2.
 

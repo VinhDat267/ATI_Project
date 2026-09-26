@@ -1,0 +1,62 @@
+{
+  "createdAt": "2026-09-26T02:41:16.4975697Z",
+  "freshFor": "frozen evaluation until any tuning from results",
+  "recordCategoryCounts": {
+    "read_only": 4,
+    "create": 8,
+    "refusal": 2,
+    "clarification": 6
+  },
+  "caseCount": 10,
+  "legacyHoldoutNotRead": true,
+  "author": "independent-agent",
+  "categoryCounts": {
+    "unconfirmed": 1,
+    "contradictory": 1,
+    "create": 4,
+    "refusal": 1,
+    "read_only": 2,
+    "incomplete": 1
+  },
+  "modelOutputsNotRead": true,
+  "validation": {
+    "checkedAt": "2026-09-26T02:42:42.9112266Z",
+    "checks": [
+      "20 records across H-01..H-10 with vi/en pairs",
+      "unique request and variant IDs",
+      "exact eight source headers",
+      "row shape and request ID equality",
+      "principal/resource policy/fault/evidence labels",
+      "four create cases with exact mapped arguments",
+      "three clarification cases matching checklist outcomes",
+      "two read-only cases with supplied card identifiers",
+      "one out-of-scope refusal case"
+    ],
+    "status": "PASS",
+    "schema": "V2DatasetSchema",
+    "providerEvaluation": "NOT_RUN"
+  },
+  "languages": [
+    "vi",
+    "en"
+  ],
+  "independence": {
+    "legacyCasesNotRead": true,
+    "liveOutputsAndJournalsNotRead": true,
+    "plannerContextNotRead": true,
+    "promptsNotRead": true,
+    "noProviderCalls": true,
+    "customerDataUsed": false
+  },
+  "datasetSha256": "a9f53f23ae0ccf0858e36b608b86a7e7b2694b91d393654e0a1abc6311c07dcb",
+  "recordCount": 20,
+  "allowedReadPaths": [
+    "packages/engine/src/pilot/dataset-schema.ts",
+    "packages/engine/src/pilot/checklist.ts",
+    "packages/engine/src/pilot/gateway.ts",
+    "packages/dsl/src/schema.ts"
+  ],
+  "version": "ai-holdout-v1",
+  "evidence": "RECONSTRUCTED_SYNTHETIC_DATASET_NOT_CUSTOMER_VALIDATED",
+  "freshHoldoutInvalidatedByTuningFromResults": true
+}

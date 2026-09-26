@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { z } from 'zod';
+import { pilotQualityHoldoutFile } from './quality-scope.js';
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const nonempty = z.string().min(1).refine((value) => value.trim().length > 0);
@@ -52,6 +53,7 @@ const InputsSchema = z.object({
     (modes) => new Set(modes).size === modes.length,
     'Comparison modes must be unique',
   ),
+  evaluationProfile: z.literal('model-only-v1').optional(),
   priceEvidence: PriceEvidenceSchema,
   budget: BudgetSchema,
   freeTier: FreeTierAttestationSchema.optional(),
@@ -106,6 +108,7 @@ const ARTIFACTS = {
     'packages/engine/src/pilot/quality-freeze.ts',
     'packages/engine/src/pilot/quality-journal.ts',
     'packages/engine/src/pilot/quality-grader.ts',
+    'packages/engine/src/pilot/quality-scope.ts',
     'packages/engine/src/pilot/checklist.ts',
     'packages/engine/src/pilot/decision-engine.ts',
     'packages/engine/src/pilot/source.ts',
@@ -157,13 +160,14 @@ async function fingerprint(root: string, paths: readonly string[]): Promise<stri
   return sha256(JSON.stringify(entries.sort(([left], [right]) => left.localeCompare(right))));
 }
 
-async function computeFingerprints(root: string): Promise<z.infer<typeof FingerprintsSchema>> {
+async function computeFingerprints(root: string, profile?: string): Promise<z.infer<typeof FingerprintsSchema>> {
   const [publicDataset, holdoutDataset, prompt, catalog, behavior] = await Promise.all([
     fingerprint(root, ARTIFACTS.publicDataset),
-    fingerprint(root, ARTIFACTS.holdoutDataset),
+    fingerprint(root, [`testdata/v2-dataset/${pilotQualityHoldoutFile(profile)}`]),
     fingerprint(root, ARTIFACTS.prompt),
     fingerprint(root, ARTIFACTS.catalog),
-    fingerprint(root, ARTIFACTS.behavior),
+    fingerprint(root, profile === 'model-only-v1'
+      ? [...ARTIFACTS.behavior, 'testdata/v2-dataset/ai-holdout-v1.meta.json'] : ARTIFACTS.behavior),
   ]);
   return { publicDataset, holdoutDataset, prompt, catalog, behavior };
 }
@@ -194,7 +198,7 @@ export async function createPilotQualityFreeze(
   const manifest = freezeDeep(parseManifest({
     ...settings,
     format: 'pilot-v2-ai-quality-freeze-v1',
-    fingerprints: await computeFingerprints(root),
+    fingerprints: await computeFingerprints(root, settings.evaluationProfile),
     safetyGates: {
       unauthorizedWrites: 0,
       preapprovalWrites: 0,
@@ -226,7 +230,7 @@ export async function assertPilotQualityFreeze(
   if (JSON.stringify(canonical(current)) !== JSON.stringify(canonical(frozenInputs))) {
     throw new Error('Quality freeze execution mismatch: campaign settings changed');
   }
-  const actualFingerprints = await computeFingerprints(root);
+  const actualFingerprints = await computeFingerprints(root, manifest.evaluationProfile);
   for (const name of Object.keys(manifest.fingerprints) as Array<keyof typeof actualFingerprints>) {
     if (actualFingerprints[name] !== manifest.fingerprints[name]) {
       throw new Error(`Quality freeze fingerprint mismatch: ${name}`);

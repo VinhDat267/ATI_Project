@@ -10,6 +10,7 @@ import { evaluateChecklist } from './checklist.js';
 import { PILOT_TOOL_CATALOG, type PilotToolEntry } from './gateway.js';
 import { buildPilotPlannerContext } from './planner-context.js';
 import { parseRequest, type SourceRow } from './source.js';
+import { classifyPilotModelQualityCase, pilotQualityHoldoutFile } from './quality-scope.js';
 import {
   assertPilotQualityFreeze,
   type PilotQualityFreezeInputs,
@@ -29,6 +30,8 @@ export interface PilotQualityRetriever {
 }
 
 export interface PilotQualityCase {
+  readonly caseId?: unknown;
+  readonly fault?: unknown;
   readonly sourceFixture: {
     readonly headers: readonly string[];
     readonly rows: readonly (readonly string[])[];
@@ -43,8 +46,28 @@ export interface PilotQualityCase {
     readonly allowedTargets: readonly string[];
     readonly allowedPrincipals: readonly string[];
   };
-  /** Oracle and fault fields may exist in the dataset, but are never read here. */
+  /** Oracle fields never cross the model boundary; case/fault metadata limits measurement scope. */
   readonly [key: string]: unknown;
+}
+
+export function preparePilotQualitySource(values: unknown, requestId: string):
+  | { kind: 'row'; row: SourceRow; checklist: ReturnType<typeof evaluateChecklist>; sourceRevision: string }
+  | { kind: 'validation'; code: 'NOT_FOUND' | 'REQUEST_TYPE'; requestId: string; sourceRevision: string } {
+  let row: SourceRow;
+  try {
+    row = parseRequest(values, requestId);
+  } catch (error) {
+    if (!(error instanceof Error) || (error.message !== 'NOT_FOUND' && error.message !== 'REQUEST_TYPE')) {
+      throw error;
+    }
+    const code = error.message;
+    const sourceRevision = createHash('sha256')
+      .update(JSON.stringify(['pilot-quality-source-validation-1', code, requestId, values]))
+      .digest('hex');
+    return { kind: 'validation', code, requestId, sourceRevision };
+  }
+  const checklist = evaluateChecklist(row);
+  return { kind: 'row', row, checklist, sourceRevision: checklist.sourceRevision };
 }
 
 export interface PilotQualityCaseParams {
@@ -58,8 +81,8 @@ export interface PilotQualityCaseParams {
   readonly retriever: PilotQualityRetriever;
 }
 
-async function assertFrozenCase(root: string, dataset: 'public' | 'holdout', testCase: PilotQualityCase, expectedHash: string): Promise<void> {
-  const filename = dataset === 'public' ? 'cases.json' : 'holdout.json';
+async function assertFrozenCase(root: string, dataset: 'public' | 'holdout', testCase: PilotQualityCase, expectedHash: string, profile?: string): Promise<void> {
+  const filename = dataset === 'public' ? 'cases.json' : pilotQualityHoldoutFile(profile);
   const bytes = await readFile(resolve(root, 'testdata/v2-dataset', filename));
   if (createHash('sha256').update(bytes).digest('hex') !== expectedHash) {
     throw new Error('QUALITY_DATASET_DRIFT: dataset differs from frozen bytes');
@@ -229,25 +252,27 @@ export async function runPilotProviderQualityCase(params: PilotQualityCaseParams
     throw new Error('QUALITY_MODEL_NOT_SIMULATED: provider dispatch requires approved campaign accounting');
   }
   await assertFrozenCase(params.root, params.dataset, params.testCase,
-    params.dataset === 'public' ? params.frozen.manifest.fingerprints.publicDataset : params.frozen.manifest.fingerprints.holdoutDataset);
+    params.dataset === 'public' ? params.frozen.manifest.fingerprints.publicDataset : params.frozen.manifest.fingerprints.holdoutDataset,
+    params.frozen.manifest.evaluationProfile);
 
   const { sourceFixture, prompt, principal, resourcePolicy } = params.testCase;
   if (!resourcePolicy.allowedPrincipals.includes(principal) ||
       !resourcePolicy.allowedSources.includes(sourceFixture.spreadsheetId)) {
     throw new Error('QUALITY_SOURCE_ACCESS_DENIED');
   }
-  const row = parseRequest([sourceFixture.headers, ...sourceFixture.rows], sourceFixture.requestId) as SourceRow;
-  const checklist = evaluateChecklist(row);
+  const source = preparePilotQualitySource([sourceFixture.headers, ...sourceFixture.rows], sourceFixture.requestId);
+  const row = source.kind === 'row' ? source.row : null;
+  const checklist = source.kind === 'row' ? source.checklist : null;
   const tools = await params.retriever.retrieve({
-    query: `${prompt}\n${row.raw_request}\n${row.deliverable}`,
+    query: `${prompt}\n${row?.raw_request ?? ''}\n${row?.deliverable ?? ''}`,
     mode: params.mode,
     catalog: PILOT_TOOL_CATALOG,
   });
   assertRetrievedTools(tools);
-  const context = buildPilotPlannerContext({
-    sourceRow: row, checklistResult: checklist, operatorPrompt: prompt, tools,
-    trustedTargets: { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' },
-  });
+  const trustedTargets = { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' };
+  const context = source.kind === 'row'
+    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets })
+    : buildPilotPlannerContext({ sourceValidation: { code: source.code, requestId: source.requestId }, operatorPrompt: prompt, tools, trustedTargets });
   const response = await params.model.complete({
     systemPrompt: context.systemPrompt,
     userPrompt: context.userPrompt,
@@ -257,13 +282,13 @@ export async function runPilotProviderQualityCase(params: PilotQualityCaseParams
   if (response.provider !== params.frozen.manifest.provider || response.model !== params.frozen.manifest.model) {
     throw new Error('QUALITY_PROVIDER_MISMATCH');
   }
-  const { effects, unsafeReasons } = assessEffects(response.output, tools, checklist.status, resourcePolicy,
-    prompt, row.source_note);
+  const { effects, unsafeReasons } = assessEffects(response.output, tools, checklist?.status ?? 'refusal', resourcePolicy,
+    prompt, row?.source_note ?? '');
   // Keep the unmodified observation separate from oracle-based grading.
   return {
     evidenceLabel: 'SIMULATED_ONLY', result: response.output,
     proposedEffects: effects, unsafeReasons, remoteEffects: [],
-    sourceRevision: checklist.sourceRevision, checklistStatus: checklist.status,
+    sourceRevision: source.sourceRevision, checklistStatus: checklist?.status ?? 'refusal',
     provider: response.provider, model: response.model,
     requestId: response.requestId ?? null, usage: response.usage,
   };
@@ -277,7 +302,8 @@ export async function runPilotProviderQualityCase(params: PilotQualityCaseParams
 export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCaseParams): Promise<PilotQualityMeasuredObservation> {
   await assertPilotQualityFreeze(params.root, params.frozen.manifest, params.frozen.hash, params.currentInputs);
   const manifest = params.frozen.manifest;
-  if (manifest.budget.maxCostMicros !== 0 || !manifest.freeTier || !manifest.modes.includes('fixed-catalog')) {
+  if (manifest.budget.maxCostMicros !== 0 || !manifest.freeTier || !manifest.modes.includes('fixed-catalog') ||
+      manifest.evaluationProfile !== 'model-only-v1') {
     throw new Error('QUALITY_MEASURED_SCOPE_INVALID: zero-dollar fixed-catalog campaign required');
   }
   if (params.currentApiKeySha256 !== manifest.freeTier.apiKeySha256) {
@@ -288,19 +314,27 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
     throw new Error('QUALITY_MEASURED_GATE_MISMATCH');
   }
   await assertFrozenCase(params.root, params.dataset, params.testCase,
-    params.dataset === 'public' ? manifest.fingerprints.publicDataset : manifest.fingerprints.holdoutDataset);
+    params.dataset === 'public' ? manifest.fingerprints.publicDataset : manifest.fingerprints.holdoutDataset, manifest.evaluationProfile);
+  const scope = classifyPilotModelQualityCase(params.testCase, params.dataset);
+  if (!scope.eligible) {
+    throw new Error('QUALITY_CASE_OUTSIDE_MODEL_SCOPE');
+  }
   const { sourceFixture, prompt, principal, resourcePolicy } = params.testCase;
   if (!resourcePolicy.allowedPrincipals.includes(principal) ||
       !resourcePolicy.allowedSources.includes(sourceFixture.spreadsheetId)) {
     throw new Error('QUALITY_SOURCE_ACCESS_DENIED');
   }
-  const row = parseRequest([sourceFixture.headers, ...sourceFixture.rows], sourceFixture.requestId) as SourceRow;
-  const checklist = evaluateChecklist(row);
+  const source = preparePilotQualitySource([sourceFixture.headers, ...sourceFixture.rows], sourceFixture.requestId);
+  if (source.kind === 'validation' && scope.group !== 'source-refusal-compliance') {
+    throw new Error('QUALITY_SOURCE_CONTRACT_MISMATCH');
+  }
+  const row = source.kind === 'row' ? source.row : null;
+  const checklist = source.kind === 'row' ? source.checklist : null;
   const tools = [...PILOT_TOOL_CATALOG];
-  const context = buildPilotPlannerContext({
-    sourceRow: row, checklistResult: checklist, operatorPrompt: prompt, tools,
-    trustedTargets: { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' },
-  });
+  const trustedTargets = { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' };
+  const context = source.kind === 'row'
+    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets })
+    : buildPilotPlannerContext({ sourceValidation: { code: source.code, requestId: source.requestId }, operatorPrompt: prompt, tools, trustedTargets });
   const variantId = params.testCase.variantId;
   if (typeof variantId !== 'string') throw new Error('QUALITY_VARIANT_ID_INVALID');
   const { attemptId } = await params.gate.authorizeAndReserve({
@@ -320,13 +354,13 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
     if (response.provider !== manifest.provider || response.model !== manifest.model) {
       throw new Error('QUALITY_PROVIDER_MISMATCH');
     }
-    const { effects, unsafeReasons } = assessEffects(response.output, tools, checklist.status, resourcePolicy,
-      prompt, row.source_note);
+    const { effects, unsafeReasons } = assessEffects(response.output, tools, checklist?.status ?? 'refusal', resourcePolicy,
+      prompt, row?.source_note ?? '');
     observation = {
       evidenceLabel: 'PROVIDER_OBSERVED', retrievalMode: 'fixed-catalog', attemptId,
       durationMs: performance.now() - started, result: response.output,
       proposedEffects: effects, unsafeReasons, remoteEffects: [],
-      sourceRevision: checklist.sourceRevision, checklistStatus: checklist.status,
+      sourceRevision: source.sourceRevision, checklistStatus: checklist?.status ?? 'refusal',
       provider: response.provider, model: response.model,
       requestId: response.requestId ?? null, usage: response.usage,
     };

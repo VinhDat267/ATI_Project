@@ -2,9 +2,7 @@ import type { SourceRow } from "./source.js";
 import type { ChecklistResult } from "./checklist.js";
 import { PILOT_TOOL_CATALOG, type PilotToolEntry } from "./gateway.js";
 
-export interface BuildPilotPlannerContextParams {
-  sourceRow: SourceRow;
-  checklistResult: ChecklistResult;
+interface BuildPilotPlannerContextCommon {
   operatorPrompt: string;
   timeZone?: string;
   secretsToRedact?: readonly string[];
@@ -18,12 +16,21 @@ export interface BuildPilotPlannerContextParams {
   };
 }
 
+export type BuildPilotPlannerContextParams = BuildPilotPlannerContextCommon & (
+  | { sourceRow: SourceRow; checklistResult: ChecklistResult; sourceValidation?: never }
+  | { sourceRow?: never; checklistResult?: never; sourceValidation: {
+    code: "NOT_FOUND" | "REQUEST_TYPE";
+    requestId: string;
+  } }
+);
+
 export interface PilotPlannerContext {
   systemPrompt: string;
   userPrompt: string;
   envelope: {
     clientUntrustedIntakeXml: string;
     checklistSummaryXml: string;
+    sourceValidationXml?: string;
   };
 }
 
@@ -90,8 +97,6 @@ export function buildPilotPlannerContext(
   params: BuildPilotPlannerContextParams,
 ): PilotPlannerContext {
   const {
-    sourceRow,
-    checklistResult,
     operatorPrompt,
     timeZone = "UTC",
     secretsToRedact = [],
@@ -100,9 +105,14 @@ export function buildPilotPlannerContext(
     trustedTargets,
   } = params;
 
-  // Sanitize and truncate fields of sourceRow
+  const sourceValidation = params.sourceValidation;
+  if (!sourceValidation && (!params.sourceRow || !params.checklistResult)) {
+    throw new Error("PILOT_PLANNER_SOURCE_MISSING");
+  }
+  // Sanitize and truncate fields of a selected row only. A failed lookup must
+  // never turn another row from the same sheet into model context.
   const cleanRow: Record<string, string> = {};
-  for (const [k, v] of Object.entries(sourceRow)) {
+  for (const [k, v] of Object.entries(params.sourceRow ?? {})) {
     const redacted = redactSecrets(String(v ?? ""), secretsToRedact);
     const truncated = truncate(redacted, 2000);
     cleanRow[k] = escapeXml(truncated);
@@ -114,7 +124,7 @@ export function buildPilotPlannerContext(
   );
 
   // XML Envelope for untrusted external intake
-  const clientUntrustedIntakeXml = [
+  const clientUntrustedIntakeXml = sourceValidation ? "" : [
     "<client_untrusted_intake>",
     `  <request_id>${cleanRow.request_id || ""}</request_id>`,
     `  <client_ref>${cleanRow.client_ref || ""}</client_ref>`,
@@ -128,17 +138,25 @@ export function buildPilotPlannerContext(
   ].join("\n");
 
   // XML Envelope for checklist result
-  const checklistSummaryXml = [
+  const checklistSummaryXml = sourceValidation ? "" : [
     "<checklist_summary>",
-    `  <status>${checklistResult.status}</status>`,
-    `  <checklist_version>${escapeXml(checklistResult.checklistVersion)}</checklist_version>`,
-    `  <source_revision>${escapeXml(checklistResult.sourceRevision)}</source_revision>`,
-    `  <unconfirmed_business>${checklistResult.unconfirmedBusiness}</unconfirmed_business>`,
-    `  <missing_fields>${escapeXml(checklistResult.missingFields.join(", "))}</missing_fields>`,
-    `  <conflicts>${escapeXml(checklistResult.conflicts.join(", "))}</conflicts>`,
-    `  <summary>${escapeXml(checklistResult.summary)}</summary>`,
+    `  <status>${params.checklistResult?.status}</status>`,
+    `  <checklist_version>${escapeXml(params.checklistResult?.checklistVersion ?? "")}</checklist_version>`,
+    `  <source_revision>${escapeXml(params.checklistResult?.sourceRevision ?? "")}</source_revision>`,
+    `  <unconfirmed_business>${params.checklistResult?.unconfirmedBusiness}</unconfirmed_business>`,
+    `  <missing_fields>${escapeXml(params.checklistResult?.missingFields.join(", ") ?? "")}</missing_fields>`,
+    `  <conflicts>${escapeXml(params.checklistResult?.conflicts.join(", ") ?? "")}</conflicts>`,
+    `  <summary>${escapeXml(params.checklistResult?.summary ?? "")}</summary>`,
     "</checklist_summary>",
   ].join("\n");
+  const sourceValidationXml = sourceValidation ? [
+    "<source_validation>",
+    "  <status>refusal</status>",
+    "  <scope>entire_source_snapshot</scope>",
+    `  <code>${sourceValidation.code}</code>`,
+    `  <requested_id>${escapeXml(truncate(redactSecrets(sourceValidation.requestId, secretsToRedact), 2000))}</requested_id>`,
+    "</source_validation>",
+  ].join("\n") : "";
 
   const systemPrompt = [
     "You are the ATI Pilot v2 Planner Assistant.",
@@ -155,6 +173,7 @@ export function buildPilotPlannerContext(
     "2. UC1 (Refusal): If the intake violates legal/security policies, emit a refusal decision with 0 writes.",
     "3. UC2 (Executable Plan): If <checklist_summary> status is 'pass' and business confirmation is verified, generate an executable plan with exactly ONE write step calling 'trello.create_card'.",
     "4. UC3 (Lookup): If the request asks to check card status, generate a read-only step calling 'trello.get_card'.",
+    ...(sourceValidation ? ["5. Source validation: <source_validation> reports that the entire source snapshot was rejected with NOT_FOUND or REQUEST_TYPE. Refuse with zero steps and no write. Do not claim an individual row has an invalid type or infer details from any other sheet row."] : []),
     "",
     "Output must strictly follow the PlannerResult schema without markdown fences.",
   ].join("\n");
@@ -192,9 +211,7 @@ export function buildPilotPlannerContext(
     ] : []),
     "",
     "=== INTAKE EVIDENCE ===",
-    checklistSummaryXml,
-    "",
-    clientUntrustedIntakeXml,
+    ...(sourceValidation ? [sourceValidationXml] : [checklistSummaryXml, "", clientUntrustedIntakeXml]),
     "",
     "=== OPERATOR INSTRUCTION ===",
     cleanOperatorPrompt,
@@ -212,6 +229,7 @@ export function buildPilotPlannerContext(
     envelope: {
       clientUntrustedIntakeXml,
       checklistSummaryXml,
+      ...(sourceValidationXml ? { sourceValidationXml } : {}),
     },
   };
 }

@@ -95,7 +95,7 @@ const SAFE_LOCAL_CODES = new Set([
   'AI_LIVE_NOT_READY', 'AI_CALL_UNAUTHORIZED', 'AI_PROVIDER_CALLS_DISABLED',
 ]);
 const SAFE_PROVIDER_CODES = new Set([
-  'service_unavailable', 'rate_limit_exceeded', 'resource_exhausted',
+  'service_unavailable', 'rate_limit_exceeded', 'too_many_requests', 'resource_exhausted',
   'quota_exceeded', 'invalid_request', 'permission_denied', 'unauthorized',
   'model_not_found', 'internal_error',
 ]);

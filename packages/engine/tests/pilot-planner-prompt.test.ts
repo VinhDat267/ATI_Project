@@ -151,6 +151,21 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.userPrompt).toContain("dueDate from due_date");
   });
 
+  it("renders a trusted source validation result without inventing an intake row", () => {
+    const context = buildPilotPlannerContext({
+      sourceValidation: { code: "NOT_FOUND", requestId: "REQ-011" },
+      operatorPrompt: "Create task REQ-011",
+      trustedTargets: { allowedBoardIds: ["board-allowed-1"], defaultListName: "To Do" },
+    });
+
+    expect(context.userPrompt).toContain("<source_validation>");
+    expect(context.userPrompt).toContain("<code>NOT_FOUND</code>");
+    expect(context.userPrompt).toContain("<requested_id>REQ-011</requested_id>");
+    expect(context.userPrompt).not.toContain("<client_untrusted_intake>");
+    expect(context.userPrompt).not.toContain("<checklist_summary>");
+    expect(context.systemPrompt).toContain("source_validation");
+  });
+
   it("escapeXml handles all 5 essential XML entities correctly", () => {
     const input = `& < > " '`;
     const escaped = escapeXml(input);

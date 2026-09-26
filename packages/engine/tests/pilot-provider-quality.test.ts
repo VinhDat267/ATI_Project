@@ -5,7 +5,7 @@ import type { StructuredModelClient } from '../src/ai/ports.js';
 import { ProviderClientError } from '../src/ai/providers/registry.js';
 import { PILOT_TOOL_CATALOG } from '../src/pilot/gateway.js';
 import { createPilotQualityFreeze, type PilotQualityFreezeInputs } from '../src/pilot/quality-freeze.js';
-import { createPilotSimulatedModel, createPilotSimulatedRetriever, runPilotMeasuredQualityCase, runPilotProviderQualityCase, type PilotQualityRetriever } from '../src/pilot/provider-quality-runner.js';
+import { createPilotSimulatedModel, createPilotSimulatedRetriever, preparePilotQualitySource, runPilotMeasuredQualityCase, runPilotProviderQualityCase, type PilotQualityRetriever } from '../src/pilot/provider-quality-runner.js';
 import type { PilotQualityMeasuredGate } from '../src/pilot/quality-journal.js';
 import { runPilotProviderQualityCli } from '../src/pilot/provider-quality-cli.js';
 
@@ -13,6 +13,8 @@ const root = resolve(import.meta.dirname, '../../..');
 const cases = JSON.parse(readFileSync(resolve(root, 'testdata/v2-dataset/cases.json'), 'utf8')).cases;
 const fixture = cases[0];
 const incompleteFixture = cases.find((entry: { variantId: string }) => entry.variantId === 'V2-09-vi');
+const missingFixture = cases.find((entry: { variantId: string }) => entry.variantId === 'V2-11-vi');
+const unsupportedTypeFixture = cases.find((entry: { variantId: string }) => entry.variantId === 'V2-20-vi');
 
 function inputs(): PilotQualityFreezeInputs {
   return {
@@ -176,6 +178,7 @@ describe('pilot v2 measured provider boundary', () => {
   function freeInputs(): PilotQualityFreezeInputs {
     return {
       ...inputs(), campaignId: 'gemini-free-contract', provider: 'google', model: 'gemini-2.5-flash',
+      evaluationProfile: 'model-only-v1',
       modes: ['fixed-catalog'], budget: { ...inputs().budget, maxCostMicros: 0 },
       freeTier: {
         apiKeySha256: 'c'.repeat(64), attestedBy: 'pilot operator',
@@ -231,6 +234,82 @@ describe('pilot v2 measured provider boundary', () => {
       testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
     expect(result.unsafeReasons).toContain('wrong_board_proposed');
     expect(result.remoteEffects).toEqual([]);
+  });
+  it('calls the provider once for a missing source ID using only trusted validation evidence', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const requests: unknown[] = [];
+    const model: StructuredModelClient = { async complete(input) {
+      requests.push(input);
+      return { output: { kind: 'refusal', reason: 'Requested ID not found in the source' },
+        provider: 'google', model: 'gemini-2.5-flash', usage: { inputTokens: 10, outputTokens: 7 } };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: missingFixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(requests).toHaveLength(1);
+    const prompt = (requests[0] as { userPrompt: string }).userPrompt;
+    expect(prompt).toContain('<code>NOT_FOUND</code>');
+    expect(prompt).toContain('<requested_id>REQ-011</requested_id>');
+    expect(prompt).not.toContain('REQ-999');
+    expect(prompt).not.toContain(missingFixture.sourceFixture.rows[0][3]);
+    expect(prompt).not.toContain(missingFixture.expected.refusalReason);
+    expect(result.checklistStatus).toBe('refusal');
+    expect(result.proposedEffects).toEqual([]);
+    expect(result.remoteEffects).toEqual([]);
+    expect(journal.reservations).toHaveLength(1);
+    expect(journal.outcomes).toMatchObject([{ status: 'succeeded' }]);
+  });
+  it('marks a proposed write unsafe when source validation failed', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const model: StructuredModelClient = { async complete() {
+      return { output: writePlan(), provider: 'google', model: 'gemini-2.5-flash',
+        usage: { inputTokens: 10, outputTokens: 7 } };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: missingFixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(result.unsafeReasons).toContain('write_proposed_for_incomplete_intake');
+    expect(result.remoteEffects).toEqual([]);
+  });
+  it('passes unsupported source type as validation status without leaking the row', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const requests: unknown[] = [];
+    const model: StructuredModelClient = { async complete(input) {
+      requests.push(input);
+      return { output: { kind: 'refusal', reason: 'Unsupported source type' },
+        provider: 'google', model: 'gemini-2.5-flash', usage: { inputTokens: 10, outputTokens: 7 } };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: unsupportedTypeFixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    const prompt = (requests[0] as { userPrompt: string }).userPrompt;
+    expect(prompt).toContain('<code>REQUEST_TYPE</code>');
+    expect(prompt).not.toContain(unsupportedTypeFixture.sourceFixture.rows[0][3]);
+    expect(JSON.stringify(requests[0])).not.toContain('"expected"');
+    expect(result.checklistStatus).toBe('refusal');
+    expect(journal.reservations).toHaveLength(1);
+  });
+  it('does not turn malformed headers or unknown parser failures into provider cases', () => {
+    expect(() => preparePilotQualitySource([['request_id']], 'REQ-001')).toThrow('HEADERS');
+    expect(() => preparePilotQualitySource([fixture.sourceFixture.headers,
+      ['REQ-001', 'client', 'web_change', 'x'.repeat(16001)]], 'REQ-001')).toThrow('TEXT_LIMIT');
+  });
+  it('retains whole-sheet validation when a different row has an unsupported type', () => {
+    const source = preparePilotQualitySource([fixture.sourceFixture.headers, ...fixture.sourceFixture.rows,
+      ['OTHER-ID', 'client', 'general']], fixture.sourceFixture.requestId);
+    expect(source).toMatchObject({ kind: 'validation', code: 'REQUEST_TYPE' });
+  });
+  it('blocks system acceptance cases before provider reservation or dispatch', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    let calls = 0;
+    const model: StructuredModelClient = { async complete() { calls++; throw new Error('must not call'); } };
+    const testCase = cases.find((entry: { variantId: string }) => entry.variantId === 'V2-16-vi');
+    await expect(runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) }))
+      .rejects.toThrow('QUALITY_CASE_OUTSIDE_MODEL_SCOPE');
+    expect(calls).toBe(0);
+    expect(journal.reservations).toHaveLength(0);
   });
   it('records unsafe proposed writes without any remote effect', async () => {
     const frozen = await createPilotQualityFreeze(root, freeInputs());

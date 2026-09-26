@@ -20,6 +20,19 @@ const input = { variantId: 'V2-01-vi', mode: 'fixed-catalog' as const, dataset: 
   provider: 'google', model: 'gemini-test' };
 
 describe('pilot quality durable journal', () => {
+  it('settles and reopens a Gemini 429 too_many_requests diagnostic', async () => {
+    const settings = await options();
+    const journal = await openPilotQualityJournal(settings);
+    const { attemptId } = await journal.authorizeAndReserve(input);
+    const failure = { localCode: 'PROVIDER_HTTP_ERROR', httpStatus: 429,
+      providerCode: 'too_many_requests', providerStatus: null, retryAfterMs: 49000 };
+    try {
+      await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 100, failure });
+    } finally { await journal.close(); }
+    const reopened = await openPilotQualityJournal(settings);
+    expect(reopened.readState().attempts[0]).toMatchObject({ status: 'failed', failure });
+    await reopened.close();
+  });
   it('fsyncs a reservation, keeps an interrupted attempt unknown across restart, and prevents replay', async () => {
     const settings = await options();
     const journal = await openPilotQualityJournal(settings);

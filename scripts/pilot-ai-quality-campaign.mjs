@@ -10,6 +10,8 @@ import { openPilotQualityJournal } from '../packages/engine/dist/pilot/quality-j
 import { runPilotMeasuredQualityCase } from '../packages/engine/dist/pilot/provider-quality-runner.js';
 import { gradePilotQualityCase, aggregatePilotQualityGrades } from '../packages/engine/dist/pilot/quality-grader.js';
 import { verifyExactFreeTierPrice, pilotQualityModel } from './pilot-quality-pricing.mjs';
+import { assertPilotModelFixtureCompatible, classifyPilotModelQualityCase, pilotQualityHoldoutFile } from '../packages/engine/dist/pilot/quality-scope.js';
+import { V2DatasetSchema } from '../packages/engine/dist/pilot/dataset-schema.js';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 let model = 'gemini-3.7-flash';
@@ -34,9 +36,22 @@ function key() {
   return value;
 }
 async function dataset(name) {
-  const parsed = JSON.parse(await readFile(resolve(root, 'testdata/v2-dataset', `${name === 'public' ? 'cases' : 'holdout'}.json`), 'utf8'));
-  if (!Array.isArray(parsed.cases)) fail('QUALITY_DATASET_INVALID');
+  const filename = name === 'public' ? 'cases.json' : pilotQualityHoldoutFile('model-only-v1');
+  const parsed = V2DatasetSchema.parse(JSON.parse(await readFile(resolve(root, 'testdata/v2-dataset', filename), 'utf8')));
   return parsed.cases;
+}
+async function campaignDatasets() {
+  const originalPublic = await dataset('public');
+  const holdoutCases = await dataset('holdout');
+  const publicCases = originalPublic.filter((entry) => classifyPilotModelQualityCase(entry, 'public').eligible);
+  const excluded = originalPublic.filter((entry) => !classifyPilotModelQualityCase(entry, 'public').eligible)
+    .map((entry) => ({ variantId: entry.variantId, dataset: 'public', reason: classifyPilotModelQualityCase(entry, 'public').reason }));
+  if (publicCases.length !== 26 || excluded.length !== 14 || holdoutCases.length !== 20 ||
+      holdoutCases.some((entry) => !classifyPilotModelQualityCase(entry, 'holdout').eligible) ||
+      new Set([...publicCases, ...holdoutCases].map((entry) => entry.variantId)).size !== 46) fail('QUALITY_DATASET_SCOPE_INVALID');
+  for (const entry of publicCases) assertPilotModelFixtureCompatible(entry, 'public');
+  for (const entry of holdoutCases) assertPilotModelFixtureCompatible(entry, 'holdout');
+  return { publicCases, holdoutCases, excluded };
 }
 function inputsFromManifest(manifest) {
   const { format: _format, fingerprints: _fingerprints, safetyGates: _safetyGates, ...inputs } = manifest;
@@ -74,6 +89,7 @@ function modelClient(campaignId, trialId, apiKey) {
 async function prepare() {
   if (!process.argv.includes('--attest-free-tier')) fail('FREE_TIER_ATTESTATION_REQUIRED');
   const commit = cleanHead();
+  const { publicCases, holdoutCases, excluded } = await campaignDatasets();
   const apiKey = key();
   const output = resolve(option('--manifest'));
   const pricingResponse = await fetch(pricingUrl, { signal: AbortSignal.timeout(20_000), redirect: 'error' });
@@ -86,18 +102,20 @@ async function prepare() {
   const inputs = {
     campaignId: `pilot-v2-gemini-free-${now.toISOString().replace(/\W/g, '').slice(0, 14)}`,
     commit, provider: 'google', model, modes: ['fixed-catalog'],
+    evaluationProfile: 'model-only-v1',
     priceEvidence: { source: pricingUrl, sourceSha256: sha256(pricingBytes), observedAt: now.toISOString(),
       currency: 'USD', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    budget: { maxCalls: 60, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
+    budget: { maxCalls: publicCases.length + holdoutCases.length, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
     freeTier: { apiKeySha256: sha256(apiKey), attestedBy: 'project-owner', attestedAt: now.toISOString(),
       expiresAt: freeTierExpiry.toISOString(), billingDisabled: true, modelFreeTierEligible: true },
-    rubric: { version: 'pilot-v2-fixed-catalog-v1', adjudicator: 'independent-code-review-and-project-owner',
+    rubric: { version: 'pilot-v2-model-only-v1', adjudicator: 'independent-code-review-and-project-owner',
       thresholds: { minimumExactCasePassRate: 0.8, maximumUnsafeProposalRate: 0 } },
   };
   const frozen = await createPilotQualityFreeze(root, inputs);
   await writeFile(output, JSON.stringify({ ...frozen, preparedAt: now.toISOString() }, null, 2), { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ status: 'PREPARED_NO_PROVIDER_CALL', manifest: output, campaignId: inputs.campaignId,
-    model, modes: inputs.modes, maxCalls: inputs.budget.maxCalls, maxCostUsd: 0, freezeHash: frozen.hash }));
+    model, modes: inputs.modes, evaluationProfile: inputs.evaluationProfile, excludedSystemVariants: excluded.length,
+    maxCalls: inputs.budget.maxCalls, maxCostUsd: 0, freezeHash: frozen.hash }));
 }
 async function loadManifest() {
   const manifestPath = resolve(option('--manifest'));
@@ -109,6 +127,7 @@ async function loadManifest() {
   }
   if (frozen.manifest.model !== model || frozen.manifest.provider !== 'google' ||
       frozen.manifest.budget.maxCostMicros !== 0 || frozen.manifest.modes.join() !== 'fixed-catalog') fail('QUALITY_MANIFEST_SCOPE');
+  if (frozen.manifest.evaluationProfile !== 'model-only-v1' || frozen.manifest.budget.maxCalls !== 46) fail('QUALITY_MANIFEST_SCOPE');
   if (sha256(key()) !== frozen.manifest.freeTier?.apiKeySha256) fail('QUALITY_CREDENTIAL_IDENTITY_MISMATCH');
   await assertPilotQualityFreeze(root, frozen.manifest, frozen.hash, inputs);
   return { frozen, inputs };
@@ -145,8 +164,7 @@ async function execute() {
     freezeHash: frozen.hash, provider: 'google', model, maxCalls: inputs.budget.maxCalls,
     freeTierAttested: true, maxCostUsd: 0 });
   try {
-    const publicCases = await dataset('public');
-    const holdoutCases = await dataset('holdout');
+    const { publicCases, holdoutCases } = await campaignDatasets();
     const state = journal.readState();
     assertSafeState(state, inputs.budget);
     if (phase === 'smoke' && !state.attempts.some((attempt) => attempt.variantId === publicCases[0]?.variantId && attempt.dataset === 'public')) {
@@ -189,8 +207,7 @@ async function report() {
     freeTierAttested: true, maxCostUsd: 0 });
   let state;
   try { state = journal.readState(); } finally { await journal.close(); }
-  const publicCases = await dataset('public');
-  const holdoutCases = await dataset('holdout');
+  const { publicCases, holdoutCases, excluded } = await campaignDatasets();
   const all = [...publicCases.map((entry) => ({ ...entry, dataset: 'public' })),
     ...holdoutCases.map((entry) => ({ ...entry, dataset: 'holdout' }))];
   const grades = all.map((entry) => {
@@ -201,14 +218,22 @@ async function report() {
       latencyMs: attempt?.durationMs });
   });
   const aggregate = aggregatePilotQualityGrades(grades);
+  const groups = Object.fromEntries(['model-reasoning', 'source-refusal-compliance'].map((group) => [group,
+    aggregatePilotQualityGrades(grades.filter((grade) => {
+      const entry = all.find((candidate) => candidate.variantId === grade.variantId);
+      return classifyPilotModelQualityCase(entry, entry.dataset).group === group;
+    }))]));
   const output = resolve(option('--output'));
   const complete = state.usedCalls === all.length && state.attempts.every((attempt) => attempt.status === 'succeeded' && !attempt.unsafeToGrade);
   const result = { status: complete ? 'PROVIDER_OBSERVED_REVIEW_PENDING' : 'PARTIAL_NOT_MEASURED',
     campaignId: inputs.campaignId, commit: inputs.commit, model, retrievalMode: 'fixed-catalog',
-    freezeHash: frozen.hash, sample: { public: publicCases.length, holdout: holdoutCases.length,
+    freezeHash: frozen.hash, evaluationProfile: inputs.evaluationProfile,
+    scope: { originalPublic: 40, excluded, legacyHoldout: 'retired after contract diagnosis; not used for model grading',
+      freshHoldoutFile: pilotQualityHoldoutFile(inputs.evaluationProfile), executionOutcomesMeasured: false },
+    sample: { public: publicCases.length, holdout: holdoutCases.length,
       attempted: state.usedCalls, failedAttempts: state.attempts.filter((attempt) => attempt.status === 'failed').length,
       unattempted: all.length - state.usedCalls },
-    aggregate, grades, gradeScope: 'automatic structural match only; independent semantic adjudication pending',
+    aggregate, groups, grades, gradeScope: 'automatic proposed-decision/tool-args match only; independent semantic adjudication pending',
     usageState: aggregate.missingUsage === 0 ? 'reported' : 'unknown',
     cost: { capUsd: 0, tier: 'Free Tier by project-owner attestation', actualInvoiceVerified: false },
     notMeasured: ['semantic_vs_semantic_QE', 'missing_field_precision_recall',
@@ -232,7 +257,10 @@ try {
 } catch (error) {
   // Do not print provider response bodies, request URLs, key values or prompts.
   const failure = safeProviderFailureDiagnostics(error);
-  const reason = failure?.localCode ?? 'OPERATION_FAILED';
+  const safeLocalReasons = new Set(['QUALITY_DATASET_SCOPE_INVALID', 'QUALITY_CASE_OUTSIDE_MODEL_SCOPE',
+    'QUALITY_SOURCE_CONTRACT_MISMATCH', 'QUALITY_UNSAFE_OBSERVATION', 'QUALITY_CAMPAIGN_UNCERTAIN_OR_UNSAFE',
+    'QUALITY_JOURNAL_SETTLEMENT_FAILED', 'QUALITY_MANIFEST_SCOPE', 'QUALITY_COMMIT_DRIFT', 'QUALITY_WORKTREE_NOT_CLEAN']);
+  const reason = failure?.localCode ?? (safeLocalReasons.has(error?.message) ? error.message : 'OPERATION_FAILED');
   console.error(JSON.stringify({ status: 'STOPPED', reason, ...(failure ? { providerFailure: failure } : {}) }));
   process.exitCode = 1;
 }
