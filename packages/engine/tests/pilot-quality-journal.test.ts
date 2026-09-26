@@ -40,7 +40,7 @@ describe('pilot quality durable journal', () => {
     try {
       await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 3,
         failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
-          providerStatus: null, retryAfterMs: null, failureStage: 'output_wire' } });
+          providerStatus: null, retryAfterMs: null, failureStage: 'output_wire_value' } });
       const { attemptId: other } = await journal.authorizeAndReserve({ ...input, variantId: 'V2-02-vi' });
       await expect(journal.recordOutcome({ attemptId: other, status: 'failed', durationMs: 3,
         failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
@@ -48,7 +48,7 @@ describe('pilot quality durable journal', () => {
         .rejects.toThrow('QUALITY_JOURNAL_INVALID_FAILURE_DIAGNOSTICS');
     } finally { await journal.close(); }
     const reopened = await openPilotQualityJournal(settings);
-    expect(reopened.readState().attempts[0]?.failure?.failureStage).toBe('output_wire');
+    expect(reopened.readState().attempts[0]?.failure?.failureStage).toBe('output_wire_value');
     await reopened.close();
   });
   it('fsyncs a reservation, keeps an interrupted attempt unknown across restart, and prevents replay', async () => {

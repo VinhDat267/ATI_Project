@@ -62,10 +62,12 @@ export type PlannerWire = { readonly result: PlannerWireResult };
 
 export class PlannerWireSchemaError extends Error {
   readonly code = "PLANNER_WIRE_INVALID" as const;
+  readonly safeCategory: "branch" | "plan_shape" | "value";
 
-  constructor(message: string) {
+  constructor(message: string, safeCategory: "branch" | "plan_shape" | "value" = "plan_shape") {
     super(message);
     this.name = "PlannerWireSchemaError";
+    this.safeCategory = safeCategory;
   }
 }
 
@@ -140,7 +142,7 @@ function encodeValue(value: ArgValue | string | number | boolean): WireValue {
 
 function decodeValue(value: unknown, path: string): ArgValue {
   if (!isRecord(value) || typeof value.kind !== "string") {
-    throw new PlannerWireSchemaError(`${path} must be a wire value`);
+    throw new PlannerWireSchemaError(`${path} must be a wire value`, "value");
   }
   const kind = value.kind;
   switch (kind) {
@@ -149,46 +151,46 @@ function decodeValue(value: unknown, path: string): ArgValue {
         value.string_value !== null ||
         value.number_value !== null ||
         value.boolean_value !== null ||
-        value.array_value !== null ||
-        value.object_entries !== null
+        (value.array_value !== null && value.array_value !== undefined) ||
+        (value.object_entries !== null && value.object_entries !== undefined)
       ) {
-        throw new PlannerWireSchemaError(`${path} null payload must be empty`);
+        throw new PlannerWireSchemaError(`${path} null payload must be empty`, "value");
       }
       return null;
     case "string":
       if (typeof value.string_value !== "string")
-        throw new PlannerWireSchemaError(`${path}.string_value required`);
+        throw new PlannerWireSchemaError(`${path}.string_value required`, "value");
       return value.string_value;
     case "number":
       if (
         typeof value.number_value !== "number" ||
         !Number.isFinite(value.number_value)
       )
-        throw new PlannerWireSchemaError(`${path}.number_value required`);
+        throw new PlannerWireSchemaError(`${path}.number_value required`, "value");
       return value.number_value;
     case "boolean":
       if (typeof value.boolean_value !== "boolean")
-        throw new PlannerWireSchemaError(`${path}.boolean_value required`);
+        throw new PlannerWireSchemaError(`${path}.boolean_value required`, "value");
       return value.boolean_value;
     case "array":
       if (!Array.isArray(value.array_value))
-        throw new PlannerWireSchemaError(`${path}.array_value required`);
+        throw new PlannerWireSchemaError(`${path}.array_value required`, "value");
       return value.array_value.map((entry, index) =>
         decodeValue(entry, `${path}.array_value[${index}]`),
       );
     case "object": {
       if (!Array.isArray(value.object_entries))
-        throw new PlannerWireSchemaError(`${path}.object_entries required`);
+        throw new PlannerWireSchemaError(`${path}.object_entries required`, "value");
       const output: Record<string, ArgValue> = {};
       const seen = new Set<string>();
       for (const [index, entry] of value.object_entries.entries()) {
         if (!isRecord(entry) || typeof entry.key !== "string")
           throw new PlannerWireSchemaError(
-            `${path}.object_entries[${index}] invalid`,
+            `${path}.object_entries[${index}] invalid`, "value",
           );
         if (seen.has(entry.key))
           throw new PlannerWireSchemaError(
-            `duplicate map entry ${entry.key} at ${path}`,
+            `duplicate map entry ${entry.key} at ${path}`, "value",
           );
         seen.add(entry.key);
         Object.defineProperty(output, entry.key, {
@@ -201,7 +203,7 @@ function decodeValue(value: unknown, path: string): ArgValue {
       return output;
     }
     default:
-      throw new PlannerWireSchemaError(`${path}.kind ${kind} is unsupported`);
+      throw new PlannerWireSchemaError(`${path}.kind ${kind} is unsupported`, "value");
   }
 }
 
@@ -373,7 +375,7 @@ export function decodePlannerWire(value: unknown): PlannerResult {
     !isRecord(envelope) ||
     !["plan", "refusal", "clarification"].includes(String(envelope.kind))
   ) {
-    throw new PlannerWireSchemaError("wire result kind is invalid");
+    throw new PlannerWireSchemaError("wire result kind is invalid", "branch");
   }
   const kind = envelope.kind;
   if (kind === "refusal") {
@@ -386,7 +388,7 @@ export function decodePlannerWire(value: unknown): PlannerResult {
       envelope.refusal.reason.trim().length === 0
     ) {
       throw new PlannerWireSchemaError(
-        "refusal branch must contain refusal and null other branches",
+        "refusal branch must contain refusal and null other branches", "branch",
       );
     }
     return PlannerResultSchema.parse({ kind, reason: envelope.refusal.reason });
@@ -400,7 +402,7 @@ export function decodePlannerWire(value: unknown): PlannerResult {
       envelope.clarification.question.trim().length === 0
     ) {
       throw new PlannerWireSchemaError(
-        "clarification branch must contain clarification and null other branches",
+        "clarification branch must contain clarification and null other branches", "branch",
       );
     }
     return PlannerResultSchema.parse({
@@ -414,7 +416,7 @@ export function decodePlannerWire(value: unknown): PlannerResult {
     !isRecord(envelope.plan)
   ) {
     throw new PlannerWireSchemaError(
-      "plan branch must contain plan and null other branches",
+      "plan branch must contain plan and null other branches", "branch",
     );
   }
   const wirePlan = envelope.plan;

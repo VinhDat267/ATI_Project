@@ -109,6 +109,7 @@ const SAFE_PROVIDER_STATUSES = new Set([
 const SAFE_FAILURE_STAGES = new Set([
   'http_body_too_large', 'http_content_type', 'http_json_envelope',
   'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
+  'output_wire_branch', 'output_wire_plan_shape', 'output_wire_value', 'output_wire_dsl',
 ]);
 
 function validFailure(value: unknown): value is PilotQualityFailureDiagnostics {

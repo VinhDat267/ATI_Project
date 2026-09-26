@@ -496,6 +496,39 @@ describe("native provider clients with fake transport", () => {
     }
   });
 
+  it('reports only fixed categories for invalid planner wires', async () => {
+    const plan = {
+      version: '1.0', name: 'canary', source_prompt: 'CANARY_SECRET',
+      inputs: null, inputs_present: false, outputs: null, outputs_present: false,
+      steps: [] as unknown[],
+    };
+    const step = {
+      id: 'one', description: 'one',
+      tool: { server: 'task_hub', name: 'append_sheet_rows', args: { kind: 'CANARY_SECRET' } },
+      depends_on: null, depends_on_present: false,
+      condition: null, condition_present: false,
+      idempotency_key: null, idempotency_key_present: false,
+      side_effect: 'write', on_error: null, on_error_present: false,
+    };
+    for (const [wire, expectedStage] of [
+      [{ result: { kind: 'CANARY_SECRET' } }, 'output_wire_branch'],
+      [{ result: { kind: 'plan', plan, refusal: { reason: 'CANARY_SECRET' }, clarification: null } }, 'output_wire_branch'],
+      [{ result: { kind: 'plan', plan: { ...plan, inputs_present: true }, refusal: null, clarification: null } }, 'output_wire_plan_shape'],
+      [{ result: { kind: 'plan', plan: { ...plan, steps: [step] }, refusal: null, clarification: null } }, 'output_wire_value'],
+      [{ result: { kind: 'plan', plan, refusal: null, clarification: null } }, 'output_wire_dsl'],
+    ] as const) {
+      const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
+        ledger: ledger(), authorizeCall: async () => {},
+        fetchImpl: async () => response({ output_text: JSON.stringify(wire) }) });
+      let caught: unknown;
+      try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+      catch (error) { caught = error; }
+      const diagnostic = safeProviderFailureDiagnostics(caught);
+      expect(diagnostic?.failureStage).toBe(expectedStage);
+      expect(JSON.stringify(diagnostic)).not.toContain('CANARY_SECRET');
+    }
+  });
+
   it("settles a usage-bearing planner call with the pinned price card", async () => {
     const settlements: unknown[] = [];
     const ports = createAiPorts({

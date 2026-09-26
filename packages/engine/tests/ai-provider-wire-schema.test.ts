@@ -85,4 +85,18 @@ describe("provider wire codecs", () => {
       }),
     ).toThrow(/refusal/i);
   });
+
+  it("accepts omitted optional recursive null fields in Google's wire schema", () => {
+    const wire = encodePlannerWire(plan) as Record<string, unknown>;
+    const encodedPlan = (wire.result as Record<string, unknown>).plan as Record<string, unknown>;
+    const firstStep = (encodedPlan.steps as Array<Record<string, unknown>>)[0]!;
+    const args = (firstStep.tool as Record<string, unknown>).args as Record<string, unknown>;
+    const entries = args.object_entries as Array<Record<string, unknown>>;
+    const rows = entries.find((entry) => entry.key === "rows")!.value as Record<string, unknown>;
+    const firstRow = (rows.array_value as Array<Record<string, unknown>>)[0]!;
+    const nullValue = (firstRow.object_entries as Array<Record<string, unknown>>)[0]!.value as Record<string, unknown>;
+    delete nullValue.array_value;
+    delete nullValue.object_entries;
+    expect(decodePlannerWire(wire)).toEqual(plan);
+  });
 });

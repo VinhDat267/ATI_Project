@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ZodError } from "zod";
 import type {
   EmbeddingPort,
   EmbeddingResult,
@@ -23,6 +24,7 @@ import {
   googlePlannerWireJsonSchema,
   decodePlannerWire,
   openAiPlannerWireJsonSchema,
+  PlannerWireSchemaError,
 } from "./wire-schema.js";
 import {
   priceProviderCall,
@@ -134,7 +136,14 @@ export class ProviderClientError extends Error {
 const SAFE_FAILURE_STAGES = new Set([
   'http_body_too_large', 'http_content_type', 'http_json_envelope',
   'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
+  'output_wire_branch', 'output_wire_plan_shape', 'output_wire_value', 'output_wire_dsl',
 ]);
+
+function safePlannerWireFailureStage(error: unknown): string {
+  if (error instanceof PlannerWireSchemaError) return `output_wire_${error.safeCategory}`;
+  if (error instanceof ZodError) return 'output_wire_dsl';
+  return 'output_wire';
+}
 
 const SAFE_PROVIDER_STATUSES = new Set([
   'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'INTERNAL', 'DEADLINE_EXCEEDED',
@@ -788,7 +797,7 @@ function createModelClient(
       let output;
       try {
         output = decodePlannerWire(wire);
-      } catch {
+      } catch (error) {
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
@@ -803,7 +812,7 @@ function createModelClient(
         throw new ProviderClientError(
           "PROVIDER_RESPONSE_INVALID",
           "provider output failed the planner wire schema",
-          { provider: profile.provider, failureStage: 'output_wire' },
+          { provider: profile.provider, failureStage: safePlannerWireFailureStage(error) },
         );
       }
       await options.ledger.settle(callId, {
