@@ -534,9 +534,12 @@ const wireInputSchema = {
     type: { type: "string", enum: ["string", "number", "boolean"] },
     description: { type: ["string", "null"] },
     description_present: { type: "boolean" },
-    required: { type: "boolean" },
-    default_value: { type: ["object", "null"], $ref: "#/$defs/wireValue" },
-    default_present: { type: "boolean" },
+    required: { type: "boolean", description: "If true, default_present must be false and default_value must be null. An input with a default must have required false." },
+    default_value: {
+      type: ["object", "null"], $ref: "#/$defs/wireValue",
+      description: "Only when default_present is true: encode a scalar string, number or boolean matching this input's declared type. No null, array or object defaults. Otherwise null.",
+    },
+    default_present: { type: "boolean", description: "May be true only when required is false and default_value is a scalar wire value matching type. Otherwise false with default_value null." },
   },
 };
 

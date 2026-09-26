@@ -49,6 +49,21 @@ describe("provider wire codecs", () => {
     wire.result.plan.inputs[0].key = 'spreadsheet_id';
     expect(decodePlannerWire(wire).kind).toBe('plan');
   });
+  it("guides mutually exclusive required/default inputs and preserves validation", () => {
+    for (const schema of [googlePlannerWireJsonSchema, openAiPlannerWireJsonSchema]) {
+      expect(schema.$defs.wireInput.properties.required).toHaveProperty('description');
+      expect(schema.$defs.wireInput.properties.default_present).toHaveProperty('description');
+    }
+    const wire = JSON.parse(JSON.stringify(encodePlannerWire(plan)));
+    wire.result.plan.inputs[0].default_present = true;
+    wire.result.plan.inputs[0].default_value = { kind: 'string', string_value: 'known-source',
+      number_value: null, boolean_value: null, array_value: null, object_entries: null };
+    expect(() => decodePlannerWire(wire)).toThrow(/required/);
+    wire.result.plan.inputs[0].required = false;
+    expect(decodePlannerWire(wire).kind).toBe('plan');
+    wire.result.plan.inputs[0].type = 'number';
+    expect(() => decodePlannerWire(wire)).toThrow();
+  });
   it("round-trips every canonical planner branch", () => {
     const values: PlannerResult[] = [
       plan,

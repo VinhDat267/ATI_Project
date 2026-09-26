@@ -35,6 +35,8 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(systemPrompt).toContain('Every plan input key must match /^[a-z][a-z0-9_]{0,31}$/');
     expect(systemPrompt).toContain('Tool argument keys such as spreadsheetId, tabId and requestId must keep their reviewed schema names');
     expect(systemPrompt).toContain('Use trusted source/target IDs as literal tool arguments');
+    expect(systemPrompt).toContain('required true implies default_present false and default_value null');
+    expect(systemPrompt).toContain('A default must be a string, number or boolean matching the declared input type');
   });
   it("wraps raw client intake in <client_untrusted_intake> and checklist in <checklist_summary>", () => {
     const context = buildPilotPlannerContext({
