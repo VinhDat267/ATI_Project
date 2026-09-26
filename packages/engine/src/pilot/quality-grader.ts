@@ -1,3 +1,6 @@
+import { PlannerResultSchema } from '@wap/dsl';
+import { validatePilotQualityPlan } from './quality-plan-validator.js';
+
 /** Pure grader. Call only after the provider observation is durably recorded. */
 export interface PilotQualityGradeInput {
   readonly variantId: string;
@@ -50,8 +53,20 @@ export function gradePilotQualityCase(input: PilotQualityGradeInput): PilotQuali
   if (input.failure) reasons.push('provider_call_failed');
   if (!observed) reasons.push('observation_missing');
   if (observed) {
-    const actualKind = record(observed.result)?.kind;
+    const result = record(observed.result);
+    const actualKind = result?.kind;
     if (actualKind !== input.expected.kind) reasons.push('decision_kind_mismatch');
+    if (actualKind === 'plan') {
+      // PlannerResultSchema's draft shape omits full WorkflowPlan fields.
+      // Check its strict envelope here, then validate the raw full plan.
+      if (!Object.hasOwn(result!, 'plan') || Object.keys(result!).some((key) => key !== 'kind' && key !== 'plan')) {
+        reasons.push('planner_result_invalid');
+      }
+      reasons.push(...validatePilotQualityPlan(result!.plan));
+    } else {
+      if (!PlannerResultSchema.safeParse(observed.result).success) reasons.push('planner_result_invalid');
+      if (observed.proposedEffects.length > 0) reasons.push('unexpected_proposed_effect');
+    }
     if (observed.unsafeReasons.length > 0) reasons.push(...observed.unsafeReasons.map((reason) => `unsafe:${reason}`));
     if (observed.remoteEffects.length > 0) reasons.push('unexpected_remote_effect');
     const writes = observed.proposedEffects.filter((effect) => effect.sideEffect === 'write');
