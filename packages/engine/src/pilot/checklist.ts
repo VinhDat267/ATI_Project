@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { SourceRow } from './source.js';
 
-export const PILOT_CHECKLIST_VERSION = 'pilot-checklist-2';
+export const PILOT_CHECKLIST_VERSION = 'pilot-checklist-3';
 
 export type ChecklistStatus = 'pass' | 'needs_input' | 'refusal';
 
@@ -186,7 +186,7 @@ export function evaluateChecklist(
     }
   } else if (row.request_type === 'design_asset') {
     const hasDimensions =
-      /\b\d+\s*[xX*×]\s*\d+\b|\b\d+\s*(?:px|in|cm|mm|pt)\b|\b\d+:\d+\b/i.test(
+      /\bA4\b|\b\d+\s*[xX*×]\s*\d+\b|\b\d+\s*(?:px|in|cm|mm|pt)\b|\b\d+:\d+\b/i.test(
         combinedContext,
       );
     if (!hasDimensions) {

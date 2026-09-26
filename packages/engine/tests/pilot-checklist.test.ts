@@ -47,6 +47,42 @@ describe('pilot/checklist', () => {
     expect(res.unconfirmedBusiness).toBe(false);
   });
 
+  it.each(['A4', 'a4'])('accepts explicit paper size %s as dimensions evidence', (paperSize) => {
+    const row: SourceRow = {
+      ...baseDesignAsset,
+      raw_request: `Create a ${paperSize} flyer for the holiday sale`,
+      deliverable: 'Print-ready flyer',
+    };
+    const res = evaluateChecklist(row);
+    expect(res.status).toBe('pass');
+    expect(res.missingFields).toEqual([]);
+    expect(res.evidencePositions.dimensions).toBe('detected in request context');
+    expect(res.evidencePositions.raw_request).toBe(row.raw_request);
+    expect(res.checklistVersion).toBe('pilot-checklist-3');
+    expect(res.sourceRevision).not.toBe(computeSourceRevision(row, 'pilot-checklist-2'));
+  });
+
+  it.each(['A40', 'BA4', 'A4X'])('does not treat embedded token %s as A4 dimensions', (token) => {
+    const res = evaluateChecklist({
+      ...baseDesignAsset,
+      raw_request: `Create a banner for campaign ${token}`,
+      deliverable: 'Banner graphic',
+    });
+    expect(res.status).toBe('needs_input');
+    expect(res.missingFields).toContain('dimensions');
+    expect(res.evidencePositions.dimensions).toBeUndefined();
+  });
+
+  it('still requires a verified assignee for an A4 design request', () => {
+    const res = evaluateChecklist({
+      ...baseDesignAsset,
+      raw_request: 'Create an A4 flyer; assign John Doe this ticket',
+      deliverable: 'Print-ready flyer',
+    });
+    expect(res.status).toBe('needs_input');
+    expect(res.missingFields).toEqual(['assignee_id']);
+  });
+
   it('detects missing or non-calendar deadline (e.g. "thứ Sáu")', () => {
     const missingDate = { ...baseWebChange, due_date: '' };
     expect(evaluateChecklist(missingDate).status).toBe('needs_input');
