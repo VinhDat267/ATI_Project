@@ -18,6 +18,10 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 let model = 'gemini-3.7-flash';
 const pricingUrl = 'https://ai.google.dev/gemini-api/docs/pricing?hl=en';
 
+// Counts are part of model-only-v1. The holdout count is validated only after
+// the public strict gate passes, so preparing/running public never parses it.
+const MODEL_ONLY_HOLDOUT_CASE_COUNT = 20;
+
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 function fail(code) { throw new Error(code); }
 function option(name) {
@@ -41,18 +45,40 @@ async function dataset(name) {
   const parsed = V2DatasetSchema.parse(JSON.parse(await readFile(resolve(root, 'testdata/v2-dataset', filename), 'utf8')));
   return parsed.cases;
 }
-async function campaignDatasets() {
+async function publicCampaignDataset() {
   const originalPublic = await dataset('public');
-  const holdoutCases = await dataset('holdout');
   const publicCases = originalPublic.filter((entry) => classifyPilotModelQualityCase(entry, 'public').eligible);
   const excluded = originalPublic.filter((entry) => !classifyPilotModelQualityCase(entry, 'public').eligible)
     .map((entry) => ({ variantId: entry.variantId, dataset: 'public', reason: classifyPilotModelQualityCase(entry, 'public').reason }));
-  if (publicCases.length !== 26 || excluded.length !== 14 || holdoutCases.length !== 20 ||
-      holdoutCases.some((entry) => !classifyPilotModelQualityCase(entry, 'holdout').eligible) ||
-      new Set([...publicCases, ...holdoutCases].map((entry) => entry.variantId)).size !== 46) fail('QUALITY_DATASET_SCOPE_INVALID');
+  if (publicCases.length !== 26 || excluded.length !== 14 ||
+      new Set(publicCases.map((entry) => entry.variantId)).size !== publicCases.length) fail('QUALITY_DATASET_SCOPE_INVALID');
   for (const entry of publicCases) assertPilotModelFixtureCompatible(entry, 'public');
+  return { publicCases, excluded };
+}
+async function holdoutCampaignDataset(publicCases) {
+  const holdoutCases = await dataset('holdout');
+  if (holdoutCases.length !== MODEL_ONLY_HOLDOUT_CASE_COUNT ||
+      holdoutCases.some((entry) => !classifyPilotModelQualityCase(entry, 'holdout').eligible) ||
+      new Set([...publicCases, ...holdoutCases].map((entry) => entry.variantId)).size !== publicCases.length + holdoutCases.length) {
+    fail('QUALITY_DATASET_SCOPE_INVALID');
+  }
   for (const entry of holdoutCases) assertPilotModelFixtureCompatible(entry, 'holdout');
-  return { publicCases, holdoutCases, excluded };
+  return holdoutCases;
+}
+function gradeSavedCase(entry, attempt) {
+  return gradePilotQualityCase({ variantId: entry.variantId, language: entry.language, expected: entry.expected,
+    observation: attempt?.status === 'succeeded' && !attempt.unsafeToGrade ? attempt.observation : undefined,
+    failure: attempt?.status === 'failed' ? 'provider_call_failed' : undefined,
+    latencyMs: attempt?.durationMs });
+}
+function assertPublicStrictGate(publicCases, state) {
+  const grades = publicCases.map((entry) => {
+    const attempt = state.attempts.find((candidate) => candidate.variantId === entry.variantId && candidate.dataset === 'public');
+    return gradeSavedCase(entry, attempt);
+  });
+  if (grades.length !== publicCases.length || grades.some((grade) => grade.verdict !== 'PASS')) {
+    fail('QUALITY_PUBLIC_STRICT_GATE_FAILED');
+  }
 }
 function inputsFromManifest(manifest) {
   const { format: _format, fingerprints: _fingerprints, safetyGates: _safetyGates, ...inputs } = manifest;
@@ -90,7 +116,7 @@ function modelClient(campaignId, trialId, apiKey) {
 async function prepare() {
   if (!process.argv.includes('--attest-free-tier')) fail('FREE_TIER_ATTESTATION_REQUIRED');
   const commit = cleanHead();
-  const { publicCases, holdoutCases, excluded } = await campaignDatasets();
+  const { publicCases, excluded } = await publicCampaignDataset();
   const apiKey = key();
   const output = resolve(option('--manifest'));
   const pricingResponse = await fetch(pricingUrl, { signal: AbortSignal.timeout(20_000), redirect: 'error' });
@@ -107,7 +133,7 @@ async function prepare() {
     evaluationProfile: 'model-only-v1',
     priceEvidence: { source: pricingUrl, sourceSha256: sha256(pricingBytes), observedAt: now.toISOString(),
       currency: 'USD', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    budget: { maxCalls: diagnostic ? 1 : publicCases.length + holdoutCases.length, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
+    budget: { maxCalls: diagnostic ? 1 : publicCases.length + MODEL_ONLY_HOLDOUT_CASE_COUNT, maxInputTokens: 1_000_000, maxOutputTokens: 200_000, maxCostMicros: 0 },
     freeTier: { apiKeySha256: sha256(apiKey), attestedBy: 'project-owner', attestedAt: now.toISOString(),
       expiresAt: freeTierExpiry.toISOString(), billingDisabled: true, modelFreeTierEligible: true },
     rubric: { version: 'pilot-v2-model-only-v1', adjudicator: 'independent-code-review-and-project-owner',
@@ -138,14 +164,19 @@ async function loadManifest() {
 function assertSafeState(state, budget) {
   if (state.attempts.some((attempt) => attempt.status !== 'succeeded' || attempt.unsafeToGrade ||
       attempt.usageState !== 'reported')) fail('QUALITY_CAMPAIGN_UNCERTAIN_OR_UNSAFE');
-  const totalInput = state.attempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0);
-  const totalOutput = state.attempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0);
-  if (totalInput > budget.maxInputTokens || totalOutput > budget.maxOutputTokens) fail('QUALITY_TOKEN_CAP_EXCEEDED');
+  if (!hasReportedUsageWithinBudget(state, budget)) fail('QUALITY_TOKEN_CAP_EXCEEDED');
   for (const attempt of state.attempts) {
     if (attempt.observation?.unsafeReasons?.length || attempt.observation?.remoteEffects?.length) {
       fail('QUALITY_UNSAFE_OBSERVATION');
     }
   }
+}
+function hasReportedUsageWithinBudget(state, budget) {
+  if (state.attempts.some((attempt) => attempt.usageState !== 'reported' ||
+      !Number.isSafeInteger(attempt.inputTokens) || !Number.isSafeInteger(attempt.outputTokens))) return false;
+  const totalInput = state.attempts.reduce((sum, attempt) => sum + attempt.inputTokens, 0);
+  const totalOutput = state.attempts.reduce((sum, attempt) => sum + attempt.outputTokens, 0);
+  return totalInput <= budget.maxInputTokens && totalOutput <= budget.maxOutputTokens;
 }
 function selectedCases(phase, publicCases, holdoutCases) {
   if (phase === 'probe') return [publicCases[0]];
@@ -168,14 +199,19 @@ async function execute() {
     freezeHash: frozen.hash, provider: 'google', model, maxCalls: inputs.budget.maxCalls,
     freeTierAttested: true, maxCostUsd: 0 });
   try {
-    const { publicCases, holdoutCases } = await campaignDatasets();
+    const { publicCases } = await publicCampaignDataset();
     const state = journal.readState();
     assertSafeState(state, inputs.budget);
+    let holdoutCases = [];
+    if (phase === 'holdout') {
+      assertPublicStrictGate(publicCases, state);
+      holdoutCases = await holdoutCampaignDataset(publicCases);
+    }
     if (phase === 'smoke' && !state.attempts.some((attempt) => attempt.variantId === publicCases[0]?.variantId && attempt.dataset === 'public')) {
       fail('QUALITY_PROBE_REQUIRED');
     }
     if (phase === 'public') {
-      const smoke = selectedCases('smoke', publicCases, holdoutCases);
+      const smoke = selectedCases('smoke', publicCases, []);
       if (smoke.some((entry) => !state.attempts.some((attempt) => attempt.variantId === entry.variantId && attempt.dataset === 'public'))) {
         fail('QUALITY_SMOKE_REQUIRED');
       }
@@ -214,16 +250,24 @@ async function report() {
     freeTierAttested: true, maxCostUsd: 0 });
   let state;
   try { state = journal.readState(); } finally { await journal.close(); }
-  const { publicCases, holdoutCases, excluded } = await campaignDatasets();
+  const { publicCases, excluded } = await publicCampaignDataset();
+  const publicGrades = publicCases.map((entry) => gradeSavedCase(entry,
+    state.attempts.find((candidate) => candidate.variantId === entry.variantId && candidate.dataset === 'public')));
+  const publicAttempts = state.attempts.filter((attempt) => attempt.dataset === 'public');
+  const publicAttemptsComplete = publicCases.every((entry) => state.attempts.some((attempt) =>
+    attempt.variantId === entry.variantId && attempt.dataset === 'public' && attempt.status === 'succeeded' &&
+    !attempt.unsafeToGrade && attempt.usageState === 'reported'));
+  const publicInputTokens = publicAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0);
+  const publicOutputTokens = publicAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0);
+  const publicStrictPass = publicAttempts.length === publicCases.length && publicAttemptsComplete &&
+    publicInputTokens <= inputs.budget.maxInputTokens && publicOutputTokens <= inputs.budget.maxOutputTokens &&
+    publicGrades.every((grade) => grade.verdict === 'PASS');
+  const canOpenHoldout = publicStrictPass && hasReportedUsageWithinBudget(state, inputs.budget);
+  const holdoutCases = canOpenHoldout ? await holdoutCampaignDataset(publicCases) : [];
   const all = [...publicCases.map((entry) => ({ ...entry, dataset: 'public' })),
     ...holdoutCases.map((entry) => ({ ...entry, dataset: 'holdout' }))];
-  const grades = all.map((entry) => {
-    const attempt = state.attempts.find((candidate) => candidate.variantId === entry.variantId && candidate.dataset === entry.dataset);
-    return gradePilotQualityCase({ variantId: entry.variantId, language: entry.language, expected: entry.expected,
-      observation: attempt?.status === 'succeeded' && !attempt.unsafeToGrade ? attempt.observation : undefined,
-      failure: attempt?.status === 'failed' ? 'provider_call_failed' : undefined,
-      latencyMs: attempt?.durationMs });
-  });
+  const grades = [...publicGrades, ...holdoutCases.map((entry) => gradeSavedCase(entry,
+    state.attempts.find((candidate) => candidate.variantId === entry.variantId && candidate.dataset === 'holdout')))];
   const aggregate = aggregatePilotQualityGrades(grades);
   const groups = Object.fromEntries(['model-reasoning', 'source-refusal-compliance'].map((group) => [group,
     aggregatePilotQualityGrades(grades.filter((grade) => {
@@ -231,15 +275,19 @@ async function report() {
       return classifyPilotModelQualityCase(entry, entry.dataset).group === group;
     }))]));
   const output = resolve(option('--output'));
-  const complete = state.usedCalls === all.length && state.attempts.every((attempt) => attempt.status === 'succeeded' && !attempt.unsafeToGrade);
+  const complete = publicStrictPass && holdoutCases.length === MODEL_ONLY_HOLDOUT_CASE_COUNT &&
+    state.usedCalls === publicCases.length + holdoutCases.length && state.attempts.every((attempt) => attempt.status === 'succeeded' && !attempt.unsafeToGrade);
   const result = { status: complete ? 'PROVIDER_OBSERVED_REVIEW_PENDING' : 'PARTIAL_NOT_MEASURED',
     campaignId: inputs.campaignId, commit: inputs.commit, model, retrievalMode: 'fixed-catalog',
     freezeHash: frozen.hash, evaluationProfile: inputs.evaluationProfile,
     scope: { originalPublic: 40, excluded, legacyHoldout: 'retired after contract diagnosis; not used for model grading',
-      freshHoldoutFile: pilotQualityHoldoutFile(inputs.evaluationProfile), executionOutcomesMeasured: false },
-    sample: { public: publicCases.length, holdout: holdoutCases.length,
+      freshHoldoutFile: pilotQualityHoldoutFile(inputs.evaluationProfile),
+      holdoutState: !publicStrictPass ? 'SEALED_PUBLIC_STRICT_GATE_PENDING'
+        : canOpenHoldout ? 'OPENED_AFTER_PUBLIC_STRICT_PASS' : 'SEALED_CAMPAIGN_USAGE_OR_BUDGET_GATE_FAILED',
+      executionOutcomesMeasured: false },
+    sample: { public: publicCases.length, holdout: canOpenHoldout ? holdoutCases.length : MODEL_ONLY_HOLDOUT_CASE_COUNT,
       attempted: state.usedCalls, failedAttempts: state.attempts.filter((attempt) => attempt.status === 'failed').length,
-      unattempted: all.length - state.usedCalls },
+      unattempted: Math.max(0, publicCases.length + (canOpenHoldout ? holdoutCases.length : MODEL_ONLY_HOLDOUT_CASE_COUNT) - state.usedCalls) },
     aggregate, groups, grades, gradeScope: 'automatic proposed-decision/tool-args match only; independent semantic adjudication pending',
     usageState: aggregate.missingUsage === 0 ? 'reported' : 'unknown',
     cost: { capUsd: 0, tier: 'Free Tier by project-owner attestation', actualInvoiceVerified: false },
@@ -266,7 +314,8 @@ try {
   const failure = safeProviderFailureDiagnostics(error);
   const safeLocalReasons = new Set(['QUALITY_DATASET_SCOPE_INVALID', 'QUALITY_CASE_OUTSIDE_MODEL_SCOPE',
     'QUALITY_SOURCE_CONTRACT_MISMATCH', 'QUALITY_UNSAFE_OBSERVATION', 'QUALITY_CAMPAIGN_UNCERTAIN_OR_UNSAFE',
-    'QUALITY_JOURNAL_SETTLEMENT_FAILED', 'QUALITY_MANIFEST_SCOPE', 'QUALITY_COMMIT_DRIFT', 'QUALITY_WORKTREE_NOT_CLEAN']);
+    'QUALITY_JOURNAL_SETTLEMENT_FAILED', 'QUALITY_MANIFEST_SCOPE', 'QUALITY_COMMIT_DRIFT', 'QUALITY_WORKTREE_NOT_CLEAN',
+    'QUALITY_PUBLIC_STRICT_GATE_FAILED']);
   const reason = failure?.localCode ?? (safeLocalReasons.has(error?.message) ? error.message : 'OPERATION_FAILED');
   console.error(JSON.stringify({ status: 'STOPPED', reason, ...(failure ? { providerFailure: failure } : {}) }));
   process.exitCode = 1;
