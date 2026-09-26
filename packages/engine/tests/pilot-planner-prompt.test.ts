@@ -130,6 +130,27 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.systemPrompt).toContain("UC3 (Lookup)");
   });
 
+  it("gives the planner trusted target IDs and reviewed create-card planning fields", () => {
+    const context = buildPilotPlannerContext({
+      sourceRow: sampleRow,
+      checklistResult: sampleChecklist,
+      operatorPrompt: "Create a Trello card",
+      trustedTargets: { allowedBoardIds: ["board-allowed-1"], defaultListName: "To Do" },
+    });
+
+    expect(context.userPrompt).toContain("<trusted_runtime_targets>");
+    expect(context.userPrompt).toContain("board-allowed-1");
+    expect(context.userPrompt).toContain("To Do");
+    for (const field of ["boardId", "listName", "title", "description", "dueDate"]) {
+      expect(context.userPrompt).toContain(`&quot;${field}&quot;`);
+    }
+    expect(context.userPrompt).toContain('&quot;cardId&quot;');
+    expect(context.userPrompt).not.toContain("intentKey");
+    expect(context.userPrompt).toContain("title from deliverable");
+    expect(context.userPrompt).toContain("description from raw_request");
+    expect(context.userPrompt).toContain("dueDate from due_date");
+  });
+
   it("escapeXml handles all 5 essential XML entities correctly", () => {
     const input = `& < > " '`;
     const escaped = escapeXml(input);

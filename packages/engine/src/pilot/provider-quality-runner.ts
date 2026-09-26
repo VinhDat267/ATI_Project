@@ -246,6 +246,7 @@ export async function runPilotProviderQualityCase(params: PilotQualityCaseParams
   assertRetrievedTools(tools);
   const context = buildPilotPlannerContext({
     sourceRow: row, checklistResult: checklist, operatorPrompt: prompt, tools,
+    trustedTargets: { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' },
   });
   const response = await params.model.complete({
     systemPrompt: context.systemPrompt,
@@ -296,7 +297,10 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
   const row = parseRequest([sourceFixture.headers, ...sourceFixture.rows], sourceFixture.requestId) as SourceRow;
   const checklist = evaluateChecklist(row);
   const tools = [...PILOT_TOOL_CATALOG];
-  const context = buildPilotPlannerContext({ sourceRow: row, checklistResult: checklist, operatorPrompt: prompt, tools });
+  const context = buildPilotPlannerContext({
+    sourceRow: row, checklistResult: checklist, operatorPrompt: prompt, tools,
+    trustedTargets: { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' },
+  });
   const variantId = params.testCase.variantId;
   if (typeof variantId !== 'string') throw new Error('QUALITY_VARIANT_ID_INVALID');
   const { attemptId } = await params.gate.authorizeAndReserve({

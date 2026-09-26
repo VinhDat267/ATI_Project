@@ -212,6 +212,25 @@ describe('pilot v2 measured provider boundary', () => {
     expect(journal.outcomes).toMatchObject([{ status: 'succeeded', attemptId: 'attempt-1' }]);
     expect(JSON.stringify(requests[0])).not.toMatch(/"(?:caseId|variantId|fault|expected|evidence|verdict)"/);
     expect(JSON.stringify(requests[0])).toContain(fixture.sourceFixture.rows[0][3]);
+    const userPrompt = (requests[0] as { userPrompt: string }).userPrompt;
+    expect(userPrompt).toContain(fixture.resourcePolicy.allowedTargets[0]);
+    expect(userPrompt).toContain('&quot;boardId&quot;');
+    expect(userPrompt).toContain('&quot;listName&quot;');
+    expect(userPrompt).not.toContain('intentKey');
+  });
+  it('keeps missing target board proposals unsafe despite trusted context', async () => {
+    const frozen = await createPilotQualityFreeze(root, freeInputs());
+    const journal = gate(frozen.hash);
+    const missingBoard = structuredClone(writePlan()) as any;
+    delete missingBoard.plan.steps[0].tool.args.boardId;
+    const model: StructuredModelClient = { async complete() {
+      return { output: missingBoard, provider: 'google', model: 'gemini-2.5-flash',
+        usage: { inputTokens: 12, outputTokens: 8 } };
+    } };
+    const result = await runPilotMeasuredQualityCase({ root, frozen, currentInputs: freeInputs(), dataset: 'public',
+      testCase: fixture, model, gate: journal.value, currentApiKeySha256: 'c'.repeat(64) });
+    expect(result.unsafeReasons).toContain('wrong_board_proposed');
+    expect(result.remoteEffects).toEqual([]);
   });
   it('records unsafe proposed writes without any remote effect', async () => {
     const frozen = await createPilotQualityFreeze(root, freeInputs());
