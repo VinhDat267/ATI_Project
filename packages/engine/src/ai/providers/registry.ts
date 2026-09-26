@@ -138,6 +138,8 @@ const SAFE_FAILURE_STAGES = new Set([
   'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
   'output_wire_branch', 'output_wire_plan_shape', 'output_wire_value', 'output_wire_dsl',
   'output_wire_dsl_steps', 'output_wire_dsl_args', 'output_wire_dsl_plan',
+  'output_wire_dsl_step_count', 'output_wire_dsl_step_id',
+  'output_wire_dsl_step_tool', 'output_wire_dsl_step_field',
 ]);
 
 function safePlannerWireFailureStage(error: unknown): string {
@@ -145,8 +147,11 @@ function safePlannerWireFailureStage(error: unknown): string {
   if (error instanceof ZodError) {
     const path = error.issues[0]?.path;
     if (path?.[0] === 'plan' && path[1] === 'steps') {
+      if (path.length === 2) return 'output_wire_dsl_step_count';
+      if (path[3] === 'id') return 'output_wire_dsl_step_id';
       if (path[3] === 'tool' && path[4] === 'args') return 'output_wire_dsl_args';
-      return 'output_wire_dsl_steps';
+      if (path[3] === 'tool') return 'output_wire_dsl_step_tool';
+      return 'output_wire_dsl_step_field';
     }
     if (path?.[0] === 'plan') return 'output_wire_dsl_plan';
     return 'output_wire_dsl';

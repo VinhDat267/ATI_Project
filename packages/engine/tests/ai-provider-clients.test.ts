@@ -515,7 +515,16 @@ describe("native provider clients with fake transport", () => {
       [{ result: { kind: 'plan', plan, refusal: { reason: 'CANARY_SECRET' }, clarification: null } }, 'output_wire_branch'],
       [{ result: { kind: 'plan', plan: { ...plan, inputs_present: true }, refusal: null, clarification: null } }, 'output_wire_plan_shape'],
       [{ result: { kind: 'plan', plan: { ...plan, steps: [step] }, refusal: null, clarification: null } }, 'output_wire_value'],
-      [{ result: { kind: 'plan', plan, refusal: null, clarification: null } }, 'output_wire_dsl_steps'],
+      [{ result: { kind: 'plan', plan, refusal: null, clarification: null } }, 'output_wire_dsl_step_count'],
+      [{ result: { kind: 'plan', plan: { ...plan, steps: [
+        { ...step, id: 'bad id', tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_step_id'],
+      [{ result: { kind: 'plan', plan: { ...plan, steps: [
+        { ...step, tool: { ...step.tool, server: '', args: { kind: 'object', object_entries: [] } } },
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_step_tool'],
+      [{ result: { kind: 'plan', plan: { ...plan, steps: [
+        { ...step, description: '', tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
+      ] }, refusal: null, clarification: null } }, 'output_wire_dsl_step_field'],
       [{ result: { kind: 'plan', plan: { ...plan, name: '', steps: [
         { ...step, tool: { ...step.tool, args: { kind: 'object', object_entries: [] } } },
       ] }, refusal: null, clarification: null } }, 'output_wire_dsl_plan'],

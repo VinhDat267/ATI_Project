@@ -111,6 +111,8 @@ const SAFE_FAILURE_STAGES = new Set([
   'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
   'output_wire_branch', 'output_wire_plan_shape', 'output_wire_value', 'output_wire_dsl',
   'output_wire_dsl_steps', 'output_wire_dsl_args', 'output_wire_dsl_plan',
+  'output_wire_dsl_step_count', 'output_wire_dsl_step_id',
+  'output_wire_dsl_step_tool', 'output_wire_dsl_step_field',
 ]);
 
 function validFailure(value: unknown): value is PilotQualityFailureDiagnostics {
