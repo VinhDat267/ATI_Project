@@ -128,6 +128,9 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.systemPrompt).toContain("UC1 (Needs Input)");
     expect(context.systemPrompt).toContain("UC2 (Executable Plan)");
     expect(context.systemPrompt).toContain("UC3 (Lookup)");
+    expect(context.systemPrompt).toContain("kind 'clarification'");
+    expect(context.systemPrompt).not.toContain("plan with empty steps");
+    expect(context.systemPrompt).toContain("/^[a-z][a-z0-9_]{0,31}$/");
   });
 
   it("gives the planner trusted target IDs and reviewed create-card planning fields", () => {
@@ -164,6 +167,7 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.userPrompt).not.toContain("<client_untrusted_intake>");
     expect(context.userPrompt).not.toContain("<checklist_summary>");
     expect(context.systemPrompt).toContain("source_validation");
+    expect(context.systemPrompt).toContain("kind 'refusal' with a non-empty reason, no plan");
   });
 
   it("escapeXml handles all 5 essential XML entities correctly", () => {
