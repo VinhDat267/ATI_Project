@@ -136,7 +136,7 @@ const SAFE_PROVIDER_STATUSES = new Set([
 ]);
 const SAFE_PROVIDER_CODES = new Set([
   'service_unavailable', 'rate_limit_exceeded', 'resource_exhausted',
-  'quota_exceeded', 'invalid_request', 'permission_denied', 'unauthorized',
+  'quota_exceeded', 'too_many_requests', 'invalid_request', 'permission_denied', 'unauthorized',
   'model_not_found', 'internal_error',
 ]);
 const SAFE_LOCAL_CODES = new Set([

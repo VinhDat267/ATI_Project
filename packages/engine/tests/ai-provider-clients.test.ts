@@ -667,6 +667,22 @@ describe("native provider clients with fake transport", () => {
     expect(settlements).toMatchObject([{ status: 'failed', usage: null, costMicros: null,
       errorCode: 'PROVIDER_HTTP_ERROR' }]);
   });
+  it('retains the documented too_many_requests code without provider prose', async () => {
+    const ports = createAiPorts({ config: readAiProviderConfig({
+      AI_PLANNING_PROVIDER: 'google', AI_PLANNING_MODEL: 'gemini-3.8-flash',
+      AI_EMBEDDING_PROVIDER: 'google', AI_EMBEDDING_MODEL: 'gemini-embedding-2',
+    }), credentials: { GEMINI_API_KEY: 'google-canary' },
+    ledger: ledger(), authorizeCall: async () => {},
+    fetchImpl: async () => new Response(JSON.stringify({ error: {
+      code: 'too_many_requests', message: 'secret=do-not-print',
+    } }), { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '49' } }) });
+    let caught: unknown;
+    try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+    catch (error) { caught = error; }
+    expect(safeProviderFailureDiagnostics(caught)).toEqual({ localCode: 'PROVIDER_HTTP_ERROR',
+      httpStatus: 429, providerCode: 'too_many_requests', providerStatus: null, retryAfterMs: 49000 });
+    expect(JSON.stringify(caught)).not.toContain('do-not-print');
+  });
   it('classifies non-JSON HTTP 503 before content validation and drops hostile fields', async () => {
     let fetchCalls = 0;
     const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
