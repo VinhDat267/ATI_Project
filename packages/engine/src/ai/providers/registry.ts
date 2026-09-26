@@ -103,6 +103,7 @@ export class ProviderClientError extends Error {
   readonly providerCode: number | string | null;
   readonly providerStatus: string | null;
   readonly retryAfterMs: number | null;
+  readonly failureStage: string | null;
 
   constructor(
     code: ProviderClientError["code"],
@@ -114,6 +115,7 @@ export class ProviderClientError extends Error {
       providerCode?: number | string | null;
       providerStatus?: string | null;
       retryAfterMs?: number | null;
+      failureStage?: string | null;
     },
   ) {
     super(message);
@@ -125,8 +127,14 @@ export class ProviderClientError extends Error {
     this.providerCode = options.providerCode ?? null;
     this.providerStatus = options.providerStatus ?? null;
     this.retryAfterMs = options.retryAfterMs ?? null;
+    this.failureStage = options.failureStage ?? null;
   }
 }
+
+const SAFE_FAILURE_STAGES = new Set([
+  'http_body_too_large', 'http_content_type', 'http_json_envelope',
+  'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
+]);
 
 const SAFE_PROVIDER_STATUSES = new Set([
   'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'INTERNAL', 'DEADLINE_EXCEEDED',
@@ -153,6 +161,7 @@ export function safeProviderFailureDiagnostics(error: unknown): {
   providerCode: number | string | null;
   providerStatus: string | null;
   retryAfterMs: number | null;
+  failureStage?: string;
 } | null {
   if (!(error instanceof ProviderClientError)) return null;
   if (!SAFE_LOCAL_CODES.has(error.code)) return null;
@@ -165,6 +174,8 @@ export function safeProviderFailureDiagnostics(error: unknown): {
     providerStatus: error.providerStatus && SAFE_PROVIDER_STATUSES.has(error.providerStatus) ? error.providerStatus : null,
     retryAfterMs: Number.isSafeInteger(error.retryAfterMs) && error.retryAfterMs! >= 0 && error.retryAfterMs! <= 3_600_000
       ? error.retryAfterMs : null,
+    ...(error.code === 'PROVIDER_RESPONSE_INVALID' && error.failureStage && SAFE_FAILURE_STAGES.has(error.failureStage)
+      ? { failureStage: error.failureStage } : {}),
   };
 }
 
@@ -463,7 +474,7 @@ function textFromProviderResponse(
   throw new ProviderClientError(
     "PROVIDER_RESPONSE_INVALID",
     "provider response did not contain structured output text",
-    { provider: "unknown" },
+    { provider: "unknown", failureStage: 'output_missing' },
   );
 }
 
@@ -498,7 +509,7 @@ async function parseResponse(
     throw new ProviderClientError(
       "PROVIDER_RESPONSE_INVALID",
       `${provider} provider response exceeds the size cap`,
-      { provider, status: response.status },
+      { provider, status: response.status, failureStage: 'http_body_too_large' },
     );
   }
   const contentType = response.headers.get("content-type");
@@ -506,7 +517,7 @@ async function parseResponse(
     throw new ProviderClientError(
       "PROVIDER_RESPONSE_INVALID",
       `${provider} provider response content type is not JSON`,
-      { provider, status: response.status },
+      { provider, status: response.status, failureStage: 'http_content_type' },
     );
   }
   let body: unknown;
@@ -519,7 +530,7 @@ async function parseResponse(
     throw new ProviderClientError(
       "PROVIDER_RESPONSE_INVALID",
       `${provider} provider returned a non-object response`,
-      { provider },
+      { provider, failureStage: 'http_json_envelope' },
     );
   }
   return body as Record<string, unknown>;
@@ -657,7 +668,8 @@ async function invokeProvider(
     const parsed = await parseResponse(response, profile.provider);
     if (profile.provider === 'google' && parsed.status !== 'completed') {
       throw new ProviderClientError('PROVIDER_RESPONSE_INVALID',
-        'google interaction did not complete', { provider: 'google', status: response.status });
+        'google interaction did not complete', { provider: 'google', status: response.status,
+          failureStage: 'interaction_incomplete' });
     }
     return {
       body: parsed,
@@ -756,7 +768,10 @@ function createModelClient(
           );
         }
         wire = JSON.parse(textFromProviderResponse(body, profile.provider));
-      } catch {
+      } catch (error) {
+        const invalid = error instanceof ProviderClientError ? error :
+          new ProviderClientError("PROVIDER_RESPONSE_INVALID", "provider output was not valid JSON",
+            { provider: profile.provider, failureStage: 'output_json' });
         await options.ledger.settle(callId, {
           status: "invalid_output",
           usage: providerUsage(body),
@@ -766,13 +781,9 @@ function createModelClient(
             profile,
             body,
           ),
-          errorCode: "PROVIDER_RESPONSE_INVALID",
+          errorCode: invalid.code,
         });
-        throw new ProviderClientError(
-          "PROVIDER_RESPONSE_INVALID",
-          "provider output was not valid JSON",
-          { provider: profile.provider },
-        );
+        throw invalid;
       }
       let output;
       try {
@@ -792,7 +803,7 @@ function createModelClient(
         throw new ProviderClientError(
           "PROVIDER_RESPONSE_INVALID",
           "provider output failed the planner wire schema",
-          { provider: profile.provider },
+          { provider: profile.provider, failureStage: 'output_wire' },
         );
       }
       await options.ledger.settle(callId, {

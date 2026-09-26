@@ -65,3 +65,23 @@ Chấm tự động mới chỉ kiểm cấu trúc quyết định và args; c�
 độc lập, kiểm ngưỡng và nghiệm thu người dùng trước `AI_QUALITY_MEASURED`/handoff.
 Nếu sửa prompt theo kết quả holdout mới, bộ đó trở thành diagnostic; cần holdout
 mới cho lần nghiệm thu cuối.
+
+## Probe sau khi khóa scope
+
+- Commit `5713c84` tạo manifest cục bộ `%TEMP%\pilot-quality-manifest-20260926-095924.json`
+  cho `gemini-3.1-flash-lite`, Free Tier/0 USD, hash
+  `7bbd7603df9da335b76c49f3e50d36314d345724bc24174db256e38bc16ce9c1`.
+  Price check đúng model đạt; trần 46 lời gọi. Một probe V2-01-vi đã reserve
+  và dừng với `PROVIDER_RESPONSE_INVALID`. Journal
+  `%TEMP%\pilot-quality-journal-20260926-095924\` ghi 1 failed attempt;
+  report `%TEMP%\pilot-quality-report-probe-20260926-095924.json` có 1/46
+  attempted, 45 unattempted, usage toàn chiến dịch unknown, 0 passed. Không
+  retry trong chiến dịch này, không chạy smoke/public/holdout.
+- Mã lỗi trước đó gom HTTP envelope, thiếu output text, JSON và wire schema.
+  Đã thêm `failureStage` thuộc enum cố định vào diagnostic/journal, không lưu
+  response/prose/prompt/credential. Một test còn chứng minh không đổi nhãn
+  `MODEL_MISMATCH` hoặc `output_missing` thành `output_json`.
+- Lỗi `PROVIDER_RESPONSE_INVALID` của probe trên **chưa được phân loại stage**
+  vì code lúc gọi chưa có diagnostic này; không suy đoán là model trả JSON sai.
+  Lượt chẩn đoán tiếp theo phải dùng manifest/commit mới, một lần gọi có trần
+  và dừng nếu provider không hợp lệ. Không gộp với hai ca pass ở freeze cũ.

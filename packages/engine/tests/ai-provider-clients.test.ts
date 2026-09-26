@@ -468,13 +468,32 @@ describe("native provider clients with fake transport", () => {
           usage: { input_tokens: 9, output_tokens: 1, total_tokens: 10 },
         }),
     });
-    await expect(
-      ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }),
-    ).rejects.toMatchObject({ code: "PROVIDER_RESPONSE_INVALID" });
+    let caught: unknown;
+    try { await ports.model.complete({ systemPrompt: "s", userPrompt: "u", schema: {} }); }
+    catch (error) { caught = error; }
+    expect(caught).toMatchObject({ code: "PROVIDER_RESPONSE_INVALID" });
+    expect(safeProviderFailureDiagnostics(caught)).toMatchObject({ failureStage: 'output_json' });
     expect(settlements[0]).toMatchObject({
       status: "invalid_output",
       usage: { totalTokens: 10 },
     });
+  });
+  it('distinguishes missing output and model mismatch from malformed output JSON', async () => {
+    for (const [body, expectedCode, expectedStage] of [
+      [{ model: 'gpt-5.6-terra' }, 'PROVIDER_RESPONSE_INVALID', 'output_missing'],
+      [{ model: 'different-model', output_text: '{}' }, 'PROVIDER_MODEL_MISMATCH', undefined],
+    ] as const) {
+      const settlements: unknown[] = [];
+      const ports = createAiPorts({ config, credentials: { OPENAI_API_KEY: 'openai-canary' },
+        ledger: { async reserve() { return 'diagnostic-test'; }, async settle(_id, outcome) { settlements.push(outcome); } },
+        authorizeCall: async () => {}, fetchImpl: async () => response(body) });
+      let caught: unknown;
+      try { await ports.model.complete({ systemPrompt: 's', userPrompt: 'u', schema: {} }); }
+      catch (error) { caught = error; }
+      expect(caught).toMatchObject({ code: expectedCode });
+      expect(safeProviderFailureDiagnostics(caught)?.failureStage).toBe(expectedStage);
+      expect(settlements).toMatchObject([{ status: 'invalid_output', errorCode: expectedCode }]);
+    }
   });
 
   it("settles a usage-bearing planner call with the pinned price card", async () => {

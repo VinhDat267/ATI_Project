@@ -33,6 +33,24 @@ describe('pilot quality durable journal', () => {
     expect(reopened.readState().attempts[0]).toMatchObject({ status: 'failed', failure });
     await reopened.close();
   });
+  it('allows only a fixed response-stage label, not provider prose', async () => {
+    const settings = await options();
+    const journal = await openPilotQualityJournal(settings);
+    const { attemptId } = await journal.authorizeAndReserve(input);
+    try {
+      await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 3,
+        failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
+          providerStatus: null, retryAfterMs: null, failureStage: 'output_wire' } });
+      const { attemptId: other } = await journal.authorizeAndReserve({ ...input, variantId: 'V2-02-vi' });
+      await expect(journal.recordOutcome({ attemptId: other, status: 'failed', durationMs: 3,
+        failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
+          providerStatus: null, retryAfterMs: null, failureStage: 'key=secret' as never } }))
+        .rejects.toThrow('QUALITY_JOURNAL_INVALID_FAILURE_DIAGNOSTICS');
+    } finally { await journal.close(); }
+    const reopened = await openPilotQualityJournal(settings);
+    expect(reopened.readState().attempts[0]?.failure?.failureStage).toBe('output_wire');
+    await reopened.close();
+  });
   it('fsyncs a reservation, keeps an interrupted attempt unknown across restart, and prevents replay', async () => {
     const settings = await options();
     const journal = await openPilotQualityJournal(settings);

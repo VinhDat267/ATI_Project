@@ -27,6 +27,7 @@ export interface PilotQualityFailureDiagnostics {
   readonly providerCode: number | string | null;
   readonly providerStatus: string | null;
   readonly retryAfterMs: number | null;
+  readonly failureStage?: string;
 }
 
 export interface PilotQualityMeasuredGate {
@@ -105,12 +106,19 @@ const SAFE_PROVIDER_STATUSES = new Set([
   'NOT_FOUND', 'UNKNOWN', 'ABORTED', 'CANCELLED', 'OUT_OF_RANGE',
   'ALREADY_EXISTS', 'DATA_LOSS', 'UNIMPLEMENTED',
 ]);
+const SAFE_FAILURE_STAGES = new Set([
+  'http_body_too_large', 'http_content_type', 'http_json_envelope',
+  'interaction_incomplete', 'output_missing', 'output_json', 'output_wire',
+]);
 
 function validFailure(value: unknown): value is PilotQualityFailureDiagnostics {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  if (Object.keys(record).some((field) => !['localCode', 'httpStatus', 'providerCode', 'providerStatus', 'retryAfterMs'].includes(field)) ||
+  if (Object.keys(record).some((field) => !['localCode', 'httpStatus', 'providerCode', 'providerStatus', 'retryAfterMs', 'failureStage'].includes(field)) ||
       typeof record.localCode !== 'string' || !SAFE_LOCAL_CODES.has(record.localCode)) return false;
+  if (record.failureStage !== undefined &&
+      (record.localCode !== 'PROVIDER_RESPONSE_INVALID' || typeof record.failureStage !== 'string' ||
+       !SAFE_FAILURE_STAGES.has(record.failureStage))) return false;
   const status = record.httpStatus;
   const code = record.providerCode;
   const providerStatus = record.providerStatus;
