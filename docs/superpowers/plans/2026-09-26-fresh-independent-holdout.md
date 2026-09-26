@@ -48,14 +48,16 @@
 - [x] Author 10 new bilingual scenarios with complete source rows, trusted synthetic source IDs, explicit expected outcomes, and independent case IDs.
 - [x] Record provenance, authorship/review state, dataset hash, and source metadata in a sidecar without prompts from or observations of v1.
 - [x] Validate schema, fixture compatibility, exact 20 count, language pairing, uniqueness, no public overlap, and secret-pattern scan.
-- [ ] Freeze the new manifest from a clean committed HEAD after a fresh exact-model price fetch and a valid Free Tier attestation.
-- [ ] Do not run the campaign until frozen manifest and all checks agree.
+- [x] Freeze the new manifest from a clean committed HEAD after a fresh exact-model price fetch and a valid Free Tier attestation.
+- [x] Do not run the campaign until frozen manifest and all checks agree.
 
 ### Task 3: Run and adjudicate
 
 **Files:** local manifest/journal/report outside Git; committed aggregate evidence and adjudication checklist only.
 
-- [ ] Run probe, smoke, public, then holdout once; stop on any gate failure and never retry an uncertain attempt.
-- [ ] Grade semantics against pre-frozen criteria; retain only case IDs, category scores, fixed reason codes, and aggregate evidence in Git.
-- [ ] Prepare user-acceptance sheet with the exact cases/observations for the project owner to review; do not mark user acceptance PASS until the user supplies the decision.
+- [x] Run probe, smoke, public, then holdout once in the successful frozen campaign; the earlier separately frozen campaign stopped on a provider 503 and is not merged into these observations.
+- [x] Grade exact contract results and independently adjudicate semantic differences; retain case IDs, fixed reason codes, and aggregate evidence in Git.
+- [x] Prepare user-acceptance sheet for the project owner; user acceptance remains pending the user's decision.
 - [ ] Verify all evidence, tests, diff, and branch state; commit and push the dedicated branch.
+
+Campaign evidence and semantic adjudication: [Fresh Holdout v2 campaign report](../../ai-evidence/PILOT-V2-AI/FRESH-HOLDOUT-V2-2026-09-26.md).
