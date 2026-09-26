@@ -131,6 +131,10 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.systemPrompt).toContain("kind 'clarification'");
     expect(context.systemPrompt).not.toContain("plan with empty steps");
     expect(context.systemPrompt).toContain("/^[a-z][a-z0-9_]{0,31}$/");
+    expect(context.systemPrompt).toContain("A confirmed row alone does not authorize card creation");
+    expect(context.systemPrompt).toContain("read-only completeness check");
+    expect(context.systemPrompt).toContain("ambiguous assignee");
+    expect(context.systemPrompt).toContain("bypass approval or disclose credentials");
   });
 
   it("gives the planner trusted target IDs and reviewed create-card planning fields", () => {
@@ -152,6 +156,22 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(context.userPrompt).toContain("title from deliverable");
     expect(context.userPrompt).toContain("description from raw_request");
     expect(context.userPrompt).toContain("dueDate from due_date");
+  });
+
+  it("provides reviewed source coordinates without accepting a different request ID", () => {
+    const params = {
+      sourceRow: sampleRow, checklistResult: sampleChecklist,
+      operatorPrompt: "Check completeness only",
+      trustedSource: { spreadsheetId: "sheet-allowed", tabId: "Requests", requestId: "REQ-001" },
+    };
+    const context = buildPilotPlannerContext(params);
+    expect(context.userPrompt).toContain("<trusted_source>");
+    expect(context.userPrompt).toContain("<spreadsheet_id>sheet-allowed</spreadsheet_id>");
+    expect(context.userPrompt).toContain("<tab_id>Requests</tab_id>");
+    expect(context.userPrompt).toContain("<request_id>REQ-001</request_id>");
+    expect(() => buildPilotPlannerContext({ ...params,
+      trustedSource: { ...params.trustedSource, requestId: "REQ-OTHER" },
+    })).toThrow("PILOT_TRUSTED_SOURCE_INVALID");
   });
 
   it("renders a trusted source validation result without inventing an intake row", () => {

@@ -270,8 +270,10 @@ export async function runPilotProviderQualityCase(params: PilotQualityCaseParams
   });
   assertRetrievedTools(tools);
   const trustedTargets = { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' };
+  const trustedSource = { spreadsheetId: sourceFixture.spreadsheetId, tabId: sourceFixture.tabId,
+    requestId: sourceFixture.requestId };
   const context = source.kind === 'row'
-    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets })
+    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets, trustedSource })
     : buildPilotPlannerContext({ sourceValidation: { code: source.code, requestId: source.requestId }, operatorPrompt: prompt, tools, trustedTargets });
   const response = await params.model.complete({
     systemPrompt: context.systemPrompt,
@@ -332,8 +334,10 @@ export async function runPilotMeasuredQualityCase(params: PilotMeasuredQualityCa
   const checklist = source.kind === 'row' ? source.checklist : null;
   const tools = [...PILOT_TOOL_CATALOG];
   const trustedTargets = { allowedBoardIds: resourcePolicy.allowedTargets, defaultListName: 'To Do' };
+  const trustedSource = { spreadsheetId: sourceFixture.spreadsheetId, tabId: sourceFixture.tabId,
+    requestId: sourceFixture.requestId };
   const context = source.kind === 'row'
-    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets })
+    ? buildPilotPlannerContext({ sourceRow: source.row, checklistResult: source.checklist, operatorPrompt: prompt, tools, trustedTargets, trustedSource })
     : buildPilotPlannerContext({ sourceValidation: { code: source.code, requestId: source.requestId }, operatorPrompt: prompt, tools, trustedTargets });
   const variantId = params.testCase.variantId;
   if (typeof variantId !== 'string') throw new Error('QUALITY_VARIANT_ID_INVALID');

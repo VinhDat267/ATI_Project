@@ -217,6 +217,8 @@ describe('pilot v2 measured provider boundary', () => {
     expect(JSON.stringify(requests[0])).toContain(fixture.sourceFixture.rows[0][3]);
     const userPrompt = (requests[0] as { userPrompt: string }).userPrompt;
     expect(userPrompt).toContain(fixture.resourcePolicy.allowedTargets[0]);
+    expect(userPrompt).toContain(`<spreadsheet_id>${fixture.sourceFixture.spreadsheetId}</spreadsheet_id>`);
+    expect(userPrompt).toContain(`<tab_id>${fixture.sourceFixture.tabId}</tab_id>`);
     expect(userPrompt).toContain('&quot;boardId&quot;');
     expect(userPrompt).toContain('&quot;listName&quot;');
     expect(userPrompt).not.toContain('intentKey');
