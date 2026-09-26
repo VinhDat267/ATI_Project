@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 26/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / AI_PUBLIC_PREVIOUS_25_OF_26_STRUCTURAL / AI_NEW_CAMPAIGN_STOPPED_9_OF_46 / AI_QUALITY_PARTIAL_NOT_MEASURED / OWNER_CARD_REVIEW_CONFIRMED / HANDOFF_BLOCKED`. Xem [điều tra Gemini và kết quả public](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md), [nghiệm thu chủ project](PILOT-V2-USER-ACCEPTANCE.md), [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
+**Trạng thái 26/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / SAAS_READ_PREFLIGHT_CONFIRMED / SAAS_ONE_CARD_CONFIRMED / LIVE_WRITE_DEFAULT_OFF / AI_PUBLIC_26_OF_26_STRUCTURAL_PASS / AI_PUBLIC_SEMANTIC_FINDINGS_OPEN / AI_HOLDOUT_NOT_RUN / AI_QUALITY_PARTIAL_NOT_MEASURED / OWNER_CARD_REVIEW_CONFIRMED / HANDOFF_BLOCKED`. Xem [public mới](ai-evidence/PILOT-V2-AI/PUBLIC-2026-09-26.md), [điều tra Gemini](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md), [nghiệm thu chủ project](PILOT-V2-USER-ACCEPTANCE.md) và [baseline](BASELINE.md). Một lần write sandbox không cấp phép chạy batch hoặc production.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -83,15 +83,17 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 holdout độc lập mới, tối đa 46 calls. V2-13–19 vẫn là nghiệm thu hệ thống và không
 được tính vào tỷ lệ AI; holdout legacy đã bị loại khỏi bộ đo. Gemini 3.1
 Flash-Lite đã chạy hết 26 ca public ở freeze `c9df557`: 25 ca structural PASS,
-V2-10-en FAIL vì đề xuất write thay vì hỏi lại về người được giao. Một freeze
-mới trên mã guard dừng ở V2-03-vi sau 9 calls vì plan không hợp lệ theo DSL.
+V2-10-en FAIL vì đề xuất write thay vì hỏi lại về người được giao. Những freeze
+trung gian dừng ở V2-03-vi sau 9 calls; diagnostic xác định input key sai và
+required/default mâu thuẫn. Sau sửa guidance, freeze `d35a9af` đạt 26/26 public
+structural PASS, 0 provider failures; review nội dung còn findings.
 Holdout 20 ca chưa gọi provider; AI quality chưa đạt cổng nghiệm thu.
 Xem [scope/dataset gate](ai-evidence/PILOT-V2-AI/MODEL-SCOPE-2026-09-26.md).
 Tạo manifest mới từ Git HEAD sạch, chọn model tường minh, rồi probe → smoke →
 public → holdout theo cùng manifest/journal. Scope, dataset và provenance thay
 đổi làm manifest cũ không hợp lệ. Không gộp các chiến dịch khác freeze.
 
-`runPilotQualityEvaluation` cũ kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`. Đường measured mới tách oracle khỏi input, khóa code/dataset/model, ghi reservation và observation vào journal bền vững trước khi chấm, chỉ dùng catalog pilot cố định và không thực thi Trello. Nó chưa so semantic với semantic+QE hoặc chứng minh payload mạng thô của provider. Probe Gemini 3.7 ngày 25/09/2026 và sau sửa giao thức đều nhận HTTP 503; probe Gemini 3.8 ngày 26/09/2026 nhận HTTP 429. Chiến dịch Gemini 3.1 Flash-Lite sau sửa giao thức có 26/26 public observation, không lỗi provider và một ca FAIL chất lượng. Xem [bằng chứng mới nhất](ai-evidence/PILOT-V2-AI/PROBE-2026-09-26.md). Báo cáo có latency của public; chưa có accuracy đã adjudicate độc lập, phân phối latency cho holdout hoặc đối soát hóa đơn.
+`runPilotQualityEvaluation` cũ kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`. Đường measured mới tách oracle khỏi input, khóa code/dataset/model, ghi reservation và observation vào journal bền vững trước khi chấm, chỉ dùng catalog pilot cố định và không thực thi Trello. Nó chưa so semantic với semantic+QE hoặc chứng minh payload mạng thô của provider. Probe Gemini 3.7 từng trả HTTP 503; Gemini 3.8 từng trả HTTP 429. Xem [public mới nhất](ai-evidence/PILOT-V2-AI/PUBLIC-2026-09-26.md): Gemini 3.1 Flash-Lite đạt 26/26 structural PASS trên `d35a9af`. Báo cáo có latency/token public; review nội dung còn findings, chưa có full semantic acceptance, holdout hoặc đối soát hóa đơn.
 
 **Quy tắc phân công hiện tại:** nếu nội dung Sheet hoặc lời yêu cầu của operator thể hiện ý định giao cho một người, checklist hỏi lại `assignee_id` và cổng tạo run không tạo approval/preview để ghi. Cổng duyệt kiểm lại cả các run pending đã tạo trước bản sửa và từ chối write nếu có ý định phân công. Pilot hiện chưa xác minh Trello member ID và chưa gắn member vào snapshot duyệt; không được diễn giải card không gán người là đã hoàn thành việc phân công. Bộ nhận diện ý định là tập mẫu Việt/Anh hữu hạn, nên chưa phải bằng chứng bao phủ mọi cách diễn đạt; giữ live write tắt và bổ sung trường phân công có cấu trúc trước khi mở rộng dùng thật.
 

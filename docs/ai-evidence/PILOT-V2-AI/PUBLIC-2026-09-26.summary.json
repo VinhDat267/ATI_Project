@@ -1,0 +1,256 @@
+{
+  "status": "PUBLIC_PLANNER_RESULT_PASS_SEMANTIC_FINDINGS_OPEN",
+  "commit": "d35a9af68daffc50c3b8b44cbdc16e69e351427c",
+  "freezeHash": "9363dc2b9778530729899e9901ca09cfaa30f8e6fef413b655c321e968d6c2f8",
+  "model": "gemini-3.1-flash-lite",
+  "evaluationProfile": "model-only-v1",
+  "publicCount": 26,
+  "publicAutomaticPassed": 26,
+  "publicProviderFailures": 0,
+  "holdoutUnattempted": 20,
+  "gradeScope": "automatic proposed-decision/tool-args match only; independent semantic adjudication pending",
+  "executionSchemaReview": {
+    "observedPlans": 8,
+    "schemaFailed": 5,
+    "unresolvedReferences": 2,
+    "reviewer": "independent Code Reviewer"
+  },
+  "capUsd": 0,
+  "actualInvoiceVerified": false,
+  "publicGrades": [
+    {
+      "variantId": "V2-01-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3303.9085,
+      "inputTokens": 2151,
+      "outputTokens": 678
+    },
+    {
+      "variantId": "V2-01-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3006.8368999999984,
+      "inputTokens": 2145,
+      "outputTokens": 670
+    },
+    {
+      "variantId": "V2-02-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3097.3062999999997,
+      "inputTokens": 2161,
+      "outputTokens": 725
+    },
+    {
+      "variantId": "V2-02-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2762.3779000000013,
+      "inputTokens": 2154,
+      "outputTokens": 668
+    },
+    {
+      "variantId": "V2-03-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 10003.584900000002,
+      "inputTokens": 2156,
+      "outputTokens": 569
+    },
+    {
+      "variantId": "V2-03-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4483.9329,
+      "inputTokens": 2143,
+      "outputTokens": 560
+    },
+    {
+      "variantId": "V2-04-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4219.7894000000015,
+      "inputTokens": 2176,
+      "outputTokens": 450
+    },
+    {
+      "variantId": "V2-04-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4187.264000000003,
+      "inputTokens": 2165,
+      "outputTokens": 413
+    },
+    {
+      "variantId": "V2-05-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2006.7544000000003,
+      "inputTokens": 2147,
+      "outputTokens": 176
+    },
+    {
+      "variantId": "V2-05-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 1933.9866000000002,
+      "inputTokens": 2141,
+      "outputTokens": 174
+    },
+    {
+      "variantId": "V2-06-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3521.138100000011,
+      "inputTokens": 2139,
+      "outputTokens": 157
+    },
+    {
+      "variantId": "V2-06-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4930.536300000007,
+      "inputTokens": 2130,
+      "outputTokens": 155
+    },
+    {
+      "variantId": "V2-07-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4785.959100000007,
+      "inputTokens": 2151,
+      "outputTokens": 155
+    },
+    {
+      "variantId": "V2-07-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4189.1397,
+      "inputTokens": 2143,
+      "outputTokens": 165
+    },
+    {
+      "variantId": "V2-08-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4146.482400000008,
+      "inputTokens": 2224,
+      "outputTokens": 175
+    },
+    {
+      "variantId": "V2-08-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2509.2802999999985,
+      "inputTokens": 2171,
+      "outputTokens": 170
+    },
+    {
+      "variantId": "V2-09-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2736.9888999999966,
+      "inputTokens": 2163,
+      "outputTokens": 186
+    },
+    {
+      "variantId": "V2-09-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3013.7544000000053,
+      "inputTokens": 2158,
+      "outputTokens": 168
+    },
+    {
+      "variantId": "V2-10-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2916.4504000000015,
+      "inputTokens": 2170,
+      "outputTokens": 161
+    },
+    {
+      "variantId": "V2-10-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3818.6900000000023,
+      "inputTokens": 2154,
+      "outputTokens": 178
+    },
+    {
+      "variantId": "V2-11-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3690.6363,
+      "inputTokens": 1880,
+      "outputTokens": 162
+    },
+    {
+      "variantId": "V2-11-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 1862.7479999999996,
+      "inputTokens": 1878,
+      "outputTokens": 154
+    },
+    {
+      "variantId": "V2-12-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 4127.402000000002,
+      "inputTokens": 2159,
+      "outputTokens": 174
+    },
+    {
+      "variantId": "V2-12-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 5272.5264000000025,
+      "inputTokens": 2143,
+      "outputTokens": 155
+    },
+    {
+      "variantId": "V2-20-vi",
+      "language": "vi",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 3354.6900000000023,
+      "inputTokens": 1882,
+      "outputTokens": 160
+    },
+    {
+      "variantId": "V2-20-en",
+      "language": "en",
+      "verdict": "PASS",
+      "reasons": [],
+      "latencyMs": 2513.6531999999715,
+      "inputTokens": 1878,
+      "outputTokens": 162
+    }
+  ]
+}
