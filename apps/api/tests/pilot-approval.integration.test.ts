@@ -151,6 +151,26 @@ function mockTrello(
 }
 
 describe("pilot durable approval over PostgreSQL and HTTP", () => {
+  it("blocks approval of an existing run whose operator prompt requests unresolved assignment", async () => {
+    const h = await harness();
+    try {
+      const runId = await h.create();
+      const preview = (await h.detail(runId)).preview;
+      await h.fixture.db.client`
+        UPDATE runs SET source_prompt = 'Assign this card to John Doe' WHERE id = ${runId}`;
+      const trello = mockTrello();
+      const approval = await h.decide(runId, "approved", preview);
+      expect(approval.status).toBe(409);
+      expect(await approval.json()).toMatchObject({ error: { code: "ASSIGNEE_UNRESOLVED" } });
+      expect(trello.writes()).toBe(0);
+      expect((await h.fixture.db.client<Array<{ decision: string }>>`
+        SELECT decision FROM pilot_approvals WHERE run_id = ${runId}`)[0]?.decision).toBe("pending");
+      expect(await h.fixture.db.client`SELECT intent_key FROM business_reservations WHERE run_id = ${runId}`).toHaveLength(0);
+    } finally {
+      await h.close();
+    }
+  }, 45_000);
+
   it("binds the verified localized list name and ID before one Trello write", async () => {
     const h = await harness(true, false, "Cần làm");
     try {

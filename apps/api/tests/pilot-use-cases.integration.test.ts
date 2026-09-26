@@ -142,6 +142,34 @@ describe("Pilot UC1 and UC3 read-only routes", () => {
     expect(await ctx.fixture.db.client`SELECT id FROM business_reservations`).toHaveLength(0);
   });
 
+  it.each([
+    { raw_request: "Update https://example.com/landing giao cho Nguyễn Văn A", userPrompt: "Tạo card" },
+    { raw_request: "Update https://example.com/landing", userPrompt: "Assign the card to John Doe" },
+  ])("asks for a verified assignee without preparing a write: $userPrompt", async ({ raw_request, userPrompt }) => {
+    const assignment = { ...row, raw_request };
+    const ctx = await harness(assignment);
+    const body = JSON.stringify({
+      spreadsheetId: ctx.policy.spreadsheetId,
+      tabId: ctx.policy.tabId,
+      requestId: assignment.request_id,
+      userPrompt,
+    });
+    const check = await fetch(`${ctx.pilotUrl}/check`, { method: "POST", headers: ctx.headers, body });
+    expect(check.status).toBe(200);
+    expect(await check.json()).toMatchObject({
+      status: "needs_input",
+      checklistResult: { valid: false, missingFields: ["assignee_id"] },
+    });
+
+    const create = await fetch(`${ctx.pilotUrl}/runs`, { method: "POST", headers: ctx.headers, body });
+    expect(create.status).toBe(202);
+    const { runId } = (await create.json()) as { runId: string };
+    const run = await ctx.fixture.db.client<Array<{ status: string }>>`SELECT status::text FROM runs WHERE id = ${runId}`;
+    expect(run[0]?.status).toBe("needs_input");
+    expect(await ctx.fixture.db.client`SELECT run_id FROM pilot_approvals WHERE run_id = ${runId}`).toHaveLength(0);
+    expect(await ctx.fixture.db.client`SELECT intent_key FROM business_reservations WHERE run_id = ${runId}`).toHaveLength(0);
+  });
+
   it("refuses prompt-injection instructions embedded in the source row", async () => {
     const injection = {
       ...row,

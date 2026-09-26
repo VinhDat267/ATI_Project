@@ -98,6 +98,28 @@ describe('pilot/checklist', () => {
     expect(res.conflicts.length).toBeGreaterThan(0);
   });
 
+  it.each([
+    'Viết bài tại https://acme.com/home giao cho Nguyễn Văn A nhưng trùng tên',
+    'Assign the update at https://acme.com/home to John Doe',
+    'Update https://acme.com/home; assignee: member_123',
+    'Nguyễn Văn A phụ trách cập nhật https://acme.com/home',
+    'Owner: John Doe, update https://acme.com/home',
+    'Assign John Doe this ticket at https://acme.com/home',
+    'Update https://acme.com/home; assignee_id: member_123',
+    'Update https://acme.com/home; assigned_to: John Doe',
+    'Nhờ Nguyễn Văn A thực hiện cập nhật https://acme.com/home',
+    'John Doe will handle the update at https://acme.com/home',
+  ])('asks for a verified Trello member before assignment: %s', (raw_request) => {
+    const res = evaluateChecklist({ ...baseWebChange, raw_request });
+    expect(res.status).toBe('needs_input');
+    expect(res.missingFields).toContain('assignee_id');
+  });
+
+  it('does not mistake an unrelated person mention for assignment', () => {
+    const res = evaluateChecklist({ ...baseWebChange, source_note: 'Approved by John Doe via email' });
+    expect(res.status).toBe('pass');
+  });
+
   it('computes stable deterministic sourceRevision and isolates changes', () => {
     const rev1 = computeSourceRevision(baseWebChange);
     const rev2 = computeSourceRevision({ ...baseWebChange });

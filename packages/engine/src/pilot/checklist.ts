@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { SourceRow } from './source.js';
 
-export const PILOT_CHECKLIST_VERSION = 'pilot-checklist-1';
+export const PILOT_CHECKLIST_VERSION = 'pilot-checklist-2';
 
 export type ChecklistStatus = 'pass' | 'needs_input' | 'refusal';
 
@@ -81,6 +81,47 @@ const CONFLICT_PATTERNS = [
   /\bcontradict/i,
 ];
 
+// Assignment is not supported by the fixed pilot card path: it cannot verify
+// a member ID against the board or bind that member to the approval snapshot.
+// Treat explicit assignment requests as incomplete instead of creating an
+// unassigned card that appears to fulfil them.
+const ASSIGNMENT_PATTERNS = [
+  /\bgiao\s+(?:việc\s+)?cho\b/iu,
+  /\bphân\s+công\b/iu,
+  /\bngười\s+(?:được\s+)?(?:giao|phụ\s+trách)\b/iu,
+  /\bphụ\s+trách\b/iu,
+  /\bassign(?:ed)?\b/iu,
+  /\bassignee\b/iu,
+  /\bassignee_id\b/iu,
+  /\bassigned_to\b/iu,
+  /\bowner\s*:/iu,
+  /\bresponsible\s+for\b/iu,
+  /\bnhờ[\s\S]{0,100}\bthực\s+hiện\b/iu,
+  /\bwill\s+handle\b/iu,
+];
+
+export function requiresVerifiedAssignee(text: string): boolean {
+  return ASSIGNMENT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function applyAssignmentGate(
+  row: SourceRow,
+  operatorPrompt: string,
+  checklist: ChecklistResult,
+): ChecklistResult {
+  const context = `${row.raw_request}\n${row.deliverable}\n${row.source_note}\n${operatorPrompt}`;
+  if (!requiresVerifiedAssignee(context) || checklist.missingFields.includes('assignee_id')) {
+    return checklist;
+  }
+  const missingFields = [...checklist.missingFields, 'assignee_id'];
+  return {
+    ...checklist,
+    status: checklist.status === 'refusal' ? 'refusal' : 'needs_input',
+    missingFields,
+    summary: `Checklist requires input for ${row.request_type} (${row.request_id}): ${missingFields.concat(checklist.conflicts).join(', ')}`,
+  };
+}
+
 export function evaluateChecklist(
   row: SourceRow,
   options?: { checklistVersion?: string },
@@ -128,6 +169,10 @@ export function evaluateChecklist(
 
   // Type-specific requirements
   const combinedContext = `${row.raw_request} ${row.deliverable} ${row.source_note}`;
+
+  if (requiresVerifiedAssignee(combinedContext)) {
+    missingFields.push('assignee_id');
+  }
 
   if (row.request_type === 'web_change') {
     const hasTargetUrl =

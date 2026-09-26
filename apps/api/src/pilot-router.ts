@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Database } from "@wap/db";
 import {
   assertPilotAccess,
+  applyAssignmentGate,
+  requiresVerifiedAssignee,
   readSheetsRequest,
   PILOT_TOOL_CATALOG,
   executePilotWorkflow,
@@ -189,6 +191,10 @@ export function createPilotRouter(options: PilotRouterOptions) {
       } catch {
         throw new HttpError(422, "INTAKE_UNAVAILABLE", "Không thể kiểm tra yêu cầu trong nguồn đã cho");
       }
+      intake = {
+        ...intake,
+        checklist: applyAssignmentGate(intake.row, body.userPrompt, intake.checklist),
+      };
 
       const directiveContext = [
         body.userPrompt,
@@ -362,6 +368,10 @@ export function createPilotRouter(options: PilotRouterOptions) {
       } catch (err: unknown) {
         throw new HttpError(400, "INTAKE_ERROR", (err as Error).message);
       }
+      intake = {
+        ...intake,
+        checklist: applyAssignmentGate(intake.row, body.userPrompt, intake.checklist),
+      };
 
       const runId = randomUUID();
       const workflowId = randomUUID();
@@ -667,8 +677,8 @@ export function createPilotRouter(options: PilotRouterOptions) {
 
       const claim = await db.client.begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(638019815)`;
-        const runRows = await tx<Array<{ id: string; status: string; profile: string; workflow_version_id: string }>>`
-          SELECT id, status, profile, workflow_version_id FROM runs
+        const runRows = await tx<Array<{ id: string; status: string; profile: string; workflow_version_id: string; source_prompt: string }>>`
+          SELECT id, status, profile, workflow_version_id, source_prompt FROM runs
           WHERE id = ${runId} AND user_id = ${userId}
           FOR UPDATE
         `;
@@ -740,6 +750,17 @@ export function createPilotRouter(options: PilotRouterOptions) {
         });
         if (plan.snapshotHash !== approval.snapshot_hash || body.snapshotHash !== approval.snapshot_hash) {
           throw new HttpError(409, "SNAPSHOT_MISMATCH", "Pilot preview changed or approval hash differs");
+        }
+
+        // Recheck persisted runs from earlier code versions before authorizing
+        // any write. The fixed pilot path cannot verify or bind a Trello member.
+        if (body.decision === "approved" && requiresVerifiedAssignee([
+          snapshot.raw_data.raw_request,
+          snapshot.raw_data.deliverable,
+          snapshot.raw_data.source_note,
+          run.source_prompt,
+        ].join("\n"))) {
+          throw new HttpError(409, "ASSIGNEE_UNRESOLVED", "Pilot assignment requires a verified Trello member");
         }
 
         if (body.decision === "rejected") {
