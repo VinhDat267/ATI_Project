@@ -142,6 +142,8 @@ const SAFE_FAILURE_STAGES = new Set([
   'output_wire_dsl_step_tool', 'output_wire_dsl_step_field',
   'output_wire_dsl_plan_name', 'output_wire_dsl_plan_source_prompt',
   'output_wire_dsl_plan_inputs', 'output_wire_dsl_plan_version', 'output_wire_dsl_plan_outputs',
+  'output_wire_dsl_input_key', 'output_wire_dsl_input_required_default',
+  'output_wire_dsl_input_default_type', 'output_wire_dsl_input_field',
 ]);
 
 function safePlannerWireFailureStage(error: unknown): string {
@@ -160,7 +162,18 @@ function safePlannerWireFailureStage(error: unknown): string {
       // Zod messages may contain provider-controlled or sensitive content.
       if (path[1] === 'name') return 'output_wire_dsl_plan_name';
       if (path[1] === 'source_prompt') return 'output_wire_dsl_plan_source_prompt';
-      if (path[1] === 'inputs') return 'output_wire_dsl_plan_inputs';
+      if (path[1] === 'inputs') {
+        const issue = error.issues[0];
+        if (issue?.code === 'invalid_key') return 'output_wire_dsl_input_key';
+        // Match only validator-owned fixed messages, never emit issue prose.
+        if (issue?.code === 'custom' && issue.message === 'input vừa required vừa có default là mâu thuẫn') {
+          return 'output_wire_dsl_input_required_default';
+        }
+        if (issue?.code === 'custom' && issue.message === 'default phải khớp kiểu input đã khai báo') {
+          return 'output_wire_dsl_input_default_type';
+        }
+        return 'output_wire_dsl_input_field';
+      }
       if (path[1] === 'version') return 'output_wire_dsl_plan_version';
       if (path[1] === 'outputs') return 'output_wire_dsl_plan_outputs';
       return 'output_wire_dsl_plan';

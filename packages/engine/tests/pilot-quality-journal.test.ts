@@ -20,11 +20,13 @@ const input = { variantId: 'V2-01-vi', mode: 'fixed-catalog' as const, dataset: 
   provider: 'google', model: 'gemini-test' };
 
 describe('pilot quality durable journal', () => {
-  it.each(['name', 'source_prompt', 'inputs', 'version', 'outputs'])('persists fixed plan %s failure category', async (field) => {
+  it.each([
+    ...['name', 'source_prompt', 'inputs', 'version', 'outputs'].map((field) => `output_wire_dsl_plan_${field}`),
+    ...['key', 'required_default', 'default_type', 'field'].map((field) => `output_wire_dsl_input_${field}`),
+  ])('persists fixed %s failure category', async (failureStage) => {
     const settings = await options();
     const journal = await openPilotQualityJournal(settings);
     const { attemptId } = await journal.authorizeAndReserve(input);
-    const failureStage = `output_wire_dsl_plan_${field}`;
     try {
       await journal.recordOutcome({ attemptId, status: 'failed', durationMs: 3,
         failure: { localCode: 'PROVIDER_RESPONSE_INVALID', httpStatus: null, providerCode: null,
