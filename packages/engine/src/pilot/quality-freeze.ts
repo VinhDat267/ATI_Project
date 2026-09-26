@@ -108,6 +108,7 @@ const ARTIFACTS = {
     'packages/engine/src/pilot/quality-freeze.ts',
     'packages/engine/src/pilot/quality-journal.ts',
     'packages/engine/src/pilot/quality-grader.ts',
+    'packages/engine/src/pilot/quality-plan-validator.ts',
     'packages/engine/src/pilot/quality-scope.ts',
     'packages/engine/src/pilot/checklist.ts',
     'packages/engine/src/pilot/decision-engine.ts',
