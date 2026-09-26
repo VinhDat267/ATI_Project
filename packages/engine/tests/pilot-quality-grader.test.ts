@@ -13,7 +13,7 @@ function writePlan(): WorkflowPlan {
     version: '1.0', name: 'Create task', source_prompt: 'Create a task', inputs: {},
     steps: [{
       id: 'create', description: 'Create task',
-      tool: { server: 'trello', name: 'trello.create_card', args: expected.toolCalls[0]!.args },
+      tool: { server: 'trello', name: 'create_card', args: expected.toolCalls[0]!.args },
       depends_on: [], condition: null,
       retry: { max_attempts: 3, backoff: 'exponential', initial_delay_ms: 500 },
       idempotency_key: '${runtime.run_id}_create_card', side_effect: 'write', on_error: 'fail', timeout_ms: 30000,
@@ -49,7 +49,7 @@ describe('pilot provider observation grader', () => {
     ['malformed reference', (plan: WorkflowPlan) => { plan.outputs.cardId = '${steps.create.output.'; }, 'workflow_schema_invalid'],
     ['broken dependency', (plan: WorkflowPlan) => { plan.steps[0]!.depends_on = ['missing']; }, 'workflow_graph_invalid'],
     ['broken reference', (plan: WorkflowPlan) => { plan.outputs.cardId = '${steps.create.output.missing}'; }, 'reference_path_invalid'],
-    ['unreviewed tool', (plan: WorkflowPlan) => { plan.steps[0]!.tool.name = 'trello.delete_card'; }, 'tool_contract_invalid'],
+    ['unreviewed tool', (plan: WorkflowPlan) => { plan.steps[0]!.tool.name = 'delete_card'; }, 'tool_contract_invalid'],
   ] as const)('fails %s even when proposed effects exactly match', (_name, invalidate, code) => {
     const plan = writePlan();
     invalidate(plan);

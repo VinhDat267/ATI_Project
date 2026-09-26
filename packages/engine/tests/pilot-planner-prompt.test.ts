@@ -71,6 +71,28 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
     expect(systemPrompt).toContain('required true implies default_present false and default_value null');
     expect(systemPrompt).toContain('A default must be a string, number or boolean matching the declared input type');
   });
+
+  it("requires valid step output references in workflow outputs", () => {
+    const { systemPrompt } = buildPilotPlannerContext({
+      sourceRow: sampleRow,
+      checklistResult: sampleChecklist,
+      operatorPrompt: "Check completeness",
+    });
+
+    expect(systemPrompt).toContain('Workflow outputs must be DSL references such as "${steps.read_request.output.row}"');
+    expect(systemPrompt).toContain('Never write prose, a status sentence, "result", or a bare step reference into workflow outputs');
+    expect(systemPrompt).toContain('For trello.get_card, valid output paths include output.id, output.name, output.desc, output.idList, output.due, output.idMembers, and output.url');
+  });
+
+  it("separates the server from the local tool name in DSL references", () => {
+    const { systemPrompt } = buildPilotPlannerContext({
+      sourceRow: sampleRow,
+      checklistResult: sampleChecklist,
+      operatorPrompt: "Create a Trello card",
+    });
+    expect(systemPrompt).toContain('server: "trello", name: "create_card"');
+    expect(systemPrompt).toContain('Do not put the qualified name "trello.create_card" in the name field');
+  });
   it("wraps raw client intake in <client_untrusted_intake> and checklist in <checklist_summary>", () => {
     const context = buildPilotPlannerContext({
       sourceRow: sampleRow,

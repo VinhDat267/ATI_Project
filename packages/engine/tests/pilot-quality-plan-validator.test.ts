@@ -7,7 +7,7 @@ function readPlan(): WorkflowPlan {
     version: '1.0', name: 'Read board lists', source_prompt: 'Find lists', inputs: {},
     steps: [{
       id: 'lists', description: 'Read lists',
-      tool: { server: 'trello', name: 'trello.list_lists', args: { boardId: 'board-1' } },
+      tool: { server: 'trello', name: 'list_lists', args: { boardId: 'board-1' } },
       depends_on: [], condition: null,
       retry: { max_attempts: 3, backoff: 'exponential', initial_delay_ms: 500 },
       idempotency_key: null as string | null, side_effect: 'read', on_error: 'fail', timeout_ms: 30000,
@@ -21,7 +21,7 @@ function writePlan() {
   plan.steps[0] = {
     ...plan.steps[0]!, id: 'create', description: 'Create task', side_effect: 'write',
     idempotency_key: 'pilot:${runtime.run_id}',
-    tool: { server: 'trello', name: 'trello.create_card', args: {
+    tool: { server: 'trello', name: 'create_card', args: {
       boardId: 'board-1', listName: 'Todo', title: 'Design landing page',
     } },
   };
@@ -56,7 +56,7 @@ describe('strict Pilot quality plan validation', () => {
     expect(validatePilotQualityPlan({ steps: [] })).toEqual(['workflow_schema_invalid']);
   });
 
-  it.each(['trello.delete_card', 'list_lists'])('rejects unreviewed tool identity %s', (name) => {
+  it.each(['delete_card', 'unknown_tool'])('rejects unreviewed tool identity %s', (name) => {
     const plan = readPlan();
     plan.steps[0]!.tool.name = name;
     expect(validatePilotQualityPlan(plan)).toEqual(['tool_contract_invalid', 'reference_path_invalid']);
@@ -90,7 +90,7 @@ describe('strict Pilot quality plan validation', () => {
   it('rejects a step-output argument without the required dependency', () => {
     const plan = readPlan();
     plan.steps.push({ ...plan.steps[0]!, id: 'members',
-      tool: { server: 'trello', name: 'trello.list_members', args: { boardId: '${steps.lists.output.0.id}' } },
+      tool: { server: 'trello', name: 'list_members', args: { boardId: '${steps.lists.output.0.id}' } },
     });
     expect(validatePilotQualityPlan(plan)).toEqual(['workflow_graph_invalid']);
   });
@@ -105,7 +105,7 @@ describe('strict Pilot quality plan validation', () => {
   it('accepts array-item property references with a declared dependency', () => {
     const plan = readPlan();
     plan.steps.push({ ...plan.steps[0]!, id: 'members', depends_on: ['lists'],
-      tool: { server: 'trello', name: 'trello.list_members', args: { boardId: '${steps.lists.output.0.id}' } },
+      tool: { server: 'trello', name: 'list_members', args: { boardId: '${steps.lists.output.0.id}' } },
     });
     plan.outputs = { lists: '${steps.members.output.0.fullName}' };
     expect(validatePilotQualityPlan(plan)).toEqual([]);
@@ -121,7 +121,7 @@ describe('strict Pilot quality plan validation', () => {
   it('rejects nonexistent paths nested in tool argument objects and arrays', () => {
     const plan = readPlan();
     plan.steps.push({ ...plan.steps[0]!, id: 'members', depends_on: ['lists'],
-      tool: { server: 'trello', name: 'trello.list_members', args: {
+      tool: { server: 'trello', name: 'list_members', args: {
         boardId: [{ nested: '${steps.lists.output.0.absent}' }],
       } },
     });
@@ -130,7 +130,7 @@ describe('strict Pilot quality plan validation', () => {
 
   it('fails closed on unstructured reviewed output objects', () => {
     const plan = readPlan();
-    plan.steps[0]!.tool = { server: 'google_sheets', name: 'google_sheets.read_request',
+    plan.steps[0]!.tool = { server: 'google_sheets', name: 'read_request',
       args: { spreadsheetId: 'sheet-1', tabId: 'tab-1', requestId: 'request-1' } };
     plan.outputs.lists = '${steps.lists.output.row.unreviewedField}';
     expect(validatePilotQualityPlan(plan)).toEqual(['reference_path_invalid']);

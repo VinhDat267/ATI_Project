@@ -21,7 +21,7 @@ export type PilotQualityPlanIssueCode =
 // Only server-reviewed catalog entries supply identities, policies and schemas.
 const trustedTools: readonly TrustedTool[] = PILOT_TOOL_CATALOG.map((tool) => ({
   server: tool.name.split('.')[0]!,
-  name: tool.name,
+  name: tool.name.split('.').slice(1).join('.'),
   sideEffect: tool.sideEffect,
   policyVersion: tool.policyVersion,
   inputSchema: reviewedPlanningSchema(tool),
