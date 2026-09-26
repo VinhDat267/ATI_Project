@@ -2,7 +2,7 @@
 
 Đây là monorepo TypeScript cho prototype điều phối workflow có bước **xem trước → người dùng duyệt → thực thi → đối chiếu kết quả**. `ATI_Project`, `ati-*` và `@wap/*` là tên kỹ thuật/lịch sử được giữ để tương thích. Phạm vi sản phẩm hiện hành là **MVP v2 cho nhóm dịch vụ thiết kế/web**; nền B/local trước đó vẫn có trong repository để phát triển và đối chứng.
 
-> **Trạng thái 25/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Một ca sandbox đã đọc Google Sheets/Trello thật, tạo đúng một card Trello sau approval, lưu receipt PostgreSQL và xác minh card bằng GET. AI quality provider và nghiệm thu người dùng đại diện **chưa chạy**. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
+> **Trạng thái 26/09/2026:** owner isolation và UC1/UC3 đã qua API, PostgreSQL và Chromium với Sheets/Trello giả; UC2 approval đã qua API/DB/browser với Trello giả. Một ca sandbox đã đọc Google Sheets/Trello thật, tạo đúng một card Trello sau approval, lưu receipt PostgreSQL và xác minh card bằng GET; chủ project đã xác nhận nội dung card. Các probe AI thật nhận Gemini 3.7 HTTP 503 và Gemini 3.8 HTTP 429; chất lượng AI chưa đo. `PILOT_V2_WRITE_ENABLED` tắt mặc định; pilot vẫn `HANDOFF_BLOCKED`. Xem [baseline](docs/BASELINE.md) và [runbook](docs/PILOT-V2-RUNBOOK.md) trước khi diễn giải kết quả test.
 
 ## Team nên đọc gì trước?
 
@@ -24,8 +24,8 @@ MVP v2 **không** bao gồm ghi ngược Sheet, gửi Slack/email thật, schedu
 |---|---|---|
 | Hợp đồng và UI pilot | API/DB integration cho approval, owner isolation, UC1/UC3; 7 ca Chromium với dịch vụ giả | Chưa chứng minh AI source-aware và trải nghiệm người dùng đại diện với SaaS thật |
 | SaaS live | `SAAS_ONE_CARD_CONFIRMED`: một ca sandbox qua API, approval DB, Trello receipt và GET đối chiếu ngày 25/09/2026 | Chưa chứng minh đa ca, lỗi mạng thật, vận hành liên tục hoặc nghiệm thu khách hàng |
-| AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; test mô phỏng | `AI_QUALITY_NOT_RUN`: runner P6 không gọi provider và còn dùng oracle để chọn một số kết quả |
-| Người dùng đại diện | Phạm vi và Design System đã được chủ project duyệt | `CUSTOMER_VALIDATED_NOT_RUN`; chưa có acceptance với người dùng đại diện |
+| AI quality v2 | Dataset 20 tình huống × vi/en = 40 record; holdout 10 × vi/en = 20 record; runner mới đã gửi probe Gemini thật | `AI_QUALITY_NOT_MEASURED`: 503/429, chưa có observation và usage để chấm; runner P6 cũ vẫn chỉ mô phỏng |
+| Người dùng đại diện | Chủ project đã xác nhận trực tiếp bốn thuộc tính của card sandbox | Nghiệm thu UI UC1/UC2/UC3 và người dùng đại diện ngoài chủ project chưa hoàn tất |
 
 `PASS` của unit/fixture không nâng trạng thái SaaS hoặc AI. Google connectivity probe của nền AI cũ chỉ chứng minh kết nối ở phạm vi probe, không đo chất lượng nghiệp vụ MVP v2. Chi tiết lỗi chặn và phần đã sửa nằm trong [audit P6](docs/plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md).
 
