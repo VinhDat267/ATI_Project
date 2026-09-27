@@ -23,10 +23,15 @@ const identifier = (name: string) => {
     throw new Error("Untrusted database identifier");
   return `"${name}"`;
 };
+const approvedAdminUrl = (base: string): string => {
+  const result = new URL(base);
+  if (result.hostname !== "127.0.0.1" || result.port !== "55532" || result.protocol !== "postgresql:" ||
+      result.search || result.hash || !/^\/[a-zA-Z0-9_-]+$/.test(result.pathname))
+    throw new Error("Only approved isolated loopback PostgreSQL is supported");
+  return result.href;
+};
 const urlFor = (base: string, db: string, user?: string, password?: string) => {
   const result = new URL(base);
-  if (result.hostname !== "127.0.0.1" || result.port !== "55532" || result.protocol !== "postgresql:")
-    throw new Error("Only approved isolated loopback PostgreSQL is supported");
   result.pathname = `/${db}`;
   if (user !== undefined) { result.username = user; result.password = password!; }
   return result.href;
@@ -35,6 +40,7 @@ const urlFor = (base: string, db: string, user?: string, password?: string) => {
 /** Privileged bootstrap is separate from the runner; no existing database is migrated. */
 export async function provisionOfflineCampaign(adminUrl: string, manifest: FrozenManifest): Promise<PrivateBootstrapReceipt> {
   assertFrozen(manifest, manifest.artifacts);
+  const approvedUrl = approvedAdminUrl(adminUrl);
   const suffix = randomUUID().replaceAll("-", "");
   const dbName = `pilot_eval_${suffix}`;
   const runtimeRole = `pilot_runtime_${suffix}`;
@@ -43,7 +49,7 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
   const identity = DatabaseIdentitySchema.parse({ measurementId: manifest.measurementId,
     databaseName: dbName, schemaVersion: manifest.schemaVersion,
     markerNonceHash: nonceHash, expectedRuntimeRole: runtimeRole });
-  const admin = postgres(adminUrl, { max: 1, connect_timeout: 5 });
+  const admin = postgres(approvedUrl, { max: 1, connect_timeout: 5 });
   const password = randomBytes(32).toString("hex");
   const reportPassword = randomBytes(32).toString("hex");
   let createdDb = false;
@@ -57,7 +63,7 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
     runtimeCreated = true;
     await admin.unsafe(`CREATE ROLE ${identifier(reportRole)} LOGIN PASSWORD '${reportPassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
     reportCreated = true;
-    const adminDbUrl = urlFor(adminUrl, dbName);
+    const adminDbUrl = urlFor(approvedUrl, dbName);
     const owner = postgres(adminDbUrl, { max: 1, connect_timeout: 5 });
     try {
       await owner.unsafe(`REVOKE ALL ON DATABASE ${identifier(dbName)} FROM PUBLIC`);
@@ -114,8 +120,8 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
       // Admission locks grant rows FOR UPDATE; only this inert column is writable.
       await owner.unsafe(`GRANT UPDATE(updated_at) ON pilot_ai_grants TO ${identifier(runtimeRole)}`);
       await owner.unsafe(`GRANT USAGE ON SEQUENCE run_events_id_seq TO ${identifier(runtimeRole)}`);
-      const receipt = { identity, manifest, runtimeUrl: urlFor(adminUrl, dbName, runtimeRole, password),
-        reportUrl: urlFor(adminUrl, dbName, reportRole, reportPassword), reportRole, logins };
+      const receipt = { identity, manifest, runtimeUrl: urlFor(approvedUrl, dbName, runtimeRole, password),
+        reportUrl: urlFor(approvedUrl, dbName, reportRole, reportPassword), reportRole, logins };
       const store = await openEvaluationStore(receipt.runtimeUrl, identity);
       await store.close();
       return receipt;

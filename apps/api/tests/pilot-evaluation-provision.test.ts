@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => {
   const state = {
-    stage: 0, failAt: 0, failPhase: "" as "" | "marker" | "migrate" | "schema" | "seed" | "grant",
+    stage: 0, failAt: 0, connections: 0, failPhase: "" as "" | "marker" | "migrate" | "schema" | "seed" | "grant",
     queries: [] as string[], marker: null as null | Record<string, string>,
     migrate: vi.fn(async () => undefined),
   };
@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => {
 });
 vi.mock("@wap/db", () => ({ migrate: mock.migrate }));
 vi.mock("postgres", () => ({ default: () => {
+  mock.connections++;
   const client = Object.assign(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = strings.join("?");
     mock.queries.push(sql);
@@ -51,9 +52,19 @@ const isolatedAdmin = "postgresql://fixture:fixture@127.0.0.1:55532/isolated-tes
 
 describe("bootstrap cleanup receipt stages (mocked SQL fault only, no real PG write)", () => {
   beforeEach(() => {
-    mock.stage = 0; mock.failAt = 0; mock.failPhase = ""; mock.marker = null;
+    mock.stage = 0; mock.failAt = 0; mock.connections = 0; mock.failPhase = ""; mock.marker = null;
     mock.queries.length = 0; mock.migrate.mockClear();
   });
+
+  it.each(["postgresql://fixture:fixture@remote.invalid:55532/isolated-test-admin",
+    "postgresql://fixture:fixture@127.0.0.1:55532/isolated-test-admin?host=remote.invalid",
+    "postgresql://fixture:fixture@127.0.0.1:55532/isolated-test-admin?port=5432"])(
+    "refuses an unapproved admin URL before any client is constructed: %s", async (url) => {
+      await expect(provisionOfflineCampaign(url, syntheticManifest())).rejects.toThrow("approved isolated loopback");
+      expect(mock.connections).toBe(0);
+      expect(mock.queries).toHaveLength(0);
+    },
+  );
 
   it.each([1, 2, 3] as const)("never drops uncreated resources after create stage %i fails", async (stage) => {
     mock.failAt = stage;
