@@ -26,6 +26,37 @@ describe("dedicated evaluator database", () => {
     });
   }, 120_000);
 
+  it("prevents runtime rewrites of frozen identity, transitions and assigned bindings", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      const store = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);
+      try {
+        await expect(store.client`UPDATE pilot_eval.campaigns SET manifest_hash=${"a".repeat(64)}`).rejects.toThrow();
+        await expect(store.client`UPDATE pilot_eval.campaigns SET sealed_hash=${"b".repeat(64)}`).rejects.toThrow();
+        await expect(store.client`UPDATE pilot_eval.slots SET input_hash=${"a".repeat(64)}`).rejects.toThrow();
+        await expect(store.client`UPDATE pilot_eval.slots SET principal_id=${receipt.manifest.principals[1].id}
+          WHERE slot_id='slot-1'`).rejects.toThrow();
+        expect(await store.claimCampaign()).toBe(true);
+        await expect(store.client`UPDATE pilot_eval.campaigns SET state='frozen'`).rejects.toThrow();
+        const owner = receipt.manifest.principals[0].id;
+        const workflow = randomUUID(), version = randomUUID(), first = randomUUID(), second = randomUUID();
+        await admin`INSERT INTO workflows(id,user_id,name,source_prompt) VALUES (${workflow},${owner},'Synthetic','Synthetic')`;
+        await admin`INSERT INTO workflow_versions(id,workflow_id,version_no,plan,origin)
+          VALUES (${version},${workflow},1,'{}','initial')`;
+        for (const runId of [first, second]) await admin`INSERT INTO runs(id,user_id,workflow_id,workflow_version_id,
+          status,source_prompt,time_zone,profile) VALUES (${runId},${owner},${workflow},${version},'planning',
+          'Synthetic','Asia/Ho_Chi_Minh','pilot-v2')`;
+        await store.bindRun('slot-1', first);
+        await expect(store.client`UPDATE pilot_eval.slots SET run_id=${second} WHERE slot_id='slot-1'`).rejects.toThrow();
+        await store.sealSlot('slot-1', 'incomplete', 'UNLINKED_RUN', 'a'.repeat(64));
+        await store.sealCampaign('incomplete');
+        await expect(store.client`UPDATE pilot_eval.campaigns SET sealed_hash=${"c".repeat(64)}`).rejects.toThrow();
+        await expect(store.client`UPDATE pilot_eval.campaigns SET state='running'`).rejects.toThrow();
+        expect((await store.client`SELECT manifest_hash,state FROM pilot_eval.campaigns`)[0]?.state).toBe('incomplete');
+        expect((await store.client`SELECT run_id FROM pilot_eval.slots WHERE slot_id='slot-1'`)[0]?.run_id).toBe(first);
+      } finally { await store.close(); }
+    });
+  }, 120_000);
+
   it("rejects a report role accidentally granted mutation on an unrelated public table", async () => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       await admin.unsafe(`GRANT INSERT ON users TO "${receipt.reportRole}"`);

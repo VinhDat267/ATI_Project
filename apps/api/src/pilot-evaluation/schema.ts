@@ -48,10 +48,31 @@ CREATE FUNCTION pilot_eval.immutable() RETURNS trigger LANGUAGE plpgsql
 CREATE TRIGGER immutable_events BEFORE UPDATE OR DELETE ON pilot_eval.events FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
 CREATE TRIGGER immutable_seals BEFORE UPDATE OR DELETE ON pilot_eval.seals FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
 CREATE TRIGGER immutable_grades BEFORE UPDATE OR DELETE ON pilot_eval.grades FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
+CREATE FUNCTION pilot_eval.protect_campaign() RETURNS trigger LANGUAGE plpgsql
+ SET search_path = pg_catalog AS $$ BEGIN
+ IF NEW.measurement_id IS DISTINCT FROM OLD.measurement_id OR
+    NEW.manifest_json IS DISTINCT FROM OLD.manifest_json OR
+    NEW.manifest_hash IS DISTINCT FROM OLD.manifest_hash OR
+    NEW.created_at IS DISTINCT FROM OLD.created_at OR
+    OLD.state IN ('completed','incomplete','blocked') OR
+    NOT ((OLD.state='frozen' AND NEW.state='running' AND NEW.sealed_hash IS NULL) OR
+         (OLD.state='running' AND NEW.state IN ('completed','incomplete','blocked') AND
+          NEW.sealed_hash ~ '^[0-9a-f]{64}$' AND OLD.sealed_hash IS NULL))
+ THEN RAISE EXCEPTION 'IMMUTABLE_CAMPAIGN'; END IF;
+ RETURN NEW; END $$;
+CREATE TRIGGER protect_campaign BEFORE UPDATE ON pilot_eval.campaigns
+ FOR EACH ROW EXECUTE FUNCTION pilot_eval.protect_campaign();
 CREATE FUNCTION pilot_eval.protect_slot() RETURNS trigger LANGUAGE plpgsql
  SET search_path = pg_catalog AS $$ BEGIN
- IF EXISTS(SELECT 1 FROM pilot_eval.seals WHERE measurement_id=OLD.measurement_id AND slot_id=OLD.slot_id)
- THEN RAISE EXCEPTION 'SEALED_SLOT'; END IF;
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'IMMUTABLE_SLOT'; END IF;
+ IF NEW.measurement_id IS DISTINCT FROM OLD.measurement_id OR NEW.slot_id IS DISTINCT FROM OLD.slot_id OR
+    NEW.ordinal IS DISTINCT FROM OLD.ordinal OR NEW.principal_id IS DISTINCT FROM OLD.principal_id OR
+    NEW.input_hash IS DISTINCT FROM OLD.input_hash OR NEW.eligibility IS DISTINCT FROM OLD.eligibility OR
+    (OLD.run_id IS NOT NULL AND NEW.run_id IS DISTINCT FROM OLD.run_id) OR
+    (OLD.call_id IS NOT NULL AND NEW.call_id IS DISTINCT FROM OLD.call_id) OR
+    (NEW.call_id IS NOT NULL AND NEW.run_id IS NULL) OR
+    EXISTS(SELECT 1 FROM pilot_eval.seals WHERE measurement_id=OLD.measurement_id AND slot_id=OLD.slot_id)
+ THEN RAISE EXCEPTION 'IMMUTABLE_SLOT'; END IF;
  RETURN NEW; END $$;
 CREATE TRIGGER protect_slot BEFORE UPDATE OR DELETE ON pilot_eval.slots FOR EACH ROW EXECUTE FUNCTION pilot_eval.protect_slot();
 CREATE FUNCTION pilot_eval.guard_event_insert() RETURNS trigger LANGUAGE plpgsql
@@ -75,6 +96,7 @@ CREATE FUNCTION pilot_eval.guard_event_insert() RETURNS trigger LANGUAGE plpgsql
  RETURN NEW; END $$;
 CREATE TRIGGER guard_event_insert BEFORE INSERT ON pilot_eval.events
  FOR EACH ROW EXECUTE FUNCTION pilot_eval.guard_event_insert();
+REVOKE ALL ON FUNCTION pilot_eval.protect_campaign() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.guard_event_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.immutable() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.protect_slot() FROM PUBLIC;

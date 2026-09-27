@@ -111,7 +111,8 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
       await owner.unsafe(`GRANT SELECT ON pilot_eval_bootstrap.marker TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
       await owner.unsafe(`GRANT USAGE ON SCHEMA pilot_eval TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
       await owner.unsafe(`GRANT SELECT ON pilot_eval.campaigns,pilot_eval.slots,pilot_eval.events,pilot_eval.seals,pilot_eval.grades TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
-      await owner.unsafe(`GRANT UPDATE ON pilot_eval.campaigns,pilot_eval.slots TO ${identifier(runtimeRole)}`);
+      await owner.unsafe(`GRANT UPDATE(state,sealed_hash) ON pilot_eval.campaigns TO ${identifier(runtimeRole)}`);
+      await owner.unsafe(`GRANT UPDATE(run_id,call_id,precleanup_status,cleanup_status) ON pilot_eval.slots TO ${identifier(runtimeRole)}`);
       await owner.unsafe(`GRANT INSERT ON pilot_eval.events,pilot_eval.seals TO ${identifier(runtimeRole)}`);
       const reads = "users,workflows,workflow_versions,runs,run_events,source_snapshots,pilot_profiles,pilot_approvals,pilot_ai_grants,pilot_ai_attempts,pilot_planner_outcomes,ai_provider_campaigns,ai_provider_calls,business_reservations";
       await owner.unsafe(`GRANT SELECT ON ${reads} TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
@@ -191,11 +192,13 @@ export async function openEvaluationStore(runtimeUrl: string, expected: Database
       has_table_privilege(current_user,'pilot_eval.seals','UPDATE') AS seal_update,
       has_table_privilege(current_user,'pilot_eval.seals','DELETE') AS seal_delete,
       has_table_privilege(current_user,'pilot_eval.grades','INSERT') AS grade_insert,
+      has_column_privilege(current_user,'pilot_eval.campaigns','manifest_hash','UPDATE') AS manifest_update,
+      has_column_privilege(current_user,'pilot_eval.slots','input_hash','UPDATE') AS descriptor_update,
       has_table_privilege(current_user,'pilot_eval_bootstrap.marker','UPDATE') AS marker_update,
       has_sequence_privilege(current_user,'run_events_id_seq','USAGE') AS event_sequence`;
     const grants = dml[0];
     if (!grants || Object.entries(grants).some(([key, allowed]) =>
-      ["event_update", "event_delete", "seal_update", "seal_delete", "grade_insert", "marker_update"].includes(key)
+      ["event_update", "event_delete", "seal_update", "seal_delete", "grade_insert", "manifest_update", "descriptor_update", "marker_update"].includes(key)
         ? allowed !== false : allowed !== true))
       throw new Error("Evaluator runtime role has broken DML privilege");
     return new EvaluationStore(client, identity);
