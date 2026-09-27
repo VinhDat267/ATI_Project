@@ -104,6 +104,8 @@ export {
   InMemoryProviderCallLedger,
   PostgresProviderCallLedger,
   createPostgresProviderCallLedger,
+  reservePostgresProviderCallInTransaction,
+  settlePostgresProviderCallInTransaction,
   ensurePostgresProviderCampaign,
   JournaledProviderCallLedger,
   restoreProviderCallRecords,
