@@ -60,6 +60,35 @@ project-process snapshots after every command.
 
 Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`. `GET /health/live` không auth và chỉ phản ánh process; `GET /health/ready` không auth, kiểm tra DB qua `SELECT 1` khi chạy main và trả `503 NOT_READY` nếu dependency lỗi. `POST /auth/logout` yêu cầu bearer hợp lệ, xoá session hiện tại và trả `204`; restart vẫn xoá toàn bộ session vì store hiện còn in-memory. `API_PLANNER_MODE=disabled` giữ `POST /runs` ở trạng thái `503 PLANNER_UNAVAILABLE`; `dev_fixture` chỉ nhận đúng các prompt server-owned trong `testdata` và không phải AI evaluation. Trace snapshot hết hạn sau 15 phút; cursor sai owner/run, hết hạn hoặc bị sửa trả `400`.
 
+### Pilot v2: planner seam thử nghiệm
+
+`POST /pilot/v2/runs` mặc định vẫn dùng checklist và preview được dẫn xuất từ source,
+**không gọi AI provider**. API có port `pilotPlanner` chỉ được inject tường minh
+trong `createApi` (chưa được `main.ts` cài đặt). Ở đường opt-in này, router lưu
+run + source snapshot vào PostgreSQL trước khi gọi planner; callback chỉ nhận
+context đã đóng gói/escape và che các credential cấu hình đã biết; chỉ được đề xuất `plan` (công cụ duy nhất
+`trello.create_card`), `clarification` hoặc `refusal`. Policy tạo write args và
+approval riêng sau khi kiểm lại snapshot, owner, checklist, board/list; model
+không được cấp quyền duyệt, chọn target hay dispatch. Lỗi/timeout và planning
+bị bỏ dở kết thúc không approval, không tự resume.
+
+Đường planner opt-in nay nhận **adapter có provider/model/ước lượng chi phí cố định**,
+đòi grant PostgreSQL còn hiệu lực cho từng principal và campaign `pilot-v2:<principalId>`
+được operator provision riêng (không có endpoint cấp quyền). Admission khoá campaign/grant,
+đếm call dưới khoá rồi reserve ledger cùng transaction; chỉ một claim được dispatch.
+Sau claim, lỗi không rõ chi phí giữ hold và không retry tự động; chi phí xác định được
+settle kể cả khi grant bị thu hồi. Trước preview approval và trước write, policy/grant
+được kiểm lại. Outcome trả về cho owner chỉ dùng reason code/thông điệp server cố định,
+không lưu câu hỏi/lý do thô của model. `main.ts` **chưa cài provider**; phép thử
+adapter fake/PostgreSQL/HTTP là bằng chứng offline, không xác nhận chất lượng AI,
+provider thật, hoặc nghiệm thu khách hàng. Gate **offline contract: CONFIRMED**
+(`npm run check`, API PostgreSQL/HTTP 49/49, engine PostgreSQL ledger 6/6,
+`git diff --check`, 2026-09-27); phạm vi này không xác nhận khả năng egress thực tế.
+Revocation ngay sau kiểm quyền cuối và trước Trello POST là best-effort, không được
+hiểu là khóa giao dịch xuyên qua network. **AI_QUALITY_NOT_MEASURED**,
+**CUSTOMER_VALIDATED_NOT_RUN**, provider thật **NOT_RUN**; không nối provider thật
+trước quyền, quota và rubric riêng.
+
 Ở môi trường không phải test, API ghi một JSON log cho mỗi request với đúng
 `event`, method, route template, status và `request_id`. Route template không
 chứa UUID/query string; body, header, bearer token, prompt và secret không được

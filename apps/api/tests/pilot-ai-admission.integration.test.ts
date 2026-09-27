@@ -5,6 +5,7 @@ import {
   type PilotConfig, type PilotPolicy, type SourceRow,
 } from "@wap/engine";
 import { createPilotAiAdmission } from "../src/pilot-ai-admission.js";
+import { createApi } from "../src/app.js";
 import { makeApiFixture } from "./fixture.js";
 
 describe("pilot AI admission schema on isolated PostgreSQL", () => {
@@ -150,7 +151,7 @@ async function preparedRun(
     requestHash: "a".repeat(64),
     snapshot: { rawData: row, checklist },
   };
-  return { coordinator, planner, admitInput, campaignId, runId, versionId };
+  return { coordinator, planner, admitInput, campaignId, runId, versionId, policy, config };
 }
 
 describe("pilot AI atomic admission and dispatch", () => {
@@ -249,6 +250,37 @@ describe("pilot AI atomic admission and dispatch", () => {
     } finally { await fixture.close(); }
   }, 45_000);
 
+  it.each(["model", "provider"] as const)(
+    "blocks a reserved call when grant %s changes before claim", async (field) => {
+      const fixture = await makeApiFixture();
+      try {
+        const setup = await preparedRun(fixture);
+        const admitted = await setup.coordinator.admit(setup.admitInput);
+        if (field === "model") await fixture.db.client`
+          UPDATE pilot_ai_grants SET model='other-model'
+          WHERE campaign_id=${setup.campaignId}`;
+        else await fixture.db.client`
+          UPDATE pilot_ai_grants SET provider='openai'
+          WHERE campaign_id=${setup.campaignId}`;
+        expect(await setup.coordinator.claim({
+          runId: setup.runId, principalId: fixture.userId, callId: admitted.callId,
+          versionId: setup.versionId, sourceKey: setup.admitInput.sourceKey,
+          sourceRevision: setup.admitInput.sourceRevision,
+          snapshot: setup.admitInput.snapshot,
+        })).toBe(false);
+        expect(await fixture.db.client`
+          SELECT state FROM pilot_ai_attempts WHERE run_id=${setup.runId}`)
+          .toEqual([{ state: "reserved" }]);
+        expect(await setup.coordinator.settle({
+          runId: setup.runId, principalId: fixture.userId, callId: admitted.callId,
+          outcome: { status: "cancelled", usage: null, costMicros: 0 },
+        })).toEqual({ overrun: false, conflict: false });
+        expect(await fixture.db.client`
+          SELECT held_micros FROM ai_provider_campaigns WHERE campaign_id=${setup.campaignId}`)
+          .toEqual([{ held_micros: "0" }]);
+      } finally { await fixture.close(); }
+    }, 45_000);
+
   it("blocks claim after grant revocation but allows known-cost settlement", async () => {
     const fixture = await makeApiFixture();
     try {
@@ -328,6 +360,94 @@ describe("pilot AI atomic admission and dispatch", () => {
         sourceRevision: setup.admitInput.sourceRevision,
         snapshot: setup.admitInput.snapshot,
       })).toBe(false);
+    } finally { await fixture.close(); }
+  }, 45_000);
+
+  it("rolls back the attempt and budget hold if provider reservation insert fails", async () => {
+    const fixture = await makeApiFixture();
+    try {
+      const setup = await preparedRun(fixture);
+      await fixture.db.client`
+        CREATE FUNCTION abort_pilot_provider_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'fixture reservation fault'; END $$`;
+      await fixture.db.client`
+        CREATE TRIGGER abort_pilot_provider_insert BEFORE INSERT ON ai_provider_calls
+        FOR EACH ROW EXECUTE FUNCTION abort_pilot_provider_insert()`;
+      await expect(setup.coordinator.admit(setup.admitInput)).rejects.toThrow();
+      expect(await fixture.db.client`SELECT run_id FROM pilot_ai_attempts`).toHaveLength(0);
+      expect(await fixture.db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
+      expect(await fixture.db.client`
+        SELECT held_micros,committed_micros FROM ai_provider_campaigns
+        WHERE campaign_id=${setup.campaignId}`)
+        .toEqual([{ held_micros: "0", committed_micros: "0" }]);
+    } finally { await fixture.close(); }
+  }, 45_000);
+
+  it("quarantines a post-claim crash without retrying or releasing its hold", async () => {
+    const fixture = await makeApiFixture();
+    let api: ReturnType<typeof createApi> | undefined;
+    try {
+      const setup = await preparedRun(fixture);
+      const { callId } = await setup.coordinator.admit(setup.admitInput);
+      expect(await setup.coordinator.claim({
+        runId: setup.runId, principalId: fixture.userId, callId,
+        versionId: setup.versionId, sourceKey: setup.admitInput.sourceKey,
+        sourceRevision: setup.admitInput.sourceRevision,
+        snapshot: setup.admitInput.snapshot,
+      })).toBe(true);
+      await fixture.db.client`UPDATE runs SET created_at=clock_timestamp() - interval '6 minutes'
+        WHERE id=${setup.runId}`;
+      api = createApi({ db: fixture.db, config: fixture.config,
+        pilotConfig: setup.config, pilotPolicy: setup.policy });
+      const base = await api.listen();
+      const login = await fetch(`${base}/auth/login`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: fixture.email, password: fixture.password }),
+      });
+      const { token } = await login.json() as { token: string };
+      const response = await fetch(`${base.replace(/\/api\/v1$/, "")}/pilot/v2/runs/${setup.runId}`,
+        { headers: { authorization: `Bearer ${token}` } });
+      expect(response.status).toBe(200);
+      const detail = await response.json() as Record<string, unknown>;
+      expect(detail.status).toBe("failed");
+      expect(detail.preview).toBeNull();
+      expect(detail.error).toBeTruthy();
+      expect(await fixture.db.client`
+        SELECT state FROM pilot_ai_attempts WHERE run_id=${setup.runId}`)
+        .toEqual([{ state: "dispatch_claimed" }]);
+      expect(await fixture.db.client`
+        SELECT status FROM ai_provider_calls WHERE call_id=${callId}`)
+        .toEqual([{ status: "reserved" }]);
+      expect(await fixture.db.client`
+        SELECT held_micros FROM ai_provider_campaigns WHERE campaign_id=${setup.campaignId}`)
+        .toEqual([{ held_micros: "60" }]);
+      expect(await fixture.db.client`SELECT id FROM pilot_approvals`).toHaveLength(0);
+    } finally { await api?.close(); await fixture.close(); }
+  }, 45_000);
+
+  it("halts on conflicting repeated settlement while retaining the first cost", async () => {
+    const fixture = await makeApiFixture();
+    try {
+      const setup = await preparedRun(fixture);
+      const { callId } = await setup.coordinator.admit(setup.admitInput);
+      expect(await setup.coordinator.claim({
+        runId: setup.runId, principalId: fixture.userId, callId,
+        versionId: setup.versionId, sourceKey: setup.admitInput.sourceKey,
+        sourceRevision: setup.admitInput.sourceRevision,
+        snapshot: setup.admitInput.snapshot,
+      })).toBe(true);
+      const first = { runId: setup.runId, principalId: fixture.userId, callId,
+        outcome: { status: "succeeded" as const, usage: null, costMicros: 2 } };
+      expect(await setup.coordinator.settle(first)).toEqual({ overrun: false, conflict: false });
+      expect(await setup.coordinator.settle(first)).toEqual({ overrun: false, conflict: false });
+      expect(await setup.coordinator.settle({ ...first,
+        outcome: { status: "failed", usage: null, costMicros: 3 },
+      })).toEqual({ overrun: false, conflict: true });
+      expect(await fixture.db.client`
+        SELECT halted,held_micros,committed_micros FROM ai_provider_campaigns
+        WHERE campaign_id=${setup.campaignId}`)
+        .toEqual([{ halted: true, held_micros: "0", committed_micros: "2" }]);
+      expect(await fixture.db.client`SELECT id FROM pilot_approvals`).toHaveLength(0);
     } finally { await fixture.close(); }
   }, 45_000);
 

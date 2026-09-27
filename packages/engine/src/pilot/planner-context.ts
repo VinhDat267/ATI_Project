@@ -94,16 +94,18 @@ export function buildPilotPlannerContext(
     "</client_untrusted_intake>",
   ].join("\n");
 
-  // XML Envelope for checklist result
+  // Checklist summaries can echo untrusted source fields (e.g. request_id).
+  // Apply the same redaction to every checklist-derived prompt field.
+  const safeChecklist = (text: string) => escapeXml(redactSecrets(text, secretsToRedact));
   const checklistSummaryXml = [
     "<checklist_summary>",
     `  <status>${checklistResult.status}</status>`,
-    `  <checklist_version>${escapeXml(checklistResult.checklistVersion)}</checklist_version>`,
-    `  <source_revision>${escapeXml(checklistResult.sourceRevision)}</source_revision>`,
+    `  <checklist_version>${safeChecklist(checklistResult.checklistVersion)}</checklist_version>`,
+    `  <source_revision>${safeChecklist(checklistResult.sourceRevision)}</source_revision>`,
     `  <unconfirmed_business>${checklistResult.unconfirmedBusiness}</unconfirmed_business>`,
-    `  <missing_fields>${escapeXml(checklistResult.missingFields.join(", "))}</missing_fields>`,
-    `  <conflicts>${escapeXml(checklistResult.conflicts.join(", "))}</conflicts>`,
-    `  <summary>${escapeXml(checklistResult.summary)}</summary>`,
+    `  <missing_fields>${safeChecklist(checklistResult.missingFields.join(", "))}</missing_fields>`,
+    `  <conflicts>${safeChecklist(checklistResult.conflicts.join(", "))}</conflicts>`,
+    `  <summary>${safeChecklist(checklistResult.summary)}</summary>`,
     "</checklist_summary>",
   ].join("\n");
 
@@ -135,7 +137,7 @@ export function buildPilotPlannerContext(
     toolCatalogPrompt,
     "",
     "=== RUNTIME PARAMETERS ===",
-    `Timezone: ${timeZone}`,
+    `Timezone: ${escapeXml(redactSecrets(timeZone, secretsToRedact))}`,
     "",
     "=== INTAKE EVIDENCE ===",
     checklistSummaryXml,

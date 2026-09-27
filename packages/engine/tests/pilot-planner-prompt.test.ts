@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildPilotPlannerContext,
+  evaluateChecklist,
   escapeXml,
   type SourceRow,
   type ChecklistResult,
@@ -95,6 +96,28 @@ describe("Pilot Planner Context & Anti-Injection Envelope (BE-20)", () => {
 
     expect(context.userPrompt).not.toContain("password-top-secret-999");
     expect(context.userPrompt).toContain("[REDACTED_SECRET]");
+  });
+
+  it("redacts secrets echoed by a derived checklist summary", () => {
+    const secret = "configured-secret-987";
+    const sourceRow: SourceRow = {
+      ...sampleRow,
+      request_id: `REQ-${secret}`,
+      request_type: "web_change",
+      raw_request: "Update /landing",
+    };
+    const checklistResult = evaluateChecklist(sourceRow);
+    expect(checklistResult.status).toBe("pass");
+    expect(checklistResult.summary).toContain(secret);
+
+    const context = buildPilotPlannerContext({
+      sourceRow, checklistResult, operatorPrompt: "Prepare preview",
+      secretsToRedact: [secret],
+    });
+    expect(context.envelope.clientUntrustedIntakeXml).not.toContain(secret);
+    expect(context.envelope.checklistSummaryXml).not.toContain(secret);
+    expect(context.envelope.checklistSummaryXml).toContain("[REDACTED_SECRET]");
+    expect(context.userPrompt).not.toContain(secret);
   });
 
   it("truncates excessively long fields and bounds total prompt characters", () => {
