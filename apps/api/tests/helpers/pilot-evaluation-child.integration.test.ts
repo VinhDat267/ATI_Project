@@ -6,7 +6,10 @@ import type { PrivateBootstrapReceipt } from "../../src/pilot-evaluation/provisi
 
 // This is only a Vitest child worker fixture; it is never imported by production.
 vi.mock("../../src/pilot-evaluation/git-evidence.js", () => ({
-  observeGitEvidence: () => ({ head: "a".repeat(40), clean: true }),
+  observeGitEvidence: () => ({ head: "a".repeat(40), clean: true,
+    sourceDigests: { code: "a".repeat(64), projection: "b".repeat(64),
+      prompt: "c".repeat(64), schema: "d".repeat(64), fakeScript: "1".repeat(64),
+      rubric: "2".repeat(64) } }),
 }));
 
 type ChildPayload = { boundary: "claim" | "intent" | "capture" | "settle";

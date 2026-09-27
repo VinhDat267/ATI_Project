@@ -118,7 +118,8 @@ trên evaluator store, không thuộc báo cáo chỉ đọc. Không có CLI, ap
 transport provider hoặc quyền write SaaS mới. `offline_fake`, provider metadata
 `google|openai`, model `offline-fixture-*` và cost dương chỉ là **SIMULATED_NOT_BILLED**.
 
-Manifest/artifact cần JSON bounded/strict, frozen hash và exact **clean Git HEAD**;
+Manifest/artifact cần JSON bounded/strict, frozen hash, exact **clean Git HEAD**
+và digest nguồn cố định cho evaluator code/projection/prompt/schema/fake/rubric;
 producer kiểm lại cùng manifest/marker/role/fixture trước claim một lần. Hai
 principal đăng nhập password qua hai `createApi` loopback thực với session mặc
 định; cleanup duy nhất là owner `rejected` dùng approval hiện thời. Nếu POST/runId,

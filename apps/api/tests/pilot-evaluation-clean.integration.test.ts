@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { freezeManifest } from "../src/pilot-evaluation/manifest.js";
+import { sourceArtifactDigests } from "../src/pilot-evaluation/git-evidence.js";
 import { runOfflineCampaign } from "../src/pilot-evaluation/coordinator.js";
 import { buildOfflineReport, openReadonlyEvaluationStore } from "../src/pilot-evaluation/report.js";
 import { syntheticBundle, syntheticManifest, syntheticOracle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
@@ -15,7 +16,8 @@ describe.skipIf(process.env.PILOT_EVAL_CLEAN_CHECKOUT !== "1")("clean frozen Git
     const bundle = syntheticBundle();
     const frozen = syntheticManifest(bundle);
     const { manifestHash: _unused, artifacts, ...draft } = frozen;
-    const manifest = freezeManifest({ ...draft, gitCommit: commit }, artifacts);
+    const manifest = freezeManifest({ ...draft, gitCommit: commit },
+      { ...artifacts, ...sourceArtifactDigests(repoRoot) });
     await withOfflineCampaign(async ({ receipt }) => {
       const result = await runOfflineCampaign({ manifest, bundle, receipt, repoRoot });
       expect(result.state).toBe("completed");

@@ -2,7 +2,8 @@ import { evaluateChecklist, sourceKey, type PilotConfig, type PilotPolicy, type 
 import { openDatabase } from "@wap/db";
 import { createApi, type ApiRuntime } from "../app.js";
 import { assertCleanProvenance, assertFrozen, canonicalHash } from "./manifest.js";
-import { FixtureBundleSchema, type FixtureBundle, type FrozenManifest, type SlotDescriptor } from "./contracts.js";
+import { FixtureBundleSchema, OFFLINE_USER_PROMPT,
+  type FixtureBundle, type FrozenManifest, type SlotDescriptor } from "./contracts.js";
 import { openEvaluationStore, type PrivateBootstrapReceipt } from "./provision.js";
 import { createObservedFakePlanner } from "./observer.js";
 import type { EvaluationStore } from "./store.js";
@@ -129,7 +130,7 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
           payload: { code: "SUBMISSION_INTENT" } });
         const submitted = await post(`${origin}${path}/runs`, {
           spreadsheetId: slot.fixture.spreadsheetId, tabId: slot.fixture.tabId,
-          requestId: slot.fixture.requestId, userPrompt: "Create the reviewed synthetic card",
+          requestId: slot.fixture.requestId, userPrompt: OFFLINE_USER_PROMPT,
         }, owner.token);
         const accepted = await safeResponse(submitted);
         // 202.status may still say planning. Exact owner detail gives actual persisted outcome.

@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
-import { openReadonlyEvaluationStore } from "../src/pilot-evaluation/report.js";
+import { openReadonlyEvaluationStore, buildOfflineReport } from "../src/pilot-evaluation/report.js";
+import { syntheticOracle } from "./helpers/pilot-evaluation-fixture.js";
 import { withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 const adminUrl = process.env.API_TEST_ADMIN_URL ?? "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
@@ -29,6 +30,28 @@ describe("dedicated evaluator database", () => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       await admin.unsafe(`GRANT INSERT ON users TO "${receipt.reportRole}"`);
       await expect(openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity)).rejects.toThrow("privilege");
+    });
+  }, 120_000);
+
+  it("records a late return on an incomplete seal without upgrading campaign completeness", async () => {
+    await withOfflineCampaign(async ({ receipt }) => {
+      const store = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);
+      const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        expect(await store.claimCampaign()).toBe(true);
+        const slotId = receipt.manifest.slots[0]!.slotId;
+        await store.appendEvent({ slotId, type: "slot_intent", durationMs: 0,
+          payload: { code: "SUBMISSION_INTENT" } });
+        await store.sealSlot(slotId, "incomplete", "UNLINKED_RUN", "b".repeat(64));
+        await store.sealCampaign("incomplete");
+        await store.appendEvent({ slotId, type: "late_return", durationMs: 5,
+          payload: { code: "LATE_RETURN" } });
+        const report = await buildOfflineReport(readOnly, syntheticOracle());
+        expect(report.verdict).toBe("INCOMPLETE");
+        expect(report.integrity).toBe("valid");
+        expect(report.structural.notRun).toBe(2);
+        expect(await store.claimCampaign()).toBe(false);
+      } finally { await readOnly.close(); await store.close(); }
     });
   }, 120_000);
 

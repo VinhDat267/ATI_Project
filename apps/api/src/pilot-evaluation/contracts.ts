@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+export const OFFLINE_USER_PROMPT = "Create the reviewed synthetic card";
 export const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
 export const UuidSchema = z.uuid();
 export const PositiveUnitsSchema = z.number().int().safe().positive();

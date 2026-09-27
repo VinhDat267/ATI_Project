@@ -108,6 +108,8 @@ export function assertFrozen(manifest: FrozenManifest, artifacts: ArtifactHashes
 /** Campaign proof requires an actual clean Git checkout at the exact frozen commit. */
 export function assertCleanProvenance(manifest: FrozenManifest, cwd: string): void {
   const evidence = observeGitEvidence(cwd);
-  if (evidence.head !== manifest.gitCommit || !evidence.clean)
-    throw new Error("Frozen campaign requires clean exact Git checkout");
+  if (evidence.head !== manifest.gitCommit || !evidence.clean ||
+      Object.entries(evidence.sourceDigests).some(([key, digest]) =>
+        manifest.artifacts[key as keyof typeof evidence.sourceDigests] !== digest))
+    throw new Error("Frozen campaign requires exact clean Git and source artifact digests");
 }

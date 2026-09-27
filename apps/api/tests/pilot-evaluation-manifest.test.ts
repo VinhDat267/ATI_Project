@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, appendFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, appendFileSync, rmSync, mkdirSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   FixtureBundleSchema, FrozenManifestSchema,
   freezeManifest, assertFrozen, assertCleanProvenance, canonicalHash, parseBoundedJson,
 } from "../src/pilot-evaluation/manifest.js";
 import type { ManifestDraft, SlotDescriptor } from "../src/pilot-evaluation/contracts.js";
+import { FROZEN_SOURCE_FILES, sourceArtifactDigests } from "../src/pilot-evaluation/git-evidence.js";
 
 const digest = (letter: string) => letter.repeat(64);
 const principals: ManifestDraft["principals"] = [
@@ -65,10 +67,18 @@ describe("offline manifest freeze", () => {
     try {
       git("init", "-q");
       writeFileSync(path.join(root, "source.txt"), "initial\n");
-      git("-c", "core.autocrlf=false", "add", "--", "source.txt");
+      const sourceRoot = fileURLToPath(new URL("../../../", import.meta.url));
+      for (const relative of FROZEN_SOURCE_FILES) {
+        mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+        copyFileSync(path.join(sourceRoot, relative), path.join(root, relative));
+      }
+      git("-c", "core.autocrlf=false", "add", "--", "source.txt", ...FROZEN_SOURCE_FILES);
       git("-c", "user.name=ATI Fixture", "-c", "user.email=ati@local.invalid", "commit", "-qm", "fixture");
-      const manifest = freezeManifest({ ...draft(), gitCommit: git("rev-parse", "HEAD") }, artifacts);
+      const manifest = freezeManifest({ ...draft(), gitCommit: git("rev-parse", "HEAD") },
+        { ...artifacts, ...sourceArtifactDigests(root) });
       expect(() => assertCleanProvenance(manifest, root)).not.toThrow();
+      expect(() => assertCleanProvenance({ ...manifest, artifacts: { ...manifest.artifacts,
+        code: "9".repeat(64) } }, root)).toThrow();
       expect(() => assertCleanProvenance({ ...manifest, gitCommit: "a".repeat(40) }, root)).toThrow();
       appendFileSync(path.join(root, "source.txt"), "changed\n");
       expect(() => assertCleanProvenance(manifest, root)).toThrow();
