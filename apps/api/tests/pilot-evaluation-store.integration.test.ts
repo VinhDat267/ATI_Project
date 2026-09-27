@@ -33,6 +33,25 @@ describe("dedicated evaluator database", () => {
     });
   }, 120_000);
 
+  it("rejects raw/oversized SQL payloads and post-seal insert under the runtime role", async () => {
+    await withOfflineCampaign(async ({ receipt }) => {
+      const store = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);
+      try {
+        await store.claimCampaign();
+        const slotId = receipt.manifest.slots[0]!.slotId;
+        const insert = (payload: Record<string, string>, seq: number) => store.client`
+          INSERT INTO pilot_eval.events(measurement_id,seq,slot_id,event_type,duration_ms,payload,previous_hash,event_hash)
+          VALUES (${receipt.identity.measurementId},${seq},${slotId},'slot_intent',0,
+            ${store.client.json(payload)},${"0".repeat(64)},${"a".repeat(64)})`;
+        await expect(insert({ question: "unsanitized" }, 1)).rejects.toThrow();
+        await expect(insert({ code: "A".repeat(17_000) }, 1)).rejects.toThrow();
+        await store.appendEvent({ slotId, type: "slot_intent", durationMs: 0, payload: { code: "SUBMISSION_INTENT" } });
+        await store.sealSlot(slotId, "complete", "OK", "b".repeat(64));
+        await expect(insert({ code: "SUBMISSION_INTENT" }, 2)).rejects.toThrow();
+      } finally { await store.close(); }
+    });
+  }, 120_000);
+
   it("records a late return on an incomplete seal without upgrading campaign completeness", async () => {
     await withOfflineCampaign(async ({ receipt }) => {
       const store = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);

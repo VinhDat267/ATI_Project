@@ -19,7 +19,11 @@ CREATE TABLE pilot_eval.events (
  event_type text NOT NULL CHECK(event_type IN ('slot_intent','callback_entered','fake_return','fake_error','http_outcome','cleanup','late_return')),
  run_id uuid REFERENCES runs(id), call_id uuid REFERENCES ai_provider_calls(call_id),
  duration_ms double precision NOT NULL CHECK(duration_ms >= 0 AND duration_ms <= 86400000),
- payload jsonb NOT NULL, previous_hash text NOT NULL, event_hash text NOT NULL,
+ payload jsonb NOT NULL CHECK (
+   jsonb_typeof(payload)='object' AND octet_length(payload::text) <= 16384 AND
+   payload - ARRAY['code','kind','valid','digest','usageKnown','costKnown',
+     'costMicros','inputTokens','outputTokens','status','previewHash']::text[] = '{}'::jsonb
+ ), previous_hash text NOT NULL, event_hash text NOT NULL,
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  PRIMARY KEY(measurement_id,seq),
  FOREIGN KEY(measurement_id,slot_id) REFERENCES pilot_eval.slots(measurement_id,slot_id)
@@ -50,6 +54,28 @@ CREATE FUNCTION pilot_eval.protect_slot() RETURNS trigger LANGUAGE plpgsql
  THEN RAISE EXCEPTION 'SEALED_SLOT'; END IF;
  RETURN NEW; END $$;
 CREATE TRIGGER protect_slot BEFORE UPDATE OR DELETE ON pilot_eval.slots FOR EACH ROW EXECUTE FUNCTION pilot_eval.protect_slot();
+CREATE FUNCTION pilot_eval.guard_event_insert() RETURNS trigger LANGUAGE plpgsql
+ SET search_path = pg_catalog AS $$ DECLARE
+ campaign_state text; slot_run uuid; slot_call uuid; sealed_state text;
+ BEGIN
+ SELECT c.state,s.run_id,s.call_id INTO campaign_state,slot_run,slot_call
+ FROM pilot_eval.campaigns c JOIN pilot_eval.slots s USING(measurement_id)
+ WHERE s.measurement_id=NEW.measurement_id AND s.slot_id=NEW.slot_id
+ FOR UPDATE OF c;
+ IF campaign_state IS NULL OR
+    (campaign_state <> 'running' AND NOT (campaign_state='incomplete' AND NEW.event_type='late_return')) OR
+    (NEW.run_id IS NOT NULL AND NEW.run_id IS DISTINCT FROM slot_run) OR
+    (NEW.call_id IS NOT NULL AND NEW.call_id IS DISTINCT FROM slot_call)
+ THEN RAISE EXCEPTION 'INVALID_EVENT_LINKAGE'; END IF;
+ SELECT completeness INTO sealed_state FROM pilot_eval.seals
+ WHERE measurement_id=NEW.measurement_id AND slot_id=NEW.slot_id;
+ IF sealed_state IS NOT NULL AND NOT (sealed_state='incomplete' AND
+    campaign_state='incomplete' AND NEW.event_type='late_return')
+ THEN RAISE EXCEPTION 'SEALED_SLOT'; END IF;
+ RETURN NEW; END $$;
+CREATE TRIGGER guard_event_insert BEFORE INSERT ON pilot_eval.events
+ FOR EACH ROW EXECUTE FUNCTION pilot_eval.guard_event_insert();
+REVOKE ALL ON FUNCTION pilot_eval.guard_event_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.immutable() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.protect_slot() FROM PUBLIC;
 `;
