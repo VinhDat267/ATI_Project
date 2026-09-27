@@ -101,6 +101,20 @@ describe("SQL-only structural report", () => {
     });
   }, 120_000);
 
+  it("rejects a run whose persisted terminal status contradicts the HTTP cleanup evidence", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      await admin`UPDATE runs SET status='failed' WHERE id=(SELECT run_id FROM pilot_eval.slots WHERE slot_id='slot-1')`;
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(reader, syntheticOracle());
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.safeReasons).toContain('MISSING_ELIGIBLE_EVIDENCE');
+      } finally { await reader.close(); }
+    });
+  }, 120_000);
+
   it("flags missing HTTP cleanup even though valid event and call seals remain", async () => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),

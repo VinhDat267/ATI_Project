@@ -158,6 +158,9 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     WHERE s.measurement_id=${measurementId} ORDER BY s.ordinal`;
   const events = await store.client`SELECT seq,slot_id,event_type,run_id,call_id,duration_ms,payload,
     previous_hash,event_hash FROM pilot_eval.events WHERE measurement_id=${measurementId} ORDER BY seq`;
+  const runRows = await store.client`SELECT r.id,r.user_id,r.profile,r.status::text AS status
+    FROM runs r JOIN pilot_eval.slots s ON s.run_id=r.id
+    WHERE s.measurement_id=${measurementId}`;
   const reservations = await store.client`SELECT count(*)::int AS n FROM business_reservations`;
   const localBusinessReservations = Number(reservations[0]?.n);
   const safeReasons = new Set<string>();
@@ -281,7 +284,11 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
           own.some((event) => ["callback_entered","fake_return","fake_error","late_return"].includes(event.event_type)) ||
           accounting.calls.some((call) => call.slot_id === slot.slotId))
         safeReasons.add("DETERMINISTIC_CLASSIFIER_MISMATCH");
-      if (row.completeness !== "complete" || !row.run_id ||
+      const run = runRows.find((entry) => entry.id === row.run_id);
+      const principal = manifest.principals.find((entry) => entry.alias === slot.principalAlias)!;
+      if (row.completeness !== "complete" || !row.run_id || !run ||
+          run.user_id !== principal.id || run.profile !== "pilot-v2" ||
+          run.status !== row.cleanup_status ||
           !["needs_input","refused"].includes(row.precleanup_status as string) ||
           row.precleanup_status !== row.cleanup_status || row.precleanup_status !== expectedStatus ||
           intents.length !== 1 || outcomes.length !== 1 ||
@@ -296,12 +303,14 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
       event.seq <= (row.event_end as number | null ?? 0));
     const count = (type: string) => own.filter((event) => event.event_type === type);
     const call = accounting.calls.find((entry) => entry.call_id === row.call_id);
+    const run = runRows.find((entry) => entry.id === row.run_id);
     const principal = manifest.principals.find((entry) => entry.alias === slot.principalAlias)!;
     const hasRun = typeof row.run_id === "string" && row.run_id.length > 0;
     const hasCall = typeof row.call_id === "string" && row.call_id.length > 0;
     const awaiting = row.precleanup_status === "awaiting_approval";
     if (row.completeness !== "complete" || !hasRun || !hasCall ||
-        !call || call.run_id !== row.run_id || call.user_id !== principal.id ||
+        !run || run.user_id !== principal.id || run.profile !== "pilot-v2" ||
+        run.status !== row.cleanup_status || !call || call.run_id !== row.run_id || call.user_id !== principal.id ||
         call.campaign_id !== `pilot-v2:${principal.id}` ||
         call.attempt_run_id !== row.run_id || call.attempt_principal_id !== principal.id ||
         call.attempt_campaign_id !== call.campaign_id || !call.dispatch_claimed ||
