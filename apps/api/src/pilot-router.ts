@@ -511,6 +511,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
             kind: "source", spreadsheetId: config.spreadsheetId, tabId: config.tabId,
           });
           const context = buildPilotPlannerContext({
+            outputContract: "pilot-advisory-v1",
             sourceRow: persisted.raw_data,
             checklistResult: persisted.checklist_result,
             operatorPrompt: persisted.inputs.userPrompt,
