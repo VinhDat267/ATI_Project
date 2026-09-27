@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import postgres from "postgres";
 import { createApi } from "../src/app.js";
 import { SessionStore } from "../src/auth.js";
 import type { PilotAccountedPlanner } from "../src/pilot-planner.js";
 import { makeApiFixture } from "./fixture.js";
 import {
-  evaluateChecklist, sourceKey, createIntentKey, ensurePostgresProviderCampaign,
-  type PilotConfig, type PilotPolicy, type SourceRow,
+  evaluateChecklist, parseRequest, projectPilotEvaluationInput, SOURCE_COLUMNS,
+  sourceKey, createIntentKey, ensurePostgresProviderCampaign,
+  type PilotConfig, type PilotPolicy, type SourceRow, type PilotEvaluationInput, type V2TestCase,
 } from "@wap/engine";
 
 const row: SourceRow = {
@@ -32,11 +34,24 @@ async function harness(
   planner?: PilotAccountedPlanner,
   plannerTimeoutMs?: number,
   provisionGrant = true,
+  intake?: PilotEvaluationInput,
 ) {
   const fixture = await makeApiFixture();
+  // The synthetic label is mapped to an actual fixture principal, never used as a DB identity.
+  if (intake && (intake.principal !== "fixture-owner" ||
+      JSON.stringify(intake.resourcePolicy.allowedPrincipals) !== JSON.stringify([intake.principal]) ||
+      intake.sourceFixture.spreadsheetId !== intake.resourcePolicy.allowedSources[0] ||
+      intake.resourcePolicy.allowedSources.length !== 1 ||
+      intake.resourcePolicy.allowedTargets.length !== 1 || !intake.sourceFixture.tabId))
+    throw new Error("Invalid projected fixture policy");
+  const intakeRow = intake
+    ? parseRequest([intake.sourceFixture.headers, ...intake.sourceFixture.rows], intake.sourceFixture.requestId)
+    : row;
   const policy: PilotPolicy = {
     enabled: true, principals: [fixture.userId, ...additionalPrincipals],
-    spreadsheetId: "sheet-pilot", tabId: "requests", boardId: "board-pilot",
+    spreadsheetId: intake?.resourcePolicy.allowedSources[0] ?? "sheet-pilot",
+    tabId: intake?.sourceFixture.tabId ?? "requests",
+    boardId: intake?.resourcePolicy.allowedTargets[0] ?? "board-pilot",
   };
   if (planner && provisionGrant) {
     for (const principalId of additionalPrincipals) {
@@ -62,14 +77,14 @@ async function harness(
     google: { apiKey: "fixture-google" },
     trello: { apiKey: "fixture-trello", apiToken: "fixture-token", listId: "list-todo" },
   };
-  const checklist = evaluateChecklist(row);
+  const checklist = evaluateChecklist(intakeRow);
   const key = sourceKey({
     groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
-    tabId: policy.tabId, requestId: row.request_id,
+    tabId: policy.tabId, requestId: intakeRow.request_id,
   });
   const intentKey = createIntentKey({
     groupId: policy.boardId, spreadsheetId: policy.spreadsheetId,
-    tabId: policy.tabId, requestId: row.request_id,
+    tabId: policy.tabId, requestId: intakeRow.request_id,
   }, policy.boardId);
 
   const customPrincipalTokens = new Map<string, string>();
@@ -99,9 +114,17 @@ async function harness(
     pilotLiveWriteEnabled: writeEnabled,
     ...(planner ? { pilotPlanner: planner } : {}),
     ...(plannerTimeoutMs ? { pilotPlannerTimeoutMs: plannerTimeoutMs } : {}),
-    readSheetsRequestFn: async () => ({
-      row, checklist, sourceKey: key, sourceRevision: checklist.sourceRevision,
-    }),
+    readSheetsRequestFn: async (request) => {
+      if (intake) {
+        expect(request.principalId).toBe(fixture.userId);
+        expect(request.requestId).toBe(intake.sourceFixture.requestId);
+        expect(request.spreadsheetId).toBe(intake.sourceFixture.spreadsheetId);
+        expect(request.tabId).toBe(intake.sourceFixture.tabId);
+        expect(request.policy).toMatchObject(policy);
+        expect(request.config.boardId).toBe(intake.resourcePolicy.allowedTargets[0]);
+      }
+      return { row: intakeRow, checklist, sourceKey: key, sourceRevision: checklist.sourceRevision };
+    },
   });
 
   const baseUrl = await api.listen();
@@ -118,8 +141,8 @@ async function harness(
       body: JSON.stringify({
         spreadsheetId: policy.spreadsheetId,
         tabId: policy.tabId,
-        requestId: row.request_id,
-        userPrompt: "Create the reviewed card",
+        requestId: intakeRow.request_id,
+        userPrompt: intake?.prompt ?? "Create the reviewed card",
       }),
     });
     const body = await response.json() as Record<string, any>;
@@ -181,7 +204,121 @@ function mockTrello(
   return { writes: () => writes };
 }
 
+function syntheticEvaluationRecord(): V2TestCase {
+  return {
+    caseId: "V2-01", variantId: "synthetic-en", language: "en",
+    origin: "reconstructed_synthetic", sourceRefs: ["not-for-model"],
+    sourceFixture: { headers: [...SOURCE_COLUMNS],
+      rows: [["REQ-SYNTH", "Synthetic Client", "web_change", "Update /sample", "Synthetic banner", "2026-11-15", "confirmed", "scope"]],
+      requestId: "REQ-SYNTH", spreadsheetId: "sheet-fixture", tabId: "tab-fixture" },
+    prompt: "Prepare the synthetic preview", principal: "fixture-owner",
+    resourcePolicy: { allowedSources: ["sheet-fixture"], allowedTargets: ["board-fixture"], allowedPrincipals: ["fixture-owner"] },
+    fault: "none", expected: { kind: "plan", terminalStatus: "awaiting_approval", writeCount: 1 },
+    evidence: { mode: "CONTRACT_TESTED", commit: "synthetic", verdict: "NOT_RUN" },
+  };
+}
+
 describe("pilot durable approval over PostgreSQL and HTTP", () => {
+  it("uses projected intake through HTTP and a committed snapshot visible to another connection", async () => {
+    const input = projectPilotEvaluationInput(syntheticEvaluationRecord());
+    let h!: Awaited<ReturnType<typeof harness>>;
+    let reader: ReturnType<typeof postgres>;
+    const seen: Array<Parameters<PilotAccountedPlanner["propose"]>[0]> = [];
+    const propose = vi.fn(async (callback: Parameters<PilotAccountedPlanner["propose"]>[0]) => {
+      const persisted = await reader`SELECT s.raw_data,s.source_revision,r.inputs FROM source_snapshots s
+        JOIN runs r ON r.id=s.run_id WHERE s.run_id=${callback.runId}`;
+      expect(persisted).toHaveLength(1);
+      expect(persisted[0]?.raw_data.deliverable).toBe("Synthetic banner");
+      expect(persisted[0]?.inputs.userPrompt).toBe(input.prompt);
+      expect(persisted[0]?.source_revision).toBe(callback.sourceRevision);
+      expect(callback.principalId).toBe(h.fixture.userId);
+      expect(callback.sourceKey).toBe(sourceKey({ groupId: "board-fixture", spreadsheetId: "sheet-fixture", tabId: "tab-fixture", requestId: "REQ-SYNTH" }));
+      expect(callback.context.userPrompt).toContain("Synthetic banner");
+      expect(callback.context.userPrompt).toContain("Prepare the synthetic preview");
+      expect(callback.context.systemPrompt).toContain("ADVISORY PROPOSAL CONTRACT");
+      expect(callback.context.userPrompt).not.toContain("trello.get_card");
+      seen.push(callback);
+      return { proposal: { kind: "plan", tool: "trello.create_card" }, usage: null, costMicros: 3 };
+    });
+    h = await harness(false, [], fakePlanner(propose), undefined, true, input);
+    reader = postgres(h.fixture.databaseUrl, { max: 1 });
+    try {
+      const realFetch = globalThis.fetch;
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+        if (new URL(String(url)).hostname !== "127.0.0.1") throw new Error("Unexpected external fetch");
+        return realFetch(url, init);
+      });
+      const first = await h.create();
+      const firstDetail = await h.detail(first);
+      expect(firstDetail.status).toBe("awaiting_approval");
+      expect(firstDetail.preview.actions[0].args).toMatchObject({ boardId: "board-fixture", title: "Synthetic banner", description: "Update /sample" });
+      expect((await h.decide(first, "rejected", firstDetail.preview)).status).toBe(200);
+      expect(fetchSpy.mock.calls.every(([url]) => new URL(String(url)).hostname === "127.0.0.1")).toBe(true);
+      expect(await h.fixture.db.client`SELECT id FROM business_reservations`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT status,cost_micros FROM ai_provider_calls WHERE run_id=${first}`)
+        .toEqual([{ status: "succeeded", cost_micros: "3" }]);
+      expect(seen).toHaveLength(1);
+      expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    } finally { await reader.end(); await h.close(); }
+  }, 45_000);
+
+  it("keeps callback contexts identical across excluded metadata changes", async () => {
+    const original = syntheticEvaluationRecord();
+    const poisoned = syntheticEvaluationRecord();
+    poisoned.caseId = "H-01";
+    poisoned.variantId = "oracle-sentinel";
+    poisoned.sourceRefs = ["oracle-sentinel"];
+    poisoned.expected = { kind: "refusal", terminalStatus: "refused", writeCount: 0 };
+    poisoned.fault = "timeout";
+    poisoned.note = "oracle-sentinel";
+    poisoned.evidence.observed = { nested: { answer: "oracle-sentinel" } };
+    const contexts: string[] = [];
+    const revisions: string[] = [];
+    const ids: string[] = [];
+    for (const record of [original, poisoned]) {
+      const h = await harness(false, [], fakePlanner(async (callback) => {
+        contexts.push(JSON.stringify(callback.context));
+        revisions.push(callback.sourceRevision);
+        ids.push(callback.runId);
+        return { proposal: { kind: "plan", tool: "trello.create_card" }, usage: null, costMicros: 3 };
+      }), undefined, true, projectPilotEvaluationInput(record));
+      try { expect((await h.detail(await h.create())).status).toBe("awaiting_approval"); }
+      finally { await h.close(); }
+    }
+    expect(contexts).toHaveLength(2);
+    expect(contexts[0]).toBe(contexts[1]);
+    expect(revisions[0]).toBe(revisions[1]);
+    expect(contexts[0]).not.toContain("oracle-sentinel");
+    expect(ids[0]).not.toBe(ids[1]);
+    expect(ids.every(id => /^[0-9a-f-]{36}$/.test(id) && !id.includes("oracle"))).toBe(true);
+  }, 90_000);
+
+  it("bypasses model for projected needs-input and refuses over-budget admission without a callback", async () => {
+    const needsInput = syntheticEvaluationRecord();
+    needsInput.sourceFixture.rows[0]![4] = "";
+    const propose = vi.fn(async () => ({ proposal: { kind: "plan", tool: "trello.create_card" }, usage: null, costMicros: 3 }));
+    const h = await harness(false, [], fakePlanner(propose), undefined, true, projectPilotEvaluationInput(needsInput));
+    try {
+      const runId = await h.create();
+      expect((await h.detail(runId)).status).toBe("needs_input");
+      expect(propose).not.toHaveBeenCalled();
+      expect(await h.fixture.db.client`SELECT id FROM pilot_approvals`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
+    } finally { await h.close(); }
+    const eligible = await harness(false, [], fakePlanner(propose), undefined, true, projectPilotEvaluationInput(syntheticEvaluationRecord()));
+    try {
+      await eligible.fixture.db.client`UPDATE ai_provider_campaigns SET limit_micros=59 WHERE campaign_id=${`pilot-v2:${eligible.fixture.userId}`}`;
+      const response = await fetch(`${eligible.pilotUrl}/runs`, { method: "POST", headers: eligible.headers,
+        body: JSON.stringify({ spreadsheetId: "sheet-fixture", tabId: "tab-fixture", requestId: "REQ-SYNTH", userPrompt: "Prepare the synthetic preview" }) });
+      expect(response.status).toBe(503);
+      expect(propose).not.toHaveBeenCalled();
+      expect(await eligible.fixture.db.client`SELECT run_id FROM pilot_ai_attempts`).toHaveLength(0);
+      expect(await eligible.fixture.db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
+      expect(await eligible.fixture.db.client`SELECT id FROM business_reservations`).toHaveLength(0);
+      expect(await eligible.fixture.db.client`SELECT status FROM runs WHERE profile='pilot-v2'`).toEqual([{ status: "failed" }]);
+    } finally { await eligible.close(); }
+  }, 90_000);
+
   it("commits source before the opt-in planner and keeps write arguments policy-owned", async () => {
     let h!: Awaited<ReturnType<typeof harness>>;
     const propose = vi.fn(async (input: Parameters<PilotAccountedPlanner["propose"]>[0]) => {
@@ -590,6 +727,7 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
         SELECT held_micros,committed_micros FROM ai_provider_campaigns
         WHERE campaign_id=${`pilot-v2:${h.fixture.userId}`}`)
         .toEqual([{ held_micros: "60", committed_micros: "4" }]);
+      expect(propose).toHaveBeenCalledTimes(3); // one claim per request; no timeout retry
       expect(await h.fixture.db.client`
         SELECT status,cost_micros FROM ai_provider_calls ORDER BY created_at,call_id`)
         .toEqual([
@@ -638,6 +776,12 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
         SELECT status FROM runs WHERE id = ${old!.id}`)[0]?.status).toBe("failed");
       expect(await h.fixture.db.client`
         SELECT id FROM pilot_approvals WHERE run_id = ${old!.id}`).toHaveLength(0);
+      expect(await h.fixture.db.client`
+        SELECT kind FROM pilot_planner_outcomes WHERE run_id = ${old!.id}`)
+        .toEqual([{ kind: "failure" }]);
+      expect(await h.fixture.db.client`
+        SELECT state FROM pilot_ai_attempts WHERE run_id = ${old!.id}`)
+        .toEqual([{ state: "settled" }]);
     } finally {
       release();
       await h.close();
@@ -681,6 +825,7 @@ describe("pilot durable approval over PostgreSQL and HTTP", () => {
       expect((await fixture.db.client`SELECT status FROM runs WHERE profile = 'pilot-v2'`)[0]?.status)
         .toBe("refused");
       expect(await fixture.db.client`SELECT id FROM pilot_approvals`).toHaveLength(0);
+      expect(await fixture.db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
     } finally {
       await api.close();
       await fixture.close();
