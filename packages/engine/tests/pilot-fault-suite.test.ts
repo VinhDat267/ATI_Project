@@ -233,7 +233,7 @@ describe('pilot/fault-suite (10 Fault Injection & Safety Gate Tests)', () => {
     });
 
     expect(result.status).toBe('reconciliation_required');
-    expect(result.error).toContain('LIST_NOT_FOUND');
+    expect(result.error).toBe('REMOTE_WRITE_UNKNOWN: Pilot dispatch requires reconciliation');
     expect((await store.getReservation('intent-f8'))?.status).toBe('unknown');
   });
 

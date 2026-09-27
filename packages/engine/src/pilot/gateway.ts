@@ -161,6 +161,7 @@ export type PilotCallContext = {
   policy: PilotPolicy;
   principalId: string;
   approvalExpiresAt?: Date;
+  authorizeBeforeWrite?: () => Promise<void>;
 };
 
 export async function dispatchPilotTool(
@@ -219,6 +220,7 @@ export async function dispatchPilotTool(
         dueDate: args.dueDate ? String(args.dueDate) : undefined,
         intentKey: String(args.intentKey ?? ''),
         approvalExpiresAt: context.approvalExpiresAt,
+        authorizeBeforeWrite: context.authorizeBeforeWrite,
       });
 
     default:

@@ -29,6 +29,8 @@ export type TrelloCreateCardParams = {
   dueDate?: string;
   intentKey: string;
   approvalExpiresAt?: Date;
+  /** Trusted server authorization hook, evaluated after list lookup and before POST. */
+  authorizeBeforeWrite?: () => Promise<void>;
 };
 
 export async function trelloCreateCard(
@@ -47,6 +49,7 @@ export async function trelloCreateCard(
     dueDate,
     intentKey,
     approvalExpiresAt,
+    authorizeBeforeWrite,
   } = params;
 
   // 1. Policy check
@@ -92,6 +95,10 @@ export async function trelloCreateCard(
 
   // 4. POST to Trello (write request -> retries = 0)
   // List lookup and reservation can take time; recheck immediately before egress.
+  if (approvalExpiresAt && Date.now() >= approvalExpiresAt.getTime()) {
+    throw new Error('APPROVAL_EXPIRED: Pilot approval expired before Trello POST');
+  }
+  await authorizeBeforeWrite?.();
   if (approvalExpiresAt && Date.now() >= approvalExpiresAt.getTime()) {
     throw new Error('APPROVAL_EXPIRED: Pilot approval expired before Trello POST');
   }

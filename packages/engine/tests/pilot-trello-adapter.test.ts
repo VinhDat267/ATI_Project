@@ -202,6 +202,26 @@ describe('pilot/adapters/trello', () => {
     ).rejects.toThrow('LIST_NOT_FOUND');
   });
 
+  it('does not POST when approval expires while the authorization hook waits', async () => {
+    const expiresAt = new Date(Date.now() + 1000);
+    let now = expiresAt.getTime() - 1;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const requests: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      requests.push(init?.method ?? 'GET');
+      return new Response(JSON.stringify([{ id: 'list-1', name: 'To Do', closed: false }]), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    await expect(trelloCreateCard({
+      config: sampleConfig, policy: samplePolicy, principalId: 'operator-a',
+      boardId: 'board-456', listName: 'To Do', title: 'Task', intentKey: 'k'.repeat(64),
+      approvalExpiresAt: expiresAt,
+      authorizeBeforeWrite: async () => { now = expiresAt.getTime(); },
+    })).rejects.toThrow('APPROVAL_EXPIRED');
+    expect(requests).toEqual(['GET']);
+  });
+
   it('does not POST when approval expires during list lookup', async () => {
     const expiresAt = new Date(Date.now() + 1000);
     let now = expiresAt.getTime() - 1;

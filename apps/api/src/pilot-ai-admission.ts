@@ -204,6 +204,15 @@ export function createPilotAiAdmission(options: {
       if (!campaign || campaign.halted || campaign.user_id !== input.principalId) return false;
       const grant = (await grantRows(tx, input.principalId, true))[0];
       if (!grant?.valid) return false;
+      const reservedCall = (await tx<Array<{
+        provider: string; model: string; status: string;
+      }>>`
+        SELECT provider,model,status FROM ai_provider_calls
+        WHERE call_id=${input.callId} AND campaign_id=${campaignId}
+          AND user_id=${input.principalId} AND run_id=${input.runId}`)[0];
+      if (!reservedCall || reservedCall.status !== "reserved" ||
+          grant.provider !== reservedCall.provider || grant.model !== reservedCall.model)
+        return false;
       const run = (await tx<Run[]>`
         SELECT id,workflow_version_id,status,profile FROM runs
         WHERE id=${input.runId} AND user_id=${input.principalId} FOR UPDATE`)[0];
