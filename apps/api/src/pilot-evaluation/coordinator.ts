@@ -6,6 +6,7 @@ import { FixtureBundleSchema, type FixtureBundle, type FrozenManifest, type Slot
 import { openEvaluationStore, type PrivateBootstrapReceipt } from "./provision.js";
 import { createObservedFakePlanner } from "./observer.js";
 import type { EvaluationStore } from "./store.js";
+import { readAccountingSnapshot } from "./accounting.js";
 
 type OfflineRunInput = {
   manifest: FrozenManifest; bundle: FixtureBundle; receipt: PrivateBootstrapReceipt; repoRoot: string;
@@ -79,29 +80,6 @@ async function openListeners(input: OfflineRunInput, store: EvaluationStore, slo
   }
 }
 
-async function accountingSnapshot(store: EvaluationStore, manifest: FrozenManifest): Promise<{
-  digest: string; unresolved: boolean;
-}> {
-  const ids = manifest.principals.map((principal) => `pilot-v2:${principal.id}`);
-  const campaigns = await store.client`SELECT campaign_id,held_micros,committed_micros,halted FROM ai_provider_campaigns
-    WHERE campaign_id IN (${ids[0]!},${ids[1]!}) ORDER BY campaign_id`;
-  const calls = await store.client`SELECT c.call_id,c.campaign_id,c.user_id,c.run_id,c.status,c.usage,c.cost_micros,c.reservation_held,
-    a.state AS attempt_state,s.slot_id
-    FROM ai_provider_calls c LEFT JOIN pilot_ai_attempts a ON a.call_id=c.call_id
-    LEFT JOIN pilot_eval.slots s ON s.call_id=c.call_id AND s.measurement_id=${store.identity.measurementId}
-    WHERE c.campaign_id IN (${ids[0]!},${ids[1]!}) ORDER BY c.call_id`;
-  const events = await store.client`SELECT call_id,event_type FROM pilot_eval.events
-    WHERE measurement_id=${store.identity.measurementId} AND call_id IS NOT NULL`;
-  const unresolved = campaigns.length !== 2 || campaigns.some((campaign) =>
-    campaign.halted || Number(campaign.held_micros) !== 0) || calls.some((call) =>
-    !call.slot_id || !call.call_id || call.reservation_held || call.cost_micros === null ||
-    call.usage === null || call.attempt_state !== "settled" ||
-    !["succeeded", "failed", "invalid_output", "cancelled"].includes(call.status) ||
-    events.filter((event) => event.call_id === call.call_id && event.event_type === "callback_entered").length !== 1 ||
-    events.filter((event) => event.call_id === call.call_id && event.event_type === "fake_return").length !== 1);
-  return { digest: canonicalHash({ campaigns, calls }), unresolved };
-}
-
 /** Production entry: Git proof is always obtained from the real checkout. */
 export async function runOfflineCampaign(input: OfflineRunInput): Promise<CampaignRunResult> {
   const { manifest, receipt } = input;
@@ -130,11 +108,11 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
       if (blocked) break;
       const fixture = bundle.slots[index]!;
       if (slot.declaredEligibility !== "eligible") {
-        const snapshot = await accountingSnapshot(store, manifest);
-        await store.sealSlot(slot.slotId, "complete", "INELIGIBLE", snapshot.digest);
+        const snapshot = await readAccountingSnapshot(store.client, manifest);
+        await store.sealSlot(slot.slotId, "complete", "INELIGIBLE", snapshot.digestForSlot(slot.slotId));
         continue;
       }
-      const before = await accountingSnapshot(store, manifest);
+      const before = await readAccountingSnapshot(store.client, manifest);
       const active = await store.client`SELECT id FROM runs WHERE status::text NOT IN
         ('succeeded','failed','rejected','cancelled','expired','refused','needs_input','reconciliation_required') LIMIT 1`;
       if (before.unresolved || active.length) { blocked = true; break; }
@@ -199,10 +177,10 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
             durationMs: 0, payload: { code: "OWNER_REJECTED", status: cleanupStatus } });
         }
         await store.markSlot(slot.slotId, detail.status, cleanupStatus);
-        const after = await accountingSnapshot(store, manifest);
+        const after = await readAccountingSnapshot(store.client, manifest);
         if (opened.observer.tainted || after.unresolved || detail.status === "planning" ||
             detail.status === "running") { blocked = true; break; }
-        await store.sealSlot(slot.slotId, "complete", "OK", after.digest);
+        await store.sealSlot(slot.slotId, "complete", "OK", after.digestForSlot(slot.slotId));
       } catch {
         blocked = true; // No retry after persisted intent; unknown HTTP/run/capture stays incomplete.
       } finally {
@@ -211,12 +189,12 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
         }
       }
     }
-    const snapshot = await accountingSnapshot(store, manifest);
+    const snapshot = await readAccountingSnapshot(store.client, manifest);
     const rows = await store.client`SELECT s.slot_id,z.completeness FROM pilot_eval.slots s
       LEFT JOIN pilot_eval.seals z USING(measurement_id,slot_id)
       WHERE s.measurement_id=${manifest.measurementId} ORDER BY s.ordinal`;
     for (const row of rows) if (!row.completeness)
-      await store.sealSlot(row.slot_id as string, "incomplete", "NOT_ATTEMPTED", snapshot.digest);
+      await store.sealSlot(row.slot_id as string, "incomplete", "NOT_ATTEMPTED", snapshot.digestForSlot(row.slot_id as string));
     const complete = !blocked && !snapshot.unresolved && rows.every((row) => row.completeness === "complete");
     const state = complete ? "completed" : "incomplete";
     const sealHash = await store.sealCampaign(state);

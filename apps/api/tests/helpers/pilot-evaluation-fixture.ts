@@ -17,6 +17,12 @@ export function syntheticBundle(): FixtureBundle {
     { slotId: "slot-2", inputHash: canonicalHash(row("REQ-2")), scriptId: "plan", row: row("REQ-2") },
   ] };
 }
+export function syntheticOracle() {
+  return { rubricVersion: "structural-1" as const, slots: [
+    { slotId: "slot-1", kind: "plan" as const, precleanupStatus: "awaiting_approval" as const },
+    { slotId: "slot-2", kind: "plan" as const, precleanupStatus: "awaiting_approval" as const },
+  ] };
+}
 export function syntheticManifest() {
   const bundle = syntheticBundle();
   return freezeManifest({
@@ -36,7 +42,7 @@ export function syntheticManifest() {
       fixture: { spreadsheetId: "synthetic-sheet", tabId: "requests", boardId: "synthetic-board", listId: "todo", requestId: entry.row!.request_id },
     })),
   }, { code: hash("a"), projection: hash("b"), prompt: hash("c"), schema: hash("d"),
-    fixtures: canonicalHash(bundle), oracle: hash("f"), fakeScript: hash("1"), rubric: hash("2") });
+    fixtures: canonicalHash(bundle), oracle: canonicalHash(syntheticOracle()), fakeScript: hash("1"), rubric: hash("2") });
 }
 
 export async function withOfflineCampaign<T>(run: (context: {
