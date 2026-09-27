@@ -1,11 +1,11 @@
 # MVP v2 — Offline gate cho AI source-aware trong API pilot
 
-**Trạng thái: PROPOSED — chờ duyệt bản viết.** Ngày lập: 27/09/2026.
-Thiết kế này không cấp quyền gọi provider thật, không mở Trello write và không
-nâng nhãn AI quality/customer acceptance. Chủ project đã đồng ý theo từng phần
-trong hội thoại với hướng tái dùng ledger, chỉ lưu outcome an toàn và giữ hold
-khi chi phí không rõ; cần duyệt **bản spec này** trước khi lập implementation
-plan. Căn cứ phạm vi: [baseline](../../BASELINE.md),
+**Trạng thái: APPROVED_BY_PROJECT_OWNER — 27/09/2026.** Người dùng trả lời
+“duyệt” sau khi nhận đường dẫn bản spec; việc duyệt chỉ cho phép lập kế hoạch
+triển khai, không duyệt kế hoạch chưa được viết hay cho phép gọi provider thật.
+Thiết kế này không mở Trello write và không nâng nhãn AI quality/customer
+acceptance. Chủ project đã đồng ý tái dùng ledger, chỉ lưu outcome an toàn và
+giữ hold khi chi phí không rõ. Căn cứ phạm vi: [baseline](../../BASELINE.md),
 [execution contract](../../EXECUTION-CONTRACT.md),
 [API README](../../../apps/api/README.md).
 
@@ -123,8 +123,8 @@ idempotency/overrun theo ledger, kể cả grant bị thu hồi sau dispatch.
 5. Adapter trả proposal theo schema đóng `plan | clarification | refusal`
    cùng usage/cost evidence do adapter tạo; chỉ proposal được parse như output
    model. Trước khi commit outcome, transaction kiểm lại run/source/version/
-   checklist, grant/owner/policy; nếu revoke hoặc drift thì không tạo approval. `plan`
-   chỉ cho `trello.create_card`; router tự xác định board/list/action args,
+   checklist, grant/owner/policy; nếu revoke hoặc drift thì không tạo approval.
+   `plan` chỉ cho `trello.create_card`; router tự xác định board/list/action args,
    preview/hash và approval TTL 10 phút. Model không được chọn target,
    snapshot hash, approval hay dispatch. `clarification/refusal` kết thúc run
    không approval. Mỗi nhánh settlement/terminal status chỉ commit nếu state
@@ -184,8 +184,9 @@ limit, tranh chấp admission, claim trùng, timeout, crash trước và sau res
 claim/settlement, late response, policy/source drift, cross-owner GET/approve,
 secret trong output, hold không tự thả, operator đối chiếu read-only không
 đổi ledger, không external provider fetch/remote write. Các test cũ inject
-planner phải được chuyển sang cấp grant fixture có kiểm soát; không tạo bypass mặc định cho test. Chạy targeted tests, `npm run
-check`, integration DB cô lập, `git diff --check` và Code Reviewer độc lập
+planner phải được chuyển sang cấp grant fixture có kiểm soát; không tạo bypass
+mặc định cho test. Chạy targeted tests, `npm run check`, integration DB cô lập,
+`git diff --check` và Code Reviewer độc lập
 sau implementation. Kết quả fake chỉ ghi `OFFLINE_TESTED`; live provider
 quality và customer acceptance vẫn `NOT_RUN`.
 
@@ -195,6 +196,7 @@ Không nối provider vào `main.ts` chỉ vì gate offline qua. Trước provid
 cần quyền operator riêng về provider/model, quota/call cap, bảng giá/bound có
 nguồn, chiến dịch ngân sách theo principal, rubric/holdout không đọc oracle,
 transport có kiểm claim/settle, đường operator-only giải hold có audit được
-phê duyệt riêng và kiểm billing/cancellation thực tế. Trước Trello write mới vẫn cần owner approval, allowlist, preview TTL và kế hoạch
-reconciliation được cấp quyền riêng. Bất kỳ lời hứa AI quality, kết quả SaaS
+phê duyệt riêng và kiểm billing/cancellation thực tế. Trước Trello write mới
+vẫn cần owner approval, allowlist, preview TTL và kế hoạch reconciliation được
+cấp quyền riêng. Bất kỳ lời hứa AI quality, kết quả SaaS
 hay handoff nào đều cần bằng chứng riêng.
