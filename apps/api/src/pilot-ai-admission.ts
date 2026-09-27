@@ -10,7 +10,6 @@ import {
   type SourceRow,
 } from "@wap/engine";
 import type postgres from "postgres";
-import type { PilotAccountedPlanner } from "./pilot-planner.js";
 
 export class PilotAiAdmissionError extends Error {
   constructor(readonly code: "PILOT_AI_UNAUTHORIZED" | "PILOT_AI_BUDGET" | "PILOT_AI_CALL_LIMIT" | "PILOT_AI_CONFLICT") {
@@ -122,7 +121,11 @@ export function createPilotAiAdmission(options: {
           FROM pilot_ai_grants WHERE campaign_id=${campaignId} AND principal_id=${principalId}`;
   };
 
-  async function preflight(principalId: string, planner: PilotAccountedPlanner): Promise<void> {
+  async function preflight(principalId: string, planner: {
+    readonly provider: "google" | "openai";
+    readonly model: string;
+    readonly estimatedCostMicros: number;
+  }): Promise<void> {
     checkPolicy(principalId);
     const campaignId = campaignFor(principalId);
     const rows = await db.client<Grant[]>`
