@@ -12,7 +12,7 @@ export { ArtifactHashesSchema, FixtureBundleSchema, FrozenManifestSchema };
 function normalized(value: unknown): string {
   if (value === null || typeof value === "string" || typeof value === "boolean")
     return JSON.stringify(value);
-  if (typeof value === "number" && Number.isFinite(value) && Number.isSafeInteger(value))
+  if (typeof value === "number" && Number.isFinite(value))
     return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(normalized).join(",")}]`;
   if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype)
