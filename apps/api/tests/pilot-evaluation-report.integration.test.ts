@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { runOfflineCampaign } from "../src/pilot-evaluation/coordinator.js";
 import { buildOfflineReport, openReadonlyEvaluationStore } from "../src/pilot-evaluation/report.js";
+import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
+import { readAccountingSnapshot } from "../src/pilot-evaluation/accounting.js";
 import { syntheticBundle, syntheticOracle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 vi.mock("../src/pilot-evaluation/git-evidence.js", () => ({
@@ -30,6 +32,60 @@ describe("SQL-only structural report", () => {
         expect(report.aiQuality).toBe("AI_QUALITY_NOT_MEASURED");
         expect((await admin`SELECT count(*)::int AS n FROM pilot_eval.events`)[0]?.n).toBe(before[0]?.n);
         await expect(readOnly.client`UPDATE pilot_eval.campaigns SET state='completed'`).rejects.toThrow();
+      } finally { await readOnly.close(); }
+    });
+  }, 120_000);
+
+  it("refuses success when eligible slots have valid empty seals but no run, call or observations", async () => {
+    await withOfflineCampaign(async ({ receipt }) => {
+      const producer = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);
+      const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        await producer.claimCampaign();
+        const accounting = await readAccountingSnapshot(producer.client, receipt.manifest);
+        for (const slot of receipt.manifest.slots)
+          await producer.sealSlot(slot.slotId, 'complete', 'OK', accounting.digestForSlot(slot.slotId));
+        await producer.sealCampaign('completed');
+        const report = await buildOfflineReport(readOnly, syntheticOracle());
+        expect(report.integrity).toBe('valid');
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.safeReasons).toContain('MISSING_ELIGIBLE_EVIDENCE');
+      } finally { await readOnly.close(); await producer.close(); }
+    });
+  }, 120_000);
+
+  it("flags missing HTTP cleanup even though valid event and call seals remain", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      await admin`ALTER TABLE pilot_eval.slots DISABLE TRIGGER protect_slot`;
+      try { await admin`UPDATE pilot_eval.slots SET cleanup_status=NULL WHERE slot_id='slot-1'`; }
+      finally { await admin`ALTER TABLE pilot_eval.slots ENABLE TRIGGER protect_slot`; }
+      const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(readOnly, syntheticOracle());
+        expect(report.integrity).toBe('valid');
+        expect(report.safeReasons).toContain('MISSING_ELIGIBLE_EVIDENCE');
+        expect(report.verdict).toBe('INCOMPLETE');
+      } finally { await readOnly.close(); }
+    });
+  }, 120_000);
+
+  it("reconciles per-principal committed counters even when aggregate total cancels out", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      await admin`UPDATE ai_provider_campaigns SET committed_micros=20
+        WHERE user_id=${receipt.manifest.principals[0].id}`;
+      await admin`UPDATE ai_provider_campaigns SET committed_micros=0
+        WHERE user_id=${receipt.manifest.principals[1].id}`;
+      const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(readOnly, syntheticOracle());
+        expect(report.accounting.committedMicros).toBe(20);
+        expect(report.accounting.knownCostMicros).toBe(20);
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.safeReasons).toContain('ACCOUNTING_COUNTER_MISMATCH');
       } finally { await readOnly.close(); }
     });
   }, 120_000);
@@ -79,7 +135,10 @@ describe("SQL-only structural report", () => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
         receipt, repoRoot: process.cwd() });
-      await admin`UPDATE pilot_eval.campaigns SET manifest_json=${admin.json({ invalid: true })}`;
+      // An administrator can disable the protection deliberately; the runtime login cannot.
+      await admin`ALTER TABLE pilot_eval.campaigns DISABLE TRIGGER protect_campaign`;
+      try { await admin`UPDATE pilot_eval.campaigns SET manifest_json=${admin.json({ invalid: true })}`; }
+      finally { await admin`ALTER TABLE pilot_eval.campaigns ENABLE TRIGGER protect_campaign`; }
       const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
       try {
         const report = await buildOfflineReport(readOnly, syntheticOracle());

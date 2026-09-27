@@ -8,14 +8,17 @@ type SqlClient = ReturnType<typeof postgres>;
 export async function readAccountingSnapshot(client: SqlClient, manifest: FrozenManifest,
   enforceCurrentGrants = false): Promise<{
   calls: Array<Record<string, unknown>>; heldMicros: number; committedMicros: number;
-  unresolved: boolean; orphanCalls: number; unknownUsageCalls: number; unknownCostCalls: number;
+  unresolved: boolean; counterMismatchCampaigns: number; orphanCalls: number;
+  unknownUsageCalls: number; unknownCostCalls: number;
   knownCostMicros: number | null; digestForSlot: (slotId: string) => string;
 }> {
   const ids = manifest.principals.map((principal) => `pilot-v2:${principal.id}`);
   const campaigns = await client`SELECT campaign_id,user_id,limit_micros,held_micros,committed_micros,halted FROM ai_provider_campaigns
     WHERE campaign_id IN (${ids[0]!},${ids[1]!}) ORDER BY campaign_id`;
   const calls = await client`SELECT c.call_id,c.campaign_id,c.user_id,c.run_id,c.status,c.usage,c.cost_micros,c.reservation_held,
-    a.state AS attempt_state,s.slot_id
+    c.estimated_cost_micros,a.state AS attempt_state,a.run_id AS attempt_run_id,
+    a.principal_id AS attempt_principal_id,a.campaign_id AS attempt_campaign_id,
+    (a.dispatch_claimed_at IS NOT NULL) AS dispatch_claimed,s.slot_id
     FROM ai_provider_calls c LEFT JOIN pilot_ai_attempts a ON a.call_id=c.call_id
     LEFT JOIN pilot_eval.slots s ON s.call_id=c.call_id AND s.measurement_id=${manifest.measurementId}
     WHERE c.campaign_id IN (${ids[0]!},${ids[1]!}) ORDER BY c.call_id`;
@@ -38,16 +41,32 @@ export async function readAccountingSnapshot(client: SqlClient, manifest: Frozen
       grant.model !== manifest.model || grant.max_calls !== principal.maxCalls ||
       Number(grant.max_estimated_cost_micros) !== manifest.estimatedCostMicros;
   });
-  const unresolved = drift || campaigns.length !== 2 || !Number.isSafeInteger(heldMicros) ||
+  // The provider ledger reserves estimates as holds and commits only known settled costs.
+  // Reconcile each principal independently: a +10/-10 cancellation cannot hide drift.
+  const counterMismatchCampaigns = campaigns.filter((campaign) => {
+    const owned = calls.filter((call) => call.campaign_id === campaign.campaign_id &&
+      call.user_id === campaign.user_id);
+    const expectedHeld = owned.reduce((sum, call) => sum +
+      (call.reservation_held ? Number(call.estimated_cost_micros) : 0), 0);
+    const expectedCommitted = owned.reduce((sum, call) => sum +
+      (call.cost_micros === null ? 0 : Number(call.cost_micros)), 0);
+    return ![expectedHeld, expectedCommitted, Number(campaign.held_micros),
+      Number(campaign.committed_micros)].every(Number.isSafeInteger) ||
+      Number(campaign.held_micros) !== expectedHeld ||
+      Number(campaign.committed_micros) !== expectedCommitted;
+  }).length;
+  const unresolved = drift || counterMismatchCampaigns > 0 || campaigns.length !== 2 || !Number.isSafeInteger(heldMicros) ||
     !Number.isSafeInteger(committedMicros) || heldMicros !== 0 ||
     campaigns.some((campaign) => campaign.halted) || calls.some((call) =>
       !call.slot_id || !call.call_id || call.reservation_held || call.cost_micros === null ||
       call.usage === null || call.attempt_state !== "settled" ||
+      call.attempt_run_id !== call.run_id || call.attempt_principal_id !== call.user_id ||
+      call.attempt_campaign_id !== call.campaign_id || !call.dispatch_claimed ||
       !["succeeded", "failed", "invalid_output", "cancelled"].includes(call.status as string) ||
       events.filter((event) => event.call_id === call.call_id && event.event_type === "callback_entered").length !== 1 ||
       events.filter((event) => event.call_id === call.call_id && event.event_type === "fake_return").length !== 1);
   const cost = calls.reduce((sum, item) => sum + Number(item.cost_micros ?? 0), 0);
-  return { calls: [...calls], heldMicros, committedMicros, unresolved, orphanCalls,
+  return { calls: [...calls], heldMicros, committedMicros, unresolved, counterMismatchCampaigns, orphanCalls,
     unknownUsageCalls, unknownCostCalls, knownCostMicros: unknownCostCalls ? null : cost,
     digestForSlot: (slotId) => canonicalHash(calls.filter((item) => item.slot_id === slotId)),
   };

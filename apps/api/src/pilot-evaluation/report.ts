@@ -186,7 +186,39 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     integrity = false; safeReasons.add("CAMPAIGN_SEAL_DRIFT");
   }
   if (!campaigns[0]!.sealed_hash || campaigns[0]!.state !== "completed") safeReasons.add("CAMPAIGN_INCOMPLETE");
+  if (accounting.counterMismatchCampaigns) safeReasons.add("ACCOUNTING_COUNTER_MISMATCH");
   if (accounting.unresolved) safeReasons.add("ACCOUNTING_UNKNOWN");
+  for (const row of rows) {
+    const slot = manifest.slots.find((entry) => entry.slotId === row.slot_id)!;
+    if (slot.declaredEligibility !== "eligible") continue;
+    const own = events.filter((event) => event.slot_id === row.slot_id &&
+      event.seq <= (row.event_end as number | null ?? 0));
+    const count = (type: string) => own.filter((event) => event.event_type === type);
+    const call = accounting.calls.find((entry) => entry.call_id === row.call_id);
+    const principal = manifest.principals.find((entry) => entry.alias === slot.principalAlias)!;
+    const hasRun = typeof row.run_id === "string" && row.run_id.length > 0;
+    const hasCall = typeof row.call_id === "string" && row.call_id.length > 0;
+    const awaiting = row.precleanup_status === "awaiting_approval";
+    if (row.completeness !== "complete" || !hasRun || !hasCall ||
+        !call || call.run_id !== row.run_id || call.user_id !== principal.id ||
+        call.campaign_id !== `pilot-v2:${principal.id}` ||
+        call.attempt_run_id !== row.run_id || call.attempt_principal_id !== principal.id ||
+        call.attempt_campaign_id !== call.campaign_id || !call.dispatch_claimed ||
+        count("slot_intent").length !== 1 || count("callback_entered").length !== 1 ||
+        count("fake_return").length !== 1 || count("http_outcome").length !== 1 ||
+        count("callback_entered")[0]?.run_id !== row.run_id ||
+        count("callback_entered")[0]?.call_id !== row.call_id ||
+        count("fake_return")[0]?.run_id !== row.run_id ||
+        count("fake_return")[0]?.call_id !== row.call_id ||
+        count("http_outcome")[0]?.run_id !== row.run_id ||
+        count("http_outcome")[0]?.payload?.status !== row.precleanup_status ||
+        !row.precleanup_status || !row.cleanup_status ||
+        (awaiting ? row.cleanup_status !== "rejected" || count("cleanup").length !== 1 ||
+          count("cleanup")[0]?.run_id !== row.run_id ||
+          count("cleanup")[0]?.payload?.status !== "rejected" :
+          row.cleanup_status !== row.precleanup_status || count("cleanup").length !== 0))
+      safeReasons.add("MISSING_ELIGIBLE_EVIDENCE");
+  }
   const parsedOracle = StructuralOracleSchema.safeParse(oracle);
   if (!parsedOracle.success || canonicalHash(parsedOracle.data) !== manifest.artifacts.oracle ||
       parsedOracle.data.rubricVersion !== manifest.rubricVersion ||
