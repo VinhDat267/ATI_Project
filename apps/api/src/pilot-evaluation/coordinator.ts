@@ -98,6 +98,7 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
         bundle.slots[index]!.row!.request_id !== slot.fixture.requestId))
     throw new Error("Frozen input or script hash mismatch");
   const store = await openEvaluationStore(receipt.runtimeUrl, receipt.identity);
+  const observers: Array<ReturnType<typeof createObservedFakePlanner>> = [];
   try {
     const frozen = await store.client`SELECT manifest_hash FROM pilot_eval.campaigns
       WHERE measurement_id=${manifest.measurementId}`;
@@ -108,18 +109,26 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
     for (const [index, slot] of manifest.slots.entries()) {
       if (blocked) break;
       const fixture = bundle.slots[index]!;
-      if (slot.declaredEligibility !== "eligible") {
+      if (slot.declaredEligibility === "out_of_scope") {
         const snapshot = await readAccountingSnapshot(store.client, manifest, true);
         await store.sealSlot(slot.slotId, "complete", "INELIGIBLE", snapshot.digestForSlot(slot.slotId));
         continue;
       }
       const before = await readAccountingSnapshot(store.client, manifest, true);
+      const classification = evaluateChecklist(fixture.row! as SourceRow);
+      if ((slot.declaredEligibility === "deterministic" && classification.status === "pass") ||
+          (slot.declaredEligibility === "eligible" && classification.status !== "pass")) {
+        await store.sealSlot(slot.slotId, "incomplete", "POLICY_BLOCKED", before.digestForSlot(slot.slotId));
+        blocked = true;
+        break;
+      }
       const active = await store.client`SELECT id FROM runs WHERE status::text NOT IN
         ('succeeded','failed','rejected','cancelled','expired','refused','needs_input','reconciliation_required') LIMIT 1`;
       if (before.unresolved || active.length) { blocked = true; break; }
       let opened: Awaited<ReturnType<typeof openListeners>> | undefined;
       try {
         opened = await openListeners(input, store, slot, fixture.row! as SourceRow);
+        observers.push(opened.observer);
         const ownerIndex = manifest.principals.findIndex((principal) => principal.alias === slot.principalAlias);
         const owner = opened.listeners[ownerIndex]!;
         const other = opened.listeners[1 - ownerIndex]!;
@@ -179,8 +188,12 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
         }
         await store.markSlot(slot.slotId, detail.status, cleanupStatus);
         const after = await readAccountingSnapshot(store.client, manifest, true);
+        const deterministic = slot.declaredEligibility === "deterministic";
+        const expectedStatus = classification.status === "refusal" ? "refused" : "needs_input";
         if (opened.observer.tainted || after.unresolved || detail.status === "planning" ||
-            detail.status === "running") { blocked = true; break; }
+            detail.status === "running" || (deterministic &&
+              (detail.status !== expectedStatus || opened.observer.invocations !== 0 ||
+               after.calls.length !== before.calls.length))) { blocked = true; break; }
         await store.sealSlot(slot.slotId, "complete", "OK", after.digestForSlot(slot.slotId));
       } catch {
         blocked = true; // No retry after persisted intent; unknown HTTP/run/capture stays incomplete.
@@ -199,7 +212,11 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
     const complete = !blocked && !snapshot.unresolved && rows.every((row) => row.completeness === "complete");
     const state = complete ? "completed" : "incomplete";
     const sealHash = await store.sealCampaign(state);
+    await Promise.all(observers.map((observer) => observer.finishLateEvidence()));
     return { measurementId: manifest.measurementId, manifestHash: manifest.manifestHash,
       state, completeness: complete ? "complete" : "incomplete", sealHash };
-  } finally { await store.close(); }
+  } finally {
+    await Promise.allSettled(observers.map((observer) => observer.finishLateEvidence()));
+    await store.close();
+  }
 }

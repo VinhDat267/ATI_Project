@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { runOfflineCampaign } from "../src/pilot-evaluation/coordinator.js";
 import { openReadonlyEvaluationStore, buildOfflineReport } from "../src/pilot-evaluation/report.js";
 import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
-import { syntheticBundle, syntheticOracle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
+import { EvaluationStore } from "../src/pilot-evaluation/store.js";
+import { freezeManifest } from "../src/pilot-evaluation/manifest.js";
+import { syntheticBundle, syntheticManifest, syntheticOracle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 vi.mock("../src/pilot-evaluation/git-evidence.js", () => ({
   observeGitEvidence: () => ({ head: "a".repeat(40), clean: true,
@@ -18,7 +20,8 @@ const apiRoot = fileURLToPath(new URL("../", import.meta.url));
 const runner = path.resolve(apiRoot, "../../node_modules/vitest/vitest.mjs");
 
 describe("real child termination at durable evaluator boundaries", () => {
-  it.each(["claim", "intent", "capture", "settle"] as const)("stops at %s and refuses restart after process exit", async (boundary) => {
+  it.each(["campaign_claim", "intent", "callback_before_fake", "result_capture_before_settlement",
+    "settled_before_seal"] as const)("stops at %s and refuses restart after process exit", async (boundary) => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       const child = spawnSync(process.execPath, [runner, "run", "--config", "vitest.integration.config.ts",
         "tests/helpers/pilot-evaluation-child.integration.test.ts"], {
@@ -36,19 +39,87 @@ describe("real child termination at durable evaluator boundaries", () => {
         const events = await db.client`SELECT event_type FROM pilot_eval.events ORDER BY seq`;
         expect(state[0]?.state).toBe("running");
         expect(events.map((entry) => entry.event_type)).toEqual(
-          boundary === "claim" ? [] : boundary === "intent" ? ["slot_intent"] :
-          boundary === "capture" ? ["slot_intent", "callback_entered"] :
+          boundary === "campaign_claim" ? [] : boundary === "intent" ? ["slot_intent"] :
+          boundary === "callback_before_fake" ? ["slot_intent", "callback_entered"] :
+          boundary === "result_capture_before_settlement" ? ["slot_intent", "callback_entered", "fake_return"] :
           ["slot_intent", "callback_entered", "fake_return", "http_outcome", "cleanup"]);
         const calls = await admin`SELECT status,cost_micros,reservation_held FROM ai_provider_calls`;
-        expect(calls).toHaveLength(boundary === "claim" || boundary === "intent" ? 0 : 1);
-        if (boundary === "capture") expect(calls[0]?.reservation_held).toBe(true);
-        if (boundary === "settle") expect(Number(calls[0]?.cost_micros)).toBe(10);
+        expect(calls).toHaveLength(boundary === "campaign_claim" || boundary === "intent" ? 0 : 1);
+        if (boundary === "callback_before_fake" || boundary === "result_capture_before_settlement") {
+          expect(calls[0]?.reservation_held).toBe(true);
+          expect(calls[0]?.cost_micros).toBeNull();
+        }
+        if (boundary === "settled_before_seal") expect(Number(calls[0]?.cost_micros)).toBe(10);
         expect((await buildOfflineReport(report, syntheticOracle())).verdict).toBe("INCOMPLETE");
         await expect(runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
           receipt, repoRoot: process.cwd() })).rejects.toThrow("report-only restart");
         expect(await admin`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(
-          boundary === "claim" || boundary === "intent" ? 0 : 1);
+          boundary === "campaign_claim" || boundary === "intent" ? 0 : 1);
       } finally { await report.close(); await db.close(); }
+    });
+  }, 120_000);
+
+  it("captures a real delayed fake response as bounded late evidence after timeout without retry", async () => {
+    const bundle = syntheticBundle('delayed');
+    const initial = syntheticManifest(bundle);
+    const { manifestHash: _hash, artifacts, ...draft } = initial;
+    const manifest = freezeManifest({ ...draft, timeoutMs: 50 }, artifacts);
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      const result = await runOfflineCampaign({ manifest: receipt.manifest, bundle,
+        receipt, repoRoot: process.cwd() });
+      expect(result.state).toBe('incomplete');
+      const eventTypes = (await admin`SELECT event_type FROM pilot_eval.events ORDER BY seq`)
+        .map((row) => row.event_type);
+      expect(eventTypes.filter((type) => type === 'late_return')).toHaveLength(1);
+      expect(eventTypes).not.toContain('fake_return');
+      expect(eventTypes.filter((type) => type === 'callback_entered')).toHaveLength(1);
+      const late = (await admin`SELECT seq FROM pilot_eval.events WHERE event_type='late_return'`)[0]?.seq;
+      const sealed = (await admin`SELECT event_end,completeness FROM pilot_eval.seals WHERE slot_id='slot-1'`)[0];
+      expect(Number(late)).toBeGreaterThan(Number(sealed?.event_end));
+      expect(sealed?.completeness).toBe('incomplete');
+      const calls = await admin`SELECT call_id,cost_micros,reservation_held FROM ai_provider_calls`;
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.cost_micros).toBeNull();
+      expect(calls[0]?.reservation_held).toBe(true);
+      expect(await admin`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(1);
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try { expect((await buildOfflineReport(reader, syntheticOracle())).verdict).toBe('INCOMPLETE'); }
+      finally { await reader.close(); }
+    }, bundle, manifest);
+  }, 120_000);
+
+  it("settles the original known fake cost over HTTP when result persistence fails", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      const append = EvaluationStore.prototype.appendEvent;
+      const fault = vi.spyOn(EvaluationStore.prototype, 'appendEvent').mockImplementation(
+        async function (this: EvaluationStore, input) {
+          if (input.type === 'fake_return') throw new Error('Synthetic persisted-result fault');
+          return append.call(this, input);
+        });
+      let result;
+      try { result = await runOfflineCampaign({ manifest: receipt.manifest,
+        bundle: syntheticBundle(), receipt, repoRoot: process.cwd() }); }
+      finally { fault.mockRestore(); }
+      expect(result.state).toBe('incomplete');
+      const calls = await admin`SELECT status,cost_micros,reservation_held FROM ai_provider_calls`;
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.status).toBe('succeeded');
+      expect(Number(calls[0]?.cost_micros)).toBe(10);
+      expect(calls[0]?.reservation_held).toBe(false);
+      expect((await admin`SELECT committed_micros FROM ai_provider_campaigns
+        WHERE user_id=${receipt.manifest.principals[0].id}`)[0]?.committed_micros).toBe('10');
+      expect(await admin`SELECT seq FROM pilot_eval.events WHERE event_type='fake_return'`).toHaveLength(0);
+      expect(await admin`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(1);
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(reader, syntheticOracle());
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.accounting.knownCostMicros).toBe(10);
+        expect(report.observations.fakeInvocations).toBeNull();
+        expect(report.observations.claimedCalls).toBe(1);
+        expect(report.outcomes.byLanguage.en).toMatchObject({ selected: 2, blocked: 1, notAttempted: 1 });
+        expect(report.safety.unauthorizedCalls).toBeNull();
+      } finally { await reader.close(); }
     });
   }, 120_000);
 

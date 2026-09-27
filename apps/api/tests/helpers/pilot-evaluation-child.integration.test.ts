@@ -12,28 +12,30 @@ vi.mock("../../src/pilot-evaluation/git-evidence.js", () => ({
       rubric: "2".repeat(64) } }),
 }));
 
-type ChildPayload = { boundary: "claim" | "intent" | "capture" | "settle";
+type ChildPayload = { boundary: "campaign_claim" | "intent" | "callback_before_fake" |
+  "result_capture_before_settlement" | "settled_before_seal";
   receipt: PrivateBootstrapReceipt; bundle: FixtureBundle };
 describe.skipIf(!process.env.PILOT_EVAL_CHILD_PAYLOAD)("synthetic child process crash fixture", () => {
   it("exits the worker immediately after the selected durable boundary", async () => {
     const payload = JSON.parse(process.env.PILOT_EVAL_CHILD_PAYLOAD!) as ChildPayload;
     const claim = EvaluationStore.prototype.claimCampaign;
     const append = EvaluationStore.prototype.appendEvent;
-    if (payload.boundary === "claim") vi.spyOn(EvaluationStore.prototype, "claimCampaign")
+    if (payload.boundary === "campaign_claim") vi.spyOn(EvaluationStore.prototype, "claimCampaign")
       .mockImplementation(async function (this: EvaluationStore) {
         const result = await claim.call(this);
         if (result) process.kill(process.pid, "SIGKILL");
         return result;
       });
-    if (payload.boundary === "intent" || payload.boundary === "capture")
+    if (["intent", "callback_before_fake", "result_capture_before_settlement"].includes(payload.boundary))
       vi.spyOn(EvaluationStore.prototype, "appendEvent")
         .mockImplementation(async function (this: EvaluationStore, input) {
           const result = await append.call(this, input);
-          if (input.type === (payload.boundary === "intent" ? "slot_intent" : "callback_entered"))
+          if (input.type === (payload.boundary === "intent" ? "slot_intent" :
+            payload.boundary === "callback_before_fake" ? "callback_entered" : "fake_return"))
             process.kill(process.pid, "SIGKILL");
           return result;
         });
-    if (payload.boundary === "settle")
+    if (payload.boundary === "settled_before_seal")
       vi.spyOn(EvaluationStore.prototype, "sealSlot")
         .mockImplementation(async () => {
           process.kill(process.pid, "SIGKILL");

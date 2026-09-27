@@ -142,7 +142,14 @@ Positive provenance không mock chỉ chạy ở detached clean checkout với
 `pilot-evaluation-*.integration.test.ts` tuần tự trên DB test cô lập. Event
 hash và immutable seals chứng minh tính nhất quán dưới role bị giới hạn, **không
 chống DB admin rewrite** hoặc chứng minh đủ observation khi missing/late data.
-Structural oracle không thấy prose; không đo specificity/refusal semantic,
+Deterministic `needs_input`/`refused` đi qua auth + HTTP thật và không dispatch fake;
+chỉ `out_of_scope` được skip. Timeout fake có thể ghi `late_return` sau incomplete
+seal trong cửa sổ đợi bounded, không nâng completeness hay settle/retry lần hai.
+Report SQL chỉ đọc phân nhóm n/N theo language/principal/route và đếm claim,
+output hợp lệ/không hợp lệ, lỗi, late return; nếu callback thiếu kết quả,
+`fakeInvocations=null` (không đoán zero). Các safety count không có quan sát
+đáng tin cậy giữ `null`, không giả làm zero; local reservation và accounting
+mismatch riêng. Structural oracle không thấy prose; không đo specificity/refusal semantic,
 citation, hallucination hay model/provider latency. Nhãn giữ nguyên:
 `AI_QUALITY_NOT_MEASURED`, `CUSTOMER_VALIDATED_NOT_RUN`, `HANDOFF_BLOCKED`.
 Không dùng fake pass rate để tuyên bố chất lượng AI, bill thật hoặc SaaS live.

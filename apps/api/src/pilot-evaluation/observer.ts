@@ -6,7 +6,8 @@ import type { EvaluationStore } from "./store.js";
 
 export function createObservedFakePlanner(options: {
   store: EvaluationStore; manifest: FrozenManifest; slot: SlotDescriptor; script: string;
-}): PilotAccountedPlanner & { readonly invocations: number; readonly tainted: boolean } {
+}): PilotAccountedPlanner & { readonly invocations: number; readonly tainted: boolean;
+  finishLateEvidence(): Promise<void> } {
   const { store, manifest, slot, script } = options;
   if (script !== slot.scriptId || !manifest.slots.some((entry) =>
     entry.slotId === slot.slotId && canonicalHash(entry) === canonicalHash(slot)))
@@ -14,10 +15,22 @@ export function createObservedFakePlanner(options: {
   let invocations = 0;
   let tainted = false;
   let entered = false;
+  let releaseLate!: () => void;
+  const sealed = new Promise<void>((resolve) => { releaseLate = resolve; });
+  let inFlight: Promise<unknown> | undefined;
   return {
     provider: manifest.provider, model: manifest.model, estimatedCostMicros: manifest.estimatedCostMicros,
     get invocations() { return invocations; },
     get tainted() { return tainted; },
+    async finishLateEvidence() {
+      releaseLate();
+      if (!inFlight) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([inFlight.then(() => undefined, () => undefined),
+          new Promise<void>((resolve) => { timer = setTimeout(resolve, Math.min(31_000, manifest.timeoutMs + 1_000)); })]);
+      } finally { if (timer) clearTimeout(timer); }
+    },
     async propose(input) {
       if (entered) throw new Error("Pilot fake dispatch is single-use");
       entered = true;
@@ -45,13 +58,16 @@ export function createObservedFakePlanner(options: {
         throw new Error("OFFLINE_CAPTURE_UNAVAILABLE");
       }
       invocations++;
+      inFlight = (async () => {
       try {
         const envelope = await invokeBuiltinFake(script, manifest, input.signal);
         const kind = (envelope.proposal as { kind: string }).kind;
         // Hash generated literal builtins only, never enumerate adapter-external/proxy data.
         const digest = canonicalHash(envelope.proposal);
         try {
-          await store.appendEvent({ slotId: slot.slotId, type: "fake_return",
+          if (input.signal.aborted) await sealed;
+          await store.appendEvent({ slotId: slot.slotId,
+            type: input.signal.aborted ? "late_return" : "fake_return",
             runId: input.runId, callId, durationMs: performance.now() - started,
             payload: { kind: kind === "plan" || kind === "clarification" || kind === "refusal" ? kind : "invalid",
               valid: script !== "invalid", digest, usageKnown: envelope.usage !== null,
@@ -67,6 +83,8 @@ export function createObservedFakePlanner(options: {
         } catch { tainted = true; }
         throw new Error("OFFLINE_FAKE_ERROR");
       }
+      })();
+      return inFlight as ReturnType<PilotAccountedPlanner["propose"]>;
     },
   };
 }

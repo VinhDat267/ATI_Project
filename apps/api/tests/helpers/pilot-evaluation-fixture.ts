@@ -8,7 +8,7 @@ import type { FrozenManifest } from "../../src/pilot-evaluation/contracts.js";
 
 const adminUrl = process.env.API_TEST_ADMIN_URL ?? "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const hash = (character: string) => character.repeat(64);
-export function syntheticBundle(firstScript: "plan" | "missing_usage" = "plan"): FixtureBundle {
+export function syntheticBundle(firstScript: "plan" | "missing_usage" | "delayed" | "invalid" = "plan"): FixtureBundle {
   const row = (requestId: string) => ({
     request_id: requestId, client_ref: "Synthetic", request_type: "web_change",
     raw_request: "Update /landing", deliverable: "Landing update", due_date: "2026-10-15",

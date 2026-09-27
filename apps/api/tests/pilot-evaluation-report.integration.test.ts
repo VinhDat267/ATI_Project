@@ -28,12 +28,59 @@ describe("SQL-only structural report", () => {
         expect(report.structural.pass).toBe(2);
         expect(report.accounting.calls).toBe(2);
         expect(report.accounting.knownCostMicros).toBe(20);
+        expect(report.observations).toEqual({ claimedCalls: 2, fakeInvocations: 2,
+          validOutputs: 2, invalidOutputs: 0, errors: 0, lateReturns: 0 });
+        expect(report.safety.unauthorizedCalls).toBeNull();
+        expect(report.safety.unauthorizedWrites).toBeNull();
+        expect(report.safety.metadataLeakage).toBeNull();
+        expect(report.safety.accountingMismatch).toBe(0);
+        expect(report.safety.localBusinessReservations).toBe(0);
+        for (const dimension of [report.outcomes.byLanguage, report.outcomes.byPrincipal,
+          report.outcomes.byRoute]) {
+          expect(Object.values(dimension).reduce((sum, group) => sum + group.selected, 0)).toBe(2);
+          for (const group of Object.values(dimension)) {
+            expect(group.completed + group.blocked + group.notAttempted + group.outOfScope).toBe(group.selected);
+            expect(Object.values(group.statuses).reduce((sum, count) => sum + count, 0)).toBe(group.selected);
+          }
+        }
+        expect(report.outcomes.byLanguage.en).toMatchObject({ selected: 2, completed: 2,
+          blocked: 0, notAttempted: 0 });
         expect(report.costEvidence).toBe("SIMULATED_NOT_BILLED");
         expect(report.aiQuality).toBe("AI_QUALITY_NOT_MEASURED");
         expect((await admin`SELECT count(*)::int AS n FROM pilot_eval.events`)[0]?.n).toBe(before[0]?.n);
         await expect(readOnly.client`UPDATE pilot_eval.campaigns SET state='completed'`).rejects.toThrow();
       } finally { await readOnly.close(); }
     });
+  }, 120_000);
+
+  it("does not fabricate safety counts when excluded source metadata changes", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const before = await buildOfflineReport(reader, syntheticOracle());
+        await admin`UPDATE source_snapshots SET raw_data=jsonb_set(raw_data,'{source_note}','"different"'::jsonb)`;
+        const after = await buildOfflineReport(reader, syntheticOracle());
+        expect(after.safety).toEqual(before.safety);
+        expect(after.observations).toEqual(before.observations);
+        expect(after.safety.unauthorizedCalls).toBeNull();
+      } finally { await reader.close(); }
+    });
+  }, 120_000);
+
+  it("counts invalid fake output and withholds success instead of calling it a safe result", async () => {
+    const bundle = syntheticBundle('invalid');
+    await withOfflineCampaign(async ({ receipt }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle, receipt, repoRoot: process.cwd() });
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(reader, syntheticOracle());
+        expect(report.observations.invalidOutputs).toBe(1);
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.safeReasons).toContain('OUTPUT_INVALID');
+      } finally { await reader.close(); }
+    }, bundle);
   }, 120_000);
 
   it("refuses success when eligible slots have valid empty seals but no run, call or observations", async () => {
@@ -87,6 +134,23 @@ describe("SQL-only structural report", () => {
         expect(report.verdict).toBe('INCOMPLETE');
         expect(report.safeReasons).toContain('ACCOUNTING_COUNTER_MISMATCH');
       } finally { await readOnly.close(); }
+    });
+  }, 120_000);
+
+  it("detects a held counter mismatch for one principal independently of settled calls", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      await admin`UPDATE ai_provider_campaigns SET held_micros=10
+        WHERE user_id=${receipt.manifest.principals[0].id}`;
+      const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(reader, syntheticOracle());
+        expect(report.verdict).toBe('INCOMPLETE');
+        expect(report.safeReasons).toContain('ACCOUNTING_COUNTER_MISMATCH');
+        expect(report.safety.accountingMismatch).toBe(1);
+        expect(report.accounting.heldMicros).toBe(10);
+      } finally { await reader.close(); }
     });
   }, 120_000);
 

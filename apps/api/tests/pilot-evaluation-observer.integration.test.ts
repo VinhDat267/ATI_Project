@@ -81,6 +81,9 @@ describe("observed fake adapter after actual admission", () => {
         const events = await store.client`SELECT event_type,call_id,payload FROM pilot_eval.events ORDER BY seq`;
         expect(events.map((event) => event.event_type)).toEqual(["callback_entered", "fake_return"]);
         expect(events.map((event) => event.call_id)).toEqual([prepared.callId, prepared.callId]);
+        await expect(store.client`UPDATE pilot_eval.slots SET call_id=NULL WHERE slot_id='slot-1'`).rejects.toThrow();
+        expect((await store.client`SELECT call_id FROM pilot_eval.slots WHERE slot_id='slot-1'`)[0]?.call_id)
+          .toBe(prepared.callId);
         expect(JSON.stringify(events)).not.toMatch(/question|raw_request|reason|exception|Synthetic/);
       } finally { await prepared.db.close(); await store.close(); }
     });

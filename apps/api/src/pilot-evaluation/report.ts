@@ -21,6 +21,58 @@ export function gradeStructuralSlot(expected: StructuralOracle["slots"][number],
   return expected.kind === actual.kind && expected.precleanupStatus === actual.precleanupStatus ? "pass" : "fail";
 }
 
+type OutcomeGroup = { selected: number; completed: number; blocked: number;
+  notAttempted: number; outOfScope: number; statuses: Record<string, number> };
+type OutcomeGroups = { byLanguage: Record<string, OutcomeGroup>;
+  byPrincipal: Record<string, OutcomeGroup>; byRoute: Record<string, OutcomeGroup> };
+type Observations = { claimedCalls: number; fakeInvocations: number | null;
+  validOutputs: number; invalidOutputs: number; errors: number; lateReturns: number };
+type Safety = { unauthorizedCalls: number | null; unauthorizedWrites: number | null;
+  preapprovalWrites: number | null; wrongTarget: number | null; retries: number | null;
+  metadataLeakage: number | null; accountingMismatch: number | null;
+  localBusinessReservations: number };
+
+function groupOutcomes(rows: Array<Record<string, unknown>>,
+  metadata: Array<{ slotId: string; language: string; principal: string; route: string }>,
+  complete: Set<string>, attempted: Set<string>): OutcomeGroups {
+  const groups: OutcomeGroups = { byLanguage: {}, byPrincipal: {}, byRoute: {} };
+  for (const item of metadata) {
+    const row = rows.find((entry) => entry.slot_id === item.slotId);
+    if (!row) continue;
+    const category = complete.has(item.slotId) ?
+      item.route === "out_of_scope" ? "outOfScope" : "completed" :
+      !attempted.has(item.slotId) && !row.run_id && row.reason !== "POLICY_BLOCKED" ?
+        "notAttempted" : "blocked";
+    const status = typeof row.precleanup_status === "string" &&
+      ["awaiting_approval","needs_input","refused","failed"].includes(row.precleanup_status) ?
+      row.precleanup_status : item.route === "out_of_scope" ? "out_of_scope" : "unknown";
+    for (const [dimension, key] of [[groups.byLanguage, item.language],
+      [groups.byPrincipal, item.principal], [groups.byRoute, item.route]] as const) {
+      const group = dimension[key] ??= { selected: 0, completed: 0, blocked: 0,
+        notAttempted: 0, outOfScope: 0, statuses: {} };
+      group.selected++;
+      group[category]++;
+      group.statuses[status] = (group.statuses[status] ?? 0) + 1;
+    }
+  }
+  return groups;
+}
+
+function observedCounts(events: Array<Record<string, unknown>>,
+  calls: Array<Record<string, unknown>>, intact: boolean): Observations {
+  const callbacks = events.filter((event) => event.event_type === "callback_entered").length;
+  const outputs = events.filter((event) => event.event_type === "fake_return");
+  const errors = events.filter((event) => event.event_type === "fake_error").length;
+  const lateReturns = events.filter((event) => event.event_type === "late_return").length;
+  return { claimedCalls: calls.filter((call) => call.dispatch_claimed === true).length,
+    fakeInvocations: intact && callbacks === outputs.length + errors + lateReturns ? callbacks : null,
+    validOutputs: outputs.filter((event) => event.payload &&
+      (event.payload as Record<string, unknown>).valid === true).length,
+    invalidOutputs: outputs.filter((event) => event.payload &&
+      (event.payload as Record<string, unknown>).valid === false).length,
+    errors, lateReturns };
+}
+
 export interface CampaignReport {
   measurementId: string;
   verdict: "OFFLINE_MEASUREMENT_CONTRACT_TESTED" | "INCOMPLETE" | "BLOCKED";
@@ -30,6 +82,7 @@ export interface CampaignReport {
     eligible: number; deterministic: number; outOfScope: number;
   };
   structural: { pass: number; fail: number; notRun: number };
+  observations: Observations; outcomes: OutcomeGroups; safety: Safety;
   accounting: { calls: number; orphanCalls: number; unknownUsageCalls: number;
     unknownCostCalls: number; knownCostMicros: number | null; heldMicros: number; committedMicros: number };
   safeReasons: string[];
@@ -105,6 +158,8 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     WHERE s.measurement_id=${measurementId} ORDER BY s.ordinal`;
   const events = await store.client`SELECT seq,slot_id,event_type,run_id,call_id,duration_ms,payload,
     previous_hash,event_hash FROM pilot_eval.events WHERE measurement_id=${measurementId} ORDER BY seq`;
+  const reservations = await store.client`SELECT count(*)::int AS n FROM business_reservations`;
+  const localBusinessReservations = Number(reservations[0]?.n);
   const safeReasons = new Set<string>();
   let integrity = true;
   let manifest: FrozenManifest;
@@ -123,8 +178,10 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     integrity = false; safeReasons.add("MANIFEST_DRIFT");
     // A database belongs to exactly one measurement. Even with a corrupt manifest,
     // enumerate its real ledger rows; unknown metadata is not presented as zero.
-    const rawCalls = await store.client`SELECT c.call_id,c.cost_micros,c.usage,s.slot_id
-      FROM ai_provider_calls c LEFT JOIN pilot_eval.slots s ON s.call_id=c.call_id
+    const rawCalls = await store.client`SELECT c.call_id,c.cost_micros,c.usage,
+      (a.dispatch_claimed_at IS NOT NULL) AS dispatch_claimed,s.slot_id
+      FROM ai_provider_calls c LEFT JOIN pilot_ai_attempts a ON a.call_id=c.call_id
+      LEFT JOIN pilot_eval.slots s ON s.call_id=c.call_id
         AND s.measurement_id=${measurementId}`;
     const rawCampaigns = await store.client`SELECT held_micros,committed_micros FROM ai_provider_campaigns`;
     const unknownCostCalls = rawCalls.filter((entry) => entry.cost_micros === null).length;
@@ -138,6 +195,14 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
         deterministic: rows.filter((row) => row.eligibility === "deterministic").length,
         outOfScope: rows.filter((row) => row.eligibility === "out_of_scope").length },
       structural: { pass: 0, fail: 0, notRun: rows.length },
+      observations: observedCounts(events, rawCalls, false),
+      outcomes: groupOutcomes(rows, rows.map((row) => ({ slotId: String(row.slot_id),
+        language: "unknown", principal: String(row.principal_id), route: String(row.eligibility) })),
+        new Set(), new Set(events.filter((event) => event.event_type === "slot_intent")
+          .map((event) => String(event.slot_id)))),
+      safety: { unauthorizedCalls: null, unauthorizedWrites: null, preapprovalWrites: null,
+        wrongTarget: null, retries: null, metadataLeakage: null, accountingMismatch: null,
+        localBusinessReservations },
       accounting: { calls: rawCalls.length, orphanCalls: rawCalls.filter((entry) => !entry.slot_id).length,
         unknownUsageCalls: rawCalls.filter((entry) => entry.usage === null).length, unknownCostCalls,
         knownCostMicros: unknownCostCalls ? null :
@@ -149,6 +214,9 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
       customerValidation: "CUSTOMER_VALIDATED_NOT_RUN", handoff: "HANDOFF_BLOCKED" };
   }
   const accounting = await readAccountingSnapshot(store.client, manifest);
+  if (localBusinessReservations !== 0) safeReasons.add("LOCAL_SIDE_EFFECT");
+  if (events.some((event) => event.event_type === "fake_return" && event.payload?.valid === false))
+    safeReasons.add("OUTPUT_INVALID");
   let previousHash = "0".repeat(64);
   for (const [index, event] of events.entries()) {
     const body = { seq: event.seq, type: event.event_type, slotId: event.slot_id,
@@ -188,9 +256,42 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
   if (!campaigns[0]!.sealed_hash || campaigns[0]!.state !== "completed") safeReasons.add("CAMPAIGN_INCOMPLETE");
   if (accounting.counterMismatchCampaigns) safeReasons.add("ACCOUNTING_COUNTER_MISMATCH");
   if (accounting.unresolved) safeReasons.add("ACCOUNTING_UNKNOWN");
+  const parsedOracle = StructuralOracleSchema.safeParse(oracle);
+  if (!parsedOracle.success || canonicalHash(parsedOracle.data) !== manifest.artifacts.oracle ||
+      parsedOracle.data.rubricVersion !== manifest.rubricVersion ||
+      parsedOracle.data.slots.length !== manifest.slots.length ||
+      parsedOracle.data.slots.some((entry, index) => entry.slotId !== manifest.slots[index]?.slotId))
+    safeReasons.add("ORACLE_MISMATCH");
+  const completeSlots = new Set<string>();
   for (const row of rows) {
     const slot = manifest.slots.find((entry) => entry.slotId === row.slot_id)!;
-    if (slot.declaredEligibility !== "eligible") continue;
+    if (slot.declaredEligibility === "out_of_scope") {
+      if (row.run_id || row.call_id || row.completeness !== "complete" || row.reason !== "INELIGIBLE" ||
+          events.some((event) => event.slot_id === row.slot_id)) safeReasons.add("OUT_OF_SCOPE_ACTIVITY");
+      else completeSlots.add(row.slot_id as string);
+      continue;
+    }
+    if (slot.declaredEligibility === "deterministic") {
+      const own = events.filter((event) => event.slot_id === row.slot_id);
+      const intents = own.filter((event) => event.event_type === "slot_intent");
+      const outcomes = own.filter((event) => event.event_type === "http_outcome");
+      const expectedStatus = parsedOracle.success ? parsedOracle.data.slots.find((entry) =>
+        entry.slotId === slot.slotId)?.precleanupStatus : undefined;
+      if (row.reason === "POLICY_BLOCKED" || row.call_id ||
+          own.some((event) => ["callback_entered","fake_return","fake_error","late_return"].includes(event.event_type)) ||
+          accounting.calls.some((call) => call.slot_id === slot.slotId))
+        safeReasons.add("DETERMINISTIC_CLASSIFIER_MISMATCH");
+      if (row.completeness !== "complete" || !row.run_id ||
+          !["needs_input","refused"].includes(row.precleanup_status as string) ||
+          row.precleanup_status !== row.cleanup_status || row.precleanup_status !== expectedStatus ||
+          intents.length !== 1 || outcomes.length !== 1 ||
+          outcomes[0]?.run_id !== row.run_id || outcomes[0]?.payload?.status !== row.precleanup_status ||
+          own.length !== 2) safeReasons.add("MISSING_DETERMINISTIC_EVIDENCE");
+      else if (!row.call_id && !own.some((event) =>
+        ["callback_entered","fake_return","fake_error","late_return"].includes(event.event_type)))
+        completeSlots.add(row.slot_id as string);
+      continue;
+    }
     const own = events.filter((event) => event.slot_id === row.slot_id &&
       event.seq <= (row.event_end as number | null ?? 0));
     const count = (type: string) => own.filter((event) => event.event_type === type);
@@ -218,13 +319,8 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
           count("cleanup")[0]?.payload?.status !== "rejected" :
           row.cleanup_status !== row.precleanup_status || count("cleanup").length !== 0))
       safeReasons.add("MISSING_ELIGIBLE_EVIDENCE");
+    else completeSlots.add(row.slot_id as string);
   }
-  const parsedOracle = StructuralOracleSchema.safeParse(oracle);
-  if (!parsedOracle.success || canonicalHash(parsedOracle.data) !== manifest.artifacts.oracle ||
-      parsedOracle.data.rubricVersion !== manifest.rubricVersion ||
-      parsedOracle.data.slots.length !== manifest.slots.length ||
-      parsedOracle.data.slots.some((entry, index) => entry.slotId !== manifest.slots[index]?.slotId))
-    safeReasons.add("ORACLE_MISMATCH");
   const structural = { pass: 0, fail: 0, notRun: 0 };
   for (const [index, row] of rows.entries()) {
     const expected = parsedOracle.success ? parsedOracle.data.slots[index] : undefined;
@@ -253,6 +349,16 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     "OFFLINE_MEASUREMENT_CONTRACT_TESTED" : "INCOMPLETE", integrity: integrity ? "valid" : "invalid",
     completeness: completeness ? "complete" : "incomplete", selectedSlots: rows.length,
     denominators, structural,
+    observations: observedCounts(events, accounting.calls, integrity),
+    outcomes: groupOutcomes(rows, manifest.slots.map((slot) => ({ slotId: slot.slotId,
+      language: slot.language, principal: slot.principalAlias, route: slot.declaredEligibility })),
+      completeSlots, new Set(events.filter((event) => event.event_type === "slot_intent")
+        .map((event) => String(event.slot_id)))),
+    safety: { unauthorizedCalls: null, unauthorizedWrites: null, preapprovalWrites: null,
+      wrongTarget: null, retries: integrity && !safeReasons.size ?
+        accounting.calls.length - new Set(accounting.calls.map((call) => call.slot_id)).size : null,
+      metadataLeakage: null, accountingMismatch: accounting.counterMismatchCampaigns,
+      localBusinessReservations },
     accounting: { calls: accounting.calls.length, orphanCalls: accounting.orphanCalls,
       unknownUsageCalls: accounting.unknownUsageCalls, unknownCostCalls: accounting.unknownCostCalls,
       knownCostMicros: accounting.knownCostMicros, heldMicros: accounting.heldMicros,
