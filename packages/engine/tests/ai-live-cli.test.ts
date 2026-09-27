@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeAll } from "vitest";
 import { resolve, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createAiFreezeTestRoot } from "./fixtures/ai-freeze-test-root.js";
 import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import {
   runLiveEvaluationCli,
@@ -11,8 +11,15 @@ import { createLiveEvaluationRuntime } from "../src/ai/live-evaluation/runtime.j
 import type { LiveEvaluationSession } from "../src/ai/live-evaluation/runner.js";
 import type { AiLiveApprovalRecord } from "../src/ai/providers/approval.js";
 
-const root = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+let fixture: ReturnType<typeof createAiFreezeTestRoot>;
+let root: string;
 const tempDirs: string[] = [];
+
+beforeAll(() => {
+  fixture = createAiFreezeTestRoot();
+  root = fixture.root;
+});
+afterAll(() => fixture.close());
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {

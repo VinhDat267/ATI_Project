@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createAiFreezeTestRoot, testPolicy } from "./fixtures/ai-freeze-test-root.js";
 import {
   createLiveFreeze,
   assertLiveFrozen,
@@ -14,9 +15,19 @@ import {
   type FrozenLiveEvaluation,
 } from "../src/ai/live-evaluation/contracts.js";
 
-const root = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+let fixture: ReturnType<typeof createAiFreezeTestRoot>;
+let root: string;
+
+beforeAll(() => {
+  fixture = createAiFreezeTestRoot();
+  root = fixture.root;
+});
+afterAll(() => fixture.close());
 
 describe("ai-live-freeze", () => {
+  it("uses a test-local policy input instead of an ignored developer AGENTS.md", () => {
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe(testPolicy);
+  });
   it("enforces cross-field rubric approval invariants", () => {
     const proposed = {
       format: "ati-ai-live-rubric-v1",
