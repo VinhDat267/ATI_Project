@@ -172,6 +172,26 @@ export async function openEvaluationStore(runtimeUrl: string, expected: Database
     if (privileges[0]?.db_create || privileges[0]?.public_create || privileges[0]?.eval_create ||
         privileges[0]?.owned !== 0 || privileges[0]?.memberships !== 0)
       throw new Error("Evaluator runtime role has DDL or membership privileges");
+    const dml = await client`SELECT
+      has_table_privilege(current_user,'pilot_ai_grants','SELECT') AS grant_read,
+      has_column_privilege(current_user,'pilot_ai_grants','updated_at','UPDATE') AS grant_lock,
+      has_table_privilege(current_user,'ai_provider_calls','SELECT') AS call_read,
+      has_table_privilege(current_user,'ai_provider_calls','INSERT') AS call_insert,
+      has_table_privilege(current_user,'runs','INSERT') AS run_insert,
+      has_table_privilege(current_user,'pilot_eval.events','INSERT') AS event_insert,
+      has_table_privilege(current_user,'pilot_eval.events','UPDATE') AS event_update,
+      has_table_privilege(current_user,'pilot_eval.events','DELETE') AS event_delete,
+      has_table_privilege(current_user,'pilot_eval.seals','INSERT') AS seal_insert,
+      has_table_privilege(current_user,'pilot_eval.seals','UPDATE') AS seal_update,
+      has_table_privilege(current_user,'pilot_eval.seals','DELETE') AS seal_delete,
+      has_table_privilege(current_user,'pilot_eval.grades','INSERT') AS grade_insert,
+      has_table_privilege(current_user,'pilot_eval_bootstrap.marker','UPDATE') AS marker_update,
+      has_sequence_privilege(current_user,'run_events_id_seq','USAGE') AS event_sequence`;
+    const grants = dml[0];
+    if (!grants || Object.entries(grants).some(([key, allowed]) =>
+      ["event_update", "event_delete", "seal_update", "seal_delete", "grade_insert", "marker_update"].includes(key)
+        ? allowed !== false : allowed !== true))
+      throw new Error("Evaluator runtime role has broken DML privilege");
     return new EvaluationStore(client, identity);
   } catch (error) { await client.end(); throw error; }
 }

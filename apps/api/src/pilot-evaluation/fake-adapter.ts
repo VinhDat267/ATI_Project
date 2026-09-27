@@ -16,7 +16,8 @@ export async function invokeBuiltinFake(
     name === "invalid" ? { kind: "plan", tool: "unreviewed.tool" } :
     { kind: "plan", tool: "trello.create_card" };
   return { proposal,
-    usage: name === "unknown" ? null : { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    usage: name === "unknown" || name === "missing_usage" ? null :
+      { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     costMicros: name === "unknown" ? null : manifest.estimatedCostMicros,
   };
 }

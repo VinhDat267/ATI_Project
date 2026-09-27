@@ -21,7 +21,7 @@ export const FixtureConfigSchema = z.object({
   requestId: z.string().min(1).max(128),
 }).strict();
 export const FakeScriptIdSchema = z.enum([
-  "plan", "clarification", "refusal", "invalid", "throw", "unknown", "delayed",
+  "plan", "clarification", "refusal", "invalid", "throw", "unknown", "missing_usage", "delayed",
 ]);
 export const SlotDescriptorSchema = z.object({
   slotId: z.string().min(1).max(128), ordinal: UnitsSchema, inputHash: DigestSchema,

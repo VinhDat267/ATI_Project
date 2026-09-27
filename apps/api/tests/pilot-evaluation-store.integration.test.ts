@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
+import { openReadonlyEvaluationStore } from "../src/pilot-evaluation/report.js";
 import { withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 const adminUrl = process.env.API_TEST_ADMIN_URL ?? "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
@@ -21,6 +22,13 @@ describe("dedicated evaluator database", () => {
         await expect(openEvaluationStore(receipt.runtimeUrl, { ...receipt.identity, markerNonceHash: "0".repeat(64) })).rejects.toThrow();
         await expect(admin`SELECT 1`).resolves.toHaveLength(1);
       } finally { await store.close(); }
+    });
+  }, 120_000);
+
+  it("rejects a report role accidentally granted mutation on an unrelated public table", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await admin.unsafe(`GRANT INSERT ON users TO "${receipt.reportRole}"`);
+      await expect(openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity)).rejects.toThrow("privilege");
     });
   }, 120_000);
 

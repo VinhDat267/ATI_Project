@@ -105,3 +105,40 @@ không thể chọn server, executable hay arguments. Active check trả `429` v
 sanitise thành `503`. Session vẫn in-memory; planner fixture không phải AI
 evaluation, còn LLM/retrieval/replan, BullMQ và browser integration vẫn là
 giới hạn ngoài technical catalog gate.
+
+### Pilot v2 Phase B: offline fake advisory campaign (library only)
+
+`src/pilot-evaluation/index.ts` xuất các entrypoint tách quyền: `freezeManifest` /
+`assertFrozen`, `provisionOfflineCampaign(adminUrl, manifest)` cho bootstrap **database
+mới** trên PostgreSQL cô lập `127.0.0.1:55532`, `openEvaluationStore` và
+`runOfflineCampaign({ manifest, bundle, receipt, repoRoot })` cho producer,
+`openReadonlyEvaluationStore` và `buildOfflineReport(readOnly, oracle)` cho báo cáo.
+Oracle chỉ được đưa cho grader sau producer; `appendGrade` là thao tác riêng
+trên evaluator store, không thuộc báo cáo chỉ đọc. Không có CLI, app launcher,
+transport provider hoặc quyền write SaaS mới. `offline_fake`, provider metadata
+`google|openai`, model `offline-fixture-*` và cost dương chỉ là **SIMULATED_NOT_BILLED**.
+
+Manifest/artifact cần JSON bounded/strict, frozen hash và exact **clean Git HEAD**;
+producer kiểm lại cùng manifest/marker/role/fixture trước claim một lần. Hai
+principal đăng nhập password qua hai `createApi` loopback thực với session mặc
+định; cleanup duy nhất là owner `rejected` dùng approval hiện thời. Nếu POST/runId,
+ledger, usage/cost hoặc capture không chắc chắn, campaign dừng, **không retry**;
+restart chỉ mở report SQL readonly, không gọi detail GET (GET có lifecycle sweep).
+`provisionOfflineCampaign` không tự drop DB/roles khi thành công; giữ measurement
+bền vững cho operator đối chiếu. Chỉ test fixture mới xóa các tên DB/role ghi
+trong receipt thuộc chính invocation. Không log/stringify receipt vì chứa login
+và DB credentials. Bootstrap cần admin test cô lập và extension vector/pgcrypto,
+không dùng DB demo hoặc biến môi trường sản phẩm làm fallback.
+
+TDD integration trong workspace dirty chỉ mock **Git evidence reader** trong
+Vitest; DB, auth, admission, ledger và HTTP là thật trên fixture synthetic.
+Positive provenance không mock chỉ chạy ở detached clean checkout với
+`PILOT_EVAL_CLEAN_CHECKOUT=1` và file `pilot-evaluation-clean.integration.test.ts`.
+`npm run check` không tự bao gồm suite PostgreSQL; chạy các
+`pilot-evaluation-*.integration.test.ts` tuần tự trên DB test cô lập. Event
+hash và immutable seals chứng minh tính nhất quán dưới role bị giới hạn, **không
+chống DB admin rewrite** hoặc chứng minh đủ observation khi missing/late data.
+Structural oracle không thấy prose; không đo specificity/refusal semantic,
+citation, hallucination hay model/provider latency. Nhãn giữ nguyên:
+`AI_QUALITY_NOT_MEASURED`, `CUSTOMER_VALIDATED_NOT_RUN`, `HANDOFF_BLOCKED`.
+Không dùng fake pass rate để tuyên bố chất lượng AI, bill thật hoặc SaaS live.

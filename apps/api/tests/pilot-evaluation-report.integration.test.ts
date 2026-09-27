@@ -72,6 +72,22 @@ describe("SQL-only structural report", () => {
     });
   }, 120_000);
 
+  it("keeps observed call totals when the persisted manifest becomes invalid", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+        receipt, repoRoot: process.cwd() });
+      await admin`UPDATE pilot_eval.campaigns SET manifest_json=${admin.json({ invalid: true })}`;
+      const readOnly = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+      try {
+        const report = await buildOfflineReport(readOnly, syntheticOracle());
+        expect(report.verdict).toBe("BLOCKED");
+        expect(report.selectedSlots).toBe(2);
+        expect(report.accounting.calls).toBe(2);
+        expect(report.accounting.knownCostMicros).toBe(20);
+      } finally { await readOnly.close(); }
+    });
+  }, 120_000);
+
   it("detects an admin-mutated event hash without granting report any repair ability", async () => {
     await withOfflineCampaign(async ({ receipt, admin }) => {
       await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),

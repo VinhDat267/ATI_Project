@@ -76,6 +76,18 @@ export async function openReadonlyEvaluationStore(url: string, expected: Databas
     if (!role || Object.entries(role).some(([key, value]) =>
       key === "memberships" || key === "owned" ? value !== 0 : value !== false))
       throw new Error("Report role has mutation or DDL privilege");
+    const writable = await client`SELECT EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      LEFT JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum > 0 AND NOT a.attisdropped
+      WHERE n.nspname IN ('public','pilot_eval','pilot_eval_bootstrap') AND c.relkind IN ('r','p')
+        AND (has_table_privilege(current_user,c.oid,'INSERT') OR
+             has_table_privilege(current_user,c.oid,'UPDATE') OR
+             has_table_privilege(current_user,c.oid,'DELETE') OR
+             (a.attnum IS NOT NULL AND
+              (has_column_privilege(current_user,c.oid,a.attnum,'INSERT') OR
+               has_column_privilege(current_user,c.oid,a.attnum,'UPDATE'))))
+    ) AS any_write`;
+    if (writable[0]?.any_write) throw new Error("Report role has mutation privilege");
     return new ReadonlyEvaluationStore(client, identity);
   } catch (error) { await client.end(); throw error; }
 }
@@ -109,12 +121,29 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     }
   } catch {
     integrity = false; safeReasons.add("MANIFEST_DRIFT");
-    // No fabricated manifest/denominator if the persisted manifest itself cannot be parsed.
+    // A database belongs to exactly one measurement. Even with a corrupt manifest,
+    // enumerate its real ledger rows; unknown metadata is not presented as zero.
+    const rawCalls = await store.client`SELECT c.call_id,c.cost_micros,c.usage,s.slot_id
+      FROM ai_provider_calls c LEFT JOIN pilot_eval.slots s ON s.call_id=c.call_id
+        AND s.measurement_id=${measurementId}`;
+    const rawCampaigns = await store.client`SELECT held_micros,committed_micros FROM ai_provider_campaigns`;
+    const unknownCostCalls = rawCalls.filter((entry) => entry.cost_micros === null).length;
+    const principalCounts: Record<string, number> = {};
+    for (const row of rows) principalCounts[row.principal_id as string] =
+      (principalCounts[row.principal_id as string] ?? 0) + 1;
     return { measurementId, verdict: "BLOCKED", integrity: "invalid", completeness: "incomplete",
-      selectedSlots: rows.length, denominators: { byLanguage: {}, byPrincipal: {}, eligible: 0,
-        deterministic: 0, outOfScope: 0 }, structural: { pass: 0, fail: 0, notRun: rows.length },
-      accounting: { calls: 0, orphanCalls: 0, unknownUsageCalls: 0, unknownCostCalls: 0,
-        knownCostMicros: null, heldMicros: 0, committedMicros: 0 },
+      selectedSlots: rows.length, denominators: { byLanguage: { unknown: rows.length },
+        byPrincipal: principalCounts,
+        eligible: rows.filter((row) => row.eligibility === "eligible").length,
+        deterministic: rows.filter((row) => row.eligibility === "deterministic").length,
+        outOfScope: rows.filter((row) => row.eligibility === "out_of_scope").length },
+      structural: { pass: 0, fail: 0, notRun: rows.length },
+      accounting: { calls: rawCalls.length, orphanCalls: rawCalls.filter((entry) => !entry.slot_id).length,
+        unknownUsageCalls: rawCalls.filter((entry) => entry.usage === null).length, unknownCostCalls,
+        knownCostMicros: unknownCostCalls ? null :
+          rawCalls.reduce((sum, entry) => sum + Number(entry.cost_micros), 0),
+        heldMicros: rawCampaigns.reduce((sum, entry) => sum + Number(entry.held_micros), 0),
+        committedMicros: rawCampaigns.reduce((sum, entry) => sum + Number(entry.committed_micros), 0) },
       safeReasons: [...safeReasons], costEvidence: "SIMULATED_NOT_BILLED",
       aiQuality: "AI_QUALITY_NOT_MEASURED", providerLatency: "NOT_RUN",
       customerValidation: "CUSTOMER_VALIDATED_NOT_RUN", handoff: "HANDOFF_BLOCKED" };

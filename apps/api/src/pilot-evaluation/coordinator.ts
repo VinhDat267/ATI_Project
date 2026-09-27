@@ -108,11 +108,11 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
       if (blocked) break;
       const fixture = bundle.slots[index]!;
       if (slot.declaredEligibility !== "eligible") {
-        const snapshot = await readAccountingSnapshot(store.client, manifest);
+        const snapshot = await readAccountingSnapshot(store.client, manifest, true);
         await store.sealSlot(slot.slotId, "complete", "INELIGIBLE", snapshot.digestForSlot(slot.slotId));
         continue;
       }
-      const before = await readAccountingSnapshot(store.client, manifest);
+      const before = await readAccountingSnapshot(store.client, manifest, true);
       const active = await store.client`SELECT id FROM runs WHERE status::text NOT IN
         ('succeeded','failed','rejected','cancelled','expired','refused','needs_input','reconciliation_required') LIMIT 1`;
       if (before.unresolved || active.length) { blocked = true; break; }
@@ -177,7 +177,7 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
             durationMs: 0, payload: { code: "OWNER_REJECTED", status: cleanupStatus } });
         }
         await store.markSlot(slot.slotId, detail.status, cleanupStatus);
-        const after = await readAccountingSnapshot(store.client, manifest);
+        const after = await readAccountingSnapshot(store.client, manifest, true);
         if (opened.observer.tainted || after.unresolved || detail.status === "planning" ||
             detail.status === "running") { blocked = true; break; }
         await store.sealSlot(slot.slotId, "complete", "OK", after.digestForSlot(slot.slotId));
@@ -189,7 +189,7 @@ export async function runOfflineCampaign(input: OfflineRunInput): Promise<Campai
         }
       }
     }
-    const snapshot = await readAccountingSnapshot(store.client, manifest);
+    const snapshot = await readAccountingSnapshot(store.client, manifest, true);
     const rows = await store.client`SELECT s.slot_id,z.completeness FROM pilot_eval.slots s
       LEFT JOIN pilot_eval.seals z USING(measurement_id,slot_id)
       WHERE s.measurement_id=${manifest.measurementId} ORDER BY s.ordinal`;
