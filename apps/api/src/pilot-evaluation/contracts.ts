@@ -31,7 +31,7 @@ export const SlotDescriptorSchema = z.object({
 }).strict();
 export const ManifestDraftSchema = z.object({
   format: z.literal("pilot-advisory-offline-v1"), measurementId: UuidSchema,
-  gitCommit: DigestSchema, executionMode: z.literal("offline_fake"),
+  gitCommit: z.string().regex(/^[0-9a-f]{40}$/), executionMode: z.literal("offline_fake"),
   outputContract: z.literal("pilot-advisory-v1"), catalogMode: z.literal("fixed"),
   costEvidence: z.literal("SIMULATED_NOT_BILLED"),
   schemaVersion: z.literal("pilot-eval-1"), rubricVersion: z.string().min(1).max(64),

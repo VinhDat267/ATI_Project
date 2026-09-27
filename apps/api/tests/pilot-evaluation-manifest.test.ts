@@ -22,7 +22,7 @@ const slot = {
 };
 const draft = () => ({
   format: "pilot-advisory-offline-v1", measurementId: randomUUID(),
-  gitCommit: digest("a"), executionMode: "offline_fake", outputContract: "pilot-advisory-v1",
+  gitCommit: "a".repeat(40), executionMode: "offline_fake", outputContract: "pilot-advisory-v1",
   catalogMode: "fixed", costEvidence: "SIMULATED_NOT_BILLED",
   schemaVersion: "pilot-eval-1", rubricVersion: "structural-1", fakeScriptVersion: "builtin-1",
   provider: "google", model: "offline-fixture-plan", estimatedCostMicros: 10,
@@ -61,7 +61,7 @@ describe("offline manifest freeze", () => {
     expect(() => assertFrozen(frozen, artifacts)).not.toThrow();
     expect(() => assertFrozen({ ...frozen, timeoutMs: 2000 }, artifacts)).toThrow();
     expect(() => assertFrozen({ ...frozen, rubricVersion: "changed" }, artifacts)).toThrow();
-    expect(() => assertFrozen({ ...frozen, gitCommit: digest("9") }, artifacts)).toThrow();
+    expect(() => assertFrozen({ ...frozen, gitCommit: "9".repeat(40) }, artifacts)).toThrow();
     expect(() => assertFrozen({ ...frozen, principals: [{ ...principals[0], limitMicros: 101 }, principals[1]] }, artifacts)).toThrow();
   });
 });

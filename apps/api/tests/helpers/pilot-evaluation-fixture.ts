@@ -1,14 +1,27 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { freezeManifest } from "../../src/pilot-evaluation/manifest.js";
+import { canonicalHash, freezeManifest } from "../../src/pilot-evaluation/manifest.js";
+import type { FixtureBundle } from "../../src/pilot-evaluation/contracts.js";
 import { provisionOfflineCampaign, type PrivateBootstrapReceipt } from "../../src/pilot-evaluation/provision.js";
 
 const adminUrl = process.env.API_TEST_ADMIN_URL ?? "postgresql://wap:wap@127.0.0.1:55532/wap_g1";
 const hash = (character: string) => character.repeat(64);
+export function syntheticBundle(): FixtureBundle {
+  const row = (requestId: string) => ({
+    request_id: requestId, client_ref: "Synthetic", request_type: "web_change",
+    raw_request: "Update /landing", deliverable: "Landing update", due_date: "2026-10-15",
+    decision_status: "confirmed", source_note: "confirmed",
+  });
+  return { slots: [
+    { slotId: "slot-1", inputHash: canonicalHash(row("REQ-1")), scriptId: "plan", row: row("REQ-1") },
+    { slotId: "slot-2", inputHash: canonicalHash(row("REQ-2")), scriptId: "plan", row: row("REQ-2") },
+  ] };
+}
 export function syntheticManifest() {
+  const bundle = syntheticBundle();
   return freezeManifest({
     format: "pilot-advisory-offline-v1", measurementId: randomUUID(),
-    gitCommit: hash("a"), executionMode: "offline_fake", outputContract: "pilot-advisory-v1",
+    gitCommit: "a".repeat(40), executionMode: "offline_fake", outputContract: "pilot-advisory-v1",
     catalogMode: "fixed", costEvidence: "SIMULATED_NOT_BILLED", schemaVersion: "pilot-eval-1",
     rubricVersion: "structural-1", fakeScriptVersion: "builtin-1", provider: "google",
     model: "offline-fixture-plan", estimatedCostMicros: 10, timeoutMs: 1000,
@@ -16,12 +29,14 @@ export function syntheticManifest() {
       { alias: "alpha", id: randomUUID(), maxCalls: 2, limitMicros: 100 },
       { alias: "beta", id: randomUUID(), maxCalls: 2, limitMicros: 100 },
     ],
-    slots: [{ slotId: "slot-1", ordinal: 0, inputHash: hash("3"), language: "en",
-      principalAlias: "alpha", declaredEligibility: "eligible", scriptId: "plan",
-      fixture: { spreadsheetId: "synthetic-sheet", tabId: "requests", boardId: "synthetic-board", listId: "todo", requestId: "REQ-1" },
-    }],
+    slots: bundle.slots.map((entry, ordinal) => ({ slotId: entry.slotId, ordinal,
+      inputHash: entry.inputHash, language: "en" as const,
+      principalAlias: ordinal === 0 ? "alpha" : "beta", declaredEligibility: "eligible" as const,
+      scriptId: entry.scriptId,
+      fixture: { spreadsheetId: "synthetic-sheet", tabId: "requests", boardId: "synthetic-board", listId: "todo", requestId: entry.row!.request_id },
+    })),
   }, { code: hash("a"), projection: hash("b"), prompt: hash("c"), schema: hash("d"),
-    fixtures: hash("e"), oracle: hash("f"), fakeScript: hash("1"), rubric: hash("2") });
+    fixtures: canonicalHash(bundle), oracle: hash("f"), fakeScript: hash("1"), rubric: hash("2") });
 }
 
 export async function withOfflineCampaign<T>(run: (context: {

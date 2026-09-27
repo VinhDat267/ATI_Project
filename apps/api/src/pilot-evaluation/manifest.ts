@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { observeGitEvidence } from "./git-evidence.js";
 import {
   ArtifactHashesSchema, FixtureBundleSchema, FrozenManifestSchema,
   ManifestDraftSchema, type ArtifactHashes, type FixtureBundle,
@@ -107,8 +107,7 @@ export function assertFrozen(manifest: FrozenManifest, artifacts: ArtifactHashes
 
 /** Campaign proof requires an actual clean Git checkout at the exact frozen commit. */
 export function assertCleanProvenance(manifest: FrozenManifest, cwd: string): void {
-  const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-  if (git("rev-parse", "HEAD") !== manifest.gitCommit ||
-      git("status", "--porcelain=v1", "-uall") !== "")
+  const evidence = observeGitEvidence(cwd);
+  if (evidence.head !== manifest.gitCommit || !evidence.clean)
     throw new Error("Frozen campaign requires clean exact Git checkout");
 }

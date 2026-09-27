@@ -111,6 +111,9 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
       await owner.unsafe(`GRANT SELECT ON ${reads} TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
       const writes = "workflows,workflow_versions,runs,run_events,source_snapshots,pilot_approvals,pilot_ai_attempts,pilot_planner_outcomes,ai_provider_campaigns,ai_provider_calls,business_reservations";
       await owner.unsafe(`GRANT INSERT,UPDATE ON ${writes} TO ${identifier(runtimeRole)}`);
+      // Admission locks grant rows FOR UPDATE; only this inert column is writable.
+      await owner.unsafe(`GRANT UPDATE(updated_at) ON pilot_ai_grants TO ${identifier(runtimeRole)}`);
+      await owner.unsafe(`GRANT USAGE ON SEQUENCE run_events_id_seq TO ${identifier(runtimeRole)}`);
       const receipt = { identity, manifest, runtimeUrl: urlFor(adminUrl, dbName, runtimeRole, password),
         reportUrl: urlFor(adminUrl, dbName, reportRole, reportPassword), reportRole, logins };
       const store = await openEvaluationStore(receipt.runtimeUrl, identity);
