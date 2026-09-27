@@ -12,6 +12,8 @@ export interface PrivateBootstrapReceipt {
   readonly runtimeUrl: string;
   readonly reportUrl: string;
   readonly reportRole: string;
+  readonly graderUrl: string;
+  readonly graderRole: string;
   readonly logins: readonly [
     { readonly alias: string; readonly email: string; readonly password: string; readonly passwordHash: string },
     { readonly alias: string; readonly email: string; readonly password: string; readonly passwordHash: string },
@@ -19,7 +21,7 @@ export interface PrivateBootstrapReceipt {
 }
 
 const identifier = (name: string) => {
-  if (!/^(?:pilot_eval|pilot_runtime|pilot_report)_[0-9a-f]{32}$/.test(name))
+  if (!/^(?:pilot_eval|pilot_runtime|pilot_report|pilot_grader)_[0-9a-f]{32}$/.test(name))
     throw new Error("Untrusted database identifier");
   return `"${name}"`;
 };
@@ -45,6 +47,7 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
   const dbName = `pilot_eval_${suffix}`;
   const runtimeRole = `pilot_runtime_${suffix}`;
   const reportRole = `pilot_report_${suffix}`;
+  const graderRole = `pilot_grader_${suffix}`;
   const nonceHash = createHash("sha256").update(randomBytes(32)).digest("hex");
   const identity = DatabaseIdentitySchema.parse({ measurementId: manifest.measurementId,
     databaseName: dbName, schemaVersion: manifest.schemaVersion,
@@ -52,9 +55,11 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
   const admin = postgres(approvedUrl, { max: 1, connect_timeout: 5 });
   const password = randomBytes(32).toString("hex");
   const reportPassword = randomBytes(32).toString("hex");
+  const graderPassword = randomBytes(32).toString("hex");
   let createdDb = false;
   let runtimeCreated = false;
   let reportCreated = false;
+  let graderCreated = false;
   try {
     // CREATE DATABASE is not transactional. Only cleanup names this invocation created.
     await admin.unsafe(`CREATE DATABASE ${identifier(dbName)}`);
@@ -63,22 +68,24 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
     runtimeCreated = true;
     await admin.unsafe(`CREATE ROLE ${identifier(reportRole)} LOGIN PASSWORD '${reportPassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
     reportCreated = true;
+    await admin.unsafe(`CREATE ROLE ${identifier(graderRole)} LOGIN PASSWORD '${graderPassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+    graderCreated = true;
     const adminDbUrl = urlFor(approvedUrl, dbName);
     const owner = postgres(adminDbUrl, { max: 1, connect_timeout: 5 });
     try {
       await owner.unsafe(`REVOKE ALL ON DATABASE ${identifier(dbName)} FROM PUBLIC`);
-      await owner.unsafe(`GRANT CONNECT ON DATABASE ${identifier(dbName)} TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
+      await owner.unsafe(`GRANT CONNECT ON DATABASE ${identifier(dbName)} TO ${identifier(runtimeRole)},${identifier(reportRole)},${identifier(graderRole)}`);
       // Immutable bootstrap marker exists before any evaluator installation or seed.
       await owner`CREATE SCHEMA pilot_eval_bootstrap`;
       await owner`CREATE TABLE pilot_eval_bootstrap.marker (
         measurement_id uuid PRIMARY KEY, schema_version text NOT NULL, nonce_hash text NOT NULL,
-        database_name text NOT NULL, runtime_role text NOT NULL
+        database_name text NOT NULL, runtime_role text NOT NULL, grader_role text NOT NULL
       )`;
-      await owner`INSERT INTO pilot_eval_bootstrap.marker(measurement_id,schema_version,nonce_hash,database_name,runtime_role)
-        VALUES (${identity.measurementId},${identity.schemaVersion},${identity.markerNonceHash},${dbName},${runtimeRole})`;
-      await assertBootstrapMarker(owner, identity);
+      await owner`INSERT INTO pilot_eval_bootstrap.marker(measurement_id,schema_version,nonce_hash,database_name,runtime_role,grader_role)
+        VALUES (${identity.measurementId},${identity.schemaVersion},${identity.markerNonceHash},${dbName},${runtimeRole},${graderRole})`;
+      await assertBootstrapMarker(owner, identity, graderRole);
       await migrate(adminDbUrl);
-      await assertBootstrapMarker(owner, identity);
+      await assertBootstrapMarker(owner, identity, graderRole);
       await owner.unsafe(EVALUATION_SCHEMA_SQL);
       const { hashPassword } = await import("../auth.js");
       const makeLogin = async (principal: FrozenManifest["principals"][number]) => {
@@ -107,9 +114,11 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
       }
       await owner`REVOKE ALL ON SCHEMA public FROM PUBLIC`;
       await owner.unsafe(`GRANT USAGE ON SCHEMA public TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
-      await owner.unsafe(`GRANT USAGE ON SCHEMA pilot_eval_bootstrap TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
-      await owner.unsafe(`GRANT SELECT ON pilot_eval_bootstrap.marker TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
-      await owner.unsafe(`GRANT USAGE ON SCHEMA pilot_eval TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
+      await owner.unsafe(`GRANT USAGE ON SCHEMA pilot_eval_bootstrap TO ${identifier(runtimeRole)},${identifier(reportRole)},${identifier(graderRole)}`);
+      await owner.unsafe(`GRANT SELECT ON pilot_eval_bootstrap.marker TO ${identifier(runtimeRole)},${identifier(reportRole)},${identifier(graderRole)}`);
+      await owner.unsafe(`GRANT USAGE ON SCHEMA pilot_eval TO ${identifier(runtimeRole)},${identifier(reportRole)},${identifier(graderRole)}`);
+      await owner.unsafe(`GRANT SELECT ON pilot_eval.campaigns,pilot_eval.seals,pilot_eval.grades TO ${identifier(graderRole)}`);
+      await owner.unsafe(`GRANT INSERT ON pilot_eval.grades TO ${identifier(graderRole)}`);
       await owner.unsafe(`GRANT SELECT ON pilot_eval.campaigns,pilot_eval.slots,pilot_eval.events,pilot_eval.seals,pilot_eval.grades TO ${identifier(runtimeRole)},${identifier(reportRole)}`);
       await owner.unsafe(`GRANT UPDATE(state,sealed_hash) ON pilot_eval.campaigns TO ${identifier(runtimeRole)}`);
       await owner.unsafe(`GRANT UPDATE(run_id,call_id,precleanup_status,cleanup_status) ON pilot_eval.slots TO ${identifier(runtimeRole)}`);
@@ -122,7 +131,8 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
       await owner.unsafe(`GRANT UPDATE(updated_at) ON pilot_ai_grants TO ${identifier(runtimeRole)}`);
       await owner.unsafe(`GRANT USAGE ON SEQUENCE run_events_id_seq TO ${identifier(runtimeRole)}`);
       const receipt = { identity, manifest, runtimeUrl: urlFor(approvedUrl, dbName, runtimeRole, password),
-        reportUrl: urlFor(approvedUrl, dbName, reportRole, reportPassword), reportRole, logins };
+        reportUrl: urlFor(approvedUrl, dbName, reportRole, reportPassword), reportRole,
+        graderUrl: urlFor(approvedUrl, dbName, graderRole, graderPassword), graderRole, logins };
       const store = await openEvaluationStore(receipt.runtimeUrl, identity);
       await store.close();
       return receipt;
@@ -131,6 +141,7 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
     // Cleanup only after successful CREATE acknowledgement; never infer ownership from prefix.
     try {
       if (createdDb) await admin.unsafe(`DROP DATABASE ${identifier(dbName)} WITH (FORCE)`);
+      if (graderCreated) await admin.unsafe(`DROP ROLE ${identifier(graderRole)}`);
       if (reportCreated) await admin.unsafe(`DROP ROLE ${identifier(reportRole)}`);
       if (runtimeCreated) await admin.unsafe(`DROP ROLE ${identifier(runtimeRole)}`);
     } catch {
@@ -140,12 +151,13 @@ export async function provisionOfflineCampaign(adminUrl: string, manifest: Froze
   } finally { await admin.end(); }
 }
 
-async function assertBootstrapMarker(db: ReturnType<typeof postgres>, identity: DatabaseIdentity): Promise<void> {
-  const rows = await db`SELECT measurement_id,schema_version,nonce_hash,database_name,runtime_role,
+async function assertBootstrapMarker(db: ReturnType<typeof postgres>, identity: DatabaseIdentity, graderRole: string): Promise<void> {
+  const rows = await db`SELECT measurement_id,schema_version,nonce_hash,database_name,runtime_role,grader_role,
     current_database() AS actual_database FROM pilot_eval_bootstrap.marker`;
   if (rows.length !== 1 || rows[0]?.measurement_id !== identity.measurementId ||
       rows[0]?.schema_version !== identity.schemaVersion || rows[0]?.nonce_hash !== identity.markerNonceHash ||
       rows[0]?.database_name !== identity.databaseName || rows[0]?.runtime_role !== identity.expectedRuntimeRole ||
+      rows[0]?.grader_role !== graderRole ||
       rows[0]?.actual_database !== identity.databaseName)
     throw new Error("Evaluator bootstrap marker mismatch");
 }

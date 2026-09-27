@@ -20,8 +20,8 @@ vi.mock("postgres", () => ({ default: () => {
     if (sql.startsWith("INSERT INTO pilot_eval_bootstrap.marker"))
       mock.marker = { measurement_id: values[0] as string, schema_version: values[1] as string,
         nonce_hash: values[2] as string, database_name: values[3] as string,
-        runtime_role: values[4] as string };
-    if (sql.startsWith("SELECT measurement_id,schema_version,nonce_hash,database_name,runtime_role") &&
+        runtime_role: values[4] as string, grader_role: values[5] as string };
+    if (sql.startsWith("SELECT measurement_id,schema_version,nonce_hash,database_name,runtime_role,grader_role") &&
         mock.marker && mock.failPhase !== "marker")
       return [{ ...mock.marker, actual_database: mock.marker.database_name }];
     if (mock.failPhase === "seed" && sql.startsWith("INSERT INTO users"))
@@ -66,12 +66,12 @@ describe("bootstrap cleanup receipt stages (mocked SQL fault only, no real PG wr
     },
   );
 
-  it.each([1, 2, 3] as const)("never drops uncreated resources after create stage %i fails", async (stage) => {
+  it.each([1, 2, 3, 4] as const)("never drops uncreated resources after create stage %i fails", async (stage) => {
     mock.failAt = stage;
     await expect(provisionOfflineCampaign(isolatedAdmin, syntheticManifest())).rejects.toThrow("Synthetic bootstrap failure");
     expect(mock.queries.filter((sql) => sql.startsWith("CREATE DATABASE"))).toHaveLength(1);
     expect(mock.queries.filter((sql) => sql.startsWith("DROP DATABASE"))).toHaveLength(stage === 1 ? 0 : 1);
-    expect(mock.queries.filter((sql) => sql.startsWith("DROP ROLE"))).toHaveLength(stage === 3 ? 1 : 0);
+    expect(mock.queries.filter((sql) => sql.startsWith("DROP ROLE"))).toHaveLength(Math.max(0, stage - 2));
     expect(mock.queries.some((sql) => sql.includes("wap_g1"))).toBe(false);
   });
 
@@ -81,7 +81,7 @@ describe("bootstrap cleanup receipt stages (mocked SQL fault only, no real PG wr
       await expect(provisionOfflineCampaign(isolatedAdmin, syntheticManifest())).rejects.toThrow(
         phase === "marker" ? "marker mismatch" : "Synthetic bootstrap failure");
       expect(mock.queries.filter((sql) => sql.startsWith("DROP DATABASE"))).toHaveLength(1);
-      expect(mock.queries.filter((sql) => sql.startsWith("DROP ROLE"))).toHaveLength(2);
+      expect(mock.queries.filter((sql) => sql.startsWith("DROP ROLE"))).toHaveLength(3);
       expect(mock.migrate).toHaveBeenCalledTimes(phase === "marker" ? 0 : 1);
       expect(mock.queries.some((sql) => sql.includes("wap_g1"))).toBe(false);
     },

@@ -114,12 +114,4 @@ export class EvaluationStore {
     });
   }
 
-  async appendGrade(slotId: string, rubricHash: string, sealHash: string,
-    grade: "pass" | "fail" | "not_run", reason: string): Promise<void> {
-    const changed = await this.client`INSERT INTO pilot_eval.grades(measurement_id,slot_id,rubric_hash,seal_hash,grade,reason)
-      SELECT ${this.identity.measurementId},${slotId},${rubricHash},${sealHash},${grade},${reason}
-      FROM pilot_eval.seals WHERE measurement_id=${this.identity.measurementId} AND slot_id=${slotId}
-        AND seal_hash=${sealHash} RETURNING slot_id`;
-    if (changed.length !== 1) throw new Error("Grade requires matching immutable seal");
-  }
 }

@@ -113,8 +113,11 @@ giới hạn ngoài technical catalog gate.
 mới** trên PostgreSQL cô lập `127.0.0.1:55532`, `openEvaluationStore` và
 `runOfflineCampaign({ manifest, bundle, receipt, repoRoot })` cho producer,
 `openReadonlyEvaluationStore` và `buildOfflineReport(readOnly, oracle)` cho báo cáo.
-Oracle chỉ được đưa cho grader sau producer; `appendGrade` là thao tác riêng
-trên evaluator store, không thuộc báo cáo chỉ đọc. Không có CLI, app launcher,
+Oracle chỉ được đưa cho grader sau producer; `openGraderEvaluationStore(receipt.graderUrl,
+receipt.identity).appendGrade(...)` dùng role riêng chỉ có SELECT marker/campaign/seal/grade
+và INSERT grade sau campaign seal, ràng buộc đúng rubric hash/seal hash, reason enum an toàn;
+regrade là append, không ghi đè. Producer và report role không thể INSERT grade.
+Không thuộc báo cáo chỉ đọc. Không có CLI, app launcher,
 transport provider hoặc quyền write SaaS mới. `offline_fake`, provider metadata
 `google|openai`, model `offline-fixture-*` và cost dương chỉ là **SIMULATED_NOT_BILLED**.
 

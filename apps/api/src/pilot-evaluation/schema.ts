@@ -38,7 +38,8 @@ CREATE TABLE pilot_eval.seals (
 );
 CREATE TABLE pilot_eval.grades (
  measurement_id uuid NOT NULL, slot_id text NOT NULL, rubric_hash text NOT NULL,
- seal_hash text NOT NULL, grade text NOT NULL, reason text NOT NULL,
+ seal_hash text NOT NULL, grade text NOT NULL CHECK(grade IN ('pass','fail','not_run')),
+ reason text NOT NULL CHECK(reason IN ('STRUCTURAL_MATCH','STRUCTURAL_MISMATCH','NOT_MEASURED','INCOMPLETE_EVIDENCE')),
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  PRIMARY KEY(measurement_id,slot_id,rubric_hash,created_at),
  FOREIGN KEY(measurement_id,slot_id) REFERENCES pilot_eval.seals(measurement_id,slot_id)
@@ -48,6 +49,20 @@ CREATE FUNCTION pilot_eval.immutable() RETURNS trigger LANGUAGE plpgsql
 CREATE TRIGGER immutable_events BEFORE UPDATE OR DELETE ON pilot_eval.events FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
 CREATE TRIGGER immutable_seals BEFORE UPDATE OR DELETE ON pilot_eval.seals FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
 CREATE TRIGGER immutable_grades BEFORE UPDATE OR DELETE ON pilot_eval.grades FOR EACH ROW EXECUTE FUNCTION pilot_eval.immutable();
+CREATE FUNCTION pilot_eval.guard_grade_insert() RETURNS trigger LANGUAGE plpgsql
+ SET search_path = pg_catalog AS $$ BEGIN
+ IF NOT EXISTS(
+   SELECT 1 FROM pilot_eval.seals z JOIN pilot_eval.campaigns c USING(measurement_id)
+   WHERE z.measurement_id=NEW.measurement_id AND z.slot_id=NEW.slot_id AND
+     z.seal_hash=NEW.seal_hash AND c.state IN ('completed','incomplete','blocked') AND
+     c.sealed_hash IS NOT NULL AND c.manifest_json->'artifacts'->>'rubric'=NEW.rubric_hash
+ ) OR (NEW.grade='pass' AND NEW.reason<>'STRUCTURAL_MATCH') OR
+      (NEW.grade='fail' AND NEW.reason<>'STRUCTURAL_MISMATCH') OR
+      (NEW.grade='not_run' AND NEW.reason NOT IN ('NOT_MEASURED','INCOMPLETE_EVIDENCE'))
+ THEN RAISE EXCEPTION 'GRADE_NOT_SEALED'; END IF;
+ RETURN NEW; END $$;
+CREATE TRIGGER guard_grade_insert BEFORE INSERT ON pilot_eval.grades
+ FOR EACH ROW EXECUTE FUNCTION pilot_eval.guard_grade_insert();
 CREATE FUNCTION pilot_eval.protect_campaign() RETURNS trigger LANGUAGE plpgsql
  SET search_path = pg_catalog AS $$ BEGIN
  IF NEW.measurement_id IS DISTINCT FROM OLD.measurement_id OR
@@ -96,6 +111,7 @@ CREATE FUNCTION pilot_eval.guard_event_insert() RETURNS trigger LANGUAGE plpgsql
  RETURN NEW; END $$;
 CREATE TRIGGER guard_event_insert BEFORE INSERT ON pilot_eval.events
  FOR EACH ROW EXECUTE FUNCTION pilot_eval.guard_event_insert();
+REVOKE ALL ON FUNCTION pilot_eval.guard_grade_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.protect_campaign() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.guard_event_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION pilot_eval.immutable() FROM PUBLIC;

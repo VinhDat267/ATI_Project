@@ -60,7 +60,7 @@ export async function withOfflineCampaign<T>(run: (context: {
     try {
       const db = receipt.identity.databaseName;
       await owner.unsafe(`DROP DATABASE "${db}" WITH (FORCE)`);
-      for (const role of [receipt.identity.expectedRuntimeRole, receipt.reportRole])
+      for (const role of [receipt.identity.expectedRuntimeRole, receipt.reportRole, receipt.graderRole])
         await owner.unsafe(`DROP ROLE "${role}"`);
     } finally { await owner.end(); }
   }
