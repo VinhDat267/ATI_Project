@@ -1,9 +1,18 @@
 import postgres from "postgres";
 import { z } from "zod";
 import { assertFrozen, canonicalHash } from "./manifest.js";
-import { DatabaseIdentitySchema, FrozenManifestSchema, SlotSealSchema,
+import { DatabaseIdentitySchema, FrozenManifestSchema, SlotSealSchema, SafeEventSchema,
   type DatabaseIdentity, type FrozenManifest } from "./contracts.js";
 import { readAccountingSnapshot } from "./accounting.js";
+
+// A valid chain proves bytes were retained, not that a result was fully observed.
+const ResultEvidenceSchema = SafeEventSchema.shape.payload.pick({
+  kind: true, valid: true, digest: true, usageKnown: true, costKnown: true,
+  costMicros: true, inputTokens: true, outputTokens: true,
+}).required();
+const CapturedUsageSchema = z.object({
+  inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative(),
+});
 
 const StructuralOracleSchema = z.object({
   rubricVersion: z.string().min(1).max(64),
@@ -308,6 +317,16 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
     const hasRun = typeof row.run_id === "string" && row.run_id.length > 0;
     const hasCall = typeof row.call_id === "string" && row.call_id.length > 0;
     const awaiting = row.precleanup_status === "awaiting_approval";
+    const result = ResultEvidenceSchema.safeParse(count("fake_return")[0]?.payload);
+    const usage = CapturedUsageSchema.safeParse(call?.usage);
+    const resultComplete = result.success && result.data.valid &&
+      ["plan", "clarification", "refusal"].includes(result.data.kind) &&
+      result.data.usageKnown && result.data.costKnown && usage.success &&
+      call?.status === "succeeded" && call.cost_micros !== null &&
+      result.data.costMicros === Number(call.cost_micros) &&
+      result.data.inputTokens === usage.data.inputTokens &&
+      result.data.outputTokens === usage.data.outputTokens;
+    if (!resultComplete) safeReasons.add("INVALID_RESULT_EVIDENCE");
     if (row.completeness !== "complete" || !hasRun || !hasCall ||
         !run || run.user_id !== principal.id || run.profile !== "pilot-v2" ||
         run.status !== row.cleanup_status || !call || call.run_id !== row.run_id || call.user_id !== principal.id ||
@@ -328,12 +347,12 @@ export async function buildOfflineReport(store: ReadonlyEvaluationStore, oracle:
           count("cleanup")[0]?.payload?.status !== "rejected" :
           row.cleanup_status !== row.precleanup_status || count("cleanup").length !== 0))
       safeReasons.add("MISSING_ELIGIBLE_EVIDENCE");
-    else completeSlots.add(row.slot_id as string);
+    else if (resultComplete) completeSlots.add(row.slot_id as string);
   }
   const structural = { pass: 0, fail: 0, notRun: 0 };
   for (const [index, row] of rows.entries()) {
     const expected = parsedOracle.success ? parsedOracle.data.slots[index] : undefined;
-    if (row.eligibility !== "eligible" || !expected || !row.seal_hash || row.completeness !== "complete") {
+    if (row.eligibility !== "eligible" || !expected || !completeSlots.has(row.slot_id as string)) {
       structural.notRun++; continue;
     }
     const returned = events.find((event) => event.slot_id === row.slot_id && event.event_type === "fake_return");

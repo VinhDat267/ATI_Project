@@ -4,6 +4,7 @@ import { runOfflineCampaign } from "../src/pilot-evaluation/coordinator.js";
 import { buildOfflineReport, openReadonlyEvaluationStore } from "../src/pilot-evaluation/report.js";
 import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
 import { readAccountingSnapshot } from "../src/pilot-evaluation/accounting.js";
+import { EvaluationStore } from "../src/pilot-evaluation/store.js";
 import { syntheticBundle, syntheticOracle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 vi.mock("../src/pilot-evaluation/git-evidence.js", () => ({
@@ -99,6 +100,40 @@ describe("SQL-only structural report", () => {
         expect(report.safeReasons).toContain('MISSING_ELIGIBLE_EVIDENCE');
       } finally { await readOnly.close(); await producer.close(); }
     });
+  }, 120_000);
+
+  it.each([
+    "digest", "valid", "usageKnown", "costKnown", "costMicros", "inputTokens", "outputTokens",
+    "wrong-cost", "wrong-input", "wrong-output", "unknown-usage", "unknown-cost",
+  ])("rejects normally hashed result evidence with missing/contradictory %s", async (fault) => {
+    const append = EvaluationStore.prototype.appendEvent;
+    const capture = vi.spyOn(EvaluationStore.prototype, "appendEvent").mockImplementation(function (this: EvaluationStore, input) {
+      if (input.type !== "fake_return" || input.slotId !== "slot-1") return append.call(this, input);
+      const payload = { ...input.payload };
+      if (fault === "wrong-cost") payload.costMicros = 999;
+      else if (fault === "wrong-input") payload.inputTokens = 999;
+      else if (fault === "wrong-output") payload.outputTokens = 999;
+      else if (fault === "unknown-usage") payload.usageKnown = false;
+      else if (fault === "unknown-cost") payload.costKnown = false;
+      else delete payload[fault as keyof typeof payload];
+      // Fault before real append: ordinary hashing, SQL privileges and seals remain intact.
+      return append.call(this, { ...input, payload });
+    });
+    try {
+      await withOfflineCampaign(async ({ receipt }) => {
+        await runOfflineCampaign({ manifest: receipt.manifest, bundle: syntheticBundle(),
+          receipt, repoRoot: process.cwd() });
+        const reader = await openReadonlyEvaluationStore(receipt.reportUrl, receipt.identity);
+        try {
+          const report = await buildOfflineReport(reader, syntheticOracle());
+          expect(report.integrity).toBe("valid");
+          expect(report.verdict).toBe("INCOMPLETE");
+          expect(report.safeReasons).toContain("INVALID_RESULT_EVIDENCE");
+          expect(report.structural).toEqual({ pass: 1, fail: 0, notRun: 1 });
+          expect(report.accounting.knownCostMicros).toBe(20);
+        } finally { await reader.close(); }
+      });
+    } finally { capture.mockRestore(); }
   }, 120_000);
 
   it("rejects a run whose persisted terminal status contradicts the HTTP cleanup evidence", async () => {
