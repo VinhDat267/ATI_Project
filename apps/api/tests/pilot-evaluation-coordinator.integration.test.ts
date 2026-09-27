@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { runOfflineCampaign } from "../src/pilot-evaluation/coordinator.js";
+import { freezeManifest } from "../src/pilot-evaluation/manifest.js";
 import { openEvaluationStore } from "../src/pilot-evaluation/provision.js";
-import { syntheticBundle, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
+import { syntheticBundle, syntheticManifest, withOfflineCampaign } from "./helpers/pilot-evaluation-fixture.js";
 
 // Only Git observation is substituted in dirty TDD; DB/auth/ledger are real.
 vi.mock("../src/pilot-evaluation/git-evidence.js", () => ({
@@ -38,5 +39,35 @@ describe("sequential authenticated offline pilot HTTP lifecycle", () => {
         ]);
       } finally { await store.close(); }
     });
+  }, 120_000);
+
+  it("rejects changed fixture bytes before a campaign claim or HTTP invocation", async () => {
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      const changed = syntheticBundle();
+      changed.slots[0]!.row!.deliverable = "Unreviewed mutation";
+      await expect(runOfflineCampaign({ manifest: receipt.manifest, bundle: changed,
+        receipt, repoRoot: process.cwd() })).rejects.toThrow("Frozen input or script hash mismatch");
+      expect((await admin`SELECT state FROM pilot_eval.campaigns`)[0]?.state).toBe("frozen");
+      expect(await admin`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(0);
+    });
+  }, 120_000);
+
+  it("honors the principal call cap without a second fake dispatch", async () => {
+    const bundle = syntheticBundle();
+    const initial = syntheticManifest(bundle);
+    const { manifestHash: _ignored, artifacts, ...draft } = initial;
+    const manifest = freezeManifest({ ...draft,
+      principals: [{ ...initial.principals[0], maxCalls: 1 }, initial.principals[1]],
+      slots: [initial.slots[0]!, { ...initial.slots[1]!, principalAlias: "alpha" }],
+    }, artifacts);
+    await withOfflineCampaign(async ({ receipt, admin }) => {
+      const result = await runOfflineCampaign({ manifest: receipt.manifest, bundle,
+        receipt, repoRoot: process.cwd() });
+      expect(result.state).toBe("incomplete");
+      expect(await admin`SELECT call_id FROM ai_provider_calls`).toHaveLength(1);
+      expect(await admin`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(2);
+      const callbacks = await admin`SELECT seq FROM pilot_eval.events WHERE event_type='callback_entered'`;
+      expect(callbacks).toHaveLength(1);
+    }, bundle, manifest);
   }, 120_000);
 });
