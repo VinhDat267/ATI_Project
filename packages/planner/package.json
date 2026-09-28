@@ -1,0 +1,15 @@
+{
+  "name": "@wap/planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@wap/tool-schemas": "*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

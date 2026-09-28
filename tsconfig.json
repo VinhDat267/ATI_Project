@@ -20,6 +20,21 @@
       ],
       "@wap/engine": [
         "packages/engine/src/index.ts"
+      ],
+      "@wap/tool-schemas": [
+        "packages/tool-schemas/src/index.ts"
+      ],
+      "@wap/tool-adapters": [
+        "packages/tool-adapters/src/index.ts"
+      ],
+      "@wap/planner": [
+        "packages/planner/src/index.ts"
+      ],
+      "@wap/executor": [
+        "packages/executor/src/index.ts"
+      ],
+      "@wap/chat-api": [
+        "apps/chat-api/src/index.ts"
       ]
     }
   },
@@ -38,6 +53,17 @@
     "apps/api/src/**/*.ts",
     "apps/api/tests/**/*.ts",
     "apps/api/vitest.unit.config.ts",
-    "apps/api/vitest.integration.config.ts"
+    "apps/api/vitest.integration.config.ts",
+    "packages/tool-schemas/src/**/*.ts",
+    "packages/tool-schemas/tests/**/*.ts",
+    "packages/tool-adapters/src/**/*.ts",
+    "packages/tool-adapters/tests/**/*.ts",
+    "packages/planner/src/**/*.ts",
+    "packages/planner/tests/**/*.ts",
+    "packages/executor/src/**/*.ts",
+    "packages/executor/tests/**/*.ts",
+    "apps/chat-api/src/**/*.ts",
+    "apps/chat-api/tests/**/*.ts",
+    "tests/**/*.ts"
   ]
 }
