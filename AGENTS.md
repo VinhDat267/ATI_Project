@@ -1,10 +1,18 @@
 # ATI Project — Multi-Agent Engineering Protocol (v3)
 
+**Version:** 3.1  
+
+> **Đối tượng:** Tài liệu này áp dụng cho mọi AI coding assistant làm việc với
+> repository này (Antigravity, Codex, Claude Code, Cursor, Gemini CLI, v.v.).
+> Dù bạn là agent nào, hãy tuân thủ các quy tắc dưới đây khi đọc/ghi code
+> trong repo `ATI_Project`.
+
 ## 1. Phạm vi & Quyền lực chuẩn tắc (Scope & Source of Truth)
 
 Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repository `ATI_Project`. Toàn bộ phương pháp luận Superpowers và vai trò Antigravity Master Orchestrator được tự động kế thừa từ **Global Rules**.
 
 ### 1.1. Quyền lực phạm vi v3 (Active Scope Authority)
+- **Báo cáo Tổng quan Project:** [`docs/PROJECT-REPORT.md`](docs/PROJECT-REPORT.md) là tài liệu mô tả toàn cảnh dự án (mục tiêu, kiến trúc, tiến độ). Đọc file này trước để nắm bức tranh tổng thể.
 - **Đặc tả Thiết kế v3:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) là tài liệu chuẩn tắc duy nhất về hành vi nghiệp vụ, luồng xử lý, tool catalog và schema của hệ thống v3.
 - **Kế hoạch Triển khai (28 Tasks TDD):** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) là bản chỉ dẫn thực thi bắt buộc theo từng task tuần tự.
 - **Quy tắc Phân quyền Module & Git:** [`docs/team-workflow.md`](docs/team-workflow.md) là chuẩn tắc về ranh giới sở hữu thư mục (Module Ownership), quy chuẩn commit (Conventional Commits) và chiến lược nhánh.
@@ -19,6 +27,8 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
   - `apps/chat-api/`
   - `apps/chat-web/`
   - `db/v3/`
+  - `prompts/`
+  - `evaluations/`
 
 ---
 
@@ -44,4 +54,4 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
 Sau khi hoàn thành mỗi task trong số 28 tasks:
 1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
 2. Reviewer độc lập (`Reality Checker` hoặc `Code Reviewer`) soi xét mã nguồn và chạy lại toàn bộ test suite của package đó.
-3. Nếu phát hiện sai sót $\to$ Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.
+3. Nếu phát hiện sai sót → Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.

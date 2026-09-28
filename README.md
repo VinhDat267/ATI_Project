@@ -2,7 +2,8 @@
 
 > **Đề tài #26:** Nền tảng tự động hóa quy trình làm việc bằng Trí tuệ Nhân tạo  
 > **Kiến trúc v3:** Chat Agent + Tool Orchestration (Plan-then-Execute)  
-> **Ngôn ngữ & Nền tảng:** TypeScript Monorepo (Node.js 22+, React 19, PostgreSQL, Docker)
+> **Ngôn ngữ & Nền tảng:** TypeScript Monorepo (Node.js 22+, React 19, PostgreSQL, Docker)  
+> **Trạng thái:** 20/28 tasks hoàn thành (71.4%) — 88 tests passing
 
 ---
 
@@ -19,13 +20,15 @@ Khác với các hệ thống cứng nhắc yêu cầu người dùng phải t�
 
 ## 2. Tài liệu thiết kế & Kế hoạch thi công
 
-Trước khi phát triển, tất cả thành viên và AI Agents cần đọc kỹ 3 tài liệu nền tảng đã qua 2 vòng phản biện chuyên sâu:
+Trước khi phát triển, tất cả thành viên và AI Agents cần đọc kỹ các tài liệu nền tảng đã qua 2 vòng phản biện chuyên sâu:
 
 | Tài liệu | Đường dẫn | Nội dung chính |
 |---|---|---|
+| 📄 **Báo cáo Kỹ thuật Dự án** | [`docs/PROJECT-REPORT.md`](docs/PROJECT-REPORT.md) | Tổng quan toàn cảnh: mục tiêu, kiến trúc, AI planner, execution engine, tiến độ. |
 | 📐 **Đặc tả Thiết kế v3** | [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Kiến trúc 2 chế độ, catalog 11 tools Trello+Slack, 4-layer validation, state machine, DB schema 6 tables. |
-| 📋 **Kế hoạch Triển khai (28 Tasks TDD)** | [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) | Lộ trình chi tiết từng task, interface rõ ràng, test đỏ $\to$ code $\to$ test xanh, không test mock hình thức. |
+| 📋 **Kế hoạch Triển khai (28 Tasks TDD)** | [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) | Lộ trình chi tiết từng task, interface rõ ràng, test đỏ → code → test xanh, không test mock hình thức. |
 | 🤝 **Quy ước Làm việc Nhóm & Git** | [`docs/team-workflow.md`](docs/team-workflow.md) | Phân chia quyền sở hữu module (Module Ownership) để chống conflict, conventional commits, nhánh Git. |
+| 🤖 **Quy tắc cho AI Agents** | [`AGENTS.md`](AGENTS.md) | Ranh giới kỹ thuật, tiêu chuẩn kiểm thử, và quy trình nghiệm thu dành cho mọi AI coding assistant. |
 
 ---
 
@@ -81,9 +84,8 @@ Các biến môi trường bắt buộc:
 - `ENCRYPTION_KEY`: Khóa 32-byte mã hóa AES-256-GCM cho credentials
 - `GEMINI_API_KEY`: Google Gemini API Key (sử dụng model `gemini-1.5-pro`)
 
-### 3. Chạy kiểm tra toàn bộ hệ sinh thái:
+### 3. Chạy kiểm tra toàn bộ hệ sinh thái v3:
 ```powershell
-# Chạy toàn bộ test suites của các package v3
 npm run test:v3
 ```
 
