@@ -64,7 +64,7 @@ Integration test tự tạo database tạm trong PostgreSQL local và xoá datab
 
 `POST /pilot/v2/runs` mặc định vẫn dùng checklist và preview được dẫn xuất từ source,
 **không gọi AI provider**. API có port `pilotPlanner` chỉ được inject tường minh
-trong `createApi` (chưa được `main.ts` cài đặt). Ở đường opt-in này, router lưu
+trong `createApi`; `main.ts` chỉ cài adapter 9router khi bật opt-in và cấu hình hợp lệ (mặc định tắt). Ở đường opt-in này, router lưu
 run + source snapshot vào PostgreSQL trước khi gọi planner; callback chỉ nhận
 context đã đóng gói/escape và che các credential cấu hình đã biết; chỉ được đề xuất `plan` (công cụ duy nhất
 `trello.create_card`), `clarification` hoặc `refusal`. Policy tạo write args và
@@ -79,7 +79,7 @@ bị bỏ dở kết thúc không approval, không tự resume.
 Sau claim, lỗi không rõ chi phí giữ hold và không retry tự động; chi phí xác định được
 settle kể cả khi grant bị thu hồi. Trước preview approval và trước write, policy/grant
 được kiểm lại. Outcome trả về cho owner chỉ dùng reason code/thông điệp server cố định,
-không lưu câu hỏi/lý do thô của model. `main.ts` **chưa cài provider**; phép thử
+không lưu câu hỏi/lý do thô của model. `main.ts` mặc định **không cài provider**; adapter 9router là opt-in. Phép thử
 adapter fake/PostgreSQL/HTTP là bằng chứng offline, không xác nhận chất lượng AI,
 provider thật, hoặc nghiệm thu khách hàng. Gate **offline contract: CONFIRMED**
 (`npm run check`, API PostgreSQL/HTTP 49/49, engine PostgreSQL ledger 6/6,
@@ -105,6 +105,73 @@ không thể chọn server, executable hay arguments. Active check trả `429` v
 sanitise thành `503`. Session vẫn in-memory; planner fixture không phải AI
 evaluation, còn LLM/retrieval/replan, BullMQ và browser integration vẫn là
 giới hạn ngoài technical catalog gate.
+
+### Pilot v2 → 9router: one-shot advisory subscription preview (opt-in)
+
+The server-only adapter is **off by default**. It sends one non-stream Chat Completions
+request to the **exact** `http://localhost:20128/v1/chat/completions` URL with
+`model=cx/gpt-5.6-sol`; no redirect or retry. This is an operator-asserted
+ChatGPT Plus subscription routing policy, **not** the metered OpenAI API.
+`INCLUDED_SUBSCRIPTION` records **zero incremental API charge under that assertion**,
+not a free subscription, a measured bill, or provider-backed proof of upstream
+identity. The adapter accepts `response.model` exactly `cx/gpt-5.6-sol` or
+`gpt-5.6-sol` (prefix-stripped), which remains router-reported, not upstream
+attestation. Any other identity, missing usage, truncation, HTTP error, timeout,
+or malformed output fails closed without retry; consumed attempts remain durable.
+Validate the router account/route/no-paid-fallback configuration separately
+before a real request. Do not assume a missing usage field proves zero tokens.
+
+Safe one-shot sample uses a **synthetic source fixture + real AI** through auth,
+PostgreSQL admission and the same API router; it does **not** read Google/Trello
+or use a dataset/holdout oracle. It cannot approve or perform a SaaS write.
+`node apps/api/dist/pilot-one-shot.js` without `--dispatch-once` does not open DB
+or call AI. Before the single allowed call, operator must:
+
+1. Migrate the selected isolated PostgreSQL database (migration `0014`), prepare
+   an existing demo principal, and provision its `pilot-v2:<principal UUID>`
+   campaign and `pilot_ai_grants` row out of band: provider `openai`, model
+   `cx/gpt-5.6-sol`, billing_mode `INCLUDED_SUBSCRIPTION`, endpoint
+   `http://localhost:20128/v1`, no_paid_fallback `true`,
+   max_estimated_cost_micros `0`, max_calls **1**, future expiry, not revoked.
+   The campaign still requires a positive nominal `limit_micros`; it is not
+   a subscription price and is not silently created by the sample runner.
+   Verify no existing `ai_provider_calls` for this campaign. An uncertain call
+   consumes its only slot regardless of zero monetary hold. For a **fresh
+   isolated DB only**, the operator may provision with these SQL statements
+   after replacing the UUID placeholder with their existing principal ID;
+   never overwrite an existing grant or campaign to bypass a consumed call:
+
+   ```sql
+   INSERT INTO ai_provider_campaigns(campaign_id,user_id,limit_micros)
+   VALUES ('pilot-v2:<principal-uuid>','<principal-uuid>',1);
+   INSERT INTO pilot_ai_grants(campaign_id,principal_id,provider,model,max_calls,
+     max_estimated_cost_micros,billing_mode,endpoint,no_paid_fallback,expires_at)
+   VALUES ('pilot-v2:<principal-uuid>','<principal-uuid>','openai','cx/gpt-5.6-sol',
+     1,0,'INCLUDED_SUBSCRIPTION','http://localhost:20128/v1',true,
+     clock_timestamp() + interval '30 minutes');
+   ```
+
+2. Confirm the local router route resolves to the approved subscription and
+   cannot fall back to a paid API. Set server process variables securely (do
+   **not** put secrets in shell history, Git or output): `G1_DATABASE_URL`,
+   `API_DEMO_EMAIL`, `API_DEMO_PASSWORD_HASH`, `API_CURSOR_KEY`, `G1_USER_ID`,
+   `PILOT_ONE_SHOT_PASSWORD`, `PILOT_AI_ROUTER_TOKEN`;
+   `PILOT_AI_ROUTER_ENABLED=1`, `PILOT_AI_ROUTER_ENDPOINT=http://localhost:20128/v1`,
+   `PILOT_AI_ROUTER_ROUTE=cx/gpt-5.6-sol`, `PILOT_AI_NO_PAID_FALLBACK=1`,
+   `AI_PROVIDER_CALLS_ENABLED=1`, `PILOT_V2_WRITE_ENABLED=0`.
+3. After independent review and explicit one-call approval only, run:
+   `npm run build -w @wap/api` then
+   `node apps/api/dist/pilot-one-shot.js --dispatch-once`.
+   Do **not** run this command from tests or repeat it if response is missing.
+   Output contains only synthetic label/run ID/status/preview presence, not
+   credentials or model content. `awaiting_approval` is preview only and must
+   not be mistaken for write authorization or AI-quality evidence.
+
+For normal API launcher `main.ts`, `PILOT_V2_ENABLED=true` and its existing
+allowlisted source/board configuration must also be present. Disable with
+`PILOT_AI_ROUTER_ENABLED=0` (no pilot planner) or
+`AI_PROVIDER_CALLS_ENABLED=0` (pilot AI dispatch denied). Keep
+`PILOT_V2_WRITE_ENABLED` off for this validation.
 
 ### Pilot v2 Phase B: offline fake advisory campaign (library only)
 

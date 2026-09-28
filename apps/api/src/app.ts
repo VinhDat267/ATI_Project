@@ -154,6 +154,7 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       pilotPolicy: options.pilotPolicy,
       liveWriteEnabled: options.pilotLiveWriteEnabled,
       pilotPlanner: options.pilotPlanner,
+      providerCallsEnabled: options.config.allowProviderCalls,
       plannerTimeoutMs: options.pilotPlannerTimeoutMs,
       readSheetsRequestFn: options.readSheetsRequestFn,
     });

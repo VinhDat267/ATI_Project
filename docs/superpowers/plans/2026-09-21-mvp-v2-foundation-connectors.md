@@ -30,8 +30,9 @@ Plan finalized: 22/09/2026; filename retains the design session date.
 - Preserve existing dirty rename edits. At execution start use an isolated worktree
   through the worktree skill, only after the document handoff gate below;
   do not reset or silently copy/stage unrelated edits.
-- Before existing-symbol changes run GitNexus impact; UNKNOWN requires source
-  confirmation. Before every commit run detect_changes and inspect the exact diff.
+- Before existing-symbol changes trace affected callers and dependencies in current
+  source; unresolved impact requires source confirmation. Before every commit
+  run git diff --check and inspect the exact diff.
 
 ## Review Focus
 
@@ -44,7 +45,7 @@ Plan finalized: 22/09/2026; filename retains the design session date.
 ## Source map and boundaries
 
 Source mapping checked at `b4e97b6`, with Codebase Onboarding Engineer read-only
-assistance. GitNexus at `59b275d` was three commits behind: navigation only, not
+assistance. The now-retired dependency analyzer at `59b275d` was three commits behind: navigation only, not
 a complete impact certificate. No runtime tests were run while writing this plan.
 
 | Existing boundary | Implication for the next integration batch |
@@ -101,7 +102,7 @@ git diff --cached
 
 - [ ] Require the staged paths to match that allowlist, review their complete
   contents (including previously untracked files), verify local links, and run
-  GitNexus change analysis. Do not treat graph results for old/untracked docs
+  current-source impact analysis and relevant regression checks. Do not treat graph results for old/untracked docs
   as proof of completeness. If checks fail, resolve them before committing.
 - [ ] Commit only the reviewed docs; record the exact commit SHA in the execution
   report. These commands must each succeed before proceeding:

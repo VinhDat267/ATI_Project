@@ -1,16 +1,18 @@
 # AI Live Evaluation Hardening Implementation Plan
 
+> Archive note (2026-09-26): obsolete references and the document path were cleaned up. The implementation history below is preserved; original schema-2 receipts/digests are archival and do not validate this edited document. Re-anchor current source and tests before reusing this plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox syntax and require red-green-refactor discipline.
 >
 > Task: Fix the T5/T6 AI live-evaluation safety, durability, provenance, runtime, and scoring gaps without weakening the production AI fail-closed boundary.
-> Evidence verified at commit `dd340c2779aa0bf5693b96ad966ec884b22f59a7`; GitNexus index fresh at the same commit with PDG available (index refresh skipped because index exactly matched HEAD).
+> Evidence verified at commit `dd340c2779aa0bf5693b96ad966ec884b22f59a7`; retired dependency analyzer index fresh at the same commit with PDG available (index refresh skipped because index exactly matched HEAD).
 > Evidence provenance schema 2; global dirty digest `0a9c85780067d9afcd0764f307b60891e3cee927ee11eaeb5ec7826d10fd82cd`; cited-path manifest 34 sorted entries; exact generated plan path excluded.
 
 **Goal:** Make T5/T6 capable of producing trustworthy live-evaluation evidence only when the exact execution scope is approved, every paid call is durably journaled and budgeted, the eval database/index is isolated and pinned, and report verdicts truthfully reflect evidence provenance.
 
 **Architecture:** Keep the evaluator as an engine-owned, opt-in composition root. Reuse the existing provider registry, approval, accounting, catalog-embedding, and pgvector boundaries; add evaluator-specific authorization, journal/ledger, and runtime adapters. Preserve the API runtime's default denial of live calls. Recovery reconstructs state from an append-only journal and never reissues a provider request.
 
-**Tech Stack:** TypeScript, Node.js file handles, Zod, Vitest, PostgreSQL/pgvector, `@wap/db`, existing OpenAI/Google provider transports, GitNexus/PDG.
+**Tech Stack:** TypeScript, Node.js file handles, Zod, Vitest, PostgreSQL/pgvector, `@wap/db`, existing OpenAI/Google provider transports, historical PDG analysis.
 
 **Spec:** `docs/superpowers/plans/2026-09-18-ai-live-evaluation.md`
 
@@ -73,16 +75,16 @@ Out of scope: selecting/approving the final rubric, supplying live credentials, 
 - [verified] `apps/api/src/ai-runtime.ts` composes the same shared provider/pgvector primitives but defaults to `denyAiLiveCalls`. The evaluator may reuse primitives, but API production composition must not import live-evaluation modules or inherit evaluator authorization.
 - [inferred] The clean boundary is therefore: shared provider and pgvector mechanisms remain generic; evaluator-only modules derive the approved scope, persist/replay the journal and ledger, create per-trial sessions, and build truthful evidence.
 
-## 4. GitNexus Findings
+## 4. retired dependency analyzer Findings
 
 - [graph] `codegraph explore "live-evaluation-authorization-ledger-journal-freeze-scorer"` identified the live evaluator, Providers, AI, and Evaluation modules; the relevant process includes `RunLiveEvaluationCli → LiveDatasetError`, while provider construction flows through `CreateAiRuntime → CreateEmbeddingClient/CreateModelClient/CreateQueryExpansionClient`.
-- [graph] `gitnexus context runLiveEvaluationCli --content` showed that the CLI directly coordinates contracts, dataset, schedule, freeze, runner, report, approval, and accounting. It is the orchestration hotspot and should become thinner rather than absorb journal/runtime implementations.
-- [graph] `gitnexus impact runLiveEvaluationCli --direction upstream --depth 3` reported a critical radius (101 symbols, 21 direct dependencies, 42 processes, 6 modules). The implementation must preserve the CLI result contract and isolate changes behind focused modules/tests.
-- [graph] `gitnexus impact runLiveEvaluation --direction upstream --depth 3` found four consumers, with direct impact concentrated in `ai-live-runner.test.ts` and `runLiveEvaluationCli`. This makes a context-rich session factory change bounded and testable.
-- [graph] `gitnexus context createAiPorts --content` plus upstream impact found direct consumers in provider-client tests and `apps/api/src/ai-runtime.ts`, with API main/tests at depths two and three. Shared context/accounting changes require API regression tests.
-- [graph] `gitnexus context buildCatalogEmbeddingRows --content` found the exact provenance-validation path and an existing integration test consumer in `packages/engine/tests/ai-live-index.integration.test.ts`; the index command should compose this function rather than invent a second embedding pipeline.
-- [graph] `gitnexus impact invokeProvider --mode pdg --line 341` found no statement block at that exact line and fell back to a callgraph bridge reaching `complete` and `expand`. This is explicitly not statement-level proof; source ordering remains the authority for authorization/reservation/network ordering.
-- [graph] GitNexus index statistics at the pinned commit: 470 files, 25,741 symbols, 57,657 edges, 285 clusters, 350 processes. The index was not refreshed because its commit exactly matched HEAD.
+- [graph] historical source-context analysis of `runLiveEvaluationCli` showed that the CLI directly coordinates contracts, dataset, schedule, freeze, runner, report, approval, and accounting. It is the orchestration hotspot and should become thinner rather than absorb journal/runtime implementations.
+- [graph] historical upstream dependency analysis of `runLiveEvaluationCli` (depth 3) reported a critical radius (101 symbols, 21 direct dependencies, 42 processes, 6 modules). The implementation must preserve the CLI result contract and isolate changes behind focused modules/tests.
+- [graph] historical upstream dependency analysis of `runLiveEvaluation` (depth 3) found four consumers, with direct impact concentrated in `ai-live-runner.test.ts` and `runLiveEvaluationCli`. This makes a context-rich session factory change bounded and testable.
+- [graph] historical source-context analysis of `createAiPorts` plus upstream impact found direct consumers in provider-client tests and `apps/api/src/ai-runtime.ts`, with API main/tests at depths two and three. Shared context/accounting changes require API regression tests.
+- [graph] historical source-context analysis of `buildCatalogEmbeddingRows` found the exact provenance-validation path and an existing integration test consumer in `packages/engine/tests/ai-live-index.integration.test.ts`; the index command should compose this function rather than invent a second embedding pipeline.
+- [graph] historical PDG analysis of `invokeProvider` at line 341 found no statement block at that exact line and fell back to a callgraph bridge reaching `complete` and `expand`. This is explicitly not statement-level proof; source ordering remains the authority for authorization/reservation/network ordering.
+- [graph] retired dependency analyzer index statistics at the pinned commit: 470 files, 25,741 symbols, 57,657 edges, 285 clusters, 350 processes. The index was not refreshed because its commit exactly matched HEAD.
 
 ## 5. Statement-Level PDG Findings
 
@@ -372,10 +374,10 @@ implementation_context:
     {
       "schema_version": 2,
       "head_commit": "dd340c2779aa0bf5693b96ad966ec884b22f59a7",
-      "generated_plan_path": "docs/plans/2026-09-19-gitnexus-plan-live-evaluation-hardening.md",
+      "generated_plan_path": "docs/plans/2026-09-19-ai-live-evaluation-hardening.md",
       "global_dirty_digest": {
         "algorithm": "sha256",
-        "canonicalization": "gitnexus-evidence-provenance-v2 NUL-framed UTF-8 records",
+        "canonicalization": "historical schema-2 NUL-framed UTF-8 records (archival metadata only)",
         "value": "0a9c85780067d9afcd0764f307b60891e3cee927ee11eaeb5ec7826d10fd82cd"
       },
       "cited_path_manifest": [
@@ -1109,7 +1111,7 @@ implementation_context:
     - 'Untracked AGENTS.md is existing workspace state and must remain unmodified/uncommitted by this work.'
 
   assumptions:
-    - 'Re-verify HEAD, GitNexus index commit, and schema-2 provenance before editing; if drifted, re-plan impacted symbols.'
+    - 'Re-verify HEAD, working-tree diff, current source and affected callers before editing; archival receipts do not validate this edited document.'
     - 'Confirm Node FileHandle.sync and exclusive-create behavior with journal integration tests on the target Windows filesystem before permitting --execute.'
     - 'Confirm provider response adapters expose model/usage fields required by probe; when unavailable, record explicit unknown and block formal PASS rather than invent values.'
     - 'Confirm AI_EVAL_DATABASE_URL points to the disposable eval database with validateEvalDatabaseUrl before opening it.'
@@ -1140,7 +1142,7 @@ implementation_context:
 
 ### Assumptions to re-verify at execution start
 
-- [assumed] HEAD and the GitNexus index still equal `dd340c2779aa0bf5693b96ad966ec884b22f59a7`. Re-run `git rev-parse HEAD`, `git status --porcelain=v2 --untracked-files=all`, and `node .gitnexus/run.cjs list`; stop and re-anchor if relevant files drift.
+- [assumed] HEAD still equals `dd340c2779aa0bf5693b96ad966ec884b22f59a7`. Re-run `git rev-parse HEAD`, `git status --porcelain=v2 --untracked-files=all`, and `git diff --name-only`; stop and re-anchor if relevant files drift.
 - [assumed] Node's file-handle sync and exclusive-create behavior is reliable for process-crash recovery on the actual Windows workspace filesystem. Prove with the Task 2 integration tests before enabling `--execute`.
 - [assumed] Provider response adapters can expose sufficient model/usage metadata for a truthful probe. Inspect the existing parsed response shapes during Task 5; missing data remains explicit unknown and blocks formal PASS.
 

@@ -232,7 +232,6 @@ npm run test:integration -w @wap/api -- ai-live-wiring
 npm run check:backend
 npm run ai:eval:live -- preflight --offline
 git diff --check
-node .gitnexus/run.cjs detect-changes --scope all
 ```
 
 Targeted commands chạy theo task; full gate chạy cuối, không chạy lại toàn bộ khi không có thay đổi hoặc nguyên nhân cụ thể. Offline preflight/report phải có canary test xác nhận zero credential/network/DB factory access. Không chạy paid probe để nghiệm thu plan này.

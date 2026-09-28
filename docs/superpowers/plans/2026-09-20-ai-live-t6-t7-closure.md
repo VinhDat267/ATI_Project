@@ -11,7 +11,7 @@
 
 **Tech Stack:** TypeScript, Node.js, Zod, Vitest, PostgreSQL/pgvector, native provider fetch adapters, PowerShell launcher.
 
-**Spec:** `docs/superpowers/plans/2026-09-18-ai-live-evaluation.md`, especially T6–T8; scope authority `docs/BASELINE.md`. This plan follows the implementation at the pinned commit and closes remaining obligations from `docs/plans/2026-09-19-gitnexus-plan-live-evaluation-hardening.md` without repeating completed module work.
+**Spec:** `docs/superpowers/plans/2026-09-18-ai-live-evaluation.md`, especially T6–T8; scope authority `docs/BASELINE.md`. This plan follows the implementation at the pinned commit and closes remaining obligations from `docs/plans/2026-09-19-ai-live-evaluation-hardening.md` without repeating completed module work.
 
 ## Global constraints
 
@@ -56,11 +56,11 @@ Existing authorization exact-match checks, schema validation, durable journal pr
 
 ### Graph evidence and limits
 
-- GitNexus index was reported at the same commit. `impact runLiveEvaluationCli --direction upstream --depth 3` returned LOW and one direct caller: the standalone code in `cli.ts`. Account for that caller plus injected CLI test consumers; LOW does not establish payment safety.
+- The now-retired dependency analyzer's historical index was reported at the same commit. `impact runLiveEvaluationCli --direction upstream --depth 3` returned LOW and one direct caller: the standalone code in `cli.ts`. Account for that caller plus injected CLI test consumers; LOW does not establish payment safety.
 - `context JournaledProviderCallLedger` found test construction, exports and recovery imports. It explicitly reported a lower bound at the `ProviderCallLedger` interface boundary; the implementer must trace injected consumers too.
 - `pdg_query controls runLiveEvaluationCli` returned an empty slice. This is not proof that guards are absent or sufficient. The ordering requirements below are source-derived, not fabricated PDG edges.
 - CodeGraph warned of stale line slices for several files. Direct source reads superseded those slices. No analyzer rebuild or index mutation was needed for this plan.
-- Publication uses the normal documentation workflow: the GitNexus skill's descriptor-anchored writer does not support this Windows environment. This document does not claim its schema-2 publication receipt.
+- Publication uses the normal documentation workflow: the retired dependency analyzer skill's descriptor-anchored writer does not support this Windows environment. This document does not claim its schema-2 publication receipt.
 
 ## 2. Decisions and interfaces
 
@@ -288,7 +288,7 @@ expect(realToolWriteDispatches).toBe(0);
 - [ ] Obtain independent read-only review of campaign locking/budget, exact role approval, credentials, DB identity, snapshot completeness, oracle separation, currentness and replay. Resolve blocker/high findings and rerun affected checks. If review is unavailable, record the readiness gate as incomplete.
 - [ ] Write the runbook: profile fields, isolated DB preparation, hidden local key launcher, approval/price/budget manifests, exact preflight/probe/index/smoke/dev/freeze/regression/report sequence, safe index switching, cancellation and stale-lock recovery. Use actual implemented flags. Do not create a fake human approval record.
 - [ ] Mark preparation `READY_FOR_LIVE_PROBE` only when all technical checks and review pass; record every provider/profile's actual live status as `NOT_RUN`. Preserve proposed rubric and fresh holdout OPEN. Update old checklists using evidence, not wholesale ticks.
-- [ ] Run `git diff --check`, review intended file list, run `node .gitnexus/run.cjs detect-changes --scope all`, and prepare final documentation commit under existing Git authorization. Preserve unrelated work and do not push automatically.
+- [ ] Run `git diff --check`, review intended file list and affected callers/tests, and prepare final documentation commit under existing Git authorization. Preserve unrelated work and do not push automatically.
 
 ## 11. Verification commands
 
@@ -308,7 +308,6 @@ npm run test:integration -w @wap/api -- ai-live-wiring
 npm run check:backend
 npm run ai:eval:live -- preflight --offline
 git diff --check
-node .gitnexus/run.cjs detect-changes --scope all
 ```
 
 Prerequisite failures (Docker unavailable, permission to create test DB absent) are reported as unverified integration evidence, never converted to a passing skipped gate. Targeted test file names created by this plan are explicitly new, not existing evidence.
@@ -321,7 +320,7 @@ Prerequisite failures (Docker unavailable, permission to create test DB absent) 
 - Native provider model support and current prices require official verification at T8. Do not infer API model IDs from Codex UI names or silently substitute providers/models.
 - Exact T8 choices remain with the operator: actual provider/model profiles, permitted synthetic data, keys, budget, expiry, and human rubric approval for formal claims. None blocks implementing/testing the preparation layer.
 - No fresh holdout is fabricated. Existing exposed regression cases retain their exposure labels. No frontend, multi-worker queue, broader DSL, production live API enablement or new SaaS integrations belong in this slice.
-- Existing GitNexus/CodeGraph limitations mean fresh execution-time impact analysis plus source verification is needed for shared registry/approval edits; an empty caller/PDG result is not a safety certificate.
+- Historical dependency-graph limitations mean fresh execution-time impact analysis plus source verification is needed for shared registry/approval edits; an empty caller/PDG result is not a safety certificate.
 
 ## 13. Definition of done
 

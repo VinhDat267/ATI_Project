@@ -15,6 +15,11 @@ export interface ApiConfig {
   readonly allowNewRuns?: boolean;
   /** Provider-call kill switch; omitted in older fixtures means enabled. */
   readonly allowProviderCalls?: boolean;
+  readonly pilotRouter?: {
+    readonly token: string;
+    readonly endpoint: "http://localhost:20128/v1";
+    readonly route: "cx/gpt-5.6-sol";
+  };
   /** Retrieval is explicit; all_tools remains the fail-safe default. */
   readonly aiRetrievalVariant?: "all_tools" | "semantic" | "semantic_qe";
   /** Maximum time the API worker waits for an active tick during shutdown. */
@@ -241,6 +246,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const plannerMode = rawPlannerMode;
   const allowNewRuns = boolean(env, "API_NEW_RUNS_ENABLED", true);
   const allowProviderCalls = boolean(env, "AI_PROVIDER_CALLS_ENABLED", true);
+  const pilotRouterEnabled = boolean(env, "PILOT_AI_ROUTER_ENABLED", false);
+  let pilotRouter: ApiConfig["pilotRouter"];
+  if (pilotRouterEnabled) {
+    if (!boolean(env, "PILOT_AI_NO_PAID_FALLBACK", false) ||
+        env.PILOT_AI_ROUTER_ENDPOINT !== "http://localhost:20128/v1" ||
+        env.PILOT_AI_ROUTER_ROUTE !== "cx/gpt-5.6-sol" ||
+        !env.PILOT_AI_ROUTER_TOKEN || env.PILOT_AI_ROUTER_TOKEN.length < 4 ||
+        /[\r\n]/.test(env.PILOT_AI_ROUTER_TOKEN))
+      throw new Error("Invalid pilot router configuration");
+    pilotRouter = { token: env.PILOT_AI_ROUTER_TOKEN,
+      endpoint: "http://localhost:20128/v1", route: "cx/gpt-5.6-sol" };
+  }
   const rawRetrievalVariant = env.AI_RETRIEVAL_VARIANT ?? "all_tools";
   if (
     rawRetrievalVariant !== "all_tools" &&
@@ -275,6 +292,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     plannerMode,
     allowNewRuns,
     allowProviderCalls,
+    ...(pilotRouter ? { pilotRouter } : {}),
     aiRetrievalVariant,
     workerShutdownTimeoutMs,
     oidc,

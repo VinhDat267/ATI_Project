@@ -1,6 +1,6 @@
 # Kế hoạch triển khai SaaS live và AI quality — MVP v2
 
-Ngày lập: 23/09/2026. Đây là kế hoạch; **chưa gọi SaaS hoặc AI provider thật**.
+Ngày lập: 23/09/2026. **Các điểm xuất phát dưới đây là ảnh chụp lúc lập kế hoạch**, không phải trạng thái hiện tại. Đến 25/09 đã có [preflight và một phiên SaaS sandbox](P6-REVIEW.md) (`SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED`) cùng [probe Gemini](../../ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md); `AI_QUALITY_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_RUN / HANDOFF_BLOCKED`. Các bước còn lại không tự được coi là hoàn thành.
 
 ## 1. Điểm xuất phát đã kiểm
 

@@ -4,6 +4,7 @@ import postgres from "postgres";
 import { createApi } from "../src/app.js";
 import { SessionStore } from "../src/auth.js";
 import type { PilotAccountedPlanner } from "../src/pilot-planner.js";
+import { createPilot9RouterPlanner } from "../src/pilot-9router.js";
 import { makeApiFixture } from "./fixture.js";
 import {
   evaluateChecklist, parseRequest, projectPilotEvaluationInput, SOURCE_COLUMNS,
@@ -66,9 +67,13 @@ async function harness(
       });
       await fixture.db.client`
         INSERT INTO pilot_ai_grants(campaign_id,principal_id,provider,model,max_calls,
-                                    max_estimated_cost_micros,expires_at)
-        VALUES (${campaignId},${principalId},${planner.provider},${planner.model},5,
-                ${planner.estimatedCostMicros},clock_timestamp() + interval '1 hour')`;
+                                    max_estimated_cost_micros,expires_at,
+                                    billing_mode,endpoint,no_paid_fallback)
+        VALUES (${campaignId},${principalId},${planner.provider},${planner.model},
+                ${planner.billingMode === "INCLUDED_SUBSCRIPTION" ? 1 : 5},
+                ${planner.estimatedCostMicros},clock_timestamp() + interval '1 hour',
+                ${planner.billingMode ?? "METERED"},${planner.endpoint ?? null},
+                ${planner.noPaidFallback ?? false})`;
     }
   }
 
@@ -219,6 +224,120 @@ function syntheticEvaluationRecord(): V2TestCase {
 }
 
 describe("pilot durable approval over PostgreSQL and HTTP", () => {
+  it("routes one synthetic-source subscription proposal through auth/PG/HTTP without a SaaS write", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ model: "gpt-5.6-sol",
+      choices: [{ message: { role: "assistant",
+        content: '{"kind":"plan","tool":"trello.create_card"}' }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 6, completion_tokens: 8, total_tokens: 14 },
+    }), { status: 200 }));
+    const planner = createPilot9RouterPlanner({ token: "fixture-router-token",
+      endpoint: "http://localhost:20128/v1", route: "cx/gpt-5.6-sol", fetchImpl });
+    const h = await harness(false, [], planner, undefined, true,
+      projectPilotEvaluationInput(syntheticEvaluationRecord()));
+    try {
+      const runId = await h.create();
+      const detail = await h.detail(runId);
+      expect(detail.status).toBe("awaiting_approval");
+      expect(detail.preview).toBeTruthy();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(await h.fixture.db.client`SELECT billing_mode,endpoint,no_paid_fallback,cost_micros,
+        status FROM ai_provider_calls WHERE run_id=${runId}`).toEqual([{
+          billing_mode: "INCLUDED_SUBSCRIPTION", endpoint: "http://localhost:20128/v1",
+          no_paid_fallback: true, cost_micros: "0", status: "succeeded",
+        }]);
+      expect(await h.fixture.db.client`SELECT id FROM business_reservations`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT id FROM pilot_approvals WHERE run_id=${runId}`).toHaveLength(1);
+      await expect(h.create()).rejects.toThrow();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(await h.fixture.db.client`SELECT count(*)::int AS count FROM ai_provider_calls`)
+        .toEqual([{ count: 1 }]);
+    } finally { await h.close(); }
+  }, 45_000);
+
+  it("rejects approval on subscription grant mode/endpoint drift before any SaaS write", async () => {
+    const planner = createPilot9RouterPlanner({ token: "fixture-router-token",
+      endpoint: "http://localhost:20128/v1", route: "cx/gpt-5.6-sol",
+      fetchImpl: async () => new Response(JSON.stringify({ model: "cx/gpt-5.6-sol",
+        choices: [{ message: { role: "assistant",
+          content: '{"kind":"plan","tool":"trello.create_card"}' }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 4, completion_tokens: 5, total_tokens: 9 } })) });
+    const h = await harness(true, [], planner);
+    try {
+      const runId = await h.create();
+      const detail = await h.detail(runId);
+      expect(detail.status).toBe("awaiting_approval");
+      await h.fixture.db.client`UPDATE pilot_ai_grants SET billing_mode='METERED',
+        endpoint=NULL,no_paid_fallback=false,model='metered-model',max_estimated_cost_micros=60
+        WHERE principal_id=${h.fixture.userId}`;
+      const trello = mockTrello();
+      expect((await h.decide(runId, "approved", detail.preview)).status).toBe(403);
+      expect(trello.writes()).toBe(0);
+      expect(await h.fixture.db.client`SELECT decision FROM pilot_approvals WHERE run_id=${runId}`)
+        .toEqual([{ decision: "pending" }]);
+    } finally { await h.close(); }
+  }, 45_000);
+
+  it.each([
+    { token: "fixture-router-token", location: "source" },
+    { token: 'fixture"router-token', location: "source" },
+    { token: "fixture\\router-token", location: "source" },
+    { token: 'fixture"router-token', location: "prompt" },
+    { token: "fixture\\router-token", location: "prompt" },
+  ])("rejects $location containing router credential before persistence ($token)", async ({ token, location }) => {
+    const prior = process.env.PILOT_AI_ROUTER_TOKEN;
+    process.env.PILOT_AI_ROUTER_TOKEN = token;
+    const input = syntheticEvaluationRecord();
+    if (location === "source") input.sourceFixture.rows[0]![3] = `Update /sample ${token}`;
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ model: "gpt-5.6-sol",
+      choices: [{ message: { role: "assistant",
+        content: '{"kind":"plan","tool":"trello.create_card"}' }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 4, completion_tokens: 5, total_tokens: 9 } })));
+    const planner = createPilot9RouterPlanner({ token,
+      endpoint: "http://localhost:20128/v1", route: "cx/gpt-5.6-sol", fetchImpl });
+    let h: Awaited<ReturnType<typeof harness>> | undefined;
+    try {
+      h = await harness(false, [], planner, undefined, true,
+        projectPilotEvaluationInput(input));
+      const response = await fetch(`${h.pilotUrl}/runs`, { method: "POST", headers: h.headers,
+        body: JSON.stringify({ spreadsheetId: h.pilotConfig.spreadsheetId,
+          tabId: h.pilotConfig.tabId, requestId: input.sourceFixture.requestId,
+          userPrompt: location === "prompt" ? `Synthetic preview ${token}` : "Synthetic preview" }) });
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(await response.json())).not.toContain(token);
+      expect(fetchImpl).toHaveBeenCalledTimes(0);
+      expect(await h.fixture.db.client`SELECT id FROM runs WHERE profile='pilot-v2'`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT run_id FROM source_snapshots`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
+    } finally {
+      await h?.close();
+      if (prior === undefined) delete process.env.PILOT_AI_ROUTER_TOKEN;
+      else process.env.PILOT_AI_ROUTER_TOKEN = prior;
+    }
+  }, 45_000);
+
+  it("quarantines missing router usage without approval or replay", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ model: "gpt-5.6-sol",
+      choices: [{ message: { role: "assistant",
+        content: '{"kind":"plan","tool":"trello.create_card"}' }, finish_reason: "stop" }],
+    }), { status: 200 }));
+    const planner = createPilot9RouterPlanner({ token: "fixture-router-token",
+      endpoint: "http://localhost:20128/v1", route: "cx/gpt-5.6-sol", fetchImpl });
+    const h = await harness(false, [], planner);
+    try {
+      const response = await fetch(`${h.pilotUrl}/runs`, { method: "POST", headers: h.headers,
+        body: JSON.stringify({ spreadsheetId: h.pilotConfig.spreadsheetId,
+          tabId: h.pilotConfig.tabId, requestId: row.request_id, userPrompt: "Synthetic preview" }) });
+      expect(response.status).toBe(503);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(await h.fixture.db.client`SELECT id FROM pilot_approvals`).toHaveLength(0);
+      expect(await h.fixture.db.client`SELECT state FROM pilot_ai_attempts`).toEqual([{ state: "uncertain" }]);
+      expect(await h.fixture.db.client`SELECT status,reservation_held,cost_micros
+        FROM ai_provider_calls`).toEqual([{ status: "ambiguous", reservation_held: true, cost_micros: null }]);
+      expect(await h.fixture.db.client`SELECT count(*)::int AS count FROM ai_provider_calls`)
+        .toEqual([{ count: 1 }]);
+    } finally { await h.close(); }
+  }, 45_000);
+
   it("uses projected intake through HTTP and a committed snapshot visible to another connection", async () => {
     const input = projectPilotEvaluationInput(syntheticEvaluationRecord());
     let h!: Awaited<ReturnType<typeof harness>>;

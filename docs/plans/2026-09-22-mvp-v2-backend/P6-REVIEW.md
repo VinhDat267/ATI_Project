@@ -2,7 +2,9 @@
 
 **Dự án:** AI Automation Platform (MVP v2)  
 **Phạm vi:** BE-26..29, cập nhật ngày 25/09/2026
-**Kết luận:** **APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED / SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED / AI_QUALITY_NOT_MEASURED / HANDOFF_BLOCKED**
+**Kết luận:** **APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED / SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED / PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_RUN / HANDOFF_BLOCKED**
+
+Các mục trước tiêu đề **“Bằng chứng SaaS Live 25/09/2026”** lưu ảnh chụp audit và cập nhật ngày 23/09, không phải trạng thái mới nhất; chỉ phiên sandbox ở mục 25/09 nâng nhãn SaaS. Probe Gemini không nâng nhãn AI quality; xem [artifact probe](../../ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md).
 
 Báo cáo P6 trước đó ghi `PASS — 100%` và “sẵn sàng bàn giao”. Kết luận đó được rút lại sau audit đọc mã và kiểm thử ngày 23/09/2026. Có 11 unit test P6 pass (4 preflight, 5 UC2, 2 evaluation), nhưng test Sheets/Trello dùng `fetch` giả; runner đánh giá không gọi AI provider. `npm run check` ở commit trên cũng pass (DSL 44; engine 516 pass, 1 skip; API 79; web 138), chỉ chứng minh build và unit gate. Browser MVP v2, SaaS live và provider-backed quality vẫn `NOT_RUN` trong audit này.
 
@@ -65,8 +67,8 @@ Thực hiện theo kế hoạch `docs/superpowers/plans/2026-09-23-pilot-v2-saas
      - **Single Approved UC2 Write**: Principal A duyệt run hợp lệ. Hệ thống dispatch chính xác 1 lệnh POST tạo card lên Trello Sandbox (`6ab4cce14cc901026198259b`, list `6ab4cce14cc90102619825a1`), nhận receipt card ID `6ab66fc11dcefdad6a08389f` (`https://trello.com/c/gNm8pWyM/2-c%E1%BA%ADp-nh%E1%BA%ADt-trang-ch%E1%BB%A7`). `pilot_approvals` chuyển `approved`, `business_reservations` chuyển `confirmed`.
      - **UC3 Remote Read-back & Reconciliation**: Đọc trực tiếp thẻ từ remote Trello API (`trelloGetCard`), đối chiếu thành công card ID `6ab66fc11dcefdad6a08389f`. Gọi `POST /pilot/v2/lookup` cho `REQ-SBX-001` trả về `status: "found"` cùng card ID liên kết.
      - **Replay Protection**: Gửi lại yêu cầu approve trên cùng run trả về HTTP `409 Conflict`.
-     - **Tổng số lệnh ghi remote**: ĐÚNG 1 LỆNH DUY NHẤT.
-   - Bằng chứng đã được lưu và redact an toàn tại `docs/ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json`.
+     - **Tổng số lệnh ghi remote theo artifact của phiên**: 1; không suy rộng ra các phiên khác.
+   - Bằng chứng đã được lưu và redact tại `docs/ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json`. Script khởi tạo API cục bộ với token test tiêm cho hai principal, nên phiên này không chứng minh toàn bộ luồng đăng nhập production. Việc gán `liveWriteFlag = false` sau approval chỉ đổi biến cục bộ, không tắt cờ trên API đã khởi tạo; script đóng API ở `finally`. Không chạy lại để kiểm tài liệu hoặc tạo card mới nếu chưa duyệt riêng.
 
 3. **Trạng thái cổng Cổng G4 / G5 / G6**:
    - **Cổng G4 (`SAAS_LIVE_EXERCISED`)**: **ĐẠT (PASSED)** — Đã có bằng chứng vận hành live thực tế trên Google Sheets và Trello Sandbox (commit `82d5e43`, artifact `live-session-confirmed.json`).

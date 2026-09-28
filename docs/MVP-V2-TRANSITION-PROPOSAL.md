@@ -24,7 +24,8 @@ Working tree đã có 7 file đổi tên sản phẩm chưa commit; đợt này 
 `README.md` trong bản đồ là working-tree version; source engine/API được đọc
 hiện tại bởi Codebase Onboarding Engineer, không chỉ suy ra từ status cũ.
 
-GitNexus `ATI_Project` ở `59b275d`, chậm HEAD hai commit, chỉ dùng điều hướng.
+Khi lập tài liệu, index `ATI_Project` của công cụ phân tích nay đã gỡ ở
+`59b275d`, chậm HEAD hai commit và chỉ được dùng để điều hướng.
 Một số cạnh cùng tên không đáng tin để kết luận ownership; CodeGraph trả source
 trên đĩa, kiểm source là căn cứ chính. Không refresh index, không chạy regression
 hay runtime acceptance trong đợt chỉ làm tài liệu. Bản đồ là phạm vi đọc có

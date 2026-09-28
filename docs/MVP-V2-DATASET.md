@@ -1,8 +1,10 @@
 # Dataset contract — MVP v2
 
-Status (23/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
-CONTRACT_TESTS_PRESENT / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN /
-CUSTOMER_VALIDATED_NOT_RUN.
+Status dataset (23/09/2026): SPEC_APPROVED / RECONSTRUCTED_DATASET_CREATED /
+CONTRACT_TESTS_PRESENT. Trạng thái dự án bổ sung 25/09:
+[SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
+cho một phiên sandbox riêng; [PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED](ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md) /
+CUSTOMER_VALIDATED_NOT_RUN. Phiên SaaS không phải phép đo trên bộ dataset này.
 
 Nguồn oracle: [đặc tả mục 8](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
 Giữ đủ V2-01 đến V2-20, mỗi case có biến thể tiếng Việt và tiếng Anh.
@@ -13,7 +15,8 @@ Không sửa `testdata/test-cases.json`, `testdata/tools.json` hoặc
 `testdata/v2-dataset/cases.json` hiện có 20 case × vi/en = 40 records;
 `testdata/v2-dataset/holdout.json` có 10 case × vi/en = 20 records. Các test
 schema/acceptance dùng fixture tái dựng; [runner P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
-không gọi provider. Holdout chưa là bằng chứng đo chất lượng AI.
+chỉ mô phỏng, không gọi provider. Đã có probe Gemini thật nhưng chưa chạy chiến dịch
+đo đầy đủ; holdout chưa là bằng chứng đo chất lượng AI.
 
 ## Dạng record và evidence cần giữ
 

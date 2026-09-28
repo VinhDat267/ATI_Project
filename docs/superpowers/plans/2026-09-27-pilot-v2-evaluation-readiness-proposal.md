@@ -36,11 +36,11 @@ Các bước thực thi của plan cũ phải được điều chỉnh theo các
   được tính là model hiểu đúng yêu cầu. UC3 phải báo riêng theo route thực tế.
 - `apps/api/src/main.ts` chưa cài pilot provider. `PilotAccountedPlanner` là seam,
   chưa phải adapter transport/campaign evaluator đã nghiệm thu.
-- **Integration blocker cần giải trước probe:** `planner-context.ts:112–128`
-  yêu cầu executable `PlannerResult`, empty-step clarification và `trello.get_card`,
-  nhưng advisory schema không chấp nhận cấu trúc đó. Adapter cần prompt/schema
-  advisory nhất quán được freeze và test; đây là lệch contract thấy trong code,
-  chưa phải kết luận một lần provider thật đã thất bại.
+- **Historical blocker — đã sửa offline trong Phase A (`049cdfe`):** builder
+  trước đó yêu cầu executable `PlannerResult` không khớp advisory schema. API
+  nay chọn `pilot-advisory-v1` với ba proposal shapes và một reviewed tool;
+  legacy default giữ nguyên. Đây là contract đã kiểm bằng fake/HTTP/PG, không
+  phải bằng chứng provider thật; Phase B phải freeze nhánh advisory hiện tại.
 - Runner P6 `packages/engine/src/pilot/live-eval-runner.ts` vẫn chỉ là mô phỏng;
   không dùng verdict của nó làm quan sát provider thật.
 - Semantic/QE là mục tiêu đối chứng của spec, không phải khả năng đã được chứng

@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createApi } from "./app.js";
 import { loadConfig } from "./config.js";
+import { createPilot9RouterPlanner } from "./pilot-9router.js";
 import { loadDevPlanner } from "./dev-planner.js";
 import { createAiRuntime } from "./ai-runtime.js";
 import { createApiAuthorizeCall } from "./ai-runtime.js";
@@ -288,6 +289,12 @@ const api = createApi({
   ...(engineFactory ? { engineFactory } : {}),
   ...(pilotConfig ? { pilotConfig } : {}),
   ...(pilotPolicy ? { pilotPolicy } : {}),
+  ...(pilotConfig?.enabled && config.pilotRouter ? {
+    pilotPlanner: createPilot9RouterPlanner({ ...config.pilotRouter,
+      callsEnabled: () => config.allowProviderCalls !== false &&
+        !["0", "false", "off"].includes((process.env.AI_PROVIDER_CALLS_ENABLED ?? "1").toLowerCase()),
+    }),
+  } : {}),
   pilotLiveWriteEnabled: Boolean(
     pilotConfig?.enabled && process.env.PILOT_V2_WRITE_ENABLED === "true",
   ),

@@ -2,17 +2,22 @@
 
 **SCOPE_APPROVED — 21/09/2026:** chủ project duyệt
 [đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
-Đây là phạm vi đích đã duyệt, không phải xác nhận live integration. Code/test
-pilot v2 đã được thêm sau ngày duyệt; [audit P6 ngày 23/09](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
-ghi các lỗi chặn. SaaS/AI live vẫn cần tài nguyên, quyền và ngân sách riêng.
+Đây là phạm vi đích đã duyệt, không phải xác nhận production. Code/test
+pilot v2 đã được thêm sau ngày duyệt; [P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)
+ghi audit 23/09 và bằng chứng bổ sung 25/09. Một preflight chỉ đọc và một
+phiên UC1 → UC2 được duyệt → UC3 trên SaaS sandbox đã được ghi nhận
+(`SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED`; xem [artifacts](ai-evidence/PILOT-V2-LIVE/)).
+Probe provider bị giới hạn quota; `AI_QUALITY_NOT_MEASURED`,
+`CUSTOMER_VALIDATED_NOT_RUN`, `HANDOFF_BLOCKED`. Mỗi lần live mới vẫn cần
+quyền, tài nguyên và ngân sách/phê duyệt tương ứng.
 
 | Thành phần | Phạm vi đích đã duyệt | Trạng thái thực thi v2 |
 |---|---|---|
 | Người dùng | Điều phối viên nhóm dịch vụ thiết kế/web; hai principal riêng, owner-only runs; cộng tác trên board ngoài | Mã và test owner-scope có; nghiệm thu với người dùng đại diện `OPEN` |
-| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | UC1 checklist clarification/refusal và UC3 linked-card lookup đã qua API/PostgreSQL + Chromium browser tests với Sheets/Trello giả; AI source-aware và SaaS live chưa được chứng minh |
-| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | Adapter/test giả lập có; `SAAS_LIVE_NOT_RUN` |
-| AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; `AI_QUALITY_NOT_RUN` |
-| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; live write mặc định tắt và SaaS thật chưa chạy |
+| Use case | Kiểm yêu cầu; duyệt/tạo một task thật; tra task đã tạo | UC1/UC3 và approval UC2 đã qua API/PostgreSQL + Chromium với dịch vụ giả; artifact phiên sandbox 25/09 ghi UC1/UC2/UC3 trên đường API với Trello thật; AI source-aware chưa được chứng minh trên đường này |
+| Tích hợp | Google Sheets chỉ đọc + Trello đọc/tạo card; một nguồn và một board allowlisted | `SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED` cho một nguồn/board/card sandbox ngày 25/09; không suy rộng production |
+| AI | Source snapshot có trước planning, checklist và bằng chứng; giữ semantic/QE/replan có giới hạn | Module source-aware có; chưa nối đầy đủ vào API pilot; probe Gemini có phản hồi nhưng bị quota/503; `PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED` |
+| Engine | Một active run trong DB dùng chung, một worker tuần tự; TTL 10 phút; no auto-resume; unknown không retry mù | Approval API lưu PostgreSQL, gắn owner/run/version/hash/list ID/TTL, đã qua HTTP integration với Trello giả; artifact phiên sandbox ghi một write sau duyệt và read-back; cờ write mặc định tắt |
 | Dedupe | Giữ operation gate; bổ sung business intent xuyên run/operator theo nguồn và board | Reservation PostgreSQL có; `claimDispatched` chỉ nhận `reserved`, runner không POST lại intent `confirmed`; integration test PostgreSQL đạt |
 | UI | Giữ System Design đã duyệt; interaction mới phải review; mode fixture/live rõ | Owner isolation và UC1/UC3 browser local đã qua cùng 5 ca UC2 approval trên API/PostgreSQL cô lập; nghiệm thu với người dùng đại diện vẫn `OPEN` |
 | Đánh giá | 20 tình huống tái dựng + holdout riêng; phân biệt contract/live/AI/customer | Dataset 40 biến thể + 20 holdout có; mô phỏng không phải AI quality; `CUSTOMER_VALIDATED=NOT_RUN` |

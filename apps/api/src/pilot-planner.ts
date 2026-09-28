@@ -37,6 +37,9 @@ export interface PilotAccountedPlanner {
   readonly provider: "google" | "openai";
   readonly model: string;
   readonly estimatedCostMicros: number;
+  readonly billingMode?: "METERED" | "INCLUDED_SUBSCRIPTION";
+  readonly endpoint?: string;
+  readonly noPaidFallback?: boolean;
   propose(input: PilotPlannerInput): Promise<{
     proposal: unknown;
     usage: PilotUsage | null;
@@ -90,7 +93,12 @@ export async function requestAccountedPilotProposal(
   input: Omit<PilotPlannerInput, "signal">,
   timeoutMs: number,
 ): Promise<{ proposal: PilotPlannerProposal; usage: PilotUsage | null; costMicros: number | null }> {
-  if (!Number.isSafeInteger(planner.estimatedCostMicros) || planner.estimatedCostMicros <= 0 ||
+  if (!Number.isSafeInteger(planner.estimatedCostMicros) ||
+      (planner.billingMode === "INCLUDED_SUBSCRIPTION"
+        ? planner.estimatedCostMicros !== 0 || planner.provider !== "openai" || !planner.noPaidFallback ||
+          planner.endpoint !== "http://localhost:20128/v1" || planner.model !== "cx/gpt-5.6-sol"
+        : planner.billingMode !== undefined && planner.billingMode !== "METERED" ||
+          planner.estimatedCostMicros <= 0 || planner.endpoint !== undefined || planner.noPaidFallback !== undefined) ||
       !["google", "openai"].includes(planner.provider) || !planner.model.trim())
     throw new Error("Invalid pilot adapter configuration");
   const result = await callWithTimeout(

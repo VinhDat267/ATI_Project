@@ -45,7 +45,7 @@ quality, paid execution readiness, or a completed model evaluation.
   recorded above. No database, temp-root, or process leak was observed, and
   this does not touch the T4 backend verdict.
 - `git diff --check`: PASS for the final candidate changes.
-- GitNexus review: PASS on the indexed `ATI_Project` repository at `210139d`
+- Historical review by the now-retired dependency analyzer: PASS on the indexed `ATI_Project` repository at `210139d`
   (23,257 symbols, 51,931 edges, PDG enabled). `detect-changes` reports 15
   files/102 symbols and 38 affected flows for the T4 follow-up range. The
   retrieval session boundary is intentionally reported as a lower-bound/high-

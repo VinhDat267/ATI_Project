@@ -35,7 +35,7 @@ import {
   PilotProposalValidationError, requestAccountedPilotProposal,
   type PilotAccountedPlanner,
 } from "./pilot-planner.js";
-import { createPilotAiAdmission, PilotAiAdmissionError } from "./pilot-ai-admission.js";
+import { createPilotAiAdmission, matchesPilotGrant, PilotAiAdmissionError } from "./pilot-ai-admission.js";
 import { pilotOutcomeMessage, savePilotPlannerOutcome,
   type PilotOutcomeKind, type PilotReasonCode } from "./pilot-ai-outcome.js";
 
@@ -48,6 +48,7 @@ export interface PilotRouterOptions {
   liveWriteEnabled?: boolean;
   /** Advisory-only, opt-in; the production launcher does not install a provider. */
   pilotPlanner?: PilotAccountedPlanner;
+  providerCallsEnabled?: boolean;
   plannerTimeoutMs?: number;
   /** Injectable intake reader for tests or offline execution */
   readSheetsRequestFn?: (params: {
@@ -120,6 +121,38 @@ async function setPilotRunStatus(
     `;
   }
   return Boolean(changed[0]);
+}
+
+async function pilotCallPolicyMatches(tx: any, campaignId: string, principalId: string,
+  runId: string): Promise<boolean> {
+  const grant = (await tx`
+    SELECT principal_id,campaign_id,provider,model,billing_mode,endpoint,no_paid_fallback,
+      max_calls,max_estimated_cost_micros,
+      (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid
+    FROM pilot_ai_grants WHERE campaign_id=${campaignId} AND principal_id=${principalId}
+    FOR UPDATE`)[0];
+  const call = (await tx`
+    SELECT c.provider,c.model,c.billing_mode,c.endpoint,c.no_paid_fallback,
+      c.estimated_cost_micros,c.status,a.state
+    FROM pilot_ai_attempts a JOIN ai_provider_calls c ON c.call_id=a.call_id
+    WHERE a.run_id=${runId} AND a.principal_id=${principalId}
+      AND a.campaign_id=${campaignId} AND c.user_id=${principalId} AND c.run_id=${runId}`)[0];
+  return Boolean(call?.state === "settled" && call.status === "succeeded" &&
+    matchesPilotGrant(grant, principalId, {
+      provider: call.provider, model: call.model,
+      estimatedCostMicros: Number(call.estimated_cost_micros),
+      billingMode: call.billing_mode, endpoint: call.endpoint ?? undefined,
+      noPaidFallback: call.no_paid_fallback,
+    }));
+}
+
+function containsCredential(value: unknown, credential: string): boolean {
+  if (typeof value === "string") return value.includes(credential);
+  if (Array.isArray(value)) return value.some((item) => containsCredential(item, credential));
+  if (value !== null && typeof value === "object")
+    return Object.entries(value).some(([key, item]) =>
+      key.includes(credential) || containsCredential(item, credential));
+  return false;
 }
 
 export function createPilotRouter(options: PilotRouterOptions) {
@@ -381,6 +414,13 @@ export function createPilotRouter(options: PilotRouterOptions) {
         throw new HttpError(400, "INTAKE_ERROR", "Pilot intake unavailable");
       }
 
+      // Source snapshots and run inputs are durable artifacts. Never persist
+      // the configured router credential if it appears in untrusted intake.
+      const routerSecret = process.env.PILOT_AI_ROUTER_TOKEN;
+      if (options.pilotPlanner && routerSecret && routerSecret.length >= 4 &&
+          (containsCredential(intake, routerSecret) || containsCredential(body, routerSecret)))
+        throw new HttpError(400, "INTAKE_ERROR", "Pilot intake unavailable");
+
       const runId = randomUUID();
       const workflowId = randomUUID();
       const versionId = randomUUID();
@@ -391,6 +431,8 @@ export function createPilotRouter(options: PilotRouterOptions) {
       const isNeedsInput = intake.checklist.status === "needs_input" ||
         intake.checklist.unconfirmedBusiness || intake.checklist.missingFields.length > 0;
       const usePlanner = Boolean(options.pilotPlanner) && !isRefusal && !isNeedsInput;
+      if (usePlanner && options.providerCallsEnabled === false)
+        throw new HttpError(503, "PILOT_AI_UNAVAILABLE", "Pilot AI admission unavailable");
       if (usePlanner) {
         try { await admission!.preflight(userId, options.pilotPlanner!); }
         catch (err) {
@@ -519,6 +561,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
             secretsToRedact: [
               config.google?.apiKey ?? "", config.google?.privateKey ?? "",
               config.trello?.apiKey ?? "", config.trello?.apiToken ?? "",
+              process.env.PILOT_AI_ROUTER_TOKEN ?? "",
             ],
           });
           const requestHash = createHash("sha256").update(JSON.stringify({
@@ -531,6 +574,9 @@ export function createPilotRouter(options: PilotRouterOptions) {
             snapshot: { rawData: persisted.raw_data, checklist: persisted.checklist_result },
             provider: options.pilotPlanner!.provider, model: options.pilotPlanner!.model,
             estimate: options.pilotPlanner!.estimatedCostMicros, requestHash,
+            billingMode: options.pilotPlanner!.billingMode,
+            endpoint: options.pilotPlanner!.endpoint,
+            noPaidFallback: options.pilotPlanner!.noPaidFallback,
           });
           callId = reserved.callId;
           claimed = await admission!.claim({
@@ -539,6 +585,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
             snapshot: { rawData: persisted.raw_data, checklist: persisted.checklist_result },
           });
           if (!claimed) throw new Error("Pilot dispatch claim unavailable");
+          if (options.providerCallsEnabled === false) throw new Error("Pilot provider calls disabled");
           const result = await requestAccountedPilotProposal(options.pilotPlanner!, {
             runId, principalId: userId, sourceKey: persisted.source_key,
             sourceRevision: persisted.source_revision, context,
@@ -546,10 +593,15 @@ export function createPilotRouter(options: PilotRouterOptions) {
           settlementAttempted = true;
           const settlement = await admission!.settle({
             runId, principalId: userId, callId,
-            outcome: { status: result.costMicros === null ? "ambiguous" : "succeeded",
-              usage: result.usage, costMicros: result.costMicros },
+            outcome: { status: result.costMicros === null ||
+              options.pilotPlanner!.billingMode === "INCLUDED_SUBSCRIPTION" && result.usage === null
+              ? "ambiguous" : "succeeded",
+              usage: result.usage, costMicros: options.pilotPlanner!.billingMode === "INCLUDED_SUBSCRIPTION" &&
+                result.usage === null ? null : result.costMicros },
           });
-          if (result.costMicros === null || settlement.overrun || settlement.conflict)
+          if (result.costMicros === null ||
+              options.pilotPlanner!.billingMode === "INCLUDED_SUBSCRIPTION" && result.usage === null ||
+              settlement.overrun || settlement.conflict)
             throw new Error("Pilot provider accounting unavailable");
           const proposal = result.proposal;
 
@@ -559,13 +611,27 @@ export function createPilotRouter(options: PilotRouterOptions) {
             const campaign = (await tx<Array<{ halted: boolean }>>`
               SELECT halted FROM ai_provider_campaigns
               WHERE campaign_id=${reserved.campaignId} AND user_id=${userId} FOR UPDATE`)[0];
-            const grant = (await tx<Array<{ valid: boolean; provider: string; model: string }>>`
+            const grant = (await tx<Array<{ valid: boolean; principal_id: string; campaign_id: string;
+              provider: string; model: string; billing_mode: string; endpoint: string | null;
+              no_paid_fallback: boolean; max_calls: number; max_estimated_cost_micros: string | number }>>`
               SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
-                     provider,model FROM pilot_ai_grants
+                     principal_id,campaign_id,provider,model,billing_mode,endpoint,no_paid_fallback,
+                     max_calls,max_estimated_cost_micros FROM pilot_ai_grants
               WHERE campaign_id=${reserved.campaignId} AND principal_id=${userId} FOR UPDATE`)[0];
-            if (!campaign || campaign.halted || !grant?.valid ||
-                grant.provider !== options.pilotPlanner!.provider ||
-                grant.model !== options.pilotPlanner!.model ||
+            const callPolicy = (await tx<Array<{ provider: "google" | "openai"; model: string;
+              billing_mode: "METERED" | "INCLUDED_SUBSCRIPTION"; endpoint: string | null;
+              no_paid_fallback: boolean; estimated_cost_micros: string | number }>>`
+              SELECT provider,model,billing_mode,endpoint,no_paid_fallback,estimated_cost_micros
+              FROM ai_provider_calls WHERE call_id=${callId} AND campaign_id=${reserved.campaignId}
+                AND user_id=${userId} AND run_id=${runId}`)[0];
+            if (!campaign || campaign.halted || !callPolicy ||
+                !matchesPilotGrant(grant, userId, options.pilotPlanner!) ||
+                !matchesPilotGrant(grant, userId, {
+                  provider: callPolicy.provider, model: callPolicy.model,
+                  estimatedCostMicros: Number(callPolicy.estimated_cost_micros),
+                  billingMode: callPolicy.billing_mode, endpoint: callPolicy.endpoint ?? undefined,
+                  noPaidFallback: callPolicy.no_paid_fallback,
+                }) ||
                 !policy.enabled || !config.enabled ||
                 !policy.principals.includes(userId) || !config.principals.includes(userId) ||
                 policy.spreadsheetId !== config.spreadsheetId ||
@@ -869,22 +935,8 @@ export function createPilotRouter(options: PilotRouterOptions) {
           const campaign = (await tx<Array<{ halted: boolean }>>`
             SELECT halted FROM ai_provider_campaigns
             WHERE campaign_id=${attempt.campaign_id} AND user_id=${userId} FOR UPDATE`)[0];
-          const grant = (await tx<Array<{
-            valid: boolean; provider: string; model: string;
-          }>>`
-            SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
-                   provider,model FROM pilot_ai_grants
-            WHERE campaign_id=${attempt.campaign_id} AND principal_id=${userId} FOR UPDATE`)[0];
-          const call = (await tx<Array<{
-            provider: string; model: string; status: string;
-          }>>`
-            SELECT c.provider,c.model,c.status FROM pilot_ai_attempts a
-            JOIN ai_provider_calls c ON c.call_id=a.call_id
-            WHERE a.run_id=${runId} AND a.principal_id=${userId}
-              AND a.campaign_id=${attempt.campaign_id}`)[0];
-          if (!campaign || campaign.halted || !grant?.valid || !call ||
-              grant.provider !== call.provider || grant.model !== call.model ||
-              call.status !== "succeeded" ||
+          if (!campaign || campaign.halted ||
+              !await pilotCallPolicyMatches(tx, attempt.campaign_id, userId, runId) ||
               attempt.state !== "settled" || !policy.enabled || !config.enabled ||
               !policy.principals.includes(userId) || !config.principals.includes(userId) ||
               policy.spreadsheetId !== config.spreadsheetId ||
@@ -1020,25 +1072,13 @@ export function createPilotRouter(options: PilotRouterOptions) {
               const campaign = (await tx<Array<{ halted: boolean }>>`
                 SELECT halted FROM ai_provider_campaigns
                 WHERE campaign_id=${claim.aiCampaignId} AND user_id=${userId} FOR UPDATE`)[0];
-              const grant = (await tx<Array<{
-                valid: boolean; provider: string; model: string;
-              }>>`
-                SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
-                       provider,model FROM pilot_ai_grants
-                WHERE campaign_id=${claim.aiCampaignId} AND principal_id=${userId} FOR UPDATE`)[0];
+
               const run = (await tx<Array<{ status: string }>>`
                 SELECT status FROM runs WHERE id=${runId} AND user_id=${userId}
                   AND profile='pilot-v2' FOR UPDATE`)[0];
-              const call = (await tx<Array<{
-                provider: string; model: string; state: string; status: string;
-              }>>`
-                SELECT c.provider,c.model,a.state,c.status FROM pilot_ai_attempts a
-                JOIN ai_provider_calls c ON c.call_id=a.call_id
-                WHERE a.run_id=${runId} AND a.principal_id=${userId}
-                  AND a.campaign_id=${claim.aiCampaignId}`)[0];
-              if (!campaign || campaign.halted || !grant?.valid ||
-                  !call || call.state !== "settled" || call.status !== "succeeded" ||
-                  grant.provider !== call.provider || grant.model !== call.model ||
+              if (!campaign || campaign.halted ||
+                  !claim.aiCampaignId ||
+                  !await pilotCallPolicyMatches(tx, claim.aiCampaignId, userId, runId) ||
                   run?.status !== "running" || !policy.enabled || !config.enabled ||
                   !policy.principals.includes(userId) || !config.principals.includes(userId) ||
                   policy.spreadsheetId !== config.spreadsheetId ||

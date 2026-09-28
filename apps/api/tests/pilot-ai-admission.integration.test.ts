@@ -155,6 +155,82 @@ async function preparedRun(
 }
 
 describe("pilot AI atomic admission and dispatch", () => {
+  it("binds subscription route, endpoint, mode and no-paid-fallback to one consumed call", async () => {
+    const fixture = await makeApiFixture();
+    try {
+      const setup = await preparedRun(fixture, { maxCalls: 1 });
+      await fixture.db.client`UPDATE pilot_ai_grants
+        SET provider='openai',model='cx/gpt-5.6-sol',billing_mode='INCLUDED_SUBSCRIPTION',
+          endpoint='http://localhost:20128/v1',no_paid_fallback=true,
+          max_estimated_cost_micros=0 WHERE campaign_id=${setup.campaignId}`;
+      await expect(fixture.db.client`UPDATE pilot_ai_grants SET max_calls=2
+        WHERE campaign_id=${setup.campaignId}`).rejects.toThrow();
+      const subscription = { ...setup.admitInput, provider: "openai" as const,
+        model: "cx/gpt-5.6-sol", billingMode: "INCLUDED_SUBSCRIPTION" as const,
+        endpoint: "http://localhost:20128/v1", noPaidFallback: true, estimate: 0 };
+      for (const drift of [
+        { billingMode: "METERED" as const }, { endpoint: "http://localhost:20129/v1" },
+        { model: "gpt-5.6-sol" }, { noPaidFallback: false },
+      ]) await expect(setup.coordinator.admit({ ...subscription, ...drift })).rejects.toThrow();
+      const { callId } = await setup.coordinator.admit(subscription);
+      expect(await fixture.db.client`SELECT billing_mode,endpoint,model,no_paid_fallback,
+          estimated_cost_micros FROM ai_provider_calls WHERE call_id=${callId}`).toEqual([{
+        billing_mode: "INCLUDED_SUBSCRIPTION", endpoint: subscription.endpoint,
+        model: subscription.model, no_paid_fallback: true, estimated_cost_micros: "0",
+      }]);
+      const claim = () => setup.coordinator.claim({ runId: setup.runId,
+        principalId: fixture.userId, callId, versionId: setup.versionId,
+        sourceKey: subscription.sourceKey, sourceRevision: subscription.sourceRevision,
+        snapshot: subscription.snapshot });
+      expect(await claim()).toBe(true);
+      expect(await claim()).toBe(false);
+      await expect(setup.coordinator.settle({ runId: setup.runId,
+        principalId: fixture.userId, callId,
+        outcome: { status: "succeeded", usage: null, costMicros: 0 },
+      })).rejects.toThrow();
+      await setup.coordinator.settle({ runId: setup.runId,
+        principalId: fixture.userId, callId,
+        outcome: { status: "ambiguous", usage: null, costMicros: null },
+      });
+      expect(await fixture.db.client`SELECT state FROM pilot_ai_attempts WHERE run_id=${setup.runId}`)
+        .toEqual([{ state: "uncertain" }]);
+      expect(await fixture.db.client`SELECT status,reservation_held,cost_micros
+        FROM ai_provider_calls WHERE call_id=${callId}`)
+        .toEqual([{ status: "ambiguous", reservation_held: true, cost_micros: null }]);
+      const another = await preparedRun(fixture, { maxCalls: 1 });
+      await expect(another.coordinator.admit({ ...subscription, runId: another.runId,
+        versionId: another.versionId, sourceKey: another.admitInput.sourceKey,
+        sourceRevision: another.admitInput.sourceRevision,
+        snapshot: another.admitInput.snapshot })).rejects.toThrow();
+      expect(await fixture.db.client`SELECT count(*)::int AS count FROM ai_provider_calls`)
+        .toEqual([{ count: 1 }]);
+    } finally { await fixture.close(); }
+  }, 45_000);
+
+  it("blocks subscription claim after grant route/billing changes", async () => {
+    const fixture = await makeApiFixture();
+    try {
+      const setup = await preparedRun(fixture, { maxCalls: 1 });
+      await fixture.db.client`UPDATE pilot_ai_grants
+        SET provider='openai',model='cx/gpt-5.6-sol',billing_mode='INCLUDED_SUBSCRIPTION',
+          endpoint='http://localhost:20128/v1',no_paid_fallback=true,
+          max_estimated_cost_micros=0 WHERE campaign_id=${setup.campaignId}`;
+      const subscription = { ...setup.admitInput, provider: "openai" as const,
+        model: "cx/gpt-5.6-sol", billingMode: "INCLUDED_SUBSCRIPTION" as const,
+        endpoint: "http://localhost:20128/v1", noPaidFallback: true, estimate: 0 };
+      const { callId } = await setup.coordinator.admit(subscription);
+      await expect(fixture.db.client`UPDATE pilot_ai_grants
+        SET endpoint='http://localhost:20129/v1' WHERE campaign_id=${setup.campaignId}`)
+        .rejects.toThrow();
+      await fixture.db.client`UPDATE pilot_ai_grants SET billing_mode='METERED',
+        endpoint=NULL,no_paid_fallback=false,model='different',max_estimated_cost_micros=60
+        WHERE campaign_id=${setup.campaignId}`;
+      expect(await setup.coordinator.claim({ runId: setup.runId, principalId: fixture.userId,
+        callId, versionId: setup.versionId, sourceKey: subscription.sourceKey,
+        sourceRevision: subscription.sourceRevision, snapshot: subscription.snapshot })).toBe(false);
+    } finally { await fixture.close(); }
+  }, 45_000);
+
   it("rejects a missing grant before reserving budget", async () => {
     const fixture = await makeApiFixture();
     try {

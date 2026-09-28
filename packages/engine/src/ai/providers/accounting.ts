@@ -13,6 +13,10 @@ export interface ProviderCallReservation {
   readonly outputCap?: number;
   readonly embeddingPurpose?: "document" | "query";
   readonly estimatedCostMicros: number;
+  /** Only pilot grants may authorize zero incremental API charge. */
+  readonly billingMode?: "METERED" | "INCLUDED_SUBSCRIPTION";
+  readonly endpoint?: string;
+  readonly noPaidFallback?: boolean;
 }
 
 export interface ProviderCallUsage {

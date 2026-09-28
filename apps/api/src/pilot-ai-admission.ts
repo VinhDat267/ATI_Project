@@ -22,6 +22,9 @@ type Grant = {
   campaign_id: string;
   provider: string;
   model: string;
+  billing_mode: string;
+  endpoint: string | null;
+  no_paid_fallback: boolean;
   max_calls: number;
   max_estimated_cost_micros: string | number;
   valid: boolean;
@@ -55,6 +58,9 @@ export interface PilotAiAdmissionInput {
   readonly provider: "google" | "openai";
   readonly model: string;
   readonly estimate: number;
+  readonly billingMode?: "METERED" | "INCLUDED_SUBSCRIPTION";
+  readonly endpoint?: string;
+  readonly noPaidFallback?: boolean;
   readonly requestHash: string;
   readonly snapshot: { readonly rawData: SourceRow; readonly checklist: ChecklistResult };
 }
@@ -82,12 +88,24 @@ function validSnapshot(snapshot: Snapshot | undefined, sourceRevision: string, s
     checklist.missingFields.length === 0);
 }
 
-function validGrant(grant: Grant | undefined, principalId: string, provider: string,
-  model: string, estimate: number): boolean {
-  return Boolean(grant && grant.valid && grant.principal_id === principalId &&
-    grant.campaign_id === campaignFor(principalId) && grant.provider === provider &&
-    grant.model === model && Number.isSafeInteger(estimate) && estimate > 0 &&
-    estimate <= Number(grant.max_estimated_cost_micros));
+export function matchesPilotGrant(grant: Grant | undefined, principalId: string, planner: {
+  provider: "google" | "openai"; model: string; estimatedCostMicros: number;
+  billingMode?: "METERED" | "INCLUDED_SUBSCRIPTION";
+  endpoint?: string; noPaidFallback?: boolean;
+}): boolean {
+  if (!grant || !grant.valid || grant.principal_id !== principalId ||
+      grant.campaign_id !== campaignFor(principalId) || grant.provider !== planner.provider ||
+      grant.model !== planner.model || grant.billing_mode !== (planner.billingMode ?? "METERED") ||
+      grant.endpoint !== (planner.endpoint ?? null) ||
+      grant.no_paid_fallback !== (planner.noPaidFallback ?? false) ||
+      !Number.isSafeInteger(planner.estimatedCostMicros)) return false;
+  return grant.billing_mode === "INCLUDED_SUBSCRIPTION"
+    ? grant.provider === "openai" && grant.model === "cx/gpt-5.6-sol" &&
+      grant.endpoint === "http://localhost:20128/v1" && grant.no_paid_fallback &&
+      grant.max_calls === 1 && planner.estimatedCostMicros === 0 &&
+      Number(grant.max_estimated_cost_micros) === 0
+    : grant.billing_mode === "METERED" && planner.estimatedCostMicros > 0 &&
+      planner.estimatedCostMicros <= Number(grant.max_estimated_cost_micros);
 }
 
 export function createPilotAiAdmission(options: {
@@ -111,12 +129,12 @@ export function createPilotAiAdmission(options: {
     const campaignId = campaignFor(principalId);
     return lock
       ? tx<Grant[]>`
-          SELECT principal_id,campaign_id,provider,model,max_calls,max_estimated_cost_micros,
+          SELECT principal_id,campaign_id,provider,model,billing_mode,endpoint,no_paid_fallback,max_calls,max_estimated_cost_micros,
                  (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid
           FROM pilot_ai_grants WHERE campaign_id=${campaignId} AND principal_id=${principalId}
           FOR UPDATE`
       : tx<Grant[]>`
-          SELECT principal_id,campaign_id,provider,model,max_calls,max_estimated_cost_micros,
+          SELECT principal_id,campaign_id,provider,model,billing_mode,endpoint,no_paid_fallback,max_calls,max_estimated_cost_micros,
                  (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid
           FROM pilot_ai_grants WHERE campaign_id=${campaignId} AND principal_id=${principalId}`;
   };
@@ -125,18 +143,20 @@ export function createPilotAiAdmission(options: {
     readonly provider: "google" | "openai";
     readonly model: string;
     readonly estimatedCostMicros: number;
+    readonly billingMode?: "METERED" | "INCLUDED_SUBSCRIPTION";
+    readonly endpoint?: string;
+    readonly noPaidFallback?: boolean;
   }): Promise<void> {
     checkPolicy(principalId);
     const campaignId = campaignFor(principalId);
     const rows = await db.client<Grant[]>`
-      SELECT g.principal_id,g.campaign_id,g.provider,g.model,g.max_calls,
+      SELECT g.principal_id,g.campaign_id,g.provider,g.model,g.billing_mode,g.endpoint,g.no_paid_fallback,g.max_calls,
              g.max_estimated_cost_micros,
              (g.revoked_at IS NULL AND g.expires_at > clock_timestamp() AND NOT c.halted) AS valid
       FROM pilot_ai_grants g JOIN ai_provider_campaigns c
         ON c.campaign_id=g.campaign_id AND c.user_id=g.principal_id
       WHERE g.campaign_id=${campaignId} AND g.principal_id=${principalId}`;
-    if (!validGrant(rows[0], principalId, planner.provider, planner.model,
-      planner.estimatedCostMicros))
+    if (!matchesPilotGrant(rows[0], principalId, planner))
       throw new PilotAiAdmissionError("PILOT_AI_UNAUTHORIZED");
   }
 
@@ -153,7 +173,10 @@ export function createPilotAiAdmission(options: {
       if (!campaign || campaign.user_id !== input.principalId || campaign.halted)
         throw new PilotAiAdmissionError("PILOT_AI_UNAUTHORIZED");
       const grant = (await grantRows(tx, input.principalId, true))[0];
-      if (!validGrant(grant, input.principalId, input.provider, input.model, input.estimate))
+      if (!matchesPilotGrant(grant, input.principalId, { provider: input.provider,
+        model: input.model, estimatedCostMicros: input.estimate,
+        billingMode: input.billingMode, endpoint: input.endpoint,
+        noPaidFallback: input.noPaidFallback }))
         throw new PilotAiAdmissionError("PILOT_AI_UNAUTHORIZED");
       const run = (await tx<Run[]>`
         SELECT id,workflow_version_id,status,profile FROM runs
@@ -186,6 +209,8 @@ export function createPilotAiAdmission(options: {
           campaignId, runId: input.runId, profileId: "pilot-v2",
           provider: input.provider, purpose: "planning", model: input.model,
           requestHash: input.requestHash, estimatedCostMicros: input.estimate,
+          billingMode: input.billingMode, endpoint: input.endpoint,
+          noPaidFallback: input.noPaidFallback,
         });
       await tx`
         UPDATE pilot_ai_attempts SET call_id=${callId},updated_at=clock_timestamp()
@@ -205,13 +230,20 @@ export function createPilotAiAdmission(options: {
       const grant = (await grantRows(tx, input.principalId, true))[0];
       if (!grant?.valid) return false;
       const reservedCall = (await tx<Array<{
-        provider: string; model: string; status: string;
+        provider: "google" | "openai"; model: string; status: string;
+        billing_mode: "METERED" | "INCLUDED_SUBSCRIPTION";
+        endpoint: string | null; no_paid_fallback: boolean; estimated_cost_micros: string | number;
       }>>`
-        SELECT provider,model,status FROM ai_provider_calls
+        SELECT provider,model,status,billing_mode,endpoint,no_paid_fallback,estimated_cost_micros FROM ai_provider_calls
         WHERE call_id=${input.callId} AND campaign_id=${campaignId}
           AND user_id=${input.principalId} AND run_id=${input.runId}`)[0];
       if (!reservedCall || reservedCall.status !== "reserved" ||
-          grant.provider !== reservedCall.provider || grant.model !== reservedCall.model)
+          !matchesPilotGrant(grant, input.principalId, {
+            provider: reservedCall.provider, model: reservedCall.model,
+            estimatedCostMicros: Number(reservedCall.estimated_cost_micros),
+            billingMode: reservedCall.billing_mode, endpoint: reservedCall.endpoint ?? undefined,
+            noPaidFallback: reservedCall.no_paid_fallback,
+          }))
         return false;
       const run = (await tx<Run[]>`
         SELECT id,workflow_version_id,status,profile FROM runs
@@ -252,6 +284,13 @@ export function createPilotAiAdmission(options: {
           AND a.call_id=${callId}`;
       const attempt = attempts[0];
       if (!attempt || (outcome.costMicros === null && !attempt.dispatch_claimed_at))
+        throw new PilotAiAdmissionError("PILOT_AI_CONFLICT");
+      const call = (await tx<Array<{ billing_mode: string }>>`
+        SELECT billing_mode FROM ai_provider_calls WHERE call_id=${callId}
+          AND campaign_id=${campaignId} AND user_id=${principalId} AND run_id=${runId}`)[0];
+      if (!call || (call.billing_mode === "INCLUDED_SUBSCRIPTION" && outcome.costMicros !== null &&
+          (outcome.costMicros !== 0 || !outcome.usage && outcome.status !== "cancelled")) ||
+          !["METERED", "INCLUDED_SUBSCRIPTION"].includes(call.billing_mode))
         throw new PilotAiAdmissionError("PILOT_AI_CONFLICT");
       const result = await settlePostgresProviderCallInTransaction(tx,
         { campaignId, userId: principalId }, callId, outcome);

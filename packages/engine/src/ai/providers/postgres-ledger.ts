@@ -133,8 +133,15 @@ export async function reservePostgresProviderCallInTransaction(
       "CAMPAIGN_CONFIG_MISMATCH",
       "provider reservation campaign does not match ledger campaign",
     );
-  if (!Number.isSafeInteger(input.estimatedCostMicros) || input.estimatedCostMicros < 0)
-    throw new Error("estimatedCostMicros must be a non-negative integer");
+  if (!Number.isSafeInteger(input.estimatedCostMicros) ||
+      (input.billingMode === "INCLUDED_SUBSCRIPTION"
+        ? input.profileId !== "pilot-v2" || input.provider !== "openai" ||
+          input.model !== "cx/gpt-5.6-sol" || input.endpoint !== "http://localhost:20128/v1" ||
+          input.noPaidFallback !== true || input.estimatedCostMicros !== 0
+        : input.billingMode !== undefined && input.billingMode !== "METERED" ||
+          input.endpoint !== undefined || input.noPaidFallback !== undefined ||
+          input.estimatedCostMicros < 0))
+    throw new Error("Invalid provider reservation billing policy");
   const rows = await tx<CampaignRow[]>`
     SELECT campaign_id,user_id,limit_micros,held_micros,committed_micros,halted
     FROM ai_provider_campaigns WHERE campaign_id=${options.campaignId} FOR UPDATE`;
@@ -162,11 +169,13 @@ export async function reservePostgresProviderCallInTransaction(
   const inserted = await tx<{ call_id: string }[]>`
     INSERT INTO ai_provider_calls(
       campaign_id,user_id,run_id,profile_id,trial_id,provider,purpose,model,
-      request_hash,output_cap,embedding_purpose,estimated_cost_micros
+      request_hash,output_cap,embedding_purpose,estimated_cost_micros,
+      billing_mode,endpoint,no_paid_fallback
     ) VALUES (
       ${options.campaignId},${options.userId},${input.runId},${input.profileId},
       ${input.trialId ?? null},${input.provider},${input.purpose},${input.model},
-      ${input.requestHash},${input.outputCap ?? null},${input.embeddingPurpose ?? null},${estimate}
+      ${input.requestHash},${input.outputCap ?? null},${input.embeddingPurpose ?? null},${estimate},
+      ${input.billingMode ?? "METERED"},${input.endpoint ?? null},${input.noPaidFallback ?? false}
     ) RETURNING call_id`;
   const callId = inserted[0]?.call_id;
   if (!callId) throw new Error("provider call insert returned no call id");

@@ -1,15 +1,17 @@
 # Backend MVP v2 — Roadmap và chỉ mục 30 task
 
-Ngày lập: 22/09/2026. Cập nhật trạng thái 23/09/2026 tại commit `9335620`:
-**PLAN_RECORDED / CODE_PRESENT / LIVE_NOT_RUN / FULL_ACCEPTANCE_OPEN**.
+Ngày lập: 22/09/2026. Ảnh chụp kế hoạch tại commit `9335620` ngày 23/09:
+**PLAN_RECORDED / CODE_PRESENT / LIVE_NOT_RUN / FULL_ACCEPTANCE_OPEN** (chỉ đúng tại thời điểm đó).
+**Bằng chứng mới 25/09:** `SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED` cho một phiên sandbox; `PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_RUN / HANDOFF_BLOCKED`. Xem [P6](P6-REVIEW.md) và [artifacts live](../../ai-evidence/PILOT-V2-LIVE/).
 
 Đây là kế hoạch gốc, không phải bảng nghiệm thu. Sau ngày lập đã có code/test
 cho nhiều task BE-01…29 và giao diện pilot. [Review P1](P1-REVIEW.md),
 [P2](P2-REVIEW.md), [P3](P3-REVIEW.md), [P4](P4-REVIEW.md) ghi kết quả tại thời
 điểm tương ứng; [audit P6](P6-REVIEW.md) rút lại verdict live `PASS`.
 Không suy `SAAS_LIVE_EXERCISED`, `AI_QUALITY_MEASURED` hay `FULL_PRODUCT_ACCEPTANCE`
-từ commit hoặc unit test. Tài liệu/code không cấp quyền gọi API trả phí hoặc tạo
-card thật.
+từ commit hoặc unit test: nhãn SaaS được ghi nhận riêng từ phiên live 25/09,
+không nâng nhãn AI/customer. Tài liệu/code không cấp quyền gọi API trả phí hoặc tạo
+card thật lần nữa.
 
 ## 1. Mục tiêu và cách dùng
 
@@ -98,7 +100,8 @@ cần xác nhận namespace/profile/API riêng; UI vẫn hoàn toàn không đ�
 ## 4. Kết quả graph và giới hạn evidence
 
 CodeGraph được dùng trước tìm/đọc code, trả source hiện hành ở các seam trên.
-GitNexus `query` và `context(prepareAccepted, prepare.ts)` được dùng để định vị.
+Khi lập tài liệu, `query` và `context(prepareAccepted, prepare.ts)` của công cụ
+phân tích nay đã gỡ được dùng để định vị.
 Index tại `59b275dce709a02312c7aaca8d64d34c2b500b72`, chậm 3 commit.
 `impact` với UID chính xác trả `risk: UNKNOWN`, direct=0: **không phải low risk**.
 Đối chiếu source tìm được wrapper `engine.ts:67`, worker `apps/api/src/worker.ts:74`,
@@ -239,7 +242,7 @@ task, `packages/dsl/src/`, `apps/api/src/`, `db/migrations/`, tests/docs/testdat
 Không đổi `apps/web/**`, `System Design/**`, dependency versions hoặc technical name.
 
 Mỗi task/nhóm nhỏ có test → review diff → commit riêng khi đã được phép execution.
-Trước commit chạy GitNexus detect_changes; partial/truncated không là clean.
+Trước commit kiểm tra exact diff, affected callers và các test liên quan; partial/truncated không là clean.
 Chỉ stage exact file allowlist, không `git add .`; không commit ở lượt lập plan này.
 Gate auth/approval/dispatch/transactions cần reviewer độc lập sau implementation.
 
@@ -258,7 +261,7 @@ backend_plan:
   ui_changes_authorized: false
   external_calls_authorized: false
   live_writes_authorized: false
-  provenance_mode: ordinary_markdown_not_gitnexus_schema2_pack
+  provenance_mode: ordinary_markdown_without_schema2_pack
   avoid:
     - overwrite_existing_dirty_changes
     - reinterpret_task_hub_as_live_saas
@@ -267,7 +270,7 @@ backend_plan:
     - label_mock_as_live_or_customer_validated
 ```
 
-Giới hạn công cụ: safe writer/read-plan của skill gitnexus-plan đòi POSIX
+Giới hạn công cụ: safe writer/read-plan của công cụ xuất bản plan đã gỡ đòi POSIX
 O_DIRECTORY/O_NOFOLLOW; runtime kiểm tra là win32 và không có hai flag đó. Vì
 vậy đây là bộ Markdown viết bằng apply_patch theo quy tắc môi trường, **không**
 giả làm plan có schema-2 provenance/safe-writer receipt. Người thực thi phải

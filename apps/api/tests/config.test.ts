@@ -93,6 +93,20 @@ describe("API configuration", () => {
     ).toThrow(/Invalid boolean configuration AI_PROVIDER_CALLS_ENABLED/);
   });
 
+  it("keeps pilot router offline by default and validates explicit endpoint/route/assertion", async () => {
+    const env = await baseEnv();
+    expect(loadConfig(env).pilotRouter).toBeUndefined();
+    const router = { PILOT_AI_ROUTER_ENABLED: "1", PILOT_AI_ROUTER_TOKEN: "fixture-secret",
+      PILOT_AI_ROUTER_ENDPOINT: "http://localhost:20128/v1",
+      PILOT_AI_ROUTER_ROUTE: "cx/gpt-5.6-sol", PILOT_AI_NO_PAID_FALLBACK: "1" };
+    expect(loadConfig({ ...env, ...router, AI_PROVIDER_CALLS_ENABLED: "0" }).pilotRouter)
+      .toMatchObject({ endpoint: router.PILOT_AI_ROUTER_ENDPOINT, route: router.PILOT_AI_ROUTER_ROUTE });
+    for (const invalid of [
+      { PILOT_AI_ROUTER_TOKEN: "" }, { PILOT_AI_ROUTER_ENDPOINT: "https://api.openai.com/v1" },
+      { PILOT_AI_ROUTER_ROUTE: "cx/other" }, { PILOT_AI_NO_PAID_FALLBACK: "0" },
+    ]) expect(() => loadConfig({ ...env, ...router, ...invalid })).toThrow(/pilot router configuration/);
+  });
+
   it("parses the worker shutdown deadline with a bounded default", async () => {
     const env = await baseEnv();
     expect(loadConfig(env).workerShutdownTimeoutMs).toBe(30_000);

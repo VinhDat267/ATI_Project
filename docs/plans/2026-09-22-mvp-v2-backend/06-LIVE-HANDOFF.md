@@ -1,8 +1,8 @@
 # Batch 06 — Live SaaS Hand-off & Live AI Evaluation
 
-Ngày lập: 23/09/2026. Trạng thái cập nhật sau audit: **CODE_PRESENT / UNIT_TESTED / LIVE_NOT_RUN / HANDOFF_BLOCKED**.
+Ngày lập: 23/09/2026. **Trạng thái bằng chứng 25/09/2026:** `SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED / PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED / CUSTOMER_VALIDATED_NOT_RUN / HANDOFF_BLOCKED`.
 
-Tài liệu này ghi tiêu chuẩn nghiệm thu cho **BE-26..29**. Mã runner và 11 unit test đã có, nhưng các runner P6 chưa được nối vào API/CLI vận hành; test Sheets/Trello dùng transport giả. Không có bằng chứng đọc/ghi SaaS hoặc đánh giá provider thật. Xem [audit P6](P6-REVIEW.md) và [runbook](../../PILOT-V2-RUNBOOK.md).
+Tài liệu này ghi tiêu chuẩn nghiệm thu cho **BE-26..29**. Unit test P6 dùng transport giả; riêng [preflight](../../ai-evidence/PILOT-V2-LIVE/preflight-read-confirmed.json) và [phiên API sandbox một card](../../ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json) có artifacts live ngày 25/09. CLI preflight và script phiên live tách khỏi runner P6 `live-uc2-runner`/`live-eval-runner` (runner đánh giá vẫn mô phỏng); [probe Gemini](../../ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md) không phải phép đo quality đầy đủ. Các DoD phía dưới là tiêu chí, không phải xác nhận mọi mục đã hoàn thành. Xem [audit P6](P6-REVIEW.md) và [runbook](../../PILOT-V2-RUNBOOK.md).
 
 ---
 
@@ -10,9 +10,9 @@ Tài liệu này ghi tiêu chuẩn nghiệm thu cho **BE-26..29**. Mã runner v�
 
 | Task ID | Tên Nhiệm vụ | Phụ thuộc | File Triển khai | File Kiểm thử | Trạng thái |
 |---|---|---|---|---|:---:|
-| **BE-26** | SaaS setup & live read preflight | BE-13 | `packages/engine/src/pilot/live-preflight.ts` | `packages/engine/tests/pilot-live-preflight.test.ts` | **UNIT_TESTED / LIVE_NOT_RUN** |
-| **BE-27** | Live manual UC2 + receipt | BE-18, BE-26 | `packages/engine/src/pilot/live-uc2-runner.ts` | `packages/engine/tests/pilot-live-uc2.test.ts` | **BLOCKED_SAFETY / LIVE_NOT_RUN** |
-| **BE-28** | Live AI / quality evaluation | BE-25, BE-27 | `packages/engine/src/pilot/live-eval-runner.ts` | `packages/engine/tests/pilot-live-eval.test.ts` | **SIMULATED_ONLY / AI_QUALITY_NOT_RUN** |
+| **BE-26** | SaaS setup & live read preflight | BE-13 | `packages/engine/src/pilot/live-preflight.ts`, `live-preflight-cli.ts` | `packages/engine/tests/pilot-live-preflight.test.ts` + live artifact | **SAAS_READ_CONFIRMED** (một preflight sandbox) |
+| **BE-27** | Live manual UC2 + receipt | BE-18, BE-26 | API `/pilot/v2` + `scripts/execute-pilot-v2-live.ts`; runner P6 riêng | HTTP/DB/Chromium giả + live artifact | **SAAS_LIVE_EXERCISED** (một card sandbox) |
+| **BE-28** | Live AI / quality evaluation | BE-25, BE-27 | `packages/engine/src/pilot/live-eval-runner.ts` (mô phỏng); probe riêng | `packages/engine/tests/pilot-live-eval.test.ts` + probe artifact | **PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED** |
 | **BE-29** | Runbook, evidence & handoff | BE-25, BE-27, BE-28 | `docs/PILOT-V2-RUNBOOK.md` | `docs/plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md` | **DOC_UPDATED / HANDOFF_BLOCKED** |
 
 ---
