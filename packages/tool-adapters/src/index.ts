@@ -2,6 +2,4 @@
 export * from './crypto.js';
 export * from './rate-limiter.js';
 export * from './base-adapter.js';
-export * from './trello/types.js';
-export * from './trello/base.js';
-export * from './trello/read-tools.js';
+export * from './trello/index.js';
