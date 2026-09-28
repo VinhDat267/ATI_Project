@@ -20,7 +20,7 @@ export interface StepErrorDetail {
   details?: any;
 }
 
-export type StepExecutionStatus = 'success' | 'failed' | 'unknown';
+export type StepExecutionStatus = 'success' | 'failed' | 'unknown' | 'succeeded';
 
 export interface StepExecutionResult {
   stepId: string;
@@ -41,4 +41,39 @@ export interface StepRunnerOptions {
 export interface ExecuteStepOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
+}
+
+export type StepStateStatus =
+  | 'pending'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'unknown'
+  | 'skipped';
+
+export interface StepState {
+  stepId: string;
+  status: StepStateStatus;
+  output?: any;
+  error?: any;
+}
+
+export type ExecutionStatus = 'completed' | 'partial' | 'stopped' | 'failed';
+
+export interface ExecutionSummary {
+  status: ExecutionStatus;
+  pausedAtStepId?: string;
+  error?: any;
+}
+
+export interface ExecutionControllerOptions {
+  runner: {
+    executeStep: (
+      step: PlanStep,
+      stepOutputs: StepOutputs,
+      options?: ExecuteStepOptions
+    ) => Promise<{ status: string; output?: any; error?: any; durationMs?: number }>;
+  };
+  steps: PlanStep[];
+  onStepUpdate?: (stepId: string, state: StepState) => void;
 }
