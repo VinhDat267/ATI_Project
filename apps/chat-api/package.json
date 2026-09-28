@@ -7,10 +7,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@types/pg": "^8.23.1",
     "@wap/executor": "*",
     "@wap/planner": "*",
     "@wap/tool-adapters": "*",
-    "@wap/tool-schemas": "*"
+    "@wap/tool-schemas": "*",
+    "pg": "^8.23.0"
   },
   "scripts": {
     "test": "vitest run"
