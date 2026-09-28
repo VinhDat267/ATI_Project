@@ -2,7 +2,7 @@
 
 ## 1. Phạm vi & Quyền lực chuẩn tắc (Scope & Source of Truth)
 
-Tài liệu này quy định cách thức phối hợp và kỷ luật kỹ thuật giữa các AI Subagents và Main Agent trong repository `ATI_Project`. Vai trò điều phối viên trưởng và các khối chuyên gia chuyên trách được kế thừa trực tiếp từ **Global Rules của Antigravity Master Orchestrator**.
+Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repository `ATI_Project`. Toàn bộ phương pháp luận Superpowers và vai trò Antigravity Master Orchestrator được tự động kế thừa từ **Global Rules**.
 
 ### 1.1. Quyền lực phạm vi v3 (Active Scope Authority)
 - **Đặc tả Thiết kế v3:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) là tài liệu chuẩn tắc duy nhất về hành vi nghiệp vụ, luồng xử lý, tool catalog và schema của hệ thống v3.
@@ -22,31 +22,24 @@ Tài liệu này quy định cách thức phối hợp và kỷ luật kỹ thu�
 
 ---
 
-## 2. Quy chuẩn Kỹ thuật Bắt buộc (Superpowers Engineering Discipline)
+## 2. Ranh giới Sở hữu Module (Module Ownership)
 
-Mọi agent tham gia thi công mã nguồn BẮT BUỘC tuân thủ nghiêm ngặt các nguyên tắc sau:
-
-### 2.1. Chu trình TDD (Red-Green-Refactor)
-1. **Viết test đỏ (Failing Test):** Viết unit/integration test mô tả đúng hành vi mong muốn và các giá trị kỳ vọng từ Spec.
-2. **Xác nhận test fail:** Chạy lệnh test thực tế và chứng minh test thất bại đúng lý do (chưa có code/hàm chưa định nghĩa).
-3. **Viết mã tối thiểu:** Triển khai logic vừa đủ để test chuyển sang màu xanh.
-4. **Xác nhận test xanh:** Chạy lại lệnh test và kiểm chứng PASS 100%.
-5. **Commit:** Thực hiện commit theo định dạng Conventional Commits (`feat(...)`, `test(...)`, `fix(...)`).
-
-### 2.2. Không chấp nhận "Mock Ảo giác"
-- Tuyệt đối không viết test mock hình thức (ví dụ: mock boolean `let approved = false` để giả vờ test race condition database).
-- Các kiểm thử tương tranh (Concurrency) phải được chứng minh qua truy vấn `WHERE status = 'pending'` thật hoặc in-memory DB pool.
-- Các kiểm thử Timeout phải kiểm tra tín hiệu hủy thực tế qua `AbortSignal`.
-- Trọng tài `Reality Checker` mặc định phản biện "CHƯA ĐẠT" và yêu cầu bằng chứng chạy lệnh thực tế (output log, exit code 0) trước khi đóng task.
-
-### 2.3. Ranh giới Sở hữu Module (Module Ownership)
 - Phân chia quyền sở hữu file và thư mục giữa các chuyên gia được quy định chi tiết tại **Mục 1 của [`docs/team-workflow.md`](docs/team-workflow.md)**.
 - Mỗi subagent chỉ được phép tạo và sửa đổi files trong package mà vai trò của mình sở hữu.
 - Không sửa chéo files của package khác. Khi cần tích hợp, 2 bên phải thỏa thuận interface chung tại `packages/tool-schemas` trước khi code.
 
 ---
 
-## 3. Hợp đồng Bàn giao & Nghiệm thu (Review & Gate)
+## 3. Tiêu chuẩn Bằng chứng & Kiểm thử (Evidence Standards)
+
+- **Tuyệt đối không dùng "Mock ảo giác":** Không viết test mock hình thức (ví dụ: mock boolean `let approved = false` để giả vờ test race condition database).
+- **Kiểm thử Concurrency thực tế:** Phải chứng minh qua câu lệnh truy vấn `WHERE status = 'pending'` thật hoặc in-memory DB pool.
+- **Kiểm thử Timeout thực tế:** Phải kiểm tra tín hiệu hủy thực tế thông qua `AbortSignal`.
+- Trọng tài `Reality Checker` mặc định phản biện "CHƯA ĐẠT" và yêu cầu bằng chứng chạy lệnh thực tế (output log, exit code 0) trước khi đóng task.
+
+---
+
+## 4. Hợp đồng Bàn giao & Nghiệm thu (Hand-off & Gate)
 
 Sau khi hoàn thành mỗi task trong số 28 tasks:
 1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
