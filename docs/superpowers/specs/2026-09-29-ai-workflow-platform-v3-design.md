@@ -1,8 +1,9 @@
 # AI Workflow Automation Platform — Thiết kế v3
 
-**Trạng thái: PENDING_OWNER_REVIEW**
+**Trạng thái: REVIEWED_AND_UPDATED**
 **Ngày lập: 29/09/2026**
-**Phương pháp: 5 sections × 2 vòng phản biện mỗi section**
+**Cập nhật: 29/09/2026 — Merge fixes từ 3 specialist reviewers (Software Architect 8.5/10, AI Engineer 6.5→8/10, Backend Architect 8.5/10)**
+**Phương pháp: 5 sections × 2 vòng phản biện + 3 specialist reviews + merge fixes**
 
 ---
 
@@ -80,7 +81,7 @@ Xây lại hệ thống từ application code, giữ project infrastructure. M�
 │                                                                   │
 │  ┌────────┐ ┌─────────────────┐ ┌──────────────┐ ┌───────────┐  │
 │  │  Auth  │ │ Conversation Mgr│ │  AI Planner  │ │   Plan    │  │
-│  │  JWT   │ │ Multi-turn state│ │  LLM + Gather│ │ Validator │  │
+│  │  JWT   │ │ Working Memory  │ │  Router+LLM  │ │ Validator │  │
 │  └────────┘ └─────────────────┘ └──────────────┘ └───────────┘  │
 │                                                                   │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────────────────┐   │
@@ -88,41 +89,43 @@ Xây lại hệ thống từ application code, giữ project infrastructure. M�
 │  │  Engine      │ │   Preview    │ │  ┌───────┐ ┌────────┐  │   │
 │  │  Sequential  │ │   Hash+TTL   │ │  │Trello │ │ Slack  │  │   │
 │  │  Per-step DB │ │              │ │  │adapter│ │adapter │  │   │
-│  └──────────────┘ └──────────────┘ │  ├───────┤ ├────────┤  │   │
-│                                     │  │GitHub │ │Sheets  │  │   │
-│                                     │  │adapter│ │adapter │  │   │
-│  ┌──────────────────┐               │  └───────┘ └────────┘  │   │
-│  │    PostgreSQL     │               └────────────────────────┘   │
-│  │ 6 tables          │                                            │
-│  │ users,convs,msgs  │ ┌─────────────────┐                      │
-│  │ plans,steps,creds  │ │  Tool Catalog   │                      │
-│  └──────────────────┘ │  18+ tools/4 svcs │                      │
-│                        └─────────────────┘                       │
+│  └──────────────┘ └──────────────┘ │  └───────┘ └────────┘  │   │
+│                                     │ (Đợt 1: 11 tools/2 svcs) │   │
+│  ┌──────────────────┐               └────────────────────────┘   │
+│  │    PostgreSQL     │               ┌────────────────────────┐   │
+│  │ 6 tables          │               │   Tool Schemas (shared)│   │
+│  │ users,convs,msgs  │               └────────────────────────┘   │
+│  │ plans,steps,creds  │                                            │
+│  └──────────────────┘                                            │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.2. Luồng chính
 
 ```
-1. USER CHAT
+1. USER CHAT (CHAT MODE)
    "Tạo task cập nhật homepage cho team frontend,
     deadline thứ 6, gán Minh, báo trên Slack"
 
-2. AI GATHER (function calling, read-only, tùy chọn)
-   Nếu AI cần context → gọi read tools: list_members, list_lists
-   Hiển thị gather progress realtime cho user
-   Skip nếu user cung cấp đủ thông tin
+2. AI GATHER & CLARIFY (CHAT MODE - Multi-turn)
+   - Prompt Injection Protection: kiểm tra intent an toàn trước khi xử lý.
+   - Nếu AI cần context → gọi search tools: search_members(query="Minh", limit=5)
+   - Hiển thị gather progress realtime cho user.
+   - Nếu ambiguous → AI hỏi Clarification. User trả lời.
+   - Quá trình lặp lại cho đến khi AI gom ĐỦ context. Skip nếu user cung cấp đủ.
 
-3. AI PLAN (structured output, 1 LLM call)
-   Sinh plan JSON nhiều bước HOẶC clarification HOẶC refusal
+3. AI PLAN (PLAN MODE - 1-shot structured output)
+   - Khi đã ĐỦ context, hệ thống chốt và chuyển sang Plan Mode.
+   - Hierarchical Planning: LLM Router chọn service subset trước.
+   - Sinh plan JSON nhiều bước trong 1 LLM call, có thinking/self-correction.
    Ví dụ plan:
      step1: trello.create_card(title=..., due=..., listId=...)
      step2: trello.add_member(cardId=$step1.output.id, memberId="m1")
      step3: trello.add_checklist(cardId=$step1.output.id, items=[...])
      step4: slack.send_message(channel=#frontend, text="Task mới: $step1.output.url")
 
-4. VALIDATION (3 lớp)
-   JSON parse → Schema validate → Semantic validate (tool tồn tại, refs hợp lệ, DAG acyclic)
+4. VALIDATION (4 lớp)
+   JSON parse → Schema validate → Semantic validate → Security validate
    Fail → retry 1 lần với error message → vẫn fail → báo lỗi user
 
 5. PREVIEW (interactive card trong chat)
@@ -131,11 +134,11 @@ Xây lại hệ thống từ application code, giữ project infrastructure. M�
    [Duyệt] [Sửa] [Hủy]
 
 6. USER APPROVAL
-   Approve gắn với plan hash (SHA-256, bất biến)
+   Approve gắn với plan hash (SHA-256, deterministic via json-stable-stringify)
    TTL 30 phút
    "Sửa" = chat feedback → AI sinh plan mới → preview mới
 
-7. EXECUTION (tuần tự, per-step state)
+7. EXECUTION (tuần tự, per-step state, ACID transactions)
    Chạy từng step → resolve references runtime → lưu output DB
    Stream progress realtime cho user
    Partial failure → pause → user chọn retry/fix/skip/stop
@@ -157,9 +160,10 @@ ATI_Project/
 ├── packages/
 │   ├── dsl/              ← code v2
 │   ├── engine/           ← code v2
-│   ├── tools/            ← MỚI: tool catalog + adapters
-│   ├── planner/          ← MỚI: AI planner
-│   └── executor/         ← MỚI: execution engine
+│   ├── tool-schemas/     ← MỚI: schema & types cho tools (shared giữa planner+executor)
+│   ├── tool-adapters/    ← MỚI: HTTP clients & SDK adapters (chỉ executor dùng)
+│   ├── planner/          ← MỚI: AI planner (import tool-schemas, KHÔNG import tool-adapters)
+│   └── executor/         ← MỚI: execution engine (import cả tool-schemas + tool-adapters)
 ├── db/
 │   ├── migrations/       ← v2 (0001-0014)
 │   └── v3/               ← MỚI: schema v3
@@ -172,9 +176,12 @@ ATI_Project/
 
 - Không có trigger tự động / scheduler (user chủ động chat)
 - Không có visual workflow editor (AI sinh plan, không kéo thả)
-- Không có multi-agent (1 planner đủ)
+- Không có multi-agent phức tạp (chỉ dùng LLM Router + Planner)
 - Không có real-time collaboration (1 user, 1 conversation tại 1 thời điểm)
 - Không có runtime conditional branching trong plan (xử lý qua clarification)
+- **Không hỗ trợ runtime dynamic loops**: Hệ thống chỉ xử lý Static DAG. Yêu cầu
+  "xóa tất cả cards nhãn Done" sẽ bị refuse vì AI cần biết chính xác ID từng phần
+  tử lúc lập Plan. Số lượng không xác định → không hỗ trợ.
 - Không maintain hoặc sửa code v2
 
 ---
@@ -183,40 +190,61 @@ ATI_Project/
 
 ### 4.1. Kỹ thuật sinh plan
 
-**Hybrid approach:**
-- **Phase 1 — Gather (function calling, read-only, tùy chọn):** AI gọi read tools
-  để thu thập context (list_members, list_lists). Kết quả lưu vào messages
-  (role="system") để trace. Hiển thị progress cho user. Skip nếu đủ context.
-- **Phase 2 — Plan (structured output):** AI sinh toàn bộ plan JSON trong 1 LLM
-  call. Dùng `response_schema` (Gemini) hoặc `response_format` (OpenAI) để
-  enforce format.
+**Kiến trúc 2 chế độ (State Machine rõ ràng):**
 
-**Tại sao hybrid:** Nếu AI sinh plan mà không biết listId hay memberId thật, nó
-sẽ hallucinate. Gather trước → plan chính xác hơn. Nhưng gather tùy chọn — nếu
-user cung cấp đủ info thì skip để tiết kiệm calls.
+- **CHAT MODE (Gather/Clarify multi-turn):**
+  - **Prompt Injection Protection:** Dùng LLM nhẹ hoặc regex filter đánh giá an
+    toàn intent đầu vào trước khi xử lý.
+  - LLM hoạt động như chatbot có function calling (chỉ `search_*` tools có limit).
+  - Thu thập IDs, hỏi user nếu cần làm rõ (Clarification). Lặp nhiều lượt.
+  - Kết quả lưu vào Working Memory (JSON object) và messages (role="system").
+  - Skip ngay nếu user đã cung cấp đủ thông tin.
+
+- **PLAN MODE (1-shot structured output):**
+  - Khi đã gom đủ context → chốt lại, chuyển sang PLAN MODE.
+  - **Hierarchical Planning:** LLM Router phân loại intent → xác định subset
+    services cần dùng (VD: chỉ Trello + Slack) → giảm tải context window.
+  - **Planner LLM:** Nhận subset tools + system prompt (kèm few-shot examples)
+    + Working Memory.
+  - LLM dùng **Self-Correction/Thinking layer** — viết reasoning trước khi
+    output JSON plan. Bắt buộc sinh toàn bộ plan trong 1 call.
+
+**Tại sao 2 chế độ:** Gather cần multi-turn (hỏi/trả lời linh hoạt). Plan cần
+1-shot (toàn bộ plan để preview). Trộn 2 cái vào 1 flow tạo state machine bất
+định, rất khó debug.
 
 ### 4.2. Tool Catalog
 
-**Đợt 1 — 4 services, token-based auth, ~18 tools:**
+**Đợt 1 (Phase 1) — 2 services, token-based auth, 11 tools:**
 
 | Service | Auth | Tools |
 |---|---|---|
-| **Trello** | API key + token | `list_boards`, `list_lists`, `list_members`, `list_cards`, `get_card`, `create_card` (W), `update_card` (W), `add_member` (W), `add_checklist` (W) |
-| **Slack** | Bot token | `list_channels`, `send_message` (W) |
-| **GitHub** | Personal Access Token | `list_repos`, `list_issues`, `get_issue`, `create_issue` (W), `add_label` (W) |
-| **Google Sheets** | Service Account | `read_range`, `append_row` (W), `update_cell` (W) |
+| **Trello** | API key + token | `search_boards` (query, limit), `search_lists` (query, limit), `search_members` (query, limit), `search_cards` (query, limit), `get_card`, `create_card` (W), `update_card` (W), `add_member` (W), `add_checklist` (W) |
+| **Slack** | Bot token | `search_channels` (query, limit), `send_message` (W) |
 
-Tổng Đợt 1: **13 read + 5 write (Trello) + 1 write (Slack) + 2 write (GitHub) + 2 write (Sheets) = 13 read + 10 write = 23 tools** trên 4 services.
+Tổng Đợt 1: **6 read + 5 write = 11 tools** trên 2 services.
 
 (W) = write, side effect.
 
-**Đợt 2 (OPTIONAL, Phase 7) — Cần OAuth2 infrastructure:**
+*Read tools BẮT BUỘC nhận tham số `query` + `limit` (max 10) để tránh tràn LLM
+context. Không có tool `list_*` trả toàn bộ data.*
+
+**Đợt 2 (Phase 7) — Mở rộng dịch vụ (PAT/Service Account):**
+
+| Service | Auth | Tools |
+|---|---|---|
+| **GitHub** | Personal Access Token | `search_repos`, `search_issues`, `get_issue`, `create_issue` (W), `add_label` (W) |
+| **Google Sheets** | Service Account | `read_range`, `append_row` (W), `update_cell` (W) |
+
+Tổng Đợt 2: **4 read + 4 write = 8 tools** trên 2 services.
+
+**Đợt 3 (Phase 8, OPTIONAL) — Cần OAuth2 infrastructure:**
 
 | Service | Auth | Tools |
 |---|---|---|
 | Gmail | OAuth2 | `send_email` (W, HIGH-RISK) |
-| Google Calendar | OAuth2 | `list_events`, `create_event` (W) |
-| Notion | Integration token / OAuth2 | `list_databases`, `query_database`, `create_page` (W) |
+| Google Calendar | OAuth2 | `search_events`, `create_event` (W) |
+| Notion | Integration token / OAuth2 | `search_databases`, `query_database`, `create_page` (W) |
 
 ### 4.3. Tool Definition Schema
 
@@ -226,9 +254,9 @@ interface ToolDefinition {
   service: string;                // "trello"
   description: string;            // mô tả cho AI hiểu khi nào dùng
   sideEffect: "read" | "write";
-  riskLevel: "low" | "medium" | "high"; // high = extra confirmation
+  riskLevel: "low" | "medium" | "high";
   inputSchema: JSONSchema;        // args cần truyền
-  outputSchema: JSONSchema;       // output trả về (cho AI reference)
+  outputSchema: JSONSchema;       // output trả về — MÔ TẢ RÕ trong prompt
   examples?: Example[];           // tùy chọn, chỉ cho tool dễ nhầm
 }
 ```
@@ -243,6 +271,7 @@ type PlannerResponse =
 
 interface PlanResponse {
   kind: "plan";
+  thinking: string;          // Self-Correction: LLM giải thích logic, dependencies
   summary: string;           // "Tạo task, gán Minh, thông báo Slack"
   steps: PlanStep[];          // 1-10 bước
   warnings: string[];         // "Board chỉ có 2 members"
@@ -275,35 +304,44 @@ interface RefusalResponse {
 }
 ```
 
-### 4.5. Validation Pipeline (3 lớp)
+### 4.5. Validation Pipeline (4 lớp) & Few-Shot Prompting
+
+Để giải quyết LLM sinh `$ref` cross-step khó và tránh hallucinate:
+
+1. **Few-shot examples:** System prompt BẮT BUỘC chứa 3-5 ví dụ JSON plan hoàn
+   chỉnh minh họa cách dùng `$ref`. Khai báo rõ output schema per tool:
+   *"trello.create_card returns {id: string, url: string}"*
+2. **Thinking Layer:** LLM viết reasoning vào trường `thinking` TRƯỚC khi list steps.
+
+**Validation (4 lớp):**
 
 ```
 LLM output
   → Lớp 1: JSON parse (reject nếu invalid JSON)
   → Lớp 2: Schema validate (reject nếu thiếu/sai field type)
   → Lớp 3: Semantic validate:
-      • Tool tồn tại trong catalog?
+      • Tool tồn tại trong subset catalog?
       • Args khớp tool inputSchema?
-      • $ref trỏ đến step đã khai báo + field tồn tại trong outputSchema?
+      • $ref trỏ đến step đã khai báo + field trong outputSchema?
       • DAG acyclic? (depends_on không vòng lặp)
       • Tối đa 10 steps?
-  → Fail bất kỳ lớp nào → retry 1 lần với error message trong prompt
-  → Retry cũng fail → báo lỗi cho user, KHÔNG chạy plan sai
+  → Lớp 4: Security validate (chặn prompt injection escape/override)
+  → Fail bất kỳ lớp → retry 1 lần với error message
+  → Retry cũng fail → báo lỗi user, KHÔNG chạy plan sai
 ```
 
 ### 4.6. Name Resolution
 
-AI resolve tên gọi (tên người, tên board, tên channel) thành ID thật trong gather
-phase:
+AI resolve tên gọi thành ID thật qua `search_*` tools trong CHAT MODE:
 
 | Case | Xử lý |
 |---|---|
-| Exact match (1 kết quả) | Dùng luôn |
+| Exact match (1 kết quả) | Dùng luôn, lưu vào Working Memory |
 | Ambiguous (nhiều kết quả) | AI hỏi clarification |
 | No match | AI hỏi: "Không tìm thấy X. Có: A, B. Chọn ai?" |
 | Fuzzy match | AI hỏi: "Bạn có phải muốn nói X?" |
 
-Name resolution xảy ra **trước** khi sinh plan. Plan chỉ chứa ID đã xác nhận.
+Name resolution xảy ra TRƯỚC Plan Mode. Plan chỉ chứa ID từ Working Memory.
 
 ### 4.7. AI chủ động đề xuất
 
@@ -326,6 +364,7 @@ interface LLMProvider {
     systemPrompt: string;
     conversationHistory: Message[];
     toolCatalog: ToolDefinition[];
+    workingMemory: Record<string, any>;  // Entities đã resolve
     signal: AbortSignal;
   }): AsyncIterable<string>;  // streaming response
 }
@@ -334,19 +373,23 @@ class GeminiProvider implements LLMProvider { ... }
 class OpenAIProvider implements LLMProvider { ... }
 ```
 
-Chọn provider qua config. Gemini Flash cho development, Gemini Pro cho evaluation
-và demo.
+**Chính sách Model đồng nhất:**
+- Bắt buộc dùng **1 model duy nhất** cho dev, eval, và production (tránh prompt
+  overfit khi đổi model).
+- Đề xuất: `gemini-1.5-pro` hoặc tương đương cho Plan Mode. LLM Router ở Chat
+  Mode có thể dùng model nhanh hơn (Flash).
 
-### 4.9. Context Management
+### 4.9. Context & Working Memory Management
 
-Khi conversation vượt 10 messages:
-- Gọi LLM tóm tắt messages 1-N thành 1 đoạn ngắn
-- Giữ nguyên 10 messages gần nhất (đầy đủ)
-- Tóm tắt lưu vào messages table (role="summary")
-- Execution state inject vào context khi user chat sau execution
-
-Mỗi LLM call gửi: system prompt (~1500 tokens) + tool catalog (~2000 tokens) +
-summary + 10 messages gần nhất + execution state = ~5000-8000 tokens.
+**Working Memory (JSON Object):**
+- Hệ thống duy trì Working Memory lưu entities đã resolve qua `search_*`:
+  `{"board": {"name": "Frontend", "id": "abc123"}, "members": [{"name":"Minh", "id":"m1"}]}`
+- Khi conversation vượt 10 messages:
+  - KHÔNG nén data quan trọng (IDs, params) vào text summary
+  - LLM chỉ tóm tắt *ngữ cảnh hội thoại* (user muốn gì, mục tiêu)
+  - Data IDs giữ an toàn trong Working Memory
+- Mỗi LLM Planner call gửi: System prompt (kèm few-shot) + Tool Catalog (subset)
+  + Working Memory + Conversation Summary + 10 messages gần nhất + Execution State
 
 ### 4.10. Prompt Versioning
 
@@ -405,9 +448,11 @@ interface ExecutionStep {
 Luồng chạy mỗi step:
 1. Resolve references ($ref, $template) từ output steps trước
 2. Validate resolved args khớp inputSchema
-3. Call tool adapter (inject credentials, timeout: 15s read / 30s write)
+3. Call tool adapter (inject credentials, timeout: 15s read / 30s write). Gắn
+   structured logging / request ID (trace context).
 4. Validate response (linh hoạt, chấp nhận extra fields)
-5. Persist step result vào DB
+5. **ACID Transaction:** Persist step result + update plan status trong 1 DB
+   transaction duy nhất → tránh data anomaly khi crash
 6. Stream status cho UI realtime
 7. Next step hoặc pause nếu failed
 
@@ -457,23 +502,26 @@ User thấy 4 options:
 
 | Risk | Tools | Safety |
 |---|---|---|
-| Low | create_card, add_member, add_checklist, update_card, append_row, create_page, create_issue, add_label | Approval 1 lần cho toàn bộ plan |
-| Medium | send_message, update_cell | Approval plan + highlight trong preview |
-| High | send_email (Đợt 2) | Preview nội dung đầy đủ + xác nhận riêng per step |
+| Low | create_card, add_member, add_checklist, update_card, create_issue, add_label | Approval 1 lần cho toàn bộ plan |
+| Medium | send_message, update_cell, append_row | Approval plan + highlight trong preview |
+| High | send_email (Đợt 3) | Preview nội dung đầy đủ + xác nhận riêng per step |
 
 ### 5.7. Plan Approval
 
 ```typescript
 interface PlanApproval {
   planId: string;
-  planHash: string;      // SHA-256 của plan JSON, verify trước execution
+  planHash: string;      // SHA-256, verify trước execution
   decision: "pending" | "approved" | "rejected" | "expired";
   expiresAt: string;     // 30 phút từ lúc tạo preview
 }
 ```
 
 Quy tắc:
-- Plan hash bất biến — verify `sha256(plan_json) === plan_hash` trước execution
+- Plan hash dùng `json-stable-stringify` (canonical key order) để đảm bảo
+  deterministic. HOẶC lưu raw string gốc từ LLM vào `plan_text TEXT`, hash trên
+  string đó.
+- Verify `sha256(data) === plan_hash` trước execution
 - Hết hạn 30 phút → plan expired → user tạo plan mới
 - Mỗi conversation chỉ 1 plan pending tại 1 thời điểm
 - "Sửa" = user chat feedback → AI sinh plan MỚI → approve plan mới
@@ -501,21 +549,30 @@ chặn cứng.
 ```
 Model: TEAM-SHARED credentials
   • 1 bộ credentials per service cho cả team
-  • Encrypted at rest (AES-256, key từ environment variable)
+  • Encrypted at rest: AES-256-GCM (authenticated encryption)
+    Format versioned: v1:base64(iv):base64(auth_tag):base64(ciphertext)
   • Server-side only — không bao giờ trong prompt, plan, preview, log, browser
   • Token expired → adapter fail → step pause → user thông báo fix
 
-Giới hạn MVP: không có per-user OAuth. Mọi action trên external service
-thực hiện dưới tên token owner. Trace user trong execution_steps.requested_by.
+Bảo mật & Phân quyền (Allowed Scope):
+  • Rủi ro Data Leakage: Shared credentials → user có thể yêu cầu AI truy xuất
+    dữ liệu nhạy cảm (private channels, private boards)
+  • Giải pháp: Admin cấu hình Allowed Scope — whitelist boards, channels, repos
+    mà token được phép truy cập. Requests ngoài scope bị chặn ở mức Adapter.
+  • Giới hạn MVP: không có per-user OAuth. Trace user trong
+    execution_steps.requested_by. Rủi ro phải thông báo rõ cho admin khi setup.
 ```
 
-### 5.12. Rate Limiting per Adapter
+### 5.12. Rate Limiting
 
 Mỗi adapter built-in rate limiter theo spec service:
 - Trello: 100 req / 10s
 - Slack: ~1 req/s cho chat.postMessage
 - GitHub: 5000 req / hour
 - Google APIs: varies
+
+**Global Rate Limiter:** Do dùng Shared Credentials, cần global queue cho mỗi
+service thay vì per-instance → tránh đụng trần API khi nhiều users concurrent.
 
 Throttle → wait + retry (read) hoặc wait + retry 1x (write).
 
@@ -549,7 +606,7 @@ Mobile: sidebar ẩn, hamburger menu, chat full width
 
 1. **User Message** — text thuần
 2. **AI Text** — markdown rendered, streaming từng chữ
-3. **Gather Progress** — collapsible, hiện read tool đang gọi + kết quả
+3. **Gather Progress** — collapsible, hiện search tool đang gọi + kết quả
 4. **Clarification** — câu hỏi + option buttons (nếu có) hoặc open-ended
 5. **Plan Preview** — interactive card: từng step + [Duyệt][Sửa][Hủy]
 6. **Execution Progress** — live update per-step: ✅ ⏳ ⏸ ❌
@@ -569,20 +626,15 @@ Mỗi transition smooth, không nhảy đột ngột.
 
 ### 6.4. Onboarding (lần đầu)
 
-1. Hiển thị 4 service cards với nút [Kết nối]
-2. Mỗi service: step-by-step wizard với screenshot hướng dẫn lấy API key
+1. Hiển thị service cards với nút [Kết nối] + step-by-step wizard
+2. Mỗi service: hướng dẫn với screenshot chỉ chỗ copy API key
 3. Nút [Kiểm tra kết nối] verify credentials thật
 4. Cần kết nối ≥1 service để vào chat
 
 ### 6.5. Empty State
 
-Dynamic suggestion chips dựa trên connected services:
-
-```typescript
-// Chỉ hiện suggestions khả thi:
-// Nếu chỉ có Trello → không hiện gợi ý Slack
-// Nếu có Trello + Slack → hiện gợi ý cross-service
-```
+Dynamic suggestion chips dựa trên connected services — chỉ hiện suggestions
+khả thi (có Trello → gợi ý Trello, có Trello + Slack → gợi ý cross-service).
 
 ### 6.6. Optimistic Updates
 
@@ -617,7 +669,7 @@ Không trả error kỹ thuật khó hiểu.
 
 ## 7. Database Schema
 
-6 bảng:
+6 bảng (PostgreSQL, sử dụng Connection Pooling):
 
 ```sql
 CREATE TABLE users (
@@ -649,8 +701,9 @@ CREATE TABLE messages (
 CREATE TABLE plans (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conv_id     UUID NOT NULL REFERENCES conversations(id),
-  plan_json   JSONB NOT NULL,             -- toàn bộ plan steps
-  plan_hash   TEXT NOT NULL,              -- SHA-256, verify trước execution
+  plan_json   JSONB NOT NULL,             -- toàn bộ plan steps (parsed)
+  plan_text   TEXT,                       -- raw string gốc từ LLM (cho hash)
+  plan_hash   TEXT NOT NULL,              -- SHA-256 trên plan_text hoặc stable-stringify
   status      TEXT NOT NULL DEFAULT 'pending',
                 -- pending | approved | rejected | expired
                 -- | executing | completed | partial | failed
@@ -677,11 +730,17 @@ CREATE TABLE execution_steps (
 
 CREATE TABLE service_credentials (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  service     TEXT NOT NULL,              -- "trello", "slack", "github", "sheets"
+  service     TEXT NOT NULL,              -- "trello", "slack"
   user_id     UUID REFERENCES users(id), -- NULL = shared
-  config      BYTEA NOT NULL,            -- encrypted JSON (AES-256)
+  config      TEXT NOT NULL,             -- encrypted: v1:iv:tag:ciphertext
   created_at  TIMESTAMPTZ DEFAULT now()
 );
+
+-- Performance Indexes
+CREATE INDEX idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX idx_messages_conv_id ON messages(conv_id);
+CREATE INDEX idx_plans_conv_id ON plans(conv_id);
+CREATE INDEX idx_execution_steps_plan_id ON execution_steps(plan_id);
 ```
 
 ---
@@ -691,11 +750,13 @@ CREATE TABLE service_credentials (
 ### 8.1. Authentication
 
 ```
-POST   /api/auth/login     → { token: "jwt..." }
+POST   /api/auth/login     → { access_token: "jwt...", refresh_token: "..." }
+POST   /api/auth/refresh   → { access_token: "jwt..." }
 GET    /api/auth/me         → { user }
 ```
 
 Admin tạo tài khoản qua CLI/seed script. Không có đăng ký tự do.
+JWT Access Token có TTL ngắn. Refresh token hỗ trợ revocation khi cần.
 
 ### 8.2. Conversations
 
@@ -713,7 +774,16 @@ POST   /api/conversations/:id/messages     → 202 Accepted { messageId }
 GET    /api/conversations/:id/stream       → SSE (luôn mở, per-conversation)
 ```
 
-SSE tách khỏi POST. POST trả về ngay. SSE nhận events:
+SSE tách khỏi POST. POST trả về ngay.
+
+**SSE Reliability:**
+- **Enforce SSE-first:** Client BẮT BUỘC mở SSE thành công TRƯỚC khi POST /messages
+- **Event sequencing:** Mỗi event gắn `sequence_id`. Khi reconnect, client gửi
+  `Last-Event-ID` → server push bù events bị mất.
+- **Memory leak protection:** Handler lắng nghe `req.on('close')` dọn resources.
+  Hỗ trợ graceful shutdown.
+
+SSE nhận events:
 
 ```
 event: thinking
@@ -744,12 +814,19 @@ POST   /api/executions/:planId/steps/:stepId/skip     → Skip step
 POST   /api/executions/:planId/stop                   → Dừng execution
 ```
 
+**Race Condition Protection (Optimistic Locking):**
+```sql
+UPDATE plans SET status = 'approved', decided_at = now()
+WHERE id = $1 AND status = 'pending' RETURNING id;
+-- Row count = 0 → đã approved/rejected → abort, không execute lặp
+```
+
 ### 8.5. Services
 
 ```
 GET    /api/services                        → List services + trạng thái
 POST   /api/services/:name/connect          → Lưu credentials
-POST   /api/services/:name/test             → Test connection (gọi 1 read tool)
+POST   /api/services/:name/test             → Test connection
 DELETE /api/services/:name                  → Xóa credentials
 ```
 
@@ -766,9 +843,9 @@ POST   /api/settings/llm                    → Cấu hình LLM provider + API k
 ### 9.1. Tổng quan
 
 ```
-Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phase 6
-                     (CRITICAL)                                    │
-                                                          Phase 7 (OPTIONAL)
+Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → Phase 6
+                     (CRITICAL)                                        │
+                                                Phase 7 (OPT) → Phase 8 (OPT)
 ```
 
 ### 9.2. Chi tiết từng Phase
@@ -776,32 +853,37 @@ Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phas
 **Phase 0: Foundation**
 - Tái dùng infrastructure (monorepo, Docker, build tools)
 - Tạo workspace mới (chat-api, chat-web, packages mới)
-- PostgreSQL schema v3 (6 tables, 1 migration)
-- Auth module (users, login, JWT middleware)
+- Auth module (users, login, JWT + refresh middleware)
 - Health check endpoint
-- **Setup test accounts** (Trello board test, Slack workspace test, GitHub repo test,
-  Sheets test) — blocker cho Phase 1
+- **Setup test accounts** (Trello board test, Slack workspace test) — blocker Phase 1
 - Demo: `curl /api/auth/login` → JWT
 
-**Phase 1: Tool Catalog & Adapters**
-- Tool registry (static config, schema definitions)
-- Adapter interface chuẩn hóa
-- 4 adapters: Trello (9 tools), Slack (2), GitHub (5), Sheets (3)
-- Rate limiter per adapter
+**Phase 1: Tool Catalog & Adapters (Đợt 1)**
+- Tool registry (static config, schema definitions trong `tool-schemas`)
+- Adapter interface chuẩn hóa (trong `tool-adapters`)
+- **2 adapters:** Trello (9 tools), Slack (2 tools)
+- Rate limiter per adapter + Global rate limiter
 - Connection test endpoint
-- Credential storage (encrypted)
+- Credential storage (encrypted, có Allowed Scope)
 - Unit tests cho mỗi adapter (mock API)
 - Demo: `curl` → tạo card thật + gửi Slack thật
 
-**Phase 2: AI Planner ⭐ (CRITICAL)**
+**Phase 2: Data & AI Planner ⭐ (CRITICAL)**
+
+*Phase 2a: DB Foundation*
+- PostgreSQL schema v3 (6 tables, 1 migration)
+- DB repositories cho users, conversations, messages, plans, execution_steps, creds
+- Context management (lưu/lấy history, Working Memory từ DB)
+
+*Phase 2b: AI Planner Core*
 - LLM provider abstraction (Gemini adapter)
-- System prompt v1
-- Gather phase (function calling read tools)
-- Plan generation (structured output)
-- 3-layer validation
-- Clarification + Refusal flows
+- System prompt v1 (kèm few-shot examples)
+- Chat Mode: gather (search tools) + clarification flow
+- Plan Mode: structured output + thinking layer
+- LLM Router (hierarchical planning)
+- 4-layer validation
 - Name resolution
-- Retry 1x nếu plan invalid
+- Working Memory management
 - Prompt versioning
 - Evaluation framework: 50 test prompts
 - Demo (CLI): gõ NL → sinh plan nhiều bước → validate pass
@@ -817,7 +899,7 @@ Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phas
 - Error classification (6 categories)
 - Partial failure handling (pause + 4 user options)
 - Write safety (UNKNOWN status, no auto retry writes)
-- Per-step state persistence (crash recovery)
+- Per-step state persistence (crash recovery, ACID transactions)
 - Intent dedup
 - Overall timeout (3 phút)
 - Integration tests (mock adapters + real DB)
@@ -826,10 +908,9 @@ Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phas
 **Phase 4: Chat API + SSE**
 - Conversation CRUD + per-user isolation
 - Message endpoint (POST → 202, async processing)
-- SSE stream endpoint (12 event types)
-- Plan approval/rejection
+- SSE stream endpoint (12 event types, sequence_id, Last-Event-ID)
+- Plan approval/rejection (optimistic locking)
 - Execution control (start/retry/skip/stop)
-- Context management (summarize >10 messages)
 - Execution state injection vào LLM context
 - Sửa plan bằng chat
 - Service management endpoints
@@ -842,9 +923,9 @@ Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phas
 - Plan Preview (interactive + approve/edit/cancel)
 - Execution Progress (live per-step)
 - Partial Failure (retry/fix/skip/stop)
-- SSE hook (auto-reconnect, sync)
+- SSE hook (auto-reconnect, sync, sequence tracking)
 - Optimistic updates
-- Settings page + connection wizard
+- Settings page + connection wizard (kèm Allowed Scope config)
 - Onboarding page
 - Empty state (dynamic suggestion chips)
 - Responsive (desktop + mobile)
@@ -852,21 +933,22 @@ Phase 0 → Phase 1 → Phase 2 ⭐ → Phase 3 → Phase 4 → Phase 5 → Phas
 - Demo: **FULL END-TO-END** trong browser
 
 **Phase 6: Polish, Evaluation & Documentation**
-- 3 demo scenarios end-to-end:
-  - Quản lý dự án (Trello + Slack)
-  - Bug tracking (GitHub + Slack)
-  - Data entry (Sheets + Trello)
+- 3 demo scenarios end-to-end (Trello + Slack workflows)
 - Final evaluation report (50 prompts, versioned)
 - Error handling demos
 - Performance metrics
 - README + API docs + architecture docs
 
 **Phase 7 (OPTIONAL): Đợt 2 Adapters**
+- GitHub adapter (5 tools)
+- Google Sheets adapter (3 tools)
+- Integration vào planner và execution flow
+
+**Phase 8 (OPTIONAL): Đợt 3 Adapters (OAuth2)**
 - OAuth2 infrastructure (consent screen, token refresh)
 - Gmail adapter (HIGH-RISK, extra confirmation UX)
 - Calendar adapter
 - Notion adapter
-- Cần Phase 1-6 hoàn thành tốt trước
 
 ### 9.3. Testing Strategy
 
@@ -919,13 +1001,16 @@ Tổng: ~150-200 tests
 
 | Risk | Xác suất | Impact | Mitigation |
 |---|---|---|---|
-| AI sinh plan sai/kém | Cao | 🔴 | Phase 2 gate. Không tiến nếu accuracy < 60% |
-| LLM rate limit/cost | TB | 🟡 | Flash cho dev, Pro cho eval. Cache gather. |
+| AI sinh plan sai/kém | Cao | 🔴 | Phase 2 gate. Thinking layer + few-shot. Không tiến nếu < 60% |
+| LLM rate limit/cost | TB | 🟡 | 1 model xuyên suốt. Cache gather. Working Memory giảm calls |
 | External API thay đổi | Thấp | 🟡 | Adapter pattern isolate. Output schema linh hoạt |
-| Test account setup phức tạp | TB | 🟡 | Setup trong Phase 0, trước khi code |
-| UI phức tạp hơn dự kiến | TB | 🟡 | SSE state machine. Components nhỏ, độc lập |
-| Scope creep | Cao | 🟡 | Giữ đúng phases. Phase 7 là OPTIONAL |
+| Test account setup | TB | 🟡 | Setup trong Phase 0, trước khi code |
+| UI phức tạp | TB | 🟡 | SSE state machine. Components nhỏ, độc lập |
+| Scope creep | Cao | 🟡 | Đợt 1 chỉ 2 services. Phase 7-8 OPTIONAL |
 | Prompt regression | TB | 🟡 | Prompt versioning + evaluation tracking |
+| Data leakage (shared creds) | TB | 🟡 | Allowed Scope whitelist. Document rủi ro |
+| Plan hash non-deterministic | TB | 🟡 | json-stable-stringify hoặc plan_text raw |
+| SSE race conditions | TB | 🟡 | sequence_id + Last-Event-ID + SSE-first protocol |
 
 ---
 
@@ -934,9 +1019,10 @@ Tổng: ~150-200 tests
 | Khía cạnh | v2 | v3 |
 |---|---|---|
 | Đầu vào | Google Sheet có cột cố định | Chat ngôn ngữ tự nhiên |
-| AI capability | 1/3 branch cố định, 1 tool | Chọn từ 18+ tools, sinh multi-step plan |
+| AI capability | 1/3 branch cố định, 1 tool | Chọn từ 11+ tools, sinh multi-step plan |
 | Workflow | 1 bước | 1-10 bước trên nhiều dịch vụ |
-| Services | 1 Sheet + 1 Trello | 4+ services (Trello, Slack, GitHub, Sheets) |
+| Services | 1 Sheet + 1 Trello | 2+ services (mở rộng qua phases) |
+| AI Architecture | Flat 1-call | LLM Router + Planner + Working Memory |
 | Giá trị | Âm (chậm hơn trực tiếp) | Dương (1 câu = 4-5 thao tác thủ công) |
-| Safety model | 14 migrations, TTL/hash/ledger/reconciliation | 6 tables, plan hash + step-level state |
+| Safety model | 14 migrations, TTL/hash/ledger/reconciliation | 6 tables, plan hash + ACID + optimistic locking |
 | Xứng tên "AI Workflow Automation Platform" | Không | Có |
