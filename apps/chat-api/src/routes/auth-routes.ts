@@ -9,6 +9,10 @@ import {
 export interface AuthRoutesOptions {
   jwtSecret: string;
   findUserByEmail?: (email: string) => Promise<AuthUser | null>;
+  validateCredentials?: (
+    email: string,
+    password: string
+  ) => Promise<AuthUser | null> | AuthUser | null;
 }
 
 export function createAuthRoutes(options: AuthRoutesOptions): Router {
@@ -25,19 +29,13 @@ export function createAuthRoutes(options: AuthRoutesOptions): Router {
       return;
     }
 
-    // Default admin user or custom finder
     let user: AuthUser | null = null;
-    if (options.findUserByEmail) {
+    if (options.validateCredentials) {
+      user = await options.validateCredentials(email, password);
+    } else if (options.findUserByEmail) {
       user = await options.findUserByEmail(email);
     } else if (email === 'admin@wap.local' && password === 'password123') {
       user = { id: 'u_admin', email: 'admin@wap.local', name: 'Administrator' };
-    } else {
-      // Allow standard demo user login
-      user = {
-        id: `u_${Buffer.from(email).toString('hex').slice(0, 8)}`,
-        email,
-        name: email.split('@')[0] || 'User',
-      };
     }
 
     if (!user) {

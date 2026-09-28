@@ -16,7 +16,11 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // POST /api/conversations
   router.post('/', async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = (req as any).user?.id || 'default_user';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversation = await convRepo.createConversation(userId);
       res.status(201).json({ conversation });
     } catch (err: any) {
@@ -27,7 +31,11 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // GET /api/conversations
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = (req as any).user?.id || 'default_user';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversations = await convRepo.listConversations(userId);
       res.status(200).json({ conversations });
     } catch (err: any) {
@@ -38,6 +46,11 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // GET /api/conversations/:id
   router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversationId = req.params.id as string;
       const conversation = await convRepo.getConversation(conversationId);
       if (!conversation) {
@@ -54,9 +67,13 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // POST /api/conversations/:id/messages
   router.post('/:id/messages', async (req: Request, res: Response): Promise<void> => {
     try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversationId = req.params.id as string;
       const { content } = req.body || {};
-      const userId = (req as any).user?.id || 'default_user';
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content string is required' });

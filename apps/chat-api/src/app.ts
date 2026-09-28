@@ -1,8 +1,9 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth-routes.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
+import { createAuthMiddleware } from './auth/jwt.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { ChatService } from './services/chat-service.js';
@@ -40,18 +41,26 @@ export function createApp(options: AppOptions): Express {
     res.status(200).json({ status: 'ok', version: 'v3' });
   });
 
-  // Auth routes
+  // Auth routes (public login/refresh, protected /me)
   app.use('/api/auth', createAuthRoutes({ jwtSecret: options.jwtSecret }));
 
-  // Stream routes
+  const authMiddleware = createAuthMiddleware(options.jwtSecret);
+  const sseAuthMiddleware = createAuthMiddleware(options.jwtSecret, { allowQueryToken: true });
+
+  // Stream routes (protected via Bearer header or ?token= query parameter)
   if (options.sseManager) {
-    app.use('/api/conversations', createStreamRoutes({ sseManager: options.sseManager }));
+    app.use(
+      '/api/conversations',
+      sseAuthMiddleware,
+      createStreamRoutes({ sseManager: options.sseManager })
+    );
   }
 
-  // Conversation routes
+  // Conversation routes (protected via Bearer header)
   if (options.convRepo && options.msgRepo && options.chatService) {
     app.use(
       '/api/conversations',
+      authMiddleware,
       createConversationRoutes({
         convRepo: options.convRepo,
         msgRepo: options.msgRepo,
@@ -60,10 +69,21 @@ export function createApp(options: AppOptions): Express {
     );
   }
 
-  // Execution routes
+  // Execution routes (protected via Bearer header)
   if (options.executionService) {
-    app.use('/api', createExecutionRoutes({ executionService: options.executionService }));
+    app.use(
+      '/api',
+      authMiddleware,
+      createExecutionRoutes({ executionService: options.executionService })
+    );
   }
+
+  // Global error handling middleware
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err?.status || err?.statusCode || 500;
+    const message = err?.message || 'Internal server error';
+    res.status(status).json({ error: message });
+  });
 
   return app;
 }

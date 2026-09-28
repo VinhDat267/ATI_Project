@@ -75,4 +75,26 @@ describe('apps/chat-api (Task 15: Auth & JWT Handling)', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
     expect(nextMissing).not.toHaveBeenCalled();
   });
+
+  it('supports authenticating via query token when allowQueryToken is enabled', async () => {
+    const user = { id: 'u5', email: 'sse@example.com', name: 'SSE Client' };
+    const { accessToken } = generateTokens(user, secret);
+    const middleware = createAuthMiddleware(secret, { allowQueryToken: true });
+
+    const req: any = {
+      headers: {},
+      query: { token: accessToken },
+    };
+    const res: any = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    const next = vi.fn();
+
+    middleware(req, res, next);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.user).toBeDefined();
+    expect(req.user.id).toBe('u5');
+  });
 });
+

@@ -13,7 +13,11 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
   router.post('/plans/:id/approve', async (req: Request, res: Response): Promise<void> => {
     try {
       const planId = req.params.id as string;
-      const userId = (req as any).user?.id || 'default_user';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const result = await executionService.approveAndStart(planId, userId);
       res.status(result.status).json(result);
     } catch (err: any) {

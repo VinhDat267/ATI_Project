@@ -138,15 +138,26 @@ export function verifyRefreshToken(token: string, secret: string): AuthUser {
   return verifyToken(token, secret, 'refresh');
 }
 
-export function createAuthMiddleware(secret: string) {
+export interface AuthMiddlewareOptions {
+  allowQueryToken?: boolean;
+}
+
+export function createAuthMiddleware(secret: string, options?: AuthMiddlewareOptions) {
   return (req: Request, res: Response, next: NextFunction): void => {
+    let token: string | undefined;
+
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (options?.allowQueryToken && typeof req.query?.token === 'string') {
+      token = req.query.token;
+    }
+
+    if (!token) {
       res.status(401).json({ error: 'Missing or invalid Authorization header' });
       return;
     }
 
-    const token = authHeader.slice(7).trim();
     try {
       const user = verifyAccessToken(token, secret);
       (req as any).user = user;
