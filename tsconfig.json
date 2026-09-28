@@ -64,6 +64,7 @@
     "packages/executor/tests/**/*.ts",
     "apps/chat-api/src/**/*.ts",
     "apps/chat-api/tests/**/*.ts",
+    "evaluations/**/*.ts",
     "tests/**/*.ts"
   ]
 }
