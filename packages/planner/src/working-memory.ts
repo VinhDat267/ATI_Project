@@ -29,6 +29,10 @@ export class WorkingMemory {
     return [...this.members];
   }
 
+  getAll(): Record<string, any> {
+    return this.toJSON();
+  }
+
   toJSON(): Record<string, any> {
     return {
       ...this.entities,
