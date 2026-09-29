@@ -173,8 +173,7 @@ async function bootstrap() {
     );
     const mockProvider = new MockLLMProvider();
     // Default smart workflow
-    mockProvider.setPlanResponses([
-      {
+    const sandboxPlan = {
         kind: 'plan',
         thinking: 'Khảo sát board Frontend trên Trello và kênh Slack #general. Lập kế hoạch tạo task sửa CSS, gán thành viên Minh và thông báo hoàn tất lên Slack.',
         summary: 'Tạo thẻ Trello sửa CSS, gán Minh và thông báo kênh Slack #general',
@@ -202,8 +201,8 @@ async function bootstrap() {
           },
         ],
         warnings: [],
-      },
-    ]);
+      };
+    mockProvider.setPlanResponses([sandboxPlan]);
     provider = mockProvider;
   }
 
@@ -308,7 +307,19 @@ async function bootstrap() {
               return { id: args.cardId, idMembers: [args.memberId] };
             }
             if (tool === 'slack.send_message') {
+              if (process.env.SANDBOX_SCENARIO === 'partial_failure') {
+                throw Object.assign(new Error('Sandbox: invalid Slack channel before send'), { category: 'VALIDATION' });
+              }
               return { ok: true, channel: args.channel, ts: `${Date.now()}.000100` };
+            }
+            if (process.env.SANDBOX_SCENARIO === 'clarification' && tool === 'trello.search_boards') {
+              return [{ id: 'board_frontend', name: 'Frontend' }];
+            }
+            if (process.env.SANDBOX_SCENARIO === 'clarification' && tool === 'trello.search_members') {
+              return [
+                { id: 'member_minh_nguyen', name: 'Minh Nguyễn' },
+                { id: 'member_minh_tran', name: 'Minh Trần' },
+              ];
             }
             if (tool.includes('.search_')) return [];
             return { ok: true, sandbox: true };

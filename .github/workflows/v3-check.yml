@@ -25,6 +25,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3
       RUNTIME_MODE: sandbox
+      CHAT_ADMIN_EMAIL: ci-browser@localhost.test
+      CHAT_ADMIN_PASSWORD: ci-browser-test-password-2026
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,3 +36,6 @@ jobs:
       - run: npm ci
       - run: npm run db:migrate:v3
       - run: npm run check
+      - run: npm run admin:provision:v3
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser:v3

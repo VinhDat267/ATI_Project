@@ -638,10 +638,10 @@ Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → 
 
 **Phase 5: Chat UI (Tasks 19–25)** đã có triển khai v3 trong `apps/chat-web/` và bộ test giao diện. Đây là trạng thái mã nguồn cục bộ, chưa phải bằng chứng nghiệm thu quy trình live.
 
-**Phase 6: E2E Integration & Demo (Tasks 26–28)** còn cần chứng minh trên đường chạy thực tế:
-- Scenario 1: tạo task Trello và thông báo Slack sau khi người dùng duyệt plan.
-- Scenario 2: xử lý tên mơ hồ bằng bước hỏi rõ và tra cứu thật.
-- Scenario 3: phục hồi lỗi một phần, kiểm tra skip/retry và trạng thái sau restart.
+**Phase 6: E2E Integration & Demo (Tasks 26–28)** đã có kiểm tra trình duyệt cục bộ với sandbox + PostgreSQL cho duyệt plan, hủy plan, hỏi rõ tên trùng, và bỏ qua bước lỗi validation. Xem [bằng chứng Phase 6 sandbox](audits/2026-09-29-v3-review/PHASE6-SANDBOX-BROWSER.md). Các việc còn lại:
+- Scenario 1: tạo task Trello và thông báo Slack thật sau khi người dùng duyệt plan.
+- Scenario 2: xử lý tên mơ hồ dựa trên kết quả tra cứu dịch vụ thật.
+- Scenario 3: thử retry, trạng thái `UNKNOWN` và phục hồi sau restart trên dữ liệu bền vững.
 
 Ưu tiên gần nhất là môi trường PostgreSQL v3 có thể tái tạo từ checkout mới, CI dùng DB thật, rồi kiểm thử E2E sandbox và live có kiểm soát. Xem [hướng dẫn setup v3](V3-LOCAL-SETUP.md). Các số liệu test cục bộ không thay thế bằng chứng live hoặc crash recovery.
 

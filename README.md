@@ -95,7 +95,9 @@ npm run check
 ```
 `check` chạy typecheck, 6 workspace test suites, build web và smoke test khởi động API/web sandbox; không chứng minh triển khai production hoặc chất lượng AI live.
 
-CI v3 chạy `npm ci`, migration và `npm run check` trên PostgreSQL 16 riêng cho mỗi job tại [v3-check.yml](.github/workflows/v3-check.yml). Chạy CI từ GitHub vẫn cần xác nhận sau khi push.
+Sau khi tạo tài khoản PostgreSQL sandbox theo hướng dẫn setup v3, chạy `npm run test:browser:v3` để kiểm tra bốn luồng bằng Chromium, API/web thật và trạng thái DB. Bằng chứng và giới hạn được ghi tại [Phase 6 sandbox browser evidence](docs/audits/2026-09-29-v3-review/PHASE6-SANDBOX-BROWSER.md).
+
+CI v3 chạy `npm ci`, migration, `npm run check` và browser E2E trên PostgreSQL 16 riêng cho mỗi job tại [v3-check.yml](.github/workflows/v3-check.yml). Chạy CI từ GitHub vẫn cần xác nhận sau khi push.
 
 Các lệnh gốc `build`, `test`, `typecheck`, `check`, `up`, `api:dev`, `api:start`, `web:dev` nay trỏ vào v3. Lệnh v2 lịch sử tương ứng có hậu tố `:v2` (ví dụ `npm run check:v2`, `npm run up:v2`); các gate `check:backend`, `check:engine`, `check:web`, `check:g1` vẫn thuộc v2. Xem [chỉ mục tài liệu](docs/README.md) trước khi dùng hướng dẫn cũ.
 
