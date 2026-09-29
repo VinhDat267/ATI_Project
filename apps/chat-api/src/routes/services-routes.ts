@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
-import type { AllowedScope } from '@wap/tool-schemas';
+import { REGISTERED_SERVICES, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 
 export interface ServicesRoutesOptions {
   credentialRepo?: CredentialRepo;
@@ -11,35 +11,14 @@ export interface ServicesRoutesOptions {
   adminUserIds?: string[];
 }
 
-function normalizeScope(service: string, value: unknown): AllowedScope | null {
-  const entries = Array.isArray(value)
-    ? value
-    : typeof value === 'object' && value !== null
-      ? (value as any)[service === 'trello' ? 'boards' : 'channels']
-      : null;
-  if (!Array.isArray(entries) || entries.length === 0 || !entries.every((x) => typeof x === 'string' && x.trim().length > 0)) return null;
-  const ids = [...new Set(entries.map((x: string) => x.trim()))];
-  return service === 'trello' ? { boards: ids } : { channels: ids };
-}
-
-async function verifyService(service: string, config: any, fetchFn: typeof fetch): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
+async function verifyService(service: string, config: Record<string, unknown>, fetchFn: typeof fetch): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
+  const registration = getRegisteredService(service);
+  if (!registration) throw new Error(`Unsupported service '${service}'`);
   const started = performance.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    let response: globalThis.Response;
-    if (service === 'trello') {
-      const url = new URL('https://api.trello.com/1/members/me');
-      url.searchParams.set('key', config.apiKey);
-      url.searchParams.set('token', config.token);
-      response = await fetchFn(url, { method: 'GET', signal: controller.signal });
-    } else {
-      response = await fetchFn('https://slack.com/api/auth.test', {
-        method: 'POST', headers: { Authorization: `Bearer ${config.botToken}` }, signal: controller.signal,
-      });
-    }
-    const body = await response.json().catch(() => ({})) as any;
-    const healthy = response.ok && (service === 'trello' ? Boolean(body?.id) : body?.ok === true);
+    const healthy = await registration.transport.checkConnection(config, fetchFn, controller.signal);
     return { healthy, message: healthy ? `Successfully connected to ${service}` : `Provider rejected ${service} credentials`, latencyMs: Math.round(performance.now() - started) };
   } finally {
     clearTimeout(timer);
@@ -55,49 +34,18 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // GET /api/services
   router.get('/', async (_req: Request, res: Response): Promise<void> => {
     try {
-      let trelloConnected = false;
-      let slackConnected = false;
-      let trelloScope: string[] = [];
-      let slackScope: string[] = [];
-
-      if (credentialRepo) {
-        const trelloCreds = await credentialRepo.getCredentials('trello');
-        trelloConnected = Boolean(trelloCreds) && verified.has('trello');
-        const slackCreds = await credentialRepo.getCredentials('slack');
-        slackConnected = Boolean(slackCreds) && verified.has('slack');
-        if (encryptionKey && trelloCreds) {
-          const saved = decryptCredentials(trelloCreds.config, encryptionKey) as any;
-          trelloScope = saved.allowedScope?.boards ?? [];
-        }
-        if (encryptionKey && slackCreds) {
-          const saved = decryptCredentials(slackCreds.config, encryptionKey) as any;
-          slackScope = saved.allowedScope?.channels ?? [];
-        }
-      } else {
-        trelloConnected = false;
-        slackConnected = false;
-      }
-
-      res.status(200).json({
-        services: [
-          {
-            id: 'trello',
-            name: 'Trello',
-            connected: trelloConnected,
-            allowedScope: trelloScope,
-            description: 'Task and project management',
-            scopes: ['read:boards', 'write:cards', 'write:checklists'],
-          },
-          {
-            id: 'slack',
-            name: 'Slack',
-            connected: slackConnected,
-            allowedScope: slackScope,
-            description: 'Team messaging and notifications',
-            scopes: ['chat:write', 'channels:read'],
-          },
-        ],
-      });
+      const services = await Promise.all(REGISTERED_SERVICES.map(async ({ id, name, description, scopes, scopeKey, credentialFields }) => {
+        const record = await credentialRepo?.getCredentials(id);
+        const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
+        const scope = config?.allowedScope as Record<string, unknown> | undefined;
+        const entries = scope?.[scopeKey];
+        return {
+          id, name, description, scopes, scopeKey, credentialFields,
+          connected: Boolean(record) && verified.has(id),
+          allowedScope: Array.isArray(entries) ? entries : [],
+        };
+      }));
+      res.status(200).json({ services });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });
     }
@@ -106,8 +54,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // POST /api/services/:service/test
   router.post('/:service/test', async (req: Request, res: Response): Promise<void> => {
     try {
-      const { service } = req.params;
-      if (service !== 'trello' && service !== 'slack') {
+      const service = String(req.params.service);
+      if (!getRegisteredService(service)) {
         res.status(400).json({ error: `Unsupported service: ${service}` });
         return;
       }
@@ -137,8 +85,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
       const service = String(req.params.service);
       const { credentials, allowedScope } = req.body || {};
-
-      if (service !== 'trello' && service !== 'slack') {
+      const registration = getRegisteredService(service);
+      if (!registration) {
         res.status(400).json({ error: 'Unsupported service' });
         return;
       }
@@ -148,18 +96,17 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
 
-      const fields = service === 'trello' ? ['apiKey', 'token'] : ['botToken'];
-      if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials) ||
-          !fields.every((field) => typeof credentials[field] === 'string' && credentials[field].trim())) {
+      const fields = registration.definition.credentialFields;
+      if (!hasValidCredentials(fields, credentials)) {
         res.status(400).json({ error: 'Valid service credentials are required' });
         return;
       }
-      const scope = normalizeScope(service, allowedScope);
+      const scope = normalizeAllowedScope(registration.definition.scopeKey, allowedScope);
       if (!scope || !encryptionKey) {
         res.status(400).json({ error: 'A non-empty allowed scope and encryption key are required' });
         return;
       }
-      const encrypted = encryptCredentials({ ...Object.fromEntries(fields.map((field) => [field, credentials[field]])), allowedScope: scope }, encryptionKey);
+      const encrypted = encryptCredentials({ ...Object.fromEntries(fields.map(({ key }) => [key, credentials[key]])), allowedScope: scope }, encryptionKey);
       await credentialRepo.saveCredentials(service, encrypted);
       verified.delete(service);
       options.onCredentialsChanged?.(service);
