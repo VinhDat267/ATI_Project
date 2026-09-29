@@ -11,7 +11,7 @@
   "scripts": {
     "build": "npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine && npm run build -w @wap/api && npm run build -w @wap/web",
     "test": "npm run test -w @wap/dsl",
-    "test:v3": "npm test -w @wap/tool-schemas -w @wap/tool-adapters -w @wap/planner -w @wap/executor -w @wap/chat-api",
+    "test:v3": "npm test -w @wap/tool-schemas -w @wap/tool-adapters -w @wap/planner -w @wap/executor -w @wap/chat-api -w @wap/chat-web",
     "pretypecheck": "npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/engine",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck -w @wap/web",
     "schema:json": "npm run schema:json -w @wap/dsl",

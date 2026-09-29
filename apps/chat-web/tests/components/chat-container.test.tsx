@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import React from 'react';
 import { MessageItem } from '../../src/components/MessageItem';
 import { ChatContainer } from '../../src/components/ChatContainer';
 
