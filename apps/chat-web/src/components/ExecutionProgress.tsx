@@ -1,0 +1,128 @@
+import React from 'react';
+import type { StepState } from '../types';
+
+export interface ExecutionStepInfo {
+  id: string;
+  tool: string;
+  description: string;
+  status: StepState;
+  duration?: string;
+  output?: string;
+  error?: string;
+}
+
+export interface ExecutionProgressProps {
+  steps: ExecutionStepInfo[];
+  title?: string;
+}
+
+export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
+  steps,
+  title = '⚡ Tiến trình thực thi liên dịch vụ',
+}) => {
+  const getStatusIcon = (status: StepState) => {
+    switch (status) {
+      case 'succeeded':
+        return (
+          <div className="w-6 h-6 rounded-full bg-[#34c759] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+            ✓
+          </div>
+        );
+      case 'running':
+        return (
+          <div className="w-6 h-6 rounded-full bg-[#007aff] text-white flex items-center justify-center text-xs font-bold shrink-0 animate-pulse shadow-xs">
+            ⏳
+          </div>
+        );
+      case 'failed':
+        return (
+          <div className="w-6 h-6 rounded-full bg-[#ff3b30] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+            ✕
+          </div>
+        );
+      case 'paused':
+        return (
+          <div className="w-6 h-6 rounded-full bg-[#ff9500] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+            ⏸
+          </div>
+        );
+      case 'unknown':
+        return (
+          <div className="w-6 h-6 rounded-full bg-[#af52de] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+            ?
+          </div>
+        );
+      default:
+        return (
+          <div className="w-6 h-6 rounded-full bg-zinc-200 text-zinc-500 flex items-center justify-center text-xs shrink-0">
+            ○
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 md:p-6 my-4 max-w-2xl">
+      <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-4">
+        <h3 className="font-semibold text-zinc-900 text-base flex items-center gap-2">
+          {title}
+        </h3>
+        <span className="text-xs text-zinc-500 font-medium">
+          {steps.filter((s) => s.status === 'succeeded').length}/{steps.length} hoàn thành
+        </span>
+      </div>
+
+      <div className="flex flex-col">
+        {steps.map((step, idx) => {
+          const isLast = idx === steps.length - 1;
+          return (
+            <div key={step.id || idx} className="relative flex items-start gap-3.5">
+              {/* Status indicator and line */}
+              <div className="flex flex-col items-center">
+                {getStatusIcon(step.status)}
+                {!isLast && (
+                  <div
+                    className={`w-0.5 h-10 my-1 ${
+                      step.status === 'succeeded' ? 'bg-[#34c759]' : 'bg-zinc-200'
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* Step info */}
+              <div className="flex-1 pb-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="bg-[#5ac8fa]/15 text-[#0071e3] border border-blue-200 font-mono text-[11px] font-semibold px-2 py-0.5 rounded">
+                      {step.tool}
+                    </span>
+                    <span className="text-sm font-semibold text-zinc-900">
+                      {step.description}
+                    </span>
+                  </div>
+                  {step.duration && (
+                    <span className="text-xs text-zinc-400 font-mono">
+                      {step.duration}
+                    </span>
+                  )}
+                </div>
+
+                {step.output && (
+                  <div className="mt-1 text-xs text-[#0066cc] font-mono hover:underline cursor-pointer">
+                    {step.output}
+                  </div>
+                )}
+
+                {step.error && (
+                  <div className="mt-1 text-xs text-red-600 font-medium">
+                    {step.error}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
