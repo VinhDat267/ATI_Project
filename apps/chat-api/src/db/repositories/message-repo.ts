@@ -31,10 +31,10 @@ export class MessageRepo {
     const res = await this.pool.query(
       `SELECT * FROM messages
        WHERE conv_id = $1
-       ORDER BY created_at ASC
+       ORDER BY created_at DESC, id DESC
        LIMIT $2`,
       [convId, limit]
     );
-    return res.rows;
+    return res.rows.reverse();
   }
 }

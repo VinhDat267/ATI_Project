@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useChatStore } from './store/chat-store';
 import { useSSE } from './hooks/use-sse';
 import { ChatContainer } from './components/ChatContainer';
@@ -29,29 +29,34 @@ export const App: React.FC = () => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [user, setUser] = useState<{ id: string; email: string; name: string } | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Authenticate with server on initial load to get real JWT access token
-  useEffect(() => {
-    async function loginUser() {
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@wap.local', password: 'password123' }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAuthToken(data.accessToken);
-          setUser(data.user);
-        } else {
-          setAuthError('Không thể xác thực với API backend');
-        }
-      } catch (err: any) {
-        setAuthError('Không thể kết nối đến máy chủ API: ' + (err?.message || ''));
+  const loginUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError(null);
+    setIsLoggingIn(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.accessToken || !data.user) {
+        setAuthError(data.error || 'Không thể xác thực với API backend');
+        return;
       }
+      setAuthToken(data.accessToken);
+      setUser(data.user);
+      setPassword('');
+    } catch (err) {
+      setAuthError('Không thể kết nối đến máy chủ API: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsLoggingIn(false);
     }
-    loginUser();
-  }, []);
+  };
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -216,6 +221,26 @@ export const App: React.FC = () => {
     ([_, st]) => st === 'failed'
   )?.[0];
 
+  if (!authToken) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#f5f5f7] p-4">
+        <form onSubmit={loginUser} className="w-full max-w-sm bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
+          <h1 className="text-lg font-semibold text-zinc-900">Đăng nhập AI Workflow</h1>
+          <label className="text-sm text-zinc-700">Email
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="username" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
+          </label>
+          <label className="text-sm text-zinc-700">Mật khẩu
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
+          </label>
+          {authError && <p role="alert" className="text-sm text-red-700">{authError}</p>}
+          <button type="submit" disabled={isLoggingIn} className="bg-[#0071e3] text-white rounded-lg p-2 disabled:opacity-50">
+            {isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập'}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-[#1d1d1f]">
       {/* Sidebar for Desktop & Mobile Drawer */}
@@ -297,7 +322,7 @@ export const App: React.FC = () => {
               {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AO'}
             </div>
             <div className="text-xs font-medium text-zinc-800">
-              {user?.name || 'Admin Operator'}
+              {user?.name || user?.email || 'Người dùng'}
             </div>
           </div>
           <button

@@ -3,6 +3,80 @@ import { ExecutionController } from '../src/index.js';
 import type { PlanStep } from '@wap/tool-schemas';
 
 describe('packages/executor (Task 14: ExecutionController & Partial Failure Recovery)', () => {
+  it('waits for durable step updates and stops before a later write when persistence fails', async () => {
+    const steps: PlanStep[] = [
+      { id: 's1', tool: 'trello.create_card', description: 'First write', args: {}, dependsOn: [] },
+      { id: 's2', tool: 'slack.send_message', description: 'Second write', args: {}, dependsOn: ['s1'] },
+    ];
+    const executeStep = vi.fn().mockResolvedValue({ status: 'succeeded', output: { id: 'created' } });
+    const controller = new ExecutionController({
+      runner: { executeStep },
+      steps,
+      onStepUpdate: async (_stepId, state) => {
+        if (state.status === 'succeeded') throw new Error('database unavailable');
+      },
+    });
+    await expect(controller.runUntilPause()).rejects.toThrow('database unavailable');
+    expect(executeStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects retry of a pending or skipped write step', async () => {
+    const steps: PlanStep[] = [
+      { id: 's1', tool: 'trello.create_card', description: 'Write', args: {}, dependsOn: [] },
+    ];
+    const runner = { executeStep: vi.fn().mockResolvedValue({ status: 'failed', error: { message: 'known failure' } }) };
+    const controller = new ExecutionController({ runner, steps });
+    await expect(controller.retryStep('s1')).rejects.toThrow(/Cannot retry/);
+    expect(runner.executeStep).not.toHaveBeenCalled();
+    await controller.runUntilPause();
+    await controller.skipStepAndContinue('s1');
+    await expect(controller.retryStep('s1')).rejects.toThrow(/Cannot retry/);
+    expect(runner.executeStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes a live AbortSignal to the runner and aborts it on stop', async () => {
+    let signal: AbortSignal | undefined;
+    let started!: () => void;
+    const observed = new Promise<void>((resolve) => { started = resolve; });
+    const runner = { executeStep: vi.fn().mockImplementation(async (_step, _outputs, options) => {
+      signal = options?.signal;
+      started();
+      await new Promise<void>((done) => signal?.addEventListener('abort', () => done(), { once: true }));
+      return { status: 'unknown', error: { message: 'aborted' } };
+    }) };
+    const controller = new ExecutionController({ runner, steps: [
+      { id: 's1', tool: 'trello.create_card', description: 'Write', args: {}, dependsOn: [] },
+    ] });
+    const running = controller.runUntilPause();
+    await observed;
+    expect(signal).toBeDefined();
+    await controller.stop();
+    expect(signal?.aborted).toBe(true);
+    expect((await running).status).toBe('reconciliation_required');
+    expect(controller.getStepState('s1')?.status).toBe('unknown');
+    await expect(controller.retryStep('s1')).rejects.toThrow(/Cannot retry/);
+  });
+
+  it('does not report completed when stop races with the final in-flight write', async () => {
+    let entered!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    const finishing = new Promise<void>((resolve) => { finish = resolve; });
+    const controller = new ExecutionController({
+      runner: { executeStep: async () => {
+        entered();
+        await finishing;
+        return { status: 'succeeded', output: { id: 'written' } };
+      } },
+      steps: [{ id: 's1', tool: 'trello.create_card', description: 'Write', args: {}, dependsOn: [] }],
+    });
+    const running = controller.runUntilPause();
+    await started;
+    await controller.stop();
+    finish();
+    expect((await running).status).toBe('stopped');
+  });
+
   it('pauses plan on step failure and allows skip step to proceed to next steps', async () => {
     const steps: PlanStep[] = [
       { id: 's1', tool: 'trello.create_card', description: 'Step 1', args: {}, dependsOn: [] },

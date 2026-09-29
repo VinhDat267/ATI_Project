@@ -135,11 +135,11 @@ describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
 
     // Fire 5 concurrent approval attempts simultaneously
     const results = await Promise.all([
-      planRepo.approvePlan(plan.id),
-      planRepo.approvePlan(plan.id),
-      planRepo.approvePlan(plan.id),
-      planRepo.approvePlan(plan.id),
-      planRepo.approvePlan(plan.id),
+      planRepo.approvePlan(plan.id, plan.plan_hash, user.id),
+      planRepo.approvePlan(plan.id, plan.plan_hash, user.id),
+      planRepo.approvePlan(plan.id, plan.plan_hash, user.id),
+      planRepo.approvePlan(plan.id, plan.plan_hash, user.id),
+      planRepo.approvePlan(plan.id, plan.plan_hash, user.id),
     ]);
 
     // Exactly one must return true, the rest false
@@ -170,7 +170,7 @@ describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
     });
 
     // Attempt to approve
-    const approved = await planRepo.approvePlan(expiredPlan.id);
+    const approved = await planRepo.approvePlan(expiredPlan.id, expiredPlan.plan_hash, user.id);
     expect(approved).toBe(false);
 
     // Verify plan remains pending (not approved)
@@ -193,7 +193,7 @@ describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
       expiresAt: new Date(Date.now() + 60000),
     });
 
-    await planRepo.approvePlan(plan.id);
+    await planRepo.approvePlan(plan.id, plan.plan_hash, user.id);
 
     // Create execution step
     const stepRow = await stepRepo.createStep({

@@ -5,6 +5,46 @@ import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precedence)', () => {
   const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS];
 
+  const cardPlan = (args: unknown) => JSON.stringify({
+    kind: 'plan', thinking: 'Create a card', summary: 'Create card', warnings: [],
+    steps: [{ id: 'step_1', tool: 'trello.create_card', description: 'Create card', args, dependsOn: [] }],
+  });
+
+  it.each([
+    [{ listId: 123, title: 'Task' }, /listId.*string/i],
+    [{ listId: 'l1', title: { malformed: true } }, /title.*string/i],
+    [{ listId: 'l1', title: 'Task', surprise: true }, /surprise|additional/i],
+    [{ listId: 'l1', title: 'Task', idMembers: [123] }, /idMembers.*string/i],
+  ])('rejects arguments violating the tool input schema: %j', (args, reason) => {
+    const result = validatePlan(cardPlan(args), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('schema');
+      expect(result.error).toMatch(reason);
+    }
+  });
+
+  it('rejects an unknown Slack argument even when required arguments are present', () => {
+    const result = validatePlan(JSON.stringify({
+      kind: 'plan', thinking: 'Send a message', summary: 'Notify', warnings: [],
+      steps: [{ id: 'step_1', tool: 'slack.send_message', description: 'Notify',
+        args: { channel: 'C1', text: 'Done', channelId: 'C2' }, dependsOn: [] }],
+    }), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error).toMatch(/channelId|additional/i);
+  });
+
+  it.each([
+    [{ id: 'step_1', tool: 'trello.create_card', description: 'Create', args: { listId: 'l1', title: 'Task' }, dependsOn: 'step_2' }, /dependsOn.*array/i],
+    [null, /step.*object/i],
+  ])('returns a schema error for a malformed step instead of throwing', (step, reason) => {
+    const result = validatePlan(JSON.stringify({
+      kind: 'plan', thinking: 'Create card', summary: 'Create', warnings: [], steps: [step],
+    }), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error).toMatch(reason);
+  });
+
   it('rejects invalid JSON at Layer 1', () => {
     const res = validatePlan('not a valid json string', catalog);
     expect(res.valid).toBe(false);

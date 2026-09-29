@@ -19,6 +19,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
+    "admin:provision": "tsx src/cli/provision-user.ts",
     "test": "vitest run"
   },
   "devDependencies": {

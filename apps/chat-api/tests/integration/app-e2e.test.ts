@@ -56,6 +56,10 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     sseManager = new SSEManager();
     const app = createApp({
       jwtSecret: secret,
+      validateCredentials: async (email, password) =>
+        email === 'admin@wap.local' && password === 'password123'
+          ? { id: DEMO_ADMIN_ID, email, name: 'Fixture Admin' }
+          : null,
       convRepo: mockConvRepo as any,
       msgRepo: mockMsgRepo as any,
       chatService: mockChatService as any,
@@ -184,9 +188,10 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     expect(res.status).toBe(401);
   });
 
-  it('authenticates SSE stream connection via URL query token ?token=...', async () => {
+  it('authenticates SSE stream connection via the Authorization header', async () => {
     const controller = new AbortController();
-    const res = await fetch(`${baseUrl}/api/conversations/conv-e2e-1/stream?token=${validToken}`, {
+    const res = await fetch(`${baseUrl}/api/conversations/conv-e2e-1/stream`, {
+      headers: { Authorization: `Bearer ${validToken}` },
       signal: controller.signal,
     });
     expect(res.status).toBe(200);

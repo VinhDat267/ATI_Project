@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { handleSSEEvent } from '../src/hooks/use-sse';
+import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 import { useChatStore } from '../src/store/chat-store';
 
 describe('SSE Client Event Handler', () => {
   beforeEach(() => {
     useChatStore.getState().reset();
+    resetSSEState();
   });
 
   it('updates store on text_start, text_delta, and plan events with sequence check', () => {
@@ -33,5 +34,27 @@ describe('SSE Client Event Handler', () => {
     handleSSEEvent('message_confirmed', JSON.stringify({ tempId: 'temp-123', confirmedId: 'msg-real-456' }), 7);
     expect(useChatStore.getState().messages[0].id).toBe('msg-real-456');
     expect(useChatStore.getState().messages[0].status).toBe('sent');
+  });
+
+  it('accepts reused sequence numbers after switching conversations and ignores late events from the old one', () => {
+    useChatStore.getState().setConversationId('conversation-a');
+    handleSSEEvent('plan', JSON.stringify({ id: 'plan-a', summary: 'Plan A', steps: [] }), 1, 'conversation-a');
+    expect(useChatStore.getState().activePlan?.id).toBe('plan-a');
+
+    useChatStore.getState().reset();
+    useChatStore.getState().setConversationId('conversation-b');
+    handleSSEEvent('plan', JSON.stringify({ id: 'plan-b', summary: 'Plan B', steps: [] }), 1, 'conversation-b');
+    expect(useChatStore.getState().activePlan?.id).toBe('plan-b');
+
+    handleSSEEvent('plan', JSON.stringify({ id: 'late-a', summary: 'Late A', steps: [] }), 2, 'conversation-a');
+    expect(useChatStore.getState().activePlan?.id).toBe('plan-b');
+  });
+
+  it('does not apply an older replayed event after a newer event in the same conversation', () => {
+    useChatStore.getState().setConversationId('conversation-a');
+    handleSSEEvent('text_start', '{}', 10, 'conversation-a');
+    handleSSEEvent('text_delta', JSON.stringify({ delta: 'new' }), 11, 'conversation-a');
+    handleSSEEvent('text_delta', JSON.stringify({ delta: 'old' }), 9, 'conversation-a');
+    expect(useChatStore.getState().streamingText).toBe('new');
   });
 });

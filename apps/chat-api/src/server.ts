@@ -10,6 +10,8 @@ import {
   UserRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
+import { verifyPassword } from './db/repositories/user-repo.js';
+import { createRuntimeAdapterFactory, createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -43,7 +45,7 @@ async function bootstrap() {
   let credRepo: any = null;
 
   try {
-    const dbUrl = env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+    const dbUrl = env.DATABASE_URL;
     pool = getPool({ connectionString: dbUrl });
     // Quick test query to verify connectivity
     await pool.query('SELECT 1');
@@ -56,13 +58,14 @@ async function bootstrap() {
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool);
 
-    await userRepo.createUser({
-      id: DEMO_ADMIN_ID,
-      email: 'admin@wap.local',
-      password: 'password123',
-      name: 'Administrator',
-    }).catch(() => {});
+    if (env.RUNTIME_MODE === 'live') {
+      const seededAdmin = await userRepo.findByEmail('admin@wap.local');
+      if (seededAdmin && (seededAdmin.id === DEMO_ADMIN_ID || verifyPassword('password123', seededAdmin.password))) {
+        throw new Error('Insecure demo admin account exists; rotate or remove it before live startup');
+      }
+    }
   } catch (err: any) {
+    if (!mayUseMemoryStorage(env.RUNTIME_MODE)) throw err;
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
     );
@@ -100,7 +103,10 @@ async function bootstrap() {
     planRepo = {
       createPlan: async (data: any) => {
         const id = `plan_${Date.now()}`;
-        const row = { id, conv_id: data.convId, plan_json: data.planJson, plan_text: JSON.stringify(data.planJson), status: 'pending', expires_at: data.expiresAt, created_at: new Date() };
+        for (const previous of planMap.values()) {
+          if (previous.conv_id === data.convId && previous.status === 'pending') previous.status = 'superseded';
+        }
+        const row = { id, conv_id: data.convId, plan_json: data.planJson, plan_text: JSON.stringify(data.planJson), plan_hash: data.planHash, status: 'pending', expires_at: data.expiresAt, created_at: new Date() };
         planMap.set(id, row);
         return row;
       },
@@ -113,13 +119,13 @@ async function bootstrap() {
       },
       approvePlan: async (planId: string) => {
         const p = planMap.get(planId);
-        if (!p || p.status !== 'pending') return false;
+        if (!p || p.status !== 'pending' || new Date(p.expires_at).getTime() <= Date.now()) return false;
         p.status = 'approved';
         return true;
       },
       rejectPlan: async (planId: string) => {
         const p = planMap.get(planId);
-        if (!p || p.status !== 'pending') return false;
+        if (!p || p.status !== 'pending' || new Date(p.expires_at).getTime() <= Date.now()) return false;
         p.status = 'rejected';
         return true;
       },
@@ -158,7 +164,7 @@ async function bootstrap() {
 
   // 2. Initialize LLM Provider
   let provider: any;
-  if (env.GEMINI_API_KEY) {
+  if (env.RUNTIME_MODE === 'live') {
     console.log(`\x1b[32m[chat-api]\x1b[0m Sử dụng Gemini 1.5 Pro Provider với API Key đã cấu hình.`);
     provider = new GeminiProvider({ apiKey: env.GEMINI_API_KEY });
   } else {
@@ -235,26 +241,28 @@ async function bootstrap() {
     },
   ]);
 
+  let gatherAdapterFactory: { getAdapterForService: (serviceName: string) => Promise<any> | any } | null = null;
+  const gatherSearch = async ({ tool, args, signal }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal }) => {
+    if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
+    const serviceName = tool.split('.')[0]!;
+    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName);
+    return adapter.execute(tool, args, { signal });
+  };
   const primaryPlanner = new AIPlanner({
     provider,
     toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
+    gatherSearch,
   });
 
   const backupPlanner = new AIPlanner({
     provider: backupMockProvider,
     toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
+    gatherSearch,
   });
 
-  const planner = {
-    processMessage: async (input: any) => {
-      try {
-        return await primaryPlanner.processMessage(input);
-      } catch (err: any) {
-        console.warn(`\x1b[33m[chat-api] Primary LLM lỗi (${err?.message || err}). Chuyển sang Smart Fallback Planner...\x1b[0m`);
-        return await backupPlanner.processMessage(input);
-      }
-    },
-  };
+  const planner = createRuntimePlanner(env.RUNTIME_MODE,
+    (input: any) => primaryPlanner.processMessage(input),
+    (input: any) => backupPlanner.processMessage(input));
 
   // 4. ChatService Event Bridge to SSE
   const chatEventEmitter = {
@@ -281,14 +289,9 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
   });
 
-  const adapterFactory = {
-    getAdapterForService: async (serviceName: string) => {
-      if (env.RUNTIME_MODE === 'live') {
-        return await realAdapterFactory.getAdapterForService(serviceName);
-      }
-      try {
-        return await realAdapterFactory.getAdapterForService(serviceName);
-      } catch (err: any) {
+  const adapterFactory = createRuntimeAdapterFactory(env.RUNTIME_MODE,
+    (serviceName: string) => realAdapterFactory.getAdapterForService(serviceName),
+    (serviceName: string) => {
         console.log(`\x1b[35m[Sandbox Mode]\x1b[0m Using In-Memory Sandbox Adapter for '${serviceName}'`);
         return {
           execute: async (tool: string, args: any) => {
@@ -307,12 +310,12 @@ async function bootstrap() {
             if (tool === 'slack.send_message') {
               return { ok: true, channel: args.channel, ts: `${Date.now()}.000100` };
             }
+            if (tool.includes('.search_')) return [];
             return { ok: true, sandbox: true };
           },
         };
-      }
-    },
-  };
+    });
+  gatherAdapterFactory = adapterFactory;
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
@@ -327,10 +330,17 @@ async function bootstrap() {
   const app = createApp({
     jwtSecret: env.JWT_SECRET,
     userRepo,
+    validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD
+      ? (email, password) => email === process.env.SANDBOX_USER_EMAIL && password === process.env.SANDBOX_USER_PASSWORD
+        ? { id: DEMO_ADMIN_ID, email, name: 'Sandbox User' } : null
+      : undefined,
     convRepo,
     msgRepo,
     planRepo,
     credentialRepo: credRepo,
+    encryptionKey: env.ENCRYPTION_KEY,
+    serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
+    onCredentialsChanged: (service) => realAdapterFactory.clearCache(service),
     chatService,
     sseManager,
     executionService,

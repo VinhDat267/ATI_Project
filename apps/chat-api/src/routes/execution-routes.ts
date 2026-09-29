@@ -34,20 +34,15 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      const planRepo = executionService.getPlanRepo();
-      const planRow = await planRepo.getPlan(planId);
-      if (!planRow) {
-        res.status(404).json({ error: 'Plan not found' });
-        return;
-      }
-      const rejected = await planRepo.rejectPlan(planId);
+      await executionService.getOwnedPlan(planId, userId);
+      const rejected = await executionService.getPlanRepo().rejectPlan(planId, userId);
       if (!rejected) {
         res.status(409).json({ error: 'Plan is already decided or expired' });
         return;
       }
       res.status(200).json({ success: true, status: 'rejected' });
     } catch (err: any) {
-      res.status(500).json({ error: err?.message || 'Failed to reject plan' });
+      res.status(err?.status || 500).json({ error: err?.message || 'Failed to reject plan' });
     }
   });
 
@@ -66,7 +61,9 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(200).json(result);
       } catch (err: any) {
         const msg = err?.message || '';
-        if (msg.startsWith('Forbidden')) {
+        if (err?.status === 409) {
+          res.status(409).json({ error: msg });
+        } else if (msg.startsWith('Forbidden')) {
           res.status(403).json({ error: msg });
         } else if (msg.includes('not found') || msg.includes('No active')) {
           res.status(404).json({ error: msg });
@@ -94,7 +91,9 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(200).json(result);
       } catch (err: any) {
         const msg = err?.message || '';
-        if (msg.startsWith('Forbidden')) {
+        if (err?.status === 409) {
+          res.status(409).json({ error: msg });
+        } else if (msg.startsWith('Forbidden')) {
           res.status(403).json({ error: msg });
         } else if (msg.includes('not found') || msg.includes('No active')) {
           res.status(404).json({ error: msg });
@@ -122,7 +121,9 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(200).json(result);
       } catch (err: any) {
         const msg = err?.message || '';
-        if (msg.startsWith('Forbidden')) {
+        if (err?.status === 409) {
+          res.status(409).json({ error: msg });
+        } else if (msg.startsWith('Forbidden')) {
           res.status(403).json({ error: msg });
         } else if (msg.includes('not found') || msg.includes('No active')) {
           res.status(404).json({ error: msg });
@@ -139,14 +140,20 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     async (req: Request, res: Response): Promise<void> => {
       try {
         const { planId } = req.params;
-        const result = executionService.getExecutionStatus(planId as string);
+        const userId = (req as any).user?.id;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+        await executionService.getOwnedPlan(planId as string, userId);
+        const result = await executionService.getExecutionStatusDurable(planId as string);
         if (!result) {
           res.status(404).json({ error: 'No execution found for this plan' });
           return;
         }
         res.status(200).json(result);
       } catch (err: any) {
-        res.status(500).json({ error: err?.message || 'Failed to fetch execution status' });
+        res.status(err?.status || 500).json({ error: err?.message || 'Failed to fetch execution status' });
       }
     }
   );

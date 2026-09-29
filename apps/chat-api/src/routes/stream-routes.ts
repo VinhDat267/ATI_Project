@@ -16,7 +16,11 @@ export function createStreamRoutes(options: StreamRoutesOptions): Router {
     const convId = req.params.id as string;
     const userId = (req as any).user?.id;
 
-    if (convRepo && userId) {
+    if (!convRepo || !userId) {
+      res.status(403).json({ error: 'Ownership verification unavailable' });
+      return;
+    }
+    {
       try {
         const conv = await convRepo.getConversation(convId);
         if (!conv) {
@@ -42,14 +46,11 @@ export function createStreamRoutes(options: StreamRoutesOptions): Router {
 
     // Check Last-Event-ID header and replay missed events
     const lastEventIdHeader = req.headers['last-event-id'];
-    if (lastEventIdHeader) {
-      const lastId = parseInt(String(lastEventIdHeader), 10);
-      if (!isNaN(lastId)) {
-        const missedEvents = sseManager.getMissedEvents(convId, lastId);
-        for (const evt of missedEvents) {
-          res.write(sseManager.formatSSE(evt));
-        }
-      }
+    const missedEvents = sseManager.getMissedEventsForCursor(
+      convId, typeof lastEventIdHeader === 'string' ? lastEventIdHeader : undefined
+    );
+    for (const evt of missedEvents) {
+      res.write(sseManager.formatSSE(evt));
     }
 
     // Register client for live events

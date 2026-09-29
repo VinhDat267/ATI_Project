@@ -4,7 +4,7 @@
 **Môn học:** Advanced Technology Integration (ATI)  
 **Ngày lập:** 29/09/2026  
 **Phiên bản:** v3 (viết lại từ v2)  
-**Trạng thái:** Đã hoàn thành Phase 0-5 + Remediation Audit F01-F14 (Gates G0-G5) — 117 tests passing (100%)
+**Trạng thái kỹ thuật (29/09/2026):** Đợt sửa audit v3 đạt 198/198 bài test cục bộ, typecheck và build; chưa chứng nhận production readiness vì kiểm thử live LLM/Trello/Slack và khôi phục sau crash chưa chạy. Xem [kết quả khắc phục](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md).
 
 ---
 
@@ -533,6 +533,8 @@ POST   /api/executions/:planId/stop                 → Dừng execution
 
 ## 9. Tiến độ Triển khai
 
+> Các bảng Phase và con số 117 tests bên dưới là ảnh chụp lịch sử của báo cáo nghiệm thu trước đợt rà soát lại. Chúng không chứng minh trạng thái production hiện tại. Kết quả kiểm chứng mới và các giới hạn được ghi trong [REMEDIATION-RESULTS.md](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md).
+
 ### 9.1. Tổng quan
 
 **Tiến độ:** 20 / 28 tasks hoàn thành **(71.4%)**  
@@ -550,7 +552,7 @@ POST   /api/executions/:planId/stop                 → Dừng execution
 | **Phase 3** | Execution Engine | 3/3 | ✅ Hoàn thành | 13 |
 | **Phase 4** | Chat API & SSE Stream | 5/5 | ✅ Certified | 37 |
 | **Phase 5** | Chat UI (React Frontend) | 7/7 | ✅ Certified | 20 |
-| **Audit G0-G5** | System Remediation (F01–F14) + PostgreSQL Docker | 14/14 | ✅ Certified | 22 (6 Docker + 16 Probes) |
+| **Audit G0-G5 (lịch sử)** | System Remediation (F01–F14) + PostgreSQL Docker | 14/14 được báo cáo | ⚠️ Chứng nhận cũ đã bị rà soát lại | 22 (6 Docker + 16 Probes) |
 | **Phase 6** | E2E Integration & Demo | 3/3 | ✅ Ready | 3 |
 
 ### 9.3. Chi tiết Test Coverage (117 Unit/Integration Tests + 16 Acceptance Probes)
@@ -568,7 +570,7 @@ POST   /api/executions/:planId/stop                 → Dừng execution
 
 ### 9.4. Security Hardening & Audit Remediation (Gates G0–G5)
 
-Toàn bộ 14 phát hiện (F01–F14) từ cuộc kiểm tra độc lập `REVIEW.md` đã được xử lý triệt để:
+Bảng dưới đây ghi lại các tuyên bố khắc phục ban đầu trong `REVIEW.md`. Đợt rà soát sau đó đã tái hiện các lỗ hổng còn sót và sửa thêm; không dùng bảng lịch sử này làm chứng nhận production.
 
 | Cổng | Phát hiện | Khắc phục thực tế | Bằng chứng kiểm thử |
 |---|---|---|---|
@@ -590,7 +592,7 @@ Qua audit bởi `agency-reality-checker`, 5 lỗ hổng đã được phát hi�
 |---|---|---|---|
 | SEC-01 | 🔴 Critical | Login cấp token cho email bất kỳ | Loại bỏ fallback, chỉ chấp nhận valid credentials |
 | SEC-02 | 🟠 High | Protected routes thiếu auth middleware | Gắn `authMiddleware` lên tất cả protected endpoints |
-| SEC-03 | 🟠 High | SSE không hỗ trợ browser auth | Thêm `allowQueryToken` cho `?token=` |
+| SEC-03 (lịch sử, đã thay thế) | 🟠 High | SSE không hỗ trợ browser auth | Token trong URL đã bị loại bỏ; client dùng `Authorization` header và server kiểm tra quyền sở hữu hội thoại |
 | REL-01 | 🟡 Medium | Thiếu global error handler | Thêm Express error middleware |
 | TST-01 | 🟡 Medium | Không có real HTTP E2E tests | Tạo 11 integration tests trên ephemeral TCP port |
 

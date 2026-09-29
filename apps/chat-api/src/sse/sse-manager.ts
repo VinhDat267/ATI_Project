@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { randomUUID } from 'node:crypto';
 
 export interface SSEEvent {
   id: number;
@@ -8,6 +9,7 @@ export interface SSEEvent {
 }
 
 export class SSEManager {
+  private readonly epoch = randomUUID();
   private seqMap = new Map<string, number>();
   private bufferMap = new Map<string, SSEEvent[]>();
   private clientsMap = new Map<string, Set<Response>>();
@@ -59,6 +61,14 @@ export class SSEManager {
     return buffer.filter((e) => e.id > lastEventId);
   }
 
+  getMissedEventsForCursor(convId: string, cursor: string | undefined): SSEEvent[] {
+    const [epoch, sequence] = (cursor || '').split(':');
+    if (epoch !== this.epoch || !sequence || !/^\d+$/.test(sequence)) {
+      return this.getMissedEvents(convId, 0);
+    }
+    return this.getMissedEvents(convId, Number(sequence));
+  }
+
   addClient(convId: string, res: Response): () => void {
     let clients = this.clientsMap.get(convId);
     if (!clients) {
@@ -88,6 +98,6 @@ export class SSEManager {
 
   formatSSE(event: SSEEvent): string {
     const dataStr = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-    return `id: ${event.id}\nevent: ${event.event}\ndata: ${dataStr}\n\n`;
+    return `id: ${this.epoch}:${event.id}\nevent: ${event.event}\ndata: ${dataStr}\n\n`;
   }
 }

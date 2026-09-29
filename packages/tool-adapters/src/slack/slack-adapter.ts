@@ -1,5 +1,8 @@
 import { BaseAdapter, StepError } from '../base-adapter.js';
+import { GlobalRateLimiter } from '../rate-limiter.js';
 import type { SlackAdapterConfig, SlackCredentials } from './types.js';
+
+const sharedSlackPostLimiter = new GlobalRateLimiter({ maxRequests: 1, windowMs: 1000 });
 
 export class SlackAdapter extends BaseAdapter {
   public readonly service = 'slack';
@@ -30,18 +33,24 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     let res: Response;
-    try {
-      res = await this.fetchFn(rawUrl, {
-        ...options,
-        headers,
-      });
-    } catch (err: any) {
-      throw new StepError({
-        message: `Slack network request failed: ${err?.message || err}`,
-        category: 'NETWORK',
-        retryable: true,
-        cause: err,
-      });
+    for (let attempt = 0; ; attempt++) {
+      const limiter = this.rateLimiter ?? (rawUrl.includes('/chat.postMessage') ? sharedSlackPostLimiter : undefined);
+      if (limiter) await this.waitForTransportSlot(limiter, this.service, options.signal ?? undefined);
+      try {
+        res = await this.fetchFn(rawUrl, {
+          ...options,
+          headers,
+        });
+      } catch (err: any) {
+        throw new StepError({
+          message: `Slack network request failed: ${err?.message || err}`,
+          category: 'NETWORK',
+          retryable: true,
+          cause: err,
+        });
+      }
+      if (res.status !== 429 || attempt >= 1) break;
+      await this.waitForRetryAfter(res.headers?.get?.('Retry-After'), options.signal ?? undefined);
     }
 
     if (!res.ok) {

@@ -1,5 +1,6 @@
 import type { AllowedScope } from '@wap/tool-schemas';
 import type { GlobalRateLimiter } from './rate-limiter.js';
+import { retryAfterMs, waitWithSignal } from './rate-limiter.js';
 
 export type ErrorCategory =
   | 'AUTH_ERROR'
@@ -52,6 +53,16 @@ export abstract class BaseAdapter {
   constructor(config: BaseAdapterConfig = {}) {
     this.allowedScope = config.allowedScope;
     this.rateLimiter = config.rateLimiter;
+  }
+
+  protected async waitForTransportSlot(limiter: GlobalRateLimiter, key: string, signal?: AbortSignal): Promise<void> {
+    if (!await limiter.waitForSlot(key, 30_000, 50, signal)) {
+      throw new StepError({ message: `${key} rate limiter timed out`, category: 'RATE_LIMIT', statusCode: 429, retryable: true });
+    }
+  }
+
+  protected async waitForRetryAfter(header: string | null | undefined, signal?: AbortSignal): Promise<void> {
+    await waitWithSignal(retryAfterMs(header), signal);
   }
 
   public abstract execute(

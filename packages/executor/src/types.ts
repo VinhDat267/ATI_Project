@@ -58,7 +58,7 @@ export interface StepState {
   error?: any;
 }
 
-export type ExecutionStatus = 'completed' | 'partial' | 'stopped' | 'failed';
+export type ExecutionStatus = 'completed' | 'partial' | 'stopped' | 'failed' | 'reconciliation_required';
 
 export interface ExecutionSummary {
   status: ExecutionStatus;
@@ -75,5 +75,5 @@ export interface ExecutionControllerOptions {
     ) => Promise<{ status: string; output?: any; error?: any; durationMs?: number }>;
   };
   steps: PlanStep[];
-  onStepUpdate?: (stepId: string, state: StepState) => void;
+  onStepUpdate?: (stepId: string, state: StepState) => void | Promise<void>;
 }

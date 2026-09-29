@@ -53,7 +53,7 @@ export class ChatService {
 
     // 2. Schedule async planner pipeline execution
     setImmediate(() => {
-      this.executePlannerPipeline(conversationId, userId, content).catch((err) => {
+      this.executePlannerPipeline(conversationId, userId, content, message.id).catch((err) => {
         this.eventEmitter.emit('error', {
           conversationId,
           message: err?.message || 'Unexpected error in planning pipeline',
@@ -70,7 +70,8 @@ export class ChatService {
   private async executePlannerPipeline(
     conversationId: string,
     _userId: string,
-    content: string
+    content: string,
+    currentMessageId: string
   ): Promise<void> {
     // Emit agent_state: planning
     this.eventEmitter.emit('agent_state', {
@@ -80,8 +81,10 @@ export class ChatService {
 
     // Retrieve previous messages for conversation context
     const previousMessages = await this.msgRepo.listMessages(conversationId);
+    const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages
-      .filter((m: any) => m.content !== content)
+      .filter((m: any) => m.id !== currentMessageId && m.metadata?.type !== 'working_memory' &&
+        (m.role === 'user' || m.role === 'assistant'))
       .map((m: any) => ({
         role: m.role as any,
         content: m.content,
@@ -89,11 +92,16 @@ export class ChatService {
 
     // Call planner
     const memory = new WorkingMemory();
+    if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
+      memory.fromJSON(lastMemory.metadata.state);
+    }
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
       memory,
+      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
     });
+    await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
 
     if (plannerResponse.kind === 'plan') {
       const planHash = createHash('sha256')
@@ -124,10 +132,13 @@ export class ChatService {
         state: 'waiting_for_approval',
       });
     } else if (plannerResponse.kind === 'clarification') {
+      await this.msgRepo.createMessage(conversationId, 'assistant', plannerResponse.question, {
+        type: 'clarification', options: plannerResponse.options ?? [], context: plannerResponse.context,
+      });
       this.eventEmitter.emit('clarification', {
         conversationId,
         question: plannerResponse.question,
-        options: plannerResponse.options,
+        options: plannerResponse.options ?? [],
         context: plannerResponse.context,
       });
 

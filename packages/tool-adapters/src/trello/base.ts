@@ -1,5 +1,8 @@
 import { BaseAdapter, StepError } from '../base-adapter.js';
+import { GlobalRateLimiter } from '../rate-limiter.js';
 import type { TrelloBaseAdapterConfig, TrelloCredentials } from './types.js';
+
+const sharedTrelloLimiter = new GlobalRateLimiter({ maxRequests: 100, windowMs: 10_000 });
 
 export class TrelloBaseAdapter extends BaseAdapter {
   public readonly service = 'trello';
@@ -12,6 +15,19 @@ export class TrelloBaseAdapter extends BaseAdapter {
     this.credentials = config.credentials;
     this.baseUrl = config.baseUrl || 'https://api.trello.com/1';
     this.fetchFn = config.fetchFn || globalThis.fetch;
+  }
+
+  protected assertParentBoard(parent: unknown): void {
+    const boardId = (parent as { idBoard?: unknown } | null)?.idBoard;
+    if (typeof boardId !== 'string' || !boardId.trim()) {
+      throw new StepError({
+        message: 'Allowed scope restriction: parent board could not be verified',
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+      });
+    }
+    this.assertAllowedScope('board', boardId);
   }
 
   /**
@@ -28,15 +44,20 @@ export class TrelloBaseAdapter extends BaseAdapter {
     url.searchParams.set('token', this.credentials.token);
 
     let res: Response;
-    try {
-      res = await this.fetchFn(url.toString(), options);
-    } catch (err: any) {
-      throw new StepError({
-        message: `Trello network request failed: ${err?.message || err}`,
-        category: 'NETWORK',
-        retryable: true,
-        cause: err,
-      });
+    for (let attempt = 0; ; attempt++) {
+      await this.waitForTransportSlot(this.rateLimiter ?? sharedTrelloLimiter, this.service, options.signal ?? undefined);
+      try {
+        res = await this.fetchFn(url.toString(), options);
+      } catch (err: any) {
+        throw new StepError({
+          message: `Trello network request failed: ${err?.message || err}`,
+          category: 'NETWORK',
+          retryable: true,
+          cause: err,
+        });
+      }
+      if (res.status !== 429 || attempt >= 1) break;
+      await this.waitForRetryAfter(res.headers?.get?.('Retry-After'), options.signal ?? undefined);
     }
 
     if (!res.ok) {

@@ -5,8 +5,14 @@ export interface ServiceCardProps {
   title: string;
   connected?: boolean;
   allowedScope?: string[];
-  onSave?: (credentials: { apiKey?: string; token?: string; allowedScope: string[] }) => void;
-  onTestConnection?: () => void;
+  onSave?: (credentials: { apiKey?: string; token?: string; allowedScope: string[] }) => Promise<ServiceActionResult> | void;
+  onTestConnection?: () => Promise<ServiceActionResult> | void;
+}
+
+export interface ServiceActionResult {
+  success: boolean;
+  message: string;
+  latencyMs?: number;
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({
@@ -21,14 +27,21 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   const [token, setToken] = useState('');
   const [scopes, setScopes] = useState<string[]>(initialScope);
   const [newScope, setNewScope] = useState('');
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ServiceActionResult | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleTest = () => {
-    setTestResult('Đang kiểm tra... ⏳');
-    onTestConnection?.();
-    setTimeout(() => {
-      setTestResult('✓ Kết nối tốt (Ping: 120ms)');
-    }, 600);
+  const handleTest = async () => {
+    if (!onTestConnection) return;
+    setFeedback(null);
+    setBusy(true);
+    try {
+      const result = await onTestConnection();
+      if (result) setFeedback(result);
+    } catch (error) {
+      setFeedback({ success: false, message: error instanceof Error ? error.message : 'Không thể kiểm tra kết nối' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleAddScope = () => {
@@ -42,8 +55,18 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
     setScopes(scopes.filter((s) => s !== scopeToRemove));
   };
 
-  const handleSave = () => {
-    onSave?.({ apiKey, token, allowedScope: scopes });
+  const handleSave = async () => {
+    if (!onSave) return;
+    setFeedback(null);
+    setBusy(true);
+    try {
+      const result = await onSave({ apiKey, token, allowedScope: scopes });
+      if (result) setFeedback(result);
+    } catch (error) {
+      setFeedback({ success: false, message: error instanceof Error ? error.message : 'Không thể lưu cấu hình' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -63,30 +86,32 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
               : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
           }`}
         >
-          {connected ? 'Đã kết nối ✅' : 'Chưa kết nối ⚪'}
+          {connected ? 'Đã cấu hình' : 'Chưa cấu hình'}
         </span>
       </div>
 
       {/* Credential Inputs */}
       <div className="mt-4 flex flex-col gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-zinc-700 mb-1">
+        {service !== 'slack' && <div>
+          <label htmlFor={`${service}-api-key`} className="block text-xs font-semibold text-zinc-700 mb-1">
             API Key / Client ID
           </label>
           <input
+            id={`${service}-api-key`}
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="••••••••••••••••"
             className="w-full bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-        </div>
+        </div>}
 
         <div>
-          <label className="block text-xs font-semibold text-zinc-700 mb-1">
-            OAuth / API Token
+          <label htmlFor={`${service}-token`} className="block text-xs font-semibold text-zinc-700 mb-1">
+            {service === 'slack' ? 'Bot Token' : 'OAuth / API Token'}
           </label>
           <input
+            id={`${service}-token`}
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
@@ -149,20 +174,28 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
         </div>
       </div>
 
+      {feedback && (
+        <p role="status" className={`mt-3 text-xs ${feedback.success ? 'text-emerald-700' : 'text-red-700'}`}>
+          {feedback.message}{feedback.latencyMs !== undefined ? ` (${feedback.latencyMs}ms)` : ''}
+        </p>
+      )}
+
       {/* Action Footer */}
       <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between">
         {onTestConnection && (
           <button
             type="button"
             onClick={handleTest}
+            disabled={busy}
             className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition"
           >
-            {testResult || 'Kiểm tra kết nối'}
+            {busy ? 'Đang xử lý...' : 'Kiểm tra kết nối'}
           </button>
         )}
         <button
           type="button"
           onClick={handleSave}
+          disabled={busy || !onSave}
           className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 px-5 py-2 rounded-full transition shadow-xs ml-auto"
         >
           Lưu cấu hình

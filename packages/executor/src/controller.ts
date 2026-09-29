@@ -9,10 +9,11 @@ import type {
 export class ExecutionController {
   private runner: ExecutionControllerOptions['runner'];
   private steps: PlanStep[];
-  private onStepUpdate?: (stepId: string, state: StepState) => void;
+  private onStepUpdate?: (stepId: string, state: StepState) => void | Promise<void>;
   private stepStates = new Map<string, StepState>();
   private stepOutputs: StepOutputs = new Map();
   private stopped = false;
+  private readonly abortController = new AbortController();
 
   constructor(options: ExecutionControllerOptions) {
     this.runner = options.runner;
@@ -27,11 +28,17 @@ export class ExecutionController {
     }
   }
 
-  private updateStepState(stepId: string, partial: Partial<StepState>): StepState {
+  private async updateStepState(stepId: string, partial: Partial<StepState>): Promise<StepState> {
     const existing = this.stepStates.get(stepId) || { stepId, status: 'pending' };
     const updated: StepState = { ...existing, ...partial };
     this.stepStates.set(stepId, updated);
-    this.onStepUpdate?.(stepId, updated);
+    try {
+      await this.onStepUpdate?.(stepId, updated);
+    } catch (err) {
+      this.stopped = true;
+      this.stepStates.set(stepId, { stepId, status: 'unknown', error: err });
+      throw err;
+    }
     return updated;
   }
 
@@ -49,12 +56,17 @@ export class ExecutionController {
 
   private isRunning: boolean = false;
 
+  isExecuting(): boolean {
+    return this.isRunning;
+  }
+
   getOutputs(): StepOutputs {
     return new Map(this.stepOutputs);
   }
 
   async stop(): Promise<ExecutionSummary> {
     this.stopped = true;
+    this.abortController.abort();
     return { status: 'stopped' };
   }
 
@@ -92,14 +104,14 @@ export class ExecutionController {
         }
 
         // Mark step running
-        this.updateStepState(step.id, { status: 'running' });
+        await this.updateStepState(step.id, { status: 'running' });
 
         // Execute step
-        const result = await this.runner.executeStep(step, this.stepOutputs);
+        const result = await this.runner.executeStep(step, this.stepOutputs, { signal: this.abortController.signal });
 
         if (result.status === 'success' || result.status === 'succeeded') {
           this.stepOutputs.set(step.id, result.output);
-          this.updateStepState(step.id, {
+          await this.updateStepState(step.id, {
             status: 'succeeded',
             output: result.output,
             error: undefined,
@@ -107,57 +119,53 @@ export class ExecutionController {
         } else {
           // failed or unknown
           const failureStatus = result.status === 'unknown' ? 'unknown' : 'failed';
-          this.updateStepState(step.id, {
+          await this.updateStepState(step.id, {
             status: failureStatus,
             error: result.error,
           });
           return {
-            status: 'partial',
+            status: failureStatus === 'unknown' && this.stopped ? 'reconciliation_required' : this.stopped ? 'stopped' : 'partial',
             pausedAtStepId: step.id,
             error: result.error,
           };
         }
       }
 
-      return { status: 'completed' };
+      return { status: this.stopped ? 'stopped' : 'completed' };
     } finally {
       this.isRunning = false;
     }
   }
 
   async retryStep(stepId: string): Promise<ExecutionSummary> {
+    if (this.stopped) throw new Error(`Cannot retry step '${stepId}' after execution was stopped`);
     const step = this.steps.find((s) => s.id === stepId);
     if (!step) {
       throw new Error(`Step '${stepId}' not found in plan`);
     }
 
     const current = this.stepStates.get(stepId);
-    if (current?.status === 'succeeded') {
-      throw new Error(`Cannot retry step '${stepId}' because it has already succeeded`);
-    }
-    if (current?.status === 'running') {
-      throw new Error(`Cannot retry step '${stepId}' because it is currently running`);
+    if (current?.status !== 'failed') {
+      throw new Error(`Cannot retry step '${stepId}' unless it failed and its outcome is known`);
     }
 
-    this.updateStepState(stepId, { status: 'pending', error: undefined });
+    await this.updateStepState(stepId, { status: 'pending', error: undefined });
     return this.runUntilPause();
   }
 
   async skipStepAndContinue(stepId: string): Promise<ExecutionSummary> {
+    if (this.stopped) throw new Error(`Cannot skip step '${stepId}' after execution was stopped`);
     const step = this.steps.find((s) => s.id === stepId);
     if (!step) {
       throw new Error(`Step '${stepId}' not found in plan`);
     }
 
     const current = this.stepStates.get(stepId);
-    if (current?.status === 'succeeded') {
-      throw new Error(`Cannot skip step '${stepId}' because it has already succeeded`);
-    }
-    if (current?.status === 'running') {
-      throw new Error(`Cannot skip step '${stepId}' because it is currently running`);
+    if (current?.status !== 'failed' && current?.status !== 'unknown') {
+      throw new Error(`Cannot skip step '${stepId}' unless it failed or has an unknown outcome`);
     }
 
-    this.updateStepState(stepId, { status: 'skipped' });
+    await this.updateStepState(stepId, { status: 'skipped' });
     return this.runUntilPause();
   }
 }

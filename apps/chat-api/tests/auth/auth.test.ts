@@ -5,6 +5,12 @@ import {
   verifyRefreshToken,
   createAuthMiddleware,
 } from '../../src/auth/jwt.js';
+import { hashPassword, verifyPassword } from '../../src/db/repositories/user-repo.js';
+import { createApp } from '../../src/app.js';
+import { createAuthRoutes } from '../../src/routes/auth-routes.js';
+import express from 'express';
+import request from 'supertest';
+import crypto from 'node:crypto';
 
 describe('apps/chat-api (Task 15: Auth & JWT Handling)', () => {
   const secret = 'jwt-test-secret-at-least-32-chars-long';
@@ -98,3 +104,45 @@ describe('apps/chat-api (Task 15: Auth & JWT Handling)', () => {
   });
 });
 
+describe('password storage and login boundary', () => {
+  const secret = 'jwt-test-secret-at-least-32-chars-long';
+
+  it('rejects malformed bcrypt-looking hashes and plaintext legacy values', async () => {
+    expect(verifyPassword('password123', '$2b$12$not-a-real-bcrypt-hash')).toBe(false);
+    expect(verifyPassword('password123', 'password123')).toBe(false);
+    const app = createApp({
+      jwtSecret: secret,
+      userRepo: { findByEmail: async () => ({ id: 'user-1', email: 'a@example.test', name: 'A', password: '$2b$12$not-a-real-bcrypt-hash' }) } as any,
+    });
+    const response = await request(app).post('/api/auth/login').send({ email: 'a@example.test', password: 'password123' });
+    expect(response.status).toBe(401);
+  });
+
+  it('uses a distinct random salt for new hashes and verifies existing PBKDF2 hashes', () => {
+    const first = hashPassword('strong-password');
+    const second = hashPassword('strong-password');
+    expect(first).not.toBe(second);
+    expect(verifyPassword('strong-password', first)).toBe(true);
+    expect(verifyPassword('wrong', first)).toBe(false);
+    const legacyHash = crypto.pbkdf2Sync('legacy-password', 'wap_v3_salt', 10_000, 32, 'sha256').toString('hex');
+    expect(verifyPassword('legacy-password', legacyHash)).toBe(true);
+    expect(verifyPassword('wrong', legacyHash)).toBe(false);
+  });
+
+  it('does not expose a default admin login when no user repository is configured', async () => {
+    const app = createApp({ jwtSecret: secret });
+    const response = await request(app).post('/api/auth/login').send({ email: 'admin@wap.local', password: 'password123' });
+    expect(response.status).toBe(401);
+  });
+
+  it('does not mint a token from a lookup that has not checked the password', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/auth', createAuthRoutes({
+      jwtSecret: secret,
+      findUserByEmail: async () => ({ id: 'u', email: 'a@example.test', name: 'A' }),
+    } as any));
+    const response = await request(app).post('/api/auth/login').send({ email: 'a@example.test', password: 'wrong' });
+    expect(response.status).toBe(401);
+  });
+});

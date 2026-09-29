@@ -1,7 +1,8 @@
-// Acceptance tests: Proves remediation of findings F01-F14 from REVIEW.md across Gates G0-G5.
+// Legacy selected probes. These do not prove all F01-F14 gates or production readiness.
 // Run from repository root: node --import tsx docs/audits/2026-09-29-v3-review/acceptance-probes.mjs
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { createApp } from '../../../apps/chat-api/src/app.ts';
 import { generateTokens } from '../../../apps/chat-api/src/auth/jwt.ts';
@@ -29,7 +30,7 @@ record('auth_bypass_eliminated', { httpStatus: bypass.status, pass: true });
 // 2. F01: Fail-closed production env validation
 assert.throws(
   () => validateEnv({ NODE_ENV: 'production' }),
-  /JWT_SECRET must be explicitly provided/,
+  /RUNTIME_MODE|JWT_SECRET/,
   'Missing production secrets must throw in fail-closed mode'
 );
 record('production_missing_env_rejected', { failClosed: true, pass: true });
@@ -144,12 +145,16 @@ record('completed_write_protected_from_retry', { adapterCalls: calls, retryRejec
 // 11. F10: Execution persistence failure reports failure and updates plan status
 const persistedEvents = [];
 let statusUpdates = 0;
+const persistedPlan = { steps: [step] };
 const execution = new ExecutionService({
   planRepo: {
     approvePlan: async () => true,
-    getPlan: async () => ({ id: 'p', conv_id: 'c', plan_json: { steps: [step] } }),
+    getPlan: async () => ({ id: 'p', conv_id: 'c', plan_json: persistedPlan,
+      plan_hash: createHash('sha256').update(JSON.stringify(persistedPlan)).digest('hex'),
+      expires_at: new Date(Date.now() + 60_000) }),
     updatePlanStatus: async () => { statusUpdates++; },
   },
+  convRepo: { getConversation: async () => ({ id: 'c', user_id: 'user-a' }) },
   stepRepo: {
     createStep: async () => ({ id: 'db-step' }),
     updateStepStatus: async () => { throw new Error('Simulated DB failure'); },
@@ -174,4 +179,4 @@ assert.equal(useChatStore.getState().streamingText, 'hello', 'Duplicate SSE toke
 assert.equal(useChatStore.getState().isStreaming, false, 'text_end must finish streaming state');
 record('sse_deduplication_and_termination', { text: useChatStore.getState().streamingText, isStreaming: useChatStore.getState().isStreaming, pass: true });
 
-console.log(JSON.stringify({ purpose: 'Audit acceptance test verifying all remediated findings', allPassed: true, count: verifications.length, verifications }, null, 2));
+console.log(JSON.stringify({ purpose: 'Selected legacy probes; see current Vitest and PostgreSQL checks for remediation evidence', allPassed: true, count: verifications.length, verifications }, null, 2));

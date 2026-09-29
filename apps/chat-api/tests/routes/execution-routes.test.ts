@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ExecutionService } from '../../src/services/execution-service.js';
+import { createHash } from 'node:crypto';
+
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection)', () => {
   it('approves pending plan with optimistic lock and rejects concurrent duplicate with 409', async () => {
@@ -14,6 +17,7 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
         conv_id: 'conv-1',
         status: 'approved',
         plan_json: { steps: [] },
+        plan_hash: hash({ steps: [] }),
       }),
     };
 
@@ -23,6 +27,7 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
 
     const service = new ExecutionService({
       planRepo: mockPlanRepo as any,
+      convRepo: { getConversation: async () => ({ user_id: 'u1' }) },
       stepRepo: { createStep: vi.fn(), updateStepState: vi.fn() } as any,
       credentialRepo: { getCredentials: vi.fn() } as any,
       adapterFactory: mockAdapterFactory as any,
@@ -52,6 +57,9 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
             { id: 's1', tool: 'trello.create_card', description: 'Create card', args: {}, dependsOn: [] },
           ],
         },
+        plan_hash: hash({ steps: [
+          { id: 's1', tool: 'trello.create_card', description: 'Create card', args: {}, dependsOn: [] },
+        ] }),
       }),
     };
 
@@ -74,6 +82,7 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
 
     const service = new ExecutionService({
       planRepo: mockPlanRepo as any,
+      convRepo: { getConversation: async () => ({ user_id: 'u2' }) },
       stepRepo: mockStepRepo as any,
       adapterFactory: mockAdapterFactory as any,
       sseManager: mockSSEManager as any,

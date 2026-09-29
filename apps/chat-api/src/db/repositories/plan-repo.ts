@@ -22,25 +22,30 @@ export class PlanRepo {
     planHash: string;
     expiresAt: Date;
   }): Promise<PlanRow> {
-    // Invalidate/supersede any existing pending plans for this conversation
-    await this.pool.query(
-      "UPDATE plans SET status = 'superseded' WHERE conv_id = $1 AND status = 'pending'",
-      [data.convId]
-    );
-
-    const res = await this.pool.query(
-      `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [
-        data.convId,
-        JSON.stringify(data.planJson),
-        data.planText || null,
-        data.planHash,
-        data.expiresAt,
-      ]
-    );
-    return res.rows[0];
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // The parent conversation row serializes proposals, including when no plan exists yet.
+      const owner = await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [data.convId]);
+      if (!owner.rowCount) throw new Error('Conversation not found');
+      await client.query(
+        "UPDATE plans SET status = 'superseded' WHERE conv_id = $1 AND status = 'pending'",
+        [data.convId]
+      );
+      const res = await client.query(
+        `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [data.convId, JSON.stringify(data.planJson), data.planText || null, data.planHash, data.expiresAt]
+      );
+      await client.query('COMMIT');
+      return res.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async getPlan(id: string): Promise<PlanRow | null> {
@@ -59,10 +64,10 @@ export class PlanRepo {
   /**
    * Optimistic locking: only transitions to approved if currently pending AND not expired.
    */
-  async approvePlan(planId: string): Promise<boolean> {
+  async approvePlan(planId: string, expectedHash: string, userId: string): Promise<boolean> {
     const res = await this.pool.query(
-      "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING id",
-      [planId]
+      "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
+      [planId, expectedHash, userId]
     );
     return (res.rowCount ?? 0) > 0;
   }
@@ -70,10 +75,10 @@ export class PlanRepo {
   /**
    * Optimistic locking: only transitions to rejected if currently pending.
    */
-  async rejectPlan(planId: string): Promise<boolean> {
+  async rejectPlan(planId: string, userId: string): Promise<boolean> {
     const res = await this.pool.query(
-      "UPDATE plans SET status = 'rejected', decided_at = now() WHERE id = $1 AND status = 'pending' RETURNING id",
-      [planId]
+      "UPDATE plans SET status = 'rejected', decided_at = now() WHERE id = $1 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $2) RETURNING id",
+      [planId, userId]
     );
     return (res.rowCount ?? 0) > 0;
   }

@@ -61,6 +61,7 @@ export const CLARIFICATION_RESPONSE = {
 
 export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> {
   const events = new EventEmitter();
+  events.on('error', () => undefined);
   const jwtSecret = 'super-secret-jwt-test-key-at-least-32-chars';
 
   // 1. In-memory data storage
@@ -225,13 +226,21 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   if (options.mode === 'happy-path' || options.mode === 'fail-step') {
     mockProvider.setPlanResponses([VALID_3_STEP_PLAN]);
   } else if (options.mode === 'clarification') {
-    mockProvider.setPlanResponses([CLARIFICATION_RESPONSE, VALID_3_STEP_PLAN]);
+    mockProvider.setPlanResponses([{ ...VALID_3_STEP_PLAN, steps: VALID_3_STEP_PLAN.steps.slice(0, 2) }]);
   }
 
   // 4. Planner
   const planner = new AIPlanner({
     provider: mockProvider,
     toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
+    gatherSearch: async ({ tool }) => {
+      if (tool === 'trello.search_boards') return [{ id: 'board_frontend', name: 'Frontend' }];
+      if (tool === 'trello.search_members') return options.mode === 'clarification'
+        ? [{ id: 'member_minh_001', name: 'Minh Nguyen' }, { id: 'member_minh_002', name: 'Minh Tran' }]
+        : [{ id: 'member_minh_001', name: 'Minh' }];
+      if (tool === 'slack.search_channels') return [{ id: 'C_GENERAL', name: 'general' }];
+      return [];
+    },
   });
 
   // 5. SSE Manager with event bridging
@@ -252,19 +261,6 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   // 6. Chat Service event forwarding
   const chatEventEmitter = {
     emit: (event: string, payload: any) => {
-      // In clarification mode, also store clarification message in msgRepo for latest check
-      if (event === 'clarification') {
-        mockMsgRepo.createMessage(
-          payload.conversationId,
-          'assistant',
-          payload.question,
-          {
-            type: 'clarification',
-            options: payload.options,
-            context: payload.context,
-          }
-        );
-      }
       recordEvent(event, payload);
     },
   };
@@ -324,6 +320,7 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   const executionService = new ExecutionService({
     planRepo: mockPlanRepo as any,
     stepRepo: mockStepRepo as any,
+    convRepo: mockConvRepo as any,
     adapterFactory,
     sseManager,
   });
@@ -331,6 +328,10 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   // 9. Create Express App
   const app = createApp({
     jwtSecret,
+    validateCredentials: async (email, password) =>
+      email === 'admin@wap.local' && password === 'password123'
+        ? { id: 'a0000000-0000-4000-8000-000000000001', email, name: 'Fixture Admin' }
+        : null,
     convRepo: mockConvRepo as any,
     msgRepo: mockMsgRepo as any,
     planRepo: mockPlanRepo as any,

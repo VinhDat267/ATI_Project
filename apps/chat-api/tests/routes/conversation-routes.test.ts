@@ -2,6 +2,39 @@ import { describe, it, expect, vi } from 'vitest';
 import { ChatService } from '../../src/services/chat-service.js';
 
 describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', () => {
+  it('persists working memory and assistant clarification across user turns', async () => {
+    const rows: any[] = [];
+    const msgRepo = {
+      createMessage: vi.fn().mockImplementation(async (_convId: string, role: string, content: string, metadata?: any) => {
+        const row = { id: `m-${rows.length + 1}`, role, content, metadata };
+        rows.push(row);
+        return row;
+      }),
+      listMessages: async () => [...rows],
+    };
+    const observations: any[] = [];
+    const planner = {
+      processMessage: async (input: any) => {
+        observations.push({ memory: input.memory.toJSON(), history: input.history });
+        if (observations.length === 1) {
+          input.memory.setEntity('__gatherPending', { key: 'member', query: 'Minh', candidates: [{ id: 'U1', name: 'Minh Nguyen' }] });
+          return { kind: 'clarification', question: 'Which Minh?', options: ['Minh Nguyen'] };
+        }
+        return { kind: 'plan', thinking: 'x', summary: 'x', steps: [], warnings: [] };
+      },
+    };
+    const events: Array<{ name: string; payload: any }> = [];
+    const emitter = { emit: (name: string, payload: any) => { events.push({ name, payload }); } };
+    const service = new ChatService({ msgRepo: msgRepo as any, planner: planner as any, eventEmitter: emitter });
+    await service.handleUserMessage({ conversationId: 'c', userId: 'u', content: 'Gán task cho Minh' });
+    await vi.waitFor(() => expect(events.some((e) => e.name === 'clarification')).toBe(true));
+    await service.handleUserMessage({ conversationId: 'c', userId: 'u', content: 'Minh Nguyen' });
+    await vi.waitFor(() => expect(observations).toHaveLength(2));
+    expect(observations[1].memory.__gatherPending.candidates[0].id).toBe('U1');
+    expect(observations[1].history).toContainEqual({ role: 'assistant', content: 'Which Minh?' });
+    expect(rows.find((m) => m.metadata?.type === 'working_memory')).toBeDefined();
+  });
+
   it('saves message to db and returns 202 accepted payload immediately', async () => {
     const mockMsgRepo = {
       createMessage: vi.fn().mockResolvedValue({ id: 'msg-123' }),

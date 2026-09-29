@@ -16,11 +16,11 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       });
       const repo = new PlanRepo({ query: mockQuery } as any);
 
-      const approved = await repo.approvePlan('plan-1');
+      const approved = await repo.approvePlan('plan-1', 'hash123', 'u1');
       expect(approved).toBe(true);
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("WHERE id = $1 AND status = 'pending'"),
-        ['plan-1']
+        expect.stringContaining("WHERE id = $1 AND plan_hash = $2 AND status = 'pending'"),
+        ['plan-1', 'hash123', 'u1']
       );
     });
 
@@ -31,7 +31,7 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       });
       const repo = new PlanRepo({ query: mockQuery } as any);
 
-      const approved = await repo.approvePlan('plan-already-processed');
+      const approved = await repo.approvePlan('plan-already-processed', 'hash123', 'u1');
       expect(approved).toBe(false);
     });
 
@@ -40,7 +40,7 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
         rowCount: 1,
         rows: [{ id: 'p1', plan_hash: 'hash123', status: 'pending' }],
       });
-      const repo = new PlanRepo({ query: mockQuery } as any);
+      const repo = new PlanRepo({ connect: async () => ({ query: mockQuery, release: () => undefined }) } as any);
 
       const expiresAt = new Date(Date.now() + 1800000);
       const plan = await repo.createPlan({
@@ -92,6 +92,10 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
 
       const history = await repo.listMessages('c1');
       expect(history).toHaveLength(1);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY created_at DESC, id DESC'),
+        ['c1', 100]
+      );
     });
   });
 
@@ -127,7 +131,7 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
         }
         return { rowCount: 1, rows: [{ id: 'cred-1', service: 'trello', config: 'v1:...' }] };
       });
-      const repo = new CredentialRepo({ query: mockQuery } as any);
+      const repo = new CredentialRepo({ query: mockQuery, connect: async () => ({ query: mockQuery, release: () => undefined }) } as any);
 
       const saved = await repo.saveCredentials('trello', 'v1:enc...');
       expect(saved.service).toBe('trello');

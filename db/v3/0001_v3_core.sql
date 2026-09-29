@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email       TEXT UNIQUE NOT NULL,
-  password    TEXT NOT NULL,              -- bcrypt hash
+  password    TEXT NOT NULL,              -- salted PBKDF2-SHA256 hash
   name        TEXT NOT NULL,
   created_at  TIMESTAMPTZ DEFAULT now()
 );

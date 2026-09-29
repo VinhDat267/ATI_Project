@@ -23,6 +23,10 @@ export class AdapterFactory {
     this.encryptionKey = options.encryptionKey;
   }
 
+  clearCache(serviceName: string): void {
+    this.adapterCache.delete(serviceName);
+  }
+
   async getAdapterForService(serviceName: string): Promise<any> {
     const cached = this.adapterCache.get(serviceName);
     if (cached) return cached;
@@ -34,6 +38,10 @@ export class AdapterFactory {
 
     const decrypted = decryptCredentials(record.config, this.encryptionKey);
     const allowedScope: AllowedScope = (decrypted.allowedScope || {}) as AllowedScope;
+    const entries = serviceName === 'trello' ? allowedScope.boards : allowedScope.channels;
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new Error(`Allowed scope is required for service '${serviceName}'`);
+    }
 
     let adapter: any;
     if (serviceName === 'trello') {

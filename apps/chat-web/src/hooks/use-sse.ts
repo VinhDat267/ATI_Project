@@ -3,23 +3,29 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
 import type { StepState } from '../types';
 
-let lastEventSeq = 0;
-const processedSeqs = new Set<number>();
+const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
+const fallbackConversationKey = '__no_conversation__';
 
 export function resetSSEState(): void {
-  lastEventSeq = 0;
-  processedSeqs.clear();
+  lastEventSeq.clear();
 }
 
-export function handleSSEEvent(event: string, dataStr: string, seq?: number): void {
+export function handleSSEEvent(event: string, dataStr: string, eventId?: number | string, conversationId?: string): void {
   const store = useChatStore.getState();
+  if (conversationId && store.conversationId !== conversationId) {
+    return;
+  }
+  const key = conversationId || store.conversationId || fallbackConversationKey;
 
-  if (seq !== undefined) {
-    if (processedSeqs.has(seq)) {
-      return; // Deduplicate already processed event
-    }
-    processedSeqs.add(seq);
-    lastEventSeq = Math.max(lastEventSeq, seq);
+  if (eventId !== undefined) {
+    const raw = String(eventId);
+    const separator = raw.lastIndexOf(':');
+    const epoch = separator < 0 ? 'legacy' : raw.slice(0, separator);
+    const seq = Number(separator < 0 ? raw : raw.slice(separator + 1));
+    if (!epoch || !Number.isSafeInteger(seq) || seq < 0) return;
+    const previous = lastEventSeq.get(key);
+    if (previous?.epoch === epoch && seq <= previous.seq) return;
+    lastEventSeq.set(key, { epoch, seq });
   }
 
   let data: any = {};
@@ -148,11 +154,14 @@ export function useSSE(conversationId: string | null, token: string | null) {
       signal: ctrl.signal,
       headers: {
         Authorization: `Bearer ${token}`,
-        'Last-Event-ID': String(lastEventSeq),
+        'Last-Event-ID': (() => {
+          const cursor = lastEventSeq.get(conversationId);
+          if (!cursor) return '0';
+          return cursor.epoch === 'legacy' ? String(cursor.seq) : `${cursor.epoch}:${cursor.seq}`;
+        })(),
       },
       onmessage(ev) {
-        const seq = ev.id ? parseInt(ev.id, 10) : undefined;
-        handleSSEEvent(ev.event || 'message', ev.data, seq);
+        handleSSEEvent(ev.event || 'message', ev.data, ev.id || undefined, conversationId);
       },
       onerror(err) {
         // Will auto-retry with last-event-id

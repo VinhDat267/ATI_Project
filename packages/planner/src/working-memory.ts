@@ -16,6 +16,10 @@ export class WorkingMemory {
     return this.entities[key];
   }
 
+  deleteEntity(key: string): void {
+    delete this.entities[key];
+  }
+
   addMember(member: ResolvedMember): void {
     const existingIndex = this.members.findIndex((m) => m.id === member.id);
     if (existingIndex >= 0) {

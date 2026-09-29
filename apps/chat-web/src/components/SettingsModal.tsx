@@ -1,5 +1,12 @@
 import React from 'react';
-import { ServiceCard } from './ServiceCard';
+import { ServiceCard, type ServiceActionResult } from './ServiceCard';
+
+interface ServiceInfo {
+  id: string;
+  name: string;
+  connected: boolean;
+  allowedScope?: string[];
+}
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -12,47 +19,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   authToken,
 }) => {
-  const [services, setServices] = React.useState<any[]>([
-    { id: 'trello', name: 'Trello', connected: false, scopes: ['Frontend Team', 'Mobile App'] },
-    { id: 'slack', name: 'Slack', connected: false, scopes: ['#general'] },
+  const [services, setServices] = React.useState<ServiceInfo[]>([
+    { id: 'trello', name: 'Trello', connected: false },
+    { id: 'slack', name: 'Slack', connected: false },
   ]);
-  const [testResult, setTestResult] = React.useState<{ service: string; message: string } | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen && authToken) {
       fetch('/api/services', {
         headers: { Authorization: `Bearer ${authToken}` },
       })
-        .then((res) => (res.ok ? res.json() : null))
+        .then((res) => {
+          if (!res.ok) throw new Error(`Không thể tải dịch vụ (${res.status})`);
+          return res.json();
+        })
         .then((data) => {
           if (data?.services && Array.isArray(data.services)) {
             setServices(data.services);
           }
         })
-        .catch((err) => console.warn('Failed to load services:', err));
+        .catch((err) => setLoadError(err instanceof Error ? err.message : 'Không thể tải dịch vụ'));
     }
   }, [isOpen, authToken]);
 
-  const handleTestConnection = async (serviceId: string) => {
+  const handleTestConnection = async (serviceId: string): Promise<ServiceActionResult> => {
     if (!authToken) {
-      setTestResult({ service: serviceId, message: 'Chưa xác thực - vui lòng đăng nhập' });
-      return;
+      return { success: false, message: 'Chưa xác thực - vui lòng đăng nhập' };
     }
     try {
       const res = await fetch(`/api/services/${serviceId}/test`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      const data = await res.json();
-      setTestResult({
-        service: serviceId,
-        message: `${data.message || 'Kết nối thành công'} (${data.latencyMs || 45}ms)`,
+      const data = await res.json().catch(() => ({}));
+      const success = res.ok && data.status === 'healthy';
+      return {
+        success,
+        message: success ? data.message || 'Kết nối thành công' : data.error || data.message || `Kiểm tra kết nối thất bại (${res.status})`,
+        latencyMs: success && typeof data.latencyMs === 'number' ? data.latencyMs : undefined,
+      };
+    } catch (err) {
+      return { success: false, message: `Lỗi kết nối: ${err instanceof Error ? err.message : 'Không thể kết nối dịch vụ'}` };
+    }
+  };
+
+  const handleSave = async (serviceId: string, input: { apiKey?: string; token?: string; allowedScope: string[] }): Promise<ServiceActionResult> => {
+    if (!authToken) return { success: false, message: 'Chưa xác thực - vui lòng đăng nhập' };
+    try {
+      const res = await fetch(`/api/services/${serviceId}/credentials`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credentials: serviceId === 'slack' ? { botToken: input.token } : { apiKey: input.apiKey, token: input.token },
+          allowedScope: input.allowedScope,
+        }),
       });
-    } catch (err: any) {
-      setTestResult({
-        service: serviceId,
-        message: `Lỗi kết nối: ${err?.message || 'Không thể kết nối dịch vụ'}`,
-      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success !== true) {
+        return { success: false, message: data.error || data.message || `Không thể lưu cấu hình (${res.status})` };
+      }
+      return { success: true, message: data.message || 'Đã lưu cấu hình' };
+    } catch (err) {
+      return { success: false, message: `Lỗi kết nối: ${err instanceof Error ? err.message : 'Không thể lưu cấu hình'}` };
     }
   };
 
@@ -98,10 +127,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {testResult && (
+          {loadError && (
             <div className="p-3 bg-zinc-100 border border-zinc-300 rounded-xl text-xs text-zinc-800 flex justify-between items-center">
-              <span><strong>[{testResult.service.toUpperCase()}]:</strong> {testResult.message}</span>
-              <button type="button" onClick={() => setTestResult(null)} className="text-zinc-500 hover:text-zinc-800">✕</button>
+              <span>{loadError}</span>
+              <button type="button" onClick={() => setLoadError(null)} className="text-zinc-500 hover:text-zinc-800">✕</button>
             </div>
           )}
 
@@ -109,11 +138,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {services.map((svc) => (
               <ServiceCard
                 key={svc.id}
-                service={svc.id as any}
+                service={svc.id}
                 title={`${svc.name} Workspace`}
                 connected={Boolean(svc.connected)}
-                allowedScope={svc.scopes || []}
+                allowedScope={svc.allowedScope || []}
                 onTestConnection={() => handleTestConnection(svc.id)}
+                onSave={(input) => handleSave(svc.id, input)}
               />
             ))}
           </div>

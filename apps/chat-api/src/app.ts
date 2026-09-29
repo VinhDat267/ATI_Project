@@ -9,6 +9,7 @@ import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
 import type { UserRepo } from './db/repositories/user-repo.js';
+import type { AuthUser } from './auth/jwt.js';
 import type { CredentialRepo } from './db/repositories/credential-repo.js';
 import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
@@ -17,10 +18,15 @@ import type { ExecutionService } from './services/execution-service.js';
 export interface AppOptions {
   jwtSecret: string;
   userRepo?: UserRepo;
+  validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
   planRepo?: PlanRepo;
   credentialRepo?: CredentialRepo;
+  encryptionKey?: string;
+  serviceFetchFn?: typeof fetch;
+  onCredentialsChanged?: (service: string) => void;
+  serviceAdminUserIds?: string[];
   chatService?: ChatService;
   sseManager?: SSEManager;
   executionService?: ExecutionService;
@@ -51,24 +57,23 @@ export function createApp(options: AppOptions): Express {
   // Auth routes (public login/refresh, protected /me)
   app.use(
     '/api/auth',
-    createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo })
+    createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, validateCredentials: options.validateCredentials })
   );
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret);
-  const sseAuthMiddleware = createAuthMiddleware(options.jwtSecret, { allowQueryToken: true });
 
   // Services routes (protected via Bearer header)
   app.use(
     '/api/services',
     authMiddleware,
-    createServicesRoutes({ credentialRepo: options.credentialRepo })
+    createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds })
   );
 
-  // Stream routes (protected via Bearer header or ?token= query parameter)
+  // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {
     app.use(
       '/api/conversations',
-      sseAuthMiddleware,
+      authMiddleware,
       createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo })
     );
   }

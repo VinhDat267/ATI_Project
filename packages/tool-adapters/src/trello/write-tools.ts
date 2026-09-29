@@ -17,9 +17,7 @@ export class TrelloWriteTools extends TrelloReadTools {
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
     if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
       const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
-      if (listInfo && listInfo.idBoard) {
-        this.assertAllowedScope('board', listInfo.idBoard);
-      }
+      this.assertParentBoard(listInfo);
     }
 
     const body: Record<string, any> = {
@@ -61,14 +59,10 @@ export class TrelloWriteTools extends TrelloReadTools {
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
     if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
       const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      if (cardInfo && cardInfo.idBoard) {
-        this.assertAllowedScope('board', cardInfo.idBoard);
-      }
+      this.assertParentBoard(cardInfo);
       if (args.idList) {
         const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
-        if (listInfo && listInfo.idBoard) {
-          this.assertAllowedScope('board', listInfo.idBoard);
-        }
+        this.assertParentBoard(listInfo);
       }
     }
 
@@ -106,9 +100,7 @@ export class TrelloWriteTools extends TrelloReadTools {
   ): Promise<{ id: string; idMembers: string[] }> {
     if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
       const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      if (cardInfo && cardInfo.idBoard) {
-        this.assertAllowedScope('board', cardInfo.idBoard);
-      }
+      this.assertParentBoard(cardInfo);
     }
 
     const res = await this.request<any>(`/cards/${args.cardId}/idMembers`, {
@@ -145,9 +137,7 @@ export class TrelloWriteTools extends TrelloReadTools {
   }> {
     if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
       const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      if (cardInfo && cardInfo.idBoard) {
-        this.assertAllowedScope('board', cardInfo.idBoard);
-      }
+      this.assertParentBoard(cardInfo);
     }
 
     const chkRes = await this.request<any>(`/cards/${args.cardId}/checklists`, {

@@ -38,11 +38,15 @@ export interface EvaluationDetail {
 }
 
 export interface EvaluationResults {
+  evidence: 'offline_fixture' | 'provider_observed';
+  qualityGate: 'not_run' | 'incomplete';
   totalPrompts: number;
   syntaxValidRate: number;
   happyPathAccuracy: number;
   edgeCaseAccuracy: number;
-  usablePlanRate: number;
+  kindAndToolMatchRate: number;
+  argumentQualityRate: number | null;
+  usablePlanRate: number | null;
   details: EvaluationDetail[];
 }
 
@@ -97,7 +101,7 @@ function buildMockResponseForPrompt(prompt: GoldenPrompt): string {
       }
     } else if (tool.startsWith('slack.')) {
       if (tool.includes('send_message')) {
-        args.channelId = 'C01234567';
+        args.channel = 'C01234567';
         args.text = prevStepId
           ? { $template: `Hoàn tất bước: \${${prevStepId}.output.id}` }
           : 'Thông báo từ hệ thống';
@@ -126,7 +130,13 @@ function buildMockResponseForPrompt(prompt: GoldenPrompt): string {
 }
 
 export async function runEvaluations(options: EvaluationOptions = {}): Promise<EvaluationResults> {
-  const { useMock = true } = options;
+  const { useMock = false } = options;
+  if (!useMock && !options.provider) {
+    throw new Error('A live LLMProvider must be provided when useMock is false');
+  }
+  if (!useMock && options.provider?.name === 'mock') {
+    throw new Error('Mock provider cannot be used for live evaluation');
+  }
   const goldenPrompts = loadGoldenPrompts();
   const allTools = [...TRELLO_TOOLS, ...SLACK_TOOLS];
 
@@ -218,14 +228,20 @@ export async function runEvaluations(options: EvaluationOptions = {}): Promise<E
   const syntaxValidRate = totalPrompts > 0 ? syntaxValidCount / totalPrompts : 0;
   const happyPathAccuracy = happyPathTotal > 0 ? happyPathPassed / happyPathTotal : 0;
   const edgeCaseAccuracy = edgeCaseTotal > 0 ? edgeCasePassed / edgeCaseTotal : 0;
-  const usablePlanRate = totalPrompts > 0 ? (happyPathPassed + edgeCasePassed) / totalPrompts : 0;
+  const kindAndToolMatchRate = totalPrompts > 0 ? (happyPathPassed + edgeCasePassed) / totalPrompts : 0;
 
   return {
+    evidence: useMock ? 'offline_fixture' : 'provider_observed',
+    // Argument quality requires independently labelled arguments; usable plan rate requires user acceptance.
+    // Neither is established by expected-label fixtures or tool matching alone.
+    qualityGate: useMock ? 'not_run' : 'incomplete',
     totalPrompts,
     syntaxValidRate,
     happyPathAccuracy,
     edgeCaseAccuracy,
-    usablePlanRate,
+    kindAndToolMatchRate,
+    argumentQualityRate: null,
+    usablePlanRate: null,
     details,
   };
 }

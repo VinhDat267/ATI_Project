@@ -21,6 +21,65 @@ const INJECTION_PATTERNS = [
   /you are now in developer mode/i,
 ];
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
+  if (isObject(value) && ('$ref' in value || '$template' in value)) {
+    const key = '$ref' in value ? '$ref' : '$template';
+    if (schema.type !== 'string' || Object.keys(value).length !== 1 ||
+      typeof value[key] !== 'string' || !value[key].trim()) {
+      return `${path} must be a ${schema.type || 'valid'} value or a single non-empty ${key} string`;
+    }
+    return null;
+  }
+
+  if (schema.type === 'object') {
+    if (!isObject(value)) return `${path} must be an object`;
+    const properties = schema.properties || {};
+    for (const required of schema.required || []) {
+      if (value[required] === undefined || value[required] === null) {
+        return `${path} is missing required argument '${required}'`;
+      }
+    }
+    for (const [key, child] of Object.entries(value)) {
+      if (!(key in properties)) {
+        if (schema.additionalProperties === false) return `${path}.${key} is an additional property`;
+        if (isObject(schema.additionalProperties)) {
+          const error = validateSchemaValue(child, schema.additionalProperties, `${path}.${key}`);
+          if (error) return error;
+        }
+      } else {
+        const error = validateSchemaValue(child, properties[key], `${path}.${key}`);
+        if (error) return error;
+      }
+    }
+  } else if (schema.type === 'array') {
+    if (!Array.isArray(value)) return `${path} must be an array`;
+    if (schema.items) {
+      for (const [index, item] of value.entries()) {
+        const error = validateSchemaValue(item, schema.items, `${path}[${index}]`);
+        if (error) return error;
+      }
+    }
+  } else if (schema.type === 'integer') {
+    if (!Number.isInteger(value)) return `${path} must be an integer`;
+  } else if (schema.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return `${path} must be a number`;
+  } else if (schema.type === 'null') {
+    if (value !== null) return `${path} must be null`;
+  } else if (schema.type && typeof value !== schema.type) {
+    return `${path} must be a ${schema.type}`;
+  }
+  if (schema.enum && !schema.enum.includes(value)) return `${path} must match an allowed value`;
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) return `${path} is below minimum`;
+    if (schema.maximum !== undefined && value > schema.maximum) return `${path} is above maximum`;
+  }
+  return null;
+}
+
 export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): ValidationResult {
   // Layer 4: Security validate (Check for prompt injection escape markers)
   for (const pattern of INJECTION_PATTERNS) {
@@ -126,6 +185,21 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
     };
   }
 
+  for (const [index, step] of parsed.steps.entries()) {
+    if (!isObject(step)) {
+      return { valid: false, layer: 'schema', error: `Step at index ${index} must be an object` };
+    }
+    if (!Array.isArray(step.dependsOn) || step.dependsOn.some((dep) => typeof dep !== 'string')) {
+      return { valid: false, layer: 'schema', error: `Step at index ${index} dependsOn must be an array of strings` };
+    }
+    if (typeof step.description !== 'string' || !step.description.trim()) {
+      return { valid: false, layer: 'schema', error: `Step at index ${index} requires a description string` };
+    }
+    if (typeof step.tool !== 'string') {
+      return { valid: false, layer: 'schema', error: `Step at index ${index} requires a tool string` };
+    }
+  }
+
   // Layer 3: Semantic validate
   const catalogMap = new Map<string, ToolDefinition>(catalog.map((t) => [t.name, t]));
   const steps: PlanStep[] = parsed.steps;
@@ -160,17 +234,9 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
       };
     }
 
-    // Check required arguments for tool
-    const requiredArgs = toolDef.inputSchema?.required || [];
-    const stepArgs = step.args || {};
-    for (const reqArg of requiredArgs) {
-      if (stepArgs[reqArg] === undefined || stepArgs[reqArg] === null) {
-        return {
-          valid: false,
-          layer: 'schema',
-          error: `Step '${step.id}' is missing required argument '${reqArg}' for tool '${step.tool}'`,
-        };
-      }
+    const argsError = validateSchemaValue(step.args, toolDef.inputSchema, `Step '${step.id}' args`);
+    if (argsError) {
+      return { valid: false, layer: 'schema', error: `${argsError} for tool '${step.tool}'` };
     }
 
     // Check declared dependencies existence

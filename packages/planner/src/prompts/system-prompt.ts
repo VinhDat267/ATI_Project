@@ -62,7 +62,7 @@ ${toolList}
       "tool": "slack.send_message",
       "description": "Gửi thông báo vào kênh general",
       "args": {
-        "channelId": "C0123456789",
+        "channel": "C0123456789",
         "text": { "$template": "Card mới đã được tạo: \${step_1.output.url}" }
       },
       "dependsOn": ["step_1"]

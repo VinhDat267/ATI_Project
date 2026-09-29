@@ -36,7 +36,7 @@ describe('apps/chat-api (Task 17: SSE Stream Manager & Sequence Tracking)', () =
 
     expect(mockRes.write).toHaveBeenCalled();
     const combined = writtenChunks.join('');
-    expect(combined).toContain('id: 1\n');
+    expect(combined).toMatch(/id: [^:]+:1\n/);
     expect(combined).toContain('event: agent_state\n');
     expect(combined).toContain('"state":"planning"');
 
@@ -58,5 +58,13 @@ describe('apps/chat-api (Task 17: SSE Stream Manager & Sequence Tracking)', () =
     // Emitting now does not write to mockRes
     manager.emitEvent(convId, 'agent_state', { state: 'idle' });
     expect(mockRes.write).not.toHaveBeenCalled();
+  });
+
+  it('replays from the beginning of the current buffer when a cursor belongs to a previous server epoch', () => {
+    const oldServer = new SSEManager();
+    const oldCursor = oldServer.formatSSE(oldServer.emitEvent('conv', 'text_delta', { delta: 'old' })).match(/^id: ([^\n]+)/)?.[1];
+    const newServer = new SSEManager();
+    newServer.emitEvent('conv', 'text_delta', { delta: 'new' });
+    expect(newServer.getMissedEventsForCursor('conv', oldCursor)).toMatchObject([{ id: 1 }]);
   });
 });

@@ -22,6 +22,7 @@ Your job is to parse the user's intent, consult working memory, and produce a si
    { "$ref": "step_id.output.propertyName" }
    or inside templates:
    { "$template": "Created task: ${step_id.output.url}" }
+5. Slack send_message uses "channel" for the channel ID; never use "channelId".
 ```
 
 ## Quality Thresholds
