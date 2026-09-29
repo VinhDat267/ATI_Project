@@ -1,12 +1,9 @@
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import {
   decryptCredentials,
-  TrelloAdapter,
-  SlackAdapter,
-  type TrelloCredentials,
-  type SlackCredentials,
 } from '@wap/tool-adapters';
 import type { AllowedScope } from '@wap/tool-schemas';
+import { getRegisteredService } from './registered-services.js';
 
 export interface AdapterFactoryOptions {
   credentialRepo: CredentialRepo;
@@ -31,6 +28,9 @@ export class AdapterFactory {
     const cached = this.adapterCache.get(serviceName);
     if (cached) return cached;
 
+    const registration = getRegisteredService(serviceName);
+    if (!registration) throw new Error(`Unsupported service '${serviceName}'`);
+
     const record = await this.credentialRepo.getCredentials(serviceName);
     if (!record) {
       throw new Error(`No credentials configured for service '${serviceName}'`);
@@ -38,25 +38,15 @@ export class AdapterFactory {
 
     const decrypted = decryptCredentials(record.config, this.encryptionKey);
     const allowedScope: AllowedScope = (decrypted.allowedScope || {}) as AllowedScope;
-    const entries = serviceName === 'trello' ? allowedScope.boards : allowedScope.channels;
+    const entries = allowedScope[registration.definition.scopeKey];
     if (!Array.isArray(entries) || entries.length === 0) {
       throw new Error(`Allowed scope is required for service '${serviceName}'`);
     }
 
-    let adapter: any;
-    if (serviceName === 'trello') {
-      adapter = new TrelloAdapter({
-        credentials: decrypted as unknown as TrelloCredentials,
-        allowedScope,
-      });
-    } else if (serviceName === 'slack') {
-      adapter = new SlackAdapter({
-        credentials: decrypted as unknown as SlackCredentials,
-        allowedScope,
-      });
-    } else {
-      throw new Error(`Unsupported service '${serviceName}'`);
+    if (!registration.definition.credentialFields.every(({ key }) => typeof decrypted[key] === 'string' && String(decrypted[key]).trim())) {
+      throw new Error(`Credentials are incomplete for service '${serviceName}'`);
     }
+    const adapter = registration.transport.createAdapter(decrypted, allowedScope);
 
     this.adapterCache.set(serviceName, adapter);
     return adapter;

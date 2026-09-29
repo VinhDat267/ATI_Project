@@ -14,10 +14,16 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
 ### 1.1. Quyền lực phạm vi v3 (Active Scope Authority)
 - **Báo cáo Tổng quan Project:** [`docs/PROJECT-REPORT.md`](docs/PROJECT-REPORT.md) là tài liệu mô tả toàn cảnh dự án (mục tiêu, kiến trúc, tiến độ). Đọc file này trước để nắm bức tranh tổng thể.
 - **Đặc tả Thiết kế v3:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) là tài liệu chuẩn tắc duy nhất về hành vi nghiệp vụ, luồng xử lý, tool catalog và schema của hệ thống v3.
-- **Kế hoạch Triển khai (28 Tasks TDD):** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) là bản chỉ dẫn thực thi bắt buộc theo từng task tuần tự.
+- **Kế hoạch Triển khai:** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) chứa 28 tasks nền và backlog Phase 7 đa dịch vụ còn mở. Hoàn thành 28 tasks không đồng nghĩa hoàn thành toàn bộ scope sản phẩm.
 - **Quy tắc Phân quyền Module & Git:** [`docs/team-workflow.md`](docs/team-workflow.md) là chuẩn tắc về ranh giới sở hữu thư mục (Module Ownership), quy chuẩn commit (Conventional Commits) và chiến lược nhánh.
 
-### 1.2. Ranh giới với mã nguồn cũ (Legacy v2)
+### 1.2. Phạm vi nền tảng đa dịch vụ
+- Mục tiêu sản phẩm là workflow trên nhiều dịch vụ bên ngoài đã tích hợp và được cấp quyền; Trello/Slack chỉ là đợt triển khai đầu tiên.
+- Áp dụng tiêu chí nghiệm thu ở mục 1.4 của đặc tả v3. Không tuyên bố hoàn thành nền tảng chỉ dựa trên demo hai dịch vụ hoặc một adapter giả lập bổ sung.
+- [`docs/MULTI-SERVICE-SCOPE.md`](docs/MULTI-SERVICE-SCOPE.md) ghi khoảng cách mã nguồn và backlog; tài liệu này không thay thế quyền lực chuẩn tắc của đặc tả v3.
+- Khi thêm dịch vụ, phải xét catalog, routing/gather, adapter, xác thực, phạm vi tài nguyên, API/UI cấu hình và kiểm thử liên dịch vụ; không giả định chỉ cần thêm một file adapter.
+
+### 1.3. Ranh giới với mã nguồn cũ (Legacy v2)
 - Các thư mục cũ: `apps/api/`, `apps/web/`, `packages/dsl/`, `packages/engine/`, `db/migrations/` là **mã nguồn lưu trữ lịch sử (Read-only)**.
 - **Tuyệt đối không sửa đổi** các file v2 trừ khi có yêu cầu trích xuất dữ liệu đối chứng. Mọi tính năng v3 được xây dựng độc lập tại:
   - `packages/tool-schemas/`
@@ -51,7 +57,7 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
 
 ## 4. Hợp đồng Bàn giao & Nghiệm thu (Hand-off & Gate)
 
-Sau khi hoàn thành mỗi task trong số 28 tasks:
+Sau khi hoàn thành mỗi task trong kế hoạch thi công (bao gồm các task mở rộng được bổ sung):
 1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
 2. Reviewer độc lập (`Reality Checker` hoặc `Code Reviewer`) soi xét mã nguồn và chạy lại toàn bộ test suite của package đó.
 3. Nếu phát hiện sai sót → Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.

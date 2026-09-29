@@ -77,7 +77,7 @@ describe('SettingsModal Component', () => {
 
   it('reports the API test failure instead of a success fallback', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [] }] }) };
+      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [], credentialFields: [{ key: 'apiKey', label: 'API Key / Client ID' }, { key: 'token', label: 'OAuth / API Token' }], scopeKey: 'boards' }] }) };
       return { ok: false, status: 503, json: async () => ({ error: 'Provider unavailable' }) };
     }));
     render(<SettingsModal isOpen onClose={vi.fn()} authToken="jwt" />);
@@ -88,7 +88,7 @@ describe('SettingsModal Component', () => {
 
   it('posts credentials and scope to the API and reports the save result', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [] }] }) };
+      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [], credentialFields: [{ key: 'apiKey', label: 'API Key / Client ID' }, { key: 'token', label: 'OAuth / API Token' }], scopeKey: 'boards' }] }) };
       if (url === '/api/services/trello/credentials') return { ok: true, json: async () => ({ success: true, message: 'Saved' }) };
       throw new Error('Unexpected endpoint');
     });
@@ -108,7 +108,7 @@ describe('SettingsModal Component', () => {
 
   it('sends Slack botToken using the API credential field', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'slack', name: 'Slack', connected: false, allowedScope: [] }] }) };
+      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'slack', name: 'Slack', connected: false, allowedScope: [], credentialFields: [{ key: 'botToken', label: 'Bot Token' }], scopeKey: 'channels' }] }) };
       if (url === '/api/services/slack/credentials') return { ok: true, json: async () => ({ success: true, message: 'Saved' }) };
       throw new Error('Unexpected endpoint');
     });
@@ -118,6 +118,27 @@ describe('SettingsModal Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Lưu cấu hình/i }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/services/slack/credentials', expect.objectContaining({
       body: JSON.stringify({ credentials: { botToken: 'xoxb-example' }, allowedScope: [] }),
+    })));
+  });
+
+  it('renders GitHub fields supplied by the service API and saves repository scope', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{
+        id: 'github', name: 'GitHub', connected: false, allowedScope: [],
+        credentialFields: [{ key: 'token', label: 'Personal Access Token', type: 'password' }],
+        scopeKey: 'repos', scopeLabel: 'Repository',
+      }] }) };
+      if (url === '/api/services/github/credentials') return { ok: true, json: async () => ({ success: true, message: 'GitHub saved' }) };
+      throw new Error(`Unexpected endpoint ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<SettingsModal isOpen onClose={vi.fn()} authToken="jwt" />);
+    fireEvent.change(await screen.findByLabelText('Personal Access Token'), { target: { value: 'ghp-example' } });
+    fireEvent.change(screen.getByPlaceholderText('Thêm Repository...'), { target: { value: 'owner/repo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/services/github/credentials', expect.objectContaining({
+      body: JSON.stringify({ credentials: { token: 'ghp-example' }, allowedScope: ['owner/repo'] }),
     })));
   });
 });

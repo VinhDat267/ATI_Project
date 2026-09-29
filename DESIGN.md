@@ -572,7 +572,7 @@ Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 +
 
 ### Recovery (khôi phục sau lần chạy kết thúc)
 
-Chốt 18/09/2026 (`/impeccable shape`). Mọi màn kết thúc có đường đi tiếp bằng một cú bấm, và không bao giờ bắt người dùng gõ lại yêu cầu.
+Chốt 18/09/2026 sau vòng thiết kế luồng. Mọi màn kết thúc có đường đi tiếp bằng một cú bấm, và không bao giờ bắt người dùng gõ lại yêu cầu.
 
 - **Chỉ màn đối chiếu hỏi về nơi nhận.** Thay nút “Tạo lại” bằng `recovery-question`: câu hỏi `title-md` (“Trên bảng “Báo cáo tuần” đã có 4 dòng tuần 37 chưa?”) và các đáp án `recovery-option`, xếp dọc, sức nặng ngang nhau. Mỗi đáp án là **link** (dẫn sang V03 đã điền sẵn), gồm nhãn đậm, dòng hệ quả `muted` và chevron: “Đã thấy đủ 4 dòng” → yêu cầu chỉ gửi thông báo; “Không thấy” → đủ yêu cầu. `conflict` thêm đáp án thứ ba “Thấy nhưng khác nội dung”, là `<button aria-expanded>` mở hướng dẫn sửa trực tiếp trên bảng tại chỗ, không tạo lại. Dưới nhóm luôn có dòng “Câu trả lời chỉ dùng để điền sẵn yêu cầu mới. Lần chạy này vẫn ở trạng thái “Cần đối chiếu”.” Không có cổng “So sánh” (API không trả dữ liệu hiện tại ở nơi nhận, nên cổng đó không cho thêm thông tin).
 - **`confirmed`:** nút primary “Tạo yêu cầu chỉ gửi thông báo”, không hỏi.
@@ -615,7 +615,7 @@ Chốt 18/09/2026 (`/impeccable shape`). Mọi màn kết thúc có đường đ
 
 ### Copy & labeling conventions
 
-Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); code và test dùng đúng các chuỗi này.
+Nguồn chuẩn cho mọi màn (chốt sau vòng hoàn thiện UI ngày 17/09/2026); code và test dùng đúng các chuỗi này.
 
 | Chỗ dùng | Chuẩn | Không dùng |
 |---|---|---|
@@ -636,7 +636,7 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 | Nhãn trạng thái run | Đúng bảng Run status (ví dụ “Đang đọc dữ liệu xem trước”, “Đang điều chỉnh kế hoạch”) | rút gọn tuỳ màn |
 | Tiêu đề run | Nguyên văn yêu cầu ở mọi màn (cắt bằng CSS, không viết lại) | bản rút gọn bằng tay |
 
-### Hardening rules (after `/impeccable harden`, 17/09/2026)
+### Hardening rules (chốt 17/09/2026)
 
 - **Control không được mâu thuẫn với chữ cạnh nó.** Hành động bị server từ chối chắc chắn (vd. `409 ACTIVE_RUN`) thì nút bị `disabled` với lý do liên kết qua `aria-describedby`; khi kết quả gửi chưa rõ, hành động chính là **kiểm tra** (nút primary “Mở Lần chạy để kiểm tra”), gửi lại chỉ là nút secondary “Gửi lại yêu cầu” kèm điều kiện.
 - **Giới hạn không phải lỗi.** `409 HISTORY_LIMIT` dùng banner `neutral` với icon thông tin, không có “Thử lại”/“Làm mới” vô ích; `unknown` chỉ dành cho kết quả ghi chưa rõ, `danger` cho lỗi thật.
@@ -651,7 +651,7 @@ Nguồn chuẩn cho mọi màn (chốt sau `/impeccable polish` 17/09/2026); cod
 - **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
 - **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
 
-### Distill rules (after `/impeccable distill`, 18/09/2026)
+### Distill rules (chốt 18/09/2026)
 
 - **Định danh kỹ thuật nằm sau disclosure “Chi tiết kỹ thuật”.** Thẻ tóm tắt lần chạy chỉ để lộ dữ kiện người dùng đọc được (Duyệt bởi, Múi giờ, Chế độ lập kế hoạch); phiên bản kế hoạch và mã băm bản xem trước nằm sau nút “Chi tiết kỹ thuật” (chevron + `aria-expanded`), đúng mẫu đã dùng ở V06. Chỉ màn `succeeded` mở sẵn disclosure vì đó là lúc người dùng cần chứng cứ; các màn khác đóng.
 - **Không lặp bảng chú giải trạng thái trong sản phẩm.** Bản đồ 14 `RunStatus` chỉ sống trong tài liệu này; mỗi hàng và mỗi thẻ đã tự mang pill trạng thái của nó.

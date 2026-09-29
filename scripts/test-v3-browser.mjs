@@ -12,6 +12,7 @@ const scenarios = [
   { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan' },
   { name: 'clarification', grep: 'clarification before plan' },
   { name: 'partial_failure', grep: 'partial failure and skip' },
+  { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },
 ];
 
 for (const scenario of scenarios) {

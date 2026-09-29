@@ -12,7 +12,8 @@ export type ErrorCategory =
   | 'RATE_LIMIT'
   | 'SERVER_ERROR'
   | 'NETWORK'
-  | 'VALIDATION';
+  | 'VALIDATION'
+  | 'UNKNOWN';
 
 export interface StepErrorDetail {
   category: ErrorCategory;

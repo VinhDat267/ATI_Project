@@ -106,3 +106,35 @@ test('real browser and PostgreSQL: partial failure and skip', async ({ page }) =
     await pool.end();
   }
 });
+
+test('real browser and PostgreSQL: approved three-service workflow resolves prior outputs', async ({ page }, testInfo) => {
+  test.skip(process.env.SANDBOX_SCENARIO !== 'three_service', 'requires the explicit three-service sandbox scenario');
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Tạo issue GitHub, thẻ Trello và thông báo Slack E2E ${Date.now()}`;
+    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('button', { name: 'Gửi' }).click();
+    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
+    expect(planId).toBeTruthy();
+    const preview = await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId]);
+    const plannedTools = preview.rows[0]?.plan_json?.steps?.map((step: { tool: string }) => step.tool);
+    expect(plannedTools).toEqual(['github.create_issue', 'trello.create_card', 'slack.send_message']);
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+    const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(steps.map((step) => step.status)).toEqual(['succeeded', 'succeeded', 'succeeded']);
+    const issueUrl = steps[0]?.output_json?.url;
+    const cardUrl = steps[1]?.output_json?.url;
+    expect(issueUrl).toMatch(/^https:\/\/github\.com\/owner\/repo\/issues\//);
+    expect(cardUrl).toMatch(/^https:\/\/trello\.com\/c\//);
+    expect(steps[1]?.output_json?.desc).toContain(issueUrl);
+    expect(steps[2]?.output_json?.text).toContain(issueUrl);
+    expect(steps[2]?.output_json?.text).toContain(cardUrl);
+    await expect(page.getByText('3/3 hoàn thành')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('three-service-approved.png'), fullPage: true });
+  } finally {
+    await pool.end();
+  }
+});

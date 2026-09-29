@@ -2,7 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the v3 AI Workflow Automation Platform featuring a conversational chat interface, multi-tool AI planner with working memory & hierarchical routing, 4-layer validation, and a sequential execution engine across Trello and Slack with write-safety guarantees.
+**Goal:** Build an extensible platform that plans and executes workflows across registered, authorized external services. Trello and Slack are the first integrations, not the product boundary. The initial 28 tasks establish the baseline; required Phase 7 must prove extension to at least a third service under the v3 spec section 1.4.
+
+**Scope status (2026-09-29):** Tasks 1–28 cover the original Phase 0–6 baseline only. GitHub was selected as the third service. MS-01 through MS-05 have local implementation and tests; MS-06 has sandbox browser + PostgreSQL evidence for GitHub → Trello → Slack. Phase 7 remains **OPEN** until live service evidence and failure/recovery gates are met. See [multi-service scope and evidence](../../MULTI-SERVICE-SCOPE.md).
+
+### Required Phase 7 backlog
+
+| Order | Work package | Acceptance output |
+|---|---|---|
+| MS-01 | Define service registration, connection capabilities and per-service configuration/scope contracts | Reviewed contracts and test cases; choose the third service |
+| MS-02 | Register existing integrations; refactor adapter factory and service APIs | Trello/Slack regression passes; unknown and unauthorized services rejected |
+| MS-03 | Route and gather against the registered, available tool catalog | A third-service test registration works without service-name branches in planner core |
+| MS-04 | Implement a third adapter and its tool definitions, auth and resource scope | Contract/transport/error tests; no live success claim from fixtures |
+| MS-05 | Adapt connection UI and service status to registry metadata | Configurable service appears from API metadata; failed/unconfigured state shown accurately |
+| MS-06 | Verify a three-service workflow with step-to-step data references | Browser/API/PostgreSQL evidence, then separately authorized live evidence and failure cases |
+
+Dependencies: MS-01 precedes all interface changes; MS-02/03 establish the integration path; MS-04/05 feed MS-06. Module ownership and independent review apply. Live credentials, quotas and external writes must be handled under the actual run authorization. Do not mark the platform complete when only the baseline or an offline third-service fixture passes.
 
 **Architecture:** A clean separation of concerns in a TypeScript monorepo: `packages/tool-schemas` defines tool interfaces and JSON schemas with zero heavy dependencies; `packages/tool-adapters` implements external APIs with AES-256-GCM encryption, global rate-limiting, and allowed scope filtering; `packages/planner` manages multi-turn gather/clarify in Chat Mode and single-shot planning with a Thinking Layer and Working Memory in Plan Mode; `packages/executor` runs sequential DAG execution with $ref resolution, ACID step state updates, and UNKNOWN write-safety; `apps/chat-api` provides async message ingestion (202 Accepted) using Express + Supertest and resilient SSE event streaming; `apps/chat-web` renders a React 19 UI with `@microsoft/fetch-event-source` for authenticated streaming and interactive approval cards.
 

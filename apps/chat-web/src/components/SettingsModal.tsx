@@ -6,6 +6,9 @@ interface ServiceInfo {
   name: string;
   connected: boolean;
   allowedScope?: string[];
+  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' }>;
+  scopeKey?: string;
+  scopeLabel?: string;
 }
 
 export interface SettingsModalProps {
@@ -19,10 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   authToken,
 }) => {
-  const [services, setServices] = React.useState<ServiceInfo[]>([
-    { id: 'trello', name: 'Trello', connected: false },
-    { id: 'slack', name: 'Slack', connected: false },
-  ]);
+  const [services, setServices] = React.useState<ServiceInfo[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -64,14 +64,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleSave = async (serviceId: string, input: { apiKey?: string; token?: string; allowedScope: string[] }): Promise<ServiceActionResult> => {
+  const handleSave = async (serviceId: string, input: { credentials: Record<string, string>; allowedScope: string[] }): Promise<ServiceActionResult> => {
     if (!authToken) return { success: false, message: 'Chưa xác thực - vui lòng đăng nhập' };
     try {
       const res = await fetch(`/api/services/${serviceId}/credentials`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          credentials: serviceId === 'slack' ? { botToken: input.token } : { apiKey: input.apiKey, token: input.token },
+          credentials: input.credentials,
           allowedScope: input.allowedScope,
         }),
       });
@@ -123,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span className="text-sm">🛡️</span>
             <div>
               <span className="font-semibold">Bảo mật Cấp quyền Tối thiểu (Least Privilege):</span>{' '}
-              Các khóa API được mã hóa AES-256-GCM ở tầng lưu trữ. AI chỉ được phép đọc và ghi trong các Board/Channel bạn đã cấu hình bên dưới.
+              Các khóa API được mã hóa AES-256-GCM ở tầng lưu trữ. AI chỉ được phép dùng những tài nguyên bạn đã cấu hình cho từng dịch vụ.
             </div>
           </div>
 
@@ -142,6 +142,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 title={`${svc.name} Workspace`}
                 connected={Boolean(svc.connected)}
                 allowedScope={svc.allowedScope || []}
+                credentialFields={svc.credentialFields || []}
+                scopeLabel={svc.scopeLabel || ({ boards: 'board', channels: 'channel', repos: 'Repository' }[svc.scopeKey || ''] ?? 'tài nguyên')}
                 onTestConnection={() => handleTestConnection(svc.id)}
                 onSave={(input) => handleSave(svc.id, input)}
               />

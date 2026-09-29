@@ -1,7 +1,5 @@
 # Product
 
-<!-- impeccable:product-schema 1 -->
-
 ## Product direction — approved 21/09/2026
 
 Tên hiện hành: **AI Automation Platform**. Loại sản phẩm: AI Automation Workflow

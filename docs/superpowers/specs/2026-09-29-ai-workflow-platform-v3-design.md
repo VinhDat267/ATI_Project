@@ -5,6 +5,8 @@
 **Cập nhật: 29/09/2026 — Merge fixes từ 3 specialist reviewers (Software Architect 8.5/10, AI Engineer 6.5→8/10, Backend Architect 8.5/10)**
 **Phương pháp: 5 sections × 2 vòng phản biện + 3 specialist reviews + merge fixes**
 
+**Đính chính phạm vi 29/09/2026:** Chủ dự án xác nhận nền tảng phải mở rộng ngoài Trello/Slack. Mục 1.4 và Phase 7 dưới đây điều chỉnh scope và tiêu chí hoàn thành; các điểm review ở trên thuộc bản thiết kế trước cập nhật này, không chứng nhận phần mở rộng đã triển khai hoặc được review độc lập.
+
 ---
 
 ## 1. Bối cảnh & Vấn đề
@@ -46,6 +48,22 @@ Xây lại hệ thống từ application code, giữ project infrastructure. M�
 
 ---
 
+### 1.4. Phạm vi đa dịch vụ và điều kiện hoàn thành
+
+**Mục tiêu bắt buộc:** lập kế hoạch và thực thi workflow phối hợp nhiều dịch vụ bên ngoài qua catalog công cụ và adapter có hợp đồng chung. Trello/Slack là đợt đầu để xây phần lõi; không phải phạm vi cuối cùng. Phase 7 không còn là phần có thể bỏ qua khi tuyên bố hoàn thành nền tảng.
+
+Phạm vi hỗ trợ là các dịch vụ đã được đăng ký, có adapter, xác thực và quyền hợp lệ. Hệ thống không tự suy ra quyền gọi một API bất kỳ từ URL hoặc nội dung người dùng đưa vào hội thoại. Các nhóm dịch vụ mục tiêu gồm quản lý công việc, nhắn tin, mã nguồn và bảng tính; email, lịch và tài liệu được mở rộng theo nhu cầu.
+
+**Tiêu chí nghiệm thu tối thiểu cho khả năng mở rộng:**
+
+1. Có ít nhất ba dịch vụ được tích hợp; ít nhất một workflow có phụ thuộc dữ liệu giữa các bước đi qua cả ba dịch vụ, từ chat → preview → duyệt → kết quả.
+2. Tên dịch vụ và năng lực được lấy từ cơ chế đăng ký chung. Thêm tích hợp không yêu cầu thêm nhánh theo tên dịch vụ trong lõi planner/executor hoặc endpoint liệt kê dịch vụ. Thay đổi tập trung ở định nghĩa tool, adapter, cấu hình xác thực/phạm vi và nơi đăng ký tích hợp.
+3. Chỉ công cụ đã đăng ký và được phép trong ngữ cảnh kết nối hiện tại mới được cung cấp cho planner. Dịch vụ chưa tích hợp, chưa cấu hình hoặc không có quyền phải được chặn rõ ràng.
+4. Mỗi adapter bổ sung có kiểm thử schema, quyền tài nguyên, lỗi, timeout và kết quả ghi không xác định. Có kiểm thử trình duyệt/API/PostgreSQL cho workflow ba dịch vụ; không dùng fixture để chứng minh chất lượng AI.
+5. Bằng chứng sandbox và live được ghi riêng. Đóng nghiệm thu tích hợp thực tế cần kết quả từ API dịch vụ thật, định danh tài nguyên/kết quả và trạng thái DB đối chiếu được. Một adapter giả lập thứ ba chỉ xác nhận hợp đồng mở rộng.
+
+GitHub đã được chọn làm tích hợp thứ ba. Registry, routing theo catalog và cấu hình UI tổng quát đã có mã nguồn và bằng chứng sandbox; nghiệm thu live vẫn **OPEN**. Google Sheets thuộc đợt sau. Xem [trạng thái triển khai và bằng chứng](../../MULTI-SERVICE-SCOPE.md).
+
 ## 2. Nguyên tắc Thiết kế
 
 1. **AI phải làm việc CỦA AI** — nhận đầu vào phi cấu trúc, chuyển thành hành
@@ -57,7 +75,7 @@ Xây lại hệ thống từ application code, giữ project infrastructure. M�
 4. **Plan-then-Execute** — AI sinh toàn bộ plan trước, user duyệt, rồi mới chạy.
    Không dùng ReAct-style step-by-step (khó preview, khó kiểm soát).
 5. **Mỗi phase có deliverable demoable** — không build 3 tuần rồi mới thấy kết quả.
-6. **Adapter pattern** — thêm service mới = thêm 1 file adapter, không đổi core.
+6. **Mở rộng theo hợp đồng tích hợp** — thêm service cần tool definitions, adapter, xác thực, phạm vi quyền, đăng ký và kiểm thử. Lõi planner/executor dùng hợp đồng chung; GitHub là tích hợp thứ ba đã qua kiểm thử sandbox, chưa qua nghiệm thu live.
 
 ---
 
@@ -229,7 +247,9 @@ Tổng Đợt 1: **6 read + 5 write = 11 tools** trên 2 services.
 *Read tools BẮT BUỘC nhận tham số `query` + `limit` (max 10) để tránh tràn LLM
 context. Không có tool `list_*` trả toàn bộ data.*
 
-**Đợt 2 (Phase 7) — Mở rộng dịch vụ (PAT/Service Account):**
+**Đợt 2 (Phase 7) — Khả năng mở rộng bắt buộc và catalog ứng viên (PAT/Service Account):**
+
+Ít nhất một trong các tích hợp bổ sung phải được hoàn thiện để đóng tiêu chí mục 1.4. Bảng dưới là catalog dự kiến; không xác nhận cả hai đã có mã nguồn.
 
 | Service | Auth | Tools |
 |---|---|---|
@@ -845,7 +865,7 @@ POST   /api/settings/llm                    → Cấu hình LLM provider + API k
 ```
 Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → Phase 6
                      (CRITICAL)                                        │
-                                                Phase 7 (OPT) → Phase 8 (OPT)
+                                                Phase 7 (REQUIRED) → Phase 8 (OPT)
 ```
 
 ### 9.2. Chi tiết từng Phase
@@ -939,10 +959,12 @@ Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → 
 - Performance metrics
 - README + API docs + architecture docs
 
-**Phase 7 (OPTIONAL): Đợt 2 Adapters**
-- GitHub adapter (5 tools)
-- Google Sheets adapter (3 tools)
-- Integration vào planner và execution flow
+**Phase 7 (REQUIRED): Tổng quát hóa tích hợp và workflow ba dịch vụ**
+- Registry cho metadata dịch vụ, tool catalog, adapter và kiểm tra cấu hình/phạm vi.
+- Routing/gather, API dịch vụ và cấu hình UI dùng hợp đồng mở rộng; giữ tương thích Trello/Slack.
+- Hoàn thiện tối thiểu một adapter thứ ba; GitHub (5 tools) hoặc Google Sheets (3 tools) là các ứng viên.
+- Kiểm chứng workflow có phụ thuộc dữ liệu qua ba dịch vụ và các ca thiếu quyền, timeout, lỗi một phần.
+- Đóng các tiêu chí mục 1.4 bằng evidence thực tế; các tích hợp còn lại tiếp tục theo nguồn lực.
 
 **Phase 8 (OPTIONAL): Đợt 3 Adapters (OAuth2)**
 - OAuth2 infrastructure (consent screen, token refresh)
@@ -972,6 +994,8 @@ Tổng: ~150-200 tests
 
 ### 10.1. Minimum Viable Demo
 
+Demo dưới đây là mốc của đợt đầu với hai dịch vụ. Nghiệm thu toàn bộ phạm vi nền tảng còn phải đạt Phase 7 và mục 1.4.
+
 ```
 1. User mở browser, đăng nhập
 2. Chat: "Tạo task cập nhật homepage cho team frontend,
@@ -993,7 +1017,7 @@ Tổng: ~150-200 tests
 | System response time (→ preview) | < 15s |
 | Execution time (approve → done) | < 15s |
 | Evaluation suite | 50 prompts, versioned |
-| Demo scenarios | 3 end-to-end trên real services |
+| Demo scenarios | 3 end-to-end trên real services; ít nhất một workflow đi qua ba dịch vụ theo mục 1.4 |
 
 ---
 
@@ -1006,7 +1030,7 @@ Tổng: ~150-200 tests
 | External API thay đổi | Thấp | 🟡 | Adapter pattern isolate. Output schema linh hoạt |
 | Test account setup | TB | 🟡 | Setup trong Phase 0, trước khi code |
 | UI phức tạp | TB | 🟡 | SSE state machine. Components nhỏ, độc lập |
-| Scope creep | Cao | 🟡 | Đợt 1 chỉ 2 services. Phase 7-8 OPTIONAL |
+| Scope creep | Cao | 🟡 | Đợt 1 có 2 services; Phase 7 bắt buộc chứng minh mở rộng với dịch vụ thứ ba. Số tích hợp tiếp theo và Phase 8 được giới hạn theo nguồn lực |
 | Prompt regression | TB | 🟡 | Prompt versioning + evaluation tracking |
 | Data leakage (shared creds) | TB | 🟡 | Allowed Scope whitelist. Document rủi ro |
 | Plan hash non-deterministic | TB | 🟡 | json-stable-stringify hoặc plan_text raw |

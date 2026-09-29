@@ -58,7 +58,7 @@ Mục tiêu: vào tài khoản demo và trở lại đúng trang được yêu c
 - Hết phiên ở bất kỳ trang nào: dừng polling, hủy request của phiên cũ, xóa dữ liệu được bảo vệ khỏi view và yêu cầu đăng nhập lại. Chỉ giữ return route chứa ID; không đưa prompt/token vào URL.
 - Reload cần đăng nhập lại. UI có thể có hành động “Thoát phiên trên tab này”; đây là xóa token local, không quảng cáo logout toàn hệ thống vì API chưa có revoke-session endpoint.
 
-**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V01):**
+**Chốt 17/09/2026 (brief thiết kế, mockup canvas “ATI Run Screens”, hàng V01):**
 
 - Không có thanh điều hướng; logo trái, nhãn “Dữ liệu mô phỏng” phải khi là fixture. Desktop hai cột trong 1120px: trái là tiêu đề “Lập kế hoạch tự động, ghi dữ liệu chỉ khi bạn duyệt”, một câu mô tả và 3 bước có icon (mô tả việc → xem trước đích và nội dung ghi → duyệt rồi xem kết quả và chứng cứ); phải là thẻ form 420px bo 14px với mức bóng duy nhất. Mobile: form trước, giới thiệu thu gọn dưới form.
 - Form thật: label luôn hiển thị, `autocomplete="username"`/`"current-password"`, nút hiện/ẩn mật khẩu (`aria-label`, `aria-pressed`), nút “Đăng nhập” 48px, dòng môi trường cuối form (“Chạy cục bộ trên máy này · Kế hoạch mẫu / AI lập kế hoạch”, không có địa chỉ/port/phiên bản).
@@ -88,7 +88,7 @@ Mục tiêu: mô tả đầu vào, đích mong muốn và công việc cần th�
 - `409 ACTIVE_RUN`: giữ draft trong phiên hiện tại, đề nghị mở run đang hoạt động. `503 PLANNER_UNAVAILABLE`: báo tính năng lập kế hoạch chưa sẵn sàng.
 - Đổi route trước submit không được tạo workflow hoặc run. Draft chỉ ở memory, không đưa vào persistent storage mặc định.
 
-**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V03):** một màn, **hai chế độ** với cùng bố cục hai cột (form trái, cột “Hệ thống làm được gì” 372px phải; mobile thu cột này thành disclosure).
+**Chốt 17/09/2026 (brief thiết kế, mockup canvas “ATI Run Screens”, hàng V03):** một màn, **hai chế độ** với cùng bố cục hai cột (form trái, cột “Hệ thống làm được gì” 372px phải; mobile thu cột này thành disclosure).
 
 - *Demo/kế hoạch mẫu* (planner `dev_fixture`): nhãn “Kế hoạch mẫu”; ô yêu cầu chỉ đọc; chọn một trong các mẫu đã allowlist bằng thẻ radio; mẫu cần filesystem bị vô hiệu kèm lý do khi filesystem tắt.
 - *AI lập kế hoạch* (planner thật, khi có): nhãn “AI lập kế hoạch”; nhập tự do; gợi ý dạng chip chèn vào ô rồi sửa được; ghi rõ AI có thể hiểu sai, hỏi lại hoặc từ chối; cột phải thêm “AI có thể trả lời: Kế hoạch · Hỏi lại · Từ chối”.
@@ -106,7 +106,7 @@ Mục tiêu: tìm lại một lần chạy, xem yêu cầu gì và kết quả r
 - `409 HISTORY_LIMIT`: thông báo cần hỗ trợ API history pagination; không âm thầm cắt dữ liệu hoặc hứa tìm được mọi run.
 - Không có nút clone/rerun/delete trong đợt đầu. Yêu cầu mới được người dùng tạo và duyệt riêng.
 
-**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V04):**
+**Chốt 17/09/2026 (brief thiết kế, mockup canvas “ATI Run Screens”, hàng V04):**
 
 - Danh sách phẳng mới nhất trước, rộng 1120px, không cột phải. Đầu trang: “N lần chạy đã tải · Tải lúc hh:mm:ss”, nút “Làm mới” (GET, không poll 2 giây) và “Tạo yêu cầu”.
 - Lọc 5 nhóm có số đếm trên dữ liệu đã tải: *Tất cả · Cần xử lý* (`awaiting_approval`, `reconciliation_required`) *· Đang chạy* (`planning`, `validating`, `dry_running`, `running`, `replanning`) *· Hoàn tất* (`succeeded`) *· Không hoàn tất* (`failed`, `rejected`, `cancelled`, `expired`, `refused`, `needs_input`). Tìm theo nội dung yêu cầu và tiền tố mã run, không phân biệt hoa thường và dấu; lọc và tìm kết hợp.
@@ -139,7 +139,7 @@ Mục tiêu: biết hệ thống có thể làm gì, trên đích local nào và
 - ~~Cần công việc backend riêng cho catalog live và kiểm kết nối chủ động.~~ Đã có từ API-CATALOG (`c80dedc`): `GET /servers/catalog` chỉ đọc, không khởi động MCP; `POST /servers/check` là kiểm tra chủ động duy nhất trên preset reviewed cố định, rate-limit 5 giây (`429` + `Retry-After`), lỗi cấu hình/kết nối trả `503`. Mỗi tool có `name`, `side_effect`, `policy_version`, `artifact_hash`, `input_schema`, `output_schema`; không có mô tả.
 - Không có form nhập Slack token, nút “Kết nối Trello thật”, thêm/xóa server tùy ý hoặc credential vault.
 
-**Chốt 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V06):**
+**Chốt 17/09/2026 (brief thiết kế, mockup canvas “ATI Run Screens”, hàng V06):**
 
 - Trang một cột 1120px. Đầu trang giải thích chỉ dùng máy chủ local đã review và quyền đọc/ghi do chính sách ứng dụng quyết định; dòng “N máy chủ đã review · Kiểm tra lúc hh:mm:ss” hoặc “Chưa kiểm tra trong phiên này”; nút primary “Kiểm tra kết nối”.
 - Vào trang chỉ gọi `GET /servers/catalog`. `POST /servers/check` **chỉ khi người dùng bấm**; đang kiểm tra khoá nút, giữ nhãn; `429` khoá nút và đếm ngược theo `Retry-After`; `503` banner danger, giữ dữ liệu lần trước và ghi rõ có thể đã cũ; `401` về đăng nhập; dữ liệu sai hợp đồng không render.
@@ -171,7 +171,7 @@ Tất cả 14 trạng thái dùng chung V05; không tạo 14 trang. Các termina
 
 Hủy là cooperative: sau POST cancel `202`, UI báo đã gửi yêu cầu hủy và tiếp tục poll đến terminal thật. Retry/skip của step là trạng thái engine, không phải nút để người dùng ép chạy lại.
 
-**Chốt V05 theo trạng thái — 17/09/2026 (brief `/impeccable shape`, mockup canvas “ATI Run Screens”, hàng V05 và “V05 — Các trạng thái khác”):** mọi trạng thái dùng chung bố cục hai cột (nội dung trái, thẻ tóm tắt 372px dính phải với hộp chia ô, hành động và bảng khoá–giá trị); chỉ `awaiting_approval` có đồng hồ thời hạn lớn và nút duyệt.
+**Chốt V05 theo trạng thái — 17/09/2026 (brief thiết kế, mockup canvas “ATI Run Screens”, hàng V05 và “V05 — Các trạng thái khác”):** mọi trạng thái dùng chung bố cục hai cột (nội dung trái, thẻ tóm tắt 372px dính phải với hộp chia ô, hành động và bảng khoá–giá trị); chỉ `awaiting_approval` có đồng hồ thời hạn lớn và nút duyệt.
 
 | Nhóm trạng thái | Nội dung trái | Thẻ phải |
 |---|---|---|
@@ -188,7 +188,7 @@ Hủy là cooperative: sau POST cancel `202`, UI báo đã gửi yêu cầu hủ
 
 Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi triển khai lấy từ `error_class`/`error_message` của attempt và `planner_result` thật.
 
-**Đối chiếu theo receipt — chốt 17/09/2026 (`/impeccable shape`, canvas hàng V05: ReconSoft, ReconConfirmed, ReconConflict; V02 OverviewSoft; V03 CreateRetry). Chỉ UI, không API mới.**
+**Đối chiếu theo receipt — chốt 17/09/2026 (vòng thiết kế, canvas hàng V05: ReconSoft, ReconConfirmed, ReconConflict; V02 OverviewSoft; V03 CreateRetry). Chỉ UI, không API mới.**
 
 - Section chính “Đối chiếu từng thao tác ghi”: “Kiểm tra lúc hh:mm:ss” + nút GET “Tải lại kết quả đối chiếu” (đang tải khoá nút; lỗi giữ kết quả cũ và ghi có thể đã cũ). Mỗi thao tác ghi là một `<article>`: dòng kết luận `role="status"` có icon/màu, ô ĐÃ GỬI LÚC / NƠI NHẬN / BIÊN NHẬN, **payload mở sẵn**, hướng dẫn theo kết luận, disclosure “Chi tiết kỹ thuật” (operation id, `receiver_mode`, `state`, receipt thô, hash).
 - Kết luận theo `receipt`: `confirmed` → “Nơi nhận xác nhận đã ghi — không cần ghi lại” (`success`, không có “Tạo lại”); `not_observed` → “Chưa thấy trên nơi nhận — kiểm tra bảng đích trước khi tạo lại” (`unknown`, hộp “Cách kiểm tra”, “Tạo lại yêu cầu này” là nút secondary kèm cảnh báo); `conflict` → “Nơi nhận có dữ liệu khác với nội dung đã gửi — kiểm tra thủ công” (`danger`, “So sánh với nội dung đã gửi” chỉ hiện payload đã gửi vì API không trả dữ liệu hiện tại ở nơi nhận; “Tạo lại” `aria-disabled` tới khi mở so sánh); `not_supported` → “Nơi nhận không hỗ trợ đối chiếu tự động — cần tự kiểm tra” (`unknown`, như `not_observed`). Nút “Tạo lại” và cổng “So sánh” ở đây đã được thay bằng câu hỏi khôi phục (chốt 18/09, “Luồng khôi phục”).
@@ -197,13 +197,13 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - V03 “Tạo lại yêu cầu này” (chỉ chế độ AI): điền sẵn prompt cũ vào nháp **trong bộ nhớ** (không đưa prompt vào URL), banner `unknown` “Tạo lại từ lần chạy cần đối chiếu” nêu mã run, dặn kiểm tra bảng đích, link quay lại đối chiếu; banner liên kết với ô yêu cầu qua `aria-describedby`. Chế độ demo chỉ dẫn tới Tạo yêu cầu.
 - Chưa vẽ: nhiều thao tác ghi với receipt khác nhau, `not_supported`, mobile của màn đối chiếu.
 
-**Kịch bản demo — chốt 18/09/2026 (`/impeccable clarify`).** Nhãn “Dữ liệu mô phỏng” và nội dung phải khớp nhau:
+**Kịch bản demo — chốt 18/09/2026 sau vòng làm rõ nội dung.** Nhãn “Dữ liệu mô phỏng” và nội dung phải khớp nhau:
 
 - **Màn chế độ demo** (có nhãn fixture) chỉ dùng đúng yêu cầu và dữ liệu của fixture server-owned: prompt `b02` “Chép nguyên các dòng Progress!A1:B2 … #team” và hai mẫu `fs-*`. Mọi tham chiếu tới lần chạy đang hoạt động trên các màn này (vd. `409 ACTIVE_RUN`) cũng dùng chính prompt đó.
 - **Màn chế độ AI/live** (không có nhãn fixture) dùng kịch bản tiếng Việt “tuần 37/38 · Tiến độ nhóm → Báo cáo tuần · #nhom-ati”; nhãn chế độ trong thẻ tóm tắt là “AI lập kế hoạch”.
 - Thời gian trong danh sách và Tổng quan ghi rõ là **lúc tạo yêu cầu**; thẻ “Cần xử lý” ghi “Kết thúc lúc …”. Thời hạn duyệt tính đúng 10 phút kể từ khi bản xem trước sẵn sàng.
 
-**Cắt gọn — chốt 18/09/2026 (`/impeccable distill`).** Bỏ những gì màn hình không cần để người dùng ra quyết định:
+**Cắt gọn — chốt 18/09/2026.** Bỏ những gì màn hình không cần để người dùng ra quyết định:
 
 - **V02 bỏ bảng chú giải 14 trạng thái.** Bản đồ `RunStatus` → nhãn/màu/icon chỉ nằm trong [DESIGN.md](../../../DESIGN.md) mục Run status; mỗi hàng trên màn đã tự mang pill của nó. Tiêu đề phụ bỏ “2 lần chạy cần bạn xử lý” (badge nav và khu “Cần xử lý” đã nói), và hai câu về “một lần chạy hoạt động” gộp thành một.
 - **Định danh kỹ thuật vào disclosure “Chi tiết kỹ thuật”** trong thẻ tóm tắt V05 và màn đối chiếu: phiên bản kế hoạch và mã băm bản xem trước ẩn sau nút có chevron/`aria-expanded`, chỉ `succeeded` mở sẵn. Thẻ chỉ còn để lộ Duyệt bởi / Múi giờ / Chế độ lập kế hoạch. Dùng lại đúng component `TechDisclosure` của V06 nên không thêm API hay thành phần mới.
@@ -211,7 +211,7 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Màn chờ nói thời gian đã trôi:** `planning` và `running` thêm dòng “mốc bắt đầu · đã N giây” trong banner trạng thái. `planning` bỏ mục “Hoạt động” (hai mốc trùng dải “Tiến trình”) cùng hairline ngăn section; `running` giữ vì nhật ký ở đó có mốc duyệt và mốc xem trước.
 - **Khung artboard bằng chiều cao nội dung** (đo trong trình duyệt với Be Vietnam Pro, làm tròn lên 20px). 34/35 khung trước đó thừa 11–533px khoảng trắng và `ReconConflict` thiếu 64px nên bị cắt; nay không khung nào tràn.
 
-**Chữ — chốt 18/09/2026 (`/impeccable typeset`).** Thang chữ đầy đủ nằm trong [DESIGN.md](../../../DESIGN.md); phần áp dụng cho mockup:
+**Chữ — chốt 18/09/2026.** Thang chữ đầy đủ nằm trong [DESIGN.md](../../../DESIGN.md); phần áp dụng cho mockup:
 
 - **Thang mobile** thêm ba token (`display-timer-mobile` 32/36, `display-md-mobile` 23/31, `headline-sm-mobile` 18/25) nên bậc lớn nhất đạt 1.39× và 1.28×, hết cảnh báo `flat-type-hierarchy` ở V05/V06 mobile. Tiêu đề run mobile vẫn nằm trong 3 dòng nên chưa cần link “Xem toàn bộ yêu cầu”.
 - **Bỏ cỡ ngoài thang:** 17px (thẻ “Cần xử lý” V02, ô yêu cầu V03, đoạn giới thiệu V01) về 16/24 đúng `body-lg` như DESIGN.md đã quy định; 12.5px về `mono-sm` 12px; “ATI” thống nhất `wordmark` 20/24 desktop, 18/22 mobile.
@@ -219,11 +219,11 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Trần độ dài dòng ~75 ký tự** áp cho 21 khối văn xuôi; trước đó dài nhất là 101 ký tự (V04 `HISTORY_LIMIT`, V06 `503`/chưa kiểm tra). Tiêu đề và nội dung yêu cầu không áp trần.
 - Board `MainMobile` vẫn còn cảnh báo thang chữ phẳng: đó là phương án cũ đã loại, giữ trên canvas để đối chiếu, không sửa.
 
-**Mobile — chốt 18/09/2026 (`/impeccable adapt`, sau critique 29/40).** Thiết kế lại cho người dùng mobile hay bị gián đoạn, không chỉ thu nhỏ desktop:
+**Mobile — chốt 18/09/2026 sau vòng thiết kế thích ứng và critique 29/40.** Thiết kế lại cho người dùng mobile hay bị gián đoạn, không chỉ thu nhỏ desktop:
 
 - **Màn duyệt (`MobileSoft`, P0):** thanh dính đáy có thêm dòng “Hết hạn lúc 14:32:10 theo máy chủ” trên đồng hồ, vì đồng hồ đếm phía client không có mốc khi người dùng quay lại app. Câu “Nếu dữ liệu nguồn thay đổi, hãy tạo yêu cầu mới thay vì duyệt bản này.” đặt trong banner chờ duyệt ở đầu trang, chỗ đọc đầu tiên khi quay lại; nút duyệt có `aria-describedby` tới cả hai. Dưới “Từ chối ghi” thêm “Bạn sẽ thấy kết quả từng bước sau khi duyệt” như desktop.
 - **Payload dạng bảng trên màn duyệt mobile** đổi từ bảng cuộn ngang (cắt giữa ô, không có dấu hiệu cuộn) sang bản ghi có nhãn DÒNG n · Tuần / Thành viên / Công việc / Tình trạng. Board dài thêm ~260px; đổi lại người dùng đọc hết mọi ô mình sắp đồng ý ghi.
-- **Màn duyệt — chốt phương án B, 18/09/2026 (`/impeccable shape`).** Critique 29/40 chỉ ra đồng hồ 56px là phần tử lớn nhất màn duyệt, trong khi đó là thứ duy nhất người dùng không làm gì được. Đã vẽ phương án B cạnh A và chọn B:
+- **Màn duyệt — chốt phương án B, 18/09/2026 sau vòng thiết kế.** Critique 29/40 chỉ ra đồng hồ 56px là phần tử lớn nhất màn duyệt, trong khi đó là thứ duy nhất người dùng không làm gì được. Đã vẽ phương án B cạnh A và chọn B:
   - Thẻ quyết định mở đầu bằng “Bạn sắp ghi” và mỗi thao tác ghi một dòng 21px đậm có icon (“Thêm 3 dòng vào “Báo cáo tuần””, “Gửi 1 tin nhắn vào #nhom-ati”); hộp THAO TÁC GHI / ĐÃ GHI / ĐÍCH bỏ vì nội dung đã nằm trong câu. Tiếp theo là dòng “Chế độ lập kế hoạch”.
   - Đồng hồ là một dòng “Còn 08:41” 16px + “Hết hạn lúc 14:32:10 theo máy chủ” ngay trên nút duyệt. Còn ≤ 2 phút: dòng này chuyển nền `action-subtle`, icon đồng hồ cát, “Sắp hết hạn · còn 01:48”; bố cục không đổi, không nhấp nháy; `aria-live` thêm mốc 2 phút (board `MainSoft2min`).
   - Mobile theo cùng nguyên tắc: thanh dính đáy là một dòng “Còn 08:41 · hết hạn lúc 14:32:10 theo máy chủ” + nút duyệt rộng hết thanh; bỏ số 32px.
@@ -231,14 +231,14 @@ Nội dung lỗi, câu hỏi và lý do planner trên mockup là minh hoạ; khi
 - **Polish sau critique — 18/09/2026:** “Chế độ lập kế hoạch” có trên mọi thẻ tóm tắt V05 và màn đối chiếu (trước đó 3/35 board). `Create409` và `CreateLost` giữ nguyên bố cục của `CreateSoft` — cột “Hệ thống làm được gì”, chọn mẫu, thanh khoá có `aria-describedby`, ô yêu cầu 4 dòng — banner trạng thái chỉ chèn thêm vào cột trái; hàng “Giá trị đầu vào” dùng một chiều cao 56px và một cỡ chữ 16px. Mobile bỏ hộp THAO TÁC GHI / ĐÃ GHI / ĐÍCH (đã có trong bản ghi và banner) theo phương án B.
 - **Harden sau critique — 18/09/2026:** focus-visible trên cả 36 board; 14 link chữ đứng riêng có vùng chạm 44px; thẻ “Cần xử lý” ở V02 thành link cả thẻ; “Xem chứng cứ” đổi từ nút sang link (6 board); mobile nâng 13 điều khiển 36px lên 44px; nút hiện mật khẩu 40 → 44px; V01 thống nhất dàn ý (H1 “Đăng nhập”, form trước trong DOM) và `Login401` hiện viền lỗi trên hai ô. `Login429` cố ý không có `aria-invalid` vì ô không sai. Hai “Tạo yêu cầu” trùng tên được giữ vì cùng đích.
 - **Polish lượt cuối — 18/09/2026:** quét 36 board: màu chỉ từ token, cỡ chữ trong thang, bo góc 4/8/14/full, một độ dày nét icon, focus-visible ở mọi board, không còn chuỗi bị cấm trong bảng Copy conventions. `RunSucceeded` dời ghi chú “Hoàn tất nghĩa là…” xuống sau “Kết quả từng bước” để kết quả là ấn tượng đầu, giới hạn là chú thích. Detector trên board đang dùng chỉ còn `cramped-padding` (37, ngoại lệ đã đo); `side-tab`/`flat-type-hierarchy` chỉ còn ở board “Cũ ·”. Còn mở: màn duyệt chưa giải thích “bản xem trước” cho người mới. (Việc mang yêu cầu cũ sang V03 đã chốt ở “Luồng khôi phục” bên dưới.)
-- **Luồng khôi phục — chốt 18/09/2026 (`/impeccable shape`, sau critique 23/40).** Critique chỉ ra “Tạo lại” ở màn đối chiếu phát lại mọi thao tác ghi, và chỉ đường rủi ro nhất mới được điền sẵn yêu cầu. Quy tắc chi tiết ở mục Recovery trong [DESIGN.md](../../../DESIGN.md); trên canvas:
+- **Luồng khôi phục — chốt 18/09/2026 sau vòng thiết kế và critique 23/40.** Critique chỉ ra “Tạo lại” ở màn đối chiếu phát lại mọi thao tác ghi, và chỉ đường rủi ro nhất mới được điền sẵn yêu cầu. Quy tắc chi tiết ở mục Recovery trong [DESIGN.md](../../../DESIGN.md); trên canvas:
   - `ReconSoft`: câu hỏi “Trên bảng “Báo cáo tuần” đã có 4 dòng tuần 37 chưa?” thay nút “Tạo lại”. “Đã thấy đủ 4 dòng” → `CreateRetrySeen` (chỉ gửi thông báo); “Không thấy” → `CreateRetry` (đủ yêu cầu, banner cảnh báo nhắc từ chối nếu các dòng xuất hiện trước khi duyệt). Câu trả lời không đổi trạng thái lần chạy.
   - `ReconConflict`: bỏ cổng “So sánh với nội dung đã gửi” và nút “Tạo lại” `aria-disabled`; cùng câu hỏi với đáp án thứ ba “Thấy nhưng khác nội dung” mở hướng dẫn sửa trực tiếp trên bảng, không tạo lại.
   - `ReconConfirmed`: primary “Tạo yêu cầu chỉ gửi thông báo”.
   - `RunExpired`, `RunFailed`: primary “Dùng lại yêu cầu này”, link “Tạo yêu cầu trống”; `CreateReuse` là màn tạo điền sẵn từ lần chạy hết hạn 0f7b52e3. `RunNeedsInput`: primary “Dùng câu gợi ý này”, link “Dùng lại câu gốc”. `RunRefused` giữ nguyên.
   - Màn duyệt của lần chạy tạo lại: `MainRecreated` (kế hoạch chỉ gửi 1 tin nhắn, dòng “Khớp câu trả lời của bạn”) và `MainRecreatedWarn` (kế hoạch vẫn thêm 4 dòng dù người dùng đã thấy: cảnh báo đứng đầu, “Từ chối và sửa yêu cầu” là primary, “Vẫn duyệt 2 thao tác ghi” là secondary và vẫn bấm được).
   - **Cần backend (đề xuất, xem mục 6):** POST /runs nhận `origin: { run_id, reason }`; GET /runs/:id trả `origin`. Cảnh báo “không khớp” do client tính: so đích ghi của kế hoạch với thao tác ghi của lần chạy gốc. Chưa làm thì màn duyệt không có `origin-strip` và không cảnh báo; màn tạo vẫn điền sẵn trong bộ nhớ như `CreateRetry`.
-  - Chưa vẽ: mobile của câu hỏi khôi phục và của màn duyệt có nguồn gốc (để lượt `/impeccable adapt`); tên hiển thị của `origin` trong “Chi tiết kỹ thuật”.
+  - Chưa vẽ: mobile của câu hỏi khôi phục và của màn duyệt có nguồn gốc (để lượt thiết kế thích ứng); tên hiển thị của `origin` trong “Chi tiết kỹ thuật”.
 - **Bộ lọc V04 mobile (`RunsMobile`, P1):** hàng 5 pill cuộn ngang, nơi pill đang bật nằm ngoài màn hình, đổi thành một `select` 48px “Nhóm trạng thái” hiện rõ “Không hoàn tất · 7”, ngay dưới là “Đang hiển thị 7 / 12 lần chạy đã tải” và nút “Bỏ lọc”. Dòng chân cũ bỏ vì số đếm đã lên đầu. Cùng năm nhóm như desktop, chỉ khác control.
 
 ## 5. Luồng end-to-end

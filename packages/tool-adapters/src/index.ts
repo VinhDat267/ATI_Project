@@ -4,3 +4,4 @@ export * from './rate-limiter.js';
 export * from './base-adapter.js';
 export * from './trello/index.js';
 export * from './slack/index.js';
+export * from './github/github-adapter.js';

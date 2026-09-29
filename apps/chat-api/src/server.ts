@@ -16,12 +16,13 @@ import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { AdapterFactory } from './services/adapter-factory.js';
+import { getConfiguredToolCatalog } from './services/registered-services.js';
 import {
   AIPlanner,
   GeminiProvider,
   MockLLMProvider,
 } from '@wap/planner';
-import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createApp } from './app.js';
 
 async function bootstrap() {
@@ -202,7 +203,32 @@ async function bootstrap() {
         ],
         warnings: [],
       };
-    mockProvider.setPlanResponses([sandboxPlan]);
+    const threeServicePlan = {
+      kind: 'plan',
+      thinking: 'Tạo issue GitHub, chuyển liên kết vào thẻ Trello, rồi thông báo cả hai liên kết qua Slack.',
+      summary: 'Tạo issue GitHub, thẻ Trello liên kết và thông báo Slack',
+      steps: [
+        {
+          id: 'step_1', tool: 'github.create_issue',
+          description: 'Tạo issue trong repository được cấp quyền',
+          args: { repo: 'owner/repo', title: 'Sửa lỗi responsive CSS' }, dependsOn: [],
+        },
+        {
+          id: 'step_2', tool: 'trello.create_card',
+          description: 'Tạo thẻ Trello dẫn tới GitHub issue',
+          args: { listId: 'list_frontend_todo', title: 'Sửa lỗi responsive CSS', desc: { $template: 'Theo dõi GitHub issue: ${step_1.output.url}' } },
+          dependsOn: ['step_1'],
+        },
+        {
+          id: 'step_3', tool: 'slack.send_message',
+          description: 'Thông báo issue GitHub và thẻ Trello',
+          args: { channel: '#general', text: { $template: 'Issue: ${step_1.output.url}; Trello: ${step_2.output.url}' } },
+          dependsOn: ['step_1', 'step_2'],
+        },
+      ],
+      warnings: [],
+    };
+    mockProvider.setPlanResponses([process.env.SANDBOX_SCENARIO === 'three_service' ? threeServicePlan : sandboxPlan]);
     provider = mockProvider;
   }
 
@@ -247,20 +273,20 @@ async function bootstrap() {
     const adapter = await gatherAdapterFactory.getAdapterForService(serviceName);
     return adapter.execute(tool, args, { signal });
   };
-  const primaryPlanner = new AIPlanner({
-    provider,
-    toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
-    gatherSearch,
-  });
-
   const backupPlanner = new AIPlanner({
     provider: backupMockProvider,
-    toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
+    toolCatalog: ALL_TOOLS,
     gatherSearch,
   });
 
   const planner = createRuntimePlanner(env.RUNTIME_MODE,
-    (input: any) => primaryPlanner.processMessage(input),
+    async (input: any) => new AIPlanner({
+      provider,
+      toolCatalog: env.RUNTIME_MODE === 'live'
+        ? await getConfiguredToolCatalog(credRepo, env.ENCRYPTION_KEY)
+        : ALL_TOOLS,
+      gatherSearch,
+    }).processMessage(input),
     (input: any) => backupPlanner.processMessage(input));
 
   // 4. ChatService Event Bridge to SSE
@@ -301,6 +327,16 @@ async function bootstrap() {
                 name: args.title || 'Thẻ mới',
                 url: 'https://trello.com/c/sandbox/card',
                 listId: args.listId || 'list_1',
+                desc: args.desc,
+              };
+            }
+            if (tool === 'github.create_issue') {
+              return {
+                id: `issue_${Date.now()}`,
+                number: 42,
+                title: args.title,
+                url: 'https://github.com/owner/repo/issues/42',
+                repo: args.repo,
               };
             }
             if (tool === 'trello.add_member') {
@@ -310,7 +346,7 @@ async function bootstrap() {
               if (process.env.SANDBOX_SCENARIO === 'partial_failure') {
                 throw Object.assign(new Error('Sandbox: invalid Slack channel before send'), { category: 'VALIDATION' });
               }
-              return { ok: true, channel: args.channel, ts: `${Date.now()}.000100` };
+              return { ok: true, channel: args.channel, text: args.text, ts: `${Date.now()}.000100` };
             }
             if (process.env.SANDBOX_SCENARIO === 'clarification' && tool === 'trello.search_boards') {
               return [{ id: 'board_frontend', name: 'Frontend' }];

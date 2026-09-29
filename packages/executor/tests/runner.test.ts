@@ -106,4 +106,16 @@ describe('packages/executor (Task 13: StepRunner with AbortSignal Timeout & UNKN
     expect(result.status).toBe('failed');
     expect(result.error?.category).toBe('AUTH_ERROR');
   });
+
+  it('preserves an ambiguous GitHub write outcome for reconciliation', async () => {
+    const runner = new StepRunner({ getAdapter: () => ({ execute: async () => {
+      throw Object.assign(new Error('GitHub write response was lost'), { category: 'UNKNOWN' });
+    } }) });
+    const result = await runner.executeStep({
+      id: 'issue', tool: 'github.create_issue', description: 'Create issue',
+      args: { repo: 'owner/repo', title: 'Release' }, dependsOn: [],
+    }, new Map());
+    expect(result.status).toBe('unknown');
+    expect(result.error?.category).toBe('UNKNOWN');
+  });
 });

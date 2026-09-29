@@ -3,6 +3,9 @@ import {
   ALL_TOOLS,
   TRELLO_TOOLS,
   SLACK_TOOLS,
+  GITHUB_TOOLS,
+  SERVICE_REGISTRY,
+  getServiceDefinition,
   getToolDefinition,
   type ToolDefinition,
   type PlanResponse,
@@ -12,14 +15,33 @@ import {
 } from '../src/index.js';
 
 describe('packages/tool-schemas (Task 2)', () => {
-  it('should export exactly 11 tools (9 Trello + 2 Slack) with unique names', () => {
-    expect(ALL_TOOLS).toHaveLength(11);
+  it('exports 16 unique tools across three registered services', () => {
+    expect(ALL_TOOLS).toHaveLength(16);
     expect(TRELLO_TOOLS).toHaveLength(9);
     expect(SLACK_TOOLS).toHaveLength(2);
+    expect(GITHUB_TOOLS).toHaveLength(5);
 
     const names = ALL_TOOLS.map((t) => t.name);
     const uniqueNames = new Set(names);
-    expect(uniqueNames.size).toBe(11);
+    expect(uniqueNames.size).toBe(16);
+    expect(new Set(SERVICE_REGISTRY.map((service) => service.id)).size).toBe(3);
+    for (const tool of ALL_TOOLS) {
+      expect(getServiceDefinition(tool.service)).toBeDefined();
+    }
+  });
+
+  it('publishes GitHub credentials, repository scope and executable tool contracts', () => {
+    const github = getServiceDefinition('github');
+    expect(github?.scopeKey).toBe('repos');
+    expect(github?.credentialFields).toEqual([{ key: 'token', label: 'Personal access token', type: 'password' }]);
+    expect(GITHUB_TOOLS.map((tool) => tool.name)).toEqual([
+      'github.search_repos', 'github.search_issues', 'github.get_issue', 'github.create_issue', 'github.add_label',
+    ]);
+    expect(getToolDefinition('github.create_issue')?.inputSchema.required).toEqual(['repo', 'title']);
+    expect(getToolDefinition('github.create_issue')?.outputSchema.properties.url.type).toBe('string');
+    expect(getToolDefinition('github.add_label')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'label']);
+    expect(getToolDefinition('github.search_repos')?.sideEffect).toBe('read');
+    expect(getToolDefinition('github.create_issue')?.sideEffect).toBe('write');
   });
 
   it('should retrieve tools by name using getToolDefinition', () => {
@@ -40,7 +62,7 @@ describe('packages/tool-schemas (Task 2)', () => {
 
   it('should enforce search_* read tools to have query or boardId and limit <= 10', () => {
     const readTools = ALL_TOOLS.filter((t) => t.sideEffect === 'read');
-    expect(readTools).toHaveLength(6);
+    expect(readTools).toHaveLength(9);
 
     for (const tool of readTools) {
       expect(tool.riskLevel).toBe('low');
@@ -56,7 +78,7 @@ describe('packages/tool-schemas (Task 2)', () => {
 
   it('should enforce write tools risk levels per spec v3', () => {
     const writeTools = ALL_TOOLS.filter((t) => t.sideEffect === 'write');
-    expect(writeTools).toHaveLength(5);
+    expect(writeTools).toHaveLength(7);
 
     // Trello writes are low risk
     const trelloWrites = writeTools.filter((t) => t.service === 'trello');

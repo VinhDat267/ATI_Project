@@ -47,7 +47,7 @@ These files are recoverable by the normal build/schema/test commands. No source,
 
 - All `docs/task-hub-evidence/` and `docs/api-evidence/` history, including failed and superseded runs. `docs/GIT-POLICY.md` and the API fix plan require preserving reviewed history and pre-existing evidence; no retention-policy change was authorized.
 - `node_modules/`, because the installed graph is valid and needed for continued work.
-- `.agents/`, `.claude/`, `.codex/`, `.impeccable/` and `.superpowers/sdd/`, because they are ignored local tooling/history, not build debris.
+- `.agents/`, `.claude/`, `.codex/` and `.superpowers/sdd/`, because they are ignored local tooling/history, not build debris.
 - `docs/archive/pre-fix-2026-09-13.zip`, because it is a tracked historical checkpoint explicitly protected by policy.
 - Every existing modified/untracked source, test, design and specification file.
 
