@@ -4,6 +4,10 @@ import { WorkingMemory } from './working-memory.js';
 import { classifyIntent } from './router.js';
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
+import {
+  MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved,
+  type SearchOutcome,
+} from './search.js';
 
 export interface AIPlannerOptions {
   provider: LLMProvider;
@@ -20,6 +24,14 @@ export interface AIPlannerOptions {
   now?: () => Date;
   /** IANA time zone users plan in; defaults to Asia/Ho_Chi_Minh. */
   timeZone?: string;
+  /**
+   * How names become IDs. 'regex' (default) resolves names with the registry's
+   * gather rules before the model runs. 'llm' lets the model call the read-only
+   * search tools itself through `gatherSearch`, in a bounded loop.
+   */
+  searchMode?: 'regex' | 'llm';
+  /** Model-driven search rounds allowed per turn (default 4). */
+  maxSearchRounds?: number;
 }
 
 export interface GatherSearchRequest {
@@ -79,8 +91,12 @@ export class AIPlanner {
   private requireGroundedResources: boolean;
   private now: () => Date;
   private timeZone: string;
+  private searchMode: 'regex' | 'llm';
+  private maxSearchRounds: number;
 
   constructor(options: AIPlannerOptions) {
+    this.searchMode = options.searchMode ?? 'regex';
+    this.maxSearchRounds = options.maxSearchRounds ?? 4;
     this.now = options.now ?? (() => new Date());
     this.timeZone = options.timeZone ?? 'Asia/Ho_Chi_Minh';
     this.provider = options.provider;
@@ -171,7 +187,119 @@ export class AIPlanner {
     return;
   }
 
+  /** Runs the model's search calls; only read tools that pass schema checks reach the service. */
+  private async runSearches(
+    calls: Array<{ tool: string; args: Record<string, unknown> }>,
+    activeTools: ToolDefinition[],
+    input: ProcessMessageInput,
+  ): Promise<SearchOutcome[]> {
+    const { memory, signal, onGatherEvent } = input;
+    const outcomes: SearchOutcome[] = [];
+    for (const call of calls) {
+      const prepared = prepareSearchCall(call, activeTools);
+      if ('error' in prepared) {
+        outcomes.push({ tool: call.tool, args: call.args, error: prepared.error });
+        continue;
+      }
+      if (!this.gatherSearch) {
+        outcomes.push({ tool: call.tool, args: prepared.args, error: 'Search is unavailable in this session' });
+        continue;
+      }
+      onGatherEvent?.({ tool: call.tool, status: 'started' });
+      try {
+        const raw = await this.gatherSearch({ tool: call.tool, args: prepared.args, signal });
+        if (!Array.isArray(raw)) throw new Error('Search did not return a list');
+        const result = raw.slice(0, MAX_RESULTS_PER_CALL);
+        const resource = activeTools.find((tool) => tool.name === call.tool)?.discovers;
+        if (resource) {
+          memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), resource, result));
+        }
+        onGatherEvent?.({ tool: call.tool, status: 'completed', output: result });
+        outcomes.push({ tool: call.tool, args: prepared.args, result });
+      } catch (err: any) {
+        if (signal?.aborted) throw err;
+        onGatherEvent?.({ tool: call.tool, status: 'completed', output: [] });
+        outcomes.push({ tool: call.tool, args: prepared.args, error: String(err?.message ?? err).slice(0, 300) });
+      }
+    }
+    return outcomes;
+  }
+
+  /**
+   * Model-driven planning: the model may answer with a search request, the
+   * results come back as data, and the loop ends with a plan, clarification or
+   * refusal. Every step is bounded, and plans must still be grounded in IDs the
+   * model actually saw, typed by the user, or took from earlier steps.
+   */
+  private async planWithSearch(input: ProcessMessageInput): Promise<PlannerResponse> {
+    const { userMessage, history = [], memory, signal } = input;
+    const conversation: ChatMessage[] = [...history, { role: 'user', content: userMessage }];
+    const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
+
+    // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
+    const targetServices = classifyIntent(userTexts.join('\n'), this.toolCatalog, this.serviceRegistry);
+    const activeTools = this.toolCatalog.filter((tool) => targetServices.includes(tool.service));
+    if (activeTools.length === 0) {
+      return { kind: 'refusal', reason: 'The requested service is not available or authorized in this connection.',
+        suggestion: 'Connect the service with an allowed resource scope before planning this workflow.' };
+    }
+
+    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch) });
+    let searchRounds = 0;
+    let rejectedPlans = 0;
+    // Search rounds, one final answer, and one correction of a rejected plan.
+    for (let call = 0; call < this.maxSearchRounds + 2; call++) {
+      const output = await this.provider.generatePlan({
+        systemPrompt, conversationHistory: conversation, toolCatalog: activeTools, workingMemory: memory.getAll(), signal,
+      });
+
+      const request = parseSearchRequest(output);
+      if (request) {
+        conversation.push({ role: 'assistant', content: output });
+        if ('error' in request) {
+          conversation.push({ role: 'user', content: `Your search request was invalid: ${request.error}` });
+        } else if (searchRounds >= this.maxSearchRounds) {
+          conversation.push({ role: 'user', content: 'The search limit was reached, so no more searches are allowed. Answer now with a plan, or ask the user for what is still missing.' });
+        } else {
+          searchRounds++;
+          conversation.push({ role: 'user', content: formatSearchResults(await this.runSearches(request.calls, activeTools, input)) });
+        }
+        continue;
+      }
+
+      const validation = validatePlan(output, activeTools, this.requireGroundedResources ? { grounding: {
+        memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts,
+      } } : {});
+      if (validation.valid) return validation.parsed;
+
+      if (++rejectedPlans > 1) {
+        if (validation.layer === 'grounding' && validation.ungrounded) {
+          const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
+          return {
+            kind: 'clarification',
+            question: `Which ${resources.join(', ')} should I use?`,
+            context: `These values could not be verified against your connected services: ${validation.ungrounded
+              .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Name the resource or give its exact ID.`,
+          };
+        }
+        throw new Error(`Validation failed after retry: [${validation.layer}] ${validation.error}`);
+      }
+      conversation.push({ role: 'assistant', content: output });
+      conversation.push({
+        role: 'user',
+        content: `Your previous response failed validation (${validation.layer} error):\n${validation.error}\nPlease fix the plan and return only the corrected valid JSON response.`,
+      });
+    }
+
+    return {
+      kind: 'clarification',
+      question: 'I could not finish looking up the resources for this request. Which board, list or channel do you mean?',
+      context: 'The lookup limit was reached before a plan could be built.',
+    };
+  }
+
   async processMessage(input: ProcessMessageInput): Promise<PlannerResponse> {
+    if (this.searchMode === 'llm') return this.planWithSearch(input);
     const { userMessage, history = [], memory, signal } = input;
 
     // Gather may clear this key after resolving the answer; keep the original

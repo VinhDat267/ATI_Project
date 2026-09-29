@@ -11,6 +11,8 @@ export interface ToolDefinition {
   service: 'trello' | 'slack' | string;
   description: string;
   sideEffect: 'read' | 'write';
+  /** For a search tool: the working-memory resource its results identify, e.g. 'board'. */
+  discovers?: string;
   riskLevel: 'low' | 'medium' | 'high';
   inputSchema: JSONSchema;
   outputSchema: JSONSchema;

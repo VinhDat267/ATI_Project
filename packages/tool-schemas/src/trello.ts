@@ -4,6 +4,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.search_boards',
     service: 'trello',
+    discovers: 'board',
     description: 'Tìm kiếm bảng (boards) trên Trello theo từ khóa hoặc tên.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -40,6 +41,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.search_lists',
     service: 'trello',
+    discovers: 'list',
     description: 'Tìm kiếm hoặc liệt kê các danh sách (lists) trong một bảng Trello cụ thể.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -49,6 +51,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         boardId: {
           type: 'string',
           description: 'ID của bảng Trello',
+          'x-resource': 'board',
         },
         query: {
           type: 'string',
@@ -80,6 +83,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.search_members',
     service: 'trello',
+    discovers: 'member',
     description: 'Tìm kiếm thành viên Trello theo tên hoặc username để lấy memberId.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -93,6 +97,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         boardId: {
           type: 'string',
           description: 'Giới hạn tìm kiếm trong bảng cụ thể (tùy chọn)',
+          'x-resource': 'board',
         },
         limit: {
           type: 'number',
@@ -120,6 +125,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.search_cards',
     service: 'trello',
+    discovers: 'card',
     description: 'Tìm kiếm thẻ (cards) trong Trello theo từ khóa.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -133,10 +139,12 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         boardId: {
           type: 'string',
           description: 'ID bảng Trello để thu hẹp phạm vi (tùy chọn)',
+          'x-resource': 'board',
         },
         listId: {
           type: 'string',
           description: 'ID danh sách Trello để thu hẹp phạm vi (tùy chọn)',
+          'x-resource': 'list',
         },
         limit: {
           type: 'number',
