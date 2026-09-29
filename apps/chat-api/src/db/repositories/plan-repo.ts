@@ -22,6 +22,12 @@ export class PlanRepo {
     planHash: string;
     expiresAt: Date;
   }): Promise<PlanRow> {
+    // Invalidate/supersede any existing pending plans for this conversation
+    await this.pool.query(
+      "UPDATE plans SET status = 'superseded' WHERE conv_id = $1 AND status = 'pending'",
+      [data.convId]
+    );
+
     const res = await this.pool.query(
       `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at)
        VALUES ($1, $2, $3, $4, $5)
@@ -51,11 +57,11 @@ export class PlanRepo {
   }
 
   /**
-   * Optimistic locking: only transitions to approved if currently pending.
+   * Optimistic locking: only transitions to approved if currently pending AND not expired.
    */
   async approvePlan(planId: string): Promise<boolean> {
     const res = await this.pool.query(
-      "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND status = 'pending' RETURNING id",
+      "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING id",
       [planId]
     );
     return (res.rowCount ?? 0) > 0;

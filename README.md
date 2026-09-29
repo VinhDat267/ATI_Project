@@ -3,7 +3,7 @@
 > **Đề tài #26:** Nền tảng tự động hóa quy trình làm việc bằng Trí tuệ Nhân tạo  
 > **Kiến trúc v3:** Chat Agent + Tool Orchestration (Plan-then-Execute)  
 > **Ngôn ngữ & Nền tảng:** TypeScript Monorepo (Node.js 22+, React 19, PostgreSQL, Docker)  
-> **Trạng thái:** 20/28 tasks hoàn thành (71.4%) — 88 tests passing
+> **Trạng thái:** Hoàn thành Phase 0-5 + Remediation Audit F01-F14 (Gates G0-G5) — 117 tests passing (100%) & 16 Acceptance Probes OK
 
 ---
 

@@ -7,7 +7,9 @@ import {
   PlanRepo,
   StepRepo,
   CredentialRepo,
+  UserRepo,
 } from './db/repositories/index.js';
+import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -33,6 +35,7 @@ async function bootstrap() {
 
   // 1. Try to connect to PostgreSQL
   let pool = null;
+  let userRepo: any = null;
   let convRepo: any = null;
   let msgRepo: any = null;
   let planRepo: any = null;
@@ -40,17 +43,25 @@ async function bootstrap() {
   let credRepo: any = null;
 
   try {
-    const dbUrl = env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/wap_g1';
+    const dbUrl = env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
     pool = getPool({ connectionString: dbUrl });
     // Quick test query to verify connectivity
     await pool.query('SELECT 1');
-    console.log(`\x1b[32m[chat-api]\x1b[0m Đã kết nối thành công tới PostgreSQL database!`);
+    console.log(`\x1b[32m[chat-api]\x1b[0m Đã kết nối thành công tới PostgreSQL database (ati_v3)!`);
 
+    userRepo = new UserRepo(pool);
     convRepo = new ConversationRepo(pool);
     msgRepo = new MessageRepo(pool);
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool);
+
+    await userRepo.createUser({
+      id: DEMO_ADMIN_ID,
+      email: 'admin@wap.local',
+      password: 'password123',
+      name: 'Administrator',
+    }).catch(() => {});
   } catch (err: any) {
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
@@ -265,27 +276,41 @@ async function bootstrap() {
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)
+  const realAdapterFactory = new AdapterFactory({
+    credentialRepo: credRepo,
+    encryptionKey: env.ENCRYPTION_KEY,
+  });
+
   const adapterFactory = {
-    getAdapterForService: (serviceName: string) => {
-      return {
-        execute: async (tool: string, args: any) => {
-          console.log(`\x1b[34m[Engine Execution]\x1b[0m Chạy tool ${tool} với args:`, JSON.stringify(args));
-          if (tool === 'trello.create_card') {
-            return {
-              id: `card_${Date.now()}`,
-              name: args.title || args.name || 'Thẻ mới',
-              url: 'https://trello.com/c/mock123/task',
-            };
-          }
-          if (tool === 'trello.add_member') {
-            return { id: args.cardId, idMembers: [args.memberId] };
-          }
-          if (tool === 'slack.send_message') {
-            return { ok: true, channel: args.channel, ts: `${Date.now()}.000100` };
-          }
-          return { ok: true, result: 'Execution success' };
-        },
-      };
+    getAdapterForService: async (serviceName: string) => {
+      if (env.RUNTIME_MODE === 'live') {
+        return await realAdapterFactory.getAdapterForService(serviceName);
+      }
+      try {
+        return await realAdapterFactory.getAdapterForService(serviceName);
+      } catch (err: any) {
+        console.log(`\x1b[35m[Sandbox Mode]\x1b[0m Using In-Memory Sandbox Adapter for '${serviceName}'`);
+        return {
+          execute: async (tool: string, args: any) => {
+            console.log(`\x1b[35m[Sandbox Execution]\x1b[0m Chạy tool ${tool} với args:`, JSON.stringify(args));
+            if (tool === 'trello.create_card') {
+              return {
+                id: `card_${Date.now()}`,
+                name: args.title || 'Thẻ mới',
+                url: 'https://trello.com/c/sandbox/card',
+                listId: args.listId || 'list_1',
+              };
+            }
+            if (tool === 'trello.add_member') {
+              return { id: args.cardId, idMembers: [args.memberId] };
+            }
+            if (tool === 'slack.send_message') {
+              return { ok: true, channel: args.channel, ts: `${Date.now()}.000100` };
+            }
+            return { ok: true, sandbox: true };
+          },
+        };
+      }
     },
   };
 
@@ -293,6 +318,7 @@ async function bootstrap() {
   const executionService = new ExecutionService({
     planRepo,
     stepRepo,
+    convRepo,
     adapterFactory,
     sseManager,
   });
@@ -300,9 +326,11 @@ async function bootstrap() {
   // 7. Express App
   const app = createApp({
     jwtSecret: env.JWT_SECRET,
+    userRepo,
     convRepo,
     msgRepo,
     planRepo,
+    credentialRepo: credRepo,
     chatService,
     sseManager,
     executionService,

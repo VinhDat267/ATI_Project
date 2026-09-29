@@ -47,6 +47,8 @@ export class ExecutionController {
     return result;
   }
 
+  private isRunning: boolean = false;
+
   getOutputs(): StepOutputs {
     return new Map(this.stepOutputs);
   }
@@ -60,65 +62,81 @@ export class ExecutionController {
     if (this.stopped) {
       return { status: 'stopped' };
     }
+    if (this.isRunning) {
+      return { status: 'partial' };
+    }
 
-    for (const step of this.steps) {
-      if (this.stopped) {
-        return { status: 'stopped' };
-      }
+    this.isRunning = true;
+    try {
+      for (const step of this.steps) {
+        if (this.stopped) {
+          return { status: 'stopped' };
+        }
 
-      const currentState = this.stepStates.get(step.id);
-      // Skip if already succeeded or skipped
-      if (currentState?.status === 'succeeded' || currentState?.status === 'skipped') {
-        continue;
-      }
+        const currentState = this.stepStates.get(step.id);
+        // Skip if already succeeded or skipped
+        if (currentState?.status === 'succeeded' || currentState?.status === 'skipped') {
+          continue;
+        }
 
-      // Check dependsOn dependencies: must be either succeeded or skipped
-      for (const depId of step.dependsOn || []) {
-        const depState = this.stepStates.get(depId);
-        if (!depState || (depState.status !== 'succeeded' && depState.status !== 'skipped')) {
+        // Check dependsOn dependencies: must be either succeeded or skipped
+        for (const depId of step.dependsOn || []) {
+          const depState = this.stepStates.get(depId);
+          if (!depState || (depState.status !== 'succeeded' && depState.status !== 'skipped')) {
+            return {
+              status: 'partial',
+              pausedAtStepId: step.id,
+              error: { message: `Waiting on dependency ${depId}` },
+            };
+          }
+        }
+
+        // Mark step running
+        this.updateStepState(step.id, { status: 'running' });
+
+        // Execute step
+        const result = await this.runner.executeStep(step, this.stepOutputs);
+
+        if (result.status === 'success' || result.status === 'succeeded') {
+          this.stepOutputs.set(step.id, result.output);
+          this.updateStepState(step.id, {
+            status: 'succeeded',
+            output: result.output,
+            error: undefined,
+          });
+        } else {
+          // failed or unknown
+          const failureStatus = result.status === 'unknown' ? 'unknown' : 'failed';
+          this.updateStepState(step.id, {
+            status: failureStatus,
+            error: result.error,
+          });
           return {
             status: 'partial',
             pausedAtStepId: step.id,
-            error: { message: `Waiting on dependency ${depId}` },
+            error: result.error,
           };
         }
       }
 
-      // Mark step running
-      this.updateStepState(step.id, { status: 'running' });
-
-      // Execute step
-      const result = await this.runner.executeStep(step, this.stepOutputs);
-
-      if (result.status === 'success' || result.status === 'succeeded') {
-        this.stepOutputs.set(step.id, result.output);
-        this.updateStepState(step.id, {
-          status: 'succeeded',
-          output: result.output,
-          error: undefined,
-        });
-      } else {
-        // failed or unknown
-        const failureStatus = result.status === 'unknown' ? 'unknown' : 'failed';
-        this.updateStepState(step.id, {
-          status: failureStatus,
-          error: result.error,
-        });
-        return {
-          status: 'partial',
-          pausedAtStepId: step.id,
-          error: result.error,
-        };
-      }
+      return { status: 'completed' };
+    } finally {
+      this.isRunning = false;
     }
-
-    return { status: 'completed' };
   }
 
   async retryStep(stepId: string): Promise<ExecutionSummary> {
     const step = this.steps.find((s) => s.id === stepId);
     if (!step) {
       throw new Error(`Step '${stepId}' not found in plan`);
+    }
+
+    const current = this.stepStates.get(stepId);
+    if (current?.status === 'succeeded') {
+      throw new Error(`Cannot retry step '${stepId}' because it has already succeeded`);
+    }
+    if (current?.status === 'running') {
+      throw new Error(`Cannot retry step '${stepId}' because it is currently running`);
     }
 
     this.updateStepState(stepId, { status: 'pending', error: undefined });
@@ -129,6 +147,14 @@ export class ExecutionController {
     const step = this.steps.find((s) => s.id === stepId);
     if (!step) {
       throw new Error(`Step '${stepId}' not found in plan`);
+    }
+
+    const current = this.stepStates.get(stepId);
+    if (current?.status === 'succeeded') {
+      throw new Error(`Cannot skip step '${stepId}' because it has already succeeded`);
+    }
+    if (current?.status === 'running') {
+      throw new Error(`Cannot skip step '${stepId}' because it is currently running`);
     }
 
     this.updateStepState(stepId, { status: 'skipped' });

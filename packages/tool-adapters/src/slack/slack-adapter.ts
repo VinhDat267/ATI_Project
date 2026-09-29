@@ -139,12 +139,13 @@ export class SlackAdapter extends BaseAdapter {
   /**
    * Search Slack channels by query, filtered by AllowedScope.
    */
-  async searchChannels(args: {
-    query: string;
-    limit?: number;
-  }): Promise<Array<{ id: string; name: string; isPrivate: boolean }>> {
+  async searchChannels(
+    args: { query: string; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<Array<{ id: string; name: string; isPrivate: boolean }>> {
     const data = await this.request<any>(
-      '/conversations.list?types=public_channel,private_channel&limit=100'
+      '/conversations.list?types=public_channel,private_channel&limit=100',
+      { signal: options?.signal }
     );
 
     const channels: any[] = Array.isArray(data?.channels) ? data.channels : [];
@@ -174,10 +175,10 @@ export class SlackAdapter extends BaseAdapter {
   /**
    * Send a message to a Slack channel.
    */
-  async sendMessage(args: {
-    channel: string;
-    text: string;
-  }): Promise<{ ts: string; channel: string }> {
+  async sendMessage(
+    args: { channel: string; text: string },
+    options?: { signal?: AbortSignal }
+  ): Promise<{ ts: string; channel: string }> {
     this.assertAllowedScope('channel', args.channel);
 
     const res = await this.request<any>('/chat.postMessage', {
@@ -186,6 +187,7 @@ export class SlackAdapter extends BaseAdapter {
         channel: args.channel,
         text: args.text,
       }),
+      signal: options?.signal,
     });
 
     return {
@@ -194,12 +196,17 @@ export class SlackAdapter extends BaseAdapter {
     };
   }
 
-  override async execute(toolName: string, args: Record<string, any>): Promise<any> {
+  override async execute(
+    toolName: string,
+    args: Record<string, any>,
+    context?: { signal?: AbortSignal }
+  ): Promise<any> {
+    const opts = context?.signal ? { signal: context.signal } : undefined;
     switch (toolName) {
       case 'slack.search_channels':
-        return this.searchChannels(args as any);
+        return this.searchChannels(args as any, opts);
       case 'slack.send_message':
-        return this.sendMessage(args as any);
+        return this.sendMessage(args as any, opts);
       default:
         throw new StepError({
           message: `Tool '${toolName}' is not supported by SlackAdapter`,

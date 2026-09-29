@@ -35,7 +35,7 @@ export interface AdapterExecutor {
 }
 
 export interface StepRunnerOptions {
-  getAdapter: (serviceName: string) => AdapterExecutor;
+  getAdapter: (serviceName: string) => AdapterExecutor | Promise<AdapterExecutor>;
 }
 
 export interface ExecuteStepOptions {

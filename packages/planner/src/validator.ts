@@ -110,6 +110,14 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
     };
   }
 
+  if (parsed.steps.length === 0) {
+    return {
+      valid: false,
+      layer: 'semantic',
+      error: 'Plan cannot be empty (must contain at least 1 step)',
+    };
+  }
+
   if (parsed.steps.length > 10) {
     return {
       valid: false,
@@ -121,6 +129,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
   // Layer 3: Semantic validate
   const catalogMap = new Map<string, ToolDefinition>(catalog.map((t) => [t.name, t]));
   const steps: PlanStep[] = parsed.steps;
+  const allStepIds = new Set<string>(steps.map((s) => s.id));
+  const stepMap = new Map<string, PlanStep>(steps.map((s) => [s.id, s]));
   const processedStepIds = new Set<string>();
 
   for (const [i, step] of steps.entries()) {
@@ -141,7 +151,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
     }
 
     // Check tool catalog existence
-    if (!catalogMap.has(step.tool)) {
+    const toolDef = catalogMap.get(step.tool);
+    if (!toolDef) {
       return {
         valid: false,
         layer: 'semantic',
@@ -149,7 +160,31 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
       };
     }
 
-    // Check $ref targets
+    // Check required arguments for tool
+    const requiredArgs = toolDef.inputSchema?.required || [];
+    const stepArgs = step.args || {};
+    for (const reqArg of requiredArgs) {
+      if (stepArgs[reqArg] === undefined || stepArgs[reqArg] === null) {
+        return {
+          valid: false,
+          layer: 'schema',
+          error: `Step '${step.id}' is missing required argument '${reqArg}' for tool '${step.tool}'`,
+        };
+      }
+    }
+
+    // Check declared dependencies existence
+    for (const depId of step.dependsOn || []) {
+      if (!allStepIds.has(depId)) {
+        return {
+          valid: false,
+          layer: 'semantic',
+          error: `Dependency '${depId}' declared in step '${step.id}' does not exist in plan`,
+        };
+      }
+    }
+
+    // Check $ref targets and output property validity
     const args = step.args || {};
     const refTargets: string[] = [];
 
@@ -173,13 +208,33 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
     extractRefs(args);
 
     for (const ref of refTargets) {
-      const targetStepId = ref.split('.')[0];
+      const parts = ref.split('.');
+      const targetStepId = parts[0];
       if (!targetStepId || !processedStepIds.has(targetStepId)) {
         return {
           valid: false,
           layer: 'semantic',
           error: `Referenced step '${targetStepId}' not found or forward reference in step '${step.id}'`,
         };
+      }
+
+      // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema
+      if (parts[1] === 'output' && parts[2]) {
+        const propName = parts[2];
+        const targetStep = stepMap.get(targetStepId);
+        if (targetStep) {
+          const targetToolDef = catalogMap.get(targetStep.tool);
+          const outSchema = targetToolDef?.outputSchema;
+          if (outSchema && outSchema.type === 'object' && outSchema.properties) {
+            if (!(propName in outSchema.properties)) {
+              return {
+                valid: false,
+                layer: 'semantic',
+                error: `Referenced output property '${propName}' does not exist in output schema of tool '${targetStep.tool}'`,
+              };
+            }
+          }
+        }
       }
     }
 

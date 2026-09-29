@@ -22,8 +22,8 @@ export class StepRepo {
     planId: string;
     stepId: string;
     tool: string;
-    argsJson: any;
-    requestedBy: string;
+    argsJson?: any;
+    requestedBy?: string;
   }): Promise<ExecutionStepRow> {
     const res = await this.pool.query(
       `INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, requested_by)
@@ -33,8 +33,8 @@ export class StepRepo {
         data.planId,
         data.stepId,
         data.tool,
-        JSON.stringify(data.argsJson),
-        data.requestedBy,
+        JSON.stringify(data.argsJson ?? {}),
+        data.requestedBy || 'system',
       ]
     );
     return res.rows[0];

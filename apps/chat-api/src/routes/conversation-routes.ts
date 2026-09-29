@@ -48,7 +48,21 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // GET /api/conversations/:id/plans/active
   router.get('/:id/plans/active', async (req: Request, res: Response): Promise<void> => {
     try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversationId = req.params.id as string;
+      const conv = await convRepo.getConversation(conversationId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+      if (conv.user_id !== userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
       if (!planRepo) {
         res.status(500).json({ error: 'Plan repository not configured' });
         return;
@@ -76,7 +90,21 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   // GET /api/conversations/:id/messages/latest
   router.get('/:id/messages/latest', async (req: Request, res: Response): Promise<void> => {
     try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
       const conversationId = req.params.id as string;
+      const conv = await convRepo.getConversation(conversationId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+      if (conv.user_id !== userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
       const messages = await msgRepo.listMessages(conversationId);
       if (!messages || messages.length === 0) {
         res.status(404).json({ error: 'No messages found in conversation' });
@@ -103,6 +131,10 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
+      if (conversation.user_id !== userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
       const messages = await msgRepo.listMessages(conversationId);
       res.status(200).json({ conversation, messages });
     } catch (err: any) {
@@ -119,6 +151,15 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
+      const conv = await convRepo.getConversation(conversationId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+      if (conv.user_id !== userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
       const { content } = req.body || {};
 
       if (!content || typeof content !== 'string') {

@@ -5,9 +5,13 @@ import {
   createAuthMiddleware,
   type AuthUser,
 } from '../auth/jwt.js';
+import { UserRepo, verifyPassword } from '../db/repositories/user-repo.js';
+
+export const DEMO_ADMIN_ID = 'a0000000-0000-4000-8000-000000000001';
 
 export interface AuthRoutesOptions {
   jwtSecret: string;
+  userRepo?: UserRepo;
   findUserByEmail?: (email: string) => Promise<AuthUser | null>;
   validateCredentials?: (
     email: string,
@@ -32,10 +36,15 @@ export function createAuthRoutes(options: AuthRoutesOptions): Router {
     let user: AuthUser | null = null;
     if (options.validateCredentials) {
       user = await options.validateCredentials(email, password);
+    } else if (options.userRepo) {
+      const dbUser = await options.userRepo.findByEmail(email);
+      if (dbUser && verifyPassword(password, dbUser.password)) {
+        user = { id: dbUser.id, email: dbUser.email, name: dbUser.name };
+      }
     } else if (options.findUserByEmail) {
       user = await options.findUserByEmail(email);
     } else if (email === 'admin@wap.local' && password === 'password123') {
-      user = { id: 'u_admin', email: 'admin@wap.local', name: 'Administrator' };
+      user = { id: DEMO_ADMIN_ID, email: 'admin@wap.local', name: 'Administrator' };
     }
 
     if (!user) {

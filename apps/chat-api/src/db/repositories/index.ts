@@ -3,3 +3,4 @@ export * from './conversation-repo.js';
 export * from './message-repo.js';
 export * from './step-repo.js';
 export * from './credential-repo.js';
+export * from './user-repo.js';

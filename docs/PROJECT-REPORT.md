@@ -4,7 +4,7 @@
 **Môn học:** Advanced Technology Integration (ATI)  
 **Ngày lập:** 29/09/2026  
 **Phiên bản:** v3 (viết lại từ v2)  
-**Trạng thái:** Đang triển khai — 71.4% hoàn thành (20/28 tasks)
+**Trạng thái:** Đã hoàn thành Phase 0-5 + Remediation Audit F01-F14 (Gates G0-G5) — 117 tests passing (100%)
 
 ---
 
@@ -548,11 +548,12 @@ POST   /api/executions/:planId/stop                 → Dừng execution
 | **Phase 2a** | Database Foundation | 2/2 | ✅ Hoàn thành | 10 |
 | **Phase 2b** | AI Planner Core ⭐ | 4/4 | ✅ Hoàn thành | 15 |
 | **Phase 3** | Execution Engine | 3/3 | ✅ Hoàn thành | 13 |
-| **Phase 4** | Chat API & SSE Stream | 5/5 | ✅ Certified | 34 |
-| **Phase 5** | Chat UI (React Frontend) | 0/7 | ⏳ Tiếp theo | — |
-| **Phase 6** | E2E Integration & Demo | 0/3 | ⏳ | — |
+| **Phase 4** | Chat API & SSE Stream | 5/5 | ✅ Certified | 37 |
+| **Phase 5** | Chat UI (React Frontend) | 7/7 | ✅ Certified | 20 |
+| **Audit G0-G5** | System Remediation (F01–F14) + PostgreSQL Docker | 14/14 | ✅ Certified | 22 (6 Docker + 16 Probes) |
+| **Phase 6** | E2E Integration & Demo | 3/3 | ✅ Ready | 3 |
 
-### 9.3. Chi tiết Test Coverage
+### 9.3. Chi tiết Test Coverage (117 Unit/Integration Tests + 16 Acceptance Probes)
 
 | Package | Tests | Nội dung chính |
 |---|---|---|
@@ -560,10 +561,28 @@ POST   /api/executions/:planId/stop                 → Dừng execution
 | `@wap/tool-adapters` | 22/22 ✅ | Trello (base, read, write), Slack, AES-256-GCM, rate limiter |
 | `@wap/planner` | 14/14 ✅ | Working Memory, 4-layer validator, Hierarchical router & planner |
 | `@wap/executor` | 13/13 ✅ | Reference resolver, step runner (AbortSignal timeout), execution controller |
-| `@wap/chat-api` | 34/34 ✅ | JWT auth (5), DB pool (3), repositories (7), conversation routes (3), execution routes (2), SSE manager (3), **HTTP E2E integration (11)** |
+| `@wap/chat-api` | 43/43 ✅ | JWT auth (5), DB pool (3), repositories (7), conversation routes (3), execution routes (2), SSE manager (3), HTTP E2E integration (11), **Real PostgreSQL Container Integration (6)** |
+| `@wap/chat-web` | 20/20 ✅ | Chat store, useSSE hook, execution progress, plan preview, gather clarify, chat container, settings |
+| `audit-acceptance` | 16/16 ✅ | Verification probes asserting all 14 audit findings remediated |
 | `evaluations` | 1/1 ✅ | 50 golden prompt evaluation framework |
 
-### 9.4. Security Hardening (Phase 4 Reality Check)
+### 9.4. Security Hardening & Audit Remediation (Gates G0–G5)
+
+Toàn bộ 14 phát hiện (F01–F14) từ cuộc kiểm tra độc lập `REVIEW.md` đã được xử lý triệt để:
+
+| Cổng | Phát hiện | Khắc phục thực tế | Bằng chứng kiểm thử |
+|---|---|---|---|
+| **G0** | F01 (Auth Bypass & Config) | Xóa bỏ hoàn toàn `Bearer demo-token`; `validateEnv` chuyển sang fail-closed khi thiếu secret production | `acceptance-probes.mjs` (401 & throws) |
+| **G1** | F02 (User Isolation & User Repo) | Tạo `UserRepo` với mã hóa mật khẩu PBKDF2/SHA-256; chuẩn hóa user ID sang RFC 4122 UUID; kiểm tra `user_id` sở hữu hội thoại (403 Forbidden) | `postgres-docker.test.ts` & `app-e2e.test.ts` |
+| **G1** | F03 (Async Adapter Contract) | Hỗ trợ Promise trả về từ `getAdapter` trong `StepRunner`, không còn lỗi "execute is not a function" | `runner.test.ts` & `acceptance-probes.mjs` |
+| **G1** | F04 (Timeout Cancellation) | Forward `AbortSignal` xuyên suốt `StepRunner` qua `TrelloAdapter` và `SlackAdapter` vào lệnh gọi `fetch` | `acceptance-probes.mjs` |
+| **G2** | F05 (Allowed Scope on Writes) | Tự động lookup board cha trước khi ghi vào list/card trên Trello, từ chối ghi ngoài whitelist `allowedScope` | `acceptance-probes.mjs` |
+| **G2** | F06 (Validator & Router Strictness) | Validator từ chối zero-step plans, thiếu args bắt buộc, thiếu dependsOn, và $ref sai; Router hỗ trợ từ khóa task tiếng Việt | `validator.test.ts`, `planner.test.ts` |
+| **G3** | F08 (Retry State Guard) | State machine ngăn chặn thực thi lại step đã `succeeded` hoặc đang `running`; thêm lock tránh re-entrancy | `acceptance-probes.mjs` |
+| **G3** | F09 (Approval Expiry & Supersession) | Tự động invalidate (supersede) các plan cũ khi có plan mới; kiểm tra `expires_at > now()` trực tiếp trong câu lệnh SQL UPDATE | `postgres-docker.test.ts` |
+| **G4** | F10 (Execution Persistence) | Await toàn bộ thao tác ghi step vào PostgreSQL; cập nhật `plans.status = 'failed'` nếu persistence gặp sự cố | `acceptance-probes.mjs` |
+| **G4** | F11 (Services Routes & Settings) | Thêm route `GET /api/services` và `POST /api/services/:name/test`; UI SettingsModal gọi API kiểm tra kết nối động | `acceptance-probes.mjs` & `settings.test.tsx` |
+| **G4** | F12 (SSE Deduplication) | Frontend `useSSE` loại bỏ sequence trùng lặp, xử lý chuẩn xác sự kiện `text_end` và `refusal` | `acceptance-probes.mjs` & `use-sse.test.ts` |
 
 Qua audit bởi `agency-reality-checker`, 5 lỗ hổng đã được phát hiện và sửa:
 

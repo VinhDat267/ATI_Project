@@ -3,6 +3,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../../src/app.js';
 import { SSEManager } from '../../src/sse/sse-manager.js';
+import { DEMO_ADMIN_ID } from '../../src/routes/auth-routes.js';
 
 describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () => {
   const secret = 'super-secret-jwt-test-key-at-least-32-chars';
@@ -23,7 +24,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     ]),
     getConversation: vi.fn().mockImplementation(async (id: string) => ({
       id,
-      user_id: 'u_admin',
+      user_id: DEMO_ADMIN_ID,
       title: 'New Conversation',
     })),
   };

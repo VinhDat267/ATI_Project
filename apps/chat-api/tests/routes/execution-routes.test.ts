@@ -42,6 +42,7 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
   it('runs execution controller on approved plan and emits SSE events', async () => {
     const mockPlanRepo = {
       approvePlan: vi.fn().mockResolvedValue(true),
+      updatePlanStatus: vi.fn().mockResolvedValue(undefined),
       getPlan: vi.fn().mockResolvedValue({
         id: 'p2',
         conv_id: 'conv-2',

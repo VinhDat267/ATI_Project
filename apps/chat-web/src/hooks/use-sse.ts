@@ -4,12 +4,22 @@ import { useChatStore } from '../store/chat-store';
 import type { StepState } from '../types';
 
 let lastEventSeq = 0;
+const processedSeqs = new Set<number>();
+
+export function resetSSEState(): void {
+  lastEventSeq = 0;
+  processedSeqs.clear();
+}
 
 export function handleSSEEvent(event: string, dataStr: string, seq?: number): void {
   const store = useChatStore.getState();
 
   if (seq !== undefined) {
-    lastEventSeq = seq;
+    if (processedSeqs.has(seq)) {
+      return; // Deduplicate already processed event
+    }
+    processedSeqs.add(seq);
+    lastEventSeq = Math.max(lastEventSeq, seq);
   }
 
   let data: any = {};
@@ -31,6 +41,7 @@ export function handleSSEEvent(event: string, dataStr: string, seq?: number): vo
       }
       break;
 
+    case 'text_end':
     case 'text_done':
       store.setIsStreaming(false);
       break;
@@ -61,11 +72,34 @@ export function handleSSEEvent(event: string, dataStr: string, seq?: number): vo
       }
       break;
 
+    case 'exec_done':
+      store.setIsStreaming(false);
+      break;
+
     case 'clarification':
+      store.setIsStreaming(false);
       store.addMessage({
         id: `msg_clarify_${Date.now()}`,
         content: data.question || 'Vui lòng làm rõ yêu cầu:',
         role: 'assistant',
+      });
+      break;
+
+    case 'refusal':
+      store.setIsStreaming(false);
+      store.addMessage({
+        id: `refusal_${Date.now()}`,
+        role: 'assistant',
+        content: `Từ chối yêu cầu: ${data.reason || 'Yêu cầu không được hỗ trợ'}${data.suggestion ? `\nGợi ý: ${data.suggestion}` : ''}`,
+      });
+      break;
+
+    case 'error':
+      store.setIsStreaming(false);
+      store.addMessage({
+        id: `err_${Date.now()}`,
+        role: 'system',
+        content: `Lỗi: ${data.message || data.error || 'Có lỗi xảy ra trong quá trình xử lý'}`,
       });
       break;
 

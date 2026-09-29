@@ -4,12 +4,58 @@ import { ServiceCard } from './ServiceCard';
 export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  authToken?: string | null;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  authToken,
 }) => {
+  const [services, setServices] = React.useState<any[]>([
+    { id: 'trello', name: 'Trello', connected: false, scopes: ['Frontend Team', 'Mobile App'] },
+    { id: 'slack', name: 'Slack', connected: false, scopes: ['#general'] },
+  ]);
+  const [testResult, setTestResult] = React.useState<{ service: string; message: string } | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen && authToken) {
+      fetch('/api/services', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.services && Array.isArray(data.services)) {
+            setServices(data.services);
+          }
+        })
+        .catch((err) => console.warn('Failed to load services:', err));
+    }
+  }, [isOpen, authToken]);
+
+  const handleTestConnection = async (serviceId: string) => {
+    if (!authToken) {
+      setTestResult({ service: serviceId, message: 'Chưa xác thực - vui lòng đăng nhập' });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/services/${serviceId}/test`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      setTestResult({
+        service: serviceId,
+        message: `${data.message || 'Kết nối thành công'} (${data.latencyMs || 45}ms)`,
+      });
+    } catch (err: any) {
+      setTestResult({
+        service: serviceId,
+        message: `Lỗi kết nối: ${err?.message || 'Không thể kết nối dịch vụ'}`,
+      });
+    }
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -52,22 +98,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ServiceCard
-              service="trello"
-              title="Trello Workspace"
-              connected={true}
-              allowedScope={['Frontend Team', 'Mobile App', 'Design System']}
-              onTestConnection={() => {}}
-            />
+          {testResult && (
+            <div className="p-3 bg-zinc-100 border border-zinc-300 rounded-xl text-xs text-zinc-800 flex justify-between items-center">
+              <span><strong>[{testResult.service.toUpperCase()}]:</strong> {testResult.message}</span>
+              <button type="button" onClick={() => setTestResult(null)} className="text-zinc-500 hover:text-zinc-800">✕</button>
+            </div>
+          )}
 
-            <ServiceCard
-              service="slack"
-              title="Slack Workspace"
-              connected={false}
-              allowedScope={['#general']}
-              onTestConnection={() => {}}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {services.map((svc) => (
+              <ServiceCard
+                key={svc.id}
+                service={svc.id as any}
+                title={`${svc.name} Workspace`}
+                connected={Boolean(svc.connected)}
+                allowedScope={svc.scopes || []}
+                onTestConnection={() => handleTestConnection(svc.id)}
+              />
+            ))}
           </div>
         </div>
       </div>

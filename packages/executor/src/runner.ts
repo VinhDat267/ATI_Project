@@ -87,7 +87,10 @@ export class StepRunner {
       // 2. Extract service name (e.g. 'trello' from 'trello.create_card')
       const dotIndex = step.tool.indexOf('.');
       const serviceName = dotIndex === -1 ? step.tool : step.tool.slice(0, dotIndex);
-      const adapter = this.options.getAdapter(serviceName);
+      const adapter = await this.options.getAdapter(serviceName);
+      if (!adapter || typeof (adapter as any).execute !== 'function') {
+        throw new Error(`Tool adapter for service '${serviceName}' is not available or missing execute() method`);
+      }
 
       // 3. Execute adapter tool with combined signal
       const output = await adapter.execute(step.tool, resolvedArgs, {

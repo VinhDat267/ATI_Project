@@ -1,0 +1,90 @@
+{
+  "purpose": "defect reproduction, not product acceptance",
+  "externalCalls": 0,
+  "observations": [
+    {
+      "name": "auth_bypass",
+      "httpStatus": 200,
+      "identity": "u_admin"
+    },
+    {
+      "name": "production_missing_env_accepted",
+      "jwtDefaultAccepted": true,
+      "encryptionDefaultAccepted": true,
+      "missingGeminiKeyAccepted": true
+    },
+    {
+      "name": "cross_user_read",
+      "httpStatus": 200,
+      "requester": "user-a",
+      "owner": "user-b"
+    },
+    {
+      "name": "missing_service_routes",
+      "httpStatus": 404
+    },
+    {
+      "name": "validator_accepts_missing_required_args",
+      "valid": true
+    },
+    {
+      "name": "validator_accepts_nonexistent_dependency",
+      "valid": true
+    },
+    {
+      "name": "validator_accepts_nonexistent_output_property",
+      "valid": true
+    },
+    {
+      "name": "validator_accepts_empty_plan",
+      "valid": true
+    },
+    {
+      "name": "demo_prompt_routes_out_trello",
+      "services": [
+        "slack"
+      ]
+    },
+    {
+      "name": "async_factory_contract",
+      "status": "unknown",
+      "message": "adapter.execute is not a function"
+    },
+    {
+      "name": "trello_timeout_not_forwarded",
+      "receivedSignal": false,
+      "status": "success",
+      "durationMs": 75,
+      "timeoutMs": 10
+    },
+    {
+      "name": "slack_timeout_not_forwarded",
+      "receivedSignal": false,
+      "status": "success",
+      "durationMs": 48,
+      "timeoutMs": 10
+    },
+    {
+      "name": "trello_write_scope_not_checked",
+      "requests": [
+        "POST"
+      ],
+      "parentBoardLookup": false
+    },
+    {
+      "name": "completed_write_can_be_retried_concurrently",
+      "adapterCalls": 3,
+      "expectedIfProtected": 1
+    },
+    {
+      "name": "completed_despite_step_persistence_failure",
+      "clientStatus": "completed",
+      "planStatusUpdateCalls": 0
+    },
+    {
+      "name": "sse_duplicate_and_end_event",
+      "text": "hellohello",
+      "isStreamingAfterTextEnd": true
+    }
+  ]
+}

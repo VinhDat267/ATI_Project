@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatStore } from './store/chat-store';
 import { useSSE } from './hooks/use-sse';
 import { ChatContainer } from './components/ChatContainer';
@@ -26,7 +26,32 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [authToken] = useState('demo-token');
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Authenticate with server on initial load to get real JWT access token
+  useEffect(() => {
+    async function loginUser() {
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@wap.local', password: 'password123' }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAuthToken(data.accessToken);
+          setUser(data.user);
+        } else {
+          setAuthError('Không thể xác thực với API backend');
+        }
+      } catch (err: any) {
+        setAuthError('Không thể kết nối đến máy chủ API: ' + (err?.message || ''));
+      }
+    }
+    loginUser();
+  }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -59,8 +84,12 @@ export const App: React.FC = () => {
         console.warn('Could not create conversation via API:', err);
       }
       if (!currentConvId) {
-        currentConvId = `conv-${Date.now()}`;
-        setConversationId(currentConvId);
+        useChatStore.getState().addMessage({
+          id: `err-${Date.now()}`,
+          role: 'system',
+          content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',
+        });
+        return;
       }
     }
 
@@ -79,40 +108,20 @@ export const App: React.FC = () => {
 
       if (!res.ok && res.status !== 202) {
         useChatStore.getState().markMessageFailed(tempId);
-      }
-    } catch {
-      // In offline / preview mode without backend running, simulate mock response
-      setTimeout(() => {
-        useChatStore.getState().confirmMessage(tempId, `msg-${Date.now()}`);
-        setActivePlan({
-          id: `plan-${Date.now()}`,
-          summary: 'Kế hoạch thực thi liên dịch vụ',
-          thinking:
-            'AI đã phân tích yêu cầu, khảo sát các board Trello và xác nhận member Minh Dev. Kế hoạch tạo thẻ trước và thông báo vào Slack.',
-          steps: [
-            {
-              id: 'step_1',
-              tool: 'trello.create_card',
-              description: 'Tạo thẻ trên board Frontend',
-              args: { name: content, idList: 'list_todo' },
-            },
-            {
-              id: 'step_2',
-              tool: 'trello.add_member',
-              description: 'Gán người phụ trách Minh Dev',
-              args: { idCard: '$step_1.output.id', idMember: 'mem_minh' },
-              dependsOn: ['step_1'],
-            },
-            {
-              id: 'step_3',
-              tool: 'slack.send_message',
-              description: 'Gửi thông báo kênh Slack #general',
-              args: { channel: '#general', text: 'Task mới đã tạo' },
-              dependsOn: ['step_2'],
-            },
-          ],
+        const errData = await res.json().catch(() => ({}));
+        useChatStore.getState().addMessage({
+          id: `err-${Date.now()}`,
+          role: 'system',
+          content: `[Lỗi gửi tin nhắn]: ${errData.error || 'Máy chủ từ chối yêu cầu'}`,
         });
-      }, 800);
+      }
+    } catch (err: any) {
+      useChatStore.getState().markMessageFailed(tempId);
+      useChatStore.getState().addMessage({
+        id: `err-${Date.now()}`,
+        role: 'system',
+        content: `[Lỗi kết nối]: Không thể gửi tin nhắn đến máy chủ. ${err?.message || ''}`,
+      });
     }
   };
 
@@ -129,15 +138,37 @@ export const App: React.FC = () => {
         },
       });
       if (!res.ok) {
-        throw new Error('Approval request failed');
+        const err = await res.json().catch(() => ({}));
+        useChatStore.getState().addMessage({
+          id: `err-${Date.now()}`,
+          role: 'system',
+          content: `[Lỗi phê duyệt kế hoạch]: ${err.error || 'Phê duyệt thất bại'}`,
+        });
       }
-    } catch {
-      // Preview mode simulation
-      updateStepStatus('step_1', 'running');
-      setTimeout(() => updateStepStatus('step_1', 'succeeded'), 1200);
-      setTimeout(() => updateStepStatus('step_2', 'running'), 1400);
-      setTimeout(() => updateStepStatus('step_2', 'failed', 'HTTP 404 Member Not Found'), 2500);
+    } catch (err: any) {
+      useChatStore.getState().addMessage({
+        id: `err-${Date.now()}`,
+        role: 'system',
+        content: `[Lỗi kết nối khi duyệt kế hoạch]: ${err?.message || 'Không thể liên lạc với máy chủ'}`,
+      });
     }
+  };
+
+  const handleRejectPlan = async () => {
+    if (!activePlan) return;
+    const planId = activePlan.id;
+    try {
+      await fetch(`/api/plans/${planId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+    } catch (err) {
+      console.warn('Reject plan API call failed:', err);
+    }
+    setActivePlan(null);
   };
 
   const handleRetry = async (stepId: string) => {
@@ -263,10 +294,10 @@ export const App: React.FC = () => {
         <div className="p-4 border-t border-zinc-200/70 flex items-center justify-between bg-zinc-100/40">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-zinc-300 text-zinc-700 flex items-center justify-center font-bold text-xs">
-              AO
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AO'}
             </div>
             <div className="text-xs font-medium text-zinc-800">
-              Admin Operator
+              {user?.name || 'Admin Operator'}
             </div>
           </div>
           <button
@@ -317,6 +348,19 @@ export const App: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {authError && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between">
+            <span>⚠️ {authError}</span>
+            <button
+              type="button"
+              onClick={() => setAuthError(null)}
+              className="text-amber-600 hover:text-amber-800 font-bold ml-2 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Chat Feed */}
         <div className="flex-1 overflow-hidden relative">
@@ -372,7 +416,7 @@ export const App: React.FC = () => {
                 plan={activePlan}
                 onApprove={handleApprovePlan}
                 onEdit={() => {}}
-                onCancel={() => setActivePlan(null)}
+                onCancel={handleRejectPlan}
               />
             )}
 
@@ -414,6 +458,7 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        authToken={authToken}
       />
     </div>
   );
