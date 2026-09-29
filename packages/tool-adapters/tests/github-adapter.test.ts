@@ -30,6 +30,28 @@ describe('GitHub adapter', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer test');
   });
 
+  it('continues past a missing allowed repository but stops on an authorization error', async () => {
+    const scope = { repos: ['team/removed', repo] };
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(json({ message: 'Not Found' }, 404))
+      .mockResolvedValueOnce(json({ id: 2, name: 'project', full_name: repo, html_url: 'https://github.com/team/project' }));
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope: scope, fetchFn: fetchFn as typeof fetch });
+    await expect(adapter.execute('github.search_repos', { query: 'project' })).resolves.toEqual([
+      { id: '2', name: 'project', fullName: repo, url: 'https://github.com/team/project' },
+    ]);
+    expect(fetchFn.mock.calls.map(([url]) => url)).toEqual([
+      'https://api.github.com/repos/team/removed',
+      'https://api.github.com/repos/team/project',
+    ]);
+
+    const deniedFetch = vi.fn()
+      .mockResolvedValueOnce(json({ message: 'Forbidden' }, 403))
+      .mockResolvedValueOnce(json({ id: 2, name: 'project', full_name: repo, html_url: 'https://github.com/team/project' }));
+    const deniedAdapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope: scope, fetchFn: deniedFetch as typeof fetch });
+    await expect(deniedAdapter.execute('github.search_repos', { query: 'project' })).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
+    expect(deniedFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('prevents out-of-scope issue reads and writes before transport', async () => {
     const fetchFn = vi.fn();
     const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
@@ -90,6 +112,18 @@ describe('GitHub adapter', () => {
     expect(JSON.parse(String(fetchFn.mock.calls[1]![1]?.body))).toEqual({ labels: ['urgent'] });
   });
 
+  it('requires the acknowledged label in a successful write response', async () => {
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(json([]))
+      .mockResolvedValueOnce(json([{ name: 'other' }]))
+      .mockResolvedValueOnce(json([{ name: 'BUG' }]));
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+    await expect(adapter.execute('github.add_label', { repo, issueNumber: 7, label: 'bug' })).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+    await expect(adapter.execute('github.add_label', { repo, issueNumber: 7, label: 'bug' })).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+    await expect(adapter.execute('github.add_label', { repo, issueNumber: 7, label: 'bug' })).resolves.toMatchObject({ labels: ['BUG'] });
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('retries a 429 read after Retry-After and never retries a rate-limited write', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(json({}, 429, { 'Retry-After': '0' })).mockResolvedValueOnce(json(issue));
     const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
@@ -133,6 +167,7 @@ describe('GitHub adapter', () => {
     await expect(adapter.execute('github.add_label', { repo, issueNumber: 0, label: 'bug' })).rejects.toMatchObject({ category: 'VALIDATION' });
     await expect(adapter.execute('github.create_issue', { repo: 'team/project/../../other', title: 'x' })).rejects.toMatchObject({ category: 'VALIDATION' });
     await expect(adapter.execute('github.get_issue', { repo: 'team/..', issueNumber: 7 })).rejects.toMatchObject({ category: 'VALIDATION' });
+    await expect(adapter.execute('github.search_repos', { query: 'x', limit: 11 })).rejects.toMatchObject({ category: 'VALIDATION' });
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });

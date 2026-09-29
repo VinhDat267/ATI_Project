@@ -35,8 +35,8 @@ function issueNumber(value: unknown): number {
 
 function limit(value: unknown): number {
   if (value === undefined) return 10;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > 100) {
-    validation('GitHub limit must be an integer between 1 and 100');
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > 10) {
+    validation('GitHub limit must be an integer between 1 and 10');
   }
   return value;
 }
@@ -148,7 +148,13 @@ export class GitHubAdapter extends BaseAdapter {
     const repos = this.allowedRepositories();
     const matches = [] as Array<{ id: string; name: string; fullName: string; url: string }>;
     for (const repo of repos) {
-      const value = await this.request<any>(`/repos/${repo}`, options?.signal);
+      let value: any;
+      try {
+        value = await this.request<any>(`/repos/${repo}`, options?.signal);
+      } catch (error) {
+        if (error instanceof StepError && error.category === 'NOT_FOUND') continue;
+        throw error;
+      }
       if (value?.full_name !== repo || !Number.isSafeInteger(value.id) || typeof value.name !== 'string' || typeof value.html_url !== 'string') {
         continue;
       }
@@ -211,7 +217,11 @@ export class GitHubAdapter extends BaseAdapter {
     if (!Array.isArray(value) || value.some((entry) => typeof entry?.name !== 'string')) {
       throw new StepError({ message: 'GitHub label write returned an invalid response', category: 'UNKNOWN', retryable: false });
     }
-    return { number, labels: value.map((entry: any) => entry.name as string), repo, url: `https://github.com/${repo}/issues/${number}` };
+    const labels = value.map((entry: any) => entry.name as string);
+    if (!labels.some((name) => name.toLowerCase() === label.toLowerCase())) {
+      throw new StepError({ message: 'GitHub label write was not confirmed by the response', category: 'UNKNOWN', retryable: false });
+    }
+    return { number, labels, repo, url: `https://github.com/${repo}/issues/${number}` };
   }
 
   override async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
