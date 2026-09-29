@@ -67,5 +67,23 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     }
   );
 
+  // GET /api/executions/:planId/status
+  router.get(
+    '/executions/:planId/status',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const { planId } = req.params;
+        const result = executionService.getExecutionStatus(planId as string);
+        if (!result) {
+          res.status(404).json({ error: 'No execution found for this plan' });
+          return;
+        }
+        res.status(200).json(result);
+      } catch (err: any) {
+        res.status(500).json({ error: err?.message || 'Failed to fetch execution status' });
+      }
+    }
+  );
+
   return router;
 }

@@ -1,17 +1,19 @@
 import { Router, type Request, type Response } from 'express';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { MessageRepo } from '../db/repositories/message-repo.js';
+import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
 
 export interface ConversationRoutesOptions {
   convRepo: ConversationRepo;
   msgRepo: MessageRepo;
   chatService: ChatService;
+  planRepo?: PlanRepo;
 }
 
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {
   const router = Router();
-  const { convRepo, msgRepo, chatService } = options;
+  const { convRepo, msgRepo, chatService, planRepo } = options;
 
   // POST /api/conversations
   router.post('/', async (req: Request, res: Response): Promise<void> => {
@@ -40,6 +42,50 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       res.status(200).json({ conversations });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list conversations' });
+    }
+  });
+
+  // GET /api/conversations/:id/plans/active
+  router.get('/:id/plans/active', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const conversationId = req.params.id as string;
+      if (!planRepo) {
+        res.status(500).json({ error: 'Plan repository not configured' });
+        return;
+      }
+      const planRow = await planRepo.getPendingPlan(conversationId);
+      if (!planRow) {
+        res.status(404).json({ error: 'No active pending plan found' });
+        return;
+      }
+      const parsed =
+        typeof planRow.plan_json === 'string'
+          ? JSON.parse(planRow.plan_json)
+          : planRow.plan_json;
+      res.status(200).json({
+        id: planRow.id,
+        convId: planRow.conv_id,
+        status: planRow.status,
+        ...parsed,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to fetch active plan' });
+    }
+  });
+
+  // GET /api/conversations/:id/messages/latest
+  router.get('/:id/messages/latest', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const conversationId = req.params.id as string;
+      const messages = await msgRepo.listMessages(conversationId);
+      if (!messages || messages.length === 0) {
+        res.status(404).json({ error: 'No messages found in conversation' });
+        return;
+      }
+      const latest = messages[messages.length - 1];
+      res.status(200).json(latest);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to fetch latest message' });
     }
   });
 

@@ -173,4 +173,22 @@ export class ExecutionService {
     }
     return controller.stop();
   }
+
+  getExecutionStatus(planId: string): { status: string; pausedStepId?: string } | null {
+    const controller = this.activeControllers.get(planId);
+    if (!controller) {
+      return null;
+    }
+    const states = controller.getAllStepStates();
+    const allSteps = Object.values(states);
+    const failed = allSteps.find((s) => s.status === 'failed' || s.status === 'unknown');
+    if (failed) {
+      return { status: 'partial', pausedStepId: failed.stepId };
+    }
+    const allDone = allSteps.every((s) => s.status === 'succeeded' || s.status === 'skipped');
+    if (allDone) {
+      return { status: 'completed' };
+    }
+    return { status: 'executing' };
+  }
 }

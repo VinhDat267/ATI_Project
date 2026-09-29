@@ -6,6 +6,7 @@ import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createAuthMiddleware } from './auth/jwt.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
+import type { PlanRepo } from './db/repositories/plan-repo.js';
 import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
@@ -14,6 +15,7 @@ export interface AppOptions {
   jwtSecret: string;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
+  planRepo?: PlanRepo;
   chatService?: ChatService;
   sseManager?: SSEManager;
   executionService?: ExecutionService;
@@ -65,6 +67,7 @@ export function createApp(options: AppOptions): Express {
         convRepo: options.convRepo,
         msgRepo: options.msgRepo,
         chatService: options.chatService,
+        planRepo: options.planRepo,
       })
     );
   }
