@@ -9,6 +9,8 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
       { key: 'token', label: 'API token', type: 'password' },
     ],
     intentKeywords: ['trello', 'card', 'cards', 'board', 'boards', 'list', 'lists', 'checklist', 'thẻ'],
+    // A creation verb makes "task" a work item to create, not a reference such as "about task X".
+    intentPatterns: [/(?<![\p{L}\p{N}_])(?:tạo|thêm|giao|create|add|assign)\s+(?:(?:một|1|a|an|new)\s+)?(?:task|tasks|công việc|việc)(?![\p{L}\p{N}_])/iu],
     fallbackIntentKeywords: ['task', 'tasks', 'deadline', 'hạn chót', 'gán'],
     gatherRules: [
       { entityKey: 'board', tool: 'trello.search_boards', pattern: /\b(?:board|bảng)\s+["']?([\p{L}\p{N}_-]+)["']?/iu, invalidates: ['list'] },

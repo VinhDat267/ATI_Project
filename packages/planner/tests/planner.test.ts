@@ -192,6 +192,28 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       expect(classifyIntent('Create a GitHub issue and a Trello card', GITHUB_TOOLS)).toEqual([]);
     });
 
+    it.each([
+      'Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack',
+      'Create a task to update the homepage for the frontend team, due Friday, assign Minh, notify Slack',
+      'Tạo một task mới cho Minh rồi gửi tin nhắn cho team',
+      'Giao việc sửa CSS cho Minh và thông báo kênh frontend',
+    ])('routes a task-creation request to Trello even when another service is named: %s', (message) => {
+      expect(classifyIntent(message, tools)).toEqual(['trello', 'slack']);
+    });
+
+    it('supports task-creation phrasing declared by a newly registered service', () => {
+      const jira: ServiceDefinition = {
+        id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
+        credentialFields: [], intentKeywords: [], intentPatterns: [/\bopen\s+a\s+ticket\b/iu],
+      };
+      const jiraTool: ToolDefinition = {
+        name: 'jira.create_ticket', service: 'jira', description: 'Create Jira ticket', sideEffect: 'write',
+        riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+      };
+      expect(classifyIntent('Open a ticket and notify Slack', [...SLACK_TOOLS, jiraTool], [...SERVICE_REGISTRY, jira]))
+        .toEqual(['slack', 'jira']);
+    });
+
     it('supports a newly registered service without another router branch', () => {
       const jira: ServiceDefinition = {
         id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
@@ -290,7 +312,7 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       steps: [{ id: 'step_1', tool: 'trello.create_card', description: 'Create card',
         args: { listId: 'list_frontend_todo', title: 'Update homepage' }, dependsOn: [] }],
     };
-    const request = 'Tạo card cập nhật homepage cho team frontend, báo trên Slack';
+    const request = 'Tạo task cập nhật homepage cho team frontend, báo trên Slack';
 
     it('asks the user instead of returning a plan when the model keeps inventing resource IDs', async () => {
       const provider = new MockLLMProvider();

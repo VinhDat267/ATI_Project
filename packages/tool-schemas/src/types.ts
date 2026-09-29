@@ -44,6 +44,9 @@ export interface ServiceDefinition {
   scopeKey: 'boards' | 'channels' | 'repos';
   credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' }>;
   intentKeywords: string[];
+  /** Phrases that select the service even when another service is named, e.g. "create a task". */
+  intentPatterns?: RegExp[];
+  /** Generic words used only when no other service matches, e.g. "task" in "about task X". */
   fallbackIntentKeywords?: string[];
   gatherRules?: GatherRule[];
 }
