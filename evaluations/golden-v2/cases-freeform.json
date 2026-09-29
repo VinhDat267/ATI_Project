@@ -345,6 +345,222 @@
       "expect": {
         "kind": "clarification"
       }
+    },
+    {
+      "id": "ff13",
+      "category": "free_form_heldout",
+      "language": "en",
+      "prompt": "Put a card 'Fix footer links' in the frontend team's To Do and assign Minh",
+      "expect": {
+        "kind": "plan",
+        "anyOf": [
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_todo"
+                },
+                "title": {
+                  "includesAny": [
+                    "footer"
+                  ]
+                },
+                "idMembers": {
+                  "contains": "member_minh"
+                }
+              }
+            }
+          ],
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_todo"
+                },
+                "title": {
+                  "includesAny": [
+                    "footer"
+                  ]
+                }
+              }
+            },
+            {
+              "tool": "trello.add_member",
+              "args": {
+                "memberId": {
+                  "equals": "member_minh"
+                },
+                "cardId": {
+                  "refTo": "trello.create_card"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "ff14",
+      "category": "free_form_heldout",
+      "language": "vi",
+      "prompt": "Thêm card 'Cập nhật banner' vào cột Doing của team frontend, gán Minh, báo kênh frontend",
+      "expect": {
+        "kind": "plan",
+        "anyOf": [
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_doing"
+                },
+                "title": {
+                  "includesAny": [
+                    "banner"
+                  ]
+                },
+                "idMembers": {
+                  "contains": "member_minh"
+                }
+              }
+            },
+            {
+              "tool": "slack.send_message",
+              "args": {
+                "channel": {
+                  "equals": "C_FE"
+                }
+              }
+            }
+          ],
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_doing"
+                },
+                "title": {
+                  "includesAny": [
+                    "banner"
+                  ]
+                }
+              }
+            },
+            {
+              "tool": "trello.add_member",
+              "args": {
+                "memberId": {
+                  "equals": "member_minh"
+                },
+                "cardId": {
+                  "refTo": "trello.create_card"
+                }
+              }
+            },
+            {
+              "tool": "slack.send_message",
+              "args": {
+                "channel": {
+                  "equals": "C_FE"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "ff15",
+      "category": "free_form_heldout",
+      "language": "en",
+      "prompt": "Let the frontend team know the deploy finished",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_FE"
+              },
+              "text": {
+                "includesAny": [
+                  "deploy"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ff16",
+      "category": "free_form_heldout",
+      "language": "vi",
+      "prompt": "Báo cho toàn công ty lịch nghỉ lễ sắp tới trên Slack",
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "ff17",
+      "category": "free_form_heldout",
+      "language": "en",
+      "prompt": "Create an issue for the web team about the slow homepage and tell the frontend channel",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/web"
+              },
+              "title": {
+                "includesAny": [
+                  "homepage",
+                  "slow"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_FE"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ff18",
+      "category": "free_form_heldout",
+      "language": "vi",
+      "prompt": "Tạo card ý tưởng livestream trong cột Ideas của team marketing",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_mkt_ideas"
+              },
+              "title": {
+                "includesAny": [
+                  "livestream"
+                ]
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }

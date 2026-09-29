@@ -11,11 +11,13 @@ const optionsOf = (c: GoldenCase): StepSpec[][] => c.expect.anyOf ?? [c.expect.s
 const planCases = cases.filter((c) => c.expect.kind === 'plan');
 
 describe('free-form golden cases', () => {
-  it('has 12 uniquely named cases: eight plans and four clarifications, in both languages', () => {
-    expect(cases).toHaveLength(12);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(12);
-    expect(planCases).toHaveLength(8);
-    expect(cases.filter((c) => c.expect.kind === 'clarification')).toHaveLength(4);
+  it('has 18 uniquely named cases in both languages: 12 first-round and 6 held out', () => {
+    expect(cases).toHaveLength(18);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(18);
+    expect(cases.filter((c) => c.category === 'free_form')).toHaveLength(12);
+    expect(cases.filter((c) => c.category === 'free_form_heldout').map((c) => c.id)).toEqual(['ff13', 'ff14', 'ff15', 'ff16', 'ff17', 'ff18']);
+    expect(planCases).toHaveLength(13);
+    expect(cases.filter((c) => c.expect.kind === 'clarification')).toHaveLength(5);
     expect(new Set(cases.map((c) => c.language))).toEqual(new Set(['vi', 'en']));
   });
 
@@ -54,5 +56,9 @@ describe('free-form golden cases', () => {
     expect((await fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh', boardId: 'board_mkt' } })).length).toBe(2);
     // The unknown board behind ff10.
     expect((await fixtureSearch({ tool: 'trello.search_boards', args: { query: 'mobile' } })).length).toBe(0);
+    // The scoping behind ff01/ff13/ff14: one Minh on the frontend board, but three without a board.
+    expect((await fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh', boardId: 'board_fe' } })).length).toBe(1);
+    expect((await fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh' } })).length).toBe(3);
+    expect((await fixtureSearch({ tool: 'trello.search_lists', args: { boardId: 'board_mkt', query: 'Ideas' } })).length).toBe(1);
   });
 });
