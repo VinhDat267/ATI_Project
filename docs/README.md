@@ -4,7 +4,8 @@
 
 - [README gốc](../README.md): cài đặt, chạy sandbox/live và lệnh mặc định.
 - [Báo cáo dự án](PROJECT-REPORT.md): mục tiêu, kiến trúc, tiến độ; các bảng nghiệm thu cũ được giữ làm ảnh chụp lịch sử.
-- [Đặc tả v3](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) và [kế hoạch 28 tasks](superpowers/plans/2026-09-29-ai-workflow-platform-v3.md): hành vi thiết kế và lộ trình ban đầu.
+- [Đặc tả v3](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) và [kế hoạch triển khai](superpowers/plans/2026-09-29-ai-workflow-platform-v3.md): hành vi thiết kế, 28 tasks nền và backlog Phase 7 đa dịch vụ bắt buộc.
+- [Phạm vi nền tảng đa dịch vụ](MULTI-SERVICE-SCOPE.md): mục tiêu sản phẩm, giới hạn mã hiện tại, backlog và tiêu chí nghiệm thu được dẫn từ đặc tả.
 - [Kết quả rà soát lại](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md): mốc 198/198 của đợt khắc phục và giới hạn chưa xác minh; [README gốc](../README.md) ghi số test hiện tại sau chỉnh lối chạy.
 - [Quy tắc Git và evidence](GIT-POLICY.md): giữ nguyên log, checkpoint và migration đã theo dõi.
 
