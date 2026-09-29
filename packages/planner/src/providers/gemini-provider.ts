@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import type { LLMProvider, LLMGeneratePlanInput } from '../types.js';
+import { callWithRetry } from './transport.js';
 
 /** The slice of the Gemini SDK the provider uses; injectable for tests. */
 export interface GeminiClient {
@@ -24,30 +25,10 @@ export interface GeminiProviderConfig {
   retryDelayMs?: number;
 }
 
-const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
-
-function isTransient(err: unknown): boolean {
-  const status = (err as { status?: unknown })?.status;
-  return typeof status === 'number' && TRANSIENT_STATUS.has(status);
-}
-
-function abortReason(signal: AbortSignal): unknown {
-  return signal.reason ?? new Error('Gemini request aborted');
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(abortReason(signal));
-    const onAbort = () => { clearTimeout(timer); reject(abortReason(signal!)); };
-    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
 export class GeminiProvider implements LLMProvider {
   public readonly name = 'gemini';
   private apiKey: string;
-  private model: string;
+  public readonly model: string;
   private client?: GeminiClient;
   private timeoutMs: number;
   private maxRetries: number;
@@ -77,42 +58,16 @@ export class GeminiProvider implements LLMProvider {
       parts: [{ text: m.content }],
     }));
 
-    for (let attempt = 0; ; attempt++) {
-      if (input.signal?.aborted) throw abortReason(input.signal);
-      try {
-        return await this.attempt(systemPrompt, contents, input.signal);
-      } catch (err) {
-        if (input.signal?.aborted) throw abortReason(input.signal);
-        if (!isTransient(err) || attempt >= this.maxRetries) throw err;
-        await sleep(this.retryDelayMs * 2 ** attempt, input.signal);
-      }
-    }
-  }
-
-  private async attempt(
-    systemInstruction: string,
-    contents: Array<{ role: string; parts: Array<{ text: string }> }>,
-    callerSignal?: AbortSignal,
-  ): Promise<string> {
-    const timeout = new AbortController();
-    const timer = setTimeout(
-      () => timeout.abort(new Error(`Gemini request timed out after ${this.timeoutMs}ms`)),
-      this.timeoutMs,
-    );
-    const abortSignal = callerSignal ? AbortSignal.any([callerSignal, timeout.signal]) : timeout.signal;
-    try {
+    return callWithRetry(async (abortSignal) => {
       const response = await this.getClient().models.generateContent({
         model: this.model,
         contents,
-        config: { systemInstruction, responseMimeType: 'application/json', abortSignal },
+        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', abortSignal },
       });
       return response.text || '';
-    } catch (err) {
-      // Surface our own deadline rather than the SDK's generic abort error.
-      if (timeout.signal.aborted && !callerSignal?.aborted) throw timeout.signal.reason;
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
+    }, {
+      label: 'Gemini', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries,
+      retryDelayMs: this.retryDelayMs, signal: input.signal,
+    });
   }
 }

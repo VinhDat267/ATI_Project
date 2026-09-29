@@ -19,8 +19,8 @@ import { AdapterFactory } from './services/adapter-factory.js';
 import { getConfiguredToolCatalog } from './services/registered-services.js';
 import {
   AIPlanner,
-  GeminiProvider,
   MockLLMProvider,
+  createProviderFromEnv,
 } from '@wap/planner';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createApp } from './app.js';
@@ -166,8 +166,8 @@ async function bootstrap() {
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
-    console.log(`\x1b[32m[chat-api]\x1b[0m Sử dụng Gemini Provider với API Key đã cấu hình.`);
-    provider = new GeminiProvider({ apiKey: env.GEMINI_API_KEY });
+    provider = createProviderFromEnv(process.env);
+    console.log(`\x1b[32m[chat-api]\x1b[0m Sử dụng LLM provider '${provider.name}' với model ${provider.model}.`);
   } else {
     console.log(
       `\x1b[33m[chat-api]\x1b[0m GEMINI_API_KEY chưa thiết lập. Sử dụng Smart Mock LLM Planner cho môi trường dev.`

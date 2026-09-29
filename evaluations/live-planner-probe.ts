@@ -6,11 +6,14 @@
  * results and earlier-turn working memory are labelled fixtures, so this
  * measures planning quality, not service connectivity.
  *
+ * The provider comes from LLM_PROVIDER (see .env.example); each call records
+ * the model the gateway reports having served.
+ *
  *   LIVE_PROBE=1 node --env-file=.env --import tsx evaluations/live-planner-probe.ts
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AIPlanner, GeminiProvider, WorkingMemory, type LLMGeneratePlanInput, type LLMProvider } from '@wap/planner';
+import { AIPlanner, WorkingMemory, createProviderFromEnv, type LLMGeneratePlanInput, type LLMProvider } from '@wap/planner';
 import { ALL_TOOLS, type PlannerResponse } from '@wap/tool-schemas';
 
 interface Scenario {
@@ -84,16 +87,16 @@ const scenarios: Scenario[] = [
 /** Records each planner-level provider call; GeminiProvider retries transient errors inside a call. */
 class RecordingProvider implements LLMProvider {
   readonly name: string;
-  calls: Array<{ ms: number; output?: string; error?: string }> = [];
-  constructor(private inner: LLMProvider) { this.name = inner.name; }
+  calls: Array<{ ms: number; servedModel?: string; output?: string; error?: string }> = [];
+  constructor(private inner: LLMProvider & { lastServedModel?: string }) { this.name = inner.name; }
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
     const started = Date.now();
     try {
       const output = await this.inner.generatePlan(input);
-      this.calls.push({ ms: Date.now() - started, output });
+      this.calls.push({ ms: Date.now() - started, servedModel: this.inner.lastServedModel, output });
       return output;
     } catch (err: any) {
-      this.calls.push({ ms: Date.now() - started, error: String(err?.message ?? err).slice(0, 500) });
+      this.calls.push({ ms: Date.now() - started, servedModel: this.inner.lastServedModel, error: String(err?.message ?? err).slice(0, 500) });
       throw err;
     }
   }
@@ -106,11 +109,12 @@ function linked(plan: Extract<PlannerResponse, { kind: 'plan' }>, from: string, 
 }
 
 async function main() {
-  if (process.env.LIVE_PROBE !== '1') throw new Error('Set LIVE_PROBE=1 to call the live Gemini provider');
-  const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  if (process.env.LIVE_PROBE !== '1') throw new Error('Set LIVE_PROBE=1 to call the live LLM provider');
+  const configured = createProviderFromEnv(process.env);
+  const model = configured.model;
   const results = [];
   for (const scenario of scenarios) {
-    const provider = new RecordingProvider(new GeminiProvider({ apiKey: process.env.GEMINI_API_KEY, model }));
+    const provider = new RecordingProvider(createProviderFromEnv(process.env));
     const planner = new AIPlanner({ provider, toolCatalog: ALL_TOOLS,
       gatherSearch: async ({ tool }) => scenario.searchable === false ? [] : fixtureSearch[tool] ?? [] });
     const memory = new WorkingMemory();
@@ -142,7 +146,9 @@ async function main() {
   const dir = join('docs', 'ai-evidence', 'V3-LIVE-PLANNER', runId);
   mkdirSync(dir, { recursive: true });
   const report = {
-    evidence: 'provider_observed', provider: 'gemini', model, runAt: new Date().toISOString(),
+    evidence: 'provider_observed', provider: configured.name, model,
+    gateway: configured.name === 'openai-compatible' ? process.env.LLM_BASE_URL : undefined,
+    runAt: new Date().toISOString(),
     scope: 'planning only; no plan executed; search results and earlier-turn memory are labelled fixtures, not live Trello/Slack/GitHub data',
     passed: results.filter((r) => r.passed).length, total: results.length, results,
   };
