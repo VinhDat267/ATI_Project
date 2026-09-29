@@ -634,21 +634,16 @@ Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → 
                                                 Phase 7 (OPT) → Phase 8 (OPT)
 ```
 
-### 10.2. Sắp Triển khai
+### 10.2. Trạng thái hiện tại và việc còn lại
 
-**Phase 5: Chat UI (7 tasks)** — React 19 Frontend
-- Task 19: Frontend workspace scaffolding & Zustand state store
-- Task 20: SSE client với `@microsoft/fetch-event-source` & event sequencing
-- Task 21: Gather Progress & Clarification Cards
-- Task 22: Message List & Chat Container
-- Task 23: Plan Preview Card with Thinking Layer & Approval Actions
-- Task 24: Live Execution Progress & Partial Failure Recovery UI
-- Task 25: Settings Page & Service Connection Wizard
+**Phase 5: Chat UI (Tasks 19–25)** đã có triển khai v3 trong `apps/chat-web/` và bộ test giao diện. Đây là trạng thái mã nguồn cục bộ, chưa phải bằng chứng nghiệm thu quy trình live.
 
-**Phase 6: E2E Integration & Demo (3 tasks)**
-- Task 26: Scenario 1 — Project Task Creation & Slack Notification
-- Task 27: Scenario 2 — Ambiguous Name Clarification & Resolution
-- Task 28: Scenario 3 — Partial Failure Recovery (Skip Step)
+**Phase 6: E2E Integration & Demo (Tasks 26–28)** còn cần chứng minh trên đường chạy thực tế:
+- Scenario 1: tạo task Trello và thông báo Slack sau khi người dùng duyệt plan.
+- Scenario 2: xử lý tên mơ hồ bằng bước hỏi rõ và tra cứu thật.
+- Scenario 3: phục hồi lỗi một phần, kiểm tra skip/retry và trạng thái sau restart.
+
+Ưu tiên gần nhất là môi trường PostgreSQL v3 có thể tái tạo từ checkout mới, CI dùng DB thật, rồi kiểm thử E2E sandbox và live có kiểm soát. Xem [hướng dẫn setup v3](V3-LOCAL-SETUP.md). Các số liệu test cục bộ không thay thế bằng chứng live hoặc crash recovery.
 
 ### 10.3. Mở rộng tương lai (Optional)
 
@@ -694,4 +689,4 @@ Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → 
 
 ---
 
-*Document này được tổng hợp từ quá trình thiết kế 5 sections × 2 vòng phản biện + 3 specialist reviews (Software Architect 8.5/10, AI Engineer 8/10, Backend Architect 8.5/10) và 20 tasks TDD đã triển khai thành công.*
+*Tài liệu này kết hợp thiết kế ban đầu với trạng thái mã nguồn v3 tại ngày 29/09/2026. Các mốc lịch sử ở Mục 9 là snapshot lúc ghi nhận, không phải danh sách commit hiện tại.*

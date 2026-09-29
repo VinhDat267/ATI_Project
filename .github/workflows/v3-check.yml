@@ -1,0 +1,36 @@
+name: v3 check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  v3:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ati_v3
+          POSTGRES_PASSWORD: ati_v3_ci_only
+          POSTGRES_DB: ati_v3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ati_v3 -d ati_v3"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3
+      RUNTIME_MODE: sandbox
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate:v3
+      - run: npm run check
