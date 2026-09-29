@@ -1,0 +1,1085 @@
+{
+  "evidence": "provider_observed",
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash"
+  ],
+  "set": "freeform",
+  "searchMode": "regex",
+  "labels": {
+    "file": "cases-freeform.json",
+    "commit": "9e68093d2ff4785a66eccd388c660b5046414a67",
+    "sha256": "86f5cae07f97a70c66b18c24c9aeb8f6fa98439921df4117fddd80d694470374",
+    "version": 2,
+    "cases": 12
+  },
+  "clock": "2026-09-29T03:00:00Z",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "runs": 3,
+  "concurrency": 2,
+  "runAt": "2026-09-29T23:34:43.668Z",
+  "scope": "planning only; no plan executed; search results and earlier-turn memory are fixtures",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": false
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.3333333333333333,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0.3333333333333333
+      },
+      {
+        "kindAccuracy": 0.3333333333333333,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0.3333333333333333
+      },
+      {
+        "kindAccuracy": 0.4166666666666667,
+        "toolSelectionAccuracy": 0.125,
+        "argumentQuality": 0,
+        "argumentMatcherRate": 0.12,
+        "strictPassRate": 0.3333333333333333
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.3611111111111111,
+      "toolSelectionAccuracy": 0.041666666666666664,
+      "argumentQuality": 0,
+      "argumentMatcherRate": 0.04,
+      "strictPassRate": 0.3333333333333333
+    },
+    "byCategory": {
+      "free_form": {
+        "cases": 12,
+        "strictPassRate": 0.3333333333333333
+      }
+    },
+    "stability": {
+      "ff01": "0/3",
+      "ff02": "0/3",
+      "ff03": "0/3",
+      "ff04": "0/3",
+      "ff05": "0/3",
+      "ff06": "0/3",
+      "ff07": "0/3",
+      "ff08": "0/3",
+      "ff09": "3/3",
+      "ff10": "3/3",
+      "ff11": "3/3",
+      "ff12": "3/3"
+    },
+    "latencyMs": {
+      "p50": 8,
+      "p95": 30024,
+      "max": 30062
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 8,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find know. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 10348,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Để di chuyển thẻ 'lỗi đăng nhập Safari' sang danh sách 'Done', cần có `idList` của danh sách 'Done'. Tuy nhiên, công cụ tìm kiếm danh sách `trello.search_lists` yêu cầu bắt buộc phải có `boardId`, mà thông tin bảng Trello hiện chưa có trong ngữ cảnh hay câu lệnh của người dùng.",
+            "question": "Thẻ \"lỗi đăng nhập Safari\" và danh sách \"Done\" nằm trong bảng (board) Trello nào vậy bạn?",
+            "context": "Hệ thống cần biết tên hoặc ID bảng Trello để xác định danh sách \"Done\" cần chuyển thẻ tới."
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 30062,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "LLM gateway request timed out after 30000ms"
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 11599,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which GitHub repository should the issue be created in, and which Trello board and list should be used for the backend backlog?",
+            "context": "Creating the issue requires the GitHub repository full name (e.g., owner/repo), and creating the card requires identifying the specific Trello board and list."
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find that. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5030,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn đặt tiêu đề và nội dung gì cho thẻ mới, và thẻ nên được tạo trong danh sách (list) nào trên bảng của mobile team?",
+            "context": "Để tạo thẻ mới trên Trello, cần có ít nhất tiêu đề thẻ (title) và danh sách (listId) chứa thẻ đó."
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4854,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn tạo thẻ lỗi đăng nhập vào bảng (board) và danh sách (list) nào trên Trello?",
+            "context": "Để tạo thẻ mới, cần xác định rõ danh sách (list) đích trên bảng Trello của bạn."
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4734,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which Slack channel would you like to send the maintenance notification to?",
+            "context": "A specific channel is required to post the notification message."
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 1,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find know. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 11928,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Yêu cầu của người dùng là di chuyển thẻ 'lỗi đăng nhập Safari' sang danh sách 'Done' và gửi thông báo vào kênh Slack 'frontend'. Kênh Slack 'frontend' đã có sẵn trong Working Memory (id: C_FE). Tuy nhiên, để di chuyển thẻ sang danh sách 'Done', hệ thống cần xác định được `idList` của danh sách 'Done'. Công cụ `trello.search_lists` yêu cầu tham số `boardId`, nhưng người dùng chưa cung cấp tên hoặc ID của bảng Trello chứa thẻ này và thông tin này cũng không có trong Working Memory. Do đó, cần hỏi người dùng để xác định bảng Trello liên quan.",
+            "question": "Bạn có thể cho biết thẻ 'lỗi đăng nhập Safari' thuộc bảng (board) Trello nào không?",
+            "context": "Cần ID hoặc tên bảng Trello để tìm danh sách 'Done' tương ứng trước khi di chuyển thẻ."
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 30024,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "LLM gateway request timed out after 30000ms"
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 5809,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which GitHub repository should the issue be created in (e.g., owner/repo), and which Trello board contains the \"backend backlog\" list?",
+            "context": "Both the target GitHub repository and the specific Trello board need to be identified before creating the issue and card."
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 1,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find that. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5770,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "What title should the new card have, and which list on the mobile team's board should it be placed in?",
+            "context": "To create a Trello card, a card title and target list are required."
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4329,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Yêu cầu tạo card Trello cần có listId (thuộc một board cụ thể), nhưng người dùng chưa cung cấp thông tin bảng hoặc danh sách nào cần tạo thẻ. Vì vậy cần làm rõ trước khi thực hiện.",
+            "question": "Bạn muốn tạo thẻ này trên bảng (board) và danh sách (list) nào trong Trello?",
+            "context": "Cần xác định danh sách mục tiêu để tạo thẻ 'Lỗi đăng nhập'."
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4233,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "The user wants to send a notification message on Slack, but did not specify which channel to send it to. A valid channel ID or channel name is required to target the message.",
+            "question": "Which Slack channel would you like to notify about tonight's maintenance?",
+            "context": "Slack messages require a specific channel destination (e.g., #general, #announcements, or #engineering)."
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find know. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 10429,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn có thể cho biết thẻ 'lỗi đăng nhập Safari' và danh sách 'Done' nằm trên bảng (board) Trello nào không?",
+            "context": "Cần thông tin bảng Trello để xác định đúng thẻ cần di chuyển và danh sách đích trước khi cập nhật."
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 3,
+              "total": 4
+            },
+            "failures": [
+              "args: github.create_issue repo"
+            ]
+          },
+          "latencyMs": 16188,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Yêu cầu của người dùng là mở một issue mới trong repository 'web' về lỗi nút thanh toán bị lệch trên điện thoại và sau đó thông báo vào kênh 'general' trên Slack. Kênh 'general' đã có trong Working Memory với ID 'C_GEN'. Đối với repository 'web', sử dụng định danh được cung cấp trực tiếp bởi người dùng. Bước đầu tiên sử dụng 'github.create_issue' để tạo issue, sau đó bước thứ hai dùng 'slack.send_message' gửi link issue vừa tạo vào kênh general thông qua tham chiếu template.",
+            "summary": "Tạo issue báo lỗi giao diện nút thanh toán trong repo 'web' và gửi thông báo kèm đường dẫn issue vào kênh Slack #general.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue báo cáo lỗi nút thanh toán bị lệch trên điện thoại trong repo web.",
+                "args": {
+                  "repo": "web",
+                  "title": "Lỗi nút thanh toán bị lệch trên điện thoại",
+                  "body": "Nút thanh toán hiển thị bị lệch trên giao diện các thiết bị di động."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_slack",
+                "tool": "slack.send_message",
+                "description": "Gửi tin nhắn thông báo issue vừa tạo vào kênh general trên Slack.",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": {
+                    "$template": "Đã tạo issue mới về lỗi nút thanh toán: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 9008,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "thinking": "The user wants to create a GitHub issue for the API team regarding a 500 error on large uploads, and create a card on Trello in the backend backlog. However, no specific GitHub repository (owner/repo) or Trello board and list identifiers or exact names exist in the Working Memory Context or prompt. Because repository and listId are required resources, clarification is needed before proceeding.",
+            "kind": "clarification",
+            "question": "Could you please provide the GitHub repository (owner/repo) for the API team, as well as the Trello board and list name where the card should be added?",
+            "context": "Creating an issue requires an authorized GitHub repository name, and creating a card requires a target Trello list ID."
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find that. Please provide another channel name.",
+            "context": "No channel matched the search."
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4538,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "The user requested creating a card on the mobile team's board, but did not specify the card title/details or which list on the board to add it to. `title` and `listId` are required parameters for creating a Trello card.",
+            "question": "What title and description would you like for the card, and do you have a specific list on the mobile team's board where it should be placed?"
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4660,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Yêu cầu tạo thẻ Trello mới cần có `listId` (danh sách đích), nhưng người dùng chưa cung cấp tên hoặc ID của bảng (board) và danh sách (list) cần tạo thẻ vào. Do đó, cần làm rõ thông tin về bảng và danh sách từ người dùng.",
+            "question": "Bạn muốn tạo card 'Lỗi đăng nhập' trên bảng (board) và danh sách (list) nào của Trello?",
+            "context": {
+              "title": "Lỗi đăng nhập"
+            }
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4858,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "The user wants to notify the team on Slack about tonight's maintenance, but did not specify which channel to send the message to.",
+            "question": "Which Slack channel should I post the maintenance notification to?",
+            "options": [
+              "#general",
+              "#announcements",
+              "#dev-team"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
