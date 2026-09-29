@@ -17,6 +17,8 @@
     "pg": "^8.23.0"
   },
   "scripts": {
+    "dev": "tsx src/server.ts",
+    "start": "tsx src/server.ts",
     "test": "vitest run"
   },
   "devDependencies": {

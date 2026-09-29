@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
-import type { ActivePlan, StepState } from '../types';
+import type { StepState } from '../types';
 
 let lastEventSeq = 0;
 
@@ -36,18 +36,37 @@ export function handleSSEEvent(event: string, dataStr: string, seq?: number): vo
       break;
 
     case 'plan':
-      store.setActivePlan(data as ActivePlan);
+    case 'plan_preview': {
+      const planObj = data.plan || data;
+      const planId = data.planId || planObj.id;
+      store.setActivePlan({
+        id: planId,
+        summary: planObj.summary,
+        thinking: planObj.thinking,
+        steps: planObj.steps,
+        warnings: planObj.warnings,
+      });
       store.setIsStreaming(false);
       break;
+    }
 
+    case 'exec_step':
     case 'step_status':
       if (data.stepId && data.status) {
         store.updateStepStatus(
           data.stepId,
           data.status as StepState,
-          data.error
+          typeof data.error === 'object' ? data.error?.message : data.error
         );
       }
+      break;
+
+    case 'clarification':
+      store.addMessage({
+        id: `msg_clarify_${Date.now()}`,
+        content: data.question || 'Vui lòng làm rõ yêu cầu:',
+        role: 'assistant',
+      });
       break;
 
     case 'message_confirmed':

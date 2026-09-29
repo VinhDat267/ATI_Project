@@ -40,8 +40,28 @@ export const App: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     let currentConvId = conversationId;
     if (!currentConvId) {
-      currentConvId = `conv-${Date.now()}`;
-      setConversationId(currentConvId);
+      try {
+        const convRes = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          currentConvId = convData.conversation?.id || convData.id;
+          if (currentConvId) {
+            setConversationId(currentConvId);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not create conversation via API:', err);
+      }
+      if (!currentConvId) {
+        currentConvId = `conv-${Date.now()}`;
+        setConversationId(currentConvId);
+      }
     }
 
     const tempId = `temp-${Date.now()}`;
@@ -65,6 +85,7 @@ export const App: React.FC = () => {
       setTimeout(() => {
         useChatStore.getState().confirmMessage(tempId, `msg-${Date.now()}`);
         setActivePlan({
+          id: `plan-${Date.now()}`,
           summary: 'Kế hoạch thực thi liên dịch vụ',
           thinking:
             'AI đã phân tích yêu cầu, khảo sát các board Trello và xác nhận member Minh Dev. Kế hoạch tạo thẻ trước và thông báo vào Slack.',
@@ -96,22 +117,67 @@ export const App: React.FC = () => {
   };
 
   const handleApprovePlan = async () => {
-    if (!activePlan || !conversationId) return;
+    if (!activePlan) return;
 
+    const planId = activePlan.id || 'plan_default';
     try {
-      await fetch(`/api/conversations/${conversationId}/plan/approve`, {
+      const res = await fetch(`/api/plans/${planId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
         },
       });
+      if (!res.ok) {
+        throw new Error('Approval request failed');
+      }
     } catch {
       // Preview mode simulation
       updateStepStatus('step_1', 'running');
       setTimeout(() => updateStepStatus('step_1', 'succeeded'), 1200);
       setTimeout(() => updateStepStatus('step_2', 'running'), 1400);
       setTimeout(() => updateStepStatus('step_2', 'failed', 'HTTP 404 Member Not Found'), 2500);
+    }
+  };
+
+  const handleRetry = async (stepId: string) => {
+    updateStepStatus(stepId, 'running');
+    if (activePlan?.id) {
+      try {
+        await fetch(`/api/executions/${activePlan.id}/steps/${stepId}/retry`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      } catch (err) {
+        console.warn('Retry API call failed, running locally:', err);
+      }
+    }
+  };
+
+  const handleSkip = async (stepId: string) => {
+    updateStepStatus(stepId, 'skipped');
+    if (activePlan?.id) {
+      try {
+        await fetch(`/api/executions/${activePlan.id}/steps/${stepId}/skip`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      } catch (err) {
+        console.warn('Skip API call failed, running locally:', err);
+      }
+    }
+  };
+
+  const handleStop = async () => {
+    if (activePlan?.id) {
+      try {
+        await fetch(`/api/executions/${activePlan.id}/stop`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      } catch (err) {
+        console.warn('Stop API call failed:', err);
+      }
     }
   };
 
@@ -148,11 +214,28 @@ export const App: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               reset();
+              try {
+                const res = await fetch('/api/conversations', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const newId = data.conversation?.id || data.id;
+                  if (newId) {
+                    setConversationId(newId);
+                    return;
+                  }
+                }
+              } catch {}
               setConversationId(`conv-${Date.now()}`);
             }}
-            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5"
+            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span>+</span>
             <span>Cuộc hội thoại mới</span>
@@ -317,10 +400,10 @@ export const App: React.FC = () => {
                 errorMessage={
                   stepErrors[failedStepId] || 'Lỗi thực thi bước'
                 }
-                onRetry={() => updateStepStatus(failedStepId, 'running')}
-                onEditAndRetry={() => updateStepStatus(failedStepId, 'running')}
-                onSkip={() => updateStepStatus(failedStepId, 'skipped')}
-                onStop={() => updateStepStatus(failedStepId, 'paused')}
+                onRetry={() => handleRetry(failedStepId)}
+                onEditAndRetry={() => handleRetry(failedStepId)}
+                onSkip={() => handleSkip(failedStepId)}
+                onStop={handleStop}
               />
             )}
           </ChatContainer>
