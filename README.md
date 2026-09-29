@@ -70,7 +70,7 @@ ATI_Project/
 
 ### 1. Cài đặt dependencies:
 ```powershell
-npm install
+npm ci
 ```
 
 ### 2. Cấu hình môi trường:
@@ -80,6 +80,8 @@ Copy-Item .env.example .env
 ```
 
 Để **đăng nhập và dùng giao diện sandbox**, điền cả `SANDBOX_USER_EMAIL` (một email bạn chọn) và `SANDBOX_USER_PASSWORD` (mật khẩu cục bộ bạn chọn) trong `.env`; không commit file này. Sandbox chỉ lắng nghe trên `127.0.0.1` và tạo JWT secret riêng cho mỗi lần chạy nếu bạn để trống biến đó. Để chạy `RUNTIME_MODE=live`, thay URL sandbox bằng PostgreSQL thật, đặt `JWT_SECRET` (ít nhất 32 byte), `ENCRYPTION_KEY` (32 byte hoặc 64 ký tự hex), `GEMINI_API_KEY` thật và `CHAT_ADMIN_EMAIL`/`CHAT_ADMIN_PASSWORD` (ít nhất 12 ký tự); sau đó chạy `npm run db:migrate:v3` và `npm run admin:provision:v3` trước khi khởi động. Live sẽ từ chối khởi động nếu thiếu cấu hình hoặc không kết nối được DB; việc kiểm thử nhà cung cấp thật vẫn chưa được nghiệm thu.
+
+Để chạy **sandbox có PostgreSQL thật** (khuyến nghị khi kiểm thử v3), làm theo [hướng dẫn môi trường v3](docs/V3-LOCAL-SETUP.md): dùng container/cổng riêng `55533`, migrate và tạo tài khoản cục bộ. Không dùng compose v2 ở cổng `55532` cho quy trình này.
 
 ### 3. Chạy API và web v3:
 ```powershell
@@ -92,6 +94,10 @@ Web: `http://127.0.0.1:5174`; API health: `http://127.0.0.1:3000/api/health`. D�
 npm run check
 ```
 `check` chạy typecheck, 6 workspace test suites, build web và smoke test khởi động API/web sandbox; không chứng minh triển khai production hoặc chất lượng AI live.
+
+Sau khi tạo tài khoản PostgreSQL sandbox theo hướng dẫn setup v3, chạy `npm run test:browser:v3` để kiểm tra bốn luồng bằng Chromium, API/web thật và trạng thái DB. Bằng chứng và giới hạn được ghi tại [Phase 6 sandbox browser evidence](docs/audits/2026-09-29-v3-review/PHASE6-SANDBOX-BROWSER.md).
+
+CI v3 chạy `npm ci`, migration, `npm run check` và browser E2E trên PostgreSQL 16 riêng cho mỗi job tại [v3-check.yml](.github/workflows/v3-check.yml). Chạy CI từ GitHub vẫn cần xác nhận sau khi push.
 
 Các lệnh gốc `build`, `test`, `typecheck`, `check`, `up`, `api:dev`, `api:start`, `web:dev` nay trỏ vào v3. Lệnh v2 lịch sử tương ứng có hậu tố `:v2` (ví dụ `npm run check:v2`, `npm run up:v2`); các gate `check:backend`, `check:engine`, `check:web`, `check:g1` vẫn thuộc v2. Xem [chỉ mục tài liệu](docs/README.md) trước khi dùng hướng dẫn cũ.
 
