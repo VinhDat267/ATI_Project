@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { assertBrowserV3Environment } from './v3-local-env.mjs';
 
+assertBrowserV3Environment(process.env);
 if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.CHAT_ADMIN_PASSWORD) {
   throw new Error('Browser E2E requires DATABASE_URL and provisioned CHAT_ADMIN_* credentials');
 }

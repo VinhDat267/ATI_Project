@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { assertLocalV3Environment } from './v3-local-env.mjs';
+import { assertBrowserV3Environment, assertLocalV3Environment } from './v3-local-env.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const local = 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
@@ -29,4 +29,14 @@ test('the local migration command rejects a shell override before touching a dat
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /dedicated local v3 database/);
+});
+
+test('browser E2E rejects live mode and unexpected CI or local database targets', () => {
+  const ciUrl = 'postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3';
+  assert.doesNotThrow(() => assertBrowserV3Environment({ RUNTIME_MODE: 'sandbox', DATABASE_URL: local }));
+  assert.doesNotThrow(() => assertBrowserV3Environment({ GITHUB_ACTIONS: 'true', RUNTIME_MODE: 'sandbox', DATABASE_URL: ciUrl }));
+  assert.throws(() => assertBrowserV3Environment({ RUNTIME_MODE: 'live', DATABASE_URL: local }), /sandbox/);
+  assert.throws(() => assertBrowserV3Environment({ CI: 'true', RUNTIME_MODE: 'sandbox', DATABASE_URL: ciUrl }), /dedicated local v3 database/);
+  assert.throws(() => assertBrowserV3Environment({ GITHUB_ACTIONS: 'true', RUNTIME_MODE: 'sandbox', DATABASE_URL: local }), /dedicated GitHub CI v3 database/);
+  assert.throws(() => assertBrowserV3Environment({ GITHUB_ACTIONS: 'true', RUNTIME_MODE: 'sandbox', DATABASE_URL: 'postgresql://prod@host/ati_v3' }), /dedicated GitHub CI v3 database/);
 });

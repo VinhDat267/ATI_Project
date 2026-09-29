@@ -2,7 +2,7 @@
 
 **Phạm vi:** Chromium headless → Vite web v3 → Express API v3 → PostgreSQL `ati_v3` trong container riêng. Trello, Slack và planner dùng adapter/provider sandbox có nhãn; không có thao tác SaaS thật.
 
-**Lệnh đã chạy cục bộ (29/09/2026):** `npm run test:browser:v3` — 4/4 browser tests qua trong ba lượt server: mặc định 2, hỏi rõ 1, lỗi một phần 1. `npm run check` — 199/199 tests trong 6 workspace, build và launcher qua; thêm 2 kiểm tra bảo vệ DB cục bộ. CI GitHub chưa được quan sát tại thời điểm ghi nhận.
+**Lệnh đã chạy cục bộ (29/09/2026):** `npm run test:browser:v3` — 4/4 browser tests qua trong ba lượt server: mặc định 2, hỏi rõ 1, lỗi một phần 1. `npm run check` — 199/199 tests trong 6 workspace, build và launcher qua; thêm 3 kiểm tra bảo vệ DB cục bộ. Kết quả CI GitHub của nhánh được theo dõi trong [PR #2](https://github.com/VinhDat267/ATI_Project/pull/2).
 
 | Luồng | Kiểm tra ở trình duyệt | Kiểm tra trong PostgreSQL |
 |---|---|---|

@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { assertBrowserV3Environment } from '../../scripts/v3-local-env.mjs';
+
+assertBrowserV3Environment(process.env);
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -14,7 +17,7 @@ export default defineConfig({
     trace: 'off',
   },
   webServer: {
-    command: process.env.CI ? 'npm run up' : 'npm run up:local:v3',
+    command: process.env.GITHUB_ACTIONS === 'true' ? 'npm run up' : 'npm run up:local:v3',
     url: 'http://127.0.0.1:3000/api/health',
     cwd: '../..',
     reuseExistingServer: false,
