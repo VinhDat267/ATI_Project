@@ -148,6 +148,11 @@ describe('search tools declare the resources they discover', () => {
     });
   });
 
+  it('requires a board for member search, as the Trello adapter does', () => {
+    const tool = ALL_TOOLS.find((t) => t.name === 'trello.search_members')!;
+    expect(tool.inputSchema.required).toEqual(expect.arrayContaining(['query', 'boardId']));
+  });
+
   it('only lets read tools discover resources that some tool argument consumes', () => {
     for (const tool of ALL_TOOLS.filter((t) => t.discovers)) expect(tool.sideEffect).toBe('read');
     const consumed = new Set(ALL_TOOLS.flatMap((tool) => Object.values<any>(tool.inputSchema.properties ?? {})

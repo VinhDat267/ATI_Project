@@ -96,6 +96,17 @@ describe('AI-driven search', () => {
     expect(lastUserMessage(inputs[1]!)).toMatch(/trello\.create_card[\s\S]*not an available read-only search tool/);
   });
 
+  it('refuses a member search that is not scoped to a board', async () => {
+    const { provider, inputs } = scripted(
+      search({ tool: 'trello.search_boards', args: { query: 'Marketing' } }, { tool: 'trello.search_members', args: { query: 'Minh' } }),
+      ask('Which board?'),
+    );
+    const s = searcher();
+    await planner(provider, s.fn).processMessage({ userMessage: 'Assign Minh on the marketing card', memory: new WorkingMemory() });
+    expect(s.calls.map((c) => c.tool)).toEqual(['trello.search_boards']);
+    expect(lastUserMessage(inputs[1]!)).toMatch(/trello\.search_members[\s\S]*boardId/);
+  });
+
   it('rejects search arguments that break the tool schema without calling the service', async () => {
     const { provider, inputs } = scripted(search({ tool: 'trello.search_boards', args: { keyword: 'Frontend' } }), ask('Which board?'));
     const s = searcher();
@@ -189,7 +200,7 @@ describe('AI-driven search', () => {
 
   it('keeps discovered IDs across turns so a follow-up plan is grounded', async () => {
     const turn1 = scripted(
-      search({ tool: 'trello.search_members', args: { query: 'Minh' } }),
+      search({ tool: 'trello.search_members', args: { query: 'Minh', boardId: 'board_mkt' } }),
       ask('Minh Anh or Minh Châu?'),
     );
     const s = searcher({ 'trello.search_members': [{ id: 'member_anh', name: 'Minh Anh' }, { id: 'member_chau', name: 'Minh Châu' }] });

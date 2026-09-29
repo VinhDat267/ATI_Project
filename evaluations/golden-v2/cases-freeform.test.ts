@@ -58,7 +58,8 @@ describe('free-form golden cases', () => {
     expect((await fixtureSearch({ tool: 'trello.search_boards', args: { query: 'mobile' } })).length).toBe(0);
     // The scoping behind ff01/ff13/ff14: one Minh on the frontend board, but three without a board.
     expect((await fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh', boardId: 'board_fe' } })).length).toBe(1);
-    expect((await fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh' } })).length).toBe(3);
+    // Like the Trello adapter, member search needs a board.
+    await expect(fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh' } })).rejects.toThrow(/board/i);
     expect((await fixtureSearch({ tool: 'trello.search_lists', args: { boardId: 'board_mkt', query: 'Ideas' } })).length).toBe(1);
   });
 });

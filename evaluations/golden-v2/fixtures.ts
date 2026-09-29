@@ -68,8 +68,11 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
   switch (tool) {
     case 'trello.search_boards': return BOARDS.filter((b) => matches(b.name, args.query));
     case 'trello.search_lists': return LISTS.filter((l) => l.boardId === args.boardId && matches(l.name, args.query));
-    case 'trello.search_members': return MEMBERS
-      .filter((m) => (!args.boardId || m.boardIds.includes(String(args.boardId))) && matches(m.name, args.query))
+    case 'trello.search_members':
+      // Mirrors TrelloReadTools.searchMembers, which refuses to search outside a board.
+      if (!args.boardId) throw new Error('A board ID is required to search members within an allowed board');
+      return MEMBERS
+      .filter((m) => m.boardIds.includes(String(args.boardId)) && matches(m.name, args.query))
       .map(({ boardIds: _boardIds, ...member }) => member);
     case 'trello.search_cards': return CARDS.filter((c) => matches(c.name, args.query));
     case 'slack.search_channels': return CHANNELS.filter((c) => matches(c.name, args.query));

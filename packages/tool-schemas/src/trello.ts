@@ -96,7 +96,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         },
         boardId: {
           type: 'string',
-          description: 'Giới hạn tìm kiếm trong bảng cụ thể (tùy chọn)',
+          description: 'ID của bảng chứa thành viên (bắt buộc; tìm bảng trước)',
           'x-resource': 'board',
         },
         limit: {
@@ -106,7 +106,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
           default: 10,
         },
       },
-      required: ['query'],
+      required: ['query', 'boardId'],
       additionalProperties: false,
     },
     outputSchema: {
