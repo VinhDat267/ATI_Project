@@ -49,6 +49,7 @@ export const SLACK_TOOLS: ToolDefinition[] = [
         channel: {
           type: 'string',
           description: 'ID kênh Slack nhận tin nhắn',
+          'x-resource': 'channel',
         },
         text: {
           type: 'string',

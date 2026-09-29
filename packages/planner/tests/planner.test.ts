@@ -17,6 +17,12 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     expect(prompt).not.toContain('"channelId": "C0123456789"');
   });
 
+  it('tells the model that resource IDs must come from working memory, the user or a $ref', () => {
+    const prompt = buildSystemPrompt(tools);
+    expect(prompt).toMatch(/x-resource/);
+    expect(prompt).toMatch(/never invent/i);
+  });
+
   it('gathers a single board match before planning and passes its ID in working memory', async () => {
     const provider = new MockLLMProvider();
     provider.setPlanResponses([{ kind: 'clarification', question: 'Which list?', context: 'Need a list' }]);
@@ -186,6 +192,28 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       expect(classifyIntent('Create a GitHub issue and a Trello card', GITHUB_TOOLS)).toEqual([]);
     });
 
+    it.each([
+      'Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack',
+      'Create a task to update the homepage for the frontend team, due Friday, assign Minh, notify Slack',
+      'Tạo một task mới cho Minh rồi gửi tin nhắn cho team',
+      'Giao việc sửa CSS cho Minh và thông báo kênh frontend',
+    ])('routes a task-creation request to Trello even when another service is named: %s', (message) => {
+      expect(classifyIntent(message, tools)).toEqual(['trello', 'slack']);
+    });
+
+    it('supports task-creation phrasing declared by a newly registered service', () => {
+      const jira: ServiceDefinition = {
+        id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
+        credentialFields: [], intentKeywords: [], intentPatterns: [/\bopen\s+a\s+ticket\b/iu],
+      };
+      const jiraTool: ToolDefinition = {
+        name: 'jira.create_ticket', service: 'jira', description: 'Create Jira ticket', sideEffect: 'write',
+        riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+      };
+      expect(classifyIntent('Open a ticket and notify Slack', [...SLACK_TOOLS, jiraTool], [...SERVICE_REGISTRY, jira]))
+        .toEqual(['slack', 'jira']);
+    });
+
     it('supports a newly registered service without another router branch', () => {
       const jira: ServiceDefinition = {
         id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
@@ -266,15 +294,100 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       ],
     }]);
     const planner = new AIPlanner({ provider, toolCatalog: [...tools, ...GITHUB_TOOLS] });
+    const memory = new WorkingMemory();
+    memory.setEntity('repository', { id: '42', name: 'app', fullName: 'acme/app' });
+    memory.setEntity('list', { id: 'list_1', name: 'To Do' });
+    memory.setEntity('channel', { id: 'C1', name: 'general' });
     const response = await planner.processMessage({
-      userMessage: 'Create GitHub issue, Trello card and notify Slack', memory: new WorkingMemory(),
+      userMessage: 'Create GitHub issue, Trello card and notify Slack', memory,
     });
     expect(response.kind).toBe('plan');
     expect(provider.getCallCount()).toBe(1);
     expect(new Set(provider.getLastInput()?.toolCatalog.map((tool) => tool.service))).toEqual(new Set(['trello', 'slack', 'github']));
   });
 
+  describe('resource grounding', () => {
+    const inventedPlan = {
+      kind: 'plan', thinking: 'Create a card and notify', summary: 'Create card and notify', warnings: [],
+      steps: [{ id: 'step_1', tool: 'trello.create_card', description: 'Create card',
+        args: { listId: 'list_frontend_todo', title: 'Update homepage' }, dependsOn: [] }],
+    };
+    const request = 'Tạo task cập nhật homepage cho team frontend, báo trên Slack';
+
+    it('asks the user instead of returning a plan when the model keeps inventing resource IDs', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([inventedPlan, inventedPlan]);
+      const memory = new WorkingMemory();
+      const planner = new AIPlanner({ provider, toolCatalog: tools });
+      const response = await planner.processMessage({ userMessage: request, memory });
+      expect(provider.getCallCount()).toBe(2);
+      expect(response.kind).toBe('clarification');
+      if (response.kind === 'clarification') expect(response.question).toMatch(/list/i);
+      expect(memory.getEntity('__gatherIntent')).toBe(request);
+    });
+
+    it('feeds unverified arguments back to the model and accepts a grounded retry', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([inventedPlan, {
+        ...inventedPlan, steps: [{ ...inventedPlan.steps[0], args: { listId: 'list_9', title: 'Update homepage' } }],
+      }]);
+      const memory = new WorkingMemory();
+      memory.setEntity('list', { id: 'list_9', name: 'To Do' });
+      const planner = new AIPlanner({ provider, toolCatalog: tools });
+      const response = await planner.processMessage({ userMessage: request, memory });
+      expect(response.kind).toBe('plan');
+      expect(provider.getLastInput()?.conversationHistory.at(-1)?.content).toMatch(/grounding.*listId/is);
+    });
+
+    it('resumes the original cross-service intent after a grounding clarification', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([inventedPlan, inventedPlan]);
+      const memory = new WorkingMemory();
+      const planner = new AIPlanner({ provider, toolCatalog: tools, gatherSearch: async ({ tool }) =>
+        tool === 'trello.search_boards' ? [{ id: 'board_1', name: 'Frontend' }] : [{ id: 'list_9', name: 'To Do' }] });
+      await planner.processMessage({ userMessage: request, memory });
+      provider.reset();
+      provider.setPlanResponses([{ kind: 'clarification', question: 'Which channel?', context: 'Need a channel' }]);
+      await planner.processMessage({ userMessage: 'board Frontend list To Do', history: [{ role: 'user', content: request }], memory });
+      const input = provider.getLastInput();
+      expect(new Set(input?.toolCatalog.map((tool) => tool.service))).toEqual(new Set(['trello', 'slack']));
+      expect(input?.conversationHistory.at(-1)?.content).toContain(request);
+      expect(input?.workingMemory.list).toEqual({ id: 'list_9', name: 'To Do' });
+    });
+
+    it('accepts an identifier the user supplies in reply and consumes the pending intent', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([inventedPlan, inventedPlan]);
+      const memory = new WorkingMemory();
+      const planner = new AIPlanner({ provider, toolCatalog: tools });
+      await planner.processMessage({ userMessage: request, memory });
+      provider.reset();
+      provider.setPlanResponses([inventedPlan]);
+      const response = await planner.processMessage({
+        userMessage: 'list_frontend_todo', history: [{ role: 'user', content: request }], memory,
+      });
+      expect(response.kind).toBe('plan');
+      expect(memory.getEntity('__gatherIntent')).toBeUndefined();
+    });
+
+    it('can be disabled for canned sandbox providers that never read working memory', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([inventedPlan]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, requireGroundedResources: false });
+      const response = await planner.processMessage({ userMessage: request, memory: new WorkingMemory() });
+      expect(response.kind).toBe('plan');
+      expect(provider.getCallCount()).toBe(1);
+    });
+  });
+
   describe('AIPlanner with 1x Retry', () => {
+    const memoryWithList = () => {
+      const memory = new WorkingMemory();
+      memory.setEntity('list', { id: 'l1', name: 'To Do' });
+      memory.setEntity('member', { id: 'm1', name: 'Minh' });
+      return memory;
+    };
+
     it('returns plan directly on first call when valid without retrying', async () => {
       const mockLLM = new MockLLMProvider();
       mockLLM.setPlanResponses([
@@ -299,7 +412,7 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       const response = await planner.processMessage({
         userMessage: 'Tạo card',
         history: [],
-        memory: new WorkingMemory(),
+        memory: memoryWithList(),
       });
 
       expect(mockLLM.getCallCount()).toBe(1);
@@ -350,7 +463,7 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       const response = await planner.processMessage({
         userMessage: 'Tạo card và thêm member',
         history: [],
-        memory: new WorkingMemory(),
+        memory: memoryWithList(),
       });
 
       expect(mockLLM.getCallCount()).toBe(2);

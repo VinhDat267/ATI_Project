@@ -35,7 +35,7 @@ describe('E2E Scenario 2: Ambiguous Name Clarification', () => {
     const msg1Res = await request(app)
       .post(`/api/conversations/${convId}/messages`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ content: 'Gán task cho Minh trên board Frontend' });
+      .send({ content: 'Gán Minh vào task trên board Frontend list To Do' });
     expect(msg1Res.status).toBe(202);
 
     // 4. Wait for clarification event

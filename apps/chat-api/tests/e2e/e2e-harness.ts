@@ -235,6 +235,7 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
     toolCatalog: [...TRELLO_TOOLS, ...SLACK_TOOLS],
     gatherSearch: async ({ tool }) => {
       if (tool === 'trello.search_boards') return [{ id: 'board_frontend', name: 'Frontend' }];
+      if (tool === 'trello.search_lists') return [{ id: 'list_todo_001', name: 'To Do', boardId: 'board_frontend' }];
       if (tool === 'trello.search_members') return options.mode === 'clarification'
         ? [{ id: 'member_minh_001', name: 'Minh Nguyen' }, { id: 'member_minh_002', name: 'Minh Tran' }]
         : [{ id: 'member_minh_001', name: 'Minh' }];

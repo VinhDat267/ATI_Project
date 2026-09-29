@@ -1,3 +1,9 @@
+/**
+ * Input properties naming an external resource carry `x-resource` (the working
+ * memory entity key filled by gather, e.g. 'list') and optionally
+ * `x-resource-field` (the entity field holding the value, default 'id').
+ * The planner rejects plans whose resource values were never looked up.
+ */
 export type JSONSchema = Record<string, any>;
 
 export interface ToolDefinition {
@@ -38,6 +44,9 @@ export interface ServiceDefinition {
   scopeKey: 'boards' | 'channels' | 'repos';
   credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' }>;
   intentKeywords: string[];
+  /** Phrases that select the service even when another service is named, e.g. "create a task". */
+  intentPatterns?: RegExp[];
+  /** Generic words used only when no other service matches, e.g. "task" in "about task X". */
   fallbackIntentKeywords?: string[];
   gatherRules?: GatherRule[];
 }

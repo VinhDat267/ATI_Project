@@ -18,7 +18,8 @@ export function classifyIntent(
   );
   const matched = services.filter((service) =>
     explicitlyNamed.includes(service) ||
-    service.intentKeywords.some((keyword) => mentionsKeyword(message, keyword))
+    service.intentKeywords.some((keyword) => mentionsKeyword(message, keyword)) ||
+    service.intentPatterns?.some((pattern) => pattern.test(message))
   );
   const fallback = matched.length > 0 ? matched : services.filter((service) =>
     service.fallbackIntentKeywords?.some((keyword) => mentionsKeyword(message, keyword))

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validatePlan } from '../src/index.js';
-import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS } from '@wap/tool-schemas';
 
 describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precedence)', () => {
   const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS];
@@ -225,5 +225,74 @@ describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precede
     });
     const resRef = validatePlan(validRefusal, catalog);
     expect(resRef.valid).toBe(true);
+  });
+});
+
+describe('packages/planner resource grounding layer', () => {
+  const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS];
+  const plan = (...steps: Array<{ tool: string; args: unknown; id?: string; dependsOn?: string[] }>) => JSON.stringify({
+    kind: 'plan', thinking: 'Grounding check', summary: 'Grounding check', warnings: [],
+    steps: steps.map((step, index) => ({
+      id: step.id ?? `step_${index + 1}`, tool: step.tool, description: 'Step', args: step.args, dependsOn: step.dependsOn ?? [],
+    })),
+  });
+
+  it('rejects a write argument whose resource ID was never looked up or typed by the user', () => {
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_frontend_todo', title: 'Task' } }),
+      catalog, { grounding: { memory: {}, userTexts: ['Tạo task cập nhật homepage cho team frontend'] } });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('grounding');
+      expect(result.error).toMatch(/listId/);
+      expect(result.ungrounded).toEqual([{ stepId: 'step_1', argument: 'listId', resource: 'list', value: 'list_frontend_todo' }]);
+    }
+  });
+
+  it('accepts IDs resolved into working memory by search tools', () => {
+    const result = validatePlan(plan(
+      { tool: 'trello.create_card', args: { listId: 'list_9', title: 'Task', idMembers: ['member_7'] } },
+      { tool: 'slack.send_message', args: { channel: 'C42', text: 'Done' } },
+    ), catalog, { grounding: {
+      memory: { list: { id: 'list_9', name: 'To Do' }, member: { id: 'member_7', name: 'Minh' }, channel: { id: 'C42', name: 'frontend' } },
+      userTexts: ['Create a card and notify'],
+    } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('checks every element of an array resource argument', () => {
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_9', title: 'Task', idMembers: ['member_7', 'member_invented'] } }),
+      catalog, { grounding: { memory: { list: { id: 'list_9' }, member: { id: 'member_7' } }, userTexts: [] } });
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.ungrounded).toEqual([{ stepId: 'step_1', argument: 'idMembers', resource: 'member', value: 'member_invented' }]);
+  });
+
+  it('does not ground a list argument with the ID of a different resource kind', () => {
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'board_1', title: 'Task' } }),
+      catalog, { grounding: { memory: { board: { id: 'board_1', name: 'Frontend' } }, userTexts: [] } });
+    expect(result.valid).toBe(false);
+  });
+
+  it('grounds a GitHub repo argument by the verified repository full name', () => {
+    const grounding = { memory: { repository: { id: '42', name: 'app', fullName: 'acme/app' } }, userTexts: [] };
+    expect(validatePlan(plan({ tool: 'github.create_issue', args: { repo: 'acme/app', title: 'Bug' } }), catalog, { grounding }).valid).toBe(true);
+    expect(validatePlan(plan({ tool: 'github.create_issue', args: { repo: 'acme/other', title: 'Bug' } }), catalog, { grounding }).valid).toBe(false);
+  });
+
+  it('accepts cross-step references and identifiers the user typed explicitly', () => {
+    const result = validatePlan(plan(
+      { id: 'card', tool: 'trello.create_card', args: { listId: 'list_9', title: 'Task' } },
+      { id: 'assign', tool: 'trello.add_member', args: { cardId: { $ref: 'card.output.id' }, memberId: 'member_7' }, dependsOn: ['card'] },
+      { id: 'move', tool: 'trello.update_card', args: { cardId: 'c2', idList: 'list_9' } },
+      { id: 'notify', tool: 'slack.send_message', args: { channel: '#general', text: 'Done' } },
+      { id: 'label', tool: 'github.add_label', args: { repo: 'acme/app', issueNumber: 12, label: 'bug' } },
+    ), catalog, { grounding: {
+      memory: { list: { id: 'list_9' } },
+      userTexts: ['Chuyển card c2, gán member_7, báo #general và gắn nhãn bug cho issue #12 của acme/app.'],
+    } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('leaves validation unchanged when no grounding context is supplied', () => {
+    expect(validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_frontend_todo', title: 'Task' } }), catalog).valid).toBe(true);
   });
 });

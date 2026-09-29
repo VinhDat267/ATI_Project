@@ -37,7 +37,7 @@ describe('E2E Scenario 1: Trello Card Creation & Slack Notification', () => {
     const msgRes = await request(app)
       .post(`/api/conversations/${convId}/messages`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ content: 'Tạo task sửa CSS cho Minh trên board Frontend và báo channel general' });
+      .send({ content: 'Tạo task sửa CSS, gán Minh trên board Frontend list To Do và báo channel general' });
     expect(msgRes.status).toBe(202);
 
     // 4. Wait for planner pipeline to complete
@@ -68,5 +68,34 @@ describe('E2E Scenario 1: Trello Card Creation & Slack Notification', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(execRes.status).toBe(200);
     expect(execRes.body.status).toBe('completed');
+  });
+
+  it('asks which list instead of previewing a plan whose list ID was never looked up', async () => {
+    const app = ctx.app;
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'admin@wap.local', password: 'password123' });
+    const token = loginRes.body.accessToken;
+    const convRes = await request(app)
+      .post('/api/conversations')
+      .set('Authorization', `Bearer ${token}`)
+      .send();
+    const convId = convRes.body.conversation.id;
+
+    // The canned model still answers with listId 'list_todo_001', but no message names a list.
+    const msgRes = await request(app)
+      .post(`/api/conversations/${convId}/messages`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: 'Tạo task sửa CSS, gán Minh trên board Frontend và báo channel general' });
+    expect(msgRes.status).toBe(202);
+
+    const clarification = await ctx.waitForEvent('clarification');
+    expect(clarification.conversationId).toBe(convId);
+    expect(clarification.question).toMatch(/list/i);
+
+    const planRes = await request(app)
+      .get(`/api/conversations/${convId}/plans/active`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(planRes.status).toBe(404);
   });
 });
