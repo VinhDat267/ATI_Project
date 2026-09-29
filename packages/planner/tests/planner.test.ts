@@ -6,7 +6,7 @@ import {
   classifyIntent,
   buildSystemPrompt,
 } from '../src/index.js';
-import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SERVICE_REGISTRY, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 
 describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Automatic Retry)', () => {
   const tools = [...TRELLO_TOOLS, ...SLACK_TOOLS];
@@ -167,6 +167,111 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       expect(ambiguous).toContain('trello');
       expect(ambiguous).toContain('slack');
     });
+
+    it('routes GitHub intent from registered metadata and only offers connected catalog tools', () => {
+      const catalog = [...tools, ...GITHUB_TOOLS];
+      expect(classifyIntent('Create issue in GitHub repository acme/app', catalog)).toEqual(['github']);
+      expect(classifyIntent('Create GitHub issue, Trello card and notify Slack', catalog)).toEqual(['trello', 'slack', 'github']);
+      expect(classifyIntent('Create GitHub issue', tools)).toEqual([]);
+      expect(classifyIntent('Create GitHub issue and Trello card', tools)).toEqual([]);
+    });
+
+    it('prefers explicitly named services over generic task and notification words', () => {
+      expect(classifyIntent('Create a GitHub issue for task X', GITHUB_TOOLS)).toEqual(['github']);
+      expect(classifyIntent('Send a Slack message about task X', SLACK_TOOLS)).toEqual(['slack']);
+      expect(classifyIntent('Tạo GitHub issue để báo lỗi cho task X', GITHUB_TOOLS)).toEqual(['github']);
+      expect(classifyIntent('Create issue for task X', GITHUB_TOOLS)).toEqual(['github']);
+      expect(classifyIntent('Send a message about task X', SLACK_TOOLS)).toEqual(['slack']);
+      expect(classifyIntent('Create card for a task and notify Slack', [...tools, ...GITHUB_TOOLS])).toEqual(['trello', 'slack']);
+      expect(classifyIntent('Create a GitHub issue and a Trello card', GITHUB_TOOLS)).toEqual([]);
+    });
+
+    it('supports a newly registered service without another router branch', () => {
+      const jira: ServiceDefinition = {
+        id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
+        credentialFields: [], intentKeywords: ['jira', 'ticket'],
+      };
+      const jiraTool: ToolDefinition = {
+        name: 'jira.create_ticket', service: 'jira', description: 'Create Jira ticket', sideEffect: 'write',
+        riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+      };
+      expect(classifyIntent('Open a Jira ticket', [jiraTool], [...SERVICE_REGISTRY, jira])).toEqual(['jira']);
+      expect(classifyIntent('Open a Jira ticket', tools, [...SERVICE_REGISTRY, jira])).toEqual([]);
+    });
+  });
+
+  it('gathers a GitHub repository and exposes its verified owner/repo in memory', async () => {
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{ kind: 'clarification', question: 'Which issue?', context: 'Need issue detail' }]);
+    const memory = new WorkingMemory();
+    const searches: Array<{ tool: string; query: unknown }> = [];
+    const planner = new AIPlanner({ provider, toolCatalog: [...tools, ...GITHUB_TOOLS],
+      gatherSearch: async ({ tool, args }) => {
+        searches.push({ tool, query: args.query });
+        return [{ id: '42', name: 'app', fullName: 'acme/app', url: 'https://github.com/acme/app' }];
+      },
+    });
+    await planner.processMessage({ userMessage: 'Create GitHub issue in repo acme/app', memory });
+    expect(searches).toEqual([{ tool: 'github.search_repos', query: 'acme/app' }]);
+    expect(memory.getEntity('repository')).toMatchObject({ id: '42', fullName: 'acme/app' });
+    expect(provider.getLastInput()?.toolCatalog.every((tool) => tool.service === 'github')).toBe(true);
+  });
+
+  it('uses a newly registered read tool for gather without planner service branches', async () => {
+    const jira: ServiceDefinition = {
+      id: 'jira', name: 'Jira', description: 'Issue tracking', scopes: [], scopeKey: 'repos',
+      credentialFields: [], intentKeywords: ['jira'],
+      gatherRules: [{ entityKey: 'ticket', tool: 'jira.search_tickets', pattern: /\bticket\s+([\w-]+)/iu }],
+    };
+    const jiraSearch: ToolDefinition = {
+      name: 'jira.search_tickets', service: 'jira', description: 'Search tickets', sideEffect: 'read',
+      riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'array' },
+    };
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{ kind: 'clarification', question: 'Next action?', context: 'Ticket resolved' }]);
+    const memory = new WorkingMemory();
+    const queries: string[] = [];
+    const planner = new AIPlanner({ provider, toolCatalog: [jiraSearch], serviceRegistry: [...SERVICE_REGISTRY, jira],
+      gatherSearch: async ({ tool, args }) => {
+        queries.push(`${tool}:${args.query}`);
+        return [{ id: 'JIRA-42', name: 'ABC-42' }];
+      },
+    });
+    await planner.processMessage({ userMessage: 'Find Jira ticket ABC-42', memory });
+    expect(queries).toEqual(['jira.search_tickets:ABC-42']);
+    expect(memory.getEntity('ticket')).toEqual({ id: 'JIRA-42', name: 'ABC-42' });
+    expect(provider.getLastInput()?.toolCatalog.map((tool) => tool.name)).toEqual(['jira.search_tickets']);
+  });
+
+  it('refuses a configured service intent when its tools are absent from the active catalog', async () => {
+    const provider = new MockLLMProvider();
+    const planner = new AIPlanner({ provider, toolCatalog: tools });
+    const response = await planner.processMessage({ userMessage: 'Create GitHub issue', memory: new WorkingMemory() });
+    expect(response.kind).toBe('refusal');
+    expect(provider.getCallCount()).toBe(0);
+  });
+
+  it('validates a dependent GitHub to Trello to Slack plan against the active catalog', async () => {
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{
+      kind: 'plan', thinking: 'Create an issue, link it from a card, then post the card.',
+      summary: 'Create GitHub issue, Trello card and Slack notice', warnings: [],
+      steps: [
+        { id: 'issue', tool: 'github.create_issue', description: 'Create issue',
+          args: { repo: 'acme/app', title: 'Fix login' }, dependsOn: [] },
+        { id: 'card', tool: 'trello.create_card', description: 'Create linked card',
+          args: { listId: 'list_1', title: 'Fix login', desc: { $template: 'Issue: ${issue.output.url}' } }, dependsOn: ['issue'] },
+        { id: 'notice', tool: 'slack.send_message', description: 'Notify team',
+          args: { channel: 'C1', text: { $template: 'Card: ${card.output.url}' } }, dependsOn: ['card'] },
+      ],
+    }]);
+    const planner = new AIPlanner({ provider, toolCatalog: [...tools, ...GITHUB_TOOLS] });
+    const response = await planner.processMessage({
+      userMessage: 'Create GitHub issue, Trello card and notify Slack', memory: new WorkingMemory(),
+    });
+    expect(response.kind).toBe('plan');
+    expect(provider.getCallCount()).toBe(1);
+    expect(new Set(provider.getLastInput()?.toolCatalog.map((tool) => tool.service))).toEqual(new Set(['trello', 'slack', 'github']));
   });
 
   describe('AIPlanner with 1x Retry', () => {

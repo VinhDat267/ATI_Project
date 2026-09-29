@@ -15,6 +15,33 @@ export interface ToolDefinition {
   }>;
 }
 
+export interface GatherRule {
+  entityKey: string;
+  tool: string;
+  pattern: RegExp;
+  nameField?: string;
+  requires?: {
+    entityKey: string;
+    argument: string;
+    searchTool: string;
+    question: string;
+    context: string;
+  };
+  invalidates?: string[];
+}
+
+export interface ServiceDefinition {
+  id: string;
+  name: string;
+  description: string;
+  scopes: string[];
+  scopeKey: 'boards' | 'channels' | 'repos';
+  credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' }>;
+  intentKeywords: string[];
+  fallbackIntentKeywords?: string[];
+  gatherRules?: GatherRule[];
+}
+
 export type ArgValue =
   | string
   | number

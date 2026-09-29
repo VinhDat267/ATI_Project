@@ -1,5 +1,5 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
 import type {
   StepOutputs,
@@ -10,7 +10,7 @@ import type {
 } from './types.js';
 
 const catalog = new Map<string, ToolDefinition>(
-  [...TRELLO_TOOLS, ...SLACK_TOOLS].map((t) => [t.name, t])
+  ALL_TOOLS.map((t) => [t.name, t])
 );
 
 export function isWriteTool(toolName: string): boolean {
@@ -36,7 +36,7 @@ function combineSignals(s1: AbortSignal, s2?: AbortSignal): AbortSignal {
 function classifyErrorCategory(err: any, timeoutAborted: boolean): ErrorCategory {
   if (
     err?.category &&
-    ['AUTH_ERROR', 'NOT_FOUND', 'RATE_LIMIT', 'SERVER_ERROR', 'NETWORK', 'VALIDATION'].includes(
+    ['AUTH_ERROR', 'NOT_FOUND', 'RATE_LIMIT', 'SERVER_ERROR', 'NETWORK', 'VALIDATION', 'UNKNOWN'].includes(
       err.category
     )
   ) {
@@ -111,7 +111,7 @@ export class StepRunner {
 
       // Write safety: Network/Server failures on write tools result in 'unknown' status
       const status =
-        isWrite && (category === 'NETWORK' || category === 'SERVER_ERROR')
+        isWrite && (category === 'NETWORK' || category === 'SERVER_ERROR' || category === 'UNKNOWN')
           ? 'unknown'
           : 'failed';
 

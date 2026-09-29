@@ -1,7 +1,7 @@
-import type { ToolDefinition, PlannerResponse } from '@wap/tool-schemas';
+import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage } from './types.js';
 import { WorkingMemory } from './working-memory.js';
-import { classifyIntent, type TargetService } from './router.js';
+import { classifyIntent } from './router.js';
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 
@@ -9,6 +9,7 @@ export interface AIPlannerOptions {
   provider: LLMProvider;
   toolCatalog: ToolDefinition[];
   gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
+  serviceRegistry?: ServiceDefinition[];
 }
 
 export interface GatherSearchRequest {
@@ -33,27 +34,22 @@ export interface ProcessMessageInput {
 
 interface GatherCandidate { id: string; name: string; [key: string]: unknown }
 interface PendingGather { key: string; query: string; candidates: GatherCandidate[] }
+interface GatherRequest { key: string; query: string; rule: GatherRule }
 
-function entityNames(message: string): Array<{ key: string; query: string; tool: string }> {
-  const patterns: Array<[string, string, RegExp]> = [
-    ['board', 'trello.search_boards', /\b(?:board|bảng)\s+["']?([\p{L}\p{N}_-]+)["']?/iu],
-    ['list', 'trello.search_lists', /\b(?:list|danh sách)\s+["']?([\p{L}\p{N}_-]+(?:\s+[\p{L}\p{N}_-]+)?)["']?/iu],
-    ['member', 'trello.search_members', /\b(?:member|gán|assign(?:\s+to)?)\s+["']?([\p{L}\p{N}_-]+)["']?/iu],
-    ['channel', 'slack.search_channels', /(?:#|\b(?:channel|kênh)\s+)["']?([\p{L}\p{N}_-]+)["']?/iu],
-  ];
-  return patterns.flatMap(([key, tool, pattern]) => {
-    const query = pattern.exec(message)?.[1]?.trim();
-    return query ? [{ key, query, tool }] : [];
+function entityNames(message: string, rules: GatherRule[]): GatherRequest[] {
+  return rules.flatMap((rule) => {
+    const query = rule.pattern.exec(message)?.[1]?.trim();
+    return query ? [{ key: rule.entityKey, query, rule }] : [];
   });
 }
 
-function asCandidates(value: unknown): GatherCandidate[] {
+function asCandidates(value: unknown, nameField?: string): GatherCandidate[] {
   if (!Array.isArray(value)) throw new Error('Gather search must return an array');
   return value.map((item) => {
     if (!item || typeof item !== 'object' || typeof item.id !== 'string') {
       throw new Error('Gather search returned an item without an ID');
     }
-    const name = item.name ?? item.fullName;
+    const name = (nameField ? item[nameField] : undefined) ?? item.name ?? item.fullName;
     if (typeof name !== 'string' || !name.trim()) {
       throw new Error('Gather search returned an item without a name');
     }
@@ -65,11 +61,13 @@ export class AIPlanner {
   private provider: LLMProvider;
   private toolCatalog: ToolDefinition[];
   private gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
+  private serviceRegistry: ServiceDefinition[];
 
   constructor(options: AIPlannerOptions) {
     this.provider = options.provider;
     this.toolCatalog = options.toolCatalog;
     this.gatherSearch = options.gatherSearch;
+    this.serviceRegistry = options.serviceRegistry ?? SERVICE_REGISTRY;
   }
 
   private async gather(input: ProcessMessageInput): Promise<PlannerResponse | undefined> {
@@ -93,48 +91,44 @@ export class AIPlanner {
 
     const intent = memory.getEntity<string>('__gatherIntent') || userMessage;
     const missing = memory.getEntity<{ key: string }>('__gatherMissing');
-    const requests = entityNames(intent).map((request) =>
+    const rules = this.serviceRegistry.flatMap((service) => service.gatherRules ?? [])
+      .filter((rule) => this.toolCatalog.some((tool) => tool.name === rule.tool && tool.sideEffect === 'read'));
+    const requests = entityNames(intent, rules).map((request) =>
       missing?.key === request.key ? { ...request, query: userMessage.trim() } : request
     );
-    if (missing?.key === 'board' && !requests.some((request) => request.key === 'board')) {
-      requests.unshift({ key: 'board', query: userMessage.trim(), tool: 'trello.search_boards' });
+    if (missing && !requests.some((request) => request.key === missing.key)) {
+      const rule = rules.find((candidate) => candidate.entityKey === missing.key);
+      if (rule) requests.unshift({ key: missing.key, query: userMessage.trim(), rule });
     }
     if (missing) memory.deleteEntity('__gatherMissing');
     if (requests.length === 0) return;
     if (!this.gatherSearch) {
-      return { kind: 'clarification', question: 'Please provide the verified IDs for the named board, list, member or channel.',
+      return { kind: 'clarification', question: 'Please provide the verified IDs for the named resources.',
         context: 'Search tools are unavailable, so names cannot be resolved safely.' };
     }
     for (const request of requests) {
       const resolved = memory.getEntity<GatherCandidate>(request.key);
       if (resolved && (bindings[request.key]?.toLocaleLowerCase() === request.query.toLocaleLowerCase() ||
         (!bindings[request.key] && resolved.name?.toLocaleLowerCase() === request.query.toLocaleLowerCase()))) continue;
-      if (request.key === 'board' && resolved) memory.deleteEntity('list');
-      const tool = this.toolCatalog.find((candidate) => candidate.name === request.tool);
+      if (resolved) for (const dependent of request.rule.invalidates ?? []) memory.deleteEntity(dependent);
+      const tool = this.toolCatalog.find((candidate) => candidate.name === request.rule.tool);
       if (!tool || tool.sideEffect !== 'read' || !tool.name.includes('.search_')) {
-        throw new Error(`Gather tool ${request.tool} is unavailable or not read-only`);
+        throw new Error(`Gather tool ${request.rule.tool} is unavailable or not read-only`);
       }
       const args: Record<string, unknown> = { query: request.query, limit: 5 };
-      if (request.tool === 'trello.search_lists') {
-        const board = memory.getEntity<GatherCandidate>('board');
-        if (!board?.id) {
-          return { kind: 'clarification', question: 'Which board contains this list?',
-            context: 'A board must be selected before searching lists.' };
-        }
-        args.boardId = board.id;
-      } else if (request.tool === 'trello.search_members') {
-        const board = memory.getEntity<GatherCandidate>('board');
-        if (!board?.id) {
+      if (request.rule.requires) {
+        const required = request.rule.requires;
+        const parent = memory.getEntity<GatherCandidate>(required.entityKey);
+        if (!parent?.id) {
           memory.setEntity('__gatherIntent', intent);
-          memory.setEntity('__gatherMissing', { key: 'board' });
-          return { kind: 'clarification', question: 'Which board contains this member?',
-            context: 'A board must be selected before searching members.' };
+          memory.setEntity('__gatherMissing', { key: required.entityKey });
+          return { kind: 'clarification', question: required.question, context: required.context };
         }
-        args.boardId = board.id;
+        args[required.argument] = parent.id;
       }
-      onGatherEvent?.({ tool: request.tool, status: 'started' });
-      const candidates = asCandidates(await this.gatherSearch({ tool: request.tool, args, signal }));
-      onGatherEvent?.({ tool: request.tool, status: 'completed', output: candidates });
+      onGatherEvent?.({ tool: request.rule.tool, status: 'started' });
+      const candidates = asCandidates(await this.gatherSearch({ tool: request.rule.tool, args, signal }), request.rule.nameField);
+      onGatherEvent?.({ tool: request.rule.tool, status: 'completed', output: candidates });
       if (candidates.length === 0) {
         memory.setEntity('__gatherIntent', intent);
         memory.setEntity('__gatherMissing', { key: request.key });
@@ -170,10 +164,14 @@ export class AIPlanner {
       : userMessage;
 
     // 1. Hierarchical Routing: filter tool catalog by intent
-    const targetServices = classifyIntent(originalIntent ?? userMessage);
+    const targetServices = classifyIntent(originalIntent ?? userMessage, this.toolCatalog, this.serviceRegistry);
     const activeTools = this.toolCatalog.filter((tool) =>
-      targetServices.includes(tool.service as TargetService)
+      targetServices.includes(tool.service)
     );
+    if (activeTools.length === 0) {
+      return { kind: 'refusal', reason: 'The requested service is not available or authorized in this connection.',
+        suggestion: 'Connect the service with an allowed resource scope before planning this workflow.' };
+    }
 
     // 2. Prepare System Prompt & Conversation
     const systemPrompt = buildSystemPrompt(activeTools);
