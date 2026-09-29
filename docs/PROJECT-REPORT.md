@@ -4,7 +4,7 @@
 **Môn học:** Advanced Technology Integration (ATI)  
 **Ngày lập:** 29/09/2026  
 **Phiên bản:** v3 (viết lại từ v2)  
-**Trạng thái kỹ thuật (29/09/2026):** Nhánh hiện tại đạt 199/199 bài test v3 cục bộ, typecheck, build và smoke test launcher; chưa chứng nhận production readiness vì kiểm thử live LLM/Trello/Slack và khôi phục sau crash chưa chạy. [Kết quả khắc phục trước đó](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md) ghi mốc 198/198.
+**Trạng thái kỹ thuật (29/09/2026):** Nhánh hiện tại đạt 227/227 bài test v3 cục bộ, typecheck, build, smoke test launcher và 5/5 browser E2E với PostgreSQL. Workflow ba dịch vụ đã được kiểm chứng trong sandbox; chưa chứng nhận production readiness vì kiểm thử live LLM/GitHub/Trello/Slack và khôi phục sau crash chưa chạy. [Kết quả khắc phục trước đó](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md) ghi mốc 198/198.
 
 ---
 
@@ -26,7 +26,9 @@
 
 ## 1. Tóm tắt Dự án
 
-**AI Workflow Automation Platform** là một hệ thống cho phép người dùng **mô tả công việc bằng ngôn ngữ tự nhiên** (tiếng Việt hoặc tiếng Anh) trong giao diện chat, sau đó AI sẽ **tự động hiểu ý định, chọn công cụ phù hợp, sinh kế hoạch nhiều bước**, và **thực thi workflow trên nhiều dịch vụ bên ngoài** (Trello, Slack, v.v.) — tất cả chỉ từ một câu chat duy nhất.
+**AI Workflow Automation Platform** hướng tới việc chuyển yêu cầu ngôn ngữ tự nhiên thành kế hoạch nhiều bước, có phê duyệt, rồi thực thi trên nhiều dịch vụ bên ngoài đã tích hợp và cấp quyền. Các nhóm tích hợp gồm quản lý công việc, nhắn tin, mã nguồn, bảng tính và các đợt mở rộng email/lịch/tài liệu.
+
+**Phạm vi sản phẩm và hiện trạng:** Trello/Slack là hai adapter đầu tiên; GitHub là tích hợp thứ ba của v3. Registry, planner, API và UI đã mở rộng theo catalog; luồng GitHub issue → Trello card → Slack message với tham chiếu dữ liệu qua ba bước đã chạy trên browser và PostgreSQL trong sandbox. Kết nối và ghi live chưa được kiểm chứng, nên Phase 7 vẫn mở ở gate live theo mục 1.4 của đặc tả. Xem [scope, bằng chứng và việc còn lại](MULTI-SERVICE-SCOPE.md).
 
 ### Ví dụ minh họa
 
@@ -57,7 +59,7 @@ Hệ thống tự động:
 | AI/LLM | Gemini Provider qua `@google/genai`; mã nguồn mặc định `gemini-3.8-flash` nếu không đặt `GEMINI_MODEL` (chưa kiểm thử live) |
 | Database | PostgreSQL (pg pool) |
 | Streaming | Server-Sent Events (SSE) |
-| Testing | Vitest; 199 tests v3 cục bộ và 1 smoke test launcher trên nhánh hiện tại; chưa kiểm thử live provider |
+| Testing | Vitest; 227 tests v3 cục bộ, 1 smoke test launcher và 5 browser E2E với PostgreSQL; chưa kiểm thử live provider |
 | Monorepo | npm workspaces, 6 packages v3 |
 
 ---
@@ -118,7 +120,7 @@ Sáu nguyên tắc dẫn dắt mọi quyết định kỹ thuật trong v3:
 
 5. **Mỗi phase có deliverable demoable** — không build 3 tuần rồi mới thấy kết quả.
 
-6. **Adapter pattern** — thêm service mới = thêm 1 file adapter, không đổi core.
+6. **Hợp đồng tích hợp mở rộng** — service mới cần tool definitions, adapter, cấu hình xác thực/phạm vi, đăng ký và kiểm thử. Mục tiêu là dùng lại lõi planner/executor; mã hiện tại còn cần tổng quát hóa để đạt điều này.
 
 ---
 
@@ -631,7 +633,7 @@ d879620 feat(api): SSE stream endpoint + sequence tracking + event replay
 ```
 Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → Phase 6
                      (CRITICAL)                                        │
-                                                Phase 7 (OPT) → Phase 8 (OPT)
+                                                Phase 7 (REQUIRED) → Phase 8 (OPT)
 ```
 
 ### 10.2. Trạng thái hiện tại và việc còn lại
@@ -645,14 +647,17 @@ Phase 0 → Phase 1 → Phase 2a/2b ⭐ → Phase 3 → Phase 4 → Phase 5 → 
 
 Ưu tiên gần nhất là môi trường PostgreSQL v3 có thể tái tạo từ checkout mới, CI dùng DB thật, rồi kiểm thử E2E sandbox và live có kiểm soát. Xem [hướng dẫn setup v3](V3-LOCAL-SETUP.md). Các số liệu test cục bộ không thay thế bằng chứng live hoặc crash recovery.
 
-### 10.3. Mở rộng tương lai (Optional)
+### 10.3. Khả năng mở rộng bắt buộc và các đợt tiếp theo
 
-**Phase 7: Đợt 2 Adapters** — GitHub (5 tools), Google Sheets (3 tools)  
-**Phase 8: Đợt 3 Adapters (OAuth2)** — Gmail, Google Calendar, Notion
+**Phase 7 (bắt buộc, chưa nghiệm thu live):** registry, routing/gather theo catalog, API/UI cấu hình và adapter GitHub (5 tools) đã triển khai. Browser E2E sandbox + PostgreSQL đã xác nhận issue GitHub được tham chiếu trong card Trello và cả hai liên kết đi vào tin nhắn Slack sau khi duyệt plan. Bằng chứng live với quyền thật, lỗi provider thật và phục hồi sau crash còn mở. Xem [bảng gate](MULTI-SERVICE-SCOPE.md); 28 tasks nền chưa bao phủ phần này.
+
+**Phase 8 (tùy chọn theo đợt):** Gmail, Google Calendar, Notion và cơ chế xác thực tương ứng. Không mặc định phải hoàn thành toàn bộ catalog mở rộng trong cùng một đợt.
 
 ### 10.4. Success Criteria
 
-**Minimum Viable Demo:**
+**Minimum Viable Demo của đợt đầu:**
+
+Demo Trello/Slack dưới đây chưa đủ để nghiệm thu scope nền tảng; cần đạt thêm tiêu chí Phase 7 trong đặc tả v3 mục 1.4.
 ```
 1. User mở browser, đăng nhập
 2. Chat: "Tạo task cập nhật homepage cho team frontend,
