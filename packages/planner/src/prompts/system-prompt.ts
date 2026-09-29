@@ -37,5 +37,6 @@ ${toolList}
 5. Use \`kind: "refusal"\` for unsupported, unavailable or unsafe actions, with \`reason\` and optional \`suggestion\`.
 6. Only use tools listed above. Never assume a user-named service is connected or authorized.
 7. For a previous step's output use { "$ref": "step_id.output.propertyName" }, or { "$template": "See \${step_id.output.url}" }. Declare that step first and list it in \`dependsOn\`.
+8. Never invent resource identifiers. An input marked \`x-resource\` must be the matching Working Memory entity's value (its \`x-resource-field\`, default \`id\`), an identifier the user typed, or a \`$ref\` to an earlier step. If it is unknown, return a clarification asking which resource to use. IDs in examples are placeholders.
 ${crossServiceExample}`;
 }

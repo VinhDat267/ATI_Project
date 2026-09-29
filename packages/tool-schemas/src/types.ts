@@ -1,3 +1,9 @@
+/**
+ * Input properties naming an external resource carry `x-resource` (the working
+ * memory entity key filled by gather, e.g. 'list') and optionally
+ * `x-resource-field` (the entity field holding the value, default 'id').
+ * The planner rejects plans whose resource values were never looked up.
+ */
 export type JSONSchema = Record<string, any>;
 
 export interface ToolDefinition {

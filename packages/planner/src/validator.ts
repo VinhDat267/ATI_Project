@@ -5,13 +5,33 @@ export interface ValidationSuccess {
   parsed: PlannerResponse;
 }
 
+export interface UngroundedArgument {
+  stepId: string;
+  argument: string;
+  resource: string;
+  value: string | number;
+}
+
 export interface ValidationFailure {
   valid: false;
-  layer: 'json' | 'schema' | 'semantic' | 'security';
+  layer: 'json' | 'schema' | 'semantic' | 'security' | 'grounding';
   error: string;
+  ungrounded?: UngroundedArgument[];
 }
 
 export type ValidationResult = ValidationSuccess | ValidationFailure;
+
+/** Sources that may legitimately supply a resource identifier. */
+export interface GroundingContext {
+  /** Working memory; gather stores looked-up resources under their entity key. */
+  memory: Record<string, any>;
+  /** The user's own messages; identifiers they typed are not model inventions. */
+  userTexts: string[];
+}
+
+export interface ValidatePlanOptions {
+  grounding?: GroundingContext;
+}
 
 const INJECTION_PATTERNS = [
   /<\|im_start\|>/i,
@@ -80,7 +100,50 @@ function validateSchemaValue(value: unknown, schema: Record<string, any>, path: 
   return null;
 }
 
-export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): ValidationResult {
+function userTokens(texts: string[]): Set<string> {
+  const tokens = new Set<string>();
+  for (const text of texts) {
+    for (const raw of text.match(/[\p{L}\p{N}_#@./:-]+/gu) ?? []) {
+      const token = raw.replace(/[.:/-]+$/u, '');
+      if (!token) continue;
+      tokens.add(token);
+      if (/^[#@]/u.test(token)) tokens.add(token.slice(1));
+    }
+  }
+  return tokens;
+}
+
+function memoryValues(memory: Record<string, any>, resource: string, field: string): Set<string> {
+  const entity = memory[resource];
+  const entries = Array.isArray(entity) ? entity : [entity];
+  return new Set(entries
+    .map((entry) => entry && typeof entry === 'object' ? entry[field] : undefined)
+    .filter((value) => typeof value === 'string' || typeof value === 'number')
+    .map(String));
+}
+
+function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
+  const typed = userTokens(grounding.userTexts);
+  const ungrounded: UngroundedArgument[] = [];
+  for (const step of steps) {
+    const properties = catalog.get(step.tool)?.inputSchema.properties ?? {};
+    for (const [argument, schema] of Object.entries<Record<string, any>>(properties)) {
+      const resource = schema['x-resource'];
+      if (typeof resource !== 'string' || step.args[argument] === undefined) continue;
+      const known = memoryValues(grounding.memory, resource, schema['x-resource-field'] ?? 'id');
+      const values = Array.isArray(step.args[argument]) ? step.args[argument] as unknown[] : [step.args[argument]];
+      for (const value of values) {
+        // $ref/$template values come from an earlier step's real output.
+        if (typeof value !== 'string' && typeof value !== 'number') continue;
+        if (known.has(String(value)) || typed.has(String(value))) continue;
+        ungrounded.push({ stepId: step.id, argument, resource, value });
+      }
+    }
+  }
+  return ungrounded;
+}
+
+export function validatePlan(rawOutput: string, catalog: ToolDefinition[], options: ValidatePlanOptions = {}): ValidationResult {
   // Layer 4: Security validate (Check for prompt injection escape markers)
   for (const pattern of INJECTION_PATTERNS) {
     if (pattern.test(rawOutput)) {
@@ -337,6 +400,20 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[]): Vali
           error: `Dependency cycle detected involving step '${step.id}'`,
         };
       }
+    }
+  }
+
+  // Layer 5: Grounding — resource IDs must come from lookups, the user or earlier steps
+  if (options.grounding) {
+    const ungrounded = findUngrounded(steps, catalogMap, options.grounding);
+    if (ungrounded.length > 0) {
+      const listed = ungrounded.map((u) => `${u.stepId}.${u.argument}=${JSON.stringify(u.value)} (${u.resource})`).join(', ');
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Unverified resource arguments: ${listed}. Use values from Working Memory, a $ref to an earlier step, or return a clarification asking the user for the resource.`,
+        ungrounded,
+      };
     }
   }
 

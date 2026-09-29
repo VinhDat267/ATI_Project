@@ -35,7 +35,7 @@ describe('E2E Scenario 3: Partial Failure Recovery', () => {
     await request(app)
       .post(`/api/conversations/${convId}/messages`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ content: 'Tạo card và gửi Slack' });
+      .send({ content: 'Tạo card, gán Minh trên board Frontend list To Do và gửi Slack channel general' });
 
     // 4. Wait for plan
     await ctx.waitForEvent('plan_preview');

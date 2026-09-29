@@ -1,7 +1,13 @@
 import type { ToolDefinition } from './types.js';
 
-const repoProperty = { type: 'string', description: 'Repository owner/name within the configured allowlist' };
-const issueNumberProperty = { type: 'number', description: 'GitHub issue number', minimum: 1 };
+const repoProperty = {
+  type: 'string', description: 'Repository owner/name within the configured allowlist',
+  'x-resource': 'repository', 'x-resource-field': 'fullName',
+};
+const issueNumberProperty = {
+  type: 'number', description: 'GitHub issue number', minimum: 1,
+  'x-resource': 'issue', 'x-resource-field': 'number',
+};
 const limitProperty = { type: 'number', maximum: 10, default: 10 };
 const issueProperties = {
   id: { type: 'string' },

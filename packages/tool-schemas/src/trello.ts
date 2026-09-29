@@ -207,6 +207,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         listId: {
           type: 'string',
           description: 'ID của danh sách Trello chứa thẻ mới',
+          'x-resource': 'list',
         },
         title: {
           type: 'string',
@@ -224,6 +225,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
           type: 'array',
           items: { type: 'string' },
           description: 'Danh sách ID thành viên được gán vào thẻ',
+          'x-resource': 'member',
         },
       },
       required: ['listId', 'title'],
@@ -252,6 +254,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         cardId: {
           type: 'string',
           description: 'ID của thẻ cần cập nhật',
+          'x-resource': 'card',
         },
         title: {
           type: 'string',
@@ -272,6 +275,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         idList: {
           type: 'string',
           description: 'ID danh sách mới nếu muốn di chuyển thẻ',
+          'x-resource': 'list',
         },
       },
       required: ['cardId'],
@@ -300,10 +304,12 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         cardId: {
           type: 'string',
           description: 'ID của thẻ Trello',
+          'x-resource': 'card',
         },
         memberId: {
           type: 'string',
           description: 'ID của thành viên Trello cần gán',
+          'x-resource': 'member',
         },
       },
       required: ['cardId', 'memberId'],
@@ -333,6 +339,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         cardId: {
           type: 'string',
           description: 'ID của thẻ Trello',
+          'x-resource': 'card',
         },
         title: {
           type: 'string',

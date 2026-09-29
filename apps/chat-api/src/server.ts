@@ -273,10 +273,13 @@ async function bootstrap() {
     const adapter = await gatherAdapterFactory.getAdapterForService(serviceName);
     return adapter.execute(tool, args, { signal });
   };
+  // Sandbox providers return canned plans without reading working memory, so
+  // resource grounding would reject every plan; live planning always enforces it.
   const backupPlanner = new AIPlanner({
     provider: backupMockProvider,
     toolCatalog: ALL_TOOLS,
     gatherSearch,
+    requireGroundedResources: false,
   });
 
   const planner = createRuntimePlanner(env.RUNTIME_MODE,
@@ -286,6 +289,7 @@ async function bootstrap() {
         ? await getConfiguredToolCatalog(credRepo, env.ENCRYPTION_KEY)
         : ALL_TOOLS,
       gatherSearch,
+      requireGroundedResources: env.RUNTIME_MODE === 'live',
     }).processMessage(input),
     (input: any) => backupPlanner.processMessage(input));
 

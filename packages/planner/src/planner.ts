@@ -10,6 +10,12 @@ export interface AIPlannerOptions {
   toolCatalog: ToolDefinition[];
   gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
   serviceRegistry?: ServiceDefinition[];
+  /**
+   * Reject plans whose resource IDs were not looked up, typed by the user or
+   * produced by an earlier step. Only canned providers that never read
+   * working memory (sandbox fixtures) should disable this.
+   */
+  requireGroundedResources?: boolean;
 }
 
 export interface GatherSearchRequest {
@@ -36,10 +42,14 @@ interface GatherCandidate { id: string; name: string; [key: string]: unknown }
 interface PendingGather { key: string; query: string; candidates: GatherCandidate[] }
 interface GatherRequest { key: string; query: string; rule: GatherRule }
 
-function entityNames(message: string, rules: GatherRule[]): GatherRequest[] {
+/** The first message naming a resource wins, so a clarification reply can name resources the original request left out. */
+function entityNames(messages: string[], rules: GatherRule[]): GatherRequest[] {
   return rules.flatMap((rule) => {
-    const query = rule.pattern.exec(message)?.[1]?.trim();
-    return query ? [{ key: rule.entityKey, query, rule }] : [];
+    for (const message of messages) {
+      const query = rule.pattern.exec(message)?.[1]?.trim();
+      if (query) return [{ key: rule.entityKey, query, rule }];
+    }
+    return [];
   });
 }
 
@@ -62,12 +72,14 @@ export class AIPlanner {
   private toolCatalog: ToolDefinition[];
   private gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
   private serviceRegistry: ServiceDefinition[];
+  private requireGroundedResources: boolean;
 
   constructor(options: AIPlannerOptions) {
     this.provider = options.provider;
     this.toolCatalog = options.toolCatalog;
     this.gatherSearch = options.gatherSearch;
     this.serviceRegistry = options.serviceRegistry ?? SERVICE_REGISTRY;
+    this.requireGroundedResources = options.requireGroundedResources ?? true;
   }
 
   private async gather(input: ProcessMessageInput): Promise<PlannerResponse | undefined> {
@@ -93,7 +105,7 @@ export class AIPlanner {
     const missing = memory.getEntity<{ key: string }>('__gatherMissing');
     const rules = this.serviceRegistry.flatMap((service) => service.gatherRules ?? [])
       .filter((rule) => this.toolCatalog.some((tool) => tool.name === rule.tool && tool.sideEffect === 'read'));
-    const requests = entityNames(intent, rules).map((request) =>
+    const requests = entityNames(intent === userMessage ? [intent] : [userMessage, intent], rules).map((request) =>
       missing?.key === request.key ? { ...request, query: userMessage.trim() } : request
     );
     if (missing && !requests.some((request) => request.key === missing.key)) {
@@ -159,6 +171,8 @@ export class AIPlanner {
     const originalIntent = memory.getEntity<string>('__gatherIntent');
     const gathered = await this.gather(input);
     if (gathered) return gathered;
+    // This planning turn consumes a pending intent even when gather had nothing to resolve.
+    memory.deleteEntity('__gatherIntent');
     const planningMessage = originalIntent
       ? `Original request: ${originalIntent}\nClarification answer: ${userMessage}`
       : userMessage;
@@ -180,6 +194,11 @@ export class AIPlanner {
       { role: 'user', content: planningMessage },
     ];
 
+    const validationOptions = this.requireGroundedResources ? { grounding: {
+      memory: memory.getAll(),
+      userTexts: conversationHistory.filter((message) => message.role === 'user').map((message) => message.content),
+    } } : {};
+
     // 3. Attempt 1: Call LLM provider
     const firstOutput = await this.provider.generatePlan({
       systemPrompt,
@@ -189,7 +208,7 @@ export class AIPlanner {
       signal,
     });
 
-    const firstValidation = validatePlan(firstOutput, activeTools);
+    const firstValidation = validatePlan(firstOutput, activeTools, validationOptions);
     if (firstValidation.valid) {
       return firstValidation.parsed;
     }
@@ -212,9 +231,22 @@ export class AIPlanner {
       signal,
     });
 
-    const retryValidation = validatePlan(retryOutput, activeTools);
+    const retryValidation = validatePlan(retryOutput, activeTools, validationOptions);
     if (retryValidation.valid) {
       return retryValidation.parsed;
+    }
+
+    // Never preview a plan built on invented IDs; ask for the resources and
+    // keep the original request so the answer resumes the same workflow.
+    if (retryValidation.layer === 'grounding' && retryValidation.ungrounded) {
+      memory.setEntity('__gatherIntent', originalIntent ?? userMessage);
+      const resources = [...new Set(retryValidation.ungrounded.map((u) => u.resource))];
+      return {
+        kind: 'clarification',
+        question: `Which ${resources.join(', ')} should I use?`,
+        context: `These values could not be verified against your connected services: ${retryValidation.ungrounded
+          .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Name the resource (for example "board Frontend list To Do") or give its exact ID.`,
+      };
     }
 
     // If both failed, throw error
