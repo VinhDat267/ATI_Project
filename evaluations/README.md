@@ -39,6 +39,30 @@ LIVE_EVAL=1 EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/
 LLM calls. Evidence is written to `docs/ai-evidence/V3-GOLDEN-V2/`. Plans are
 never executed, so a pass says nothing about live Trello/Slack/GitHub behaviour.
 
+### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
+
+| Run | Tool selection | Argument quality | Strict pass | Latency p50 / p95 / max |
+|---|---|---|---|---|
+| [Baseline](../docs/ai-evidence/V3-GOLDEN-V2/2026-09-29T23-13-58-727Z/summary.md) | 35.2% | 100% | 54.7% | 7.3 / 13.4 / 25.4 s |
+| [After step-format fix](../docs/ai-evidence/V3-GOLDEN-V2/2026-09-29T23-23-32-372Z/summary.md) | 100% | 100% | 100% (150/150) | 5.1 / 9.6 / 19.7 s |
+
+The baseline failed single- and multi-step requests on schema: the plan step
+format was only shown in the cross-service example, so the model wrote
+`arguments` instead of `args`. The fix states the format in every prompt; the
+labels did not change between the two runs.
+
+Read the 100% with its limits:
+
+- Prompts are phrased so the regex gather resolves their resources ("board X,
+  list Y"). The score measures planning once context is resolved, not how well
+  free-form phrasing ("for the frontend team") is understood.
+- Three clarification cases (cl02–cl04) are answered by gather before any
+  model call.
+- Free-text labels only require a keyword, and the same author wrote prompts
+  and labels.
+- Two of three runs of cs02 exceeded the 15 s preview target (18.7 s, 19.7 s).
+- Usable plan rate is unmeasured and no plan was executed.
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline
