@@ -11,6 +11,10 @@
   "scripts": {
     "build": "npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/mcp-task-hub && npm run build -w @wap/engine && npm run build -w @wap/api && npm run build -w @wap/web",
     "test": "npm run test -w @wap/dsl",
+    "build:v3": "npm run build -w @wap/chat-web",
+    "typecheck:v3": "tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit",
+    "chat:dev": "npm run dev -w @wap/chat-web",
+    "api:v3:dev": "npm run dev -w @wap/chat-api",
     "test:v3": "npm test -w @wap/tool-schemas -w @wap/tool-adapters -w @wap/planner -w @wap/executor -w @wap/chat-api -w @wap/chat-web",
     "pretypecheck": "npm run build -w @wap/dsl && npm run build -w @wap/db && npm run build -w @wap/engine",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck -w @wap/web",

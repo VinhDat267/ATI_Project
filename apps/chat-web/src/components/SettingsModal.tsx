@@ -15,12 +15,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-zinc-200">
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900">
+            <h2 id="settings-modal-title" className="text-lg font-bold text-zinc-900">
               Cài đặt & Tích hợp Dịch vụ
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">

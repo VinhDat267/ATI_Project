@@ -25,7 +25,14 @@ export const App: React.FC = () => {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [authToken] = useState('demo-token');
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+  };
 
   // Activate SSE connection for current conversation
   useSSE(conversationId, authToken);
@@ -197,6 +204,7 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Mở danh sách hội thoại"
               className="md:hidden p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-600"
             >
               ☰
@@ -209,7 +217,16 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={toggleTheme}
+              aria-label="Chuyển chế độ sáng/tối"
+              className="w-8 h-8 rounded-full border border-zinc-200 hover:bg-zinc-50 text-xs flex items-center justify-center transition cursor-pointer"
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+            <button
+              type="button"
               onClick={() => setIsSettingsOpen(true)}
+              aria-label="Mở cài đặt dịch vụ"
               className="text-xs text-zinc-600 border border-zinc-200 hover:bg-zinc-50 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5"
             >
               <span>⚙️</span>

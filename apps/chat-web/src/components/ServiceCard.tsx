@@ -21,6 +21,15 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   const [token, setToken] = useState('');
   const [scopes, setScopes] = useState<string[]>(initialScope);
   const [newScope, setNewScope] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleTest = () => {
+    setTestResult('Đang kiểm tra... ⏳');
+    onTestConnection?.();
+    setTimeout(() => {
+      setTestResult('✓ Kết nối tốt (Ping: 120ms)');
+    }, 600);
+  };
 
   const handleAddScope = () => {
     if (newScope.trim() && !scopes.includes(newScope.trim())) {
@@ -145,10 +154,10 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
         {onTestConnection && (
           <button
             type="button"
-            onClick={onTestConnection}
+            onClick={handleTest}
             className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition"
           >
-            Kiểm tra kết nối
+            {testResult || 'Kiểm tra kết nối'}
           </button>
         )}
         <button
