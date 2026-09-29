@@ -155,7 +155,18 @@ export class ExecutionService {
     if (!controller) {
       throw new Error(`No active execution controller for plan '${planId}'`);
     }
-    return controller.retryStep(stepId);
+    const planRow = await this.planRepo.getPlan(planId);
+    const convId = planRow?.conv_id || '';
+    const summary = await controller.retryStep(stepId);
+    if (convId && this.sseManager) {
+      this.sseManager.emitEvent(convId, 'exec_done', {
+        planId,
+        status: summary.status,
+        pausedAtStepId: summary.pausedAtStepId,
+        error: summary.error,
+      });
+    }
+    return summary;
   }
 
   async skipStep(planId: string, stepId: string): Promise<any> {
@@ -163,7 +174,18 @@ export class ExecutionService {
     if (!controller) {
       throw new Error(`No active execution controller for plan '${planId}'`);
     }
-    return controller.skipStepAndContinue(stepId);
+    const planRow = await this.planRepo.getPlan(planId);
+    const convId = planRow?.conv_id || '';
+    const summary = await controller.skipStepAndContinue(stepId);
+    if (convId && this.sseManager) {
+      this.sseManager.emitEvent(convId, 'exec_done', {
+        planId,
+        status: summary.status,
+        pausedAtStepId: summary.pausedAtStepId,
+        error: summary.error,
+      });
+    }
+    return summary;
   }
 
   async stop(planId: string): Promise<any> {
