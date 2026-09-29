@@ -4,7 +4,7 @@
 **Môn học:** Advanced Technology Integration (ATI)  
 **Ngày lập:** 29/09/2026  
 **Phiên bản:** v3 (viết lại từ v2)  
-**Trạng thái kỹ thuật (29/09/2026):** Đợt sửa audit v3 đạt 198/198 bài test cục bộ, typecheck và build; chưa chứng nhận production readiness vì kiểm thử live LLM/Trello/Slack và khôi phục sau crash chưa chạy. Xem [kết quả khắc phục](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md).
+**Trạng thái kỹ thuật (29/09/2026):** Nhánh hiện tại đạt 199/199 bài test v3 cục bộ, typecheck, build và smoke test launcher; chưa chứng nhận production readiness vì kiểm thử live LLM/Trello/Slack và khôi phục sau crash chưa chạy. [Kết quả khắc phục trước đó](audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md) ghi mốc 198/198.
 
 ---
 
@@ -54,10 +54,10 @@ Hệ thống tự động:
 |---|---|
 | Backend | Node.js, TypeScript 5.6+, Express 5 |
 | Frontend | React 19, Vite, Tailwind CSS, Zustand |
-| AI/LLM | Google Gemini API (`gemini-1.5-pro`) via `@google/genai` |
+| AI/LLM | Gemini Provider qua `@google/genai`; mã nguồn mặc định `gemini-3.8-flash` nếu không đặt `GEMINI_MODEL` (chưa kiểm thử live) |
 | Database | PostgreSQL (pg pool) |
 | Streaming | Server-Sent Events (SSE) |
-| Testing | Vitest, 89 tests hiện tại |
+| Testing | Vitest; 199 tests v3 cục bộ và 1 smoke test launcher trên nhánh hiện tại; chưa kiểm thử live provider |
 | Monorepo | npm workspaces, 6 packages v3 |
 
 ---

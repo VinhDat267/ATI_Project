@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { validateEnv } from '../../src/config/env.js';
 
 describe('runtime mode fail-closed boundaries', () => {
+  it('creates a fresh private JWT secret for each sandbox process', () => {
+    const first = validateEnv({ RUNTIME_MODE: 'sandbox' });
+    const second = validateEnv({ RUNTIME_MODE: 'sandbox' });
+    expect(first.JWT_SECRET).toMatch(/^[0-9a-f]{64}$/);
+    expect(second.JWT_SECRET).not.toBe(first.JWT_SECRET);
+    expect(() => validateEnv({ RUNTIME_MODE: 'sandbox', JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
+  });
+
   it('requires an explicit database in live and rejects production sandbox', () => {
     const secure = { JWT_SECRET: 'secure-jwt-secret-for-test-at-least-32-chars', ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef', GEMINI_API_KEY: 'test-only-key' };
     expect(() => validateEnv({ ...secure, RUNTIME_MODE: 'live' })).toThrow(/DATABASE_URL/);

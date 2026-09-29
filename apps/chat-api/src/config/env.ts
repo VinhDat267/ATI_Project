@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -37,7 +39,13 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   }
 
   const DATABASE_URL = env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/ati_v3';
-  const JWT_SECRET = env.JWT_SECRET || 'default_jwt_secret_min_32_characters_long_for_dev';
+  if (env.JWT_SECRET && (
+    env.JWT_SECRET === 'default_jwt_secret_min_32_characters_long_for_dev' ||
+    Buffer.byteLength(env.JWT_SECRET, 'utf8') < 32
+  )) {
+    throw new Error('JWT_SECRET must be a private secret of at least 32 bytes');
+  }
+  const JWT_SECRET = env.JWT_SECRET || randomBytes(32).toString('hex');
   const ENCRYPTION_KEY = env.ENCRYPTION_KEY || '01234567890123456789012345678901';
   const GEMINI_API_KEY = env.GEMINI_API_KEY || '';
   const PORT = Number(env.PORT) || 3000;

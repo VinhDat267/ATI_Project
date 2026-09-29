@@ -3,7 +3,7 @@
 > **Đề tài #26:** Nền tảng tự động hóa quy trình làm việc bằng Trí tuệ Nhân tạo  
 > **Kiến trúc v3:** Chat Agent + Tool Orchestration (Plan-then-Execute)  
 > **Ngôn ngữ & Nền tảng:** TypeScript Monorepo (Node.js 22+, React 19, PostgreSQL, Docker)  
-> **Trạng thái:** Hoàn thành Phase 0-5 + Remediation Audit F01-F14 (Gates G0-G5) — 117 tests passing (100%) & 16 Acceptance Probes OK
+> **Trạng thái kiểm chứng (29/09/2026):** 199/199 tests v3 cục bộ và smoke test launcher đã qua trên nhánh hiện tại (đợt [rà soát trước](docs/audits/2026-09-29-v3-review/REMEDIATION-RESULTS.md) ghi 198/198). Production readiness chưa được xác nhận; chưa có kiểm thử live Gemini/Trello/Slack và phục hồi sau crash.
 
 ---
 
@@ -74,20 +74,26 @@ npm install
 ```
 
 ### 2. Cấu hình môi trường:
-Sao chép template cấu hình và điền các API key:
+Sao chép template vào file `.env` được Git bỏ qua. Mặc định là `RUNTIME_MODE=sandbox` với PostgreSQL trỏ vào cổng loopback không mở để dùng bộ nhớ tạm; không gọi Gemini/Trello/Slack thật:
 ```powershell
-cp .env.example .env
+Copy-Item .env.example .env
 ```
-Các biến môi trường bắt buộc:
-- `DATABASE_URL`: Chuỗi kết nối PostgreSQL (VD: `postgresql://postgres:postgres@localhost:5432/ati_v3`)
-- `JWT_SECRET`: Khóa bí mật ký token đăng nhập (tối thiểu 32 ký tự)
-- `ENCRYPTION_KEY`: Khóa 32-byte mã hóa AES-256-GCM cho credentials
-- `GEMINI_API_KEY`: Google Gemini API Key (sử dụng model `gemini-1.5-pro`)
 
-### 3. Chạy kiểm tra toàn bộ hệ sinh thái v3:
+Để **đăng nhập và dùng giao diện sandbox**, điền cả `SANDBOX_USER_EMAIL` (một email bạn chọn) và `SANDBOX_USER_PASSWORD` (mật khẩu cục bộ bạn chọn) trong `.env`; không commit file này. Sandbox chỉ lắng nghe trên `127.0.0.1` và tạo JWT secret riêng cho mỗi lần chạy nếu bạn để trống biến đó. Để chạy `RUNTIME_MODE=live`, thay URL sandbox bằng PostgreSQL thật, đặt `JWT_SECRET` (ít nhất 32 byte), `ENCRYPTION_KEY` (32 byte hoặc 64 ký tự hex), `GEMINI_API_KEY` thật và `CHAT_ADMIN_EMAIL`/`CHAT_ADMIN_PASSWORD` (ít nhất 12 ký tự); sau đó chạy `npm run db:migrate:v3` và `npm run admin:provision:v3` trước khi khởi động. Live sẽ từ chối khởi động nếu thiếu cấu hình hoặc không kết nối được DB; việc kiểm thử nhà cung cấp thật vẫn chưa được nghiệm thu.
+
+### 3. Chạy API và web v3:
 ```powershell
-npm run test:v3
+npm run up
 ```
+Web: `http://127.0.0.1:5174`; API health: `http://127.0.0.1:3000/api/health`. Dừng bằng Ctrl+C. Có thể chạy riêng `npm run api:dev` và `npm run web:dev`.
+
+### 4. Kiểm tra mã v3:
+```powershell
+npm run check
+```
+`check` chạy typecheck, 6 workspace test suites, build web và smoke test khởi động API/web sandbox; không chứng minh triển khai production hoặc chất lượng AI live.
+
+Các lệnh gốc `build`, `test`, `typecheck`, `check`, `up`, `api:dev`, `api:start`, `web:dev` nay trỏ vào v3. Lệnh v2 lịch sử tương ứng có hậu tố `:v2` (ví dụ `npm run check:v2`, `npm run up:v2`); các gate `check:backend`, `check:engine`, `check:web`, `check:g1` vẫn thuộc v2. Xem [chỉ mục tài liệu](docs/README.md) trước khi dùng hướng dẫn cũ.
 
 ---
 

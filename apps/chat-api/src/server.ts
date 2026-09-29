@@ -165,7 +165,7 @@ async function bootstrap() {
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
-    console.log(`\x1b[32m[chat-api]\x1b[0m Sử dụng Gemini 1.5 Pro Provider với API Key đã cấu hình.`);
+    console.log(`\x1b[32m[chat-api]\x1b[0m Sử dụng Gemini Provider với API Key đã cấu hình.`);
     provider = new GeminiProvider({ apiKey: env.GEMINI_API_KEY });
   } else {
     console.log(
@@ -346,9 +346,10 @@ async function bootstrap() {
     executionService,
   });
 
-  app.listen(port, () => {
-    console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://localhost:${port}\x1b[0m`);
-    console.log(`\x1b[36m[chat-api] ✓ Health check: http://localhost:${port}/api/health\x1b[0m`);
+  const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
+  app.listen(port, host, () => {
+    console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
+    console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
   });
 }
 
