@@ -60,6 +60,35 @@ project-process snapshots after every command.
 
 Integration test tự tạo database tạm trong PostgreSQL local và xoá database đó khi kết thúc. API chỉ bind loopback; mọi request trả `x-request-id`, JSON strict và `Cache-Control: no-store`. `GET /health/live` không auth và chỉ phản ánh process; `GET /health/ready` không auth, kiểm tra DB qua `SELECT 1` khi chạy main và trả `503 NOT_READY` nếu dependency lỗi. `POST /auth/logout` yêu cầu bearer hợp lệ, xoá session hiện tại và trả `204`; restart vẫn xoá toàn bộ session vì store hiện còn in-memory. `API_PLANNER_MODE=disabled` giữ `POST /runs` ở trạng thái `503 PLANNER_UNAVAILABLE`; `dev_fixture` chỉ nhận đúng các prompt server-owned trong `testdata` và không phải AI evaluation. Trace snapshot hết hạn sau 15 phút; cursor sai owner/run, hết hạn hoặc bị sửa trả `400`.
 
+### Pilot v2: planner seam thử nghiệm
+
+`POST /pilot/v2/runs` mặc định vẫn dùng checklist và preview được dẫn xuất từ source,
+**không gọi AI provider**. API có port `pilotPlanner` chỉ được inject tường minh
+trong `createApi` (chưa được `main.ts` cài đặt). Ở đường opt-in này, router lưu
+run + source snapshot vào PostgreSQL trước khi gọi planner; callback chỉ nhận
+context đã đóng gói/escape và che các credential cấu hình đã biết; chỉ được đề xuất `plan` (công cụ duy nhất
+`trello.create_card`), `clarification` hoặc `refusal`. Policy tạo write args và
+approval riêng sau khi kiểm lại snapshot, owner, checklist, board/list; model
+không được cấp quyền duyệt, chọn target hay dispatch. Lỗi/timeout và planning
+bị bỏ dở kết thúc không approval, không tự resume.
+
+Đường planner opt-in nay nhận **adapter có provider/model/ước lượng chi phí cố định**,
+đòi grant PostgreSQL còn hiệu lực cho từng principal và campaign `pilot-v2:<principalId>`
+được operator provision riêng (không có endpoint cấp quyền). Admission khoá campaign/grant,
+đếm call dưới khoá rồi reserve ledger cùng transaction; chỉ một claim được dispatch.
+Sau claim, lỗi không rõ chi phí giữ hold và không retry tự động; chi phí xác định được
+settle kể cả khi grant bị thu hồi. Trước preview approval và trước write, policy/grant
+được kiểm lại. Outcome trả về cho owner chỉ dùng reason code/thông điệp server cố định,
+không lưu câu hỏi/lý do thô của model. `main.ts` **chưa cài provider**; phép thử
+adapter fake/PostgreSQL/HTTP là bằng chứng offline, không xác nhận chất lượng AI,
+provider thật, hoặc nghiệm thu khách hàng. Gate **offline contract: CONFIRMED**
+(`npm run check`, API PostgreSQL/HTTP 49/49, engine PostgreSQL ledger 6/6,
+`git diff --check`, 2026-09-27); phạm vi này không xác nhận khả năng egress thực tế.
+Revocation ngay sau kiểm quyền cuối và trước Trello POST là best-effort, không được
+hiểu là khóa giao dịch xuyên qua network. **AI_QUALITY_NOT_MEASURED**,
+**CUSTOMER_VALIDATED_NOT_RUN**, provider thật **NOT_RUN**; không nối provider thật
+trước quyền, quota và rubric riêng.
+
 Ở môi trường không phải test, API ghi một JSON log cho mỗi request với đúng
 `event`, method, route template, status và `request_id`. Route template không
 chứa UUID/query string; body, header, bearer token, prompt và secret không được
@@ -76,3 +105,51 @@ không thể chọn server, executable hay arguments. Active check trả `429` v
 sanitise thành `503`. Session vẫn in-memory; planner fixture không phải AI
 evaluation, còn LLM/retrieval/replan, BullMQ và browser integration vẫn là
 giới hạn ngoài technical catalog gate.
+
+### Pilot v2 Phase B: offline fake advisory campaign (library only)
+
+`src/pilot-evaluation/index.ts` xuất các entrypoint tách quyền: `freezeManifest` /
+`assertFrozen`, `provisionOfflineCampaign(adminUrl, manifest)` cho bootstrap **database
+mới** trên PostgreSQL cô lập `127.0.0.1:55532`, `openEvaluationStore` và
+`runOfflineCampaign({ manifest, bundle, receipt, repoRoot })` cho producer,
+`openReadonlyEvaluationStore` và `buildOfflineReport(readOnly, oracle)` cho báo cáo.
+Oracle chỉ được đưa cho grader sau producer; `openGraderEvaluationStore(receipt.graderUrl,
+receipt.identity).appendGrade(...)` dùng role riêng chỉ có SELECT marker/campaign/seal/grade
+và INSERT grade sau campaign seal, ràng buộc đúng rubric hash/seal hash, reason enum an toàn;
+regrade là append, không ghi đè. Producer và report role không thể INSERT grade.
+Không thuộc báo cáo chỉ đọc. Không có CLI, app launcher,
+transport provider hoặc quyền write SaaS mới. `offline_fake`, provider metadata
+`google|openai`, model `offline-fixture-*` và cost dương chỉ là **SIMULATED_NOT_BILLED**.
+
+Manifest/artifact cần JSON bounded/strict, frozen hash, exact **clean Git HEAD**
+và digest nguồn cố định cho evaluator code/projection/prompt/schema/fake/rubric;
+producer kiểm lại cùng manifest/marker/role/fixture trước claim một lần. Hai
+principal đăng nhập password qua hai `createApi` loopback thực với session mặc
+định; cleanup duy nhất là owner `rejected` dùng approval hiện thời. Nếu POST/runId,
+ledger, usage/cost hoặc capture không chắc chắn, campaign dừng, **không retry**;
+restart chỉ mở report SQL readonly, không gọi detail GET (GET có lifecycle sweep).
+`provisionOfflineCampaign` không tự drop DB/roles khi thành công; giữ measurement
+bền vững cho operator đối chiếu. Chỉ test fixture mới xóa các tên DB/role ghi
+trong receipt thuộc chính invocation. Không log/stringify receipt vì chứa login
+và DB credentials. Bootstrap cần admin test cô lập và extension vector/pgcrypto,
+không dùng DB demo hoặc biến môi trường sản phẩm làm fallback.
+
+TDD integration trong workspace dirty chỉ mock **Git evidence reader** trong
+Vitest; DB, auth, admission, ledger và HTTP là thật trên fixture synthetic.
+Positive provenance không mock chỉ chạy ở detached clean checkout với
+`PILOT_EVAL_CLEAN_CHECKOUT=1` và file `pilot-evaluation-clean.integration.test.ts`.
+`npm run check` không tự bao gồm suite PostgreSQL; chạy các
+`pilot-evaluation-*.integration.test.ts` tuần tự trên DB test cô lập. Event
+hash và immutable seals chứng minh tính nhất quán dưới role bị giới hạn, **không
+chống DB admin rewrite** hoặc chứng minh đủ observation khi missing/late data.
+Deterministic `needs_input`/`refused` đi qua auth + HTTP thật và không dispatch fake;
+chỉ `out_of_scope` được skip. Timeout fake có thể ghi `late_return` sau incomplete
+seal trong cửa sổ đợi bounded, không nâng completeness hay settle/retry lần hai.
+Report SQL chỉ đọc phân nhóm n/N theo language/principal/route và đếm claim,
+output hợp lệ/không hợp lệ, lỗi, late return; nếu callback thiếu kết quả,
+`fakeInvocations=null` (không đoán zero). Các safety count không có quan sát
+đáng tin cậy giữ `null`, không giả làm zero; local reservation và accounting
+mismatch riêng. Structural oracle không thấy prose; không đo specificity/refusal semantic,
+citation, hallucination hay model/provider latency. Nhãn giữ nguyên:
+`AI_QUALITY_NOT_MEASURED`, `CUSTOMER_VALIDATED_NOT_RUN`, `HANDOFF_BLOCKED`.
+Không dùng fake pass rate để tuyên bố chất lượng AI, bill thật hoặc SaaS live.

@@ -1,0 +1,57 @@
+{
+  "auditedHead": "5948ecc45c4c1658c178e5053969b619ffe10ba8",
+  "currentHead": "5948ecc45c4c1658c178e5053969b619ffe10ba8",
+  "branch": "main",
+  "observedAt": "2026-09-29T08:53:08.0255907+07:00",
+  "trackedDiffEmpty": true,
+  "checks": [
+    {
+      "testFiles": 29,
+      "exitCode": 0,
+      "testsPassed": 111,
+      "command": "npm run test:v3"
+    },
+    {
+      "evaluationMode": "mock",
+      "testFiles": 2,
+      "exitCode": 0,
+      "testsPassed": 2,
+      "command": "npx --no-install vitest run tests/scaffold.test.ts evaluations/eval.test.ts"
+    },
+    {
+      "exitCode": 0,
+      "command": "npm run typecheck:v3"
+    },
+    {
+      "scope": "chat-web",
+      "exitCode": 0,
+      "command": "npm run build:v3"
+    },
+    {
+      "exitCode": 0,
+      "defectObservations": 16,
+      "command": "node --import tsx docs/audits/2026-09-29-v3-review/offline-probes.mjs"
+    }
+  ],
+  "notRun": [
+    "PostgreSQL integration and migrations",
+    "live AI evaluation",
+    "live SaaS writes",
+    "browser E2E and visual audit",
+    "v2 full regression"
+  ],
+  "artifacts": [
+    {
+      "sha256": "5EC44EA2EAB2DD57A8A889D7BFEC513BCE40E1DB842C325EC710549132175332",
+      "name": "offline-probes-output.json"
+    },
+    {
+      "sha256": "1F35DA6E17884B1A44D3903D36CE72CA022E86E096C0558F8A5C8D0DC045631F",
+      "name": "offline-probes.mjs"
+    },
+    {
+      "sha256": "E5A1DCD5A3432CBBFD41714DAB08E3552A237C7ABF8F16C7670D06EDF2DAC094",
+      "name": "REVIEW.md"
+    }
+  ]
+}

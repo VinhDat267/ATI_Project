@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "@wap/db";
 import {
@@ -22,6 +22,7 @@ import {
   type ReadSheetsRequestResult,
   type SourceRow,
   type PilotToolEntry,
+  buildPilotPlannerContext,
   createIntentKey,
   trelloGetCard,
 } from "@wap/engine";
@@ -30,6 +31,13 @@ import type { SessionAuthority } from "./auth.js";
 import { sessionCredential } from "./http-auth.js";
 import type { WorkerControl } from "./worker.js";
 import { buildPilotApproval, pilotPreview } from "./pilot-approval.js";
+import {
+  PilotProposalValidationError, requestAccountedPilotProposal,
+  type PilotAccountedPlanner,
+} from "./pilot-planner.js";
+import { createPilotAiAdmission, PilotAiAdmissionError } from "./pilot-ai-admission.js";
+import { pilotOutcomeMessage, savePilotPlannerOutcome,
+  type PilotOutcomeKind, type PilotReasonCode } from "./pilot-ai-outcome.js";
 
 export interface PilotRouterOptions {
   db: Database;
@@ -38,6 +46,9 @@ export interface PilotRouterOptions {
   pilotConfig?: PilotConfig;
   pilotPolicy?: PilotPolicy;
   liveWriteEnabled?: boolean;
+  /** Advisory-only, opt-in; the production launcher does not install a provider. */
+  pilotPlanner?: PilotAccountedPlanner;
+  plannerTimeoutMs?: number;
   /** Injectable intake reader for tests or offline execution */
   readSheetsRequestFn?: (params: {
     config: PilotConfig;
@@ -52,6 +63,23 @@ export interface PilotRouterOptions {
 // Pilot dispatch is deliberately non-retryable. Expired pending approvals and
 // abandoned dispatches are closed conservatively before admitting another run.
 async function sweepPilotLifecycle(tx: any): Promise<void> {
+  // A crashed planner is never resumed. The callback is bounded to at most
+  // 30 seconds; the five-minute window avoids racing a still-running call.
+  const abandoned = await tx`
+    SELECT id,user_id FROM runs WHERE profile = 'pilot-v2' AND status = 'planning'
+      AND created_at <= clock_timestamp() - interval '5 minutes'
+    FOR UPDATE
+  `;
+  for (const row of abandoned) {
+    if (await setPilotRunStatus(tx, row.id, "failed", "planning")) {
+      const attempt = await tx`SELECT run_id FROM pilot_ai_attempts WHERE run_id=${row.id}`;
+      if (attempt.length) await savePilotPlannerOutcome(tx, {
+        runId: row.id, principalId: row.user_id,
+        kind: "failure", reasonCode: "PLANNING_FAILED",
+      });
+    }
+  }
+
   const expired = await tx`
     SELECT r.id FROM runs r JOIN pilot_approvals a ON a.run_id = r.id
     WHERE r.profile = 'pilot-v2' AND r.status = 'awaiting_approval'
@@ -102,6 +130,8 @@ export function createPilotRouter(options: PilotRouterOptions) {
 
   const readSheetsFn = options.readSheetsRequestFn ?? readSheetsRequest;
   const store = new PostgresReservationStore(db);
+  const admission = policy && config && options.pilotPlanner
+    ? createPilotAiAdmission({ db, policy, config }) : null;
 
   return async function handlePilotV2Request(
     request: IncomingMessage,
@@ -347,19 +377,31 @@ export function createPilotRouter(options: PilotRouterOptions) {
           tabId: body.tabId,
           requestId: body.requestId,
         });
-      } catch (err: unknown) {
-        throw new HttpError(400, "INTAKE_ERROR", (err as Error).message);
+      } catch {
+        throw new HttpError(400, "INTAKE_ERROR", "Pilot intake unavailable");
       }
 
       const runId = randomUUID();
       const workflowId = randomUUID();
       const versionId = randomUUID();
 
-      // Branching: Check if checklist requires clarification (UC1)
-      const isUnconfirmed = intake.checklist.unconfirmedBusiness;
-      const isNeedsInput = intake.checklist.status === "needs_input" || isUnconfirmed;
-      const initialStatus = isNeedsInput ? "needs_input" : "awaiting_approval";
-      const approvalPlan = !isNeedsInput ? buildPilotApproval({
+      // The checklist is authoritative. A model cannot turn refusal or
+      // incomplete/unconfirmed business data into an approval-eligible run.
+      const isRefusal = intake.checklist.status === "refusal";
+      const isNeedsInput = intake.checklist.status === "needs_input" ||
+        intake.checklist.unconfirmedBusiness || intake.checklist.missingFields.length > 0;
+      const usePlanner = Boolean(options.pilotPlanner) && !isRefusal && !isNeedsInput;
+      if (usePlanner) {
+        try { await admission!.preflight(userId, options.pilotPlanner!); }
+        catch (err) {
+          if (err instanceof PilotAiAdmissionError)
+            throw new HttpError(403, "PILOT_AI_UNAUTHORIZED", "Pilot AI admission unavailable");
+          throw new HttpError(503, "PILOT_AI_UNAVAILABLE", "Pilot AI admission unavailable");
+        }
+      }
+      const initialStatus = isRefusal ? "refused" : isNeedsInput ? "needs_input" :
+        usePlanner ? "planning" : "awaiting_approval";
+      const approvalPlan = initialStatus === "awaiting_approval" ? buildPilotApproval({
         runId, ownerId: userId, versionId, sourceKey: intake.sourceKey,
         sourceRevision: intake.sourceRevision, row: intake.row, policy,
         targetListId: config.trello?.listId,
@@ -443,7 +485,181 @@ export function createPilotRouter(options: PilotRouterOptions) {
         await tx`UPDATE runs SET next_event_seq = 2 WHERE id = ${runId}`;
       });
 
-      if (!isNeedsInput) {
+      if (usePlanner) {
+        let callId: string | null = null;
+        let claimed = false;
+        let settlementAttempted = false;
+        try {
+          // This SELECT runs after the admission transaction commits. No
+          // callback receives the uncommitted intake or a DB/write handle.
+          const saved = await db.client<Array<{
+            source_key: string;
+            source_revision: string;
+            raw_data: SourceRow;
+            checklist_result: ReadSheetsRequestResult["checklist"];
+            inputs: { userPrompt: string; timeZone: string };
+            status: string;
+          }>>`
+            SELECT s.source_key, s.source_revision, s.raw_data, s.checklist_result,
+                   r.inputs, r.status FROM source_snapshots s
+            JOIN runs r ON r.id = s.run_id
+            WHERE s.run_id = ${runId} AND r.user_id = ${userId} AND r.profile = 'pilot-v2'
+          `;
+          const persisted = saved[0];
+          if (!persisted || persisted.status !== "planning") throw new Error("Pilot snapshot unavailable");
+          assertPilotAccess(policy, userId, {
+            kind: "source", spreadsheetId: config.spreadsheetId, tabId: config.tabId,
+          });
+          const context = buildPilotPlannerContext({
+            outputContract: "pilot-advisory-v1",
+            sourceRow: persisted.raw_data,
+            checklistResult: persisted.checklist_result,
+            operatorPrompt: persisted.inputs.userPrompt,
+            timeZone: persisted.inputs.timeZone,
+            secretsToRedact: [
+              config.google?.apiKey ?? "", config.google?.privateKey ?? "",
+              config.trello?.apiKey ?? "", config.trello?.apiToken ?? "",
+            ],
+          });
+          const requestHash = createHash("sha256").update(JSON.stringify({
+            runId, userId, versionId, sourceKey: persisted.source_key,
+            sourceRevision: persisted.source_revision, context,
+          })).digest("hex");
+          const reserved = await admission!.admit({
+            runId, principalId: userId, versionId,
+            sourceKey: persisted.source_key, sourceRevision: persisted.source_revision,
+            snapshot: { rawData: persisted.raw_data, checklist: persisted.checklist_result },
+            provider: options.pilotPlanner!.provider, model: options.pilotPlanner!.model,
+            estimate: options.pilotPlanner!.estimatedCostMicros, requestHash,
+          });
+          callId = reserved.callId;
+          claimed = await admission!.claim({
+            runId, principalId: userId, callId, versionId,
+            sourceKey: persisted.source_key, sourceRevision: persisted.source_revision,
+            snapshot: { rawData: persisted.raw_data, checklist: persisted.checklist_result },
+          });
+          if (!claimed) throw new Error("Pilot dispatch claim unavailable");
+          const result = await requestAccountedPilotProposal(options.pilotPlanner!, {
+            runId, principalId: userId, sourceKey: persisted.source_key,
+            sourceRevision: persisted.source_revision, context,
+          }, options.plannerTimeoutMs ?? 15_000);
+          settlementAttempted = true;
+          const settlement = await admission!.settle({
+            runId, principalId: userId, callId,
+            outcome: { status: result.costMicros === null ? "ambiguous" : "succeeded",
+              usage: result.usage, costMicros: result.costMicros },
+          });
+          if (result.costMicros === null || settlement.overrun || settlement.conflict)
+            throw new Error("Pilot provider accounting unavailable");
+          const proposal = result.proposal;
+
+          await db.client.begin(async (tx) => {
+            await tx`SELECT pg_advisory_xact_lock(638019815)`;
+            // Same order as admission: campaign, grant, run, snapshot.
+            const campaign = (await tx<Array<{ halted: boolean }>>`
+              SELECT halted FROM ai_provider_campaigns
+              WHERE campaign_id=${reserved.campaignId} AND user_id=${userId} FOR UPDATE`)[0];
+            const grant = (await tx<Array<{ valid: boolean; provider: string; model: string }>>`
+              SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
+                     provider,model FROM pilot_ai_grants
+              WHERE campaign_id=${reserved.campaignId} AND principal_id=${userId} FOR UPDATE`)[0];
+            if (!campaign || campaign.halted || !grant?.valid ||
+                grant.provider !== options.pilotPlanner!.provider ||
+                grant.model !== options.pilotPlanner!.model ||
+                !policy.enabled || !config.enabled ||
+                !policy.principals.includes(userId) || !config.principals.includes(userId) ||
+                policy.spreadsheetId !== config.spreadsheetId ||
+                policy.tabId !== config.tabId || policy.boardId !== config.boardId)
+              throw new Error("Pilot authorization changed during planning");
+            const lockedRun = await tx<Array<{ status: string; workflow_version_id: string }>>`
+              SELECT status, workflow_version_id FROM runs
+              WHERE id = ${runId} AND user_id = ${userId} AND profile = 'pilot-v2' FOR UPDATE
+            `;
+            const lockedSnapshot = await tx<Array<{
+              source_key: string; source_revision: string; raw_data: SourceRow;
+              checklist_result: ReadSheetsRequestResult["checklist"];
+            }>>`
+              SELECT source_key, source_revision, raw_data, checklist_result
+              FROM source_snapshots WHERE run_id = ${runId} FOR UPDATE
+            `;
+            const current = lockedSnapshot[0];
+            if (lockedRun[0]?.status !== "planning" ||
+                lockedRun[0]?.workflow_version_id !== versionId || !current ||
+                current.source_key !== persisted.source_key ||
+                current.source_revision !== persisted.source_revision ||
+                JSON.stringify(current.raw_data) !== JSON.stringify(persisted.raw_data) ||
+                JSON.stringify(current.checklist_result) !== JSON.stringify(persisted.checklist_result)) {
+              throw new Error("Pilot source or run changed during planning");
+            }
+            assertPilotAccess(policy, userId, {
+              kind: "source", spreadsheetId: config.spreadsheetId, tabId: config.tabId,
+            });
+            if (current.checklist_result.status !== "pass" ||
+                current.checklist_result.unconfirmedBusiness ||
+                current.checklist_result.missingFields.length > 0) {
+              throw new Error("Pilot checklist is not approval eligible");
+            }
+            const attempt = (await tx<Array<{ state: string }>>`
+              SELECT state FROM pilot_ai_attempts WHERE run_id=${runId}
+                AND principal_id=${userId} AND call_id=${callId} FOR UPDATE`)[0];
+            if (attempt?.state !== "settled") throw new Error("Pilot accounting not settled");
+            await tx`
+              UPDATE workflow_versions SET plan = ${tx.json({
+                profile: "pilot-v2", sourceRevision: current.source_revision,
+                plannerDecision: proposal.kind,
+              })} WHERE id = ${versionId}
+            `;
+            const reasonCode = proposal.kind === "plan" ? "PLAN_PROPOSED" :
+              proposal.kind === "refusal" ? "REFUSED" : "CLARIFICATION_REQUIRED";
+            await savePilotPlannerOutcome(tx, {
+              runId, principalId: userId, kind: proposal.kind, reasonCode,
+            });
+            if (proposal.kind === "plan") {
+              assertPilotAccess(policy, userId, { kind: "board", boardId: config.boardId });
+              if (!config.trello?.listId) throw new Error("Pilot target list missing");
+              const plan = buildPilotApproval({
+                runId, ownerId: userId, versionId, sourceKey: current.source_key,
+                sourceRevision: current.source_revision, row: current.raw_data, policy,
+                targetListId: config.trello.listId,
+              });
+              await tx`
+                INSERT INTO pilot_approvals(run_id, owner_id, version_id, snapshot_hash, expires_at)
+                VALUES (${runId}, ${userId}, ${versionId}, ${plan.snapshotHash},
+                        clock_timestamp() + interval '10 minutes')
+              `;
+              await setPilotRunStatus(tx, runId, "awaiting_approval", "planning");
+            } else {
+              await setPilotRunStatus(tx, runId,
+                proposal.kind === "refusal" ? "refused" : "needs_input", "planning");
+            }
+          });
+        } catch (error) {
+          // A proven pre-dispatch failure costs zero. Any post-claim unknown
+          // cost retains the hold; a validated adapter cost is settled even
+          // when the model proposal is invalid. Never retry the transport.
+          if (callId && !settlementAttempted) {
+            const outcome = !claimed
+              ? { status: "cancelled" as const, usage: null, costMicros: 0 }
+              : error instanceof PilotProposalValidationError
+                ? { status: "invalid_output" as const, usage: error.usage,
+                    costMicros: error.costMicros }
+                : { status: "ambiguous" as const, usage: null, costMicros: null };
+            try { await admission!.settle({ runId, principalId: userId, callId, outcome }); }
+            catch { /* Reconciliation is operator-only; retain DB evidence. */ }
+          }
+          // No model failure, timeout, invalid output or policy drift may
+          // create an approval. A stale planning run is fail-closed by sweep.
+          await db.client.begin(async (tx) => {
+            await tx`SELECT id FROM runs WHERE id = ${runId} AND user_id = ${userId} FOR UPDATE`;
+            if (await setPilotRunStatus(tx, runId, "failed", "planning"))
+              await savePilotPlannerOutcome(tx, {
+                runId, principalId: userId,
+                kind: "failure", reasonCode: "PLANNING_FAILED",
+              });
+          });
+          throw new HttpError(503, "PILOT_PLANNING_FAILED", "Pilot planning unavailable");
+        }
+      } else if (approvalPlan) {
         worker?.wake();
       }
 
@@ -498,6 +714,14 @@ export function createPilotRouter(options: PilotRouterOptions) {
       }
 
       const run = runRows[0];
+      const outcomeRows = await db.client<Array<{
+        kind: PilotOutcomeKind; reason_code: PilotReasonCode;
+      }>>`
+        SELECT kind,reason_code FROM pilot_planner_outcomes
+        WHERE run_id=${runId} AND principal_id=${userId} LIMIT 1`;
+      const outcome = outcomeRows[0];
+      const outcomeMessage = outcome
+        ? pilotOutcomeMessage(outcome.kind, outcome.reason_code) : null;
 
       // Query source snapshot
       const snapshotRows = await db.client<
@@ -526,7 +750,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
         checklist_result: { valid: false, unconfirmedBusiness: false, missingFields: [] },
       };
 
-      const rawChecklist = (snapshot.checklist_result ?? {}) as Record<string, any>;
+      const rawChecklist = (snapshot.checklist_result ?? {}) as Record<string, unknown>;
       const normalizedChecklist = {
         valid: rawChecklist.status === "pass" || Boolean(rawChecklist.valid),
         unconfirmedBusiness: Boolean(rawChecklist.unconfirmedBusiness),
@@ -599,6 +823,9 @@ export function createPilotRouter(options: PilotRouterOptions) {
         sourceRevision: snapshot.source_revision,
         checklistResult: normalizedChecklist,
         preview,
+        clarificationQuestion: outcome?.kind === "clarification" ? outcomeMessage : null,
+        refusalReason: outcome?.kind === "refusal" ? outcomeMessage : null,
+        error: outcome?.kind === "failure" ? outcomeMessage : null,
         receipt: run.status === "succeeded" && reservation?.status === "confirmed" &&
           reservation.remoteId && reservation.remoteUrl && reservation.remoteListId
           ? {
@@ -633,6 +860,37 @@ export function createPilotRouter(options: PilotRouterOptions) {
 
       const claim = await db.client.begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(638019815)`;
+        // Planner runs must remain authorized through the owner's approval.
+        // Acquire the campaign and grant before run/snapshot locks, as in claim.
+        const attempt = (await tx<Array<{ campaign_id: string; state: string }>>`
+          SELECT campaign_id,state FROM pilot_ai_attempts
+          WHERE run_id=${runId} AND principal_id=${userId}`)[0];
+        if (body.decision === "approved" && attempt) {
+          const campaign = (await tx<Array<{ halted: boolean }>>`
+            SELECT halted FROM ai_provider_campaigns
+            WHERE campaign_id=${attempt.campaign_id} AND user_id=${userId} FOR UPDATE`)[0];
+          const grant = (await tx<Array<{
+            valid: boolean; provider: string; model: string;
+          }>>`
+            SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
+                   provider,model FROM pilot_ai_grants
+            WHERE campaign_id=${attempt.campaign_id} AND principal_id=${userId} FOR UPDATE`)[0];
+          const call = (await tx<Array<{
+            provider: string; model: string; status: string;
+          }>>`
+            SELECT c.provider,c.model,c.status FROM pilot_ai_attempts a
+            JOIN ai_provider_calls c ON c.call_id=a.call_id
+            WHERE a.run_id=${runId} AND a.principal_id=${userId}
+              AND a.campaign_id=${attempt.campaign_id}`)[0];
+          if (!campaign || campaign.halted || !grant?.valid || !call ||
+              grant.provider !== call.provider || grant.model !== call.model ||
+              call.status !== "succeeded" ||
+              attempt.state !== "settled" || !policy.enabled || !config.enabled ||
+              !policy.principals.includes(userId) || !config.principals.includes(userId) ||
+              policy.spreadsheetId !== config.spreadsheetId ||
+              policy.tabId !== config.tabId || policy.boardId !== config.boardId)
+            throw new HttpError(403, "PILOT_AI_UNAUTHORIZED", "Pilot AI authorization unavailable");
+        }
         const runRows = await tx<Array<{ id: string; status: string; profile: string; workflow_version_id: string }>>`
           SELECT id, status, profile, workflow_version_id FROM runs
           WHERE id = ${runId} AND user_id = ${userId}
@@ -729,6 +987,7 @@ export function createPilotRouter(options: PilotRouterOptions) {
         return {
           kind: "approved", plan, sourceKey: snapshot.source_key, intentKey,
           expiresAt: new Date(approval.expires_at),
+          aiCampaignId: attempt?.campaign_id ?? null,
         } as const;
       });
 
@@ -756,6 +1015,37 @@ export function createPilotRouter(options: PilotRouterOptions) {
           listId: claim.plan.listId,
           intentKey: claim.intentKey,
           sourceKey: claim.sourceKey,
+          authorizeBeforeWrite: claim.aiCampaignId ? async () => {
+            await db.client.begin(async (tx) => {
+              const campaign = (await tx<Array<{ halted: boolean }>>`
+                SELECT halted FROM ai_provider_campaigns
+                WHERE campaign_id=${claim.aiCampaignId} AND user_id=${userId} FOR UPDATE`)[0];
+              const grant = (await tx<Array<{
+                valid: boolean; provider: string; model: string;
+              }>>`
+                SELECT (revoked_at IS NULL AND expires_at > clock_timestamp()) AS valid,
+                       provider,model FROM pilot_ai_grants
+                WHERE campaign_id=${claim.aiCampaignId} AND principal_id=${userId} FOR UPDATE`)[0];
+              const run = (await tx<Array<{ status: string }>>`
+                SELECT status FROM runs WHERE id=${runId} AND user_id=${userId}
+                  AND profile='pilot-v2' FOR UPDATE`)[0];
+              const call = (await tx<Array<{
+                provider: string; model: string; state: string; status: string;
+              }>>`
+                SELECT c.provider,c.model,a.state,c.status FROM pilot_ai_attempts a
+                JOIN ai_provider_calls c ON c.call_id=a.call_id
+                WHERE a.run_id=${runId} AND a.principal_id=${userId}
+                  AND a.campaign_id=${claim.aiCampaignId}`)[0];
+              if (!campaign || campaign.halted || !grant?.valid ||
+                  !call || call.state !== "settled" || call.status !== "succeeded" ||
+                  grant.provider !== call.provider || grant.model !== call.model ||
+                  run?.status !== "running" || !policy.enabled || !config.enabled ||
+                  !policy.principals.includes(userId) || !config.principals.includes(userId) ||
+                  policy.spreadsheetId !== config.spreadsheetId ||
+                  policy.tabId !== config.tabId || policy.boardId !== config.boardId)
+                throw new Error("PILOT_AI_EGRESS_DENIED");
+            });
+          } : undefined,
         });
       } catch {
         await db.client.begin(async (tx) => {

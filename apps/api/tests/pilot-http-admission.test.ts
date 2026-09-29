@@ -330,6 +330,55 @@ describe("Pilot V2 API Admission & Router Integration (BE-19)", () => {
     expect(snapshotsDb[0]!.run_id).toBe(result.runId);
   });
 
+  it("creates the pilot preview from the source without external fetch calls", async () => {
+    // The intake is injected; only HTTP requests to this local test API are allowed.
+    // This guards fetch egress, not every provider transport or production wiring.
+    const { pilotUrl, tokenA, snapshotsDb } = await createTestApi();
+    const apiOrigin = new URL(pilotUrl).origin;
+    const actualFetch = globalThis.fetch.bind(globalThis);
+    const outbound: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (new URL(url).origin !== apiOrigin) {
+        outbound.push(url);
+        throw new Error("Unexpected outbound request from pilot run creation");
+      }
+      return actualFetch(input, init);
+    });
+    const createRes = await fetch(`${pilotUrl}/runs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenA}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        spreadsheetId: "sheet-abc",
+        tabId: "tab-1",
+        requestId: "REQ-101",
+        userPrompt: "Suggest a different title using AI",
+      }),
+    });
+    expect(createRes.status).toBe(202);
+    const { runId } = (await createRes.json()) as { runId: string };
+    const detailRes = await fetch(`${pilotUrl}/runs/${runId}`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(snapshotsDb).toHaveLength(1);
+    expect(detail.preview.actions).toEqual([{
+      tool: "trello.create_card",
+      sideEffect: "write",
+      args: {
+        boardId: testPolicy.boardId,
+        listId: testConfig.trello?.listId,
+        listName: "To Do",
+        title: mockIntakeResult.row.deliverable,
+        description: mockIntakeResult.row.raw_request,
+        dueDate: mockIntakeResult.row.due_date,
+        intentKey: mockIntakeResult.sourceKey,
+      },
+    }]);
+    expect(outbound).toEqual([]);
+  });
+
   it("blocks approval when the durable approval row is missing", async () => {
     const { pilotUrl, tokenA, runsDb } = await createTestApi();
     const runId = "11111111-2222-4444-8888-999999999998";

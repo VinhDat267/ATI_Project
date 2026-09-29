@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatBusinessError } from "../../core/errors.js";
 import { Banner } from "./Banner";
 import { Button } from "./Button";
 import { Icon, type IconName } from "./Icon";
@@ -38,8 +39,10 @@ export function ErrorState({
   error: unknown;
   onRetry?: () => void;
 }) {
-  const message =
-    error instanceof Error ? error.message : "Lỗi không xác định";
+  const message = formatBusinessError(
+    error,
+    "Không thể tải dữ liệu vào lúc này. Vui lòng thử lại sau ít giây.",
+  );
   return (
     <div className="flex flex-col gap-3">
       <Banner tone="danger" icon="circle-x" title={title} live>

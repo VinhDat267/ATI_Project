@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { EventPage, Reconciliation, RunDetail, TracePage } from "../../../core/contracts.js";
+import {
+  formatBusinessError,
+  formatErrorClass,
+  toBusinessErrorMessage,
+} from "../../../core/errors.js";
 import { routeToHash } from "../../../core/navigation.js";
 import {
   formatClock,
@@ -54,11 +59,11 @@ function eventLine(event: RunEvent, run: RunDetail): string | null {
     case "step.started":
       return `Bắt đầu: ${step(event.payload.step_id)}`;
     case "step.retrying":
-      return `Thử lại: ${step(event.payload.step_id)} (${event.payload.error_message})`;
+      return `Thử lại: ${step(event.payload.step_id)} (${toBusinessErrorMessage(event.payload.error_message)})`;
     case "step.succeeded":
       return `Xong: ${step(event.payload.step_id)}`;
     case "step.failed":
-      return `Lỗi ở ${step(event.payload.step_id)}: ${event.payload.error_message}`;
+      return `Lỗi ở ${step(event.payload.step_id)}: ${toBusinessErrorMessage(event.payload.error_message)}`;
     case "step.skipped":
       return `Không chạy: ${step(event.payload.step_id)} (${event.payload.condition})`;
     case "replan.started":
@@ -143,10 +148,18 @@ function StatusBanner({ run, trace, reconciliation }: { run: RunDetail; trace?: 
     case "failed": {
       const failed = trace?.attempts.find((a) => a.error_message);
       return (
-        <Banner tone="danger" icon="circle-x" title={failed ? `Thất bại: ${failed.error_message}` : "Lần chạy thất bại"}>
+        <Banner
+          tone="danger"
+          icon="circle-x"
+          title={
+            failed?.error_message
+              ? `Không thể hoàn tất: ${toBusinessErrorMessage(failed.error_message)}`
+              : "Công việc chưa thể hoàn tất"
+          }
+        >
           {failed?.outcome_certainty === "known_not_applied"
-            ? "Công cụ trả lỗi đã biết và xác nhận thao tác đó chưa được ghi. Hệ thống không tự thử lại."
-            : "Hệ thống không tự thử lại. Xem chi tiết lỗi bên dưới."}
+            ? "Hệ thống xác nhận chưa có dữ liệu nào bị thay đổi ở bước gặp lỗi và không tự động thử lại."
+            : "Hệ thống đã dừng thực thi và không tự động thử lại. Xem thông tin bên dưới để xử lý."}
         </Banner>
       );
     }
@@ -457,9 +470,9 @@ export function RunView({ runId }: { runId: string }) {
             <Section title="Chi tiết lỗi">
               <dl className="m-0 flex flex-col">
                 {[
-                  ["Loại lỗi", failedAttempt.error_class ?? "—"],
-                  ["Kết quả ghi", failedAttempt.outcome_certainty === "known_not_applied" ? "Chắc chắn chưa ghi" : "Chưa rõ"],
-                  ["Thông điệp", failedAttempt.error_message ?? "—"],
+                  ["Nguyên nhân", formatErrorClass(failedAttempt.error_class)],
+                  ["Trạng thái dữ liệu đích", failedAttempt.outcome_certainty === "known_not_applied" ? "Chắc chắn chưa ghi" : "Cần kiểm tra đối chiếu"],
+                  ["Nội dung chi tiết", toBusinessErrorMessage(failedAttempt.error_message)],
                 ].map(([label, value]) => (
                   <div key={label} className="grid gap-1 border-b border-hairline-soft py-3 desk:grid-cols-[200px_minmax(0,1fr)] desk:gap-4">
                     <dt className="text-body-md text-muted">{label}</dt>
@@ -501,7 +514,7 @@ export function RunView({ runId }: { runId: string }) {
                   </Button>
                 ) : null}
                 {traceSnapshot.error ? (
-                  <p className="m-0 text-body-sm text-danger">{traceSnapshot.error.message}</p>
+                  <p className="m-0 text-body-sm text-danger">{formatBusinessError(traceSnapshot.error)}</p>
                 ) : null}
               </div>
             </TechDisclosure>

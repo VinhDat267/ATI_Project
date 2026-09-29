@@ -1,6 +1,12 @@
 # Baseline hiện hành — MVP v2
 
-**SCOPE_APPROVED — 21/09/2026:** chủ project duyệt
+> [!IMPORTANT]
+> **THAY THẾ BỞI V3 (29/09/2026):** Tài liệu này là Baseline lưu trữ lịch sử của MVP v2. Toàn bộ phạm vi hiện hành của hệ thống đã được chuyển giao và nâng cấp lên **AI Workflow Automation Platform v3**.
+> - **Đặc tả Thiết kế v3 chuẩn tắc:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md)
+> - **Kế hoạch Triển khai 28 tasks TDD:** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](superpowers/plans/2026-09-29-ai-workflow-platform-v3.md)
+> - **Quy ước Nhóm & Git:** [`docs/team-workflow.md`](team-workflow.md)
+
+**SCOPE_APPROVED — 21/09/2026 (Lịch sử v2):** chủ project duyệt
 [đặc tả MVP v2](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md).
 Đây là phạm vi đích đã duyệt, không phải xác nhận live integration. Code/test
 pilot v2 đã được thêm sau ngày duyệt; [audit P6 ngày 23/09](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md)

@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.gitnexus
+.codegraph
+.artifacts
+.cache
+coverage
+playwright-report
+test-results
+docs/api-evidence
+docs/g1-evidence
+docs/engine-evidence
+*.log

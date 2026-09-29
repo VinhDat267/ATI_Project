@@ -8,13 +8,20 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { runOfflineEvaluationCli } from "../src/ai/evaluation/cli.js";
 import { createOfflineReviewedCatalog } from "../src/ai/local-catalog.js";
+import { createAiFreezeTestRoot } from "./fixtures/ai-freeze-test-root.js";
 
-const root = fileURLToPath(new URL("../../../", import.meta.url));
+let fixture: ReturnType<typeof createAiFreezeTestRoot>;
+let root: string;
 const temporaryDirectories: string[] = [];
+
+beforeAll(() => {
+  fixture = createAiFreezeTestRoot();
+  root = fixture.root;
+});
+afterAll(() => fixture.close());
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0))

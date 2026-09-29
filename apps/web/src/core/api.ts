@@ -39,7 +39,7 @@ import {
   PilotCheckResponseSchema,
   PilotLookupResponseSchema,
 } from "./pilot-contracts.js";
-import { ClientError } from "./errors.js";
+import { ClientError, toBusinessErrorMessage } from "./errors.js";
 
 export interface HttpTransportOptions {
   baseUrl?: string;
@@ -136,7 +136,8 @@ export function createHttpTransport(
         });
       }
       throw new ClientError({
-        message: "Không thể kết nối đến máy chủ",
+        message:
+          "Chưa thể kết nối đến dịch vụ hệ thống. Vui lòng kiểm tra kết nối hoặc đợi dịch vụ khởi động rồi thử lại.",
         kind: "network",
         uncertain: isWrite,
         cause: err,
@@ -145,7 +146,7 @@ export function createHttpTransport(
 
     if (!response.ok) {
       let code = "HTTP_ERROR";
-      let message = `Máy chủ phản hồi mã lỗi ${response.status}`;
+      let rawMessage: string | undefined;
       let requestId = response.headers.get("x-request-id") ?? undefined;
 
       try {
@@ -153,7 +154,7 @@ export function createHttpTransport(
         const parsed = ApiErrorSchema.safeParse(errorJson);
         if (parsed.success) {
           code = parsed.data.error.code;
-          message = parsed.data.error.message;
+          rawMessage = parsed.data.error.message;
           requestId = parsed.data.error.request_id;
         } else if (
           typeof errorJson === "object" &&
@@ -163,13 +164,18 @@ export function createHttpTransport(
           const rawErr = (
             errorJson as { error?: { message?: string; code?: string } }
           ).error;
-          if (rawErr?.message) message = rawErr.message;
+          if (rawErr?.message) rawMessage = rawErr.message;
           if (rawErr?.code) code = rawErr.code;
         }
       } catch {
         // Non-JSON body
       }
 
+      const message = toBusinessErrorMessage(
+        rawMessage,
+        code,
+        response.status,
+      );
       const uncertain = isWrite && response.status >= 500;
 
       throw new ClientError({
@@ -191,7 +197,8 @@ export function createHttpTransport(
       json = await response.json();
     } catch (err) {
       throw new ClientError({
-        message: "Phản hồi từ máy chủ không phải JSON hợp lệ",
+        message:
+          "Dữ liệu phản hồi từ hệ thống bị gián đoạn. Vui lòng tải lại trang hoặc thử lại.",
         kind: "protocol",
         cause: err,
       });
@@ -200,7 +207,8 @@ export function createHttpTransport(
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
       throw new ClientError({
-        message: "Phản hồi từ máy chủ không khớp với cấu trúc dữ liệu mong đợi",
+        message:
+          "Dữ liệu nhận được chưa đồng bộ với phiên bản giao diện hiện tại. Vui lòng tải lại trang.",
         kind: "protocol",
         cause: parsed.error,
       });

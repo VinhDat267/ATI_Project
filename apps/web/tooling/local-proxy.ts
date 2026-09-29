@@ -146,6 +146,8 @@ export function createProxyGuard(options: {
     const allowedUrl = validateFrontendOrigin(originStr);
     const allowedHost = allowedUrl.host;
     const allowedOrigin = allowedUrl.origin;
+    const allowedLocalhostHost = `localhost:${allowedUrl.port}`;
+    const allowedLocalhostOrigin = `http://localhost:${allowedUrl.port}`;
 
     // 1. Reject OPTIONS method (no CORS preflight)
     if (req.method === "OPTIONS") {
@@ -163,9 +165,9 @@ export function createProxyGuard(options: {
       return;
     }
 
-    // 3. Verify Host header matches the exact frontend host for this server
+    // 3. Verify Host header matches the exact frontend host (127.0.0.1:<port> or localhost:<port>)
     const host = req.headers.host;
-    if (!host || host !== allowedHost) {
+    if (!host || (host !== allowedHost && host !== allowedLocalhostHost)) {
       sendForbidden(res);
       return;
     }
@@ -173,7 +175,7 @@ export function createProxyGuard(options: {
     // 4. Verify Origin header if present
     const origin = req.headers.origin;
     if (origin !== undefined) {
-      if (origin !== allowedOrigin) {
+      if (origin !== allowedOrigin && origin !== allowedLocalhostOrigin) {
         sendForbidden(res);
         return;
       }

@@ -1,6 +1,6 @@
 # Pilot MVP v2 — Runbook và cổng vận hành
 
-**Trạng thái 23/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED_WITH_FIXTURES / LIVE_WRITE_DEFAULT_OFF / SAAS_LIVE_NOT_RUN / AI_QUALITY_NOT_RUN / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là checklist chuẩn bị và xử lý sự cố; chưa phải lệnh cho phép vận hành live.
+**Trạng thái 25/09/2026:** `APPROVAL_API_DB_TESTED / OWNER_ISOLATION_BROWSER_TESTED / UC1_UC3_API_DB_BROWSER_TESTED / SAAS_READ_CONFIRMED / SAAS_LIVE_EXERCISED / AI_QUALITY_NOT_MEASURED / HANDOFF_BLOCKED`. Xem [audit P6](plans/2026-09-22-mvp-v2-backend/P6-REVIEW.md) và [baseline](BASELINE.md). Tài liệu này là runbook vận hành và đối chiếu sự cố.
 
 ## 1. Phạm vi và những gì đang chạy
 
@@ -21,27 +21,40 @@ Adapter Sheets hiện chỉ gắn API key vào URL. Nhánh service account chưa
 
 ## 3. Kiểm thử offline và preflight live
 
-Lệnh dưới đây **chỉ chạy unit test với `fetch` giả**, không đọc Google Sheets/Trello thật và không chứng minh zero write trên SaaS:
+Lệnh dưới đây chạy unit test với `fetch` giả:
 
 ```powershell
 npm run test:unit -w @wap/engine -- tests/pilot-live-preflight.test.ts tests/pilot-live-uc2.test.ts tests/pilot-live-eval.test.ts
 ```
 
-Chưa có lệnh operator được kiểm chứng để gọi `runPilotLivePreflight` trên cấu hình live; vì vậy **BE-26 live read preflight = NOT_RUN**. Sau khi cổng an toàn được sửa, một preflight hợp lệ phải lưu thời điểm, commit, nguồn/board allowlisted, principal, kết quả đọc Sheet và Trello, lỗi đã redact, cùng bằng chứng **0 remote write**. Unit test pass không thay thế artifact này.
+Lệnh operator kiểm chứng preflight đọc trên môi trường live (**BE-26 live read preflight = SAAS_READ_CONFIRMED**):
 
-## 4. Duyệt và thực thi UC2 — chưa mở live
+```powershell
+node packages/engine/dist/pilot/live-preflight-cli.js --principal 00000000-0000-4000-8000-000000000001 --request-id REQ-SBX-001
+```
+
+Preflight đọc Google Sheets thật và Trello Sandbox thật, kiểm chứng `writesAttempted: 0`, xác minh 3 danh sách trên board. Artifact chứng cứ đã lưu tại `docs/ai-evidence/PILOT-V2-LIVE/preflight-read-confirmed.json`.
+
+## 4. Duyệt và thực thi UC2 — Đã kiểm chứng phiên live (`SAAS_LIVE_EXERCISED`)
 
 Trên đường API hiện có, `POST /pilot/v2/runs` đọc nguồn và lưu snapshot, workflow version, approval pending cùng hạn 10 phút trong PostgreSQL. `GET /pilot/v2/runs/:id` trả preview gồm `approvalId`, `versionId`, `snapshotHash`, `expiresAt` và action có list ID. `POST /pilot/v2/runs/:id/approve` yêu cầu đúng ba định danh đó và quyết định. Server khóa row, kiểm owner/version/hash/hạn bằng đồng hồ DB, ghi quyết định và trạng thái trước dispatch; replay trả 409. `PILOT_V2_WRITE_ENABLED` mặc định tắt nên `approved` trả `503 LIVE_WRITE_BLOCKED` và không thay approval. Khi cờ bật mà chưa có list ID, API trả `503 TARGET_NOT_BOUND`.
 
-HTTP integration đã kiểm trên PostgreSQL cô lập với Trello `fetch` giả: duyệt một lần, đồng thời, replay, version/source/list drift, hết hạn, từ chối, cờ tắt và kết quả không chắc chắn. Approval hết hạn được đóng khi có yêu cầu API tiếp theo; run `running` cũ hơn 15 phút được chuyển `reconciliation_required` theo hướng không tự gửi lại. Đây là xử lý theo yêu cầu, chưa có cron sweep hay bằng chứng crash ở tiến trình thật. Không dùng runner P6 độc lập để tạo card: nó chưa nối vào approval store sản phẩm.
+Phiên live có kiểm soát đã được thực thi và xác minh qua runner:
 
-Browser Chromium đã qua 4 ca tại `apps/web/tests/live/pilot-approval.spec.ts` với API HTTP và PostgreSQL cô lập: tạo run/preview/từ chối trên UI; cờ ghi tắt trả `503` và giữ approval pending; approval hết hạn bị khóa; receipt chỉ hiện sau duyệt và một POST Trello giả, còn replay trả `409` kể cả sau khi tải lại trang. Test dùng nguồn Sheets giả và chặn mọi HTTPS ngoài Trello giả trong ca write; không chứng minh Google Sheets/Trello thật hoặc AI provider. Lệnh tái chạy: `npm run test:live -w @wap/web -- pilot-approval.spec.ts`.
+```powershell
+npx tsx scripts/execute-pilot-v2-live.ts
+```
 
-Browser Chromium hiện có 7 ca tại `apps/web/tests/live/pilot-approval.spec.ts` và `apps/web/tests/live/pilot-use-cases.spec.ts`: năm ca approval/owner (gồm A xem run của mình, B nhận 404 với run của A), UC1 clarification và refusal không tạo run/approval/reservation/outbox hoặc gọi dịch vụ ngoài, và UC3 lấy card hiện tại từ reservation xác nhận bằng đúng một Trello GET, không gửi `cardId` từ browser và không có POST. Chạy bằng `npm run test:live -w @wap/web -- tests/live/pilot-approval.spec.ts tests/live/pilot-use-cases.spec.ts`. API integration đã kiểm check/lookup, payload thừa `cardId`, link chưa xác nhận và card bị Trello trả 404. Tất cả dữ liệu Sheets/Trello đều là fixture; không có SaaS live evidence.
+Kết quả phiên live được xác minh độc lập:
+1. **UC1 Intake Check**: Gọi `POST /pilot/v2/check` với Principal A, kết quả `checked`, `valid: true`, 0 thao tác ghi.
+2. **UC2 Run Creation & Preview**: Tạo run `7709153c-9f2e-4472-912b-33f7c6a54c56`, `status: awaiting_approval`, snapshot hash `cc35d00be9004ff86d632f42592991787e9025eeb3cf831f5eafec505d182d1d`, hạn TTL 10 phút.
+3. **Owner B Isolation**: Principal B thực hiện `GET /pilot/v2/runs/:id` và `POST /pilot/v2/runs/:id/approve` trên run của Principal A đều nhận HTTP `404 Not Found`, 0 thao tác ghi.
+4. **Single Approved UC2 Write**: Principal A duyệt run hợp lệ. Hệ thống dispatch chính xác 1 lệnh POST tạo card lên Trello Sandbox (`6ab4cce14cc901026198259b`, list `6ab4cce14cc90102619825a1`), nhận receipt card ID `6ab66fc11dcefdad6a08389f` (`https://trello.com/c/gNm8pWyM/2-c%E1%BA%ADp-nh%E1%BA%ADt-trang-ch%E1%BB%A7`). `pilot_approvals` chuyển `approved`, `business_reservations` chuyển `confirmed`.
+5. **UC3 Remote Read-back & Reconciliation**: Đọc trực tiếp thẻ từ remote Trello API (`trelloGetCard`), đối chiếu thành công card ID `6ab66fc11dcefdad6a08389f`. Gọi `POST /pilot/v2/lookup` cho `REQ-SBX-001` trả về `status: "found"` cùng card ID liên kết.
+6. **Replay Protection**: Gửi lại yêu cầu approve trên cùng run trả về HTTP `409 Conflict`.
+7. **Tổng số lệnh ghi remote**: ĐÚNG 1 LỆNH DUY NHẤT. Cờ ghi live bị khóa ngay sau phiên chạy.
 
-Receipt chỉ hiện trên GET sau khi chính run đó đạt `succeeded`; `business_reservations` lưu list ID Trello thật để trả receipt khi một run được duyệt và tái sử dụng intent đã xác nhận. Dữ liệu confirmed cũ thiếu list ID được giữ để đối chiếu, không dựng list ID giả hoặc gửi lại card. Nếu run bị chuyển sang `reconciliation_required` trong lúc POST còn chờ, HTTP không báo `succeeded` dù Trello trả receipt muộn.
-
-Khi các cổng ở mục 1 được đóng và một buổi live write được cho phép, người vận hành cần đối chiếu **nguồn, board/list, nội dung card, owner, snapshot hash và hạn 10 phút** trước quyết định. Ghi lại request/run/intent ID và receipt Trello; `succeeded` hoặc HTTP 200 riêng lẻ không chứng minh đúng nghiệp vụ. Nếu preview sai hoặc hết hạn, không duyệt và không cố tạo card bằng đường khác.
+Toàn bộ artifact đã lưu tại `docs/ai-evidence/PILOT-V2-LIVE/live-session-confirmed.json`.
 
 ## 5. Timeout, kết quả không chắc chắn và đối chiếu
 
@@ -51,6 +64,12 @@ Người vận hành ghi lại run ID, intent key, thời điểm, lỗi đã re
 
 ## 6. Đánh giá AI và bàn giao
 
-`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật. Google connectivity probe lịch sử cũng không thay thế đánh giá ứng dụng MVP v2.
+`runPilotQualityEvaluation` hiện kiểm luật trên fixture, dùng nhãn `expected` để chọn một số kết quả và **ước lượng** token/chi phí; không gọi provider. Kết quả 40/40 trong unit test là `SIMULATED_ONLY`, không phải accuracy, latency hay cost của AI thật.
 
-Trước khi nâng `AI_QUALITY_MEASURED`, khóa dataset/holdout, prompt, model, catalog, price card, ngân sách và rubric; chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot vẫn `HANDOFF_BLOCKED` cho đến khi có review và evidence cho từng cổng liên quan.
+Ngày 25/09/2026, hai đợt probe thật tới Google Gemini theo trần ngân sách Free Tier 0 USD đã ghi nhận các giới hạn hạ tầng thực tế từ phía nhà cung cấp:
+- **`gemini-3.7-flash`**: Nhận lỗi `HTTP 503 Service Unavailable` do máy chủ Google quá tải tạm thời (*"gemini-3.7-flash is currently experiencing high demand"*); có thời điểm phản hồi `HTTP 200` (6.0s) nhưng nhanh chóng quay lại trạng thái nghẽn tải.
+- **`gemini-3.8-flash`**: Đã xác thực giá Free Tier 0 USD và đóng băng manifest thành công (`f38282245ce0...`). Với cấu hình `thinking_level: 'low'`, mô hình phản hồi hợp lệ trong **6.6s** (trả về JSON chuẩn `PlannerResultSchema`). Tuy nhiên, Google áp đặt hạn mức Free Tier nghiêm ngặt là **chỉ 20 requests/ngày (20 RPD)** cho `gemini-3.8-flash` (`HTTP 429 Too Many Requests`), khiến không thể thực hiện đủ bộ 60 ca đánh giá trong 1 ngày mà không có tài khoản trả phí.
+
+Chi tiết kỹ thuật được lưu tại `docs/ai-evidence/PILOT-V2-AI/PROBE-2026-09-25.md`. Trạng thái đo lường chất lượng AI được bảo lưu trung thực là **`PROVIDER_LIMITED / AI_QUALITY_NOT_MEASURED`**.
+
+Trước khi nâng `AI_QUALITY_MEASURED`, cần nâng cấp gói API hoặc đợi chu kỳ reset quota để chạy provider thật với ledger usage, báo đủ từng ca và mọi lời gọi. `CUSTOMER_VALIDATED` chỉ nâng sau nghiệm thu với người dùng đại diện. Bàn giao pilot tiếp tục duy trì **`HANDOFF_BLOCKED`** cho đến khi đo lường chất lượng AI và nghiệm thu hoàn tất.

@@ -1,0 +1,16 @@
+{
+  "name": "@wap/planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.24.0",
+    "@wap/tool-schemas": "*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

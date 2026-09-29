@@ -3,14 +3,23 @@ import { runPilotLivePreflight } from '../src/pilot/live-preflight.js';
 
 describe('BE-26: SaaS Setup & Live Read Preflight', () => {
   const originalFetch = globalThis.fetch;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    process.env = { ...originalEnv };
+    delete process.env.GOOGLE_SHEETS_API_KEY;
+    delete process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
+    delete process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+    delete process.env.TRELLO_API_KEY;
+    delete process.env.TRELLO_API_TOKEN;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    process.env = originalEnv;
   });
+
 
   it('fails-closed as BLOCKED_EXTERNAL when credentials are not configured', async () => {
     const result = await runPilotLivePreflight({
@@ -147,4 +156,80 @@ describe('BE-26: SaaS Setup & Live Read Preflight', () => {
     expect(jsonStr).not.toContain(sensitiveToken);
     expect(result.checks.writeVerification.writesAttempted).toBe(0);
   });
+
+  it('rejects allowSimulatedFallback as fail-closed', async () => {
+    const result = await runPilotLivePreflight({
+      config: {
+        enabled: true,
+        principals: ['operator-1'],
+        spreadsheetId: 'sheet-1',
+        tabId: 'Tab-1',
+        boardId: 'board-1',
+        google: { apiKey: 'key' },
+        trello: { apiKey: 'key', apiToken: 'token' },
+      },
+      allowSimulatedFallback: true,
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.evidenceLabel).toBe('PROPOSED');
+    expect(result.checks.config.status).toBe('fail');
+    expect(result.checks.config.error).toContain('Simulated fallback is rejected');
+  });
+
+  it('rejects empty principalId or empty testRequestId', async () => {
+    const validConfig = {
+      enabled: true,
+      principals: ['operator-1'],
+      spreadsheetId: 'sheet-1',
+      tabId: 'Tab-1',
+      boardId: 'board-1',
+      google: { apiKey: 'key' },
+      trello: { apiKey: 'key', apiToken: 'token' },
+    };
+
+    const emptyPrincipalResult = await runPilotLivePreflight({
+      config: validConfig,
+      principalId: '   ',
+    });
+    expect(emptyPrincipalResult.status).toBe('failed');
+    expect(emptyPrincipalResult.checks.config.error).toContain('Principal ID cannot be empty');
+
+    const emptyRequestResult = await runPilotLivePreflight({
+      config: validConfig,
+      testRequestId: '   ',
+    });
+    expect(emptyRequestResult.status).toBe('failed');
+    expect(emptyRequestResult.checks.config.error).toContain('Request ID cannot be empty');
+  });
+
+  it('fails-closed when privateKey is configured without bearer token during preflight', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const sensitiveKey = 'super-secret-service-account-key';
+
+    const result = await runPilotLivePreflight({
+      config: {
+        enabled: true,
+        principals: ['operator-1'],
+        spreadsheetId: 'sheet-abc-123',
+        tabId: 'Requests',
+        boardId: 'board-xyz-789',
+        google: {
+          clientEmail: 'sa@project.iam.gserviceaccount.com',
+          privateKey: sensitiveKey,
+        },
+        trello: { apiKey: 'trello-key', apiToken: 'trello-token' },
+      },
+      testRequestId: 'REQ-001',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.checks.sheetsRead.status).toBe('fail');
+    expect(result.checks.sheetsRead.error).toContain('CONFIG_ERROR');
+    expect(result.checks.writeVerification.writesAttempted).toBe(0);
+
+    const json = JSON.stringify(result);
+    expect(json).not.toContain(sensitiveKey);
+  });
 });
+

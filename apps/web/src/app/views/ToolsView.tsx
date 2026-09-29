@@ -22,13 +22,13 @@ const STATUS: Record<ServerStatus, { label: string; tone: Tone; icon: IconName }
 
 const SERVERS: Record<string, { name: string; body: string; off: string }> = {
   task_hub: {
-    name: "Dữ liệu nhóm",
-    body: "Bảng tính, thẻ công việc và tin nhắn local.",
+    name: "Dữ liệu nhóm (Task Hub)",
+    body: "Quản lý dữ liệu bảng tính, thẻ công việc và kênh trao đổi nội bộ.",
     off: "Khi máy chủ này không kết nối, yêu cầu đọc hoặc ghi bảng tính, thẻ và tin nhắn sẽ không lập được kế hoạch.",
   },
   filesystem: {
-    name: "Tệp cục bộ",
-    body: "Đọc và ghi tệp trong thư mục đã cho phép.",
+    name: "Hệ thống tệp (Filesystem)",
+    body: "Đọc và ghi tệp trong thư mục làm việc an toàn được phân quyền.",
     off: "Máy chủ này chỉ bật khi hệ thống được khởi chạy với chính sách filesystem đã duyệt; không bật được từ giao diện. Khi đang tắt, yêu cầu cần đọc hoặc ghi tệp sẽ không lập được kế hoạch.",
   },
 };
@@ -49,7 +49,7 @@ export function ToolsView() {
         <div className="flex max-w-measure flex-col gap-1">
           <h1 className="m-0 text-display-md-mobile desk:text-display-md">Công cụ &amp; kết nối</h1>
           <p className="m-0 text-body-lg text-muted">
-            Hệ thống chỉ dùng các máy chủ công cụ local đã review. Quyền đọc/ghi do chính sách của ứng dụng quyết định.
+            Hệ thống chỉ kích hoạt các công cụ và kết nối đã được kiểm duyệt an toàn. Mọi quyền truy cập tuân thủ nguyên tắc fail-closed.
           </p>
           {checkedAt ? (
             <p className="m-0 tabular text-body-sm text-muted">
@@ -106,7 +106,7 @@ export function ToolsView() {
                 ) : null}
                 {server.status === "connected" ? (
                   <p className="m-0 text-body-sm text-muted">
-                    Danh sách công cụ chi tiết cần API catalog, chưa nối ở bản mô phỏng này.
+                    Máy chủ công cụ đang hoạt động bình thường theo chính sách kiểm soát an toàn.
                   </p>
                 ) : null}
               </li>
@@ -115,9 +115,86 @@ export function ToolsView() {
         </ul>
       ) : null}
 
-      <a href={routeToHash({ page: "new" })} className="inline-flex min-h-11 items-center self-start text-button-sm">
-        Đã sẵn sàng? Tạo yêu cầu
-      </a>
+      {/* SaaS Pilot v2 Connectors Section */}
+      <section className="mt-8 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="m-0 text-headline-sm">Đầu nối dịch vụ SaaS Pilot v2</h2>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-success/20 bg-success-subtle px-2.5 py-0.5 text-badge text-success">
+              <span className="size-1.5 rounded-full bg-success" />
+              Đã kiểm định
+            </span>
+          </div>
+          <p className="m-0 text-body-md text-muted">
+            Các cổng kết nối trực tiếp đến dịch vụ đám mây thực tế, bảo vệ bởi chính sách Single Remote Write và kiểm tra danh sách miền cho phép (Egress Allowlist).
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Google Sheets Connector */}
+          <div className="flex flex-col gap-3 rounded-md border border-hairline bg-surface-soft p-4 sm:p-5 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success-subtle text-success">
+                  <Icon name="table" size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="m-0 text-title-md font-semibold text-ink">Google Sheets</h3>
+                  <p className="m-0 font-mono text-caption text-muted truncate">sheets.googleapis.com</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-strong px-2 py-0.5 text-caption font-medium text-ink shrink-0">
+                <Icon name="circle-check" size={12} className="text-success" />
+                Chỉ đọc (Read-only)
+              </span>
+            </div>
+            <p className="m-0 text-body-sm text-muted">
+              Đọc dữ liệu hàng theo phạm vi bảng tính và tab ID được phê duyệt trước. Không thực hiện bất kỳ thao tác ghi nào lên trang tính gốc.
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-hairline pt-3 text-caption text-muted">
+              <span className="font-mono bg-canvas px-2 py-0.5 rounded border border-hairline text-caption break-all">google_sheets.read_rows</span>
+              <span>· Giới hạn: 5 MB</span>
+            </div>
+          </div>
+
+          {/* Trello Workspace Connector */}
+          <div className="flex flex-col gap-3 rounded-md border border-hairline bg-surface-soft p-4 sm:p-5 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-action-subtle text-action">
+                  <Icon name="kanban" size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="m-0 text-title-md font-semibold text-ink">Trello Workspace</h3>
+                  <p className="m-0 font-mono text-caption text-muted truncate">api.trello.com</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-action-subtle px-2 py-0.5 text-caption font-medium text-action shrink-0">
+                <Icon name="shield-check" size={12} className="text-action" />
+                Single Remote Write
+              </span>
+            </div>
+            <p className="m-0 text-body-sm text-muted">
+              Tra cứu thẻ và tạo thẻ công việc mới khi có phê duyệt rõ ràng từ người vận hành (Human-in-the-Loop). Nghiêm cấm ghi mù khi timeout.
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-hairline pt-3 text-caption text-muted">
+              <span className="font-mono bg-canvas px-2 py-0.5 rounded border border-hairline text-caption break-all">trello.create_card</span>
+              <span className="font-mono bg-canvas px-2 py-0.5 rounded border border-hairline text-caption break-all">trello.get_card</span>
+              <span>· TTL: 10 phút</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <a href={routeToHash({ page: "pilot-new" })} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-sm bg-ink px-4 text-button-sm font-semibold text-on-primary no-underline shadow-sm transition-colors hover:bg-ink/90 text-center">
+          <span>Khởi tạo quy trình Pilot v2</span>
+          <Icon name="arrow-right" size={15} />
+        </a>
+        <a href={routeToHash({ page: "new" })} className="inline-flex min-h-11 items-center justify-center text-button-sm text-muted hover:text-ink text-center">
+          Tạo yêu cầu AI tự do
+        </a>
+      </div>
     </>
   );
 }

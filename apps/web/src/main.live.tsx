@@ -18,7 +18,12 @@ export function bootstrap(): void {
 
   createRoot(rootElement).render(
     <StrictMode>
-      <App transport={transport} session={session} mode="live" />
+      <App
+        transport={transport}
+        session={session}
+        mode="live"
+        demoLogin={{ email: "demo@local", password: "synthetic-password" }}
+      />
     </StrictMode>,
   );
 }

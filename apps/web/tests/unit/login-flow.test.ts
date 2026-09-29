@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHttpTransport } from "../../src/core/api.js";
-import { ClientError } from "../../src/core/errors.js";
+import {
+  ClientError,
+  formatBusinessFieldName,
+  formatChecklistSummary,
+  formatErrorClass,
+  toBusinessErrorMessage,
+} from "../../src/core/errors.js";
 import { createSession } from "../../src/core/session.js";
 import type { Transport } from "../../src/core/contracts.js";
 
@@ -70,6 +76,35 @@ describe("Login Flow & Error Mapping", () => {
     expect(netErr.kind).toBe("network");
   });
 
+  it("translates technical error codes, raw English server messages, and snake_case fields into business Vietnamese", () => {
+    expect(toBusinessErrorMessage("NOT_FOUND", "INTAKE_ERROR", 422)).toContain(
+      "Không tìm thấy Mã yêu cầu này trong bảng dữ liệu",
+    );
+    expect(toBusinessErrorMessage("HEADERS", "INTAKE_ERROR", 422)).toContain(
+      "Cấu trúc bảng Google Sheets chưa đúng biểu mẫu chuẩn",
+    );
+    expect(toBusinessErrorMessage("A run is already active", "ACTIVE_RUN", 409)).toContain(
+      "Hệ thống đang xử lý một công việc khác",
+    );
+    expect(toBusinessErrorMessage("Invalid credentials", "INVALID_CREDENTIALS", 401)).toContain(
+      "Email hoặc mật khẩu",
+    );
+    expect(
+      toBusinessErrorMessage(
+        "CHANNEL_NOT_FOUND: Không tìm thấy nơi nhận thông báo.",
+        undefined,
+        400,
+      ),
+    ).toBe("Không tìm thấy nơi nhận thông báo.");
+
+    expect(formatBusinessFieldName("due_date")).toBe("Thời hạn hoàn thành");
+    expect(formatBusinessFieldName("dimensions")).toContain("kích thước");
+    expect(formatChecklistSummary("Checklist passed for design_asset", [], [])).toContain(
+      "đầy đủ",
+    );
+    expect(formatErrorClass("bad_args")).toContain("nơi nhận");
+  });
+
   it("createHttpTransport integrates with session.getToken()", async () => {
     const session = createSession();
     session.setToken("active-token-999");
@@ -103,3 +138,4 @@ describe("Login Flow & Error Mapping", () => {
     }
   });
 });
+

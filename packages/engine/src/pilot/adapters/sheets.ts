@@ -41,13 +41,24 @@ export async function readSheetsRequest(
   const headers: Record<string, string> = {};
   const secrets: string[] = [];
 
+  if (config.google?.privateKey) {
+    secrets.push(config.google.privateKey);
+  }
+  if (config.google?.clientEmail) {
+    secrets.push(config.google.clientEmail);
+  }
+
   if (config.google?.apiKey) {
     url += `?key=${encodeURIComponent(config.google.apiKey)}`;
     secrets.push(config.google.apiKey);
   } else if (config.google?.privateKey) {
-    // Service account token bearer would go here
-    secrets.push(config.google.privateKey);
+    throw new Error(
+      'CONFIG_ERROR: Service account private key authentication requires OAuth2 bearer token; use GOOGLE_SHEETS_API_KEY for API key authentication',
+    );
+  } else {
+    throw new Error('CONFIG_ERROR: Missing Google credentials');
   }
+
 
   // 3. Fetch data via bounded HTTP client
   const response = await pilotFetch<{ values?: unknown[][] }>(

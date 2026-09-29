@@ -1,0 +1,57 @@
+# ATI Project — Multi-Agent Engineering Protocol (v3)
+
+**Version:** 3.1  
+
+> **Đối tượng:** Tài liệu này áp dụng cho mọi AI coding assistant làm việc với
+> repository này (Antigravity, Codex, Claude Code, Cursor, Gemini CLI, v.v.).
+> Dù bạn là agent nào, hãy tuân thủ các quy tắc dưới đây khi đọc/ghi code
+> trong repo `ATI_Project`.
+
+## 1. Phạm vi & Quyền lực chuẩn tắc (Scope & Source of Truth)
+
+Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repository `ATI_Project`. Toàn bộ phương pháp luận Superpowers và vai trò Antigravity Master Orchestrator được tự động kế thừa từ **Global Rules**.
+
+### 1.1. Quyền lực phạm vi v3 (Active Scope Authority)
+- **Báo cáo Tổng quan Project:** [`docs/PROJECT-REPORT.md`](docs/PROJECT-REPORT.md) là tài liệu mô tả toàn cảnh dự án (mục tiêu, kiến trúc, tiến độ). Đọc file này trước để nắm bức tranh tổng thể.
+- **Đặc tả Thiết kế v3:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) là tài liệu chuẩn tắc duy nhất về hành vi nghiệp vụ, luồng xử lý, tool catalog và schema của hệ thống v3.
+- **Kế hoạch Triển khai (28 Tasks TDD):** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) là bản chỉ dẫn thực thi bắt buộc theo từng task tuần tự.
+- **Quy tắc Phân quyền Module & Git:** [`docs/team-workflow.md`](docs/team-workflow.md) là chuẩn tắc về ranh giới sở hữu thư mục (Module Ownership), quy chuẩn commit (Conventional Commits) và chiến lược nhánh.
+
+### 1.2. Ranh giới với mã nguồn cũ (Legacy v2)
+- Các thư mục cũ: `apps/api/`, `apps/web/`, `packages/dsl/`, `packages/engine/`, `db/migrations/` là **mã nguồn lưu trữ lịch sử (Read-only)**.
+- **Tuyệt đối không sửa đổi** các file v2 trừ khi có yêu cầu trích xuất dữ liệu đối chứng. Mọi tính năng v3 được xây dựng độc lập tại:
+  - `packages/tool-schemas/`
+  - `packages/tool-adapters/`
+  - `packages/planner/`
+  - `packages/executor/`
+  - `apps/chat-api/`
+  - `apps/chat-web/`
+  - `db/v3/`
+  - `prompts/`
+  - `evaluations/`
+
+---
+
+## 2. Ranh giới Sở hữu Module (Module Ownership)
+
+- Phân chia quyền sở hữu file và thư mục giữa các chuyên gia được quy định chi tiết tại **Mục 1 của [`docs/team-workflow.md`](docs/team-workflow.md)**.
+- Mỗi subagent chỉ được phép tạo và sửa đổi files trong package mà vai trò của mình sở hữu.
+- Không sửa chéo files của package khác. Khi cần tích hợp, 2 bên phải thỏa thuận interface chung tại `packages/tool-schemas` trước khi code.
+
+---
+
+## 3. Tiêu chuẩn Bằng chứng & Kiểm thử (Evidence Standards)
+
+- **Tuyệt đối không dùng "Mock ảo giác":** Không viết test mock hình thức (ví dụ: mock boolean `let approved = false` để giả vờ test race condition database).
+- **Kiểm thử Concurrency thực tế:** Phải chứng minh qua câu lệnh truy vấn `WHERE status = 'pending'` thật hoặc in-memory DB pool.
+- **Kiểm thử Timeout thực tế:** Phải kiểm tra tín hiệu hủy thực tế thông qua `AbortSignal`.
+- Trọng tài `Reality Checker` mặc định phản biện "CHƯA ĐẠT" và yêu cầu bằng chứng chạy lệnh thực tế (output log, exit code 0) trước khi đóng task.
+
+---
+
+## 4. Hợp đồng Bàn giao & Nghiệm thu (Hand-off & Gate)
+
+Sau khi hoàn thành mỗi task trong số 28 tasks:
+1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
+2. Reviewer độc lập (`Reality Checker` hoặc `Code Reviewer`) soi xét mã nguồn và chạy lại toàn bộ test suite của package đó.
+3. Nếu phát hiện sai sót → Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.

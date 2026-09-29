@@ -1,4 +1,5 @@
 import type { StepState, StepView } from "../../../core/steps.js";
+import { toBusinessErrorMessage } from "../../../core/errors.js";
 import { formatClock } from "../../../core/presentation.js";
 import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "../../components/Icon";
@@ -58,7 +59,11 @@ export function StepList({
                 >
                   {kind}
                 </span>
-                <span>Bước {index + 1}{when}{step.attemptError ? ` · ${step.attemptError}` : ""}</span>
+                <span>
+                  Bước {index + 1}
+                  {when}
+                  {step.attemptError ? ` · ${toBusinessErrorMessage(step.attemptError)}` : ""}
+                </span>
               </span>
             </span>
             <span className={cn("inline-flex items-center gap-1.5 text-button-sm", state.text)}>

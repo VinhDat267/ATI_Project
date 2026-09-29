@@ -128,6 +128,60 @@ describe('pilot/adapters/trello', () => {
     expect(receipt.intentKey).toBe('k'.repeat(64));
   });
 
+  it('creates card when listId matches even if listName differs (localized boards)', async () => {
+    const mockLists = [
+      { id: 'list-vn-1', name: 'Cần làm', closed: false },
+      { id: 'list-vn-2', name: 'Đang làm', closed: false },
+    ];
+    const mockCreatedCard = {
+      id: 'new-card-vn',
+      idList: 'list-vn-1',
+      name: 'Localized Task',
+      url: 'https://trello.com/c/new-card-vn',
+    };
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockLists), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockCreatedCard), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    const receipt = await trelloCreateCard({
+      config: sampleConfig,
+      policy: samplePolicy,
+      principalId: 'operator-a',
+      boardId: 'board-456',
+      listName: 'To Do',
+      listId: 'list-vn-1',
+      title: 'Localized Task',
+      intentKey: 'k'.repeat(64),
+    });
+
+    expect(receipt.cardId).toBe('new-card-vn');
+    expect(receipt.listId).toBe('list-vn-1');
+  });
+
+  it('throws error when explicit listId is absent from board even if listName matches another list', async () => {
+    const mockLists = [
+      { id: 'different-list-id', name: 'To Do', closed: false },
+    ];
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockLists), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+
+    await expect(
+      trelloCreateCard({
+        config: sampleConfig,
+        policy: samplePolicy,
+        principalId: 'operator-a',
+        boardId: 'board-456',
+        listName: 'To Do',
+        listId: 'disappeared-list-id',
+        title: 'Task',
+        intentKey: 'k'.repeat(64),
+      }),
+    ).rejects.toThrow('LIST_NOT_FOUND');
+  });
+
   it('throws error if target list name is not found on board', async () => {
     const mockLists = [{ id: 'list-1', name: 'In Progress', closed: false }];
 
@@ -146,6 +200,26 @@ describe('pilot/adapters/trello', () => {
         intentKey: 'k'.repeat(64),
       }),
     ).rejects.toThrow('LIST_NOT_FOUND');
+  });
+
+  it('does not POST when approval expires while the authorization hook waits', async () => {
+    const expiresAt = new Date(Date.now() + 1000);
+    let now = expiresAt.getTime() - 1;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const requests: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      requests.push(init?.method ?? 'GET');
+      return new Response(JSON.stringify([{ id: 'list-1', name: 'To Do', closed: false }]), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    await expect(trelloCreateCard({
+      config: sampleConfig, policy: samplePolicy, principalId: 'operator-a',
+      boardId: 'board-456', listName: 'To Do', title: 'Task', intentKey: 'k'.repeat(64),
+      approvalExpiresAt: expiresAt,
+      authorizeBeforeWrite: async () => { now = expiresAt.getTime(); },
+    })).rejects.toThrow('APPROVAL_EXPIRED');
+    expect(requests).toEqual(['GET']);
   });
 
   it('does not POST when approval expires during list lookup', async () => {

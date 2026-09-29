@@ -97,6 +97,7 @@ export async function runPilotLivePreflight(
   const secrets = [
     pilotConfig.google?.apiKey,
     pilotConfig.google?.privateKey,
+    pilotConfig.google?.clientEmail,
     pilotConfig.trello?.apiKey,
     pilotConfig.trello?.apiToken,
   ];
@@ -130,6 +131,39 @@ export async function runPilotLivePreflight(
     errors: [],
     evidenceLabel: 'PROPOSED',
   };
+
+  // Reject simulated fallback for live preflight invocation
+  if (options.allowSimulatedFallback) {
+    result.status = 'failed';
+    result.evidenceLabel = 'PROPOSED';
+    const err = 'CONFIG_ERROR: Simulated fallback is rejected for live preflight invocation';
+    result.errors = [err];
+    result.checks.config.error = err;
+    result.checks.config.status = 'fail';
+    return redactObject(result, secrets);
+  }
+
+  // Validate non-empty principalId if specified
+  if (options.principalId !== undefined && !options.principalId.trim()) {
+    result.status = 'failed';
+    result.evidenceLabel = 'PROPOSED';
+    const err = 'CONFIG_ERROR: Principal ID cannot be empty';
+    result.errors = [err];
+    result.checks.config.error = err;
+    result.checks.config.status = 'fail';
+    return redactObject(result, secrets);
+  }
+
+  // Validate non-empty testRequestId if specified
+  if (options.testRequestId !== undefined && !options.testRequestId.trim()) {
+    result.status = 'failed';
+    result.evidenceLabel = 'PROPOSED';
+    const err = 'CONFIG_ERROR: Request ID cannot be empty';
+    result.errors = [err];
+    result.checks.config.error = err;
+    result.checks.config.status = 'fail';
+    return redactObject(result, secrets);
+  }
 
   // If live config is incomplete or disabled, fail-closed as BLOCKED_EXTERNAL
   if (!hasValidConfig || !hasGoogleCreds || !hasTrelloCreds) {

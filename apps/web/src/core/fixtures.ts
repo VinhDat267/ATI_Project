@@ -22,6 +22,18 @@ import type {
   Servers,
   Transport,
 } from "./contracts.js";
+import type {
+  PilotApproveInput,
+  PilotApproveResponse,
+  PilotCatalogResponse,
+  PilotCheckInput,
+  PilotCheckResponse,
+  PilotCreateRunInput,
+  PilotCreateRunResponse,
+  PilotLookupInput,
+  PilotLookupResponse,
+  PilotRunDetailResponse,
+} from "./pilot-contracts.js";
 import { createWorld, WORLD_IDS, type WorldRun } from "../fixtures/world.js";
 
 export const FIXTURE_RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -238,6 +250,61 @@ export function createFixtureTransport(
     return run;
   };
   let created = 0;
+  let createdPilot = 0;
+  const pilotRuns = new Map<string, PilotRunDetailResponse>();
+  const samplePilotId = "pilot-sample-01";
+  pilotRuns.set(samplePilotId, {
+    id: samplePilotId,
+    runId: samplePilotId,
+    userId: "00000000-0000-4000-8000-000000000001",
+    profile: "pilot-v2",
+    status: "awaiting_approval",
+    sourceKey: "sheet-pilot-001/tab-001/REQ-2026-001",
+    sourceRevision: "rev-fixture-01",
+    sourceSnapshot: {
+      requestId: "REQ-2026-001",
+      clientRef: "CR-9042",
+      requestType: "task_create",
+      rawRequest: "Tạo thẻ công việc hoàn thiện báo cáo tài chính Q3 trên Trello",
+      deliverable: "Thẻ Trello kèm deadline",
+      dueDate: "2026-10-05",
+      decisionStatus: "confirmed",
+    },
+    checklistResult: {
+      valid: true,
+      unconfirmedBusiness: false,
+      missingFields: [],
+      summary: "Yêu cầu đầy đủ thông tin, đã qua thẩm định tự động.",
+    },
+    preview: {
+      snapshotHash: "b".repeat(64),
+      actions: [
+        {
+          tool: "trello.create_card",
+          sideEffect: "write",
+          args: {
+            boardId: "board-pilot-01",
+            listName: "Cần làm",
+            title: "[REQ-2026-001] Hoàn thiện báo cáo tài chính Q3",
+            desc: "Yêu cầu tự động trích xuất từ bảng tính Google Sheets.",
+            due: "2026-10-05T17:00:00.000Z",
+          },
+        },
+      ],
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+    },
+    receipt: null,
+    accounting: {
+      inputTokens: 1250,
+      outputTokens: 380,
+      costMicroUsd: 450,
+    },
+    clarificationQuestion: null,
+    refusalReason: null,
+    error: null,
+    createdAt: new Date().toISOString(),
+    endedAt: null,
+  });
 
   return {
     runId: statusResult.success ? FIXTURE_RUN_ID : WORLD_IDS.approval,
@@ -389,6 +456,180 @@ export function createFixtureTransport(
               operations: [],
             },
           ),
+        signal,
+      );
+    },
+
+    async createPilotRun(input, signal) {
+      record("POST", "/pilot/v2/runs");
+      const runId = `pilot-run-${++createdPilot}`;
+      const previewHash = "b".repeat(64);
+      const expiresAt = new Date(Date.now() + 600000).toISOString();
+      const detail: PilotRunDetailResponse = {
+        id: runId,
+        runId,
+        userId: "00000000-0000-4000-8000-000000000001",
+        profile: "pilot-v2",
+        status: "awaiting_approval",
+        sourceKey: `${input.spreadsheetId}/${input.tabId}/${input.requestId}`,
+        sourceRevision: "rev-fixture-01",
+        sourceSnapshot: {
+          requestId: input.requestId,
+          clientRef: "CR-AUTO",
+          requestType: "task_create",
+          rawRequest: input.userPrompt,
+          deliverable: "Thẻ công việc",
+          dueDate: "2026-10-01",
+          decisionStatus: "confirmed",
+        },
+        checklistResult: {
+          valid: true,
+          unconfirmedBusiness: false,
+          missingFields: [],
+          summary: "Yêu cầu hợp lệ và đã qua kiểm tra checklist.",
+        },
+        preview: {
+          snapshotHash: previewHash,
+          actions: [
+            {
+              tool: "trello.create_card",
+              sideEffect: "write",
+              args: {
+                boardId: "board-pilot-01",
+                listName: "Cần làm",
+                title: `[${input.requestId}] ${input.userPrompt.slice(0, 50)}`,
+                desc: input.userPrompt,
+                due: "2026-10-01T17:00:00.000Z",
+              },
+            },
+          ],
+          expiresAt,
+        },
+        receipt: null,
+        accounting: {
+          inputTokens: 1100,
+          outputTokens: 320,
+          costMicroUsd: 390,
+        },
+        clarificationQuestion: null,
+        refusalReason: null,
+        error: null,
+        createdAt: new Date().toISOString(),
+        endedAt: null,
+      };
+      pilotRuns.set(runId, detail);
+      return resolveWithSignal(
+        {
+          runId,
+          status: "awaiting_approval",
+          preview: detail.preview ?? undefined,
+          snapshotHash: previewHash,
+          expiresAt,
+        },
+        signal,
+      );
+    },
+
+    async getPilotRun(id, signal) {
+      record("GET", `/pilot/v2/runs/${id}`);
+      const run = pilotRuns.get(id);
+      if (!run) throw notFound();
+      return resolveWithSignal(run, signal);
+    },
+
+    async approvePilotRun(id, input, signal) {
+      record("POST", `/pilot/v2/runs/${id}/approve`);
+      const run = pilotRuns.get(id);
+      if (!run) throw notFound();
+      if (input.decision === "approved") {
+        run.status = "succeeded";
+        run.endedAt = new Date().toISOString();
+        run.receipt = {
+          cardId: `trello-card-${Date.now()}`,
+          url: "https://trello.com/c/fixture-confirmed-card",
+          listId: "list-fixture-todo",
+          boardId: "board-pilot-01",
+          confirmedAt: new Date().toISOString(),
+        };
+        return resolveWithSignal(
+          {
+            status: "succeeded",
+            receipt: run.receipt,
+          },
+          signal,
+        );
+      }
+      run.status = "rejected";
+      run.endedAt = new Date().toISOString();
+      return resolveWithSignal({ status: "rejected" }, signal);
+    },
+
+    async getPilotCatalog(signal) {
+      record("GET", "/pilot/v2/catalog");
+      return resolveWithSignal(
+        {
+          profile: "pilot-v2",
+          tools: [
+            {
+              name: "google_sheets.read_rows",
+              description: "Đọc dòng dữ liệu từ Google Sheets trong phạm vi đã phê duyệt",
+              sideEffect: "read",
+            },
+            {
+              name: "trello.get_card",
+              description: "Tra cứu thông tin và trạng thái thẻ công việc trên Trello",
+              sideEffect: "read",
+            },
+            {
+              name: "trello.create_card",
+              description: "Tạo thẻ công việc mới trên bảng Trello chỉ định (Cần duyệt)",
+              sideEffect: "write",
+            },
+          ],
+        },
+        signal,
+      );
+    },
+
+    async checkPilotRequest(input, signal) {
+      record("POST", "/pilot/v2/check");
+      return resolveWithSignal(
+        {
+          status: "checked",
+          sourceKey: `${input.spreadsheetId}/${input.tabId}/${input.requestId}`,
+          sourceRevision: "rev-fixture-01",
+          checklistResult: {
+            valid: true,
+            unconfirmedBusiness: false,
+            missingFields: [],
+            conflicts: [],
+            evidences: { request_id: input.requestId },
+            summary: "Checklist hợp lệ.",
+          },
+          summary: "Yêu cầu đạt tiêu chuẩn xử lý.",
+          clarificationQuestion: null,
+          refusalReason: null,
+        },
+        signal,
+      );
+    },
+
+    async lookupPilotCard(input, signal) {
+      record("POST", "/pilot/v2/lookup");
+      return resolveWithSignal(
+        {
+          status: "found",
+          sourceKey: `${input.spreadsheetId}/${input.tabId}/${input.requestId}`,
+          card: {
+            id: "card-fixture-lookup",
+            name: `Thẻ ${input.requestId}`,
+            description: "Thẻ đã được tìm thấy trên Trello",
+            listId: "list-fixture-todo",
+            due: null,
+            members: [],
+            url: "https://trello.com/c/fixture-lookup-card",
+          },
+        },
         signal,
       );
     },

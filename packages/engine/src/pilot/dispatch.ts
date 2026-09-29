@@ -165,6 +165,7 @@ export async function executePilotWorkflow(params: {
   assigneeId?: string;
   intentKey: string;
   sourceKey: string;
+  authorizeBeforeWrite?: () => Promise<void>;
 }): Promise<PilotWorkflowResult> {
   const {
     runId,
@@ -226,7 +227,16 @@ export async function executePilotWorkflow(params: {
       runId,
     });
   } catch (err: unknown) {
-    return { status: 'failed', error: (err as Error).message };
+    const message = err instanceof Error ? err.message : '';
+    // Only the two server-owned reservation states may cross this boundary.
+    // Never propagate a PostgreSQL or external exception body to the client.
+    let code = 'RESERVATION_UNAVAILABLE: Pilot reservation unavailable';
+    if (message.startsWith('INTENT_ALREADY_RESERVED:')) {
+      code = 'INTENT_ALREADY_RESERVED: Pilot intent already reserved';
+    } else if (message.startsWith('INTENT_IN_UNKNOWN_STATE:')) {
+      code = 'INTENT_IN_UNKNOWN_STATE: Pilot intent requires reconciliation';
+    }
+    return { status: 'failed', error: code };
   }
 
   // If already confirmed, reuse existing card receipt without dispatching again
@@ -265,7 +275,8 @@ export async function executePilotWorkflow(params: {
         assigneeId,
         intentKey,
       },
-      { config, policy, principalId, approvalExpiresAt: approval.expiresAt },
+      { config, policy, principalId, approvalExpiresAt: approval.expiresAt,
+        authorizeBeforeWrite: params.authorizeBeforeWrite },
     );
 
     // Validate receipt strictly against schema before confirming
@@ -278,20 +289,18 @@ export async function executePilotWorkflow(params: {
       status: 'succeeded',
       receipt,
     };
-  } catch (err: unknown) {
-    const msg = (err as Error)?.message ?? String(err);
-    // A string in an error cannot prove the POST was never accepted remotely.
-    // Conservatively quarantine every failure after dispatch invocation.
-    let storeErrorDetail = '';
+  } catch {
+    // No exception text or remote response body is safe to expose. A failure
+    // after dispatch claim cannot prove whether Trello accepted the write.
     try {
       await store.markUnknown(intentKey);
-    } catch (storeError: unknown) {
-      storeErrorDetail = `; MARK_UNKNOWN_FAILED: ${storeError instanceof Error ? storeError.message : String(storeError)}`;
+    } catch {
+      // If quarantine persistence itself failed, the claimed reservation still
+      // cannot be retried; the caller must reconcile the run conservatively.
     }
-
     return {
       status: 'reconciliation_required',
-      error: `REMOTE_WRITE_UNKNOWN: ${msg}${storeErrorDetail}`,
+      error: 'REMOTE_WRITE_UNKNOWN: Pilot dispatch requires reconciliation',
     };
   }
 }

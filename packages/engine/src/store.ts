@@ -226,11 +226,53 @@ export class Store {
         if (attempt.result !== null && attempt.result !== undefined)
           readOutputs[attempt.step_id] = attempt.result;
       }
+
+      const rawPlan = version?.plan as Record<string, unknown> | undefined;
+      const isLegacyPlan =
+        rawPlan && Array.isArray(rawPlan.steps) && rawPlan.steps.length > 0;
+      let plan = null;
+      if (isLegacyPlan) {
+        plan = rawPlan;
+      } else if (run.workflow_version_id) {
+        plan = {
+          version: "1.0",
+          name: `Pilot v2: ${(run.source_prompt || "Run").slice(0, 30)}`,
+          source_prompt: run.source_prompt || "Pilot v2 execution",
+          inputs: {},
+          steps: [
+            {
+              id: "pilot_action",
+              description: (run.source_prompt || "Thao tác Pilot v2").slice(
+                0,
+                100,
+              ),
+              tool: {
+                server: "pilot-gateway",
+                name: "trello.create_card",
+                args: {},
+              },
+              depends_on: [],
+              condition: null,
+              retry: {
+                max_attempts: 1,
+                backoff: "exponential",
+                initial_delay_ms: 500,
+              },
+              idempotency_key: "pilot-" + id,
+              side_effect: "write",
+              on_error: "fail",
+              timeout_ms: 30000,
+            },
+          ],
+          outputs: {},
+        };
+      }
+
       return RunDetailSchema.parse({
         run_id: id,
         status: run.status,
         workflow_version_id: run.workflow_version_id,
-        plan: version?.plan ?? null,
+        plan,
         planner_result: run.planner_result ?? null,
         time_zone: run.time_zone,
         runtime: run.runtime,
@@ -246,7 +288,9 @@ export class Store {
               snapshot_hash: approval.snapshot_hash,
               decision: approval.decision,
               expires_at: stamp(approval.expires_at),
-              actions: (approval.preview as Snapshot).actions,
+              actions: Array.isArray((approval.preview as Snapshot)?.actions)
+                ? (approval.preview as Snapshot).actions
+                : [],
             }
           : null,
       });
@@ -262,7 +306,22 @@ export class Store {
         "HISTORY_LIMIT",
         "Run history is limited to the newest 1000 runs",
       );
-    return Promise.all(rows.map((row) => this.detail(row.id)));
+    const results = await Promise.allSettled(
+      rows.map((row) => this.detail(row.id)),
+    );
+    const runs: Awaited<ReturnType<Store["detail"]>>[] = [];
+    results.forEach((res, i) => {
+      const row = rows[i];
+      if (res.status === "fulfilled") {
+        runs.push(res.value);
+      } else if (row) {
+        console.error(
+          `Failed to load run detail for ${row.id}:`,
+          res.reason,
+        );
+      }
+    });
+    return runs;
   }
 
   async claimPrepare(id: string) {

@@ -73,6 +73,26 @@ describe('pilot/dispatch', () => {
   });
 
   describe('executePilotWorkflow', () => {
+    it('does not expose unexpected reservation error text', async () => {
+      const store = new InMemoryReservationStore();
+      const poison = 'fixture-token <script>database diagnostic</script>';
+      vi.spyOn(store, 'reserve').mockRejectedValue(new Error(poison));
+      const post = vi.spyOn(globalThis, 'fetch');
+      const result = await executePilotWorkflow({
+        runId: 'run-reserve-fault', principalId: 'operator-a',
+        config: sampleConfig, policy: samplePolicy, store,
+        approval: {
+          ownerId: 'operator-a', decision: 'approved', snapshotHash: 'hash-abc',
+          expiresAt: new Date(Date.now() + 600_000),
+        },
+        expectedHash: 'hash-abc', cardTitle: 'Task', listName: 'To Do',
+        intentKey: 'intent-reserve-fault', sourceKey: 'source-reserve-fault',
+      });
+      expect(result).toEqual({ status: 'failed',
+        error: 'RESERVATION_UNAVAILABLE: Pilot reservation unavailable' });
+      expect(JSON.stringify(result)).not.toContain(poison);
+      expect(post).not.toHaveBeenCalled();
+    });
     it('does not release an intent when a POST error body resembles a preflight error', async () => {
       const store = new InMemoryReservationStore();
       const post = vi.spyOn(globalThis, 'fetch')

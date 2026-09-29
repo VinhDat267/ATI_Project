@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RunDetail } from "../../../core/contracts.js";
+import { formatBusinessError } from "../../../core/errors.js";
 import { formatClock, formatRemaining } from "../../../core/presentation.js";
 import { runKeys } from "../../../core/queries.js";
 import { summarizeAction, type WriteSummary } from "../../../core/writes.js";
@@ -134,8 +135,9 @@ export function DecisionCard({ run }: { run: RunDetail }) {
         </Banner>
       ) : commandSnapshot.status === "error" ? (
         <Banner tone="danger" icon="circle-x" title="Chưa gửi được quyết định" live>
-          {commandSnapshot.error?.message ??
-            "Trạng thái lần chạy đang được tải lại. Nếu bản xem trước đã hết hạn hoặc đã có quyết định khác, trang sẽ cập nhật theo máy chủ."}
+          {commandSnapshot.error
+            ? formatBusinessError(commandSnapshot.error)
+            : "Trạng thái lần chạy đang được tải lại. Nếu bản xem trước đã hết hạn hoặc đã có quyết định khác, trang sẽ cập nhật theo máy chủ."}
         </Banner>
       ) : null}
 

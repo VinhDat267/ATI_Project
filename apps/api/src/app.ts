@@ -69,6 +69,7 @@ export interface HealthOptions {
 }
 
 import { createPilotRouter } from "./pilot-router.js";
+import type { PilotAccountedPlanner } from "./pilot-planner.js";
 import type { PilotConfig, PilotPolicy, ReadSheetsRequestResult } from "@wap/engine";
 
 export interface CreateApiOptions {
@@ -101,6 +102,9 @@ export interface CreateApiOptions {
   pilotConfig?: PilotConfig;
   pilotPolicy?: PilotPolicy;
   pilotLiveWriteEnabled?: boolean;
+  /** Opt-in advisory planner; no provider is installed by the production launcher. */
+  pilotPlanner?: PilotAccountedPlanner;
+  pilotPlannerTimeoutMs?: number;
   readSheetsRequestFn?: (params: {
     config: PilotConfig;
     policy: PilotPolicy;
@@ -149,6 +153,8 @@ export function createApi(options: CreateApiOptions): ApiRuntime {
       pilotConfig: options.pilotConfig,
       pilotPolicy: options.pilotPolicy,
       liveWriteEnabled: options.pilotLiveWriteEnabled,
+      pilotPlanner: options.pilotPlanner,
+      plannerTimeoutMs: options.pilotPlannerTimeoutMs,
       readSheetsRequestFn: options.readSheetsRequestFn,
     });
   const identityLookup =

@@ -5,6 +5,8 @@ import { DEMO_USER_ID, migrate, openDatabase, seedDemo } from "@wap/db";
 import {
   createPostgresProviderCallLedger,
   ensurePostgresProviderCampaign,
+  reservePostgresProviderCallInTransaction,
+  settlePostgresProviderCallInTransaction,
 } from "../src/ai/providers/postgres-ledger.js";
 import type { ProviderCallReservation } from "../src/ai/providers/accounting.js";
 
@@ -150,5 +152,42 @@ describe("PostgreSQL provider call ledger", () => {
     await expect(
       db.client`SELECT held_micros,committed_micros FROM ai_provider_campaigns WHERE campaign_id=${campaignId}`,
     ).resolves.toEqual([{ held_micros: "60", committed_micros: "0" }]);
+  });
+
+  it("rolls back a transaction-scoped reservation when the caller fails", async () => {
+    await expect(db.client.begin(async (tx) => {
+      await reservePostgresProviderCallInTransaction(tx, {
+        campaignId, userId: DEMO_USER_ID,
+      }, reservation({ estimatedCostMicros: 60 }));
+      throw new Error("caller rolled back");
+    })).rejects.toThrow("caller rolled back");
+    expect(await db.client`SELECT call_id FROM ai_provider_calls`).toHaveLength(0);
+    expect(await db.client`
+      SELECT held_micros,committed_micros FROM ai_provider_campaigns
+      WHERE campaign_id=${campaignId}`)
+      .toEqual([{ held_micros: "0", committed_micros: "0" }]);
+  });
+
+  it("serializes transaction-scoped reservations and keeps identical settlement idempotent", async () => {
+    const scope = { campaignId, userId: DEMO_USER_ID };
+    const results = await Promise.allSettled([
+      db.client.begin((tx) => reservePostgresProviderCallInTransaction(tx, scope,
+        reservation({ estimatedCostMicros: 60 }))),
+      db.client.begin((tx) => reservePostgresProviderCallInTransaction(tx, scope,
+        reservation({ estimatedCostMicros: 60, trialId: "second" }))),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const callId = (results.find((result) => result.status === "fulfilled") as PromiseFulfilledResult<string>).value;
+    const outcome = { status: "succeeded" as const, usage: { totalTokens: 5 }, costMicros: 60 };
+    const first = await db.client.begin((tx) =>
+      settlePostgresProviderCallInTransaction(tx, scope, callId, outcome));
+    const replay = await db.client.begin((tx) =>
+      settlePostgresProviderCallInTransaction(tx, scope, callId, outcome));
+    expect(first).toEqual({ overrun: false, conflict: false });
+    expect(replay).toEqual({ overrun: false, conflict: false });
+    expect(await db.client`
+      SELECT held_micros,committed_micros FROM ai_provider_campaigns
+      WHERE campaign_id=${campaignId}`)
+      .toEqual([{ held_micros: "0", committed_micros: "60" }]);
   });
 });

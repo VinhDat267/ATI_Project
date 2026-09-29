@@ -1,0 +1,21 @@
+name: ati-v3
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ati_v3
+      POSTGRES_PASSWORD: ati_v3_local_only
+      POSTGRES_DB: ati_v3
+    ports:
+      - "127.0.0.1:55533:5432"
+    volumes:
+      - v3_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ati_v3 -d ati_v3"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  v3_pgdata:
