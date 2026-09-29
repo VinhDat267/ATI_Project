@@ -7,9 +7,8 @@ import { ExecutionService } from '../../src/services/execution-service.js';
 import {
   AIPlanner,
   MockLLMProvider,
-  type PlannerResponse,
 } from '@wap/planner';
-import { TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { TRELLO_TOOLS, SLACK_TOOLS, type PlannerResponse } from '@wap/tool-schemas';
 
 export interface E2EAppOptions {
   mode: 'happy-path' | 'clarification' | 'fail-step';
@@ -245,8 +244,9 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   const sseManager = new SSEManager();
   const originalEmit = sseManager.emitEvent.bind(sseManager);
   sseManager.emitEvent = (convId: string, eventName: string, data: any) => {
-    originalEmit(convId, eventName, data);
+    const event = originalEmit(convId, eventName, data);
     recordEvent(eventName, data);
+    return event;
   };
 
   // 6. Chat Service event forwarding
@@ -342,8 +342,10 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
   const waitForEvent = (eventName: string, timeoutMs = 5000): Promise<any> => {
     const existingIndex = eventHistory.findIndex((e) => e.event === eventName);
     if (existingIndex !== -1) {
-      const matched = eventHistory.splice(existingIndex, 1)[0];
-      return Promise.resolve(matched.data);
+      const [matched] = eventHistory.splice(existingIndex, 1);
+      if (matched) {
+        return Promise.resolve(matched.data);
+      }
     }
 
     return new Promise((resolve, reject) => {
