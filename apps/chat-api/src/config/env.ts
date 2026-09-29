@@ -6,6 +6,8 @@ export interface EnvConfig {
   ENCRYPTION_KEY: string;
   GEMINI_API_KEY: string;
   LLM_PROVIDER: 'gemini' | 'openai-compatible';
+  /** IANA zone the planner resolves relative dates such as "thứ 6" in. */
+  APP_TIME_ZONE: string;
   PORT: number;
   RUNTIME_MODE: 'live' | 'sandbox';
 }
@@ -22,6 +24,12 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const LLM_PROVIDER = env.LLM_PROVIDER || 'gemini';
   if (LLM_PROVIDER !== 'gemini' && LLM_PROVIDER !== 'openai-compatible') {
     throw new Error('LLM_PROVIDER must be gemini or openai-compatible');
+  }
+  const APP_TIME_ZONE = env.APP_TIME_ZONE || 'Asia/Ho_Chi_Minh';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: APP_TIME_ZONE });
+  } catch {
+    throw new Error(`APP_TIME_ZONE must be an IANA time zone such as Asia/Ho_Chi_Minh, got ${APP_TIME_ZONE}`);
   }
 
   if (isProduction || isLive) {
@@ -65,6 +73,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     ENCRYPTION_KEY,
     GEMINI_API_KEY,
     LLM_PROVIDER,
+    APP_TIME_ZONE,
     PORT,
     RUNTIME_MODE,
   };

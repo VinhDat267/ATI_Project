@@ -290,6 +290,7 @@ async function bootstrap() {
         : ALL_TOOLS,
       gatherSearch,
       requireGroundedResources: env.RUNTIME_MODE === 'live',
+      timeZone: env.APP_TIME_ZONE,
     }).processMessage(input),
     (input: any) => backupPlanner.processMessage(input));
 

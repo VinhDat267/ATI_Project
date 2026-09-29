@@ -27,6 +27,8 @@ interface Scenario {
   expectTools?: string[];
   /** Each [from, to] pair: a step using `to` must reference the output of a step using `from`. */
   expectLinks?: Array<[string, string]>;
+  /** Expected create_card `due` date prefix, or null when no deadline was stated. */
+  expectDue?: string | null;
 }
 
 const board = { id: 'fixture_board_frontend', name: 'Frontend' };
@@ -40,6 +42,10 @@ const fixtureSearch: Record<string, unknown[]> = {
   'slack.search_channels': [channel], 'github.search_repos': [repository],
 };
 
+/** Fixed clock so relative deadlines are checkable: Tuesday 2026-09-29, 10:00 in Hanoi. */
+const PROBE_NOW = new Date('2026-09-29T03:00:00Z');
+const PROBE_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
 const scenarios: Scenario[] = [
   {
     // First turn of a real conversation: nothing resolved yet, only search.
@@ -50,17 +56,17 @@ const scenarios: Scenario[] = [
   {
     id: 'demo_vi', memory: { board, list, member, channel },
     message: 'Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack',
-    expectKind: 'plan', expectTools: ['trello.create_card', 'slack.send_message'],
+    expectKind: 'plan', expectTools: ['trello.create_card', 'slack.send_message'], expectDue: '2026-10-02',
     expectLinks: [['trello.create_card', 'slack.send_message']],
   },
   {
     id: 'demo_en', memory: { board, list, member, channel },
     message: 'Create a task to update the homepage for the frontend team, due Friday, assign Minh, and notify the team on Slack',
-    expectKind: 'plan', expectTools: ['trello.create_card', 'slack.send_message'],
+    expectKind: 'plan', expectTools: ['trello.create_card', 'slack.send_message'], expectDue: '2026-10-02',
     expectLinks: [['trello.create_card', 'slack.send_message']],
   },
   {
-    id: 'demo_vi_checklist', memory: { board, list, member, channel },
+    id: 'demo_vi_checklist', memory: { board, list, member, channel }, expectDue: null,
     message: 'Tạo task chuẩn bị release v2 cho Minh, thêm checklist gồm viết changelog, chạy test, deploy staging, rồi báo kênh Slack',
     expectKind: 'plan', expectTools: ['trello.create_card', 'trello.add_checklist', 'slack.send_message'],
     expectLinks: [['trello.create_card', 'trello.add_checklist'], ['trello.create_card', 'slack.send_message']],
@@ -115,7 +121,7 @@ async function main() {
   const results = [];
   for (const scenario of scenarios) {
     const provider = new RecordingProvider(createProviderFromEnv(process.env));
-    const planner = new AIPlanner({ provider, toolCatalog: ALL_TOOLS,
+    const planner = new AIPlanner({ provider, toolCatalog: ALL_TOOLS, now: () => PROBE_NOW, timeZone: PROBE_TIME_ZONE,
       gatherSearch: async ({ tool }) => scenario.searchable === false ? [] : fixtureSearch[tool] ?? [] });
     const memory = new WorkingMemory();
     memory.fromJSON(structuredClone(scenario.memory));
@@ -132,6 +138,11 @@ async function main() {
       const used = response.steps.map((s) => s.tool);
       if (scenario.expectTools) checks.tools = scenario.expectTools.every((tool) => used.includes(tool));
       for (const [from, to] of scenario.expectLinks ?? []) checks[`link ${from} -> ${to}`] = linked(response, from, to);
+      if (scenario.expectDue !== undefined) {
+        const due = response.steps.find((step) => step.tool === 'trello.create_card')?.args.due;
+        checks.due = scenario.expectDue === null ? due === undefined
+          : typeof due === 'string' && due.startsWith(scenario.expectDue) && due.endsWith('+07:00');
+      }
     }
     const result = {
       id: scenario.id, message: scenario.message, fixtureMemory: scenario.memory,
@@ -148,7 +159,7 @@ async function main() {
   const report = {
     evidence: 'provider_observed', provider: configured.name, model,
     gateway: configured.name === 'openai-compatible' ? process.env.LLM_BASE_URL : undefined,
-    runAt: new Date().toISOString(),
+    runAt: new Date().toISOString(), plannerClock: PROBE_NOW.toISOString(), timeZone: PROBE_TIME_ZONE,
     scope: 'planning only; no plan executed; search results and earlier-turn memory are labelled fixtures, not live Trello/Slack/GitHub data',
     passed: results.filter((r) => r.passed).length, total: results.length, results,
   };

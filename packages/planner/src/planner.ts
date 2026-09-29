@@ -16,6 +16,10 @@ export interface AIPlannerOptions {
    * working memory (sandbox fixtures) should disable this.
    */
   requireGroundedResources?: boolean;
+  /** Clock used to resolve relative dates such as "thứ 6"; defaults to the system clock. */
+  now?: () => Date;
+  /** IANA time zone users plan in; defaults to Asia/Ho_Chi_Minh. */
+  timeZone?: string;
 }
 
 export interface GatherSearchRequest {
@@ -73,8 +77,12 @@ export class AIPlanner {
   private gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
   private serviceRegistry: ServiceDefinition[];
   private requireGroundedResources: boolean;
+  private now: () => Date;
+  private timeZone: string;
 
   constructor(options: AIPlannerOptions) {
+    this.now = options.now ?? (() => new Date());
+    this.timeZone = options.timeZone ?? 'Asia/Ho_Chi_Minh';
     this.provider = options.provider;
     this.toolCatalog = options.toolCatalog;
     this.gatherSearch = options.gatherSearch;
@@ -188,7 +196,7 @@ export class AIPlanner {
     }
 
     // 2. Prepare System Prompt & Conversation
-    const systemPrompt = buildSystemPrompt(activeTools);
+    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone });
     const conversationHistory: ChatMessage[] = [
       ...history,
       { role: 'user', content: planningMessage },

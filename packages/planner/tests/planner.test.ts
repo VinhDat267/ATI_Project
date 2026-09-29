@@ -23,6 +23,38 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     expect(prompt).toMatch(/never invent/i);
   });
 
+  describe('current date context', () => {
+    const tuesdayMorningHanoi = { now: new Date('2026-09-29T03:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' };
+
+    it('states today in the configured time zone with its UTC offset', () => {
+      const prompt = buildSystemPrompt(tools, tuesdayMorningHanoi);
+      expect(prompt).toContain('Today is 2026-09-29, thứ 3 / Tuesday, time zone Asia/Ho_Chi_Minh (UTC+07:00)');
+    });
+
+    it('lists the next seven days with Vietnamese and English weekday names', () => {
+      const prompt = buildSystemPrompt(tools, tuesdayMorningHanoi);
+      expect(prompt).toContain('- thứ 6 / Friday: 2026-10-02');
+      expect(prompt).toContain('- chủ nhật / Sunday: 2026-10-04');
+      expect(prompt).toContain('- thứ 2 / Monday: 2026-10-05');
+      expect(prompt).toContain('- ngày mai / tomorrow: 2026-09-30');
+      expect(prompt).toMatch(/due.*ISO-8601.*\+07:00/s);
+    });
+
+    it('uses the local calendar day when UTC is still on the previous day', () => {
+      const prompt = buildSystemPrompt(tools, { now: new Date('2026-09-29T20:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' });
+      expect(prompt).toContain('Today is 2026-09-30, thứ 4 / Wednesday');
+      expect(prompt).toContain('- thứ 6 / Friday: 2026-10-02');
+    });
+
+    it('gives the model the planner clock and time zone', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([{ kind: 'refusal', reason: 'n/a' }]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, now: () => new Date('2026-12-31T18:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' });
+      await planner.processMessage({ userMessage: 'Tạo card deadline thứ 6', memory: new WorkingMemory() });
+      expect(provider.getLastInput()?.systemPrompt).toContain('Today is 2027-01-01, thứ 6 / Friday');
+    });
+  });
+
   it('gathers a single board match before planning and passes its ID in working memory', async () => {
     const provider = new MockLLMProvider();
     provider.setPlanResponses([{ kind: 'clarification', question: 'Which list?', context: 'Need a list' }]);

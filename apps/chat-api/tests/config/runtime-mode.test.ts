@@ -30,6 +30,12 @@ describe('runtime mode fail-closed boundaries', () => {
     expect(() => validateEnv({ ...live, LLM_PROVIDER: 'mystery', GEMINI_API_KEY: 'k' })).toThrow(/LLM_PROVIDER/);
   });
 
+  it('defaults the planning time zone and rejects an unknown one at startup', () => {
+    expect(validateEnv({ RUNTIME_MODE: 'sandbox' }).APP_TIME_ZONE).toBe('Asia/Ho_Chi_Minh');
+    expect(validateEnv({ RUNTIME_MODE: 'sandbox', APP_TIME_ZONE: 'Europe/Berlin' }).APP_TIME_ZONE).toBe('Europe/Berlin');
+    expect(() => validateEnv({ RUNTIME_MODE: 'sandbox', APP_TIME_ZONE: 'Mars/Olympus' })).toThrow(/APP_TIME_ZONE/);
+  });
+
   it('never resolves a real adapter in sandbox even if credentials exist', async () => {
     const { createRuntimeAdapterFactory } = await import('../../src/config/runtime-policy.js');
     const real = vi.fn().mockResolvedValue({ execute: vi.fn() });

@@ -1,6 +1,7 @@
 import type { ToolDefinition } from '@wap/tool-schemas';
+import { buildDateContext, type DateContext } from './date-context.js';
 
-export function buildSystemPrompt(tools: ToolDefinition[]): string {
+export function buildSystemPrompt(tools: ToolDefinition[], dateContext?: DateContext): string {
   const serviceNames = [...new Set(tools.map((tool) => tool.service))].join(', ');
   const toolList = tools.map((tool) =>
     `- **${tool.name}** (${tool.sideEffect}, risk: ${tool.riskLevel}): ${tool.description}\n  Input: ${JSON.stringify(tool.inputSchema)}\n  Output: ${JSON.stringify(tool.outputSchema)}`
@@ -38,5 +39,5 @@ ${toolList}
 6. Only use tools listed above. Never assume a user-named service is connected or authorized.
 7. For a previous step's output use { "$ref": "step_id.output.propertyName" }, or { "$template": "See \${step_id.output.url}" }. Declare that step first and list it in \`dependsOn\`.
 8. Never invent resource identifiers. An input marked \`x-resource\` must be the matching Working Memory entity's value (its \`x-resource-field\`, default \`id\`), an identifier the user typed, or a \`$ref\` to an earlier step. If it is unknown, return a clarification asking which resource to use. IDs in examples are placeholders.
-${crossServiceExample}`;
+${dateContext ? `\n${buildDateContext(dateContext)}\n` : ''}${crossServiceExample}`;
 }
