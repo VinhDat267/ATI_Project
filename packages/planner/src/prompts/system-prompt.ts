@@ -33,7 +33,7 @@ ${toolList}
 ### Rules:
 1. Include a \`thinking\` property explaining the selected tools, arguments and dependencies.
 2. Return only one raw JSON object without markdown or other text.
-3. Use \`kind: "plan"\` when the workflow is executable, with \`thinking\`, \`summary\`, \`steps\` and \`warnings\` (maximum 10 steps).
+3. Use \`kind: "plan"\` when the workflow is executable, with \`thinking\`, \`summary\`, \`steps\` and \`warnings\` (maximum 10 steps). Every step is exactly { "id": string, "tool": string, "description": string, "args": object, "dependsOn": string[] }: tool inputs go in "args", never "arguments", and "description" is a short human-readable sentence.
 4. Use \`kind: "clarification"\` for missing or ambiguous resources, with \`question\`, optional \`options\` and \`context\`.
 5. Use \`kind: "refusal"\` for unsupported, unavailable or unsafe actions, with \`reason\` and optional \`suggestion\`.
 6. Only use tools listed above. Never assume a user-named service is connected or authorized.

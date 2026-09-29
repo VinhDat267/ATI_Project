@@ -17,6 +17,15 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     expect(prompt).not.toContain('"channelId": "C0123456789"');
   });
 
+  it('always specifies the plan step format, even when the cross-service example is not shown', () => {
+    for (const catalog of [GITHUB_TOOLS, SLACK_TOOLS, TRELLO_TOOLS.filter((tool) => tool.name !== 'trello.add_member')]) {
+      const prompt = buildSystemPrompt(catalog);
+      expect(prompt).not.toContain('#### Example: Cross-step reference');
+      expect(prompt).toContain('{ "id": string, "tool": string, "description": string, "args": object, "dependsOn": string[] }');
+      expect(prompt).toMatch(/"args".*never "arguments"/);
+    }
+  });
+
   it('tells the model that resource IDs must come from working memory, the user or a $ref', () => {
     const prompt = buildSystemPrompt(tools);
     expect(prompt).toMatch(/x-resource/);
