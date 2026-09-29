@@ -1,6 +1,6 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal';
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form';
 
 /** Label for one argument; every key present must hold. */
 export interface Matcher {

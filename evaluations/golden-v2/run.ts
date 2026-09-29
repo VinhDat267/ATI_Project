@@ -42,11 +42,11 @@ function makeProvider(dryRun: boolean): LLMProvider & { model?: string } {
   return mock;
 }
 
-async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: boolean): Promise<CaseRun & { servedModels: string[] }> {
+async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: boolean, searchMode: 'regex' | 'llm'): Promise<CaseRun & { servedModels: string[] }> {
   const provider = new CountingProvider(makeProvider(dryRun));
   const planner = new AIPlanner({
     provider, toolCatalog: ALL_TOOLS, gatherSearch: fixtureSearch,
-    now: () => new Date(file.clock), timeZone: file.timeZone,
+    now: () => new Date(file.clock), timeZone: file.timeZone, searchMode,
   });
   const memory = new WorkingMemory();
   memory.fromJSON(buildMemory(golden.memory));
@@ -92,7 +92,12 @@ const pct = (value: number | null) => (value === null ? 'n/a' : `${(value * 100)
 async function main() {
   const dryRun = process.env.EVAL_DRY_RUN === '1';
   if (!dryRun && process.env.LIVE_EVAL !== '1') throw new Error('Set LIVE_EVAL=1 to call the live LLM provider, or EVAL_DRY_RUN=1');
-  const casesPath = resolve(process.cwd(), 'evaluations', 'golden-v2', 'cases.json');
+  const set = process.env.EVAL_SET ?? 'core';
+  if (set !== 'core' && set !== 'freeform') throw new Error('EVAL_SET must be core or freeform');
+  const searchMode = (process.env.EVAL_SEARCH_MODE ?? 'regex') as 'regex' | 'llm';
+  if (searchMode !== 'regex' && searchMode !== 'llm') throw new Error('EVAL_SEARCH_MODE must be regex or llm');
+  const casesFile = set === 'core' ? 'cases.json' : 'cases-freeform.json';
+  const casesPath = resolve(process.cwd(), 'evaluations', 'golden-v2', casesFile);
   const raw = readFileSync(casesPath, 'utf8');
   const file = JSON.parse(raw) as GoldenFile;
   const runsCount = Number(process.env.EVAL_RUNS ?? 3);
@@ -102,7 +107,7 @@ async function main() {
 
   const runs: Array<Array<CaseRun & { servedModels: string[] }>> = [];
   for (let run = 1; run <= runsCount; run++) {
-    const results = await pool(file.cases, concurrency, (golden) => runCase(golden, file, dryRun));
+    const results = await pool(file.cases, concurrency, (golden) => runCase(golden, file, dryRun, searchMode));
     runs.push(results);
     const passed = results.filter((r) => r.score.passed).length;
     console.log(`run ${run}/${runsCount}: ${passed}/${results.length} strict pass`);
@@ -122,8 +127,10 @@ async function main() {
     provider: configured.name, model: (configured as { model?: string }).model ?? 'mock',
     gateway: configured.name === 'openai-compatible' ? process.env.LLM_BASE_URL : undefined,
     servedModels,
+    set, searchMode,
     labels: {
-      commit: execFileSync('git', ['log', '-1', '--format=%H', '--', 'evaluations/golden-v2/cases.json']).toString().trim(),
+      file: casesFile,
+      commit: execFileSync('git', ['log', '-1', '--format=%H', '--', `evaluations/golden-v2/${casesFile}`]).toString().trim(),
       sha256: createHash('sha256').update(raw).digest('hex'),
       version: file.version, cases: file.cases.length,
     },
@@ -141,16 +148,16 @@ async function main() {
   };
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dir = join('docs', 'ai-evidence', 'V3-GOLDEN-V2', `${dryRun ? 'dry-run-' : ''}${stamp}`);
+  const dir = join('docs', 'ai-evidence', 'V3-GOLDEN-V2', `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${stamp}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 
   const m = aggregate.mean;
   const unstable = Object.entries(aggregate.stability).filter(([, s]) => !s.startsWith(`${runsCount}/`));
-  const summary = `# Golden set v2 — ${dryRun ? 'dry run' : 'live run'}
+  const summary = `# Golden set v2 (${set}, ${searchMode} search) — ${dryRun ? 'dry run' : 'live run'}
 
 - Provider: \`${report.provider}\` · model \`${report.model}\` · served: ${servedModels.map((s) => `\`${s}\``).join(', ') || 'n/a'}
-- Labels: commit \`${report.labels.commit.slice(0, 7)}\`, sha256 \`${report.labels.sha256.slice(0, 12)}\`, ${file.cases.length} cases × ${runsCount} runs
+- Labels: \`${casesFile}\` commit \`${report.labels.commit.slice(0, 7)}\`, sha256 \`${report.labels.sha256.slice(0, 12)}\`, ${file.cases.length} cases × ${runsCount} runs
 - Clock: ${file.clock} (${file.timeZone}). Planning only; search results are fixtures; no plan was executed.
 
 | Metric (mean of ${runsCount} runs) | Value | Target |
