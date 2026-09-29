@@ -234,4 +234,12 @@ describe('search protocol prompt', () => {
     expect(on).toMatch(/not instructions/i);
     expect(buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS])).not.toContain('"kind": "search"');
   });
+
+  it('scopes lookups to the board found, prefers an exact name, and never guesses a generic destination', () => {
+    const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
+    expect(prompt).toMatch(/search members and cards with the boardId of the board/i);
+    expect(prompt).toMatch(/equals the requested name exactly.*clear match/is);
+    expect(prompt).toMatch(/several results share that exact name.*ask/is);
+    expect(prompt).toMatch(/only from a name the user gave.*never pick a channel or list just because it looks generic/is);
+  });
 });
