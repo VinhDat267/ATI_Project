@@ -117,17 +117,38 @@ through the gateway, reasoning included).
 | Measurement (model search, 3 runs) | Before | After |
 |---|---|---|
 | Live three-service plan | 31.0 s, 37.2 s | 9.2, 9.4, 9.7, 14.0, 14.7 s |
-| Core 50: p50 / p95 | 9.2 / 17.6 s | 6.9 / 14.6 s, then 7.0 / 17.4 s |
-| Free-form 18: p50 / p95 | 10.3 / 15.6 s | 7.8 / 23.0 s, then 8.5 / 21.2 s |
+| Core 50: p50 / p95 | 9.2 / 17.6 s | 6.3 / 20.1 s (final code) |
+| Free-form 18: p50 / p95 | 10.3 / 15.6 s | 8.1 / 15.7 s (final code) |
 
-The median is well under the 15 s target, but the tail is not reliably so:
-single model calls occasionally stall at the gateway for 20–30 s (5–18% of
-case-runs exceeded 15 s, and cs11 timed out at 30 s in several runs). That tail
-comes from the gateway, not from the number of calls, and nothing tried here
-removes it. Quality held: free-form 54/54 in both later runs; core 146/150 and
-148/150, where every failure but one is a gateway timeout. The exception, cs03
-losing the issue link when first asked for brevity, was fixed by limiting
-brevity to wording.
+Final code (`c407899`, no hedging, three runs per set, every run on the same
+labels as before):
+[free-form](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-30T10-07-38-154Z/summary.md)
+54/54, 4 of 54 case-runs over 15 s;
+[core](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-09-30T10-17-21-413Z/summary.md)
+148/150, 14 of 150 over 15 s. Both core failures are 30 s timeouts (cs11, cs02).
+
+The median is well under the 15 s target; the 95th percentile is not (20.1 s on
+the core set, 15.7 s on free-form). Between measurements of near-identical code
+the core p95 ranged from 14.6 s to 20.1 s, so a single p95 is not a stable
+figure.
+
+**Where the tail comes from.** Earlier notes here blamed the gateway stalling.
+That is wrong for the worst cases. cs11 took 28 s for one model call that
+generated 8,715 reasoning tokens for a 255-token answer (typical calls use
+100–800), and timed out at 30 s in 3 of 3 isolated runs; its prompt was also
+15.8k tokens because it routes to all three services, against 5.7–7.0k for a
+typical case. cs02 does the same only some of the time (2 of 12 runs timed out,
+the others took 6.4 s). Across the four unhedged core runs cs11's median is 22.8 s and cs02's 16.9 s,
+against about 6.5 s for single- and multi-step cases. So the tail is the model
+occasionally reasoning for a very long time on requests that chain
+`$ref`/`$template` values across services, which is also why hedging could not
+help: both requests reason just as long. Nothing tried here removes it; the
+candidates are a smaller tool list per request, a model or endpoint that caps
+reasoning, and a longer timeout than 30 s.
+
+Quality held. Free-form was 54/54 in all three measurements. Core failures were
+timeouts except one: cs03 losing the issue link when first asked for brevity,
+fixed by limiting brevity to wording.
 
 ## Controlled live execution
 
