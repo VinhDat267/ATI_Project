@@ -104,51 +104,50 @@ What the runs found, beyond the scores:
 ### Planning latency
 
 A live three-service request took 31–37 s: three model calls made up 92% of
-it, and the real Trello, Slack and GitHub searches 2.5 s. Thinking variants of
-the model made no reliable difference; output length did (about 140 tokens/s
-through the gateway, reasoning included).
+it, and the real Trello, Slack and GitHub searches 2.5 s. Time per call follows
+the tokens the model generates, reasoning included (about 140 tokens/s through
+the gateway). The gateway reports reasoning tokens inside `prompt_tokens`, so
+subtract them to get the real prompt size.
 
 | Change | Effect |
 |---|---|
 | List the workspace before the first model call (parallel, capped, 2.5 s budget) | One model call instead of three for 83–94% of case-runs |
 | Minified JSON, 15-word `thinking`, 8-word step descriptions | Output 580 → 288 tokens; plan call 9.3–11.6 s → 6.0–7.1 s |
-| Request hedging (tried, removed) | No benefit: more case-runs over 15 s, and a stalled gateway stalls both requests |
+| Search first for an existing item whose details are needed; no read tools in plans | cs11: 41–63 s → 13–27 s in isolation; no timeouts in the next full run |
+| Assign members on a new card with `idMembers` (tool descriptions) | Removes the separate `add_member` step that went with long reasoning |
+| Thinking variants of the model (`-low`, `reasoning_effort`) | No reliable difference; not used |
+| Request hedging | No benefit (more case-runs over 15 s); removed |
+| Compact tool listing (`compactTools`, off) | 41% fewer prompt characters, no effect on the slow case; left as an option |
 
-| Measurement (model search, 3 runs) | Before | After |
+| Measurement (model search, 3 runs per set) | Before | After (`40ba374`) |
 |---|---|---|
-| Live three-service plan | 31.0 s, 37.2 s | 9.2, 9.4, 9.7, 14.0, 14.7 s |
-| Core 50: p50 / p95 | 9.2 / 17.6 s | 6.3 / 20.1 s (final code) |
-| Free-form 18: p50 / p95 | 10.3 / 15.6 s | 8.1 / 15.7 s (final code) |
+| Live three-service plan | 31.0 s, 37.2 s | 8.1, 9.2, 10.4 s |
+| [Core 50](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-09-30T11-53-33-168Z/summary.md): p50 / p95 | 9.2 / 17.6 s | 6.0 / 13.9 s |
+| [Free-form 18](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-30T11-56-36-156Z/summary.md): p50 / p95 | 10.3 / 15.6 s | 6.1 / 10.8 s |
+| Case-runs over 15 s | — | 7 of 150 core, 0 of 54 free-form |
+| Timeouts | cs11 and cs02 in every earlier run | none |
 
-Final code (`c407899`, no hedging, three runs per set, every run on the same
-labels as before):
-[free-form](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-30T10-07-38-154Z/summary.md)
-54/54, 4 of 54 case-runs over 15 s;
-[core](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-09-30T10-17-21-413Z/summary.md)
-148/150, 14 of 150 over 15 s. Both core failures are 30 s timeouts (cs11, cs02).
+Both sets are under the 15 s target at the 95th percentile in this run. It is
+one run of each set; between earlier runs of near-identical code the core p95
+moved between 14.6 s and 20.1 s, so treat a single p95 as approximate. The
+case-runs still over 15 s are mostly clarifications that take two or three
+model calls (cl02, cl03).
 
-The median is well under the 15 s target; the 95th percentile is not (20.1 s on
-the core set, 15.7 s on free-form). Between measurements of near-identical code
-the core p95 ranged from 14.6 s to 20.1 s, so a single p95 is not a stable
-figure.
+**Where the tail came from.** Not the gateway and not the prompt size, as
+earlier versions of this section claimed. cs11 ("create a card for issue 42 of
+repo …") made the model reason for 10–19k tokens in one call; the same request
+without the issue reference took under 2.4k, and cs12, with the same 16 tools
+and three services, about 1k. The model was weighing two valid shapes: search
+for the issue, or chain a `get_issue` step into the plan with `$ref` values.
+Telling it to search first removed the deliberation. cs11's prompt is 7.1k
+tokens, not 15.8k as stated before.
 
-**Where the tail comes from.** Earlier notes here blamed the gateway stalling.
-That is wrong for the worst cases. cs11 took 28 s for one model call that
-generated 8,715 reasoning tokens for a 255-token answer (typical calls use
-100–800), and timed out at 30 s in 3 of 3 isolated runs; its prompt was also
-15.8k tokens because it routes to all three services, against 5.7–7.0k for a
-typical case. cs02 does the same only some of the time (2 of 12 runs timed out,
-the others took 6.4 s). Across the four unhedged core runs cs11's median is 22.8 s and cs02's 16.9 s,
-against about 6.5 s for single- and multi-step cases. So the tail is the model
-occasionally reasoning for a very long time on requests that chain
-`$ref`/`$template` values across services, which is also why hedging could not
-help: both requests reason just as long. Nothing tried here removes it; the
-candidates are a smaller tool list per request, a model or endpoint that caps
-reasoning, and a longer timeout than 30 s.
-
-Quality held. Free-form was 54/54 in all three measurements. Core failures were
-timeouts except one: cs03 losing the issue link when first asked for brevity,
-fixed by limiting brevity to wording.
+**Quality.** Free-form 54/54. Core 148/150: both failures are cs11, whose plans
+are correct (card titled with the looked-up issue title, issue link in the
+description, member assigned, Slack notified) but miss a label that requires
+"42" in the title or a `$ref` to a `get_issue` plan step, the shape the new rule
+removes. The label was left unchanged; it should be revisited in its own commit.
+No plan in this run contains a read-only step.
 
 ## Controlled live execution
 
