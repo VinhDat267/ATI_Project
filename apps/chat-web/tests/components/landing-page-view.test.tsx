@@ -77,8 +77,8 @@ describe('LandingPageView Component', () => {
     expect(container.querySelector('#security')).not.toBeNull();
 
     // Verify key features text is displayed
-    expect(screen.getByText(/Phân tích ý định tự nhiên/i)).toBeDefined();
-    expect(screen.getByText(/Điều phối DAG phụ thuộc/i)).toBeDefined();
-    expect(screen.getByText(/Tự phục hồi lỗi từng phần/i)).toBeDefined();
+    expect(screen.getByText(/Hiểu mệnh lệnh tự nhiên/i)).toBeDefined();
+    expect(screen.getByText(/Tự động liên kết công việc theo chuỗi/i)).toBeDefined();
+    expect(screen.getByText(/Tự phục hồi gián đoạn thông minh/i)).toBeDefined();
   });
 });
