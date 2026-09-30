@@ -10,6 +10,8 @@ export interface OpenAICompatibleProviderConfig {
   timeoutMs?: number;
   maxRetries?: number;
   retryDelayMs?: number;
+  /** Race a second request when the first is slower than this; shortens the latency tail at the cost of extra requests. */
+  hedgeAfterMs?: number;
 }
 
 export class OpenAICompatibleError extends Error {
@@ -48,6 +50,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private timeoutMs: number;
   private maxRetries: number;
   private retryDelayMs: number;
+  public readonly hedgeAfterMs?: number;
 
   constructor(config: OpenAICompatibleProviderConfig) {
     if (!config.baseUrl) throw new Error('LLM_BASE_URL is required for the OpenAI-compatible provider');
@@ -59,6 +62,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.maxRetries = config.maxRetries ?? 2;
     this.retryDelayMs = config.retryDelayMs ?? 1_000;
+    this.hedgeAfterMs = config.hedgeAfterMs;
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
@@ -93,7 +97,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       return messageText(json.choices?.[0]?.message?.content);
     }, {
       label: 'LLM gateway', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries,
-      retryDelayMs: this.retryDelayMs, signal: input.signal,
+      retryDelayMs: this.retryDelayMs, hedgeAfterMs: this.hedgeAfterMs, signal: input.signal,
     });
   }
 }

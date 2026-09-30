@@ -103,6 +103,49 @@ describe('OpenAICompatibleProvider', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('sends a second request when the first is slow and returns whichever answers first', async () => {
+    const { fetchFn, calls } = scriptedFetch([hang, completion('{"kind":"refusal","reason":"hedge"}')]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, hedgeAfterMs: 30 });
+    await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"hedge"}');
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.init.signal?.aborted).toBe(true);
+  });
+
+  it('does not hedge a request that answers in time', async () => {
+    const { fetchFn, calls } = scriptedFetch([completion('{}')]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, hedgeAfterMs: 200 });
+    await expect(provider.generatePlan(input)).resolves.toBe('{}');
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(calls).toHaveLength(1);
+  });
+
+  it('keeps waiting for the first request when the hedge fails', async () => {
+    const slow = () => new Promise<Response>((resolve) => setTimeout(() => resolve(new Response(JSON.stringify({ model: 'ag/gemini-3.8-flash', choices: [{ message: { content: '{"first":true}' } }] }), { status: 200 })), 80));
+    const { fetchFn, calls } = scriptedFetch([slow, status(400)]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, hedgeAfterMs: 20, maxRetries: 0 });
+    await expect(provider.generatePlan(input)).resolves.toBe('{"first":true}');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('fails without hedging when the first request is rejected outright', async () => {
+    const { fetchFn, calls } = scriptedFetch([status(400)]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, hedgeAfterMs: 20, maxRetries: 0 });
+    await expect(provider.generatePlan(input)).rejects.toMatchObject({ status: 400 });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(calls).toHaveLength(1);
+  });
+
+  it('aborts both requests when the caller aborts', async () => {
+    const { fetchFn, calls } = scriptedFetch([hang, hang]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, hedgeAfterMs: 20, timeoutMs: 10_000 });
+    const controller = new AbortController();
+    const pending = provider.generatePlan({ ...input, signal: controller.signal });
+    setTimeout(() => controller.abort(new Error('user left')), 60);
+    await expect(pending).rejects.toThrow(/user left/);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((call) => call.init.signal?.aborted)).toBe(true);
+  });
+
   it('requires a base URL and model', () => {
     expect(() => new OpenAICompatibleProvider({ baseUrl: '', model: 'm' })).toThrow(/LLM_BASE_URL/);
     expect(() => new OpenAICompatibleProvider({ baseUrl: 'http://x/v1', model: '' })).toThrow(/LLM_MODEL/);
@@ -116,6 +159,13 @@ describe('createProviderFromEnv', () => {
     });
     expect(provider).toBeInstanceOf(OpenAICompatibleProvider);
     expect(provider.model).toBe('ag/gemini-3.8-flash');
+  });
+
+  it('reads the hedge delay from LLM_HEDGE_AFTER_MS and rejects a bad value', () => {
+    const env = { LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://localhost:20128/v1', LLM_MODEL: 'm' };
+    expect((createProviderFromEnv({ ...env, LLM_HEDGE_AFTER_MS: '9000' }) as OpenAICompatibleProvider).hedgeAfterMs).toBe(9000);
+    expect((createProviderFromEnv(env) as OpenAICompatibleProvider).hedgeAfterMs).toBeUndefined();
+    expect(() => createProviderFromEnv({ ...env, LLM_HEDGE_AFTER_MS: 'soon' })).toThrow(/LLM_HEDGE_AFTER_MS/);
   });
 
   it('keeps Gemini as the default provider', () => {

@@ -33,6 +33,12 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     expect(prompt).toMatch(/description.*at most 8 words/is);
   });
 
+  it('limits brevity to wording and never to the arguments a request implies', () => {
+    const prompt = buildSystemPrompt(tools);
+    expect(prompt).toMatch(/brevity applies to wording.*never omit.*argument/is);
+    expect(prompt).not.toMatch(/Keep it short: the answer/);
+  });
+
   it('tells the model that resource IDs must come from working memory, the user or a $ref', () => {
     const prompt = buildSystemPrompt(tools);
     expect(prompt).toMatch(/x-resource/);

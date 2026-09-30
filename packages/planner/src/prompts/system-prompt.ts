@@ -55,7 +55,7 @@ ${toolList}
 
 ### Rules:
 1. Include a \`thinking\` property: one short sentence of at most 15 words naming the tools chosen. Do not restate the plan in it.
-2. Return only one raw JSON object, minified on a single line with no indentation or line breaks, without markdown or other text. Keep it short: the answer's length is what the user waits for.
+2. Return only one raw JSON object, minified on a single line with no indentation or line breaks, without markdown or other text. Brevity applies to wording only (thinking, summary, descriptions, whitespace): never omit or shorten a tool argument the request implies, such as a link to an item it says to track or a deadline it states.
 3. Use \`kind: "plan"\` when the workflow is executable, with \`thinking\`, \`summary\`, \`steps\` and \`warnings\` (maximum 10 steps). Every step is exactly { "id": string, "tool": string, "description": string, "args": object, "dependsOn": string[] }: tool inputs go in "args", never "arguments", and "description" is a human-readable phrase of at most 8 words.
 4. Use \`kind: "clarification"\` for missing or ambiguous resources, with \`question\`, optional \`options\` and \`context\`.
 5. Use \`kind: "refusal"\` for unsupported, unavailable or unsafe actions, with \`reason\` and optional \`suggestion\`.
