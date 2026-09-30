@@ -146,8 +146,16 @@ tokens, not 15.8k as stated before.
 are correct (card titled with the looked-up issue title, issue link in the
 description, member assigned, Slack notified) but miss a label that requires
 "42" in the title or a `$ref` to a `get_issue` plan step, the shape the new rule
-removes. The label was left unchanged; it should be revisited in its own commit.
-No plan in this run contains a read-only step.
+removes. No plan in this run contains a read-only step.
+
+**Label revision (cs11).** After that run, and in its own commit, the cs11 label
+was changed: the card title may be the looked-up issue title as well as contain
+"42" or reference a `get_issue` step, and the card description must now link the
+issue (`issues/42` or a reference to the looked-up issue), which the old label
+did not require. The reports above keep the scores they were recorded with;
+each report names the labels' commit and SHA-256 it was scored against.
+Re-scoring all 17 stored cs11 plans with the revised label changes only the two
+plans above, from fail to pass.
 
 ## Controlled live execution
 
