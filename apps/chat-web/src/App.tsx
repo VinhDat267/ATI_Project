@@ -119,6 +119,9 @@ export const App: React.FC = () => {
           role: 'system',
           content: `[Lỗi gửi tin nhắn]: ${errData.error || 'Máy chủ từ chối yêu cầu'}`,
         });
+      } else {
+        const accepted = await res.json().catch(() => ({}));
+        useChatStore.getState().confirmMessage(tempId, accepted.messageId || tempId);
       }
     } catch (err: any) {
       useChatStore.getState().markMessageFailed(tempId);

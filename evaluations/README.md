@@ -209,8 +209,10 @@ One run so far (2026-09-30): a three-service request reached the preview in
 Trello card linking it and a Slack message; plan and steps ended `completed` /
 `succeeded` in PostgreSQL, and the issue and card were read back from the
 services. The Slack message was not read back. The run showed that the preview
-renders `$template` arguments as `[object Object]`, so the reviewer cannot read
-the text that will be sent.
+rendered `$template` arguments as `[object Object]`, so the reviewer could not
+read the text that would be sent, and that a sent message stayed marked
+"Đang gửi…"; both were fixed afterwards and have not been re-checked in a live
+run.
 
 ## Legacy golden set (v1)
 
