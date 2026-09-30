@@ -5,6 +5,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
     name: 'trello.search_boards',
     service: 'trello',
     discovers: 'board',
+    listable: true,
     description: 'Tìm kiếm bảng (boards) trên Trello theo từ khóa hoặc tên.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -42,6 +43,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
     name: 'trello.search_lists',
     service: 'trello',
     discovers: 'list',
+    listable: true,
     description: 'Tìm kiếm hoặc liệt kê các danh sách (lists) trong một bảng Trello cụ thể.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -84,6 +86,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
     name: 'trello.search_members',
     service: 'trello',
     discovers: 'member',
+    listable: true,
     description: 'Tìm kiếm thành viên Trello theo tên hoặc username để lấy memberId.',
     sideEffect: 'read',
     riskLevel: 'low',
@@ -206,7 +209,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.create_card',
     service: 'trello',
-    description: 'Tạo thẻ (card) mới trên một danh sách Trello xác định.',
+    description: 'Tạo thẻ (card) mới trên một danh sách Trello xác định. Gán thành viên ngay khi tạo bằng idMembers.',
     sideEffect: 'write',
     riskLevel: 'low',
     inputSchema: {
@@ -303,7 +306,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.add_member',
     service: 'trello',
-    description: 'Gán thành viên vào một thẻ Trello.',
+    description: 'Gán thành viên vào một thẻ Trello đã có. Với thẻ sắp tạo trong cùng plan, dùng idMembers của trello.create_card thay cho tool này.',
     sideEffect: 'write',
     riskLevel: 'low',
     inputSchema: {

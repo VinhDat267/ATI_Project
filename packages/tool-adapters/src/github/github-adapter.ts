@@ -143,7 +143,9 @@ export class GitHubAdapter extends BaseAdapter {
   }
 
   async searchRepos(args: { query: string; limit?: number }, options?: { signal?: AbortSignal }) {
-    const query = text(args.query, 'query').toLowerCase();
+    // An empty query lists every allowed repository; the allowlist bounds the result.
+    if (typeof args.query !== 'string') validation('GitHub query must be a string');
+    const query = args.query.trim().toLowerCase();
     const max = limit(args.limit);
     const repos = this.allowedRepositories();
     const matches = [] as Array<{ id: string; name: string; fullName: string; url: string }>;

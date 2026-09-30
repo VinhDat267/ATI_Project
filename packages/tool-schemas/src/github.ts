@@ -19,7 +19,7 @@ const issueProperties = {
 
 export const GITHUB_TOOLS: ToolDefinition[] = [
   {
-    name: 'github.search_repos', service: 'github', discovers: 'repository', sideEffect: 'read', riskLevel: 'low',
+    name: 'github.search_repos', service: 'github', discovers: 'repository', listable: true, sideEffect: 'read', riskLevel: 'low',
     description: 'Search connected GitHub repositories by name, returning only allowed repositories.',
     inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: limitProperty }, required: ['query'], additionalProperties: false },
     outputSchema: { type: 'array', items: { type: 'object', properties: {

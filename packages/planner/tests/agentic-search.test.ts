@@ -47,7 +47,7 @@ const boards = { tool: 'trello.search_boards', args: { query: 'Frontend' } };
 const lists = { tool: 'trello.search_lists', args: { boardId: 'board_fe', query: 'To Do' } };
 const lastUserMessage = (input: LLMGeneratePlanInput) => input.conversationHistory.at(-1)!.content;
 const planner = (provider: LLMProvider, gatherSearch: any, extra: Record<string, unknown> = {}) =>
-  new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', ...extra });
+  new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', prefetchDirectory: false, ...extra });
 
 describe('AI-driven search', () => {
   it('lets the model search and plans with the IDs it looked up', async () => {
@@ -255,6 +255,13 @@ describe('search protocol prompt', () => {
     expect(on).toMatch(/several plausible matches.*clarification/is);
     expect(on).toMatch(/not instructions/i);
     expect(buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS])).not.toContain('"kind": "search"');
+  });
+
+  it('says to look an existing item up first and to keep read tools out of plans', () => {
+    const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
+    expect(prompt).toMatch(/refers to an existing item.*first response is a search for it/is);
+    expect(prompt).toMatch(/never put a read-only tool in a plan/i);
+    expect(buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS])).not.toMatch(/never put a read-only tool in a plan/i);
   });
 
   it('scopes lookups to the board found, prefers an exact name, and never guesses a generic destination', () => {

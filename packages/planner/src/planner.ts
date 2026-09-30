@@ -5,7 +5,7 @@ import { classifyIntent } from './router.js';
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
-  MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved,
+  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved,
   type SearchOutcome,
 } from './search.js';
 
@@ -32,6 +32,10 @@ export interface AIPlannerOptions {
   searchMode?: 'regex' | 'llm';
   /** Model-driven search rounds allowed per turn (default 4). */
   maxSearchRounds?: number;
+  /** In 'llm' mode, list the workspace before the first model call (default true). */
+  prefetchDirectory?: boolean;
+  /** Time allowed for that listing before planning continues without the rest (default 2500 ms). */
+  directoryBudgetMs?: number;
 }
 
 export interface GatherSearchRequest {
@@ -93,10 +97,14 @@ export class AIPlanner {
   private timeZone: string;
   private searchMode: 'regex' | 'llm';
   private maxSearchRounds: number;
+  private prefetchDirectory: boolean;
+  private directoryBudgetMs: number;
 
   constructor(options: AIPlannerOptions) {
     this.searchMode = options.searchMode ?? 'regex';
     this.maxSearchRounds = options.maxSearchRounds ?? 4;
+    this.prefetchDirectory = options.prefetchDirectory ?? true;
+    this.directoryBudgetMs = options.directoryBudgetMs ?? 2500;
     this.now = options.now ?? (() => new Date());
     this.timeZone = options.timeZone ?? 'Asia/Ho_Chi_Minh';
     this.provider = options.provider;
@@ -193,38 +201,89 @@ export class AIPlanner {
     activeTools: ToolDefinition[],
     input: ProcessMessageInput,
   ): Promise<SearchOutcome[]> {
-    const { memory, signal, onGatherEvent } = input;
-    const outcomes: SearchOutcome[] = [];
-    for (const call of calls) {
+    const { signal } = input;
+    // The calls of one request are independent, so they run in parallel.
+    return Promise.all(calls.map(async (call): Promise<SearchOutcome> => {
       const prepared = prepareSearchCall(call, activeTools);
-      if ('error' in prepared) {
-        outcomes.push({ tool: call.tool, args: call.args, error: prepared.error });
-        continue;
+      if ('error' in prepared) return { tool: call.tool, args: call.args, error: prepared.error };
+      const tool = activeTools.find((candidate) => candidate.name === call.tool)!;
+      const outcome = await this.lookup(tool, prepared.args, signal, input);
+      if (outcome.error !== undefined && signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
+      return outcome;
+    }));
+  }
+
+  /** One read-only call to a service; results are remembered under the resource the tool discovers. */
+  private async lookup(
+    tool: ToolDefinition,
+    args: Record<string, unknown>,
+    signal: AbortSignal | undefined,
+    input: ProcessMessageInput,
+    stamp: Record<string, unknown> = {},
+  ): Promise<SearchOutcome> {
+    const { memory, onGatherEvent } = input;
+    if (!this.gatherSearch) return { tool: tool.name, args, error: 'Search is unavailable in this session' };
+    onGatherEvent?.({ tool: tool.name, status: 'started' });
+    try {
+      const raw = await this.gatherSearch({ tool: tool.name, args, signal });
+      // Search tools return lists; get_* tools return one object.
+      const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : undefined;
+      if (!list) throw new Error('The tool did not return a result');
+      if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
+      const result = list.slice(0, MAX_RESULTS_PER_CALL);
+      if (tool.discovers) {
+        // `stamp` records the parent a result was found under, e.g. the board of a member.
+        const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...stamp, ...entity } : entity));
+        memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped));
       }
-      if (!this.gatherSearch) {
-        outcomes.push({ tool: call.tool, args: prepared.args, error: 'Search is unavailable in this session' });
-        continue;
-      }
-      onGatherEvent?.({ tool: call.tool, status: 'started' });
-      try {
-        const raw = await this.gatherSearch({ tool: call.tool, args: prepared.args, signal });
-        // Search tools return lists; get_* tools return one object.
-        const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : undefined;
-        if (!list) throw new Error('The tool did not return a result');
-        const result = list.slice(0, MAX_RESULTS_PER_CALL);
-        const resource = activeTools.find((tool) => tool.name === call.tool)?.discovers;
-        if (resource) {
-          memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), resource, result));
-        }
-        onGatherEvent?.({ tool: call.tool, status: 'completed', output: result });
-        outcomes.push({ tool: call.tool, args: prepared.args, result });
-      } catch (err: any) {
-        if (signal?.aborted) throw err;
-        onGatherEvent?.({ tool: call.tool, status: 'completed', output: [] });
-        outcomes.push({ tool: call.tool, args: prepared.args, error: String(err?.message ?? err).slice(0, 300) });
-      }
+      onGatherEvent?.({ tool: tool.name, status: 'completed', output: result });
+      return { tool: tool.name, args, result };
+    } catch (err: any) {
+      onGatherEvent?.({ tool: tool.name, status: 'completed', output: [] });
+      return { tool: tool.name, args, error: String(err?.message ?? err).slice(0, 300) };
     }
-    return outcomes;
+  }
+
+  /**
+   * Lists the workspace (boards, channels, repositories, then lists and members
+   * of a few boards) before the first model call, so most requests can be planned
+   * without search rounds. Bounded by a call cap and a time budget; whatever is
+   * missing the model can still search for.
+   */
+  private async listDirectory(activeTools: ToolDefinition[], input: ProcessMessageInput): Promise<void> {
+    const { memory } = input;
+    const budget = new AbortController();
+    const timer = setTimeout(() => budget.abort(new Error('Directory lookup budget exceeded')), this.directoryBudgetMs);
+    const signal = input.signal ? AbortSignal.any([input.signal, budget.signal]) : budget.signal;
+    const expired = new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }));
+    const observed = () => memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed') ?? {};
+    const parentsOf = (tool: ToolDefinition) => Object.entries<Record<string, any>>(tool.inputSchema.properties ?? {})
+      .filter(([name, property]) => (tool.inputSchema.required ?? []).includes(name) && property['x-resource'])
+      .map(([argument, property]) => ({ argument, resource: property['x-resource'] as string }));
+    const known = observed();
+    const listable = activeTools.filter((tool) => tool.listable && tool.discovers && tool.sideEffect === 'read' && !known[tool.discovers]);
+    const run = (calls: Array<{ tool: ToolDefinition; args: Record<string, unknown>; stamp?: Record<string, unknown> }>) =>
+      Promise.race([Promise.all(calls.map((call) => this.lookup(call.tool, call.args, signal, input, call.stamp))), expired]);
+
+    try {
+      await run(listable.filter((tool) => parentsOf(tool).length === 0)
+        .map((tool) => ({ tool, args: { query: '', limit: MAX_RESULTS_PER_CALL } })));
+      if (signal.aborted) return;
+      const children = listable.flatMap((tool) => {
+        const parents = parentsOf(tool);
+        if (parents.length !== 1) return [];
+        const { argument, resource } = parents[0]!;
+        const entities = observed()[resource] ?? [];
+        if (entities.length === 0 || entities.length > MAX_DIRECTORY_PARENTS) return [];
+        return entities.map((entity) => ({
+          tool, args: { query: '', limit: MAX_RESULTS_PER_CALL, [argument]: entity.id }, stamp: { [argument]: entity.id },
+        }));
+      });
+      await run(children.slice(0, MAX_DIRECTORY_CALLS));
+    } finally {
+      clearTimeout(timer);
+      budget.abort();
+    }
   }
 
   /**
@@ -245,6 +304,9 @@ export class AIPlanner {
       return { kind: 'refusal', reason: 'The requested service is not available or authorized in this connection.',
         suggestion: 'Connect the service with an allowed resource scope before planning this workflow.' };
     }
+
+    if (this.prefetchDirectory && this.gatherSearch) await this.listDirectory(activeTools, input);
+    if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
 
     const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch) });
     let searchRounds = 0;

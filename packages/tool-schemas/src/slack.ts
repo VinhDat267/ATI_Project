@@ -4,6 +4,7 @@ export const SLACK_TOOLS: ToolDefinition[] = [
   {
     name: 'slack.search_channels',
     discovers: 'channel',
+    listable: true,
     service: 'slack',
     description: 'Tìm kiếm kênh (channels) trên Slack theo tên để lấy channel ID.',
     sideEffect: 'read',

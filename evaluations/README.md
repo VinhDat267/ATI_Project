@@ -101,6 +101,62 @@ What the runs found, beyond the scores:
 - Eighteen free-form cases by one author are a small sample, and the search
   results are fixtures.
 
+### Planning latency
+
+A live three-service request took 31–37 s: three model calls made up 92% of
+it, and the real Trello, Slack and GitHub searches 2.5 s. Time per call follows
+the tokens the model generates, reasoning included (about 140 tokens/s through
+the gateway). The gateway reports reasoning tokens inside `prompt_tokens`, so
+subtract them to get the real prompt size.
+
+| Change | Effect |
+|---|---|
+| List the workspace before the first model call (parallel, capped, 2.5 s budget) | One model call instead of three for 83–94% of case-runs |
+| Minified JSON, 15-word `thinking`, 8-word step descriptions | Output 580 → 288 tokens; plan call 9.3–11.6 s → 6.0–7.1 s |
+| Search first for an existing item whose details are needed; no read tools in plans | cs11: 41–63 s → 13–27 s in isolation; no timeouts in the next full run |
+| Assign members on a new card with `idMembers` (tool descriptions) | Removes the separate `add_member` step that went with long reasoning |
+| Thinking variants of the model (`-low`, `reasoning_effort`) | No reliable difference; not used |
+| Request hedging | No benefit (more case-runs over 15 s); removed |
+| Compact tool listing (`compactTools`, off) | 41% fewer prompt characters, no effect on the slow case; left as an option |
+
+| Measurement (model search, 3 runs per set) | Before | After (`40ba374`) |
+|---|---|---|
+| Live three-service plan | 31.0 s, 37.2 s | 8.1, 9.2, 10.4 s |
+| [Core 50](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-09-30T11-53-33-168Z/summary.md): p50 / p95 | 9.2 / 17.6 s | 6.0 / 13.9 s |
+| [Free-form 18](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-30T11-56-36-156Z/summary.md): p50 / p95 | 10.3 / 15.6 s | 6.1 / 10.8 s |
+| Case-runs over 15 s | — | 7 of 150 core, 0 of 54 free-form |
+| Timeouts | cs11 and cs02 in every earlier run | none |
+
+Both sets are under the 15 s target at the 95th percentile in this run. It is
+one run of each set; between earlier runs of near-identical code the core p95
+moved between 14.6 s and 20.1 s, so treat a single p95 as approximate. The
+case-runs still over 15 s are mostly clarifications that take two or three
+model calls (cl02, cl03).
+
+**Where the tail came from.** Not the gateway and not the prompt size, as
+earlier versions of this section claimed. cs11 ("create a card for issue 42 of
+repo …") made the model reason for 10–19k tokens in one call; the same request
+without the issue reference took under 2.4k, and cs12, with the same 16 tools
+and three services, about 1k. The model was weighing two valid shapes: search
+for the issue, or chain a `get_issue` step into the plan with `$ref` values.
+Telling it to search first removed the deliberation. cs11's prompt is 7.1k
+tokens, not 15.8k as stated before.
+
+**Quality.** Free-form 54/54. Core 148/150: both failures are cs11, whose plans
+are correct (card titled with the looked-up issue title, issue link in the
+description, member assigned, Slack notified) but miss a label that requires
+"42" in the title or a `$ref` to a `get_issue` plan step, the shape the new rule
+removes. No plan in this run contains a read-only step.
+
+**Label revision (cs11).** After that run, and in its own commit, the cs11 label
+was changed: the card title may be the looked-up issue title as well as contain
+"42" or reference a `get_issue` step, and the card description must now link the
+issue (`issues/42` or a reference to the looked-up issue), which the old label
+did not require. The reports above keep the scores they were recorded with;
+each report names the labels' commit and SHA-256 it was scored against.
+Re-scoring all 17 stored cs11 plans with the revised label changes only the two
+plans above, from fail to pass.
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against

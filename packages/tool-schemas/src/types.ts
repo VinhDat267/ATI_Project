@@ -13,6 +13,8 @@ export interface ToolDefinition {
   sideEffect: 'read' | 'write';
   /** For a search tool: the working-memory resource its results identify, e.g. 'board'. */
   discovers?: string;
+  /** The search may be called with an empty query to enumerate the resource (bounded by `limit`). */
+  listable?: boolean;
   riskLevel: 'low' | 'medium' | 'high';
   inputSchema: JSONSchema;
   outputSchema: JSONSchema;
