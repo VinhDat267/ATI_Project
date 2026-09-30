@@ -7,8 +7,13 @@ import { ExecutionProgress } from './components/ExecutionProgress';
 import { PartialFailureModal } from './components/PartialFailureModal';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginView } from './components/LoginView';
+import { LandingPageView } from './components/LandingPageView';
 
-export const App: React.FC = () => {
+export interface AppProps {
+  initialView?: 'landing' | 'login';
+}
+
+export const App: React.FC<AppProps> = ({ initialView }) => {
   const {
     conversationId,
     messages,
@@ -23,6 +28,19 @@ export const App: React.FC = () => {
     updateStepStatus,
     reset,
   } = useChatStore();
+
+  const [currentView, setCurrentView] = useState<'landing' | 'login'>(() => {
+    if (initialView) return initialView;
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'login') return 'login';
+      if (params.get('view') === 'landing') return 'landing';
+    }
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      return 'login';
+    }
+    return 'landing';
+  });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -226,6 +244,21 @@ export const App: React.FC = () => {
   )?.[0];
 
   if (!authToken) {
+    if (currentView === 'landing') {
+      return (
+        <LandingPageView
+          onGoToLogin={() => {
+            setCurrentView('login');
+            if (typeof window !== 'undefined' && window.history?.pushState) {
+              const url = new URL(window.location.href);
+              url.searchParams.set('view', 'login');
+              window.history.pushState({}, '', url.toString());
+            }
+          }}
+        />
+      );
+    }
+
     return (
       <LoginView
         email={email}
@@ -235,6 +268,18 @@ export const App: React.FC = () => {
         isLoggingIn={isLoggingIn}
         authError={authError}
         onLogin={loginUser}
+        onQuickFillAdmin={() => {
+          setEmail('admin@localhost.test');
+          setPassword('ChangeMe123!');
+        }}
+        onBackToLanding={() => {
+          setCurrentView('landing');
+          if (typeof window !== 'undefined' && window.history?.pushState) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('view');
+            window.history.pushState({}, '', url.toString());
+          }
+        }}
       />
     );
   }

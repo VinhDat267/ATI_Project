@@ -125,4 +125,26 @@ describe('LoginView Component', () => {
     const submitBtn = screen.getByRole('button', { name: /Đang đăng nhập/i });
     expect(submitBtn.hasAttribute('disabled')).toBe(true);
   });
+
+  it('triggers onBackToLanding when the back button is clicked', () => {
+    const onBackToLanding = vi.fn();
+    render(
+      <LoginView
+        email=""
+        setEmail={vi.fn()}
+        password=""
+        setPassword={vi.fn()}
+        isLoggingIn={false}
+        authError={null}
+        onLogin={vi.fn()}
+        onBackToLanding={onBackToLanding}
+      />
+    );
+
+    const backBtn = screen.getByRole('button', { name: /Quay lại trang giới thiệu/i });
+    expect(backBtn).toBeDefined();
+
+    fireEvent.click(backBtn);
+    expect(onBackToLanding).toHaveBeenCalledTimes(1);
+  });
 });

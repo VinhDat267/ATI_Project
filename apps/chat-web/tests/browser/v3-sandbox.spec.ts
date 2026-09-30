@@ -8,6 +8,10 @@ if (!email || !password || !connectionString) throw new Error('Browser E2E requi
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/');
+  const landingLoginBtn = page.getByRole('button', { name: 'Đăng nhập vào hệ thống' });
+  if (await landingLoginBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await landingLoginBtn.click();
+  }
   await page.getByRole('textbox', { name: 'Email' }).fill(email!);
   await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();

@@ -9,6 +9,7 @@ export interface LoginViewProps {
   authError: string | null;
   onLogin: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   onQuickFillAdmin?: () => void;
+  onBackToLanding?: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
@@ -20,6 +21,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   authError,
   onLogin,
   onQuickFillAdmin,
+  onBackToLanding,
 }) => {
   const handleQuickFill = () => {
     if (onQuickFillAdmin) {
@@ -38,6 +40,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
       {/* 1. Phần Đầu trang: Nhận diện Thương hiệu & Định vị Nền tảng */}
       <header className="relative z-10 flex flex-col items-center text-center max-w-2xl mx-auto pt-2 sm:pt-4">
+        {onBackToLanding && (
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-zinc-500 hover:text-blue-600 bg-white/70 hover:bg-white border border-zinc-200/80 shadow-2xs transition-all mb-3 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>Quay lại trang giới thiệu</span>
+          </button>
+        )}
         <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/80 border border-zinc-200/80 shadow-xs backdrop-blur-md text-xs font-medium text-zinc-700 mb-3">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-semibold text-zinc-800">AI Workflow Automation Platform</span>
