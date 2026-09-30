@@ -5,6 +5,9 @@ import { validateSchemaValue } from './validator.js';
 export const MAX_CALLS_PER_REQUEST = 4;
 export const MAX_RESULTS_PER_CALL = 10;
 export const MAX_OBSERVED_PER_RESOURCE = 20;
+/** Directory listing: parents (e.g. boards) whose children are listed, and the cap on those child calls. */
+export const MAX_DIRECTORY_PARENTS = 3;
+export const MAX_DIRECTORY_CALLS = 8;
 
 export interface SearchCall { tool: string; args: Record<string, unknown> }
 export type SearchRequest = { calls: SearchCall[] } | { error: string };

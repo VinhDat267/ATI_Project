@@ -47,7 +47,7 @@ const boards = { tool: 'trello.search_boards', args: { query: 'Frontend' } };
 const lists = { tool: 'trello.search_lists', args: { boardId: 'board_fe', query: 'To Do' } };
 const lastUserMessage = (input: LLMGeneratePlanInput) => input.conversationHistory.at(-1)!.content;
 const planner = (provider: LLMProvider, gatherSearch: any, extra: Record<string, unknown> = {}) =>
-  new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', ...extra });
+  new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', prefetchDirectory: false, ...extra });
 
 describe('AI-driven search', () => {
   it('lets the model search and plans with the IDs it looked up', async () => {

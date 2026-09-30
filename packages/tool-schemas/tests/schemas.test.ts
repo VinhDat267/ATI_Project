@@ -148,6 +148,13 @@ describe('search tools declare the resources they discover', () => {
     });
   });
 
+  it('marks the search tools that can enumerate a resource with an empty query', () => {
+    expect(ALL_TOOLS.filter((t) => t.listable).map((t) => t.name).sort()).toEqual([
+      'github.search_repos', 'slack.search_channels', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
+    ]);
+    for (const tool of ALL_TOOLS.filter((t) => t.listable)) expect(tool.discovers, tool.name).toBeDefined();
+  });
+
   it('requires a board for member search, as the Trello adapter does', () => {
     const tool = ALL_TOOLS.find((t) => t.name === 'trello.search_members')!;
     expect(tool.inputSchema.required).toEqual(expect.arrayContaining(['query', 'boardId']));

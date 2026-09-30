@@ -30,6 +30,15 @@ describe('GitHub adapter', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer test');
   });
 
+  it('lists every allowed repository for an empty query and still rejects a non-string query', async () => {
+    const fetchFn = vi.fn(async (_url: string, _init?: RequestInit) => json({ id: 2, name: 'project', full_name: repo, html_url: 'https://github.com/team/project' }));
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+    await expect(adapter.execute('github.search_repos', { query: '' })).resolves.toEqual([
+      { id: '2', name: 'project', fullName: repo, url: 'https://github.com/team/project' },
+    ]);
+    await expect(adapter.execute('github.search_repos', { query: 42 as any })).rejects.toMatchObject({ category: 'VALIDATION' });
+  });
+
   it('continues past a missing allowed repository but stops on an authorization error', async () => {
     const scope = { repos: ['team/removed', repo] };
     const fetchFn = vi.fn()

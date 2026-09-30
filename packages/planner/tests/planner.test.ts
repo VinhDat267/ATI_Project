@@ -26,6 +26,13 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     }
   });
 
+  it('asks for a short, minified answer because output length dominates latency', () => {
+    const prompt = buildSystemPrompt(tools);
+    expect(prompt).toMatch(/minified on a single line/i);
+    expect(prompt).toMatch(/thinking.*one short sentence.*at most 15 words/is);
+    expect(prompt).toMatch(/description.*at most 8 words/is);
+  });
+
   it('tells the model that resource IDs must come from working memory, the user or a $ref', () => {
     const prompt = buildSystemPrompt(tools);
     expect(prompt).toMatch(/x-resource/);
