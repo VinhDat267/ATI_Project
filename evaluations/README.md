@@ -63,6 +63,44 @@ Read the 100% with its limits:
 - Two of three runs of cs02 exceeded the 15 s preview target (18.7 s, 19.7 s).
 - Usable plan rate is unmeasured and no plan was executed.
 
+### Free-form cases and model-driven search
+
+`golden-v2/cases-freeform.json` holds 18 cases where resources are named the
+way people talk ("the frontend team", "the backend backlog", "repo web"), with
+no "board X, list Y" phrasing and no pre-resolved memory. Twelve were committed
+before the first run (`9e68093`); six held-out cases were committed after that
+run but before the prompt changed in response (`695ad87`).
+
+```bash
+LIVE_EVAL=1 EVAL_SET=freeform EVAL_SEARCH_MODE=llm node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+`EVAL_SEARCH_MODE=regex|llm` selects how names become IDs; `EVAL_ONLY=cs11,ss09`
+reruns named cases and marks the report as a subset.
+
+| Set, search mode (3 runs each) | Strict pass | Tools | Latency p50 / p95 |
+|---|---|---|---|
+| [Free-form 12, regex](../docs/ai-evidence/V3-GOLDEN-V2/freeform-regex-2026-09-29T23-34-43-668Z/summary.md) | 33.3% | 4.2% | — |
+| [Free-form 12, model search](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-29T23-37-59-335Z/summary.md) | 86.1% | 87.5% | 10.3 / 15.4 s |
+| [Free-form 18, after scoping rules](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-29T23-45-06-561Z/summary.md) | 96.3% (held-out 100%) | 100% | 9.5 / 17.8 s |
+| [Free-form 18, member search scoped to a board](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-09-29T23-52-34-909Z/summary.md) | 100% (54/54) | 100% | 10.3 / 15.6 s |
+| [Core 50, model search](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-09-30T00-04-24-686Z/summary.md) | 98.0% (147/150) | 97.1% | 9.2 / 17.6 s |
+| [Core cs11 + ss09 only, after issue fixtures](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-subset-2026-09-30T05-10-15-166Z/summary.md) | 6/6 | 100% | 8.3 / 21.7 s |
+
+What the runs found, beyond the scores:
+
+- The third run assigned a person from another board: the schema called
+  `boardId` optional for member search although the Trello adapter requires it,
+  and the fixture was more permissive than the adapter. The schema now requires
+  it and the fixture mirrors the adapter.
+- cs11 failed in model-search mode because the model looked issue 42 up and the
+  fixture workspace had no issues. Issues were added to the fixtures; the full
+  core set was not rerun afterwards, only cs11 and ss09.
+- Model-driven search costs two to three model calls per request. Latency p95 is
+  15–18 s, above the 15 s preview target that the regex mode met (9.6 s).
+- Eighteen free-form cases by one author are a small sample, and the search
+  results are fixtures.
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline

@@ -1,0 +1,403 @@
+{
+  "evidence": "provider_observed",
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash"
+  ],
+  "set": "core",
+  "searchMode": "llm",
+  "subset": [
+    "cs11",
+    "ss09"
+  ],
+  "labels": {
+    "file": "cases.json",
+    "commit": "ddd130467aa5289824081023ac00f7200f3ac029",
+    "sha256": "6284640ebbc115b037320325caaab46138e3dd792a12cd3a1663d7ad6b77c96b",
+    "version": 2,
+    "cases": 2
+  },
+  "clock": "2026-09-29T03:00:00Z",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "runs": 3,
+  "concurrency": 2,
+  "runAt": "2026-09-30T05:10:15.165Z",
+  "scope": "planning only; no plan executed; search results and earlier-turn memory are fixtures",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      },
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      },
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 1,
+      "toolSelectionAccuracy": 1,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 1,
+      "strictPassRate": 1
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 1,
+        "strictPassRate": 1
+      },
+      "cross_service": {
+        "cases": 1,
+        "strictPassRate": 1
+      }
+    },
+    "stability": {
+      "ss09": "3/3",
+      "cs11": "3/3"
+    },
+    "latencyMs": {
+      "p50": 8256,
+      "p95": 21725,
+      "max": 21725
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8256,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "The user has provided all necessary parameters: repository fullName ('acme/web'), issue number (42), and label name ('bug'). We can directly invoke github.add_label to attach the label to the specified issue.",
+            "summary": "Add the 'bug' label to issue #42 in repository acme/web.",
+            "steps": [
+              {
+                "id": "add_label_1",
+                "tool": "github.add_label",
+                "description": "Add the 'bug' label to issue #42 in acme/web.",
+                "args": {
+                  "repo": "acme/web",
+                  "issueNumber": 42,
+                  "label": "bug"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 21725,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "All necessary resources have been found. I will create a new card on the 'Backlog' list with details from GitHub issue #42 and assign Huy, then post a notification to the #backend Slack channel.",
+            "summary": "Tạo Trello card cho GitHub issue #42, gán Huy và thông báo kênh Slack #backend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo card mới trên list Backlog cho issue #42 và gán thành viên Huy",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Issue #42: Webhook retries drop events",
+                  "desc": "GitHub Issue: https://github.com/acme/api/issues/42\n\nRetries after a 5xx are not re-queued.",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo vào kênh #backend kèm liên kết card Trello vừa tạo",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "Đã tạo Trello card cho issue #42 (Webhook retries drop events) và gán cho Huy: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": [
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6736,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "The user explicitly provided the repository fullName ('acme/web'), the issue number (42), and the label to add ('bug'). We can directly call `github.add_label` with these parameters.",
+            "summary": "Add the 'bug' label to issue #42 in repository acme/web.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "github.add_label",
+                "description": "Add label 'bug' to issue #42 in acme/web",
+                "args": {
+                  "repo": "acme/web",
+                  "issueNumber": 42,
+                  "label": "bug"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 21432,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Đã có đầy đủ thông tin: Issue #42 repo acme/api ('Webhook retries drop events'), listId 'list_be_backlog' trên board 'Backend', memberId 'member_huy', và channelId 'C_BE' (#backend). Tiến hành tạo card Trello được gán cho Huy, sau đó gửi thông báo đến kênh Slack #backend kèm link card vừa tạo.",
+            "summary": "Tạo thẻ Trello cho GitHub Issue #42 trên danh sách Backlog, gán cho Huy và gửi thông báo vào kênh Slack #backend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ Trello cho issue #42 và gán cho thành viên Huy",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Issue #42: Webhook retries drop events",
+                  "desc": "GitHub Issue: https://github.com/acme/api/issues/42\n\nRetries after a 5xx are not re-queued.",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Thông báo thẻ Trello mới tạo vào kênh Slack #backend",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "Đã tạo thẻ Trello cho Issue #42: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": [
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 7294,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "The user provided the repository ('acme/web'), the issue number (42), and the label name ('bug'). These match the required inputs for `github.add_label`, allowing a direct plan execution.",
+            "summary": "Add the 'bug' label to issue #42 in acme/web.",
+            "steps": [
+              {
+                "id": "add_label_step",
+                "tool": "github.add_label",
+                "description": "Add label 'bug' to issue #42 in repository 'acme/web'",
+                "args": {
+                  "repo": "acme/web",
+                  "issueNumber": 42,
+                  "label": "bug"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 17923,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Tạo Trello card trong danh sách 'Backlog' của bảng 'Backend' với thông tin từ issue #42 repo acme/api, gán cho thành viên Huy (member_huy), sau đó gửi thông báo kèm link card vào kênh Slack #backend (C_BE).",
+            "summary": "Tạo card trên Trello cho issue #42, gán Huy và thông báo tới kênh #backend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ Trello cho issue #42 trong danh sách Backlog và gán cho Huy",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Issue #42: Webhook retries drop events",
+                  "desc": "GitHub Issue: https://github.com/acme/api/issues/42\n\nRetries after a 5xx are not re-queued.",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Gửi tin nhắn thông báo vào kênh Slack #backend",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "Đã tạo thẻ Trello cho issue #42 (Webhook retries drop events): ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    }
+  ]
+}
