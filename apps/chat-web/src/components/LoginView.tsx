@@ -32,38 +32,38 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
   return (
     <main className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white text-zinc-900 font-sans">
-      {/* Cột trái: Góc nhìn Giá trị Doanh nghiệp & Mô phỏng Quy trình Thực tế */}
+      {/* Cột trái: Góc nhìn Nền tảng Đa Dịch vụ Mở rộng cho Doanh nghiệp */}
       <section className="hidden lg:flex lg:col-span-6 xl:col-span-7 relative flex-col justify-between p-12 xl:p-16 bg-gradient-to-br from-zinc-950 via-zinc-900 to-blue-950 text-white overflow-hidden">
         {/* Hiệu ứng ánh sáng nền ambient tinh tế */}
         <div className="absolute top-0 -left-20 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[30rem] h-[30rem] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Tiêu đề & Thông điệp Doanh nghiệp */}
+        {/* Tiêu đề & Thông điệp Nền tảng Mở rộng */}
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs font-medium text-blue-200 mb-6 shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>AI Workflow Automation Platform</span>
             <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-[10px] text-blue-300 font-semibold tracking-wider uppercase">
-              Doanh nghiệp
+              Đa Dịch Vụ
             </span>
           </div>
 
           <h1 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
-            Tự động hóa mọi quy trình chỉ với một câu lệnh
+            Nền tảng Tự động hóa Quy trình Đa Dịch vụ
           </h1>
           <p className="mt-4 text-sm xl:text-base text-zinc-300 max-w-xl leading-relaxed">
-            Biến yêu cầu tự nhiên thành chuỗi hành động cụ thể trên các công cụ làm việc quen thuộc. 
-            Giảm thiểu tối đa thao tác thủ công, giúp đội ngũ của bạn tập trung tạo ra giá trị kinh doanh đột phá.
+            Kết nối và điều phối linh hoạt toàn bộ hệ sinh thái ứng dụng của doanh nghiệp — từ Quản lý dự án, 
+            Kho mã nguồn, Kênh giao tiếp đến Bảng tính và Dữ liệu đám mây. Mở rộng không giới hạn theo quy mô tổ chức.
           </p>
         </div>
 
-        {/* Thẻ mô phỏng Quy trình thực tế (Workflow Preview Widget) */}
+        {/* Thẻ mô phỏng Quy trình mẫu liên thông giữa các nhóm ứng dụng */}
         <div className="relative z-10 my-6 max-w-xl">
           <div className="rounded-2xl bg-white/[0.05] border border-white/10 p-5 backdrop-blur-md shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <span className="font-semibold text-white tracking-wide">Mô phỏng quy trình thực tế</span>
+                <span className="font-semibold text-white tracking-wide">Ví dụ một quy trình liên thông mẫu</span>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium text-[11px]">
                 ⚡ Tiết kiệm 80% thời gian
@@ -76,10 +76,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                <span>Yêu cầu từ người quản lý:</span>
+                <span>Người dùng yêu cầu bằng ngôn ngữ tự nhiên:</span>
               </div>
               <div className="p-2.5 rounded-xl bg-white/10 text-xs text-white font-medium border border-white/10 italic">
-                &ldquo;Tạo task cập nhật trang chủ cho team Frontend, gán cho Minh trên Trello và thông báo vào Slack&rdquo;
+                &ldquo;Tạo task cập nhật trang chủ, gán Minh trên bảng dự án và thông báo tức thì cho team qua kênh chat&rdquo;
               </div>
             </div>
 
@@ -90,25 +90,25 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </svg>
             </div>
 
-            {/* Bước 2: AI tự động điều phối & thực hiện */}
+            {/* Bước 2: AI tự động phân giải và điều phối đa dịch vụ */}
             <div className="space-y-2">
               <div className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs">
                 <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0 font-bold text-[10px]">
-                  TR
+                  PM
                 </div>
                 <div className="flex-1">
-                  <span className="font-semibold text-white">Trello:</span>
-                  <span className="text-zinc-300 ml-1.5">Tạo thẻ công việc mới &amp; phân công nhân sự</span>
+                  <span className="font-semibold text-white">Quản lý công việc (Trello / Jira...):</span>
+                  <span className="text-zinc-300 ml-1.5">Tạo card nhiệm vụ &amp; phân công nhân sự</span>
                 </div>
-                <span className="text-emerald-400 text-xs">✓ Đã lập kế hoạch</span>
+                <span className="text-emerald-400 text-xs">✓ Đã lên kế hoạch</span>
               </div>
 
               <div className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs">
                 <div className="w-6 h-6 rounded-lg bg-zinc-800 text-zinc-200 flex items-center justify-center shrink-0 font-bold text-[10px]">
-                  GH
+                  GIT
                 </div>
                 <div className="flex-1">
-                  <span className="font-semibold text-white">GitHub:</span>
+                  <span className="font-semibold text-white">Kho mã nguồn (GitHub / GitLab...):</span>
                   <span className="text-zinc-300 ml-1.5">Liên kết issue và repository liên quan</span>
                 </div>
                 <span className="text-emerald-400 text-xs">✓ Đã đồng bộ</span>
@@ -116,13 +116,24 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
               <div className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs">
                 <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 font-bold text-[10px]">
-                  SL
+                  MSG
                 </div>
                 <div className="flex-1">
-                  <span className="font-semibold text-white">Slack:</span>
+                  <span className="font-semibold text-white">Truyền thông nội bộ (Slack / Teams...):</span>
                   <span className="text-zinc-300 ml-1.5">Gửi thông báo cập nhật trực tiếp đến kênh làm việc</span>
                 </div>
                 <span className="text-emerald-400 text-xs">✓ Sẵn sàng gửi</span>
+              </div>
+
+              <div className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 font-bold text-[10px]">
+                  DOC
+                </div>
+                <div className="flex-1">
+                  <span className="font-semibold text-white">Bảng tính &amp; Báo cáo (Google Sheets / Notion...):</span>
+                  <span className="text-zinc-300 ml-1.5">Tự động ghi chép dữ liệu và nhật ký tiến độ</span>
+                </div>
+                <span className="text-blue-300 text-xs">+ Sẵn sàng tích hợp</span>
               </div>
             </div>
 
@@ -139,14 +150,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
         </div>
 
-        {/* 3 Trụ cột Lợi ích Doanh nghiệp */}
+        {/* 3 Trụ cột Nền tảng Doanh nghiệp */}
         <div className="relative z-10 grid grid-cols-3 gap-3 max-w-xl text-left">
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
             <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
               <span>⚡</span> Năng suất vượt trội
             </h3>
             <p className="text-[11px] text-zinc-400 mt-1 leading-normal">
-              1 câu chat thay thế 4–5 thao tác thủ công trên nhiều ứng dụng.
+              1 câu chat điều phối chuỗi hành động xuyên suốt nhiều phần mềm khác nhau.
             </p>
           </div>
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
@@ -154,30 +165,36 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span>🛡️</span> Kiểm soát 100%
             </h3>
             <p className="text-[11px] text-zinc-400 mt-1 leading-normal">
-              Xem trước và duyệt kế hoạch, không tự ý thay đổi dữ liệu.
+              Xem trước và duyệt kế hoạch, không tự ý thay đổi dữ liệu khi chưa xác nhận.
             </p>
           </div>
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
             <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
-              <span>🤝</span> Đồng bộ phòng ban
+              <span>🧩</span> Mở rộng linh hoạt
             </h3>
             <p className="text-[11px] text-zinc-400 mt-1 leading-normal">
-              Kết nối liền mạch đội ngũ kỹ thuật, quản lý và truyền thông.
+              Kiến trúc adapter mở, dễ dàng kết nối thêm bất kỳ công cụ hoặc API nào.
             </p>
           </div>
         </div>
 
-        {/* Chân trang cột trái */}
+        {/* Chân trang cột trái: Danh sách hệ sinh thái mở rộng phong phú */}
         <div className="relative z-10 border-t border-white/10 pt-5 mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400 font-medium">Hệ sinh thái kết nối:</span>
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-400 font-medium">Hệ sinh thái tích hợp &amp; mở rộng:</span>
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-200">GitHub</span>
               <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-200">Trello</span>
               <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-200">Slack</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-300">Google Sheets</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-300">Jira</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-medium text-zinc-300">Notion</span>
+              <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-[11px] font-semibold text-blue-300 border border-blue-400/20">
+                + Không giới hạn dịch vụ
+              </span>
             </div>
           </div>
-          <span className="text-[11px] text-zinc-400">Nền tảng Tự động hóa Vận hành Doanh nghiệp</span>
+          <span className="text-[11px] text-zinc-400 shrink-0">Nền tảng Tự động hóa Vận hành Doanh nghiệp</span>
         </div>
       </section>
 
