@@ -1,0 +1,2461 @@
+{
+  "evidence": "provider_observed",
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash"
+  ],
+  "set": "freeform",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases-freeform.json",
+    "commit": "695ad8758d9d658bd3606d15d679845dce30f7e4",
+    "sha256": "79812f905a3d51752d7f245f3f258b6f2f2673b42a9ecadf2404d706293f0f80",
+    "version": 2,
+    "cases": 18
+  },
+  "clock": "2026-09-29T03:00:00Z",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "runs": 3,
+  "concurrency": 2,
+  "runAt": "2026-09-30T06:46:34.221Z",
+  "scope": "planning only; no plan executed; search results and earlier-turn memory are fixtures",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      },
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      },
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 1,
+      "toolSelectionAccuracy": 1,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 1,
+      "strictPassRate": 1
+    },
+    "byCategory": {
+      "free_form": {
+        "cases": 12,
+        "strictPassRate": 1
+      },
+      "free_form_heldout": {
+        "cases": 6,
+        "strictPassRate": 1
+      }
+    },
+    "stability": {
+      "ff01": "3/3",
+      "ff02": "3/3",
+      "ff03": "3/3",
+      "ff04": "3/3",
+      "ff05": "3/3",
+      "ff06": "3/3",
+      "ff07": "3/3",
+      "ff08": "3/3",
+      "ff09": "3/3",
+      "ff10": "3/3",
+      "ff11": "3/3",
+      "ff12": "3/3",
+      "ff13": "3/3",
+      "ff14": "3/3",
+      "ff15": "3/3",
+      "ff16": "3/3",
+      "ff17": "3/3",
+      "ff18": "3/3"
+    },
+    "latencyMs": {
+      "p50": 8521,
+      "p95": 21168,
+      "max": 22083
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 10618,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card and slack.send_message to create card and notify team.",
+            "summary": "Tạo task cập nhật homepage trên Trello và thông báo vào Slack",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ trên Trello",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Cập nhật homepage",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo trên Slack",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã tạo task cập nhật homepage: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8622,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card and slack.send_message.",
+            "summary": "Create card in Backend Backlog and notify Slack",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create card in backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Migrate the users table to the new schema"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify backend channel",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "New card added to backlog: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5375,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card to create a card for Backend team.",
+            "summary": "Tạo thẻ 'Tối ưu truy vấn báo cáo' trong danh sách To Do của bảng Backend và gán cho Huy.",
+            "steps": [
+              {
+                "id": "create_be_card",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ mới cho Huy",
+                "args": {
+                  "listId": "list_be_todo",
+                  "title": "Tối ưu truy vấn báo cáo",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 13846,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.update_card and slack.send_message.",
+            "summary": "Chuyển thẻ Lỗi đăng nhập Safari sang Done và thông báo trên kênh Slack frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.update_card",
+                "description": "Move card to Done",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "idList": "list_fe_done"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã chuyển thẻ \"Lỗi đăng nhập Safari\" sang Done: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6921,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using github.create_issue and slack.send_message.",
+            "summary": "Tạo issue trên GitHub repo web và thông báo qua kênh general trên Slack.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue lỗi nút thanh toán",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Lỗi nút thanh toán bị lệch trên điện thoại",
+                  "body": "Nút thanh toán bị lệch khi xem trên thiết bị điện thoại."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_slack",
+                "tool": "slack.send_message",
+                "description": "Báo kênh Slack general",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": {
+                    "$template": "Đã tạo issue mới: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 11602,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create GitHub issue and Trello card using github.create_issue and trello.create_card.",
+            "summary": "Create a GitHub issue in acme/api and a corresponding card in the Backend backlog.",
+            "steps": [
+              {
+                "id": "step_issue",
+                "tool": "github.create_issue",
+                "description": "Create GitHub issue for 500 error",
+                "args": {
+                  "repo": "acme/api",
+                  "title": "500 error on large uploads"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_card",
+                "tool": "trello.create_card",
+                "description": "Create Trello card in backend backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "500 error on large uploads",
+                  "desc": {
+                    "$template": "GitHub issue: ${step_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10286,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Gán thành viên Lan vào thẻ bằng trello.add_member.",
+            "summary": "Gán thành viên Lan vào thẻ 'Lỗi đăng nhập Safari' trên Trello.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.add_member",
+                "description": "Gán Lan vào thẻ",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "memberId": "member_lan"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 6243,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send announcement message to release channel using slack.send_message.",
+            "summary": "Notify the release channel that v2.5 is live.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Post v2.5 release announcement",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "v2.5 is live"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 15550,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarifying which member named Minh to assign.",
+            "question": "Bạn muốn gán thẻ cho Minh Anh hay Minh Châu trong bảng Marketing?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ]
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 18091,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Không tìm thấy bảng 'Mobile'. Bạn muốn tạo thẻ trên bảng nào và tiêu đề thẻ là gì?",
+            "options": [
+              "Frontend",
+              "Backend",
+              "Marketing"
+            ],
+            "context": "Không có bảng nào tên Mobile trong tài khoản Trello."
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5330,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn tạo card lỗi đăng nhập trên bảng và danh sách nào?",
+            "options": [
+              "Bảng Frontend - Danh sách To Do",
+              "Bảng Backend - Danh sách To Do",
+              "Bảng Backend - Danh sách Backlog"
+            ]
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5855,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "slack.send_message will be used once a channel is selected.",
+            "question": "Which Slack channel would you like to post the maintenance notification to?",
+            "options": [
+              "#general",
+              "#release",
+              "#backend",
+              "#frontend"
+            ]
+          }
+        },
+        {
+          "id": "ff13",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 4780,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a card in Frontend To Do list assigned to Minh using trello.create_card.",
+            "summary": "Create the 'Fix footer links' card in the Frontend To Do list and assign it to Minh.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create card and assign to Minh",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Fix footer links",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff14",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 21168,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use trello.create_card, trello.add_member, and slack.send_message to complete the request.",
+            "summary": "Tạo thẻ Cập nhật banner, gán Minh và thông báo kênh frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ Cập nhật banner",
+                "args": {
+                  "listId": "list_fe_doing",
+                  "title": "Cập nhật banner"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "trello.add_member",
+                "description": "Gán Minh vào thẻ",
+                "args": {
+                  "cardId": {
+                    "$ref": "step_1.output.id"
+                  },
+                  "memberId": "member_minh"
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              },
+              {
+                "id": "step_3",
+                "tool": "slack.send_message",
+                "description": "Thông báo kênh frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã tạo thẻ Cập nhật banner: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff15",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 6726,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send deploy completion message to the frontend channel using slack.send_message.",
+            "summary": "Notify frontend team that deploy finished",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": "The deploy finished."
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff16",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9683,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi thông báo lịch nghỉ lễ vào kênh nào và nội dung cụ thể (thời gian, dịp lễ) là gì?",
+            "options": [
+              "Kênh #general",
+              "Kênh khác"
+            ],
+            "context": "Trong Slack hiện có kênh #general thường dùng cho toàn công ty, nhưng cần xác nhận kênh và chi tiết lịch nghỉ trước khi gửi."
+          }
+        },
+        {
+          "id": "ff17",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6720,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Plan uses github.create_issue and slack.send_message to report and notify the issue.",
+            "summary": "Create a GitHub issue for the slow homepage in acme/web and notify the #frontend Slack channel.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Create issue for slow homepage",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Slow homepage",
+                  "body": "Investigate and resolve slow loading on the homepage."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_frontend",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel on Slack",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Created issue for slow homepage: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff18",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10021,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use trello.create_card to create the card in the marketing board.",
+            "summary": "Tạo thẻ 'Ý tưởng livestream' trong danh sách Ideas của bảng Marketing.",
+            "steps": [
+              {
+                "id": "create_card_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ ý tưởng livestream",
+                "args": {
+                  "listId": "list_mkt_ideas",
+                  "title": "Ý tưởng livestream"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 8597,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card and slack.send_message to create card and notify.",
+            "summary": "Tạo task cập nhật homepage trên Trello và thông báo vào Slack frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create homepage update task",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Cập nhật homepage",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify frontend Slack channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã tạo task Cập nhật homepage: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5714,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use trello.create_card and slack.send_message.",
+            "summary": "Create a card in the backend backlog and notify the backend channel.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create card in backend backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Migrate the users table to the new schema"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify backend channel",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "Card created in Backlog: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 7684,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using trello.create_card to add the report query optimization task for Huy.",
+            "summary": "Tạo thẻ 'Tối ưu truy vấn báo cáo' trong danh sách To Do của bảng Backend và gán cho Huy.",
+            "steps": [
+              {
+                "id": "create_card",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ tối ưu truy vấn báo cáo",
+                "args": {
+                  "listId": "list_be_todo",
+                  "title": "Tối ưu truy vấn báo cáo",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 15997,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Move card with trello.update_card and notify Slack via slack.send_message.",
+            "summary": "Chuyển thẻ 'Lỗi đăng nhập Safari' sang Done và thông báo vào kênh frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.update_card",
+                "description": "Move card to Done list",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "idList": "list_fe_done"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel on Slack",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã chuyển thẻ \"${step_1.output.name}\" sang danh sách Done: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 17070,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using github.create_issue and slack.send_message to create an issue and notify Slack.",
+            "summary": "Tạo issue lỗi nút thanh toán trên repo web và gửi thông báo vào kênh general.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue nút thanh toán bị lệch",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Lỗi nút thanh toán bị lệch trên điện thoại"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_slack",
+                "tool": "slack.send_message",
+                "description": "Thông báo tới kênh general",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": {
+                    "$template": "Đã tạo issue về lỗi nút thanh toán bị lệch trên điện thoại: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7075,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create GitHub issue with github.create_issue and Trello card with trello.create_card.",
+            "summary": "Create an issue in acme/api and add a corresponding card in the Backend Backlog list.",
+            "steps": [
+              {
+                "id": "create_gh_issue",
+                "tool": "github.create_issue",
+                "description": "Create API upload error issue",
+                "args": {
+                  "repo": "acme/api",
+                  "title": "500 error on large uploads",
+                  "body": "Investigate and resolve 500 error occurring on large uploads."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "create_trello_card",
+                "tool": "trello.create_card",
+                "description": "Create card in backend backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "500 error on large uploads",
+                  "desc": {
+                    "$template": "GitHub issue: ${create_gh_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_gh_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10201,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.add_member to assign Lan to the Safari login card.",
+            "summary": "Gán thành viên Lan vào thẻ Lỗi đăng nhập Safari trên Trello",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.add_member",
+                "description": "Gán Lan vào thẻ Trello",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "memberId": "member_lan"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 4409,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will send a message using slack.send_message.",
+            "summary": "Notify the release channel that v2.5 is live",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Send announcement to release channel",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "v2.5 is live"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 10632,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarifying member choice between Minh Anh and Minh Chau in Marketing.",
+            "question": "Trong bảng Marketing có hai thành viên tên Minh, bạn muốn gán thẻ cho ai?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ]
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 11422,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find a Trello board for the Mobile team. Which board would you like to use, and what should the card title and list be?",
+            "options": [
+              "Frontend",
+              "Backend",
+              "Marketing"
+            ],
+            "context": "No board matching \"Mobile\" was found."
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 4814,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn tạo card lỗi đăng nhập vào bảng và danh sách nào?",
+            "options": [
+              "Bảng Frontend - Danh sách To Do",
+              "Bảng Backend - Danh sách To Do",
+              "Bảng Backend - Danh sách Backlog"
+            ],
+            "context": "Chưa rõ bảng và danh sách cần tạo card"
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5254,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which Slack channel would you like to notify about tonight's maintenance?",
+            "options": [
+              "#general",
+              "#backend",
+              "#frontend",
+              "#release"
+            ]
+          }
+        },
+        {
+          "id": "ff13",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8521,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a card in Trello assigned to Minh using trello.create_card.",
+            "summary": "Create card 'Fix footer links' in Frontend's To Do list and assign Minh.",
+            "steps": [
+              {
+                "id": "create_card",
+                "tool": "trello.create_card",
+                "description": "Create card and assign to Minh",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Fix footer links",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff14",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 22083,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use trello.create_card, trello.add_member, and slack.send_message.",
+            "summary": "Tạo thẻ Cập nhật banner trên Trello, gán Minh và gửi thông báo qua Slack",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ mới",
+                "args": {
+                  "listId": "list_fe_doing",
+                  "title": "Cập nhật banner"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "trello.add_member",
+                "description": "Gán Minh vào thẻ",
+                "args": {
+                  "cardId": {
+                    "$ref": "step_1.output.id"
+                  },
+                  "memberId": "member_minh"
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              },
+              {
+                "id": "step_3",
+                "tool": "slack.send_message",
+                "description": "Thông báo kênh Slack frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã tạo thẻ Cập nhật banner: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff15",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 8030,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send a Slack message to notify the frontend channel using slack.send_message.",
+            "summary": "Notify frontend team that the deploy finished",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": "The deploy finished."
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff16",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6744,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi thông báo này vào kênh Slack nào và nội dung/thời gian cụ thể của lịch nghỉ lễ là gì?",
+            "options": [
+              "general",
+              "frontend",
+              "backend",
+              "release"
+            ]
+          }
+        },
+        {
+          "id": "ff17",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8465,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using github.create_issue and slack.send_message to report the issue and notify frontend.",
+            "summary": "Create a GitHub issue about the slow homepage in acme/web and notify the frontend channel on Slack.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Create issue for slow homepage",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Slow homepage performance",
+                  "body": "Investigation needed for slow homepage performance."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_slack",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Created issue for slow homepage: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff18",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 9168,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using trello.create_card to create the card.",
+            "summary": "Tạo card ý tưởng livestream trong danh sách Ideas của bảng Marketing",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo card ý tưởng livestream",
+                "args": {
+                  "listId": "list_mkt_ideas",
+                  "title": "Ý tưởng livestream"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": [
+        {
+          "id": "ff01",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 17597,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card and slack.send_message to create card and notify team.",
+            "summary": "Tạo task cập nhật homepage và thông báo trên kênh Slack frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo task cập nhật homepage",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Cập nhật homepage",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Thông báo trên kênh Slack frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã tạo task cập nhật homepage: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff02",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5588,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using trello.create_card and slack.send_message to create card and notify.",
+            "summary": "Create a card in Backend Backlog and notify the backend Slack channel",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create card in Backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Migrate the users table to the new schema"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify backend channel",
+                "args": {
+                  "channel": "C_BE",
+                  "text": {
+                    "$template": "Added card to backlog: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff03",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5911,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Chosen trello.create_card to create the backend card assigned to Huy.",
+            "summary": "Tạo thẻ 'Tối ưu truy vấn báo cáo' trong danh sách To Do của Backend và gán cho Huy.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ và gán cho Huy",
+                "args": {
+                  "listId": "list_be_todo",
+                  "title": "Tối ưu truy vấn báo cáo",
+                  "idMembers": [
+                    "member_huy"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff04",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 19142,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Update card list with trello.update_card and notify Slack via slack.send_message.",
+            "summary": "Chuyển thẻ sang danh sách Done và thông báo vào kênh frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.update_card",
+                "description": "Move card to Done",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "idList": "list_fe_done"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã chuyển thẻ \"Lỗi đăng nhập Safari\" sang Done: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff05",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7828,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create issue via github.create_issue and notify via slack.send_message.",
+            "summary": "Mở issue về lỗi nút thanh toán trong repo acme/web và thông báo vào kênh general.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue trên repo web",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Lỗi nút thanh toán bị lệch trên điện thoại",
+                  "body": "Lỗi hiển thị nút thanh toán bị lệch trên giao diện điện thoại."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_slack",
+                "tool": "slack.send_message",
+                "description": "Báo vào kênh general",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": {
+                    "$template": "Đã mở issue mới: ${create_issue.output.title} - ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff06",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 9984,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use github.create_issue and trello.create_card to create the issue and card.",
+            "summary": "Create a GitHub issue in acme/api and link it to a new card in the Backend Backlog list.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Create API 500 error GitHub issue",
+                "args": {
+                  "repo": "acme/api",
+                  "title": "500 error on large uploads"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "create_card",
+                "tool": "trello.create_card",
+                "description": "Create card in backend backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "500 error on large uploads",
+                  "desc": {
+                    "$template": "GitHub Issue: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff07",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10820,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.add_member to assign Lan to the card.",
+            "summary": "Gán thành viên Lan vào thẻ 'Lỗi đăng nhập Safari' trên Trello.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.add_member",
+                "description": "Gán Lan vào thẻ",
+                "args": {
+                  "cardId": "card_fe_login",
+                  "memberId": "member_lan"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff08",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 4528,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send announcement message to the release channel using slack.send_message.",
+            "summary": "Send a message to the #release channel announcing that v2.5 is live.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Post release announcement to Slack channel",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "v2.5 is live"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff09",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 17005,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Trong team Marketing có hai thành viên là Minh Anh và Minh Châu, bạn muốn gán thẻ cho ai?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ]
+          }
+        },
+        {
+          "id": "ff10",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 21649,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash",
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "I couldn't find a board for the Mobile team. Could you confirm the board name, along with the card title and target list?",
+            "context": "No Trello boards matching 'Mobile' were found. Available boards include Frontend, Backend, and Marketing."
+          }
+        },
+        {
+          "id": "ff11",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 13328,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn tạo card lỗi đăng nhập vào bảng và danh sách nào?",
+            "options": [
+              "Bảng Frontend - Danh sách To Do",
+              "Bảng Backend - Danh sách To Do",
+              "Bảng Backend - Danh sách Backlog"
+            ]
+          }
+        },
+        {
+          "id": "ff12",
+          "category": "free_form",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5136,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which Slack channel would you like to send the maintenance notification to?",
+            "options": [
+              "#general",
+              "#release",
+              "#backend",
+              "#frontend"
+            ]
+          }
+        },
+        {
+          "id": "ff13",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5011,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a card using trello.create_card.",
+            "summary": "Create a card 'Fix footer links' in Frontend To Do assigned to Minh.",
+            "steps": [
+              {
+                "id": "create_card",
+                "tool": "trello.create_card",
+                "description": "Create card assigned to Minh",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Fix footer links",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff14",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 8968,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Plan using trello.create_card and slack.send_message to create card and notify.",
+            "summary": "Tạo card 'Cập nhật banner' trên cột Doing và thông báo qua kênh Slack frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo card và gán Minh",
+                "args": {
+                  "listId": "list_fe_doing",
+                  "title": "Cập nhật banner",
+                  "idMembers": [
+                    "member_minh"
+                  ]
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Thông báo trên kênh frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Đã thêm card 'Cập nhật banner' cho Minh: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff15",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 8472,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send deploy notification using slack.send_message.",
+            "summary": "Notify frontend team of deploy completion",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Notify frontend team about deploy",
+                "args": {
+                  "channel": "C_FE",
+                  "text": "The deploy finished."
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff16",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 8713,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi thông báo lịch nghỉ lễ vào kênh Slack nào và nội dung chi tiết của thông báo là gì?",
+            "options": [
+              "Kênh #general (C_GEN)"
+            ],
+            "context": "Vui lòng cung cấp nội dung lịch nghỉ lễ cụ thể và xác nhận kênh nhận thông báo."
+          }
+        },
+        {
+          "id": "ff17",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 7326,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create issue with github.create_issue and notify via slack.send_message.",
+            "summary": "Create a GitHub issue in the web repository and notify the frontend Slack channel.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Create slow homepage issue",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Slow homepage",
+                  "body": "Investigate and resolve slow homepage performance."
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_frontend",
+                "tool": "slack.send_message",
+                "description": "Notify frontend channel of issue",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Created issue for slow homepage: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          }
+        },
+        {
+          "id": "ff18",
+          "category": "free_form_heldout",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 4784,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card to create the card in the marketing board.",
+            "summary": "Tạo card 'Ý tưởng livestream' trong danh sách Ideas của bảng Marketing",
+            "steps": [
+              {
+                "id": "create_livestream_card",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ ý tưởng livestream",
+                "args": {
+                  "listId": "list_mkt_ideas",
+                  "title": "Ý tưởng livestream"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,8 +6,6 @@ export interface TransportOptions {
   maxRetries: number;
   /** Base backoff; retry n waits retryDelayMs * 2^(n-1). */
   retryDelayMs: number;
-  /** Start a second identical attempt when the first has not answered after this long. */
-  hedgeAfterMs?: number;
   /** Provider name used in the timeout message. */
   label: string;
   signal?: AbortSignal;
@@ -52,50 +50,11 @@ async function attemptWithDeadline<T>(attempt: (signal: AbortSignal) => Promise<
   }
 }
 
-/**
- * Races a second identical attempt against one that is slow to answer and
- * returns whichever succeeds first, aborting the other. Only for idempotent,
- * read-only calls: it trades an extra request for a shorter latency tail.
- */
-function attemptWithHedge<T>(attempt: (signal: AbortSignal) => Promise<T>, options: TransportOptions): Promise<T> {
-  if (!options.hedgeAfterMs) return attemptWithDeadline(attempt, options);
-  return new Promise<T>((resolve, reject) => {
-    const losers = [new AbortController(), new AbortController()];
-    const errors: unknown[] = [];
-    let started = 0;
-    let settled = false;
-    const launch = () => {
-      const index = started++;
-      attemptWithDeadline((signal) => attempt(AbortSignal.any([signal, losers[index]!.signal])), options).then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          losers[1 - index]!.abort(new Error(`${options.label} hedged request was not needed`));
-          resolve(value);
-        },
-        (err) => {
-          errors.push(err);
-          if (settled) return;
-          // A rejected first attempt fails at once; after the hedge started, wait for the other one.
-          if (started === 1 || errors.length === 2) {
-            settled = true;
-            clearTimeout(timer);
-            reject(errors[0]);
-          }
-        },
-      );
-    };
-    const timer = setTimeout(() => { if (!settled && !options.signal?.aborted) launch(); }, options.hedgeAfterMs);
-    launch();
-  });
-}
-
 export async function callWithRetry<T>(attempt: (signal: AbortSignal) => Promise<T>, options: TransportOptions): Promise<T> {
   for (let retry = 0; ; retry++) {
     if (options.signal?.aborted) throw abortReason(options.signal, options.label);
     try {
-      return await attemptWithHedge(attempt, options);
+      return await attemptWithDeadline(attempt, options);
     } catch (err) {
       if (options.signal?.aborted) throw abortReason(options.signal, options.label);
       if (!isTransientStatus(err) || retry >= options.maxRetries) throw err;
