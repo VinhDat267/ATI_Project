@@ -155,6 +155,12 @@ describe('search tools declare the resources they discover', () => {
     for (const tool of ALL_TOOLS.filter((t) => t.listable)) expect(tool.discovers, tool.name).toBeDefined();
   });
 
+  it('steers member assignment on a new card to create_card.idMembers', () => {
+    const description = (name: string) => ALL_TOOLS.find((t) => t.name === name)!.description;
+    expect(description('trello.add_member')).toMatch(/đã có.*idMembers/is);
+    expect(description('trello.create_card')).toMatch(/idMembers/);
+  });
+
   it('requires a board for member search, as the Trello adapter does', () => {
     const tool = ALL_TOOLS.find((t) => t.name === 'trello.search_members')!;
     expect(tool.inputSchema.required).toEqual(expect.arrayContaining(['query', 'boardId']));

@@ -209,7 +209,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.create_card',
     service: 'trello',
-    description: 'Tạo thẻ (card) mới trên một danh sách Trello xác định.',
+    description: 'Tạo thẻ (card) mới trên một danh sách Trello xác định. Gán thành viên ngay khi tạo bằng idMembers.',
     sideEffect: 'write',
     riskLevel: 'low',
     inputSchema: {
@@ -306,7 +306,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.add_member',
     service: 'trello',
-    description: 'Gán thành viên vào một thẻ Trello.',
+    description: 'Gán thành viên vào một thẻ Trello đã có. Với thẻ sắp tạo trong cùng plan, dùng idMembers của trello.create_card thay cho tool này.',
     sideEffect: 'write',
     riskLevel: 'low',
     inputSchema: {

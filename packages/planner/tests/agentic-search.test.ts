@@ -257,6 +257,13 @@ describe('search protocol prompt', () => {
     expect(buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS])).not.toContain('"kind": "search"');
   });
 
+  it('says to look an existing item up first and to keep read tools out of plans', () => {
+    const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
+    expect(prompt).toMatch(/refers to an existing item.*first response is a search for it/is);
+    expect(prompt).toMatch(/never put a read-only tool in a plan/i);
+    expect(buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS])).not.toMatch(/never put a read-only tool in a plan/i);
+  });
+
   it('scopes lookups to the board found, prefers an exact name, and never guesses a generic destination', () => {
     const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
     expect(prompt).toMatch(/search members and cards with the boardId of the board/i);
