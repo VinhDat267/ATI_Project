@@ -376,10 +376,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
           <div className="flex items-center gap-2 font-medium text-zinc-700">
             <span>AI Workflow Automation Platform</span>
             <span>•</span>
-            <span>Đề tài 26 — Advanced Technology Integration (ATI)</span>
+            <span className="text-zinc-500 font-normal">Enterprise Multi-Service Orchestration</span>
           </div>
           <div className="text-zinc-400">
-            © 2026 ATI Project. All rights reserved.
+            © 2026 AI Workflow Platform. All rights reserved.
           </div>
         </div>
       </footer>
