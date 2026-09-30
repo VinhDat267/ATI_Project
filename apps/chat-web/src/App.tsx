@@ -6,6 +6,7 @@ import { PlanPreview } from './components/PlanPreview';
 import { ExecutionProgress } from './components/ExecutionProgress';
 import { PartialFailureModal } from './components/PartialFailureModal';
 import { SettingsModal } from './components/SettingsModal';
+import { LoginView } from './components/LoginView';
 
 export const App: React.FC = () => {
   const {
@@ -226,21 +227,15 @@ export const App: React.FC = () => {
 
   if (!authToken) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#f5f5f7] p-4">
-        <form onSubmit={loginUser} className="w-full max-w-sm bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-          <h1 className="text-lg font-semibold text-zinc-900">Đăng nhập AI Workflow</h1>
-          <label className="text-sm text-zinc-700">Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="username" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
-          </label>
-          <label className="text-sm text-zinc-700">Mật khẩu
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
-          </label>
-          {authError && <p role="alert" className="text-sm text-red-700">{authError}</p>}
-          <button type="submit" disabled={isLoggingIn} className="bg-[#0071e3] text-white rounded-lg p-2 disabled:opacity-50">
-            {isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </button>
-        </form>
-      </main>
+      <LoginView
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        isLoggingIn={isLoggingIn}
+        authError={authError}
+        onLogin={loginUser}
+      />
     );
   }
 
