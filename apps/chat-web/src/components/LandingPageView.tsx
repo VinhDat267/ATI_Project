@@ -18,7 +18,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
             <div className="flex items-center gap-2">
               <span className="font-bold text-base sm:text-lg text-zinc-900 tracking-tight">AI Workflow</span>
               <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[10px] text-blue-700 border border-blue-200/60 font-semibold tracking-wider uppercase">
-                Platform v3
+                Platform
               </span>
             </div>
           </div>
@@ -328,7 +328,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               </div>
               <h3 className="font-bold text-base text-zinc-900">Kiến trúc Adapter mở</h3>
               <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
-                Dễ dàng mở rộng thêm các dịch vụ mới mà không làm thay đổi lõi xử lý. Chuẩn hóa qua Tool Schemas và Tool Catalog v3.
+                Dễ dàng mở rộng thêm các dịch vụ mới mà không làm thay đổi lõi xử lý. Chuẩn hóa theo kiến trúc Tool Catalog mở rộng.
               </p>
             </div>
           </div>

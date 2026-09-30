@@ -185,7 +185,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span>Điền nhanh tài khoản Admin</span>
             </button>
             <p className="text-[11px] text-zinc-400 text-center">
-              Dùng cho môi trường thử nghiệm cục bộ (PostgreSQL v3)
+              Dùng để thử nghiệm nhanh tài khoản quản trị hệ thống
             </p>
           </div>
         </div>

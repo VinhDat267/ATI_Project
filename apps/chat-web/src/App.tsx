@@ -299,7 +299,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
                 AI
               </div>
               <span className="font-semibold text-sm tracking-tight text-zinc-900">
-                AI Workflow v3
+                AI Workflow Platform
               </span>
             </div>
             <button
