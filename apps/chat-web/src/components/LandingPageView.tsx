@@ -6,7 +6,7 @@ export interface LandingPageViewProps {
 
 export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin }) => {
   return (
-    <div className="min-h-screen w-full bg-[#f8fafc] text-zinc-900 font-sans selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen w-full bg-[#f8fafc] text-zinc-900 font-sans selection:bg-blue-500 selection:text-white scroll-smooth">
       {/* 1. Sticky Navigation Bar */}
       <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-zinc-200/80 transition-all">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -125,7 +125,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
       </section>
 
       {/* 3. CORE SECTION: Before vs After Comparison */}
-      <section id="comparison" className="py-16 sm:py-24 bg-white border-y border-zinc-200/80">
+      <section id="comparison" className="py-16 sm:py-24 bg-white border-y border-zinc-200/80 scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 font-semibold text-xs tracking-wide uppercase">
@@ -256,8 +256,87 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
         </div>
       </section>
 
-      {/* 4. Ecosystem Section */}
-      <section id="ecosystem" className="py-16 sm:py-24 max-w-5xl mx-auto px-4 sm:px-6">
+      {/* 4. Core Features Section */}
+      <section id="features" className="py-16 sm:py-24 bg-zinc-50/70 border-b border-zinc-200/80 scroll-mt-16">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 font-semibold text-xs tracking-wide uppercase">
+              Tính năng cốt lõi
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mt-3">
+              Mọi thứ bạn cần để vận hành tự động
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-zinc-500">
+              Kết hợp sức mạnh trí tuệ nhân tạo và hệ thống lập kế hoạch thực thi phụ thuộc thông minh.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg mb-4">
+                🧠
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Phân tích ý định tự nhiên</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Hiểu yêu cầu bằng tiếng Việt và tiếng Anh. Tự động nhận diện công việc, thành viên được gán và các dịch vụ đích cần tương tác.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg mb-4">
+                🔗
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Điều phối DAG phụ thuộc</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Nối kết dữ liệu thông minh giữa các bước: lấy ID hoặc liên kết từ bước trước (URL Trello card) truyền vào bước sau (GitHub issue, Slack message).
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg mb-4">
+                👁️
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Minh bạch &amp; Duyệt trước</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Kiểm duyệt an toàn Human-in-the-Loop. Toàn bộ tham số và thứ tự các bước đều được hiển thị chi tiết trước khi bạn bấm phê duyệt.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-lg mb-4">
+                🛡️
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Tự phục hồi lỗi từng phần</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Nếu một dịch vụ gặp sự cố mạng hoặc hạn ngạch, quy trình không bị đổ vỡ. Bạn có thể Thử lại (Retry) hoặc Bỏ qua (Skip) từng bước an toàn.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg mb-4">
+                ⚡
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Tiến độ thời gian thực (SSE)</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Cập nhật trạng thái từng bước đang chạy theo thời gian thực qua Server-Sent Events. Quan sát rõ ràng thời lượng và kết quả từng thao tác.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white border border-zinc-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center font-bold text-lg mb-4">
+                🧩
+              </div>
+              <h3 className="font-bold text-base text-zinc-900">Kiến trúc Adapter mở</h3>
+              <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
+                Dễ dàng mở rộng thêm các dịch vụ mới mà không làm thay đổi lõi xử lý. Chuẩn hóa qua Tool Schemas và Tool Catalog v3.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Ecosystem Section */}
+      <section id="ecosystem" className="py-16 sm:py-24 max-w-5xl mx-auto px-4 sm:px-6 scroll-mt-16">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <span className="px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-700 font-semibold text-xs tracking-wide uppercase">
             Khả năng tích hợp mở rộng
@@ -307,8 +386,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
         </div>
       </section>
 
-      {/* 5. Enterprise Trust & Security Section */}
-      <section id="security" className="py-16 sm:py-20 bg-zinc-900 text-white">
+      {/* 6. Enterprise Trust & Security Section */}
+      <section id="security" className="py-16 sm:py-20 bg-zinc-900 text-white scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="px-3 py-1 rounded-full bg-white/10 text-blue-300 font-semibold text-xs tracking-wide uppercase">

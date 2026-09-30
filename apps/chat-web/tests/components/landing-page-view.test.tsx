@@ -56,4 +56,29 @@ describe('LandingPageView Component', () => {
     fireEvent.click(navLoginBtn);
     expect(onGoToLogin).toHaveBeenCalledTimes(1);
   });
+
+  it('renders all nav anchor links pointing to valid section IDs including features', () => {
+    const { container } = render(<LandingPageView onGoToLogin={vi.fn()} />);
+
+    const comparisonLink = container.querySelector('a[href="#comparison"]');
+    const featuresLink = container.querySelector('a[href="#features"]');
+    const ecosystemLink = container.querySelector('a[href="#ecosystem"]');
+    const securityLink = container.querySelector('a[href="#security"]');
+
+    expect(comparisonLink).not.toBeNull();
+    expect(featuresLink).not.toBeNull();
+    expect(ecosystemLink).not.toBeNull();
+    expect(securityLink).not.toBeNull();
+
+    // Verify sections with corresponding IDs exist
+    expect(container.querySelector('#comparison')).not.toBeNull();
+    expect(container.querySelector('#features')).not.toBeNull();
+    expect(container.querySelector('#ecosystem')).not.toBeNull();
+    expect(container.querySelector('#security')).not.toBeNull();
+
+    // Verify key features text is displayed
+    expect(screen.getByText(/Phân tích ý định tự nhiên/i)).toBeDefined();
+    expect(screen.getByText(/Điều phối DAG phụ thuộc/i)).toBeDefined();
+    expect(screen.getByText(/Tự phục hồi lỗi từng phần/i)).toBeDefined();
+  });
 });
