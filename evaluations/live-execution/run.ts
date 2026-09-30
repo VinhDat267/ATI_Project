@@ -91,19 +91,31 @@ async function plan(request: string, services: Record<string, LiveService>) {
   const enabled = Object.keys(services);
   if (enabled.length === 0) throw new Error('No service is enabled; run "check" to see why');
   const adapters = new Map(enabled.map((service) => [service, createAdapter(service, services[service]!)]));
-  const searches: Array<{ tool: string; args: unknown; results?: number; error?: string }> = [];
-  const provider = createProviderFromEnv(process.env);
+  const searches: Array<{ tool: string; args: unknown; ms: number; results?: number; error?: string }> = [];
+  const llmCalls: Array<{ ms: number; outputChars: number }> = [];
+  const inner = createProviderFromEnv(process.env);
+  // Times every model call so a turn's latency can be attributed.
+  const provider = {
+    name: inner.name, model: inner.model,
+    generatePlan: async (input: Parameters<typeof inner.generatePlan>[0]) => {
+      const startedAt = Date.now();
+      const output = await inner.generatePlan(input);
+      llmCalls.push({ ms: Date.now() - startedAt, outputChars: output.length });
+      return output;
+    },
+  };
   const planner = new AIPlanner({
     provider, toolCatalog: ALL_TOOLS.filter((tool) => enabled.includes(tool.service)), searchMode: 'llm',
     timeZone: process.env.APP_TIME_ZONE || undefined,
     // The planner only lets read tools through; this is the single path to the services.
     gatherSearch: async ({ tool, args, signal }) => {
+      const startedAt = Date.now();
       try {
         const result = await adapters.get(tool.split('.')[0]!)!.execute(tool, args, { signal });
-        searches.push({ tool, args, results: Array.isArray(result) ? result.length : 1 });
+        searches.push({ tool, args, ms: Date.now() - startedAt, results: Array.isArray(result) ? result.length : 1 });
         return result;
       } catch (err) {
-        searches.push({ tool, args, error: errorText(err) });
+        searches.push({ tool, args, ms: Date.now() - startedAt, error: errorText(err) });
         throw err;
       }
     },
@@ -120,10 +132,11 @@ async function plan(request: string, services: Record<string, LiveService>) {
   writeFileSync(file, `${JSON.stringify({
     request, requestedAt: new Date().toISOString(), provider: provider.name, model: provider.model,
     services: Object.fromEntries(enabled.map((service) => [service, services[service]!.allowedScope])),
-    latencyMs, searches, hash, response,
+    latencyMs, llmCalls, searches, hash, response,
   }, null, 2)}\n`);
 
-  console.log(`\nSearches: ${searches.map((s) => `${s.tool}(${s.error ?? s.results})`).join(', ') || 'none'}`);
+  console.log(`\nSearches: ${searches.map((s) => `${s.tool}(${s.error ?? s.results}, ${s.ms}ms)`).join(', ') || 'none'}`);
+  console.log(`Model calls: ${llmCalls.map((c) => `${c.ms}ms/${c.outputChars}ch`).join(', ')}`);
   console.log(`Planner answered in ${latencyMs} ms with: ${response.kind}`);
   if (response.kind !== 'plan') {
     console.log(JSON.stringify(response, null, 2));
