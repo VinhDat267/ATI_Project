@@ -211,8 +211,9 @@ Trello card linking it and a Slack message; plan and steps ended `completed` /
 services. The Slack message was not read back. The run showed that the preview
 rendered `$template` arguments as `[object Object]`, so the reviewer could not
 read the text that would be sent, and that a sent message stayed marked
-"Đang gửi…"; both were fixed afterwards and have not been re-checked in a live
-run.
+"Đang gửi…"; both were fixed afterwards and confirmed in a second live run
+that stopped at the preview and cancelled (8.6 s to the preview, nothing
+executed).
 
 ## Legacy golden set (v1)
 
