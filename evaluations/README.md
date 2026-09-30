@@ -101,6 +101,34 @@ What the runs found, beyond the scores:
 - Eighteen free-form cases by one author are a small sample, and the search
   results are fixtures.
 
+### Planning latency
+
+A live three-service request took 31–37 s: three model calls made up 92% of
+it, and the real Trello, Slack and GitHub searches 2.5 s. Thinking variants of
+the model made no reliable difference; output length did (about 140 tokens/s
+through the gateway, reasoning included).
+
+| Change | Effect |
+|---|---|
+| List the workspace before the first model call (parallel, capped, 2.5 s budget) | One model call instead of three for 83–94% of case-runs |
+| Minified JSON, 15-word `thinking`, 8-word step descriptions | Output 580 → 288 tokens; plan call 9.3–11.6 s → 6.0–7.1 s |
+| Request hedging (tried, removed) | No benefit: more case-runs over 15 s, and a stalled gateway stalls both requests |
+
+| Measurement (model search, 3 runs) | Before | After |
+|---|---|---|
+| Live three-service plan | 31.0 s, 37.2 s | 9.2, 9.4, 9.7, 14.0, 14.7 s |
+| Core 50: p50 / p95 | 9.2 / 17.6 s | 6.9 / 14.6 s, then 7.0 / 17.4 s |
+| Free-form 18: p50 / p95 | 10.3 / 15.6 s | 7.8 / 23.0 s, then 8.5 / 21.2 s |
+
+The median is well under the 15 s target, but the tail is not reliably so:
+single model calls occasionally stall at the gateway for 20–30 s (5–18% of
+case-runs exceeded 15 s, and cs11 timed out at 30 s in several runs). That tail
+comes from the gateway, not from the number of calls, and nothing tried here
+removes it. Quality held: free-form 54/54 in both later runs; core 146/150 and
+148/150, where every failure but one is a gateway timeout. The exception, cs03
+losing the issue link when first asked for brevity, was fixed by limiting
+brevity to wording.
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against
