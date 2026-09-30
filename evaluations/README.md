@@ -180,6 +180,41 @@ repository. External writes cannot be rolled back. Evidence is written to
 node --env-file=.env --import tsx evaluations/live-execution/run.ts check
 ```
 
+### Through the app
+
+`live-app/` takes one request through the product itself: web UI, chat-api in
+live mode, PostgreSQL, the real model and the real services.
+
+1. Start the server with `RUNTIME_MODE=live npm run up`. It needs `JWT_SECRET`,
+   `ENCRYPTION_KEY`, a provisioned `CHAT_ADMIN_*` user and that user's id in
+   `SERVICE_ADMIN_USER_IDS`. In live mode the API listens on `0.0.0.0`.
+2. Store the service tokens and allowlists through the server's configuration
+   API (run this yourself; it prints service names and status only):
+
+   ```bash
+   node --env-file=.env --import tsx evaluations/live-app/setup-credentials.ts
+   ```
+
+3. Run the browser scenario. It sends `LIVE_APP_PROMPT`, stops at the preview
+   and saves `plan.json` with the plan's hash. It clicks "Duyệt kế hoạch" only
+   after that hash is written to `confirm.txt` in the run directory; otherwise
+   it cancels the plan.
+
+   ```bash
+   LIVE_APP=1 LIVE_APP_PROMPT="<request>" node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/playwright.config.ts
+   ```
+
+One run so far (2026-09-30): a three-service request reached the preview in
+17.3 s, above the 15 s target, and after approval created a GitHub issue, a
+Trello card linking it and a Slack message; plan and steps ended `completed` /
+`succeeded` in PostgreSQL, and the issue and card were read back from the
+services. The Slack message was not read back. The run showed that the preview
+rendered `$template` arguments as `[object Object]`, so the reviewer could not
+read the text that would be sent, and that a sent message stayed marked
+"Đang gửi…"; both were fixed afterwards and confirmed in a second live run
+that stopped at the preview and cancelled (8.6 s to the preview, nothing
+executed).
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline
