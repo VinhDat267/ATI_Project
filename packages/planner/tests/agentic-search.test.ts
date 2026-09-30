@@ -154,6 +154,17 @@ describe('AI-driven search', () => {
     expect(response.kind).toBe('clarification');
   });
 
+  it('accepts a read tool that returns one object, such as get_issue', async () => {
+    const { provider, inputs } = scripted(
+      search({ tool: 'github.get_issue', args: { repo: 'acme/api', issueNumber: 42 } }),
+      ask('Which list?'),
+    );
+    const s = searcher({ 'github.get_issue': { id: 'issue_42', number: 42, title: 'Webhook retries', url: 'https://github.com/acme/api/issues/42', repo: 'acme/api' } });
+    await planner(provider, s.fn).processMessage({ userMessage: 'Create a card for issue 42 in repo acme/api', memory: new WorkingMemory() });
+    expect(lastUserMessage(inputs[1]!)).toContain('Webhook retries');
+    expect(lastUserMessage(inputs[1]!)).not.toMatch(/did not return/i);
+  });
+
   it('reports a failing search to the model so it can ask the user', async () => {
     const { provider, inputs } = scripted(search(boards), ask('Trello is unreachable; which board did you mean?'));
     const s = searcher({ 'trello.search_boards': new Error('Trello returned 401') });

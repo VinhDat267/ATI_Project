@@ -208,8 +208,10 @@ export class AIPlanner {
       onGatherEvent?.({ tool: call.tool, status: 'started' });
       try {
         const raw = await this.gatherSearch({ tool: call.tool, args: prepared.args, signal });
-        if (!Array.isArray(raw)) throw new Error('Search did not return a list');
-        const result = raw.slice(0, MAX_RESULTS_PER_CALL);
+        // Search tools return lists; get_* tools return one object.
+        const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : undefined;
+        if (!list) throw new Error('The tool did not return a result');
+        const result = list.slice(0, MAX_RESULTS_PER_CALL);
         const resource = activeTools.find((tool) => tool.name === call.tool)?.discovers;
         if (resource) {
           memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), resource, result));

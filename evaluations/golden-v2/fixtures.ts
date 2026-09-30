@@ -42,6 +42,11 @@ export const REPOS = [
   { id: 'repo_api', name: 'api', fullName: 'acme/api', url: 'https://github.com/acme/api' },
 ];
 
+export const ISSUES = [
+  { id: 'issue_api_42', number: 42, title: 'Webhook retries drop events', url: 'https://github.com/acme/api/issues/42', repo: 'acme/api', body: 'Retries after a 5xx are not re-queued.', labels: [] as string[] },
+  { id: 'issue_web_42', number: 42, title: 'Footer overlaps on small screens', url: 'https://github.com/acme/web/issues/42', repo: 'acme/web', body: 'The footer covers the last form field.', labels: [] as string[] },
+];
+
 const ENTITIES: Record<string, Array<{ id: string }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS,
 };
@@ -63,8 +68,8 @@ export function buildMemory(refs: Record<string, string> = {}): Record<string, u
 const matches = (name: string, query: unknown) =>
   typeof query !== 'string' || name.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'));
 
-/** Fixture implementation of the planner's gather search. */
-export async function fixtureSearch({ tool, args }: { tool: string; args: Record<string, unknown> }): Promise<unknown[]> {
+/** Fixture implementation of the planner's gather search; get_* tools return one object like the adapters. */
+export async function fixtureSearch({ tool, args }: { tool: string; args: Record<string, unknown> }): Promise<any> {
   switch (tool) {
     case 'trello.search_boards': return BOARDS.filter((b) => matches(b.name, args.query));
     case 'trello.search_lists': return LISTS.filter((l) => l.boardId === args.boardId && matches(l.name, args.query));
@@ -77,6 +82,19 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
     case 'trello.search_cards': return CARDS.filter((c) => matches(c.name, args.query));
     case 'slack.search_channels': return CHANNELS.filter((c) => matches(c.name, args.query));
     case 'github.search_repos': return REPOS.filter((r) => matches(r.fullName, args.query));
+    case 'github.search_issues': return ISSUES
+      .filter((i) => i.repo === args.repo && (matches(i.title, args.query) || String(i.number) === String(args.query).replace('#', '')))
+      .map(({ body: _body, labels: _labels, ...issue }) => issue);
+    case 'github.get_issue': {
+      const found = ISSUES.find((i) => i.repo === args.repo && i.number === args.issueNumber);
+      if (!found) throw new Error(`Issue ${args.issueNumber} not found in ${args.repo}`);
+      return found;
+    }
+    case 'trello.get_card': {
+      const found = CARDS.find((c) => c.id === args.cardId);
+      if (!found) throw new Error(`Card ${args.cardId} not found`);
+      return found;
+    }
     default: return [];
   }
 }

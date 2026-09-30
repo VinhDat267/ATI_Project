@@ -61,5 +61,9 @@ describe('free-form golden cases', () => {
     // Like the Trello adapter, member search needs a board.
     await expect(fixtureSearch({ tool: 'trello.search_members', args: { query: 'Minh' } })).rejects.toThrow(/board/i);
     expect((await fixtureSearch({ tool: 'trello.search_lists', args: { boardId: 'board_mkt', query: 'Ideas' } })).length).toBe(1);
+    // Issues the core prompts mention by number exist, so a model that looks them up finds them.
+    expect(await fixtureSearch({ tool: 'github.get_issue', args: { repo: 'acme/api', issueNumber: 42 } })).toMatchObject({ number: 42, repo: 'acme/api' });
+    expect((await fixtureSearch({ tool: 'github.search_issues', args: { repo: 'acme/web', query: '42' } })).length).toBe(1);
+    await expect(fixtureSearch({ tool: 'github.get_issue', args: { repo: 'acme/api', issueNumber: 999 } })).rejects.toThrow(/not found/i);
   });
 });

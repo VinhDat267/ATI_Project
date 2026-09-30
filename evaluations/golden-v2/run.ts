@@ -100,6 +100,13 @@ async function main() {
   const casesPath = resolve(process.cwd(), 'evaluations', 'golden-v2', casesFile);
   const raw = readFileSync(casesPath, 'utf8');
   const file = JSON.parse(raw) as GoldenFile;
+  // EVAL_ONLY=cs11,ss09 reruns a subset; the report records it so it is never read as a full run.
+  const only = (process.env.EVAL_ONLY ?? '').split(',').map((id) => id.trim()).filter(Boolean);
+  if (only.length) {
+    const unknown = only.filter((id) => !file.cases.some((c) => c.id === id));
+    if (unknown.length) throw new Error(`EVAL_ONLY names unknown cases: ${unknown.join(', ')}`);
+    file.cases = file.cases.filter((c) => only.includes(c.id));
+  }
   const runsCount = Number(process.env.EVAL_RUNS ?? 3);
   const concurrency = Number(process.env.EVAL_CONCURRENCY ?? 2);
   await preflight(dryRun);
@@ -127,7 +134,7 @@ async function main() {
     provider: configured.name, model: (configured as { model?: string }).model ?? 'mock',
     gateway: configured.name === 'openai-compatible' ? process.env.LLM_BASE_URL : undefined,
     servedModels,
-    set, searchMode,
+    set, searchMode, subset: only.length ? only : undefined,
     labels: {
       file: casesFile,
       commit: execFileSync('git', ['log', '-1', '--format=%H', '--', `evaluations/golden-v2/${casesFile}`]).toString().trim(),
@@ -148,13 +155,13 @@ async function main() {
   };
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dir = join('docs', 'ai-evidence', 'V3-GOLDEN-V2', `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${stamp}`);
+  const dir = join('docs', 'ai-evidence', 'V3-GOLDEN-V2', `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${only.length ? 'subset-' : ''}${stamp}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 
   const m = aggregate.mean;
   const unstable = Object.entries(aggregate.stability).filter(([, s]) => !s.startsWith(`${runsCount}/`));
-  const summary = `# Golden set v2 (${set}, ${searchMode} search) — ${dryRun ? 'dry run' : 'live run'}
+  const summary = `# Golden set v2 (${set}, ${searchMode} search${only.length ? `, subset: ${only.join(', ')}` : ''}) — ${dryRun ? 'dry run' : 'live run'}
 
 - Provider: \`${report.provider}\` · model \`${report.model}\` · served: ${servedModels.map((s) => `\`${s}\``).join(', ') || 'n/a'}
 - Labels: \`${casesFile}\` commit \`${report.labels.commit.slice(0, 7)}\`, sha256 \`${report.labels.sha256.slice(0, 12)}\`, ${file.cases.length} cases × ${runsCount} runs
