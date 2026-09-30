@@ -101,6 +101,29 @@ What the runs found, beyond the scores:
 - Eighteen free-form cases by one author are a small sample, and the search
   results are fixtures.
 
+## Controlled live execution
+
+`live-execution/run.ts` runs the real planner, executor and adapters against
+real Trello, Slack and GitHub. It is the only evaluation path that writes to an
+external service, so each mode is gated:
+
+| Mode | Effect |
+|---|---|
+| `discover` | Lists the boards and channels the tokens can see, to choose test targets. Read-only. |
+| `check` | Verifies each enabled service within its allowlist. Read-only. |
+| `plan "<request>"` | Real model and real read-only searches; saves `plan.json` with the plan's hash. Writes nothing to the services. |
+| `execute <plan.json> --confirm <hash>` | Runs that saved plan's write steps, only when the hash matches the file. |
+
+A service is enabled only with its token and an allowlist of test resources
+(`LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`); the
+adapters refuse anything outside it. Use a throwaway board, channel and
+repository. External writes cannot be rolled back. Evidence is written to
+`docs/ai-evidence/V3-LIVE-EXECUTION/`.
+
+```bash
+node --env-file=.env --import tsx evaluations/live-execution/run.ts check
+```
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline
