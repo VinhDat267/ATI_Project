@@ -1,16 +1,38 @@
 import { GoogleGenAI } from '@google/genai';
 import type { LLMProvider, LLMGeneratePlanInput } from '../types.js';
+import { callWithRetry } from './transport.js';
+
+/** The slice of the Gemini SDK the provider uses; injectable for tests. */
+export interface GeminiClient {
+  models: {
+    generateContent(request: {
+      model: string;
+      contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+      config?: { systemInstruction?: string; responseMimeType?: string; abortSignal?: AbortSignal };
+    }): Promise<{ text?: string }>;
+  };
+}
 
 export interface GeminiProviderConfig {
   apiKey?: string;
   model?: string;
+  client?: GeminiClient;
+  /** Per-attempt deadline; the request is aborted when it elapses. */
+  timeoutMs?: number;
+  /** Retries after a transient failure (429 or 5xx); other errors fail fast. */
+  maxRetries?: number;
+  /** Base backoff; attempt n waits retryDelayMs * 2^(n-1). */
+  retryDelayMs?: number;
 }
 
 export class GeminiProvider implements LLMProvider {
   public readonly name = 'gemini';
   private apiKey: string;
-  private model: string;
-  private ai?: GoogleGenAI;
+  public readonly model: string;
+  private client?: GeminiClient;
+  private timeoutMs: number;
+  private maxRetries: number;
+  private retryDelayMs: number;
 
   constructor(config: GeminiProviderConfig = {}) {
     this.apiKey = config.apiKey || process.env.GEMINI_API_KEY || '';
@@ -18,54 +40,34 @@ export class GeminiProvider implements LLMProvider {
       throw new Error('GEMINI_API_KEY is required for GeminiProvider');
     }
     this.model = config.model || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    this.client = config.client;
+    this.timeoutMs = config.timeoutMs ?? 30_000;
+    this.maxRetries = config.maxRetries ?? 2;
+    this.retryDelayMs = config.retryDelayMs ?? 1_000;
   }
 
-  private getClient(): GoogleGenAI {
-    if (!this.ai) {
-      this.ai = new GoogleGenAI({ apiKey: this.apiKey });
-    }
-    return this.ai;
+  private getClient(): GeminiClient {
+    this.client ??= new GoogleGenAI({ apiKey: this.apiKey });
+    return this.client;
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
-    const ai = this.getClient();
     const systemPrompt = `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`;
+    const contents = input.conversationHistory.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
 
-    try {
-      const response = await ai.models.generateContent({
+    return callWithRetry(async (abortSignal) => {
+      const response = await this.getClient().models.generateContent({
         model: this.model,
-        contents: input.conversationHistory.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        })),
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: 'application/json',
-        },
+        contents,
+        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', abortSignal },
       });
-
       return response.text || '';
-    } catch (err: any) {
-      // Fallback to gemini-1.5-flash if 2.5-flash is not available on this tier
-      if (this.model !== 'gemini-1.5-flash') {
-        try {
-          const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
-            contents: input.conversationHistory.map((m) => ({
-              role: m.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: m.content }],
-            })),
-            config: {
-              systemInstruction: systemPrompt,
-              responseMimeType: 'application/json',
-            },
-          });
-          return response.text || '';
-        } catch {
-          throw err;
-        }
-      }
-      throw err;
-    }
+    }, {
+      label: 'Gemini', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries,
+      retryDelayMs: this.retryDelayMs, signal: input.signal,
+    });
   }
 }

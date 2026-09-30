@@ -1,0 +1,3487 @@
+{
+  "evidence": "provider_observed",
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [],
+  "labels": {
+    "commit": "ddd130467aa5289824081023ac00f7200f3ac029",
+    "sha256": "6284640ebbc115b037320325caaab46138e3dd792a12cd3a1663d7ad6b77c96b",
+    "version": 2,
+    "cases": 50
+  },
+  "clock": "2026-09-29T03:00:00Z",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "runs": 3,
+  "concurrency": 2,
+  "runAt": "2026-09-29T23:03:18.504Z",
+  "scope": "planning only; no plan executed; search results and earlier-turn memory are fixtures",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": false
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.06,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0.06
+      },
+      {
+        "kindAccuracy": 0.06,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0.06
+      },
+      {
+        "kindAccuracy": 0.06,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0.06
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.06,
+      "toolSelectionAccuracy": 0,
+      "argumentQuality": null,
+      "argumentMatcherRate": 0,
+      "strictPassRate": 0.06
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 10,
+        "strictPassRate": 0
+      },
+      "multi_step": {
+        "cases": 10,
+        "strictPassRate": 0
+      },
+      "cross_service": {
+        "cases": 15,
+        "strictPassRate": 0
+      },
+      "clarification": {
+        "cases": 8,
+        "strictPassRate": 0.375
+      },
+      "refusal": {
+        "cases": 7,
+        "strictPassRate": 0
+      }
+    },
+    "stability": {
+      "ss01": "0/3",
+      "ss02": "0/3",
+      "ss03": "0/3",
+      "ss04": "0/3",
+      "ss05": "0/3",
+      "ss06": "0/3",
+      "ss07": "0/3",
+      "ss08": "0/3",
+      "ss09": "0/3",
+      "ss10": "0/3",
+      "ms01": "0/3",
+      "ms02": "0/3",
+      "ms03": "0/3",
+      "ms04": "0/3",
+      "ms05": "0/3",
+      "ms06": "0/3",
+      "ms07": "0/3",
+      "ms08": "0/3",
+      "ms09": "0/3",
+      "ms10": "0/3",
+      "cs01": "0/3",
+      "cs02": "0/3",
+      "cs03": "0/3",
+      "cs04": "0/3",
+      "cs05": "0/3",
+      "cs06": "0/3",
+      "cs07": "0/3",
+      "cs08": "0/3",
+      "cs09": "0/3",
+      "cs10": "0/3",
+      "cs11": "0/3",
+      "cs12": "0/3",
+      "cs13": "0/3",
+      "cs14": "0/3",
+      "cs15": "0/3",
+      "cl01": "0/3",
+      "cl02": "3/3",
+      "cl03": "3/3",
+      "cl04": "3/3",
+      "cl05": "0/3",
+      "cl06": "0/3",
+      "cl07": "0/3",
+      "cl08": "0/3",
+      "rf01": "0/3",
+      "rf02": "0/3",
+      "rf03": "0/3",
+      "rf04": "0/3",
+      "rf05": "0/3",
+      "rf06": "0/3",
+      "rf07": "0/3"
+    },
+    "latencyMs": {
+      "p50": 2,
+      "p95": 5,
+      "max": 99
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ss01",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 88,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 99,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss03",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 21,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss04",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 12,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss05",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 10,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss06",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss07",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss08",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss10",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms01",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms02",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms03",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms04",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms05",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms06",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms07",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms08",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms09",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms10",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs01",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs02",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs03",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs04",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs05",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs06",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs07",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs08",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs09",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs10",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs12",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 8
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs13",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs14",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs15",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 7
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl01",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl02",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "cl03",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which member do you mean?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ],
+            "context": "Multiple results matched Minh."
+          }
+        },
+        {
+          "id": "cl04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find Mobile. Please provide another board name.",
+            "context": "No board matched the search."
+          }
+        },
+        {
+          "id": "cl05",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl06",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl07",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl08",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf01",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf02",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 7,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf03",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 7,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf04",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf05",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf06",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf07",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": [
+        {
+          "id": "ss01",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss03",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss04",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss05",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss06",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss07",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss08",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss10",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms01",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms02",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms03",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms04",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms05",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms06",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms07",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms08",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms09",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms10",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs01",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs02",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs03",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs04",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs05",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs06",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs07",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs08",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs09",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs10",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs12",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 8
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs13",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs14",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs15",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 7
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl01",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl02",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "cl03",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which member do you mean?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ],
+            "context": "Multiple results matched Minh."
+          }
+        },
+        {
+          "id": "cl04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find Mobile. Please provide another board name.",
+            "context": "No board matched the search."
+          }
+        },
+        {
+          "id": "cl05",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl06",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl07",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl08",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf01",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf02",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf03",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 5,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf04",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf05",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf06",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf07",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 1,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": [
+        {
+          "id": "ss01",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss03",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss04",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss05",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss06",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss07",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss08",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss09",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ss10",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms01",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms02",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms03",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms04",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms05",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms06",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms07",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms08",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms09",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 1,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "ms10",
+          "category": "multi_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs01",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs02",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs03",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs04",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs05",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs06",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs07",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs08",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs09",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs10",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs11",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs12",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 8
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs13",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs14",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cs15",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 7
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl01",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl02",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which board contains this member?",
+            "context": "A board must be selected before searching members."
+          }
+        },
+        {
+          "id": "cl03",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Which member do you mean?",
+            "options": [
+              "Minh Anh",
+              "Minh Châu"
+            ],
+            "context": "Multiple results matched Minh."
+          }
+        },
+        {
+          "id": "cl04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "I could not find Mobile. Please provide another board name.",
+            "context": "No board matched the search."
+          }
+        },
+        {
+          "id": "cl05",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl06",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl07",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "cl08",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf01",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf02",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf03",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf04",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf05",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf06",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 3,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        },
+        {
+          "id": "rf07",
+          "category": "refusal",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected refusal, got error"
+            ]
+          },
+          "latencyMs": 2,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "fetch failed"
+        }
+      ]
+    }
+  ]
+}

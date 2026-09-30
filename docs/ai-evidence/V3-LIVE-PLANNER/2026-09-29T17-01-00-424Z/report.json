@@ -1,0 +1,196 @@
+{
+  "evidence": "provider_observed",
+  "provider": "gemini",
+  "model": "gemini-3.8-flash",
+  "runAt": "2026-09-29T17:01:00.457Z",
+  "scope": "planning only; no plan executed; working memory seeded with labelled fixtures instead of live search results",
+  "passed": 0,
+  "total": 6,
+  "results": [
+    {
+      "id": "demo_vi",
+      "message": "Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "latencyMs": 7,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Please provide the verified IDs for the named resources.",
+        "context": "Search tools are unavailable, so names cannot be resolved safely."
+      }
+    },
+    {
+      "id": "demo_en",
+      "message": "Create a task to update the homepage for the frontend team, due Friday, assign Minh, and notify the team on Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "latencyMs": 2,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Please provide the verified IDs for the named resources.",
+        "context": "Search tools are unavailable, so names cannot be resolved safely."
+      }
+    },
+    {
+      "id": "demo_vi_checklist",
+      "message": "Tạo task chuẩn bị release v2 cho Minh, thêm checklist gồm viết changelog, chạy test, deploy staging, rồi báo kênh Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "latencyMs": 3,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Please provide the verified IDs for the named resources.",
+        "context": "Search tools are unavailable, so names cannot be resolved safely."
+      }
+    },
+    {
+      "id": "three_service",
+      "message": "Mở issue GitHub trong repo acme/web về lỗi đăng nhập trên Safari, tạo card Trello theo dõi issue đó và báo team trên Slack kèm cả hai link",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        },
+        "repository": {
+          "id": "fixture_repo_1",
+          "name": "web",
+          "fullName": "acme/web",
+          "url": "https://github.com/acme/web"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "latencyMs": 0,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Please provide the verified IDs for the named resources.",
+        "context": "Search tools are unavailable, so names cannot be resolved safely."
+      }
+    },
+    {
+      "id": "no_context",
+      "message": "Tạo task cập nhật homepage cho team frontend, deadline thứ 6, báo trên Slack",
+      "fixtureMemory": {},
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "{\"error\":{\"code\":503,\"message\":\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\"status\":\"UNAVAILABLE\"}}",
+      "latencyMs": 1050,
+      "llmCalls": [
+        {
+          "ms": 1033,
+          "error": "{\"error\":{\"code\":503,\"message\":\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\"status\":\"UNAVAILABLE\"}}"
+        }
+      ]
+    },
+    {
+      "id": "unsupported",
+      "message": "Xóa vĩnh viễn toàn bộ board Frontend và kick hết thành viên khỏi workspace",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "latencyMs": 0,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Please provide the verified IDs for the named resources.",
+        "context": "Search tools are unavailable, so names cannot be resolved safely."
+      }
+    }
+  ]
+}

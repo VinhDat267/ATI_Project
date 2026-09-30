@@ -5,6 +5,11 @@ export interface EnvConfig {
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
   GEMINI_API_KEY: string;
+  LLM_PROVIDER: 'gemini' | 'openai-compatible';
+  /** 'llm': the model calls search tools itself; 'regex': registry gather rules resolve names first. */
+  PLANNER_SEARCH_MODE: 'llm' | 'regex';
+  /** IANA zone the planner resolves relative dates such as "thứ 6" in. */
+  APP_TIME_ZONE: string;
   PORT: number;
   RUNTIME_MODE: 'live' | 'sandbox';
 }
@@ -17,6 +22,20 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   }
   if (isProduction && env.RUNTIME_MODE !== 'live') {
     throw new Error('RUNTIME_MODE=live is required in production');
+  }
+  const LLM_PROVIDER = env.LLM_PROVIDER || 'gemini';
+  if (LLM_PROVIDER !== 'gemini' && LLM_PROVIDER !== 'openai-compatible') {
+    throw new Error('LLM_PROVIDER must be gemini or openai-compatible');
+  }
+  const PLANNER_SEARCH_MODE = env.PLANNER_SEARCH_MODE || (isLive ? 'llm' : 'regex');
+  if (PLANNER_SEARCH_MODE !== 'llm' && PLANNER_SEARCH_MODE !== 'regex') {
+    throw new Error('PLANNER_SEARCH_MODE must be llm or regex');
+  }
+  const APP_TIME_ZONE = env.APP_TIME_ZONE || 'Asia/Ho_Chi_Minh';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: APP_TIME_ZONE });
+  } catch {
+    throw new Error(`APP_TIME_ZONE must be an IANA time zone such as Asia/Ho_Chi_Minh, got ${APP_TIME_ZONE}`);
   }
 
   if (isProduction || isLive) {
@@ -33,7 +52,10 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     if (Buffer.byteLength(env.ENCRYPTION_KEY, 'utf8') !== 32 && !/^[0-9a-fA-F]{64}$/.test(env.ENCRYPTION_KEY)) {
       throw new Error('ENCRYPTION_KEY must be 32 bytes or 64 hex characters');
     }
-    if (!env.GEMINI_API_KEY) {
+    if (LLM_PROVIDER === 'openai-compatible') {
+      if (!env.LLM_BASE_URL) throw new Error('LLM_BASE_URL must be provided for LLM_PROVIDER=openai-compatible');
+      if (!env.LLM_MODEL) throw new Error('LLM_MODEL must be provided for LLM_PROVIDER=openai-compatible');
+    } else if (!env.GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY must be provided in production/live mode');
     }
   }
@@ -56,6 +78,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     JWT_SECRET,
     ENCRYPTION_KEY,
     GEMINI_API_KEY,
+    LLM_PROVIDER,
+    PLANNER_SEARCH_MODE,
+    APP_TIME_ZONE,
     PORT,
     RUNTIME_MODE,
   };

@@ -132,3 +132,31 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(responses[2]?.kind).toBe('refusal');
   });
 });
+
+describe('search tools declare the resources they discover', () => {
+  const searchTools = ALL_TOOLS.filter((tool) => tool.name.includes('.search_'));
+
+  it('maps each search tool to the resource its results identify', () => {
+    expect(Object.fromEntries(searchTools.map((tool) => [tool.name, tool.discovers]))).toEqual({
+      'trello.search_boards': 'board',
+      'trello.search_lists': 'list',
+      'trello.search_members': 'member',
+      'trello.search_cards': 'card',
+      'slack.search_channels': 'channel',
+      'github.search_repos': 'repository',
+      'github.search_issues': 'issue',
+    });
+  });
+
+  it('requires a board for member search, as the Trello adapter does', () => {
+    const tool = ALL_TOOLS.find((t) => t.name === 'trello.search_members')!;
+    expect(tool.inputSchema.required).toEqual(expect.arrayContaining(['query', 'boardId']));
+  });
+
+  it('only lets read tools discover resources that some tool argument consumes', () => {
+    for (const tool of ALL_TOOLS.filter((t) => t.discovers)) expect(tool.sideEffect).toBe('read');
+    const consumed = new Set(ALL_TOOLS.flatMap((tool) => Object.values<any>(tool.inputSchema.properties ?? {})
+      .map((property) => property['x-resource']).filter(Boolean)));
+    for (const tool of searchTools) expect(consumed.has(tool.discovers!), tool.name).toBe(true);
+  });
+});

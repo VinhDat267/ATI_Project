@@ -1,0 +1,218 @@
+{
+  "evidence": "provider_observed",
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "runAt": "2026-09-29T17:15:52.043Z",
+  "scope": "planning only; no plan executed; search results and earlier-turn memory are labelled fixtures, not live Trello/Slack/GitHub data",
+  "passed": 1,
+  "total": 7,
+  "results": [
+    {
+      "id": "demo_vi_gather_only",
+      "message": "Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack",
+      "fixtureMemory": {},
+      "passed": true,
+      "checks": {
+        "kind": true
+      },
+      "latencyMs": 6,
+      "llmCalls": [],
+      "response": {
+        "kind": "clarification",
+        "question": "Which board contains this member?",
+        "context": "A board must be selected before searching members."
+      }
+    },
+    {
+      "id": "demo_vi",
+      "message": "Tạo task cập nhật homepage cho team frontend, deadline thứ 6, gán Minh, báo trên Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 407,
+      "llmCalls": [
+        {
+          "ms": 384,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    },
+    {
+      "id": "demo_en",
+      "message": "Create a task to update the homepage for the frontend team, due Friday, assign Minh, and notify the team on Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 17,
+      "llmCalls": [
+        {
+          "ms": 9,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    },
+    {
+      "id": "demo_vi_checklist",
+      "message": "Tạo task chuẩn bị release v2 cho Minh, thêm checklist gồm viết changelog, chạy test, deploy staging, rồi báo kênh Slack",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "member": {
+          "id": "fixture_member_minh",
+          "name": "Minh"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 18,
+      "llmCalls": [
+        {
+          "ms": 10,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    },
+    {
+      "id": "three_service",
+      "message": "Mở issue GitHub trong repo acme/web về lỗi đăng nhập trên Safari, tạo card Trello theo dõi issue đó và báo team trên Slack kèm cả hai link",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        },
+        "repository": {
+          "id": "fixture_repo_1",
+          "name": "web",
+          "fullName": "acme/web",
+          "url": "https://github.com/acme/web"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 5,
+      "llmCalls": [
+        {
+          "ms": 5,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    },
+    {
+      "id": "no_context",
+      "message": "Tạo task cập nhật homepage cho team frontend, deadline thứ 6, báo trên Slack",
+      "fixtureMemory": {},
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 9,
+      "llmCalls": [
+        {
+          "ms": 8,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    },
+    {
+      "id": "unsupported",
+      "message": "Xóa vĩnh viễn toàn bộ board Frontend và kick hết thành viên khỏi workspace",
+      "fixtureMemory": {
+        "board": {
+          "id": "fixture_board_frontend",
+          "name": "Frontend"
+        },
+        "list": {
+          "id": "fixture_list_todo",
+          "name": "To Do",
+          "boardId": "fixture_board_frontend"
+        },
+        "channel": {
+          "id": "CFIXTUREFE",
+          "name": "frontend"
+        }
+      },
+      "passed": false,
+      "checks": {
+        "kind": false
+      },
+      "error": "LLM gateway returned 401: Missing API key",
+      "latencyMs": 23,
+      "llmCalls": [
+        {
+          "ms": 14,
+          "error": "LLM gateway returned 401: Missing API key"
+        }
+      ]
+    }
+  ]
+}

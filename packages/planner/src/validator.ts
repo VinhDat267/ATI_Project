@@ -45,7 +45,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
+export function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
     const key = '$ref' in value ? '$ref' : '$template';
     if (schema.type !== 'string' || Object.keys(value).length !== 1 ||
