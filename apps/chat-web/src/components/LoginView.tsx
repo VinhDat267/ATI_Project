@@ -24,7 +24,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onBackToLanding,
 }) => {
   const defaultAdminEmail = (import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test';
-  const defaultAdminPassword = (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678';
+  const defaultAdminPassword =
+    (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD !== undefined
+      ? (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD
+      : 'Admin@12345678';
 
   const handleQuickFill = () => {
     if (onQuickFillAdmin) {
@@ -179,30 +182,38 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           </form>
 
-          {/* Quick-Fill Admin Helper for Local Testing */}
-          <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/80 text-blue-700 transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer group shadow-2xs"
-            >
-              <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-              <span>Điền nhanh tài khoản Admin</span>
-            </button>
-            <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 text-[11px] text-zinc-600 flex flex-col gap-1 text-left">
-              <div className="flex items-center gap-1.5 font-medium text-zinc-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                <span>Tài khoản Quản trị viên thử nghiệm:</span>
-              </div>
-              <div className="flex items-center justify-between text-zinc-500 pl-3 font-mono">
-                <span>{defaultAdminEmail}</span>
-                <span className="text-zinc-400">/</span>
-                <span>{defaultAdminPassword}</span>
+          {/* Quick-Fill Admin Helper for Local Testing (Only in sandbox/dev mode) */}
+          {defaultAdminPassword && (
+            <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleQuickFill}
+                className="w-full py-2.5 px-3 rounded-xl border border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/80 text-blue-700 transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer group shadow-2xs"
+              >
+                <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                <span>Điền nhanh tài khoản Admin</span>
+              </button>
+              <div className="p-2.5 rounded-xl bg-zinc-50/90 border border-zinc-200/80 text-[11px] flex flex-col gap-1.5 text-left">
+                <div className="flex items-center gap-1.5 font-medium text-zinc-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  <span>Tài khoản Quản trị viên thử nghiệm:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 pl-3 text-[11px] text-zinc-600">
+                  <span className="text-zinc-400">Email:</span>
+                  <code className="font-mono text-zinc-800 bg-white px-1.5 py-0.5 rounded border border-zinc-200/80 select-all font-semibold">
+                    {defaultAdminEmail}
+                  </code>
+                  <span className="text-zinc-300 mx-0.5">|</span>
+                  <span className="text-zinc-400">Mật khẩu:</span>
+                  <code className="font-mono text-zinc-800 bg-white px-1.5 py-0.5 rounded border border-zinc-200/80 select-all font-semibold">
+                    {defaultAdminPassword}
+                  </code>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
