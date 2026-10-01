@@ -24,6 +24,7 @@ export interface ChatStoreState {
   stepErrors: Record<string, string>;
   executionSnapshot: ExecutionSnapshot | null;
   executionRevision: number;
+  planRevision: number;
   executionLoadError: string | null;
   setExecutionSnapshot: (snapshot: ExecutionSnapshot | null) => void;
   setExecutionLoadError: (error: string | null) => void;
@@ -65,6 +66,7 @@ const initialState = {
   stepErrors: {},
   executionSnapshot: null,
   executionRevision: 0,
+  planRevision: 0,
   executionLoadError: null,
 };
 
@@ -112,7 +114,8 @@ export const useChatStore = create<ChatStoreState>((set) => ({
 
   setIsStreaming: (isStreaming) => set({ isStreaming }),
 
-  setActivePlan: (plan) => set(state => ({ activePlan: plan, executionRevision: state.executionRevision + 1 })),
+  // A read-only execution snapshot may hydrate activePlan, but cannot supersede a pending-plan read.
+  setActivePlan: (plan) => set(state => ({ activePlan: plan, planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
 
   setPlanStatus: (status) => set(state => ({ planStatus: status, executionRevision: state.executionRevision + 1 })),
 
@@ -170,6 +173,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       executionSnapshot: null,
       executionLoadError: null,
       executionRevision: state.executionRevision + 1,
+      planRevision: state.planRevision + 1,
       conversations: state.conversations,
     })),
 }));

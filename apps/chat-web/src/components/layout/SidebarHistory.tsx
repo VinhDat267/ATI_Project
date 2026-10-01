@@ -95,10 +95,10 @@ export const SidebarHistory: React.FC<SidebarHistoryProps> = ({
       }
 
       try {
-        const revision = useChatStore.getState().executionRevision;
+        const revision = useChatStore.getState().planRevision;
         const activePlan = await apiClient.getActivePlan(id);
         if (!isCurrent()) return;
-        if (activePlan && useChatStore.getState().executionRevision === revision) {
+        if (activePlan && useChatStore.getState().planRevision === revision) {
           store.setActivePlan(activePlan);
           const status = activePlan.status;
           store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);

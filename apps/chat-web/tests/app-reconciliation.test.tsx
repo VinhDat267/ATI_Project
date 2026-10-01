@@ -162,4 +162,33 @@ describe('saved execution recovery in the actual App/history flow', () => {
     const notice = await openHistory();
     expect(JSON.parse(notice.querySelector('pre')!.textContent!)).toEqual({ wrapper: 'nested-card', whole: output, nullable: null, text: 'Card nested-card' });
   });
+
+  it('describes and retries the saved partial execution even with a newer preview sharing step IDs', async () => {
+    snapshot.execution = { status: 'partial', pausedStepId: 'step_2' }; snapshot.plan.status = 'partial';
+    snapshot.steps[1].status = 'failed'; snapshot.recoveryActions = ['retry', 'skip', 'stop'];
+    const originalRequest = request.getMockImplementation()!;
+    request.mockImplementation((url: string, options?: RequestInit) => url === '/api/conversations/c1/plans/active'
+      ? Promise.resolve({ id: 'new-plan', summary: 'New pending', steps: [{ id: 'step_2', tool: 'slack.send_message', description: 'NEW operation', args: { text: 'NEW arguments' } }] })
+      : originalRequest(url, options));
+    render(<App />); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    const modal = await screen.findByRole('alertdialog');
+    expect(within(modal).getByText('trello.add_member')).toBeInTheDocument();
+    expect(within(modal).getByText('Gán Minh vào thẻ')).toBeInTheDocument();
+    expect(within(modal).getByTestId('step-args-preview')).toHaveTextContent('minh');
+    expect(within(modal).queryByText('NEW operation')).toBeNull();
+    fireEvent.click(within(modal).getByRole('button', { name: /Thử lại bước này/ }));
+    await screen.findByText('Quy trình đã hoàn thành.');
+    expect(request).toHaveBeenCalledWith('/api/executions/p1/steps/step_2/retry', { method: 'POST' });
+    expect(useChatStore.getState().activePlan?.id).toBe('new-plan');
+  });
+
+  it('lets a fresh partial UNKNOWN use the same safe reconciliation actions', async () => {
+    snapshot.execution.status = 'partial'; snapshot.plan.status = 'partial';
+    const notice = await openHistory();
+    expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Thử lại|retry/i })).toBeNull();
+    fireEvent.click(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' }));
+    await screen.findByText('Quy trình đã hoàn thành.');
+    expect(request).toHaveBeenCalledWith('/api/executions/p1/steps/step_2/skip', { method: 'POST' });
+  });
 });

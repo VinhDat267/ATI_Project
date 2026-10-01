@@ -300,10 +300,15 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   };
 
   const executionStatus = executionSnapshot?.execution.status || planStatus;
+  const pausedStep = executionSnapshot?.steps.find(step => step.stepId === executionSnapshot.execution.pausedStepId);
+  const needsReconciliation = executionStatus === 'reconciliation_required' ||
+    (executionStatus === 'partial' && pausedStep?.status === 'unknown');
   const failedStepId = executionStatus === 'partial' ? Object.entries(stepStatuses).find(
     ([_, st]) => st === 'failed'
   )?.[0] : undefined;
   const progressPlan = executionSnapshot?.plan || activePlan;
+  const failureId = pausedStep?.status === 'failed' ? pausedStep.stepId : failedStepId;
+  const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
 
   if (!authToken) {
     if (currentView === 'landing') {
@@ -474,11 +479,11 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
 
             {/* Live Execution Progress Card */}
             {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
-            {executionSnapshot && executionStatus === 'reconciliation_required' && <ReconciliationNotice
+            {executionSnapshot && needsReconciliation && <ReconciliationNotice
               snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} />}
             {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
             {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
-            {recoveryError && executionStatus !== 'reconciliation_required' && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
+            {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
             {progressPlan && Object.keys(stepStatuses).length > 0 && (
               <ExecutionProgress
                 steps={(progressPlan.steps || executionSnapshot?.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId })) || []).map((st) => {
@@ -496,29 +501,25 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             )}
 
             {/* Partial Failure Recovery Modal */}
-            {failedStepId && (
+            {failureId && !needsReconciliation && (
               <PartialFailureModal
                 busy={recoveryBusy}
                 allowedActions={executionSnapshot?.recoveryActions}
                 allowEdit={false}
-                stepId={failedStepId}
-                tool={
-                  activePlan?.steps.find((s) => s.id === failedStepId)?.tool ||
-                  'unknown'
-                }
+                stepId={failureId}
+                tool={failureStep?.tool || pausedStep?.tool || 'unknown'}
                 errorMessage={
-                  stepErrors[failedStepId] || 'Lỗi thực thi bước'
+                  stepErrors[failureId] || 'Lỗi thực thi bước'
                 }
                 stepArgs={
-                  activePlan?.steps.find((s) => s.id === failedStepId)?.args
+                  failureStep?.args
                 }
                 prompt={
-                  (activePlan?.steps.find((s) => s.id === failedStepId)?.args?.prompt as string) ||
-                  activePlan?.steps.find((s) => s.id === failedStepId)?.description
+                  (typeof failureStep?.args?.prompt === 'string' ? failureStep.args.prompt : undefined) || failureStep?.description
                 }
-                onRetry={() => handleRetry(failedStepId)}
-                onEditAndRetry={() => handleRetry(failedStepId)}
-                onSkip={() => handleSkip(failedStepId)}
+                onRetry={() => handleRetry(failureId)}
+                onEditAndRetry={() => handleRetry(failureId)}
+                onSkip={() => handleSkip(failureId)}
                 onStop={handleStop}
                 onClose={handleStop}
               />
