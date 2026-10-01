@@ -2,7 +2,7 @@
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
-Mốc 01/10/2026: `main` tại `abbb55f` đã chứa W2-01 qua #15, W2-02 và W2-04 qua #18. #20 merge vào nhánh W2-02 tại `c30604b`, #18 merge `main` tại `9c652c4`, rồi #19 merge metadata tại `abbb55f`. Không còn PR mở lúc đối chiếu; W2-03 vẫn chờ scope và phê duyệt ghi live. Task card và nhật ký cũ giữ nguyên trạng thái tại thời điểm bàn giao; bảng này ghi trạng thái sau merge.
+Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
 
 | Tuần | Việc | Task card | Trạng thái |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Mốc 01/10/2026: `main` tại `abbb55f` đã chứa W2-01 qua #15, W2-02 và W2
 | 2 | Tiếp tục hoặc dừng một plan sau khi đối soát | [W2-02](tasks/W2-02-resume-after-restart.md) | xong, #18 đã merge `main` tại `9c652c4` |
 | 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ scope/plan live và người dùng duyệt lệnh ghi; chưa chạy live failure |
 | 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | xong, #20 merge vào #18 tại `c30604b`, đã vào `main` qua #18 |
-| 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | chờ |
+| 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | xong, #23 tại `1029e55` |
 | 3 (15–21/10) | Google Sheets làm service thứ tư: tool, adapter, xác thực, allowed scope, UI cấu hình, test liên service; một workflow qua bốn service, sandbox và chạy thật | — | chưa có task card |
 | 4 (22–28/10) | Đánh giá: ≥ 30 câu mới do thành viên khác viết; ≥ 20 lượt người dùng thật duyệt plan để đo tỉ lệ plan dùng được; ≥ 20 lượt đo latency qua frontend; đo lại hành vi khi lịch sử có plan cũ | — | chưa có task card |
 | 5 (29/10–04/11) | Ngừng thêm tính năng; môi trường demo dựng lại được theo hướng dẫn; đường LLM dự phòng qua Gemini API chính thức; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |

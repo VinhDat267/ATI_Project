@@ -1,11 +1,11 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 01/10/2026, sau khi PR #20, #18 và #19 merge; `main` = `abbb55f`. Agent cập nhật: Codex reviewer.
+**Cập nhật lần cuối:** 01/10/2026, sau khi PR #22 và #23 merge; `main` = `1029e55`. Agent cập nhật: Claude Code (reviewer).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
 
-> **Trạng thái merge:** W2-01 đã vào `main` qua PR #15. PR #20 (W2-04) đã merge vào nhánh W2-02 tại `c30604b`; PR #18 đã đưa cả W2-02 và W2-04 vào `main` tại `9c652c4`; PR #19 cập nhật metadata rồi merge tại `abbb55f`. Không còn PR mở lúc đối chiếu. Task card và nhật ký thi công giữ nguyên thông tin lịch sử tại thời điểm bàn giao; trạng thái sau merge nằm ở file này và ROADMAP.
+> **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 
 ## 1. Sản phẩm
 
@@ -35,17 +35,17 @@ Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng lần đo 
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 479/479 | 01/10, `63c3c63`; agent thi công chạy sau sửa review | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá | 66/66 | 01/10, `63c3c63`; agent thi công chạy sau sửa review | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 7/7 kịch bản | 01/10, `63c3c63`; agent thi công chạy sau sửa review; CI `c30604b` cũng có 7 pass | `npm run test:browser:v3` |
-| Typecheck, build | đạt | 01/10, `63c3c63`; agent thi công chạy sau sửa review | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
+| Unit + integration v3 | 503/503 | 01/10, `722000b` (head PR #23); reviewer chạy lại | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá | 66/66 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 8/8 kịch bản | như trên; CI PR #23 pass | `npm run test:browser:v3` |
+| Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối `npm run check` tại `63c3c63` exit 0: v3 479 = 11 schema + 53 adapter + 128 planner + 23 executor + 127 API + 137 web, eval 66, typecheck/build, launcher 1/1 và local-env 3/3. Browser 7/7 cũng exit 0. [CI head bàn giao W2-04 `f0d4bd6`](https://github.com/VinhDat267/ATI_Project/actions/runs/36833133925), [CI sau merge #20 `c30604b`](https://github.com/VinhDat267/ATI_Project/actions/runs/36839816958) và [v3 CI trên `main` `abbb55f`](https://github.com/VinhDat267/ATI_Project/actions/runs/36840448668) đều SUCCESS. Số 479 là output local cuối được ghi trong [nhật ký W2-04](log/2026-10-01-codex-W2-04.md), không suy ra từ dấu chấm của CI reporter.
+Lần kiểm tra cuối: reviewer chạy `npm run check` tại `722000b`, exit 0: v3 503 = 11 schema + 53 adapter + 128 planner + 25 executor + 143 API + 143 web; eval 66; typecheck/build; launcher 1/1; local-env 3/3. Browser 8/8. Mutation test: gỡ việc đánh dấu `completed`, gỡ `await` khi ghi `running`, cho chạy tiếp khi có step `failed` — cả ba đều bị test bắt.
 
-Reviewer đã chạy lại độc lập tại `49cb9c5` (source `30784eb`): check 472/472 v3, eval 66/66, browser 7/7, exit 0; phát hiện hai lỗi Important về pending preview và modal nhắm sai execution. Agent thi công sửa trong một lượt TDD, thêm guard cho phản hồi pending đến muộn và kiểm tra lại source cuối `63c3c63` như trên. **Reviewer chưa chạy lại fixed head**; lần cập nhật metadata sau merge chỉ đối chiếu source, ancestry, log và CI. Không chạy lại model hoặc ghi service thật; live UNKNOWN chưa được kiểm chứng.
+Audit tuần 2 (Claude Code) chạy probe trên PostgreSQL thật: chết giữa hai step → chạy tiếp được, plan `completed`, không gọi lại step đã xong; chết sau step cuối → tự thành `completed`; skip step `unknown` → step sau dùng đúng output đã lưu.
 
 Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần người dùng thật duyệt plan).
 
@@ -59,13 +59,13 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #17 và #15: metadata reviewer đã merge vào nhánh bàn giao lúc 06:53:57 UTC và nhánh bàn giao đã merge vào `main` lúc 06:56:35 UTC ngày 01/10. Các nhật ký trước đó là lịch sử tại thời điểm viết, không thay thế trạng thái mới này.
 - #20 và #18: #20 merge W2-04 vào nhánh W2-02 tại `c30604b` lúc 08:59:25 UTC ngày 01/10; #18 đưa cả hai vào `main` tại `9c652c4` lúc 09:03:35 UTC. W2-02 khôi phục controller từ approved plan và progress đã lưu, kiểm tra integrity/CAS trước dispatch; skip UNKNOWN, retry failed đã biết, Stop giữ bằng chứng, không chạy lại success. API latest execution snapshot theo owner cung cấp plan/steps/output/timing/recoveryActions; invalid recovery là Stop-only theo spec 5.8. W2-04 tải snapshot khi mở lại hội thoại, hiện ngữ cảnh UNKNOWN cùng Skip/Stop theo server, giữ preview mới và target execution đúng; tin nhắn gửi/lịch sử hiển thị giờ/ngày theo máy người dùng. Tham số hiển thị dựng lại từ saved plan/output, không phải log của request đã gửi service.
 - #19: metadata hậu merge #15 được đưa vào `main` tại `abbb55f` lúc 09:04:40 UTC ngày 01/10. File này cập nhật tiếp trạng thái sau #18/#20; không sửa lại task card hoặc nhật ký thi công cũ.
+- #22: kết quả audit tuần 2 và task card W2-05.
+- #23 (W2-05): khôi phục an toàn hơn sau khi server khởi động lại. Plan có mọi step `succeeded`/`skipped` tự thành `completed`; plan không có step chưa rõ kết quả mà còn step `pending` được **chạy tiếp** (`POST /api/executions/:planId/continue`, nút "Chạy tiếp các bước còn lại"). Đặc tả v3 §5.8 đã được sửa theo. Bất biến "ghi `running` xong mới gọi service" có test khóa.
 
 ## 5. Lỗi và hạn chế đã biết
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Server chết giữa hai step (không có step `unknown`, còn step `pending`): sau khởi động lại chỉ được Stop, không chạy tiếp được | `startup-reconciliation.ts`, `execution-service.ts` | Audit 01/10 tại `e6ea708`, chứng minh bằng probe trên PostgreSQL thật; task [W2-05](tasks/W2-05-continue-safe-plans.md) |
-| Server chết sau step cuối, trước khi ghi trạng thái plan: plan thành `reconciliation_required`, Stop xong thành `stopped` dù mọi step đã chạy xong | như trên | Như trên; W2-05 |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
