@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
 const composerSend = (page: import('@playwright/test').Page) => page.locator('form')
@@ -10,6 +11,60 @@ const email = process.env.CHAT_ADMIN_EMAIL;
 const password = process.env.CHAT_ADMIN_PASSWORD;
 const connectionString = process.env.DATABASE_URL;
 if (!email || !password || !connectionString) throw new Error('Browser E2E requires provisioned CHAT_ADMIN_* and DATABASE_URL');
+
+test('real browser and PostgreSQL: login, chat, approval and execution recovery after reload', async ({ page }, testInfo) => {
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
+    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
+    const title = `Đối soát E2E ${Date.now()}`;
+    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, title]);
+    const plan = { kind: 'plan', summary: 'Khôi phục sau restart', steps: [
+      { id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ trước restart', args: { listId: 'list_1', title: 'Task đã tạo' }, dependsOn: [] },
+      { id: 'step_2', tool: 'trello.add_member', description: 'Gán Minh vào thẻ đã tạo', args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'minh' }, dependsOn: ['step_1'] },
+      { id: 'step_3', tool: 'slack.send_message', description: 'Thông báo sau đối soát', args: { channel: '#general', text: { $template: 'Task đã đối soát: ${step_1.output.url}' } }, dependsOn: ['step_1'] },
+    ], warnings: [] };
+    const text = JSON.stringify(plan);
+    const planId = (await pool.query(`INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, status, expires_at, decided_at)
+      VALUES ($1, $2::jsonb, $3::text, $4, 'reconciliation_required', now() + interval '30 minutes', now()) RETURNING id`,
+      [convId, text, text, createHash('sha256').update(text).digest('hex')])).rows[0].id;
+    for (const [index, step] of plan.steps.entries()) {
+      await pool.query(`INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, output_json, requested_by, started_at, completed_at, duration_ms)
+        VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7, CASE WHEN $8 THEN now() ELSE NULL END, CASE WHEN $8 THEN now() ELSE NULL END, CASE WHEN $8 THEN 250 ELSE NULL END)`,
+        [planId, step.id, step.tool, JSON.stringify(step.args), ['succeeded', 'unknown', 'pending'][index],
+          index === 0 ? JSON.stringify({ id: 'saved-browser-card', url: 'https://trello.com/c/saved-browser' }) : null, owner, index < 2]);
+    }
+    const before = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_1'])).rows[0];
+    const writes: string[] = [];
+    page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
+    // PostgreSQL conversations currently have no title field; select the newest row
+    // after verifying the real list endpoint returned the seeded conversation first.
+    const listed = page.waitForResponse(response => response.url().endsWith('/api/conversations') && response.request().method() === 'GET');
+    await page.reload();
+    expect((await (await listed).json()).conversations[0].id).toBe(convId);
+    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
+    await expect(notice).toBeVisible();
+    await expect(notice.getByText('trello.add_member')).toBeVisible();
+    await expect(notice.getByText(/saved-browser-card/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /thử lại|retry|Duyệt kế hoạch/i })).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('reconciliation-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await notice.scrollIntoViewIfNeeded();
+    await expect(notice.getByRole('button', { name: 'Dừng plan' })).toBeVisible();
+    await notice.screenshot({ path: testInfo.outputPath('reconciliation-mobile.png') });
+    await notice.getByRole('button', { name: 'Skip step này rồi chạy tiếp' }).click();
+    await expect(page.getByText('Quy trình đã hoàn thành.')).toBeVisible();
+    await expect(notice).toHaveCount(0);
+    expect((await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0].status).toBe('completed');
+    const rows = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(rows.map(row => row.status)).toEqual(['succeeded', 'skipped', 'succeeded']);
+    expect(rows[0]).toEqual(before);
+    expect(rows[2].output_json.text).toContain('https://trello.com/c/saved-browser');
+    expect(writes).toEqual([`/api/executions/${planId}/steps/step_2/skip`]);
+  } finally { await pool.end(); }
+});
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/');

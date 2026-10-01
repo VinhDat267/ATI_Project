@@ -45,6 +45,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   timestamp,
   onRetry,
 }) => {
+  const date = timestamp ? new Date(timestamp) : null;
+  const now = new Date();
+  const validDate = date && !Number.isNaN(date.getTime());
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const sameDay = validDate && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  const timeLabel = validDate ? `${sameDay ? '' : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} `}${pad(date.getHours())}:${pad(date.getMinutes())}` : '';
+  const time = timeLabel && <time dateTime={timestamp}>{timeLabel}</time>;
   if (role === 'user') {
     return (
       <div className="flex flex-col items-end my-3 ml-auto max-w-[80%]">
@@ -76,7 +83,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               )}
             </div>
           )}
-          {timestamp && <span>{timestamp}</span>}
+          {time}
         </div>
       </div>
     );
@@ -89,8 +96,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       </div>
       <div className="flex-1 text-sm leading-relaxed text-zinc-800">
         <div className="whitespace-pre-wrap">{renderFormattedContent(content)}</div>
-        {timestamp && (
-          <div className="mt-1 text-[11px] text-zinc-400">{timestamp}</div>
+        {time && (
+          <div className="mt-1 text-[11px] text-zinc-400">{time}</div>
         )}
       </div>
     </div>

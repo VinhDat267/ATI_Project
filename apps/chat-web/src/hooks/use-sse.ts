@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
-import type { GatherStep, StepState } from '../types';
+import type { GatherStep, StepState, PlanStatus } from '../types';
+import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 
 const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
 const fallbackConversationKey = '__no_conversation__';
@@ -40,6 +41,9 @@ export function handleSSEEvent(
     data = { raw: dataStr };
   }
 
+  if (['exec_start', 'exec_step', 'step_status', 'exec_done'].includes(event) &&
+      data.planId && store.activePlan?.id && data.planId !== store.activePlan.id) return;
+
   switch (event) {
     case 'text_start':
       store.setIsStreaming(true);
@@ -61,6 +65,7 @@ export function handleSSEEvent(
     case 'plan_preview': {
       const planObj = data.plan || data;
       const planId = data.planId || planObj.id;
+      if (planId && store.executionSnapshot?.plan.id === planId) break;
       store.setActivePlan({
         id: planId,
         summary: planObj.summary,
@@ -156,6 +161,7 @@ export function handleSSEEvent(
     }
 
     case 'exec_start':
+      store.setExecutionSnapshot(null);
       store.setPlanStatus('executing');
       break;
 
@@ -172,7 +178,7 @@ export function handleSSEEvent(
 
     case 'exec_done':
       store.setIsStreaming(false);
-      store.setPlanStatus('completed');
+      store.setPlanStatus((['completed', 'partial', 'reconciliation_required', 'stopped', 'failed'].includes(data.status) ? data.status : 'completed') as PlanStatus);
       break;
 
     case 'refusal':
@@ -262,6 +268,8 @@ export function useSSE(conversationId: string | null, token: string | null) {
           res.headers?.get?.('content-type') ||
           (res.headers as any)?.['content-type'];
         if (res.ok && contentType?.includes('text/event-stream')) {
+          // Reconnect after an API restart has no guarantee of a replayable cursor.
+          void refreshExecutionSnapshot(conversationId).catch(() => {});
           return;
         }
         if (res.status >= 400 && res.status < 500) {
@@ -279,6 +287,9 @@ export function useSSE(conversationId: string | null, token: string | null) {
           ev.id || undefined,
           conversationId
         );
+        if (ev.event === 'exec_done') {
+          void refreshExecutionSnapshot(conversationId).catch(() => {});
+        }
       },
       onerror(err) {
         if (

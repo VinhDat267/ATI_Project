@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore } from './store/chat-store';
 import { useSSE } from './hooks/use-sse';
 import { authStorage, subscribeAuthTokens } from './services/auth-storage';
@@ -13,6 +13,8 @@ import { LandingPageView } from './components/LandingPageView';
 import { SidebarHistory } from './components/layout/SidebarHistory';
 import { UserNavMenu } from './components/layout/UserNavMenu';
 import { MissionControlLaunchpad } from './components/MissionControlLaunchpad';
+import { ReconciliationNotice } from './components/ReconciliationNotice';
+import { refreshExecutionSnapshot } from './services/execution-snapshot';
 import type { User } from './types';
 
 export interface AppProps {
@@ -29,11 +31,12 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     planStatus,
     stepStatuses,
     stepErrors,
+    executionSnapshot,
+    executionLoadError,
     setConversationId,
     addOptimisticMessage,
     setActivePlan,
     setPlanStatus,
-    updateStepStatus,
     reset,
   } = useChatStore();
 
@@ -58,6 +61,10 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const recoveryPending = useRef(false);
+  useEffect(() => { setRecoveryError(null); }, [conversationId, executionSnapshot?.plan.id]);
 
   // Subscribe to auth token updates to keep React state and SSE in sync
   useEffect(() => {
@@ -236,37 +243,34 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     setPlanStatus('rejected');
   };
 
-  const handleRetry = async (stepId: string) => {
-    updateStepStatus(stepId, 'running');
-    if (activePlan?.id) {
-      try {
-        await apiClient.retryStep(activePlan.id, stepId);
-      } catch (err) {
-        console.warn('Retry API call failed, running locally:', err);
+  const recover = async (action: 'retry' | 'skip' | 'stop', stepId?: string) => {
+    const planId = executionSnapshot?.plan.id || activePlan?.id;
+    const convId = conversationId;
+    if (!planId || !convId || recoveryPending.current) return;
+    if (executionSnapshot && !executionSnapshot.recoveryActions.includes(action)) return;
+    if (action === 'retry' && stepId && stepStatuses[stepId] === 'unknown') return;
+    recoveryPending.current = true;
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    try {
+      if (action === 'stop') await apiClient.stopExecution(planId);
+      else if (stepId) {
+        if (action === 'retry') await apiClient.retryStep(planId, stepId);
+        else await apiClient.skipStep(planId, stepId);
       }
+      if (useChatStore.getState().conversationId === convId) await refreshExecutionSnapshot(convId, planId);
+    } catch (err) {
+      if (useChatStore.getState().conversationId === convId) {
+        setRecoveryError(err instanceof Error ? err.message : 'Không thể cập nhật quy trình. Hãy tải lại trạng thái trước khi quyết định.');
+      }
+    } finally {
+      recoveryPending.current = false;
+      setRecoveryBusy(false);
     }
   };
-
-  const handleSkip = async (stepId: string) => {
-    updateStepStatus(stepId, 'skipped');
-    if (activePlan?.id) {
-      try {
-        await apiClient.skipStep(activePlan.id, stepId);
-      } catch (err) {
-        console.warn('Skip API call failed, running locally:', err);
-      }
-    }
-  };
-
-  const handleStop = async () => {
-    if (activePlan?.id) {
-      try {
-        await apiClient.stopExecution(activePlan.id);
-      } catch (err) {
-        console.warn('Stop API call failed:', err);
-      }
-    }
-  };
+  const handleRetry = (stepId: string) => recover('retry', stepId);
+  const handleSkip = (stepId: string) => recover('skip', stepId);
+  const handleStop = () => recover('stop');
 
   const handleEditPlan = () => {
     if (typeof window !== 'undefined') {
@@ -295,9 +299,11 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     }
   };
 
-  const failedStepId = Object.entries(stepStatuses).find(
+  const executionStatus = executionSnapshot?.execution.status || planStatus;
+  const failedStepId = executionStatus === 'partial' ? Object.entries(stepStatuses).find(
     ([_, st]) => st === 'failed'
-  )?.[0];
+  )?.[0] : undefined;
+  const progressPlan = executionSnapshot?.plan || activePlan;
 
   if (!authToken) {
     if (currentView === 'landing') {
@@ -456,7 +462,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             )}
 
             {/* Plan Preview Card */}
-            {activePlan && (
+            {activePlan && ['preview', 'approving'].includes(planStatus) && (
               <PlanPreview
                 plan={activePlan}
                 isApproving={planStatus === 'approving'}
@@ -467,21 +473,34 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             )}
 
             {/* Live Execution Progress Card */}
-            {activePlan && Object.keys(stepStatuses).length > 0 && (
+            {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
+            {executionSnapshot && executionStatus === 'reconciliation_required' && <ReconciliationNotice
+              snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} />}
+            {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
+            {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
+            {recoveryError && executionStatus !== 'reconciliation_required' && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
+            {progressPlan && Object.keys(stepStatuses).length > 0 && (
               <ExecutionProgress
-                steps={activePlan.steps.map((st) => ({
+                steps={(progressPlan.steps || executionSnapshot?.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId })) || []).map((st) => {
+                  const saved = executionSnapshot?.steps.find(row => row.stepId === st.id);
+                  return ({
                   id: st.id,
                   tool: st.tool,
                   description: st.description,
                   status: stepStatuses[st.id] || 'pending',
                   error: stepErrors[st.id],
-                }))}
+                  duration: saved?.durationMs != null ? `${saved.durationMs / 1000}s` : undefined,
+                  output: saved?.output != null ? JSON.stringify(saved.output) : undefined,
+                }); })}
               />
             )}
 
             {/* Partial Failure Recovery Modal */}
             {failedStepId && (
               <PartialFailureModal
+                busy={recoveryBusy}
+                allowedActions={executionSnapshot?.recoveryActions}
+                allowEdit={false}
                 stepId={failedStepId}
                 tool={
                   activePlan?.steps.find((s) => s.id === failedStepId)?.tool ||
@@ -498,26 +517,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
                   activePlan?.steps.find((s) => s.id === failedStepId)?.description
                 }
                 onRetry={() => handleRetry(failedStepId)}
-                onEditAndRetry={(updatedArgs, updatedPrompt) => {
-                  if (activePlan) {
-                    const updatedSteps = activePlan.steps.map((s) => {
-                      if (s.id === failedStepId) {
-                        const newArgs = updatedArgs ? { ...updatedArgs } : { ...s.args };
-                        if (updatedPrompt && ('prompt' in newArgs || !updatedArgs)) {
-                          newArgs.prompt = updatedPrompt;
-                        }
-                        return {
-                          ...s,
-                          args: newArgs,
-                          description: updatedPrompt || s.description,
-                        };
-                      }
-                      return s;
-                    });
-                    setActivePlan({ ...activePlan, steps: updatedSteps });
-                  }
-                  handleRetry(failedStepId);
-                }}
+                onEditAndRetry={() => handleRetry(failedStepId)}
                 onSkip={() => handleSkip(failedStepId)}
                 onStop={handleStop}
                 onClose={handleStop}
