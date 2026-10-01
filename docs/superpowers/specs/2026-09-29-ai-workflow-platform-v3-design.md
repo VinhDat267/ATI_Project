@@ -548,10 +548,12 @@ Quy tắc:
 
 ### 5.8. Crash Recovery
 
-- Mỗi step status persisted vào DB ngay khi thay đổi
-- Server restart → tìm plans có status="executing"
-- Step đang "running" khi crash: read → auto retry, write → mark UNKNOWN
-- Thông báo user kiểm tra
+- Mỗi step status persisted vào DB ngay khi thay đổi.
+- Khi server khởi động lại sau khi tiến trình thực thi cũ đã dừng, đối soát PostgreSQL trong một transaction trước khi nhận request. Phạm vi là các plan `approved`, `executing`, `stopping`, `partial`, `unknown`, `reconciliation_required`; không sửa plan chờ duyệt hoặc đã kết thúc. Cơ chế này áp dụng cho một API instance, chưa cung cấp lease/fencing cho nhiều replica.
+- Step `running` bị gián đoạn, dù read hay write, chuyển thành `unknown`, ghi lý do restart và thời điểm hoàn tất. Giữ nguyên các step `pending`, `succeeded`, `skipped`, `failed`. Không tự retry step hoặc tiếp tục plan khi startup.
+- Plan có step `unknown` chuyển thành `reconciliation_required`. Plan còn `approved`, `executing`, `stopping`, `unknown` cũng chuyển thành `reconciliation_required`, kể cả chưa có dòng step hoặc mọi step còn `pending`. Không tạo step `unknown` giả để biểu diễn trường hợp chưa bắt đầu. Plan `partial` chỉ có lỗi đã rõ (`failed`, không có `unknown`/`running`) giữ nguyên `partial`.
+- Đối soát phải idempotent; log chỉ chứa id plan và số step vừa chuyển thành `unknown`, không chứa argument/output. Nếu transaction lỗi, rollback và không mở HTTP listener.
+- API trạng thái trả `pausedStepId` của step `unknown` đầu tiên theo thứ tự plan; với plan `partial` chỉ có lỗi đã rõ, trả step `failed` đầu tiên. Thông báo user kiểm tra; step `unknown` không được retry. Khôi phục controller và thao tác skip/stop là W2-02. Plan cần đối soát mà không có step `unknown` chỉ được Stop trong luồng khôi phục, cho đến khi có đặc tả tiếp tục riêng được duyệt.
 
 ### 5.9. Intent Dedup
 
