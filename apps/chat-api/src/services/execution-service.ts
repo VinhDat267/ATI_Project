@@ -5,7 +5,7 @@ import { StepRunner, ExecutionController, type StepState } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoverySteps } from './execution-recovery.js';
+import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoverySteps } from './execution-recovery.js';
 
 export interface ApproveResult {
   success: boolean;
@@ -365,7 +365,7 @@ export class ExecutionService {
     if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
     const plan = await this.planRepo.getLatestExecutedPlan(convId);
     if (!plan) throw Object.assign(new Error('No execution found'), { status: 404 });
-    const parsed = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+    const parsed = readableRecoveryPlan(plan);
     const execution = await this.getExecutionStatusDurable(plan.id);
     const rows = this.stepRepo ? await this.stepRepo.listSteps(plan.id) : [];
     const order = new Map<string, number>((parsed?.steps ?? []).map((step: PlanStep, index: number) => [step.id, index]));
@@ -396,7 +396,7 @@ export class ExecutionService {
     if (!plan || ['pending', 'rejected', 'superseded', 'expired'].includes(plan.status)) return null;
     if (['approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required'].includes(plan.status)) {
       const steps = this.stepRepo ? await this.stepRepo.listSteps(planId) : [];
-      const planJson = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+      const planJson = readableRecoveryPlan(plan);
       // Repository order is lexical (step_10 precedes step_2); recovery follows
       // the approved plan's order and prioritizes uncertain results over failures.
       const order = new Map<string, number>((planJson?.steps ?? []).map((step: PlanStep, index: number) => [step.id, index]));

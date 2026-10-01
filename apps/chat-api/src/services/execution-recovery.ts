@@ -9,6 +9,22 @@ export function recoveryConflict(message: string): Error & { status: number } {
   return Object.assign(new Error(message), { status: 409 });
 }
 
+// Read-only projection: malformed plan data must not hide saved step evidence
+// or prevent Stop. Continuation still uses verifiedRecoverySteps exclusively.
+export function readableRecoveryPlan(plan: PlanRow): Record<string, any> {
+  for (const value of [plan.plan_json, plan.plan_text]) {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && Array.isArray(parsed.steps)
+        && parsed.steps.every((step: any) => step && typeof step === 'object' && typeof step.id === 'string')) {
+        return parsed;
+      }
+    } catch { /* Try the saved text, then fall back to step evidence only. */ }
+  }
+  return {};
+}
+
 export function verifiedRecoverySteps(plan: PlanRow): PlanStep[] {
   try {
     const parsed = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;

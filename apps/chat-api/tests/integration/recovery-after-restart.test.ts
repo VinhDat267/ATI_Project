@@ -286,4 +286,30 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
     expect(response.body.steps).toEqual([]);
     expect(response.body.recoveryActions).toEqual(['stop']);
   });
+
+  it.each([
+    { value: { steps: { invalid: true } }, corruptText: false },
+    { value: 'not-valid-plan-json', corruptText: false },
+    { value: null, corruptText: false },
+    { value: 'not-valid-plan-json', corruptText: true },
+  ])('loads evidence and Stop-only actions for malformed stored plan $value / text=$corruptText', async ({ value, corruptText }) => {
+    const plan = await fixture('reconciliation_required', ['succeeded', 'unknown', 'pending']);
+    const before = await stepRepo.listSteps(plan.id);
+    await pool.query('UPDATE plans SET plan_json = $2::jsonb, plan_text = CASE WHEN $3 THEN $4 ELSE plan_text END WHERE id = $1',
+      [plan.id, JSON.stringify(value), corruptText, 'invalid-plan-text']);
+    const recovered = freshService();
+    const response = await request(recovered.app).get(`/api/conversations/${plan.conv_id}/executions/latest`).set('Authorization', `Bearer ${ownerToken}`);
+    expect(response.status).toBe(200);
+    expect(response.body.plan.id).toBe(plan.id);
+    expect(response.body.steps.map((step: any) => step.status)).toEqual(['succeeded', 'unknown', 'pending']);
+    expect(response.body.steps[0].output).toEqual(before[0]!.output_json);
+    expect(response.body.recoveryActions).toEqual(['stop']);
+    const status = await request(recovered.app).get(`/api/executions/${plan.id}/status`).set('Authorization', `Bearer ${ownerToken}`);
+    expect(status.status).toBe(200);
+    expect(status.body).toEqual({ status: 'reconciliation_required', pausedStepId: 'step_2' });
+    expect((await recovered.post(plan.id, 'steps/step_2/skip')).status).toBe(409);
+    expect((await recovered.post(plan.id, 'stop')).status).toBe(200);
+    expect(await stepRepo.listSteps(plan.id)).toEqual(before);
+    expect(recovered.calls).toEqual([]);
+  });
 });
