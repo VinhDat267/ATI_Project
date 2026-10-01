@@ -21,6 +21,8 @@ export interface GeminiProviderConfig {
   timeoutMs?: number;
   /** Retries after a transient failure (429 or 5xx); other errors fail fast. */
   maxRetries?: number;
+  /** Retries after the per-attempt deadline elapses (default 1). */
+  timeoutRetries?: number;
   /** Base backoff; attempt n waits retryDelayMs * 2^(n-1). */
   retryDelayMs?: number;
 }
@@ -32,6 +34,7 @@ export class GeminiProvider implements LLMProvider {
   private client?: GeminiClient;
   private timeoutMs: number;
   private maxRetries: number;
+  private timeoutRetries: number;
   private retryDelayMs: number;
 
   constructor(config: GeminiProviderConfig = {}) {
@@ -43,6 +46,7 @@ export class GeminiProvider implements LLMProvider {
     this.client = config.client;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.maxRetries = config.maxRetries ?? 2;
+    this.timeoutRetries = config.timeoutRetries ?? 1;
     this.retryDelayMs = config.retryDelayMs ?? 1_000;
   }
 
@@ -66,7 +70,7 @@ export class GeminiProvider implements LLMProvider {
       });
       return response.text || '';
     }, {
-      label: 'Gemini', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries,
+      label: 'Gemini', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries, timeoutRetries: this.timeoutRetries,
       retryDelayMs: this.retryDelayMs, signal: input.signal,
     });
   }

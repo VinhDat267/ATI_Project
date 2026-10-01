@@ -88,9 +88,32 @@ describe('OpenAICompatibleProvider', () => {
 
   it('aborts a hung request when the per-call timeout elapses', async () => {
     const { fetchFn, calls } = scriptedFetch([hang]);
-    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, timeoutMs: 50, maxRetries: 0 });
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, timeoutMs: 50, maxRetries: 0, timeoutRetries: 0 });
     await expect(provider.generatePlan(input)).rejects.toThrow(/timed out after 50ms/);
     expect(calls[0]!.init.signal?.aborted).toBe(true);
+  });
+
+  it('retries once after its own deadline and returns the second answer', async () => {
+    const { fetchFn, calls } = scriptedFetch([hang, completion('{"kind":"refusal","reason":"x"}')]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, timeoutMs: 50 });
+    await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"x"}');
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.init.signal?.aborted).toBe(true);
+    expect(calls[1]!.init.signal?.aborted).toBe(false);
+  });
+
+  it('gives up after the timeout retries even when more transient retries remain', async () => {
+    const { fetchFn, calls } = scriptedFetch([hang, hang, hang]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, timeoutMs: 50, maxRetries: 2, timeoutRetries: 1 });
+    await expect(provider.generatePlan(input)).rejects.toThrow(/timed out after 50ms/);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not retry a timeout when timeoutRetries is 0', async () => {
+    const { fetchFn, calls } = scriptedFetch([hang, completion('{}')]);
+    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn, timeoutMs: 50, timeoutRetries: 0 });
+    await expect(provider.generatePlan(input)).rejects.toThrow(/timed out after 50ms/);
+    expect(calls).toHaveLength(1);
   });
 
   it('stops immediately when the caller aborts, without retrying', async () => {

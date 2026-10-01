@@ -4,6 +4,12 @@ export interface TransportOptions {
   timeoutMs: number;
   /** Retries after a transient failure; other errors fail fast. */
   maxRetries: number;
+  /**
+   * Retries after this call hit its own deadline. Counted separately from
+   * maxRetries because each one costs a whole timeoutMs; a slow answer is
+   * usually a long reasoning run that a fresh attempt does not repeat.
+   */
+  timeoutRetries?: number;
   /** Base backoff; retry n waits retryDelayMs * 2^(n-1). */
   retryDelayMs: number;
   /** Provider name used in the timeout message. */
@@ -32,10 +38,12 @@ function sleep(ms: number, signal: AbortSignal | undefined, label: string): Prom
   });
 }
 
+class DeadlineError extends Error {}
+
 async function attemptWithDeadline<T>(attempt: (signal: AbortSignal) => Promise<T>, options: TransportOptions): Promise<T> {
   const timeout = new AbortController();
   const timer = setTimeout(
-    () => timeout.abort(new Error(`${options.label} request timed out after ${options.timeoutMs}ms`)),
+    () => timeout.abort(new DeadlineError(`${options.label} request timed out after ${options.timeoutMs}ms`)),
     options.timeoutMs,
   );
   const signal = options.signal ? AbortSignal.any([options.signal, timeout.signal]) : timeout.signal;
@@ -51,14 +59,23 @@ async function attemptWithDeadline<T>(attempt: (signal: AbortSignal) => Promise<
 }
 
 export async function callWithRetry<T>(attempt: (signal: AbortSignal) => Promise<T>, options: TransportOptions): Promise<T> {
-  for (let retry = 0; ; retry++) {
+  const timeoutRetries = options.timeoutRetries ?? 0;
+  let retry = 0;
+  let timeouts = 0;
+  for (;;) {
     if (options.signal?.aborted) throw abortReason(options.signal, options.label);
     try {
       return await attemptWithDeadline(attempt, options);
     } catch (err) {
       if (options.signal?.aborted) throw abortReason(options.signal, options.label);
+      if (err instanceof DeadlineError) {
+        if (timeouts >= timeoutRetries) throw err;
+        timeouts += 1;
+        continue;
+      }
       if (!isTransientStatus(err) || retry >= options.maxRetries) throw err;
       await sleep(options.retryDelayMs * 2 ** retry, options.signal, options.label);
+      retry += 1;
     }
   }
 }
