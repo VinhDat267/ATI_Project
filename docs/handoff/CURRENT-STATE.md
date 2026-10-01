@@ -64,6 +64,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
+| Server chết giữa hai step (không có step `unknown`, còn step `pending`): sau khởi động lại chỉ được Stop, không chạy tiếp được | `startup-reconciliation.ts`, `execution-service.ts` | Audit 01/10 tại `e6ea708`, chứng minh bằng probe trên PostgreSQL thật; task [W2-05](tasks/W2-05-continue-safe-plans.md) |
+| Server chết sau step cuối, trước khi ghi trạng thái plan: plan thành `reconciliation_required`, Stop xong thành `stopped` dù mọi step đã chạy xong | như trên | Như trên; W2-05 |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
