@@ -12,6 +12,7 @@ import { LoginView } from './components/LoginView';
 import { LandingPageView } from './components/LandingPageView';
 import { SidebarHistory } from './components/layout/SidebarHistory';
 import { UserNavMenu } from './components/layout/UserNavMenu';
+import { MissionControlLaunchpad } from './components/MissionControlLaunchpad';
 import type { User } from './types';
 
 export interface AppProps {
@@ -449,44 +450,9 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             streamingText={streamingText}
             isStreaming={isStreaming}
           >
-            {/* Empty state prompt chips */}
+            {/* Mission Control Launchpad when no messages */}
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-[#0071e3] flex items-center justify-center text-xl mb-4 shadow-xs">
-                  ✨
-                </div>
-                <h2 className="text-xl font-bold text-zinc-900 mb-2">
-                  Bạn muốn điều phối tác vụ nào hôm nay?
-                </h2>
-                <p className="text-xs text-zinc-500 mb-6">
-                  Nền tảng tự động hóa quy trình đa dịch vụ — bạn luôn có toàn quyền kiểm duyệt trước khi chạy và dữ liệu luôn được bảo vệ an toàn.
-                </p>
-
-                <div className="flex flex-wrap gap-2 justify-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Tạo task cập nhật landing page cho Minh trên Trello board Frontend và báo Slack channel #general'
-                      )
-                    }
-                    className="text-xs bg-[#fafafc] border border-zinc-200 hover:border-blue-400 hover:bg-blue-50/40 text-zinc-700 px-3.5 py-2 rounded-full transition shadow-2xs"
-                  >
-                    ✨ Tạo công việc trên Trello, phân công nhân sự và thông báo qua Slack
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Kiểm tra danh sách boards trên Trello và các channels trên Slack'
-                      )
-                    }
-                    className="text-xs bg-[#fafafc] border border-zinc-200 hover:border-blue-400 hover:bg-blue-50/40 text-zinc-700 px-3.5 py-2 rounded-full transition shadow-2xs"
-                  >
-                    🔍 Kiểm tra danh sách bảng việc Trello và kênh Slack liên kết
-                  </button>
-                </div>
-              </div>
+              <MissionControlLaunchpad onSendMessage={handleSendMessage} />
             )}
 
             {/* Plan Preview Card */}

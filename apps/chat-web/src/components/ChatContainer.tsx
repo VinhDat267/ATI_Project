@@ -97,7 +97,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 max-w-3xl mx-auto w-full">
+      <div
+        className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 mx-auto w-full ${
+          messages.length === 0 ? 'max-w-4xl' : 'max-w-3xl'
+        }`}
+      >
         {messages.map((msg) => (
           <MessageItem
             key={msg.id}
