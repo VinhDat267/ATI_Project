@@ -1,11 +1,11 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 01/10/2026, sau khi PR #16 merge vào `docs/agent-handoff` tại `1a0b623`. Agent cập nhật: Codex reviewer.
+**Cập nhật lần cuối:** 01/10/2026, sau khi PR #17 và #15 merge; `main` = `35f454a`. Agent cập nhật: Codex reviewer.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
 
-> **Phân biệt nhánh:** PR #16 (W2-01) đã merge vào `docs/agent-handoff`, chưa vào `main`. PR #15 vẫn OPEN, head `1a0b623`; `main` vẫn là `29afc4f`. Các thay đổi W2-01 dưới đây có trên nhánh bàn giao; cần merge #15 để đưa chúng vào `main`.
+> **Phân biệt nhánh:** PR #17 đã merge metadata vào `docs/agent-handoff` tại `adf472c`; PR #15 đã đưa handoff và W2-01 vào `main` tại `35f454a`. PR #18 (W2-02) còn OPEN, base `main`, head `31670bc`; W2-04 đang triển khai trên nhánh riêng đặt trên W2-02. Không coi hai phần chưa merge này là hiện trạng `main`.
 
 ## 1. Sản phẩm
 
@@ -31,7 +31,7 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Các số liệu W2-01 được đo trên nhánh bàn giao, không phải `main`; các bằng chứng golden/live cũ giữ nguyên ngày đo và giới hạn.
+Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới là bằng chứng cho source W2-01 hiện có trên `main`; ngày đo local vẫn là 01/10 trên `c8d122c`, được bổ sung CI tại head cuối PR #15 `adf472c`. Các bằng chứng golden/live cũ giữ nguyên ngày đo và giới hạn.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
@@ -43,7 +43,9 @@ Mỗi số liệu ghi kèm ngày đo và commit. Các số liệu W2-01 được
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-W2-01 có 16 test startup trên PostgreSQL thật, gồm row lock, rollback khi SQL lỗi, idempotence và kill tiến trình thực thi giữa write. Các lần chạy local trên `c8d122c` đều exit 0 sau RED 9 fail / 7 pass. [CI PR #16 tại `5c03224`](https://github.com/VinhDat267/ATI_Project/actions/runs/36817860975) và [CI PR #15 tại merge commit `1a0b623`](https://github.com/VinhDat267/ATI_Project/actions/runs/36818421247) đều SUCCESS. `git diff 5c03224 1a0b623` rỗng: merge giữ nguyên tree đã kiểm. Không chạy lại live model hoặc ghi service thật trong W2-01.
+W2-01 có 16 test startup trên PostgreSQL thật, gồm row lock, rollback khi SQL lỗi, idempotence và kill tiến trình thực thi giữa write. Các lần chạy local trên `c8d122c` đều exit 0 sau RED 9 fail / 7 pass. [CI PR #16 tại `5c03224`](https://github.com/VinhDat267/ATI_Project/actions/runs/36817860975) và [CI cuối PR #15 tại `adf472c`](https://github.com/VinhDat267/ATI_Project/actions/runs/36827265860) đều SUCCESS. Diff `5c03224` → `35f454a` rỗng trong `apps/`, `packages/`, `db/`, `prompts/`, `evaluations/`; toàn bộ tree `adf472c` → `35f454a` cũng rỗng. Số liệu 416 v3 / 66 eval / 6 browser tiếp tục áp dụng cho source trên `main`; không chạy lại live model hoặc ghi service thật trong W2-01.
+
+**Bằng chứng nhánh chưa merge:** PR #18 (W2-02) có v3 442/442, eval 66/66, browser 6/6, typecheck/build đạt ngày 01/10 tại head `2a2fc5a`, do agent thi công chạy sau sửa review. Đây không phải số liệu `main` hoặc lần reviewer chạy lại fixed head. [CI tại `2a2fc5a`](https://github.com/VinhDat267/ATI_Project/actions/runs/36822341262) và [CI sau tích hợp `main` tại `31670bc`](https://github.com/VinhDat267/ATI_Project/actions/runs/36827517047) đều SUCCESS; diff giữa hai head rỗng trong các thư mục source nêu trên. PR #18 vẫn OPEN.
 
 Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần người dùng thật duyệt plan).
 
@@ -53,17 +55,17 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #10–#12: công cụ chạy thật có kiểm soát; giảm latency 31–37 s → 8–10 s; chạy thật qua frontend; sửa plan preview hiện `[object Object]`.
 - #14: thiết kế lại frontend (trang giới thiệu, đăng nhập, lịch sử hội thoại, gợi ý yêu cầu, hộp thoại lỗi).
 - #13 (tuần 1): retry khi model timeout; kiểm tra thành viên đúng board của card; liệt kê bằng query rỗng thay vì đoán tên; ghi thời lượng từng step; lưu plan vào hội thoại để "Sửa qua Chat" hoạt động.
-- #16 (W2-01): đã merge vào `docs/agent-handoff` tại `1a0b623`, chờ #15 vào `main`. Startup đối soát trong transaction trước HTTP: step `running` thành `unknown`, plan cần kiểm tra thành `reconciliation_required`; giữ output đã thành công và step `pending`, không tự chạy lại. Lỗi đối soát thì rollback và không listen; API durable status trả `pausedStepId` theo thứ tự plan. Đặc tả mục 5.8 đã đồng bộ chính sách này. Phạm vi một instance, executor cũ phải đã dừng.
+- #16 (W2-01): đã merge vào `docs/agent-handoff` tại `1a0b623`, nay có trên `main` qua #15 tại `35f454a`. Startup đối soát trong transaction trước HTTP: step `running` thành `unknown`, plan cần kiểm tra thành `reconciliation_required`; giữ output đã thành công và step `pending`, không tự chạy lại. Lỗi đối soát thì rollback và không listen; API durable status trả `pausedStepId` theo thứ tự plan. Đặc tả mục 5.8 đã đồng bộ chính sách này. Phạm vi một instance, executor cũ phải đã dừng.
+- #17 và #15: metadata reviewer đã merge vào nhánh bàn giao lúc 06:53:57 UTC và nhánh bàn giao đã merge vào `main` lúc 06:56:35 UTC ngày 01/10. Các nhật ký trước đó là lịch sử tại thời điểm viết, không thay thế trạng thái mới này.
 
-W2-02 đang được triển khai trên nhánh `vinhdat/fix-w2-02-resume-after-restart`; chưa review hoặc merge.
+W2-02 ở PR #18 trên nhánh `vinhdat/fix-w2-02-resume-after-restart`, base đã đổi về `main`, head `31670bc`; chưa merge. W2-04 đang triển khai trong worktree `w2-04-reconciliation-ui`, nhánh `vinhdat/feat-w2-04-reconciliation-ui` đặt trên W2-02; chưa có kết luận nghiệm thu hoặc merge.
 
 ## 5. Lỗi và hạn chế đã biết
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Đối soát startup đã có trên nhánh bàn giao, chưa có trên `main` | `apps/chat-api/src/services/startup-reconciliation.ts` | W2-01 đã merge qua #16; #15 còn OPEN |
-| Sau restart controller chưa được khôi phục; retry/skip/stop chưa tiếp tục được từ dữ liệu đã lưu | `apps/chat-api/src/services/execution-service.ts` | W2-02 đang làm; giữ output thành công, chặn retry `unknown`, plan không có `unknown` chỉ Stop trong luồng recovery |
-| Tải lại UI chưa lấy execution/step snapshot cần đối soát | `apps/chat-web`, API snapshot | Hợp đồng API thuộc W2-02; UI thuộc W2-04 |
+| Trên `main`, sau restart controller chưa được khôi phục; retry/skip/stop chưa tiếp tục được từ dữ liệu đã lưu | `apps/chat-api/src/services/execution-service.ts` | W2-02 đã có code/test trong PR #18 còn OPEN; giữ output thành công, chặn retry `unknown`, plan không có `unknown` chỉ Stop trong luồng recovery |
+| Trên `main`, tải lại UI chưa lấy execution/step snapshot cần đối soát | `apps/chat-web`, API snapshot | API nằm trong PR #18 chưa merge; W2-04 đang triển khai UI trên nhánh đặt trên W2-02 |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation | Chỉ một API instance, executor cũ đã dừng; ngoài phạm vi W2-01 |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | Task W2-03 |
 | Thời gian dưới tin nhắn người dùng hiện dạng ISO thô | `apps/chat-web` | Task W2-04 |
