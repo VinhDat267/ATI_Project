@@ -1,5 +1,7 @@
 # 2026-10-01 · Claude Code · Lập kế hoạch tuần 3 và tuần 4
 
+> **Ghi chú 02/10/2026:** ba task card tuần 3 trong nhật ký này (chỉ cho Google Sheets) đã được thay bằng W3-00 → W3-07 trước khi PR #25 merge. Xem `2026-10-02-claude-code-plan-five-services.md` và `2026-10-02-claude-code-W3-plan-review.md`.
+
 - **Đã làm:** viết 7 task card (W3-01 → W3-03, W4-01 → W4-04) và cập nhật `ROADMAP.md`. Trước khi viết đã đọc mã nguồn trên `main` `2ae2a16` để task card khớp với code.
 - **Phát hiện khi đọc code (đã ghi vào task card):**
   - `scopeKey` bị viết cố định thành `'boards' | 'channels' | 'repos'` ở `tool-schemas/types.ts`, `registered-services.ts`, `adapter-factory.ts` và `live-execution/harness.ts`, nên thêm Google Sheets phải sửa cả những chỗ này (W3-02).

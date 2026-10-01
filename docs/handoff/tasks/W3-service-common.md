@@ -12,12 +12,22 @@ Mỗi task card service (Sheets, Calendar, Notion, Telegram, Jira) chỉ ghi ph�
 
 Một PR gồm đủ các phần sau, theo cấu trúc file W3-00 đã tạo:
 
-1. **Tool schema** `packages/tool-schemas/src/<id>.ts` và định nghĩa service `packages/tool-schemas/src/services/<id>.ts`: `scopeKey`, `scopeLabel`, `scopePattern`, `credentialFields`, `intentKeywords`, `fallbackIntentKeywords`, `gatherRules` nếu cần. Mô tả tool bằng tiếng Việt như các tool hiện có. Tham số chỉ tới tài nguyên có `x-resource`.
+1. **Tool schema** `packages/tool-schemas/src/<id>.ts` và định nghĩa service `packages/tool-schemas/src/registry/<id>.ts`: `scopeKey`, `scopeLabel`, `scopePattern`, `credentialFields`, `intentKeywords`, `fallbackIntentKeywords`, `gatherRules` nếu cần. Mô tả tool bằng tiếng Việt như các tool hiện có. Tham số chỉ tới tài nguyên có `x-resource`.
 2. **Adapter** `packages/tool-adapters/src/<id>/`: kế thừa `BaseAdapter`, rate limiter dùng chung, `AbortSignal` cho mọi request.
 3. **Transport** `apps/chat-api/src/services/transports/<id>.ts`: `createAdapter`, `checkConnection` (một lệnh đọc nhẹ, không ghi).
 4. **Sandbox** `apps/chat-api/src/sandbox/fake-results/<id>.ts` và một kịch bản `SANDBOX_SCENARIO=<id>_slack`: service mới + Slack, có phụ thuộc dữ liệu (output step trước đi vào step sau qua `$ref`/`$template`).
 5. **Browser E2E** trong `scripts/test-v3-browser.mjs` cho kịch bản trên.
 6. **Chạy thật:** một mục mới trong `evaluations/live-execution/live-services.ts`; tên biến env (không có giá trị) thêm vào `.env.example`.
+
+## Hợp đồng output với planner (bắt buộc)
+
+Planner chỉ giữ một số trường của kết quả search trong bộ nhớ grounding (`KEPT_FIELDS` trong `packages/planner/src/search.ts`: `id`, `name`, `fullName`, `number`, `title`, `boardId`, `boardIds`, `url`, và `key` sau W3-00). Thực thể thiếu `id` bị **bỏ hẳn**; trường không có trong danh sách thì model không thấy. Vì vậy:
+
+- Mỗi phần tử do tool đọc trả về có `id` (chuỗi hoặc số) và một tên hiển thị `title` hoặc `name`. Đổi tên trường của API cho khớp: ví dụ `summary` → `title`, `sheetId` → `id`.
+- `x-resource-field` (nếu có) phải là một trường trong `KEPT_FIELDS`.
+- Prefetch (`listDirectory` trong `planner.ts`) gọi tool `listable` với `{ query: '', limit: 10 }`. Tool con `listable` phải có **đúng một** tham số bắt buộc mang `x-resource`, và prefetch truyền `id` của thực thể cha vào tham số đó. Tool có tham số bắt buộc khác (ví dụ khoảng thời gian) hoặc cần trường khác `id` của cha thì **không** đặt `listable`.
+- Tool `listable` phải nhận `query` rỗng và `limit` (tối đa 10).
+- Service mới chỉ hỗ trợ chế độ tìm kiếm `PLANNER_SEARCH_MODE=llm` (mặc định khi chạy thật). Không bắt buộc `gatherRules` cho chế độ `regex`; ghi rõ điều này trong PR.
 
 ## Quy tắc an toàn bắt buộc
 
@@ -32,9 +42,9 @@ Một PR gồm đủ các phần sau, theo cấu trúc file W3-00 đã tạo:
 
 - Bắt buộc có tên service (`id` và `name`) làm từ khóa. Thêm từ khóa khác chỉ khi nó **chỉ** gợi tới service này.
 - Không dùng từ trong danh sách cấm của test bất biến (W3-00). Từ chung chung của lĩnh vực đặt vào `fallbackIntentKeywords` (chỉ dùng khi không service nào khác khớp).
-- Test định tuyến bắt buộc, chạy với **tất cả** service đã đăng ký, gồm cả trường hợp service mới **chưa cấu hình**:
+- Bộ câu hồi quy định tuyến của W3-00 (`evaluations/golden-v2/routing.test.ts`) phải giữ nguyên snapshot. Nếu đăng ký service mới làm snapshot đổi, cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR; reviewer sẽ không chấp nhận câu của bộ 50/18 bị chuyển thành `[]` khi service mới chưa cấu hình.
+- Test định tuyến riêng của service, chạy với **tất cả** service đã đăng ký, gồm cả khi service mới **chưa cấu hình**:
   - câu nêu tên service mới → chọn service mới;
-  - các câu mẫu của service cũ (lấy từ `MissionControlLaunchpad.tsx` và 5 câu bất kỳ trong golden set 50 câu) → **không** chọn service mới và **không** bị từ chối khi service mới chưa cấu hình;
   - các ca dễ nhầm ghi trong task card của service.
 
 ## Tiêu chí nghiệm thu chung
@@ -47,7 +57,8 @@ Một PR gồm đủ các phần sau, theo cấu trúc file W3-00 đã tạo:
 - [ ] Test `normalizeAllowedScope` với `scopePattern` của service (hợp lệ, sai dạng, rỗng).
 - [ ] Test API: lưu credentials, `GET /api/services` trả đúng `credentialFields`/`scopeLabel`, không bao giờ trả lại giá trị bí mật.
 - [ ] Test planner: tool của service chỉ có trong catalog khi service đã cấu hình; grounding từ chối ID tài nguyên không có trong kết quả search.
-- [ ] Test định tuyến như mục trên.
+- [ ] Test định tuyến như mục trên; bộ câu hồi quy định tuyến đạt.
+- [ ] Test hợp đồng output: mọi tool đọc trả phần tử có `id` và `title`/`name`; tool `listable` chạy được với `{ query: '', limit: 10 }` (và `id` của cha nếu là tool con).
 - [ ] Browser E2E kịch bản `<id>_slack`: duyệt plan → mọi step `succeeded`, giá trị từ step trước có trong step sau (kiểm `output_json` trong PostgreSQL).
 - [ ] Toàn bộ kịch bản browser cũ vẫn đạt.
 - [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.

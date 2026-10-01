@@ -24,13 +24,14 @@
 | Tool | Loại | Input | Output |
 |---|---|---|---|
 | `sheets.list_spreadsheets` | read, `discovers: 'spreadsheet'`, `listable` | `query` (có thể rỗng), `limit` ≤ 10 | `{ id, title, url }` của spreadsheet trong allowlist, lọc theo tên |
-| `sheets.list_sheets` | read, `discovers: 'sheet'` | `spreadsheetId` (`x-resource: 'spreadsheet'`) | `{ sheetId, title, spreadsheetId }[]` |
+| `sheets.list_sheets` | read, `discovers: 'sheet'`, `listable` (con của spreadsheet) | `spreadsheetId` (`x-resource: 'spreadsheet'`), `query` (có thể rỗng), `limit` ≤ 10 | `{ id, title, spreadsheetId }[]`; `id` là `sheetId` của Google đổi tên |
 | `sheets.read_range` | read | `spreadsheetId`, `range` (A1, ví dụ `Tasks!A1:E20`), `limit` số dòng ≤ 50 | `{ range, values: string[][] }`, cắt theo `limit` |
-| `sheets.append_rows` | write, `riskLevel: 'medium'` | `spreadsheetId`, `sheet` (tên tab), `rows: string[][]` (1–20 dòng, mỗi dòng ≤ 20 ô, mỗi ô ≤ 1000 ký tự) | `{ spreadsheetId, updatedRange, updatedRows, url }` |
+| `sheets.append_rows` | write, `riskLevel: 'medium'` | `spreadsheetId`, `sheet` (tên tab, `x-resource: 'sheet'`, `x-resource-field: 'title'`), `rows: string[][]` (1–20 dòng, mỗi dòng ≤ 20 ô, mỗi ô ≤ 1000 ký tự) | `{ spreadsheetId, updatedRange, updatedRows, url }` |
 
 - `append_rows` dùng `values:append`, `valueInputOption=USER_ENTERED`, `insertDataOption=INSERT_ROWS`.
 - **Chặn chèn công thức:** ô bắt đầu bằng `=`, `+`, `-`, `@` (kể cả sau khoảng trắng đầu) được thêm `'` ở đầu.
 - Không có tool sửa, xóa, định dạng ô hay tạo spreadsheet.
+- Giới hạn đã biết: bộ nhớ grounding không ghi tab thuộc spreadsheet nào (chỉ Trello có `boardId`), nên plan dùng tab của spreadsheet A với spreadsheet B vẫn qua validator; adapter sẽ trả lỗi `VALIDATION`/`NOT_FOUND` khi chạy. Không sửa lõi planner trong task này.
 
 ## Ca định tuyến dễ nhầm (thêm vào test)
 

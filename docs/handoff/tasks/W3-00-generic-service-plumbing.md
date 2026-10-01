@@ -2,65 +2,83 @@
 
 **Trạng thái:** chờ · **Nhánh gợi ý:** `refactor/w3-00-generic-service-plumbing` · **Phụ thuộc:** không · **Chặn:** W3-01 → W3-05 (mọi task thêm service phải chờ task này merge)
 
+Phần giao diện và câu từ chối nêu tên service nằm ở [W3-00b](W3-00b-frontend-and-refusal-naming.md), không chặn các task service, để task này nhỏ và merge sớm.
+
 ## Vì sao làm trước
 
 Nhóm đã chốt (02/10/2026) thêm năm service: Google Sheets, Google Calendar, Notion, Telegram, Jira. Hiện mỗi service mới phải sửa lõi ở nhiều chỗ, trái với tiêu chí 2 mục 1.4 của đặc tả v3 ("thêm tích hợp không yêu cầu thêm nhánh theo tên dịch vụ trong lõi"). Nếu không sửa trước, năm task service sẽ cùng sửa các file lõi, xung đột nhau và mỗi task tự đặt quy tắc riêng.
 
 Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
 
-| Chỗ | Vấn đề |
-|---|---|
-| `packages/tool-schemas/src/types.ts` | `scopeKey: 'boards' \| 'channels' \| 'repos'`; `AllowedScope` có đúng 3 trường; `ToolDefinition.service: 'trello' \| 'slack' \| string` |
-| `packages/tool-adapters/src/base-adapter.ts` | `assertAllowedScope(type: 'board' \| 'channel' \| 'repo', …)` với ba khối `if` gần giống nhau |
-| `apps/chat-api/src/services/registered-services.ts` | `normalizeAllowedScope(scopeKey: 'boards' \| 'channels' \| 'repos', …)`, regex kiểm repo viết riêng cho `repos`; `transports` gom cả ba service trong một file |
-| `apps/chat-api/src/server.ts` (dòng ~221–411) | Adapter giả và kịch bản sandbox viết bằng chuỗi `if (tool === '…')` trong file khởi động server |
-| `evaluations/live-execution/harness.ts` (`readLiveConfig`) | Đọc env riêng cho từng service bằng code lặp |
-| `apps/chat-web/src/components/ReconciliationNotice.tsx:43` | Bảng tên hiển thị `{ trello, slack, github }` viết cố định |
-| `apps/chat-web/src/components/MissionControlLaunchpad.tsx:199` | Placeholder liệt kê `@trello, @slack, @github` |
-| Ô nhập credentials | Chỉ có `text`/`password` một dòng; private key của Google có nhiều dòng |
-| `packages/planner/src/router.ts` + `planner.ts` | Khi câu chat khớp từ khóa của một service đã đăng ký nhưng chưa cấu hình, router trả `[]` và planner từ chối bằng một câu chung chung, không nói service nào thiếu |
-
-Điểm cuối cùng là rủi ro lớn nhất khi có 8 service: router chạy trên **toàn bộ** tin nhắn của người dùng trong hội thoại, nên chỉ cần một từ khóa quá rộng của service chưa cấu hình (ví dụ Telegram dùng "tin nhắn", Calendar dùng "lịch") là mọi yêu cầu Slack hoặc mọi câu có "lịch sử", "du lịch" đều bị từ chối.
+| Chỗ | Vấn đề | Xử lý |
+|---|---|---|
+| `packages/tool-schemas/src/types.ts` | `scopeKey: 'boards' \| 'channels' \| 'repos'`; `AllowedScope` có đúng 3 trường | Task này |
+| `packages/tool-adapters/src/base-adapter.ts` | `assertAllowedScope(type: 'board' \| 'channel' \| 'repo', …)` với ba khối `if` gần giống nhau | Task này |
+| `apps/chat-api/src/services/registered-services.ts` | `normalizeAllowedScope(scopeKey: 'boards' \| 'channels' \| 'repos', …)`, regex repo viết riêng; `transports` gom cả ba service | Task này |
+| `apps/chat-api/src/server.ts` (dòng ~221–411) | Adapter giả và kịch bản sandbox viết bằng chuỗi `if (tool === '…')` | Task này |
+| `evaluations/live-execution/harness.ts` (`readLiveConfig`) | Đọc env riêng cho từng service bằng code lặp | Task này |
+| `apps/chat-web/src/components/SettingsModal.tsx:174` | Nhãn allowlist `{ boards: 'board', channels: 'channel', repos: 'Repository' }` | API trả `scopeLabel` ở task này; frontend dùng ở W3-00b |
+| `apps/chat-web/src/components/ReconciliationNotice.tsx:43`, `MissionControlLaunchpad.tsx:199` | Tên hiển thị và placeholder viết cố định | W3-00b |
+| `packages/planner/src/validator.ts:145–165, 467` | Kiểm tra thành viên đúng board của card (`trello.create_card`, `trello.add_member`) | **Giữ nguyên**, ghi là ngoại lệ (quy tắc nghiệp vụ riêng của Trello, không cản việc thêm service khác) |
+| `packages/planner/src/prompts/system-prompt.ts:37–48` | Ví dụ plan liên service dùng tool Trello/Slack, chỉ hiện khi các tool đó có trong catalog | **Giữ nguyên**, ngoại lệ; sửa prompt sẽ làm mất giá trị so sánh của golden set |
+| `packages/planner/src/search.ts:24` (`KEPT_FIELDS`) | Chỉ giữ `id, name, fullName, number, title, boardId, boardIds, url` khi đưa kết quả search vào bộ nhớ grounding | Thêm `key` (Jira dùng issue key/project key làm định danh); không đổi gì khác |
 
 ## Việc cần làm
 
 1. **Kiểu dữ liệu chung** (`tool-schemas`):
-   - `ServiceDefinition.scopeKey: string`; thêm `scopeLabel` (nhãn cho UI, ví dụ "Board ID", "Spreadsheet ID") và `scopePattern?: RegExp` (định dạng hợp lệ của một phần tử allowlist).
-   - `AllowedScope = Partial<Record<string, string[]>>`; giữ tương thích dữ liệu credentials đã lưu (`{ boards: [...] }` …).
-   - `credentialFields[].type` thêm `'multiline'` (cho private key).
+   - `ServiceDefinition.scopeKey: string`; thêm `scopeLabel` (nhãn cho UI, ví dụ "Board ID") và `scopePattern?: RegExp` (định dạng hợp lệ của một phần tử allowlist).
+   - `AllowedScope = Partial<Record<string, string[]>>`; dữ liệu credentials đã lưu (`{ boards: [...] }` …) giữ nguyên định dạng.
+   - `credentialFields[].type` thêm `'multiline'` (kiểu dữ liệu; phần hiển thị ở W3-00b).
    - `ToolDefinition.service: string`.
-2. **Tách registry theo service:** mỗi service một file `packages/tool-schemas/src/services/<id>.ts` (định nghĩa service) bên cạnh file tool hiện có; `SERVICE_REGISTRY` và `ALL_TOOLS` chỉ còn là danh sách import. Tương tự trong `apps/chat-api`: `src/services/transports/<id>.ts` (createAdapter + checkConnection), `registered-services.ts` chỉ gom lại. Mục đích: task thêm service chỉ thêm file mới và **một dòng** ở mỗi danh sách, xung đột merge tối thiểu.
+   - `GET /api/services` trả thêm `scopeLabel`.
+2. **Tách registry theo service** để task thêm service chỉ thêm file mới và **một dòng** ở mỗi danh sách:
+   - đổi `packages/tool-schemas/src/services.ts` thành thư mục `src/registry/` (một file mỗi service + `index.ts` gom `SERVICE_REGISTRY`); không đặt song song file `services.ts` và thư mục `services/` cùng tên;
+   - `apps/chat-api/src/services/transports/<id>.ts` (createAdapter + checkConnection), `registered-services.ts` chỉ gom lại.
 3. **Allowlist chung:**
    - `normalizeAllowedScope(definition, value)` dùng `definition.scopePattern`; regex `owner/name` chuyển vào định nghĩa GitHub.
-   - `BaseAdapter.assertAllowedScope(scopeKey, value)` một đường code duy nhất; giữ nguyên định dạng thông báo lỗi và `category: 'AUTH_ERROR'`. Sửa các chỗ gọi trong Trello/Slack/GitHub.
-4. **Sandbox tách khỏi `server.ts`:** chuyển adapter giả sang `apps/chat-api/src/sandbox/`: mỗi service một file `fake-results/<id>.ts` (map tên tool → hàm trả kết quả giả), kịch bản (`default`, `three_service`, `clarification`, …) sang `scenarios.ts`. Hành vi không đổi: `npm run test:browser:v3` vẫn 8/8.
-5. **Cấu hình chạy thật:** `readLiveConfig` đọc từ một bảng `evaluations/live-execution/live-services.ts`, mỗi service một mục (tên biến env của credentials, tên biến allowlist, cách kiểm định dạng). Giữ nguyên tên biến env đang dùng.
-6. **Router an toàn hơn khi có nhiều service:**
-   - `classifyIntent` trả thêm danh sách service bị chặn vì chưa cấu hình (ví dụ `{ services, unavailable }`); hai chỗ gọi trong `planner.ts` cập nhật theo.
-   - Câu từ chối **nêu tên** service còn thiếu ("Google Calendar chưa được kết nối…"), dùng `name` trong registry.
-   - Giữ nguyên chính sách hiện tại: nếu câu khớp một service chưa cấu hình thì từ chối, không lặng lẽ chuyển sang service khác.
-   - Thêm **test bất biến của registry**: không từ khóa nào (`intentKeywords`, `fallbackIntentKeywords`) xuất hiện ở hai service; không service nào dùng các từ quá rộng trong danh sách cấm: `lịch`, `bảng`, `trang`, `tin nhắn` (trừ Slack, đang dùng), `message` (trừ Slack), `issue` (trừ GitHub), `task`, `chat`, `nhóm`, `page`, `database`, `sprint`, `board` (trừ Trello). Danh sách cấm đặt trong file test, kèm lý do từng từ.
-7. **Frontend:**
-   - Tên hiển thị service lấy từ `GET /api/services` (hoặc từ tiền tố tên tool tra trong danh sách đó), bỏ bảng viết cố định trong `ReconciliationNotice.tsx`.
-   - Placeholder trong `MissionControlLaunchpad.tsx` dựng từ danh sách service.
-   - Ô credentials kiểu `multiline` hiển thị `textarea`, vẫn che giá trị khi đã lưu.
-   - Trang giới thiệu (`LandingPageView.tsx`) **không** thuộc task này.
-8. **Kiểm tra tĩnh chống viết cố định:** một test quét `packages/planner/src`, `packages/executor/src`, `apps/chat-api/src/routes`, `apps/chat-web/src/components` (trừ file test, trừ ví dụ trong chuỗi hiển thị đã được duyệt trong danh sách ngoại lệ có ghi lý do) và fail nếu thấy chuỗi `'trello'`, `'slack'`, `'github'` dùng để rẽ nhánh.
-9. **Test hợp đồng mở rộng:** trong test (không phải code production), đăng ký một service giả `demo` gồm một tool đọc `demo.list_things` (`listable`, `discovers: 'thing'`) và một tool ghi `demo.create_thing`, cùng transport giả. Chứng minh không cần sửa lõi mà vẫn: hiện trong `GET /api/services`, lưu được credentials và allowlist, router chọn đúng, planner nhận tool, adapter factory tạo adapter, allowlist chặn tài nguyên ngoài danh sách.
+   - `BaseAdapter.assertAllowedScope(scopeKey, value)` một đường code; giữ nguyên định dạng thông báo lỗi và `category: 'AUTH_ERROR'`. Sửa các chỗ gọi trong Trello/Slack/GitHub.
+4. **Sandbox tách khỏi `server.ts`:** chuyển sang `apps/chat-api/src/sandbox/`: mỗi service một file `fake-results/<id>.ts` (map tên tool → hàm trả kết quả giả), kịch bản sang `scenarios.ts`. Hành vi không đổi: `npm run test:browser:v3` vẫn 8/8.
+5. **Cấu hình chạy thật:** `readLiveConfig` đọc từ bảng `evaluations/live-execution/live-services.ts`, mỗi service một mục. Giữ nguyên tên biến env đang dùng.
+6. **`KEPT_FIELDS` thêm `key`** (xem bảng trên), kèm test grounding chấp nhận giá trị lấy theo `x-resource-field: 'key'`.
+7. **Bất biến từ khóa của registry** (test trong `packages/tool-schemas` hoặc `packages/planner`):
+   - không từ khóa nào (`intentKeywords`, `fallbackIntentKeywords`, `id`, `name`) xuất hiện ở hai service; so sánh **nguyên cụm, không phân biệt hoa thường** (cụm `lên lịch` hợp lệ dù `lịch` bị cấm);
+   - **service mới** không được dùng từ trong danh sách cấm: `lịch`, `bảng`, `trang`, `tin nhắn`, `message`, `thông báo`, `báo`, `kênh`, `channel`, `issue`, `issues`, `task`, `tasks`, `chat`, `nhóm`, `page`, `database`, `sprint`, `board`, `list`, `note`, `dòng`, `row`. Từ khóa đang có của Trello, Slack, GitHub được giữ (ghi rõ danh sách ngoại lệ theo service trong test, kèm lý do), không sửa registry cũ.
+8. **Bộ câu hồi quy định tuyến** `evaluations/golden-v2/routing.test.ts` (chạy trong `npm run test:eval:v3`):
+   - kho câu: mọi `prompt` trong `cases.json`, `cases-freeform.json`, và các câu mẫu của `MissionControlLaunchpad.tsx` (chép vào một file fixture trong `evaluations/`, không import từ `apps/chat-web`);
+   - chạy `classifyIntent` với hai cấu hình: (a) catalog chỉ có Trello, Slack, GitHub nhưng registry đủ mọi service đã đăng ký; (b) catalog đủ mọi service;
+   - so với file snapshot đã commit. Task thêm service nào làm snapshot đổi phải cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR. Ở cấu hình (a), không câu nào của bộ 50 và bộ 18 được chuyển từ "có service" thành `[]`.
+9. **Kiểm tra tĩnh chống viết cố định:** test lấy danh sách `id` từ `SERVICE_REGISTRY`, quét `packages/planner/src`, `packages/executor/src`, `apps/chat-api/src/routes`, `apps/chat-api/src/services` (trừ `transports/`), `apps/chat-web/src` (trừ test), và fail nếu gặp:
+   - tên tool dạng `'<id>.<tên>'`;
+   - chuỗi `'<id>'` đứng riêng;
+   - khóa object `<id>:`.
+
+   Ngoại lệ ghi trong một danh sách của test (file + mẫu + lý do): hai ngoại lệ planner ở bảng trên, chuỗi hiển thị trên trang giới thiệu/đăng nhập, và các chỗ W3-00b sẽ gỡ (W3-00b xóa chúng khỏi danh sách ngoại lệ).
+10. **Test hợp đồng mở rộng:** trong test, đăng ký một service giả `demo` gồm `demo.list_things` (`listable`, `discovers: 'thing'`) và `demo.create_thing`, cùng transport giả. Chứng minh không cần sửa lõi mà vẫn:
+    - hiện trong `GET /api/services`;
+    - lưu được credentials và allowlist;
+    - router chọn đúng, planner nhận tool, prefetch gọi `demo.list_things`;
+    - adapter factory tạo adapter, allowlist chặn tài nguyên ngoài danh sách.
 
 ## Không làm trong task này
 
 - Chưa thêm service thật nào.
 - Không đổi tên tool, tên biến env hay định dạng dữ liệu đã lưu trong PostgreSQL.
-- Không sửa prompt của planner.
+- Không sửa prompt của planner; không đổi chính sách định tuyến.
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Toàn bộ test cũ vẫn đạt, không sửa expectation của test cũ trừ chỗ đổi chữ ký hàm (ghi rõ từng chỗ trong PR).
-- [ ] Test mới fail trước khi sửa: router nêu tên service thiếu; bất biến từ khóa của registry; kiểm tra tĩnh chống viết cố định; test hợp đồng với service `demo`; `assertAllowedScope` chung cho scope key bất kỳ; `normalizeAllowedScope` dùng `scopePattern`; ô `multiline`.
-- [ ] Credentials đã lưu trước task này (định dạng `{ boards: [...] }`) vẫn đọc được: test trên PostgreSQL thật.
+- [ ] Toàn bộ test cũ vẫn đạt; test cũ chỉ đổi ở chỗ đổi chữ ký hàm (ghi rõ từng chỗ trong PR).
+- [ ] Test mới fail trước khi sửa:
+  - bất biến từ khóa;
+  - bộ câu hồi quy định tuyến;
+  - kiểm tra tĩnh;
+  - test hợp đồng `demo`;
+  - `assertAllowedScope` chung;
+  - `normalizeAllowedScope` dùng `scopePattern`;
+  - `KEPT_FIELDS` có `key`.
+- [ ] Credentials đã lưu trước task này vẫn đọc được: test trên PostgreSQL thật.
 - [ ] `npm run check` exit 0; `npm run test:browser:v3` 8/8.
-- [ ] PR ghi một bảng "trước/sau": số file phải sửa để thêm một service (trước: liệt kê; sau: chỉ file mới + một dòng ở mỗi danh sách).
+- [ ] PR có bảng "trước/sau": số file phải sửa để thêm một service.
 
 ## Kết quả (agent thi công điền)
 

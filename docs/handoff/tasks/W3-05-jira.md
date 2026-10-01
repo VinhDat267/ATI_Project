@@ -24,12 +24,13 @@ Atlassian đã thay endpoint tìm kiếm cũ (`/rest/api/3/search`) bằng endpo
 | Tool | Loại | Input | Output |
 |---|---|---|---|
 | `jira.search_projects` | read, `discovers: 'project'`, `listable` | `query` (có thể rỗng), `limit` ≤ 10 | `{ key, id, name }` của project trong allowlist |
-| `jira.search_issues` | read, `discovers: 'jira_issue'` | `projectKey` (`x-resource: 'project'`, `x-resource-field: 'key'`), `query` (tùy chọn), `limit` ≤ 20 | `{ issues: [{ key, summary, status, url }] }` |
-| `jira.create_issue` | write, `riskLevel: 'medium'` | `projectKey`, `summary` (1–255), `description` (tùy chọn, văn bản thuần ≤ 4000), `issueType` (tùy chọn, mặc định `Task`) | `{ key, id, url }` |
+| `jira.search_issues` | read, `discovers: 'jira_issue'` | `projectKey` (`x-resource: 'project'`, `x-resource-field: 'key'`), `query` (tùy chọn), `limit` ≤ 20 | `{ issues: [{ id, key, title, status, url }] }` (`title` ← `summary`; thiếu `id` thì planner bỏ cả thực thể). Không `listable` (prefetch truyền `id` của project, không phải `key`) |
+| `jira.create_issue` | write, `riskLevel: 'medium'` | `projectKey`, `summary` (1–255), `description` (tùy chọn, văn bản thuần ≤ 4000), `issueType` (tùy chọn) | `{ key, id, url }` |
 | `jira.add_comment` | write, `riskLevel: 'medium'` | `issueKey` (`x-resource: 'jira_issue'`, `x-resource-field: 'key'`), `body` (1–4000) | `{ id, issueKey, url }` |
 
 - **JQL do adapter dựng**, model không bao giờ gửi JQL: `project = "<KEY>" AND text ~ "<query đã escape>" ORDER BY updated DESC`. Escape `\` và `"`; có test chèn kiểu `x" OR project = OTHER OR text ~ "y`.
-- `create_issue`: kiểm `issueType` có trong project (đọc danh sách issue type của project) trước khi ghi; không có → `VALIDATION`.
+- `create_issue`: đọc danh sách issue type của project trước khi ghi. Có `issueType` mà không thuộc project → `VALIDATION`, thông báo kèm các tên hợp lệ. Không có `issueType` → dùng loại tên `Task` nếu project có, không thì loại chuẩn (không phải sub-task) đầu tiên; tên loại có thể khác nhau giữa các site, không viết cố định.
+- `search_issues`: `query` rỗng thì bỏ điều kiện `text ~`. Ký tự đặc biệt của tìm kiếm văn bản (`+ - & | ! ( ) { } [ ] ^ ~ * ? \ :`) phải được escape hoặc bỏ để Jira không trả lỗi 400.
 - `add_comment`: tiền tố của `issueKey` phải là project trong allowlist; ngoài ra đọc issue để xác nhận project thật (issue có thể đã bị chuyển project) **trước** khi ghi.
 - Văn bản thuần chuyển thành ADF đơn giản (đoạn văn), không diễn giải wiki markup.
 - Không có tool chuyển trạng thái, gán người, xóa issue hay comment.
@@ -48,9 +49,10 @@ Kịch bản `jira_slack`: tạo issue Jira → báo Slack kèm `key` và `url` 
 ## Tiêu chí riêng (ngoài tiêu chí chung)
 
 - [ ] Test `siteUrl`: chấp nhận đúng dạng; từ chối `http://`, có path, có cổng, host khác (`evil.com`, `x.atlassian.net.evil.com`), có `@`.
-- [ ] Test JQL escape với chuỗi chèn; JQL gửi đi luôn có `project = "<KEY>"` thuộc allowlist.
+- [ ] Test JQL escape với chuỗi chèn và ký tự đặc biệt; `query` rỗng không có `text ~`; JQL gửi đi luôn có `project = "<KEY>"` thuộc allowlist.
 - [ ] Test `add_comment` từ chối issue có tiền tố ngoài allowlist (số lần gọi `fetch` = 0) và issue đã chuyển sang project ngoài allowlist (không ghi).
-- [ ] Test `create_issue` từ chối `issueType` không có trong project trước khi ghi.
+- [ ] Test `create_issue` từ chối `issueType` không có trong project trước khi ghi; chọn loại mặc định đúng khi project không có `Task`.
+- [ ] Test grounding: `projectKey`/`issueKey` lấy theo `x-resource-field: 'key'` được chấp nhận khi đã xuất hiện trong kết quả search, bị từ chối khi chưa.
 
 ## Kết quả (agent thi công điền)
 

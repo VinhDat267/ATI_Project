@@ -19,9 +19,9 @@
 
 | Tool | Loại | Input | Output |
 |---|---|---|---|
-| `calendar.list_calendars` | read, `discovers: 'calendar'`, `listable` | `query` (có thể rỗng), `limit` ≤ 10 | `{ id, summary, timeZone }` của lịch trong allowlist |
-| `calendar.list_events` | read | `calendarId` (`x-resource: 'calendar'`), `timeMin`, `timeMax` (ISO 8601 có múi giờ, bắt buộc, khoảng ≤ 31 ngày), `query` (tùy chọn), `limit` ≤ 20 | `{ events: [{ id, summary, start, end, htmlLink }] }`; `singleEvents=true`, `orderBy=startTime` |
-| `calendar.create_event` | write, `riskLevel: 'medium'` | `calendarId`, `summary` (≤ 200 ký tự), `description` (tùy chọn, ≤ 4000), `start`, `end` (ISO 8601 có múi giờ), `location` (tùy chọn) | `{ id, htmlLink, start, end }` |
+| `calendar.list_calendars` | read, `discovers: 'calendar'`, `listable` | `query` (có thể rỗng), `limit` ≤ 10 | `{ id, title, timeZone }` của lịch trong allowlist (`title` lấy từ `summary` của API) |
+| `calendar.list_events` | read | `calendarId` (`x-resource: 'calendar'`), `timeMin`, `timeMax` (ISO 8601 có múi giờ, bắt buộc, khoảng ≤ 31 ngày), `query` (tùy chọn), `limit` ≤ 20 | `{ events: [{ id, title, start, end, url }] }` (`title` ← `summary`, `url` ← `htmlLink`); `singleEvents=true`, `orderBy=startTime`. Không `listable` (cần khoảng thời gian) |
+| `calendar.create_event` | write, `riskLevel: 'medium'` | `calendarId`, `summary` (≤ 200 ký tự), `description` (tùy chọn, ≤ 4000), `start`, `end` (ISO 8601 có múi giờ), `location` (tùy chọn) | `{ id, title, url, start, end }` |
 
 - `create_event` không có `attendees`, không gửi thông báo (`sendUpdates=none`).
 - Kiểm tra trước khi gọi API (lỗi `VALIDATION`, số lần gọi `fetch` = 0): `end` sau `start`; độ dài ≤ 24 giờ; thời điểm có múi giờ rõ ràng.
@@ -35,7 +35,11 @@
 
 ## Sandbox
 
-Kịch bản `calendar_slack`: tạo sự kiện → báo Slack kèm `htmlLink` và giờ bắt đầu của step trước.
+Kịch bản `calendar_slack`: tạo sự kiện → báo Slack kèm `url` và giờ bắt đầu của step trước.
+
+## Ảnh hưởng tới golden set
+
+Câu `rf06` của bộ 50 câu ("Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm") đang có label `refusal` vì trước đây chưa có Calendar. Task này **không sửa label**; W3-06 xử lý trong commit riêng trước khi chạy model. Ghi điều này trong PR.
 
 ## Tiêu chí riêng (ngoài tiêu chí chung)
 

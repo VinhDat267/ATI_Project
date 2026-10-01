@@ -8,6 +8,10 @@
 
 ## Việc cần làm
 
+0. **Sửa label đã lỗi thời, trong commit riêng, trước mọi lần chạy model:**
+   - `rf06` ("Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm") có label `refusal` vì trước đây chưa có Calendar. Nếu Calendar còn trong phạm vi, label cũ không còn đúng. Câu này còn yêu cầu mời cả nhóm, trong khi `calendar.create_event` không có `attendees`. Đổi label thành `clarification` hoặc `plan` không mời người là một quyết định nhãn; agent đề xuất, **người dùng chốt** trước khi commit.
+   - Rà lại toàn bộ câu `refusal` và câu nhắc tới dịch vụ "chưa hỗ trợ" trong bộ 50 và bộ 18 theo catalog đã chốt; liệt kê câu nào bị ảnh hưởng.
+   - Báo cáo so sánh với lần đo 01/10 trên các câu **không đổi label**; câu đổi label báo riêng.
 1. **Workspace giả lập:** thêm tài nguyên của từng service mới vào `evaluations/golden-v2/fixtures.ts`, đúng định dạng output của adapter thật (spreadsheet + tab, lịch, database Notion + page, chat Telegram, project + issue Jira). Có cả tên dễ nhầm giữa các service (ví dụ một board Trello và một spreadsheet cùng tên "Frontend").
 2. **Bộ câu `cases-services.json`**, label đăng ký trước:
    - ít nhất **8 câu cho mỗi service mới** (≥ 40), mỗi service có: chỉ đọc, ghi một bước, liên service có phụ thuộc dữ liệu (`$ref`/`$template`), một câu cần hỏi lại, một câu phải từ chối (thao tác không có tool, ví dụ xóa);
@@ -16,15 +20,15 @@
    - có cả tiếng Việt và tiếng Anh; câu có ngày giờ tương đối cho Calendar.
 3. **Commit label trước khi chạy model lần nào**; ghi commit hash trong báo cáo. Sửa label sau đó chỉ trong commit riêng, có giải thích, không sửa để khớp kết quả.
 4. Cho `run.ts` nhận `EVAL_SET=services`; test kiểm cấu trúc bộ câu như `cases.test.ts` (mọi tool trong label tồn tại trong catalog, mọi ID tài nguyên có trong fixtures).
-5. **Test định tuyến tất định** (không gọi model) trong `packages/planner`: chạy `classifyIntent` trên toàn bộ câu của bộ 50, bộ 18, bộ services và câu mẫu trong `MissionControlLaunchpad.tsx`, với hai cấu hình: đủ 8 service, và chỉ 3 service cũ được cấu hình. Ghi bảng kết quả; ở cấu hình chỉ 3 service cũ, **không câu nào của bộ 50 và bộ 18 được phép bị từ chối** vì từ khóa của service mới.
-6. **Chạy model thật**, mỗi câu 3 lần: bộ services, bộ 50 câu, bộ 18 câu tự do.
+5. **Định tuyến tất định:** mở rộng bộ câu hồi quy của W3-00 (`evaluations/golden-v2/routing.test.ts`) với các câu của `cases-services.json`; kiểm hai cấu hình như W3-00 (chỉ 3 service cũ được cấu hình; đủ mọi service). Ở cấu hình chỉ 3 service cũ, **không câu nào của bộ 50 và bộ 18 bị từ chối** vì từ khóa của service mới.
+6. **Chạy model thật** với `PLANNER_SEARCH_MODE=llm` (chế độ dùng khi chạy thật; service mới không có `gatherRules` cho chế độ `regex`), mỗi câu 3 lần: bộ services, bộ 50 câu, bộ 18 câu tự do.
 7. Cập nhật `evaluations/README.md`: số liệu theo từng service, p50/p95 latency, giới hạn.
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Label commit trước mọi lần chạy model.
+- [ ] Label commit trước mọi lần chạy model; sửa label lỗi thời (như `rf06`) nằm trong commit riêng, có giải thích và người dùng đã chốt.
 - [ ] Bộ services: chọn đúng tool ≥ 85%, chất lượng tham số ≥ 75% (chỉ tiêu của đặc tả), báo **riêng từng service**. Không đạt thì ghi rõ service nào, câu nào; không sửa label cho khớp.
-- [ ] Bộ 50 và bộ 18 không giảm so với lần đo 01/10 (50/50, 18/18); nếu giảm, ghi rõ câu nào và vì sao.
+- [ ] Bộ 50 và bộ 18 không giảm so với lần đo 01/10 (50/50, 18/18) trên các câu không đổi label; nếu giảm, ghi rõ câu nào và vì sao.
 - [ ] Test định tuyến tất định đạt ở cả hai cấu hình.
 - [ ] Bằng chứng golden lưu `docs/ai-evidence/V3-GOLDEN-V2/` (commit như trước).
 - [ ] `npm run test:eval:v3` và `npm run check` exit 0.
