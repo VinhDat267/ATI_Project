@@ -147,4 +147,45 @@ describe('LoginView Component', () => {
     fireEvent.click(backBtn);
     expect(onBackToLanding).toHaveBeenCalledTimes(1);
   });
+
+  it('uses standardized admin credentials when quick-fill button is clicked without onQuickFillAdmin prop', () => {
+    const setEmail = vi.fn();
+    const setPassword = vi.fn();
+
+    render(
+      <LoginView
+        email=""
+        setEmail={setEmail}
+        password=""
+        setPassword={setPassword}
+        isLoggingIn={false}
+        authError={null}
+        onLogin={vi.fn()}
+      />
+    );
+
+    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản Admin/i });
+    fireEvent.click(quickFillBtn);
+
+    expect(setEmail).toHaveBeenCalledWith('admin@localhost.test');
+    expect(setPassword).toHaveBeenCalledWith('Admin@12345678');
+  });
+
+  it('translates generic Invalid email or password error into helpful Vietnamese guidance', () => {
+    render(
+      <LoginView
+        email="admin@test.com"
+        setEmail={vi.fn()}
+        password="wrong"
+        setPassword={vi.fn()}
+        isLoggingIn={false}
+        authError="Invalid email or password"
+        onLogin={vi.fn()}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('Email hoặc mật khẩu không chính xác');
+    expect(alert.textContent).toContain('Điền nhanh tài khoản Admin');
+  });
 });

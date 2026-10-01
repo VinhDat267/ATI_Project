@@ -23,12 +23,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onQuickFillAdmin,
   onBackToLanding,
 }) => {
+  const defaultAdminEmail = (import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test';
+  const defaultAdminPassword = (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678';
+
   const handleQuickFill = () => {
     if (onQuickFillAdmin) {
       onQuickFillAdmin();
     } else {
-      setEmail('admin@localhost.test');
-      setPassword('admin12345678');
+      setEmail(defaultAdminEmail);
+      setPassword(defaultAdminPassword);
     }
   };
 
@@ -143,7 +146,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <svg className="w-4 h-4 shrink-0 mt-0.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="leading-tight text-left">{authError}</span>
+                <span className="leading-tight text-left">
+                  {authError.toLowerCase().includes('invalid email or password')
+                    ? 'Email hoặc mật khẩu không chính xác. Bạn có thể sử dụng nút "Điền nhanh tài khoản Admin" bên dưới để đăng nhập tài khoản quản trị thử nghiệm.'
+                    : authError}
+                </span>
               </div>
             )}
 
@@ -173,20 +180,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </form>
 
           {/* Quick-Fill Admin Helper for Local Testing */}
-          <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-1.5">
+          <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-2">
             <button
               type="button"
               onClick={handleQuickFill}
-              className="w-full py-2 px-3 rounded-xl border border-dashed border-zinc-300 hover:border-blue-400 bg-zinc-50/70 hover:bg-blue-50/40 text-zinc-600 hover:text-blue-700 transition-all text-xs font-medium flex items-center justify-center gap-2 cursor-pointer group"
+              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/80 text-blue-700 transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer group shadow-2xs"
             >
-              <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
               <span>Điền nhanh tài khoản Admin</span>
             </button>
-            <p className="text-[11px] text-zinc-400 text-center">
-              Dùng để thử nghiệm nhanh tài khoản quản trị hệ thống
-            </p>
+            <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 text-[11px] text-zinc-600 flex flex-col gap-1 text-left">
+              <div className="flex items-center gap-1.5 font-medium text-zinc-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                <span>Tài khoản Quản trị viên thử nghiệm:</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-500 pl-3 font-mono">
+                <span>{defaultAdminEmail}</span>
+                <span className="text-zinc-400">/</span>
+                <span>{defaultAdminPassword}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

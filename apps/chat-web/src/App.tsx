@@ -324,8 +324,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         authError={authError}
         onLogin={loginUser}
         onQuickFillAdmin={() => {
-          setEmail('admin@localhost.test');
-          setPassword('ChangeMe123!');
+          setEmail((import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test');
+          setPassword((import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678');
         }}
         onBackToLanding={() => {
           setCurrentView('landing');
