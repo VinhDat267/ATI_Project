@@ -1,9 +1,11 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 01/10/2026, sau khi merge PR #13 (`main` = `29afc4f`). Agent cập nhật: Claude Code.
+**Cập nhật lần cuối:** 01/10/2026, sau khi PR #16 merge vào `docs/agent-handoff` tại `1a0b623`. Agent cập nhật: Codex reviewer.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
+
+> **Phân biệt nhánh:** PR #16 (W2-01) đã merge vào `docs/agent-handoff`, chưa vào `main`. PR #15 vẫn OPEN, head `1a0b623`; `main` vẫn là `29afc4f`. Các thay đổi W2-01 dưới đây có trên nhánh bàn giao; cần merge #15 để đưa chúng vào `main`.
 
 ## 1. Sản phẩm
 
@@ -29,17 +31,19 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Số liệu cũ hơn commit hiện tại của `main` có thể đã lỗi thời.
+Mỗi số liệu ghi kèm ngày đo và commit. Các số liệu W2-01 được đo trên nhánh bàn giao, không phải `main`; các bằng chứng golden/live cũ giữ nguyên ngày đo và giới hạn.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 400/400 | 01/10, `29afc4f` | `npm run test:v3` |
-| Test của bộ đánh giá | 66/66 | 01/10, `29afc4f` | `npm run test:eval:v3` |
-| Browser E2E (sandbox, PostgreSQL thật) | 6/6 kịch bản | 01/10, nhánh PR #13 | `npm run test:browser:v3` |
-| Typecheck, build | đạt | 01/10, nhánh PR #13 | `npm run typecheck:v3`, `npm run build:v3` |
+| Unit + integration v3 | 416/416 | 01/10, `c8d122c`; reviewer chạy lại độc lập | `npm run test:v3` |
+| Test của bộ đánh giá | 66/66 | 01/10, `c8d122c`; reviewer chạy lại độc lập | `npm run test:eval:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 6/6 kịch bản | 01/10, `c8d122c`; agent thi công chạy, CI `5c03224` đạt | `npm run test:browser:v3` |
+| Typecheck, build | đạt | 01/10, `c8d122c`; reviewer chạy lại typecheck, build do agent thi công và CI `5c03224` | `npm run typecheck:v3`, `npm run build:v3` |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
+
+W2-01 có 16 test startup trên PostgreSQL thật, gồm row lock, rollback khi SQL lỗi, idempotence và kill tiến trình thực thi giữa write. Các lần chạy local trên `c8d122c` đều exit 0 sau RED 9 fail / 7 pass. [CI PR #16 tại `5c03224`](https://github.com/VinhDat267/ATI_Project/actions/runs/36817860975) và [CI PR #15 tại merge commit `1a0b623`](https://github.com/VinhDat267/ATI_Project/actions/runs/36818421247) đều SUCCESS. `git diff 5c03224 1a0b623` rỗng: merge giữ nguyên tree đã kiểm. Không chạy lại live model hoặc ghi service thật trong W2-01.
 
 Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần người dùng thật duyệt plan).
 
@@ -49,12 +53,18 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #10–#12: công cụ chạy thật có kiểm soát; giảm latency 31–37 s → 8–10 s; chạy thật qua frontend; sửa plan preview hiện `[object Object]`.
 - #14: thiết kế lại frontend (trang giới thiệu, đăng nhập, lịch sử hội thoại, gợi ý yêu cầu, hộp thoại lỗi).
 - #13 (tuần 1): retry khi model timeout; kiểm tra thành viên đúng board của card; liệt kê bằng query rỗng thay vì đoán tên; ghi thời lượng từng step; lưu plan vào hội thoại để "Sửa qua Chat" hoạt động.
+- #16 (W2-01): đã merge vào `docs/agent-handoff` tại `1a0b623`, chờ #15 vào `main`. Startup đối soát trong transaction trước HTTP: step `running` thành `unknown`, plan cần kiểm tra thành `reconciliation_required`; giữ output đã thành công và step `pending`, không tự chạy lại. Lỗi đối soát thì rollback và không listen; API durable status trả `pausedStepId` theo thứ tự plan. Đặc tả mục 5.8 đã đồng bộ chính sách này. Phạm vi một instance, executor cũ phải đã dừng.
+
+W2-02 đang được triển khai trên nhánh `vinhdat/fix-w2-02-resume-after-restart`; chưa review hoặc merge.
 
 ## 5. Lỗi và hạn chế đã biết
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Server khởi động lại giữa lúc thực thi thì plan kẹt ở `approved`/`partial`, step kẹt ở `running`, retry/skip trả 409 | `apps/chat-api/src/services/execution-service.ts` | Task W2-01, W2-02 |
+| Đối soát startup đã có trên nhánh bàn giao, chưa có trên `main` | `apps/chat-api/src/services/startup-reconciliation.ts` | W2-01 đã merge qua #16; #15 còn OPEN |
+| Sau restart controller chưa được khôi phục; retry/skip/stop chưa tiếp tục được từ dữ liệu đã lưu | `apps/chat-api/src/services/execution-service.ts` | W2-02 đang làm; giữ output thành công, chặn retry `unknown`, plan không có `unknown` chỉ Stop trong luồng recovery |
+| Tải lại UI chưa lấy execution/step snapshot cần đối soát | `apps/chat-web`, API snapshot | Hợp đồng API thuộc W2-02; UI thuộc W2-04 |
+| Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation | Chỉ một API instance, executor cũ đã dừng; ngoài phạm vi W2-01 |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | Task W2-03 |
 | Thời gian dưới tin nhắn người dùng hiện dạng ISO thô | `apps/chat-web` | Task W2-04 |
 | Ở sandbox, `vite.config.ts` đưa `CHAT_ADMIN_PASSWORD` vào bundle frontend; mật khẩu mặc định `Admin@12345678` viết cố định | `apps/chat-web/vite.config.ts`, `LoginView.tsx` | Live mode để trống; đừng dùng mật khẩu này cho tài khoản thật |
