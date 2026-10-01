@@ -13,6 +13,11 @@ import { join, resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
 
+/** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
+const composerSend = (page: import('@playwright/test').Page) => page.locator('form')
+  .filter({ has: page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...') })
+  .getByRole('button', { name: 'Gửi', exact: true });
+
 const email = process.env.CHAT_ADMIN_EMAIL;
 const password = process.env.CHAT_ADMIN_PASSWORD;
 const connectionString = process.env.DATABASE_URL;
@@ -49,7 +54,7 @@ test('live app: chat, preview, human approval and real execution', async ({ page
     const created = page.waitForResponse((response) => response.url().endsWith('/api/conversations') && response.request().method() === 'POST');
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt!);
     const sentAt = Date.now();
-    await page.getByRole('button', { name: 'Gửi' }).click();
+    await composerSend(page).click();
     const body = await (await created).json();
     const conversationId = body.conversation?.id || body.id;
     expect(conversationId).toBeTruthy();
