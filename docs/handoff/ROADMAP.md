@@ -2,7 +2,7 @@
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
-Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
+Mốc 02/10/2026: nhóm chốt thêm năm service (Sheets, Calendar, Notion, Telegram, Jira); tuần 1–2 đã xong sớm nên tuần 3 bắt đầu ngay. Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
 
 | Tuần | Việc | Task card | Trạng thái |
 |---|---|---|---|
@@ -16,9 +16,14 @@ Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-
 | 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ scope/plan live và người dùng duyệt lệnh ghi; chưa chạy live failure |
 | 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | xong, #20 merge vào #18 tại `c30604b`, đã vào `main` qua #18 |
 | 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | xong, #23 tại `1029e55` |
-| 3 (15–21/10) | Google Sheets: tool schema và adapter (service account, allowlist, chặn chèn công thức) | [W3-01](tasks/W3-01-sheets-adapter.md) | chờ |
-| 3 | Google Sheets: đăng ký vào nền tảng (registry, scope, backend, planner, frontend, sandbox bốn service) | [W3-02](tasks/W3-02-sheets-platform-integration.md) | chờ (sau W3-01) |
-| 3 | Google Sheets: golden set riêng, đo lại bộ cũ, chạy thật bốn service | [W3-03](tasks/W3-03-sheets-eval-and-live.md) | chờ (sau W3-02; người dùng chuẩn bị service account) |
+| 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, router nêu tên service thiếu, test bất biến từ khóa | [W3-00](tasks/W3-00-generic-service-plumbing.md) | chờ (làm đầu tiên, chặn W3-01 → W3-05) |
+| 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | chờ (sau W3-00) |
+| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | chờ (sau W3-01) |
+| 3 | Notion | [W3-03](tasks/W3-03-notion.md) | chờ (sau W3-00) |
+| 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | chờ (sau W3-00) |
+| 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | chờ (sau W3-00) |
+| 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | chờ (sau mốc chốt catalog) |
+| 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
@@ -28,6 +33,12 @@ Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-
 
 W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/fencing nhiều replica chưa có. Minor `text_*` streaming của frontend được hoãn: chưa tìm thấy production emitter, reachability chưa chứng minh; cần xử lý timestamp/finalized message trước khi nối producer này. Số liệu hiện tại và giới hạn review/live xem [CURRENT-STATE](CURRENT-STATE.md).
 
-Có thể làm song song: W3-01 với W4-02, W4-04, và phần khung của W4-01, W4-03. W3-02 phải chờ W3-01; W3-03 phải chờ W3-02. Phần việc của con người nên bắt đầu sớm: tạo Google service account (W3-03), các thành viên viết câu hỏi (W4-01), hẹn người tham gia buổi thử (W4-03).
+Yêu cầu chung cho mọi task thêm service: [W3-service-common](tasks/W3-service-common.md).
 
-Thứ tự ưu tiên khi thiếu thời gian: bỏ Google Sheets (tuần 3) trước, không bỏ phục hồi và an toàn ghi (tuần 2).
+Thứ tự và song song: W3-00 làm trước. Sau khi W3-00 merge, W3-01, W3-03, W3-04, W3-05 làm song song (mỗi task chỉ thêm file mới và một dòng ở các danh sách đăng ký); W3-02 chờ W3-01. W3-07 làm từng service ngay khi service đó merge. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
+
+**Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
+
+Phần việc của con người nên bắt đầu ngay: tạo tài khoản và tài nguyên thử nghiệm cho năm service (W3-07), các thành viên viết câu hỏi (W4-01), hẹn người tham gia buổi thử (W4-03).
+
+Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets.

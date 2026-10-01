@@ -1,6 +1,6 @@
 # W4-01 · Bộ đánh giá độc lập do thành viên khác viết
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-01-independent-eval` · **Phụ thuộc:** nên sau W3-03 (để có cả câu Sheets) · **Có phần việc của con người**
+**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-01-independent-eval` · **Phụ thuộc:** khung làm ngay được; câu hỏi nên viết sau mốc chốt catalog (20/10) để có cả các service mới · **Có phần việc của con người**
 
 ## Vấn đề
 

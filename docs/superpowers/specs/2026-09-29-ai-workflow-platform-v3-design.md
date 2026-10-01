@@ -64,6 +64,8 @@ Phạm vi hỗ trợ là các dịch vụ đã được đăng ký, có adapter,
 
 GitHub đã được chọn làm tích hợp thứ ba. Registry, routing theo catalog và cấu hình UI tổng quát đã có mã nguồn và bằng chứng sandbox; nghiệm thu live vẫn **OPEN**. Google Sheets thuộc đợt sau. Xem [trạng thái triển khai và bằng chứng](../../MULTI-SERVICE-SCOPE.md).
 
+**Cập nhật 02/10/2026:** Chủ dự án chốt đợt mở rộng tiếp theo gồm năm dịch vụ: Google Sheets, Google Calendar, Notion, Telegram, Jira. Trước khi thêm, các chỗ còn viết cố định theo tên dịch vụ trong lõi phải được gỡ (task W3-00) để đáp ứng tiêu chí 2. Kế hoạch, mốc chốt catalog và thứ tự bỏ bớt khi thiếu thời gian xem [`docs/handoff/ROADMAP.md`](../../handoff/ROADMAP.md).
+
 ## 2. Nguyên tắc Thiết kế
 
 1. **AI phải làm việc CỦA AI** — nhận đầu vào phi cấu trúc, chuyển thành hành

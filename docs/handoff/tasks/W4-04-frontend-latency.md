@@ -13,7 +13,7 @@ Thời gian từ lúc gửi câu chat tới khi plan preview hiện ra mới đ�
    - **luôn bấm Hủy**, không bao giờ bấm Duyệt. Chế độ này không được ghi gì ra service thật;
    - nghỉ giữa các câu để không vượt rate limit của model.
 2. Lấy thêm thời gian của từng giai đoạn từ phía server nếu có thể đọc được mà không sửa code sản phẩm (ví dụ thời điểm lưu tin nhắn và thời điểm lưu plan trong PostgreSQL), để tách thời gian của model khỏi thời gian của frontend/SSE.
-3. Bộ ≥ 20 câu đo: lấy từ bộ 18 câu tự do và bộ Sheets (W3-03), đổi tài nguyên sang tài nguyên thử nghiệm thật; có cả câu một, hai, ba và bốn service.
+3. Bộ ≥ 20 câu đo: lấy từ bộ 18 câu tự do và bộ services (W3-06), đổi tài nguyên sang tài nguyên thử nghiệm thật; có câu một, hai, ba service và ít nhất 4 câu đi qua ≥ 4 service. Phép đo chính thức chạy sau mốc chốt catalog (20/10).
 4. Chạy chế độ live với model thật, ghi bằng chứng vào `docs/ai-evidence/V3-LIVE-EXECUTION/` (không commit), tóm tắt p50/p95/max theo số service vào `evaluations/README.md`.
 
 ## Tiêu chí nghiệm thu
