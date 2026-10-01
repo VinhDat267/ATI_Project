@@ -29,7 +29,15 @@ Hiện `continueStep` trong `apps/chat-api/src/services/execution-service.ts` c�
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
+- PR: [#18](https://github.com/VinhDat267/ATI_Project/pull/18), base `docs/agent-handoff` tại merge #16 (`1a0b623`). Chưa merge W2-02; #15 còn OPEN khi bàn giao, `main` chưa chứa W2-01.
+- Commit: code/spec/test `eca39896c95f156556a91c33bb656aef30b0946f`; sửa hai finding review `8282826323086b4b2c521fc5ad198f845d8867fd`.
+- Test đã chạy và kết quả (01/10/2026, source tại `8282826`):
+  - Baseline v3 416/416, exit 0. Trước production: executor recovery RED 5 fail / 5, API PostgreSQL/HTTP recovery RED 13 fail / 2 pass (15), exit 1; GREEN 5/5 và 15/15, exit 0. Crash test kill tiến trình executor A thật trước đối soát và phục hồi B; row-lock SQL thật cho hai request, một 200 / một 409 / đúng một dispatch. Output success và `$ref`/`$template` được giữ; UNKNOWN retry bị từ chối, Stop không chạy pending, partial failed retry đúng một lần.
+  - Review độc lập tại `eca3989` đọc diff và chạy lại v3 436/436, eval 66/66, typecheck, exit 0; kết luận chưa đạt với hai lỗi Important. Đã sửa trong một lượt TDD: memory fallback snapshot RED 2 fail → 2/2 GREEN; malformed plan table RED 3 fail / 1 pass → 4/4 GREEN. Hai bộ API recovery cuối cùng 21/21, exit 0. Không tuyên bố reviewer chạy lại fixed head.
+  - `npm run check`: exit 0; v3 **442/442** (11 schema + 53 adapter + 128 planner + 23 executor + 127 API + 100 web), eval **66/66**, typecheck/build exit 0, launcher 1/1, local-env 3/3.
+  - `npm run test:browser:v3`: **6/6**, exit 0; sandbox và PostgreSQL 16 riêng. Không gọi model thật hoặc ghi service thật.
 - Điều chưa làm hoặc khác với task card:
+  - Thêm endpoint owner-scoped `GET /api/conversations/:convId/executions/latest` cho W2-04: plan/execution/steps/output/timing/recoveryActions. Invalid/thiếu progress vẫn đọc được bằng chứng và Stop-only; plan JSON/text bị hỏng không được dùng để authorize continuation.
+  - Restore mới kiểm tra approved hash/text/JSON, matching đầy đủ step, SQL CAS owner/hash/status/xmin rồi đọc lại progress. Stop idle dùng CAS, không cần controller; giữ nguyên UNKNOWN evidence. Plan `reconciliation_required` không có UNKNOWN là Stop-only theo spec 5.8.
+  - Executor cũ phải đã dừng, một API instance; chưa có distributed lease/fencing. Sandbox memory vẫn mất dữ liệu khi process chết. Không đổi schema, frontend, planner/prompt/provider; W2-03 live failure và W2-04 UI chưa chạy trong task này.
+  - PR chờ review/người dùng merge theo handoff protocol. Reviewer cập nhật CURRENT-STATE/ROADMAP sau merge; agent thi công không sửa hai file đó. Nhật ký: [2026-10-01-codex-W2-02.md](../log/2026-10-01-codex-W2-02.md).
