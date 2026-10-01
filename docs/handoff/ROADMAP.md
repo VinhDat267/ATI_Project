@@ -2,7 +2,7 @@
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
-Mốc 02/10/2026: nhóm chốt thêm năm service (Sheets, Calendar, Notion, Telegram, Jira); tuần 1–2 đã xong sớm nên tuần 3 bắt đầu ngay. Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
+Mốc 02/10/2026: nhóm chốt thêm năm service và mảng tài khoản (đăng ký, quên mật khẩu, Google, quản lý tài khoản) (Sheets, Calendar, Notion, Telegram, Jira); tuần 1–2 đã xong sớm nên tuần 3 bắt đầu ngay. Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
 
 | Tuần | Việc | Task card | Trạng thái |
 |---|---|---|---|
@@ -25,6 +25,12 @@ Mốc 02/10/2026: nhóm chốt thêm năm service (Sheets, Calendar, Notion, Tel
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | chờ (sau W3-00) |
 | 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | chờ (sau mốc chốt catalog) |
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
+| 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | chờ (làm đầu tiên trong mảng tài khoản; song song với W3-00) |
+| 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | chờ (sau AUTH-01) |
+| 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | chờ (sau AUTH-01) |
+| 3–4 | Đăng nhập và đăng ký bằng Google | [AUTH-04](tasks/AUTH-04-google-login.md) | chờ (sau AUTH-01) |
+| 3–4 | Trang quản lý tài khoản: hồ sơ, đổi mật khẩu, phương thức đăng nhập, phiên đăng nhập | [AUTH-05](tasks/AUTH-05-account-page.md) | chờ (sau AUTH-01; liên kết Google sau AUTH-04) |
+| 4 | Cấu hình Gmail SMTP, Google OAuth và kiểm tra chạy thật | [AUTH-06](tasks/AUTH-06-auth-live-setup.md) | chờ (sau AUTH-02, AUTH-04; người dùng chuẩn bị) |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
@@ -40,6 +46,8 @@ Thứ tự và song song: W3-00 làm trước. Sau khi W3-00 merge, W3-00b, W3-0
 
 **Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
 
-Phần việc của con người nên bắt đầu ngay: tạo tài khoản và tài nguyên thử nghiệm cho năm service (W3-07), các thành viên viết câu hỏi (W4-01), hẹn người tham gia buổi thử (W4-03).
+**Mảng tài khoản** (chốt 02/10/2026: đăng ký mở nhưng admin duyệt; gửi email bằng Gmail SMTP; thêm đăng nhập Google). Yêu cầu chung: [AUTH-common](tasks/AUTH-common.md). AUTH-01 làm trước, song song với W3-00. Sau đó AUTH-02, AUTH-03, AUTH-04, AUTH-05 làm song song. Đăng ký chỉ mặc định bật khi AUTH-02 và AUTH-03 đều đã merge. Mục tiêu: merge AUTH-01 → AUTH-05 trước 24/10, AUTH-06 trước 28/10.
 
-Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets.
+Phần việc của con người nên bắt đầu ngay: tạo tài khoản và tài nguyên thử nghiệm cho năm service (W3-07); tạo Gmail gửi thư và App Password, OAuth client của Google (AUTH-06); các thành viên viết câu hỏi (W4-01); hẹn người tham gia buổi thử (W4-03).
+
+Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04.

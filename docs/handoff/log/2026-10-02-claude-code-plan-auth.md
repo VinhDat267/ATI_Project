@@ -1,0 +1,27 @@
+# 2026-10-02 · Claude Code · Kiểm tra phần tài khoản và lập kế hoạch AUTH-01 → AUTH-06
+
+- **Yêu cầu:** chủ dự án hỏi hệ thống đã có đăng nhập, tạo tài khoản, quên mật khẩu chưa, và muốn thêm đăng nhập Google, đăng xuất, quản lý tài khoản.
+- **Kiểm tra code trên `main` `2ae2a16`:**
+  - Đã có: đăng nhập email/mật khẩu (PBKDF2 210.000 vòng, timing-safe), access JWT 15 phút, frontend tự refresh (gộp request trong một tab).
+  - Tạo tài khoản và đổi mật khẩu chỉ qua CLI `provision-user`.
+  - Không có: đăng ký, quên mật khẩu, gửi email, Google, trang tài khoản, chặn đoán mật khẩu, cột vai trò (quyền admin chỉ lấy từ env `SERVICE_ADMIN_USER_IDS`).
+  - Đăng xuất chỉ xóa `localStorage`. Refresh token là JWT 7 ngày không lưu ở server, nên **không thu hồi được**, trái với đặc tả §8.1 ("Refresh token hỗ trợ revocation").
+  - `users.password` là `NOT NULL`, nên tài khoản chỉ dùng Google cần migration.
+  - `db/v3/migrate.mjs` chạy lại mọi file SQL mỗi lần, nên migration mới phải idempotent và không có `UPDATE` chạy lặp.
+  - Credentials của service dùng chung cả nhóm (`service_credentials.user_id` NULL), nên mở đăng ký đồng nghĩa người đăng ký dùng được service của nhóm.
+  - Bằng chứng chạy thật `docs/ai-evidence/V3-LIVE-EXECUTION/` chỉ được bỏ qua qua `.git/info/exclude` ở máy nhóm trưởng, không có trong `.gitignore`.
+- **Quyết định của chủ dự án** (hỏi trực tiếp): đăng ký mở nhưng admin duyệt; gửi email bằng Gmail SMTP.
+- **Đã làm:**
+  - viết `tasks/AUTH-common.md` và AUTH-01 → AUTH-06;
+  - thêm mảng tài khoản vào `ROADMAP.md`;
+  - thêm đoạn "Cập nhật 02/10/2026" vào đặc tả §8.1;
+  - W3-07 thêm yêu cầu `git check-ignore` cho thư mục bằng chứng.
+- **Quyết định thiết kế:**
+  - Refresh token ngẫu nhiên lưu hash trong `auth_sessions`, xoay vòng. Dùng lại token cũ thì thu hồi phiên; riêng token liền trước trong 30 giây trả `REFRESH_ROTATED`, vì nhiều tab dùng chung `localStorage`.
+  - Middleware kiểm phiên và trạng thái trong DB, để đăng xuất và khóa tài khoản có hiệu lực ngay.
+  - Google dùng code + PKCE + `state` + `nonce`, `state` lưu ở server, ID token kiểm bằng JWKS và `node:crypto`. Bắt buộc `email_verified`.
+  - Email trùng với tài khoản chưa xác minh thì Google "nhận lại" tài khoản, xóa mật khẩu và thu hồi phiên, để chặn chiếm tài khoản bằng đăng ký trước.
+  - Cờ `AUTH_SIGNUP_ENABLED` mặc định tắt cho tới khi có cả AUTH-02 và AUTH-03.
+  - Browser E2E cho Google dùng máy chủ OIDC giả; chế độ `live` luôn dùng URL thật của Google.
+  - Không có xóa tài khoản hay đổi email trong phạm vi môn học.
+- **Việc tiếp theo đề xuất:** giao AUTH-01 song song với W3-00. Người dùng chuẩn bị Gmail gửi thư (App Password) và OAuth client của Google theo AUTH-06.

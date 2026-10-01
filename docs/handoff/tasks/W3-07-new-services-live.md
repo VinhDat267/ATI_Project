@@ -46,7 +46,7 @@ Sau khi đủ các service còn trong phạm vi:
 - [ ] Mỗi service còn trong phạm vi: một lần đọc thật, một lần ghi thật đã được người dùng duyệt, có đối chiếu kết quả.
 - [ ] Một workflow thật ≥ 4 service (≥ 2 service mới) thành công, có đối chiếu từng bước.
 - [ ] Mỗi service: một ca credentials sai được service thật từ chối và hệ thống phân loại `AUTH_ERROR`, không lộ bí mật.
-- [ ] Bằng chứng lưu `docs/ai-evidence/V3-LIVE-EXECUTION/` (**không commit**); PR chỉ có tóm tắt (thời điểm, plan hash, trạng thái step, ID kết quả đã che bớt nếu cần) và cập nhật `evaluations/README.md`, `docs/MULTI-SERVICE-SCOPE.md`.
+- [ ] Bằng chứng lưu `docs/ai-evidence/V3-LIVE-EXECUTION/` (**không commit**). Thư mục này hiện chỉ được bỏ qua bằng `.git/info/exclude` ở máy nhóm trưởng: chạy `git check-ignore` trước khi lưu; nếu không bị bỏ qua thì thêm vào `.gitignore` trong PR; PR chỉ có tóm tắt (thời điểm, plan hash, trạng thái step, ID kết quả đã che bớt nếu cần) và cập nhật `evaluations/README.md`, `docs/MULTI-SERVICE-SCOPE.md`.
 
 ## Kết quả (agent thi công điền)
 
