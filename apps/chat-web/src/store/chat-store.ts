@@ -7,6 +7,7 @@ import type {
   PlanStatus,
   ClarificationState,
   GatherState,
+  ExecutionSnapshot,
 } from '../types';
 
 export interface ChatStoreState {
@@ -21,6 +22,12 @@ export interface ChatStoreState {
   gatherState: GatherState | null;
   stepStatuses: Record<string, StepState>;
   stepErrors: Record<string, string>;
+  executionSnapshot: ExecutionSnapshot | null;
+  executionRevision: number;
+  planRevision: number;
+  executionLoadError: string | null;
+  setExecutionSnapshot: (snapshot: ExecutionSnapshot | null) => void;
+  setExecutionLoadError: (error: string | null) => void;
 
   // Actions
   setConversationId: (id: string | null) => void;
@@ -57,6 +64,10 @@ const initialState = {
   gatherState: null,
   stepStatuses: {},
   stepErrors: {},
+  executionSnapshot: null,
+  executionRevision: 0,
+  planRevision: 0,
+  executionLoadError: null,
 };
 
 export const useChatStore = create<ChatStoreState>((set) => ({
@@ -66,7 +77,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
   setConversations: (conversations) => set({ conversations }),
 
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => ({ messages: [...state.messages, { ...message, timestamp: message.timestamp || message.created_at || new Date().toISOString() }] })),
 
   addOptimisticMessage: ({ id, content }) =>
     set((state) => ({
@@ -103,9 +114,32 @@ export const useChatStore = create<ChatStoreState>((set) => ({
 
   setIsStreaming: (isStreaming) => set({ isStreaming }),
 
-  setActivePlan: (plan) => set({ activePlan: plan }),
+  // A read-only execution snapshot may hydrate activePlan, but cannot supersede a pending-plan read.
+  setActivePlan: (plan) => set(state => ({ activePlan: plan, planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
 
-  setPlanStatus: (status) => set({ planStatus: status }),
+  setPlanStatus: (status) => set(state => ({ planStatus: status, executionRevision: state.executionRevision + 1 })),
+
+  setExecutionLoadError: (error) => set({ executionLoadError: error }),
+  setExecutionSnapshot: (snapshot) => set(state => {
+    if (!snapshot) return { executionSnapshot: null, stepStatuses: {}, stepErrors: {}, executionRevision: state.executionRevision + 1 };
+    const hasNewPreview = state.activePlan?.id !== snapshot.plan.id && ['preview', 'approving'].includes(state.planStatus);
+    const plan: ActivePlan = {
+      id: snapshot.plan.id,
+      summary: snapshot.plan.summary || 'Quy trình đã lưu',
+      steps: snapshot.plan.steps || snapshot.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId, args: {} })),
+    };
+    return {
+      executionSnapshot: snapshot,
+      executionRevision: state.executionRevision + 1,
+      executionLoadError: null,
+      ...(hasNewPreview ? {} : { activePlan: plan, planStatus: snapshot.execution.status }),
+      stepStatuses: Object.fromEntries(snapshot.steps.map(row => [row.stepId, row.status])),
+      stepErrors: Object.fromEntries(snapshot.steps.flatMap(row => {
+        const error = typeof row.error === 'string' ? row.error : row.error?.message;
+        return error ? [[row.stepId, error]] : [];
+      })),
+    };
+  }),
 
   setClarification: (clarification) =>
     set({ activeClarification: clarification }),
@@ -117,12 +151,12 @@ export const useChatStore = create<ChatStoreState>((set) => ({
     })),
 
   updateStepStatus: (stepId, status, error) =>
-    set((state) => ({
-      stepStatuses: { ...state.stepStatuses, [stepId]: status },
-      stepErrors: error
-        ? { ...state.stepErrors, [stepId]: error }
-        : state.stepErrors,
-    })),
+    set((state) => {
+      const stepErrors = { ...state.stepErrors };
+      if (error) stepErrors[stepId] = error;
+      else if (status === 'running' || status === 'succeeded') delete stepErrors[stepId];
+      return { stepStatuses: { ...state.stepStatuses, [stepId]: status }, stepErrors, executionRevision: state.executionRevision + 1 };
+    }),
 
   reset: () =>
     set((state) => ({
@@ -136,6 +170,10 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       gatherState: null,
       stepStatuses: {},
       stepErrors: {},
+      executionSnapshot: null,
+      executionLoadError: null,
+      executionRevision: state.executionRevision + 1,
+      planRevision: state.planRevision + 1,
       conversations: state.conversations,
     })),
 }));

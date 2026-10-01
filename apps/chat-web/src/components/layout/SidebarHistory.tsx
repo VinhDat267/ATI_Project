@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../store/chat-store';
 import { apiClient } from '../../services/api-client';
-import type { ChatMessage, MessageRole, PlanStatus } from '../../types';
+import type { ChatMessage } from '../../types';
+import { refreshExecutionSnapshot } from '../../services/execution-snapshot';
 
 export interface SidebarHistoryProps {
   currentConversationId: string | null;
@@ -41,6 +42,8 @@ export const SidebarHistory: React.FC<SidebarHistoryProps> = ({
   const conversations = useChatStore((s) => s.conversations);
   const setConversations = useChatStore((s) => s.setConversations);
   const [isLoading, setIsLoading] = useState(false);
+  const selection = useRef(0);
+  useEffect(() => () => { selection.current++; }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,54 +73,52 @@ export const SidebarHistory: React.FC<SidebarHistoryProps> = ({
       return;
     }
 
+    const selected = ++selection.current;
+    const store = useChatStore.getState();
+    store.reset();
+    store.setConversationId(id);
+    const isCurrent = () => selected === selection.current && useChatStore.getState().conversationId === id;
     try {
       const data = await apiClient.getConversation(id);
-      const store = useChatStore.getState();
+      if (!isCurrent()) return;
       const loadedMessages: ChatMessage[] = (data.messages || [])
-        .filter((m: any) => !(m.metadata?.type === 'working_memory' && !m.content))
-        .map((m: any) => ({
+        .filter((m) => !(m.metadata?.type === 'working_memory' && !m.content))
+        .map((m) => ({
           id: m.id,
-          role: (m.role as MessageRole) || 'user',
+          role: m.role || 'user',
           content: m.content || '',
-          timestamp: m.created_at
-            ? new Date(m.created_at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : undefined,
+          timestamp: m.created_at || m.timestamp,
         }));
 
-      store.reset();
-      store.setConversationId(id);
       for (const msg of loadedMessages) {
         store.addMessage(msg);
       }
 
       try {
+        const revision = useChatStore.getState().planRevision;
         const activePlan = await apiClient.getActivePlan(id);
-        if (activePlan) {
+        if (!isCurrent()) return;
+        const current = useChatStore.getState();
+        const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
+          (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
+        if (activePlan && current.planRevision === revision && !alreadyExecuted) {
           store.setActivePlan(activePlan);
-          const rawStatus = (activePlan as any).status || 'preview';
-          const statusMap: Record<string, PlanStatus> = {
-            pending: 'preview',
-            preview: 'preview',
-            approving: 'approving',
-            approved: 'executing',
-            executing: 'executing',
-            completed: 'completed',
-            rejected: 'rejected',
-          };
-          store.setPlanStatus(statusMap[rawStatus] || 'preview');
+          const status = activePlan.status;
+          store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
         }
       } catch (planErr) {
         console.warn('Could not check active plan:', planErr);
       }
+      if (!isCurrent()) return;
+      await refreshExecutionSnapshot(id);
     } catch (err) {
       console.error('Failed to load conversation details:', err);
     }
 
-    onSelectConversation?.(id);
-    onCloseMobileSidebar?.();
+    if (isCurrent()) {
+      onSelectConversation?.(id);
+      onCloseMobileSidebar?.();
+    }
   };
 
   return (

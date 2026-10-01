@@ -22,7 +22,7 @@ describe('Message Item Component', () => {
         role="user"
         content="Tạo task mới"
         status="sending"
-        timestamp="10:42"
+        timestamp={new Date(new Date().setHours(10, 42, 0, 0)).toISOString()}
       />
     );
     expect(screen.getByText('Tạo task mới')).toBeDefined();

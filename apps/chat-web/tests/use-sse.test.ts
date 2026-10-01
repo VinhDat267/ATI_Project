@@ -67,6 +67,18 @@ describe('SSE Client Event Handler', () => {
     expect(useChatStore.getState().planStatus).toBe('completed');
   });
 
+  it.each(['partial', 'reconciliation_required', 'stopped', 'failed'])('preserves actual exec_done status %s', status => {
+    handleSSEEvent('exec_start', '{}', 1);
+    handleSSEEvent('exec_done', JSON.stringify({ status }), 2);
+    expect(useChatStore.getState().planStatus).toBe(status);
+  });
+
+  it('clears a previous step error when retry runs/succeeds', () => {
+    handleSSEEvent('exec_step', JSON.stringify({ stepId: 'step_2', status: 'failed', error: { message: 'Old failure' } }), 1);
+    handleSSEEvent('exec_step', JSON.stringify({ stepId: 'step_2', status: 'running' }), 2);
+    expect(useChatStore.getState().stepErrors.step_2).toBeUndefined();
+  });
+
   it('accumulates gather_progress steps and sets gatherState', () => {
     handleSSEEvent(
       'gather_progress',
@@ -146,5 +158,21 @@ describe('SSE Client Event Handler', () => {
     expect(plan).toBeDefined();
     expect(plan?.steps).toBeInstanceOf(Array);
     expect(plan?.steps).toHaveLength(0);
+  });
+
+  it('does not replay approval controls for an already saved executed plan', () => {
+    useChatStore.getState().setExecutionSnapshot({
+      plan: { id: 'saved', convId: 'c1', status: 'reconciliation_required', summary: 'Saved', steps: [] },
+      execution: { status: 'reconciliation_required' }, steps: [], recoveryActions: ['stop'],
+    });
+    handleSSEEvent('plan_preview', JSON.stringify({ planId: 'saved', summary: 'Old preview', steps: [] }));
+    expect(useChatStore.getState().planStatus).toBe('reconciliation_required');
+  });
+
+  it('does not let an older execution event dismiss a newer pending preview', () => {
+    useChatStore.getState().setActivePlan({ id: 'new', summary: 'New', steps: [] });
+    useChatStore.getState().setPlanStatus('preview');
+    handleSSEEvent('exec_done', JSON.stringify({ planId: 'old', status: 'completed' }));
+    expect(useChatStore.getState().planStatus).toBe('preview');
   });
 });
