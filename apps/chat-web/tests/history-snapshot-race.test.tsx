@@ -58,4 +58,23 @@ describe('history pending plan alongside SSE snapshot connection', () => {
     expect(useChatStore.getState().activePlan?.id).toBe('newest');
     expect(screen.queryByText('Stale')).toBeNull();
   });
+  it('does not restore pending approval for the same already executed snapshot', async () => {
+    const options = await selectHistory(); await connect(options);
+    let finishRead!: (value: ExecutionSnapshot | null) => void;
+    vi.mocked(apiClient.getLatestExecutionSnapshot).mockImplementation(() => new Promise(resolve => { finishRead = resolve; }));
+    await act(async () => finishPreview({ id: 'old', summary: 'Stale pending', status: 'pending', steps: [] }));
+    expect(useChatStore.getState().planStatus).toBe('reconciliation_required');
+    expect(screen.queryByRole('button', { name: /Duyệt kế hoạch/ })).toBeNull();
+    await act(async () => finishRead(saved));
+  });
+  it('does not restore pending approval after SSE has started that execution', async () => {
+    const options = await selectHistory(); await connect(options);
+    act(() => handleSSEEvent('exec_start', JSON.stringify({ planId: 'old' }), undefined, 'c1'));
+    let finishRead!: (value: ExecutionSnapshot | null) => void;
+    vi.mocked(apiClient.getLatestExecutionSnapshot).mockImplementation(() => new Promise(resolve => { finishRead = resolve; }));
+    await act(async () => finishPreview({ id: 'old', summary: 'Stale pending', status: 'pending', steps: [] }));
+    expect(useChatStore.getState().planStatus).toBe('executing');
+    expect(screen.queryByRole('button', { name: /Duyệt kế hoạch/ })).toBeNull();
+    await act(async () => finishRead({ ...saved, execution: { status: 'executing' } }));
+  });
 });
