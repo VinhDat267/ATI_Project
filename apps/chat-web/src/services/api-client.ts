@@ -5,6 +5,7 @@ import type {
   Conversation,
   ServiceInfo,
   User,
+  ExecutionSnapshot,
 } from '../types';
 
 export class ApiClient {
@@ -223,6 +224,15 @@ export class ApiClient {
   }
 
   // --- Executions ---
+  async getLatestExecutionSnapshot(convId: string): Promise<ExecutionSnapshot | null> {
+    try {
+      return await this.request<ExecutionSnapshot>(`/api/conversations/${convId}/executions/latest`);
+    } catch (err: any) {
+      if (err.status === 404) return null;
+      throw err;
+    }
+  }
+
   async getExecutionStatus(planId: string): Promise<any> {
     return this.request<any>(`/api/executions/${planId}/status`);
   }

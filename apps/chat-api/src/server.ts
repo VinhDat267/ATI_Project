@@ -102,45 +102,72 @@ async function bootstrap() {
       listMessages: async (convId: string) => msgMap.get(convId) || [],
     };
 
+    const setMemoryPlanStatus = (plan: any, status: string) => {
+      plan.status = status;
+      plan.revision = String(Number(plan.revision) + 1);
+    };
     planRepo = {
       createPlan: async (data: any) => {
         const id = `plan_${Date.now()}`;
         for (const previous of planMap.values()) {
-          if (previous.conv_id === data.convId && previous.status === 'pending') previous.status = 'superseded';
+          if (previous.conv_id === data.convId && previous.status === 'pending') setMemoryPlanStatus(previous, 'superseded');
         }
-        const row = { id, conv_id: data.convId, plan_json: data.planJson, plan_text: JSON.stringify(data.planJson), plan_hash: data.planHash, status: 'pending', expires_at: data.expiresAt, created_at: new Date() };
+        const row = { id, conv_id: data.convId, plan_json: data.planJson, plan_text: data.planText || JSON.stringify(data.planJson), plan_hash: data.planHash, status: 'pending', expires_at: data.expiresAt, decided_at: null, created_at: new Date(), revision: '1' };
         planMap.set(id, row);
-        return row;
+        return { ...row };
       },
-      getPlan: async (id: string) => planMap.get(id) || null,
+      getPlan: async (id: string) => {
+        const plan = planMap.get(id);
+        return plan ? { ...plan } : null;
+      },
       getPendingPlan: async (convId: string) => {
         for (const p of planMap.values()) {
-          if (p.conv_id === convId && p.status === 'pending') return p;
+          if (p.conv_id === convId && p.status === 'pending' && new Date(p.expires_at).getTime() > Date.now()) return { ...p };
         }
         return null;
       },
-      approvePlan: async (planId: string) => {
+      getLatestExecutedPlan: async (convId: string) => {
+        const statuses = ['approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required', 'completed', 'stopped', 'failed'];
+        const plans = [...planMap.values()].filter(p => p.conv_id === convId && statuses.includes(p.status));
+        plans.sort((a, b) => b.created_at.getTime() - a.created_at.getTime() || b.id.localeCompare(a.id));
+        return plans[0] ? { ...plans[0] } : null;
+      },
+      approvePlan: async (planId: string, expectedHash: string, userId: string) => {
         const p = planMap.get(planId);
-        if (!p || p.status !== 'pending' || new Date(p.expires_at).getTime() <= Date.now()) return false;
-        p.status = 'approved';
+        if (!p || p.plan_hash !== expectedHash || convMap.get(p.conv_id)?.user_id !== userId
+          || p.status !== 'pending' || new Date(p.expires_at).getTime() <= Date.now()) return false;
+        p.decided_at = new Date();
+        setMemoryPlanStatus(p, 'approved');
         return true;
       },
-      rejectPlan: async (planId: string) => {
+      rejectPlan: async (planId: string, userId: string) => {
         const p = planMap.get(planId);
-        if (!p || p.status !== 'pending' || new Date(p.expires_at).getTime() <= Date.now()) return false;
-        p.status = 'rejected';
+        if (!p || convMap.get(p.conv_id)?.user_id !== userId || p.status !== 'pending'
+          || new Date(p.expires_at).getTime() <= Date.now()) return false;
+        p.decided_at = new Date();
+        setMemoryPlanStatus(p, 'rejected');
         return true;
       },
       updatePlanStatus: async (planId: string, status: string) => {
         const p = planMap.get(planId);
-        if (p) p.status = status;
+        if (p) setMemoryPlanStatus(p, status);
+      },
+      claimRecovery: async (snapshot: any, userId: string, nextStatus: 'executing' | 'stopped') => {
+        const p = planMap.get(snapshot.id);
+        if (!p || !p.decided_at || convMap.get(p.conv_id)?.user_id !== userId
+          || p.plan_hash !== snapshot.plan_hash || p.status !== snapshot.status || p.revision !== snapshot.revision
+          || !['partial', 'reconciliation_required'].includes(p.status)) return false;
+        setMemoryPlanStatus(p, nextStatus);
+        return true;
       },
     };
 
     stepRepo = {
       createStep: async (data: any) => {
         const id = `step_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-        const row = { id, ...data, status: 'pending' };
+        const row = { id, plan_id: data.planId, step_id: data.stepId, tool: data.tool,
+          args_json: data.argsJson ?? {}, requested_by: data.requestedBy || 'system', status: 'pending',
+          output_json: null, error_json: null, started_at: null, completed_at: null, duration_ms: null };
         stepMap.set(id, row);
         return row;
       },
@@ -148,13 +175,25 @@ async function bootstrap() {
         const s = stepMap.get(id);
         if (s) {
           s.status = status;
-          if (outputJson) s.output_json = outputJson;
-          if (errorJson) s.error_json = errorJson;
-          if (durationMs) s.duration_ms = durationMs;
+          if (outputJson != null) s.output_json = outputJson;
+          if (status === 'running' || status === 'succeeded') s.error_json = errorJson ?? null;
+          else if (errorJson != null) s.error_json = errorJson;
+          if (status === 'running') {
+            s.started_at = new Date();
+            s.completed_at = null;
+            s.duration_ms = null;
+          } else {
+            if (['succeeded', 'failed', 'skipped', 'unknown'].includes(status)) s.completed_at = new Date();
+            if (durationMs != null) s.duration_ms = durationMs;
+            else if (['succeeded', 'failed', 'unknown'].includes(status) && s.started_at) {
+              s.duration_ms = s.completed_at.getTime() - s.started_at.getTime();
+            }
+          }
         }
         return s;
       },
-      listSteps: async (planId: string) => Array.from(stepMap.values()).filter((s) => s.planId === planId),
+      listSteps: async (planId: string) => Array.from(stepMap.values()).filter(s => s.plan_id === planId)
+        .sort((a, b) => a.step_id.localeCompare(b.step_id)),
     };
 
     credRepo = {

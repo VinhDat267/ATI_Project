@@ -10,6 +10,7 @@ export interface PlanRow {
   expires_at: Date;
   decided_at: Date | null;
   created_at: Date;
+  revision?: string;
 }
 
 export class PlanRepo {
@@ -49,7 +50,7 @@ export class PlanRepo {
   }
 
   async getPlan(id: string): Promise<PlanRow | null> {
-    const res = await this.pool.query('SELECT * FROM plans WHERE id = $1', [id]);
+    const res = await this.pool.query('SELECT *, xmin::text AS revision FROM plans WHERE id = $1', [id]);
     return res.rows[0] || null;
   }
 
@@ -85,5 +86,31 @@ export class PlanRepo {
 
   async updatePlanStatus(planId: string, status: string): Promise<void> {
     await this.pool.query('UPDATE plans SET status = $2 WHERE id = $1', [planId, status]);
+  }
+
+  /** Claim exactly the approved durable snapshot read by the recovery request.
+   * xmin also rejects a stale request if a prior run returned to the same status.
+   */
+  async claimRecovery(plan: PlanRow, userId: string, nextStatus: 'executing' | 'stopped'): Promise<boolean> {
+    if (!plan.revision) return false;
+    const result = await this.pool.query(
+      `UPDATE plans SET status = $6
+       WHERE id = $1 AND plan_hash = $2 AND status = $3 AND xmin::text = $4
+         AND status IN ('partial', 'reconciliation_required') AND decided_at IS NOT NULL
+         AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $5)
+       RETURNING id`,
+      [plan.id, plan.plan_hash, plan.status, plan.revision, userId, nextStatus],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getLatestExecutedPlan(convId: string): Promise<PlanRow | null> {
+    const result = await this.pool.query(
+      `SELECT *, xmin::text AS revision FROM plans
+       WHERE conv_id = $1 AND status IN ('approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required', 'completed', 'stopped', 'failed')
+       ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [convId],
+    );
+    return result.rows[0] ?? null;
   }
 }

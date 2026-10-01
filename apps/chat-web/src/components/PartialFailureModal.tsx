@@ -11,6 +11,9 @@ export interface PartialFailureModalProps {
   onSkip: () => void;
   onStop: () => void;
   onClose?: () => void;
+  busy?: boolean;
+  allowedActions?: Array<'retry' | 'skip' | 'stop'>;
+  allowEdit?: boolean;
 }
 
 export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
@@ -24,6 +27,9 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
   onSkip,
   onStop,
   onClose,
+  busy = false,
+  allowedActions = ['retry', 'skip', 'stop'],
+  allowEdit = true,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [argsText, setArgsText] = useState(() =>
@@ -34,7 +40,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
 
-  const handleClose = onClose || onStop;
+  const handleClose = () => { if (!busy && allowedActions.includes('stop')) (onClose || onStop)(); };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -92,6 +98,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
           </div>
           <button
             type="button"
+            disabled={busy}
+            hidden={!allowedActions.includes('stop')}
             onClick={handleClose}
             aria-label="Đóng hộp thoại"
             className="text-zinc-400 hover:text-zinc-600 text-sm font-semibold p-1 rounded-md"
@@ -123,6 +131,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             </span>
             <button
               type="button"
+              hidden={!allowEdit}
+              disabled={busy}
               onClick={() => setIsEditing(!isEditing)}
               className="text-xs text-[#0071e3] hover:underline cursor-pointer"
             >
@@ -188,6 +198,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
           <button
             type="button"
+            disabled={busy}
+            hidden={!allowedActions.includes('retry')}
             onClick={onRetry}
             className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 px-4 py-2 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
@@ -196,6 +208,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
 
           <button
             type="button"
+            disabled={busy}
+            hidden={!allowEdit || !allowedActions.includes('retry')}
             onClick={handleEditAndRetryClick}
             className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
           >
@@ -204,6 +218,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
 
           <button
             type="button"
+            disabled={busy}
+            hidden={!allowedActions.includes('skip')}
             onClick={onSkip}
             className="text-xs font-medium text-zinc-700 border border-zinc-300 hover:bg-zinc-100 px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
           >
@@ -212,6 +228,8 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
 
           <button
             type="button"
+            disabled={busy}
+            hidden={!allowedActions.includes('stop')}
             onClick={onStop}
             className="text-xs font-medium text-red-500 hover:bg-red-50 px-3.5 py-2 rounded-full transition cursor-pointer ml-auto"
           >

@@ -108,7 +108,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
                 </div>
 
                 {step.output && (
-                  <div className="mt-1 text-xs text-[#0066cc] font-mono hover:underline cursor-pointer">
+                  <div className="mt-1 text-xs text-[#0066cc] font-mono break-all whitespace-pre-wrap">
                     {step.output}
                   </div>
                 )}

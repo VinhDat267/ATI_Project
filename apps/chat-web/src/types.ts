@@ -7,6 +7,8 @@ export interface ChatMessage {
   content: string;
   status?: MessageStatus;
   timestamp?: string;
+  created_at?: string;
+  metadata?: { type?: string };
 }
 
 export type StepState = 'pending' | 'running' | 'succeeded' | 'failed' | 'paused' | 'skipped' | 'unknown';
@@ -21,6 +23,7 @@ export interface PlanStep {
 
 export interface ActivePlan {
   id?: string;
+  status?: PlanStatus | 'pending' | 'approved';
   kind?: 'plan';
   summary: string;
   steps: PlanStep[];
@@ -51,7 +54,23 @@ export interface User {
   name: string;
 }
 
-export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected';
+export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected' | 'partial' | 'reconciliation_required' | 'stopped' | 'failed';
+
+export interface ExecutionSnapshot {
+  plan: Omit<Partial<ActivePlan>, 'status'> & { id: string; convId: string; status: string };
+  execution: { status: PlanStatus; pausedStepId?: string };
+  steps: Array<{
+    stepId: string;
+    tool: string;
+    status: StepState;
+    output?: unknown;
+    error?: { message?: string } | string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    durationMs?: number | null;
+  }>;
+  recoveryActions: Array<'retry' | 'skip' | 'stop'>;
+}
 
 export interface ClarificationState {
   question: string;

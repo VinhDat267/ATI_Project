@@ -21,10 +21,14 @@ export class ExecutionController {
     this.onStepUpdate = options.onStepUpdate;
 
     for (const step of this.steps) {
-      this.stepStates.set(step.id, {
+      const saved = options.initialStates && Object.hasOwn(options.initialStates, step.id)
+        ? options.initialStates[step.id] : undefined;
+      if (saved?.status === 'running') throw new Error('Cannot restore running progress before reconciliation');
+      this.stepStates.set(step.id, saved ? { ...saved, stepId: step.id } : {
         stepId: step.id,
         status: 'pending',
       });
+      if (saved?.status === 'succeeded') this.stepOutputs.set(step.id, saved.output);
     }
   }
 
@@ -60,6 +64,10 @@ export class ExecutionController {
     return this.isRunning;
   }
 
+  isStopped(): boolean {
+    return this.stopped;
+  }
+
   getOutputs(): StepOutputs {
     return new Map(this.stepOutputs);
   }
@@ -89,6 +97,15 @@ export class ExecutionController {
         // Skip if already succeeded or skipped
         if (currentState?.status === 'succeeded' || currentState?.status === 'skipped') {
           continue;
+        }
+        // Restored failures require an explicit decision. Continuing past one
+        // paused step must never replay another uncertain or failed operation.
+        if (currentState?.status === 'failed' || currentState?.status === 'unknown') {
+          return {
+            status: currentState.status === 'unknown' ? 'reconciliation_required' : 'partial',
+            pausedAtStepId: step.id,
+            error: currentState.error,
+          };
         }
 
         // Check dependsOn dependencies: must be either succeeded or skipped

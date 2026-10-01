@@ -12,6 +12,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useChatStore.getState().reset();
+  vi.spyOn(apiClient, 'getLatestExecutionSnapshot').mockResolvedValue(null);
 });
 
 describe('SidebarHistory Component', () => {
