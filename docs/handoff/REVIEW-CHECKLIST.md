@@ -15,8 +15,11 @@ Dùng khi review PR của bất kỳ agent nào. Kết luận mặc định là 
 
 ## 3. Đúng quy trình
 - [ ] CI xanh trên PR. Không merge khi CI đang chạy hoặc đỏ.
-- [ ] `CURRENT-STATE.md`, phần "Kết quả" của task card và `HANDOFF-LOG.md` được cập nhật trong cùng PR.
+- [ ] Phần "Kết quả" của task card được điền và có một file nhật ký mới trong `docs/handoff/log/`. PR thi công **không** sửa `CURRENT-STATE.md` hay `ROADMAP.md`.
+- [ ] Chỉ có file của task trong PR (không lẫn thay đổi của agent khác đang làm cùng thư mục).
 - [ ] Commit theo Conventional Commits; mô tả PR không có dòng "Generated with …".
 
 ## 4. Kết luận
 Ghi vào PR một trong ba: **Đạt**, **Đạt sau khi sửa nhỏ** (liệt kê), **Chưa đạt** (liệt kê lỗi, mỗi lỗi có file:dòng và cách tái hiện).
+
+Sau khi PR được merge: reviewer cập nhật `CURRENT-STATE.md` (số liệu kèm ngày và commit) và trạng thái trong `ROADMAP.md`.

@@ -15,7 +15,8 @@
 Khi backend khởi động (trước khi nhận request), chạy một bước đối soát trên PostgreSQL:
 
 1. Mọi step `running` của plan chưa kết thúc chuyển thành `unknown`, `error_json` ghi lý do (ví dụ `{"category":"UNKNOWN","message":"Server restarted while this step was running"}`), `completed_at` được ghi. Step `pending` giữ nguyên. Step `succeeded`/`skipped`/`failed` giữ nguyên.
-2. Plan có ít nhất một step `unknown` chuyển thành `reconciliation_required`. Plan `approved` mà mọi step vẫn `pending` (chưa chạy step nào) cũng chuyển thành `reconciliation_required`, vì không biết lần chạy có bắt đầu hay chưa.
+2. Plan có ít nhất một step `unknown` chuyển thành `reconciliation_required`. Plan `approved` mà mọi step vẫn `pending`, **hoặc chưa có dòng nào trong `execution_steps`** (server dừng giữa lúc duyệt và lúc tạo step trong `executePlan`), cũng chuyển thành `reconciliation_required`, vì không biết lần chạy có bắt đầu hay chưa.
+   Plan `partial` chỉ có step `failed` (lỗi đã rõ, không có `unknown`) **giữ nguyên `partial`**: kết quả đã rõ nên W2-02 sẽ cho retry hoặc skip bình thường.
 3. Đối soát phải idempotent: chạy hai lần cho kết quả như chạy một lần.
 4. Ghi log một dòng cho mỗi plan được đối soát (id plan, số step chuyển sang `unknown`); không ghi argument hay output.
 
@@ -31,7 +32,9 @@ Gợi ý vị trí: một hàm trong `apps/chat-api/src/services/` (hoặc repos
 - [ ] Test trên **PostgreSQL thật** (theo mẫu `apps/chat-api/tests/integration/postgres-docker.test.ts`): tạo plan `approved` với step `succeeded`, `running`, `pending` → sau đối soát: plan `reconciliation_required`, step `running` thành `unknown` có `error_json` và `completed_at`, hai step còn lại không đổi.
 - [ ] Test: plan `completed`, `rejected`, `pending` không bị đụng tới.
 - [ ] Test: chạy đối soát hai lần, kết quả như một lần.
-- [ ] Test: `getExecutionStatusDurable` trả `pausedStepId` là step `unknown` đầu tiên.
+- [ ] Test: plan `approved` chưa có dòng nào trong `execution_steps` → `reconciliation_required`.
+- [ ] Test: plan `partial` chỉ có step `failed` → giữ nguyên `partial`, step không đổi.
+- [ ] `getExecutionStatusDurable` hiện chỉ trả `{ status }`; sửa để trả thêm `pausedStepId` (step `unknown` đầu tiên, hoặc step `failed` đầu tiên với plan `partial`), có test.
 - [ ] Các test mới fail trước khi sửa (ghi output fail vào mô tả PR).
 - [ ] `npm run test:v3`, `npm run test:eval:v3`, `npm run typecheck:v3` đạt; browser E2E 6/6.
 

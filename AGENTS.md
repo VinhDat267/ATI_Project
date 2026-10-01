@@ -57,20 +57,12 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
 
 ---
 
-## 4. Hợp đồng Bàn giao & Nghiệm thu (Hand-off & Gate)
+## 4. Bàn giao và nghiệm thu giữa các agent (bắt buộc)
 
-Sau khi hoàn thành mỗi task trong kế hoạch thi công (bao gồm các task mở rộng được bổ sung):
-1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
-2. Reviewer độc lập (`Reality Checker` hoặc `Code Reviewer`) soi xét mã nguồn và chạy lại toàn bộ test suite của package đó.
-3. Nếu phát hiện sai sót → Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.
+Nhiều agent khác nhau cùng làm dự án này và không agent nào nhớ phiên của agent khác. Trí nhớ chung nằm trong `docs/handoff/` (xem `docs/handoff/README.md`).
 
----
-
-## 5. Bàn giao giữa các agent (bắt buộc)
-
-Nhiều agent khác nhau cùng làm dự án này và không agent nào nhớ phiên của agent khác. Trí nhớ chung nằm trong `docs/handoff/`.
-
-1. **Trước khi làm:** đọc `docs/handoff/CURRENT-STATE.md` và 3 mục cuối của `docs/handoff/HANDOFF-LOG.md`. Chạy `git status` và `git log -5 --format='%h %ar %s'`; nếu thư mục đang ở một nhánh có commit mới của agent khác, làm trong `git worktree` riêng, không chuyển nhánh.
-2. **Khi làm:** chỉ làm một task card trong `docs/handoff/tasks/`, trên nhánh riêng, đúng phạm vi. TDD, bằng chứng thật như mục 3.
-3. **Khi xong:** trong cùng PR, cập nhật `CURRENT-STATE.md`, phần "Kết quả" của task card và thêm một mục vào cuối `HANDOFF-LOG.md`. Mô tả PR không có dòng "Generated with …" hay chữ ký AI.
-4. **Merge:** chỉ khi CI xanh và đã được review theo `docs/handoff/REVIEW-CHECKLIST.md`.
+1. **Trước khi làm:** đọc `docs/handoff/CURRENT-STATE.md` và 3 file mới nhất trong `docs/handoff/log/`. Chạy `git status` và `git log -5 --format='%h %ar %s'`; nếu thư mục có thay đổi chưa commit không phải của bạn, hoặc đang ở một nhánh có commit mới của agent khác, làm trong `git worktree` riêng, không chuyển nhánh.
+2. **Khi làm:** chỉ làm một task card trong `docs/handoff/tasks/`, trên nhánh riêng, đúng phạm vi. TDD, bằng chứng thật như mục 3. Khi commit, chỉ `git add` đúng các file của task.
+3. **Khi xong:** trong cùng PR, điền phần "Kết quả" của task card và thêm **một file mới** trong `docs/handoff/log/`. Không sửa `CURRENT-STATE.md` hay `ROADMAP.md` (chỉ reviewer sửa, sau khi merge). Mô tả PR theo `.github/pull_request_template.md`, có file đã sửa, output test thật, commit hash; không có dòng "Generated with …" hay chữ ký AI.
+4. **Review:** reviewer độc lập review theo `docs/handoff/REVIEW-CHECKLIST.md`, chạy lại test ở máy, mặc định kết luận "chưa đạt" cho tới khi có bằng chứng. Phát hiện sai sót thì sửa trước khi sang task tiếp theo.
+5. **Merge:** chỉ khi CI xanh và review đạt. Sau khi merge, reviewer cập nhật `CURRENT-STATE.md` và `ROADMAP.md`.

@@ -2,7 +2,7 @@
 
 **Cập nhật lần cuối:** 01/10/2026, sau khi merge PR #13 (`main` = `29afc4f`). Agent cập nhật: Claude Code.
 
-> Đọc file này trước khi làm bất cứ việc gì. Khi xong một task, sửa các mục bị ảnh hưởng và đổi dòng "Cập nhật lần cuối".
+> Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
 
 ## 1. Sản phẩm
@@ -10,8 +10,7 @@
 Đề tài môn ATI (thay khóa luận): **AI Workflow Automation Platform**. Người dùng mô tả công việc bằng một câu chat; AI chọn tool, lập plan nhiều bước, người dùng duyệt, hệ thống thực thi trên Trello, Slack, GitHub. Mục tiêu: một câu chat thay 4–5 thao tác thủ công trên ít nhất hai hệ thống.
 
 - Khởi động dự án 10/09/2026. Giữa kỳ nộp 30/09. Cuối kỳ (nộp + bảo vệ) dự kiến khoảng 11/11/2026.
-- Nhóm: Nguyễn Đạt Vinh (nhóm trưởng), Nguyễn Thành Long, Vũ Thị Loan, Mai Hải Yến.
-- Báo cáo giữa kỳ: `docs/reports/MIDTERM-PROGRESS-2026-09-30.docx` (chỉ có ở máy nhóm trưởng, chưa commit).
+- Báo cáo môn học chỉ lưu ở máy nhóm trưởng, không commit lên repo công khai.
 
 ## 2. Kiến trúc (v3)
 
@@ -30,15 +29,17 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-| Kiểm tra | Kết quả | Lệnh |
-|---|---|---|
-| Unit + integration v3 | 400/400 | `npm run test:v3` |
-| Test của bộ đánh giá | 66/66 | `npm run test:eval:v3` |
-| Browser E2E (sandbox, PostgreSQL thật) | 6/6 kịch bản | `npm run test:browser:v3` |
-| Typecheck, build | đạt | `npm run typecheck:v3`, `npm run build:v3` |
-| Golden 50 câu, model thật, 1 lần (01/10) | 50/50; p50/p95 5,5/14,8 s | xem `evaluations/README.md` |
-| Golden 18 câu tự do, model thật, 1 lần (01/10) | 18/18; p50/p95 7,8/12,1 s | như trên |
-| Chạy thật qua frontend (30/09) | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | `evaluations/live-app/` |
+Mỗi số liệu ghi kèm ngày đo và commit. Số liệu cũ hơn commit hiện tại của `main` có thể đã lỗi thời.
+
+| Kiểm tra | Kết quả | Đo lúc | Lệnh |
+|---|---|---|---|
+| Unit + integration v3 | 400/400 | 01/10, `29afc4f` | `npm run test:v3` |
+| Test của bộ đánh giá | 66/66 | 01/10, `29afc4f` | `npm run test:eval:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 6/6 kịch bản | 01/10, nhánh PR #13 | `npm run test:browser:v3` |
+| Typecheck, build | đạt | 01/10, nhánh PR #13 | `npm run typecheck:v3`, `npm run build:v3` |
+| Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
+| Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
+| Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
 Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần người dùng thật duyệt plan).
 
@@ -53,7 +54,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Server khởi động lại giữa lúc thực thi thì plan kẹt ở `approved`, step kẹt ở `running`, retry/skip trả 409 | `apps/chat-api/src/services/execution-service.ts` | Task W2-01, W2-02 |
+| Server khởi động lại giữa lúc thực thi thì plan kẹt ở `approved`/`partial`, step kẹt ở `running`, retry/skip trả 409 | `apps/chat-api/src/services/execution-service.ts` | Task W2-01, W2-02 |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | Task W2-03 |
 | Thời gian dưới tin nhắn người dùng hiện dạng ISO thô | `apps/chat-web` | Task W2-04 |
 | Ở sandbox, `vite.config.ts` đưa `CHAT_ADMIN_PASSWORD` vào bundle frontend; mật khẩu mặc định `Admin@12345678` viết cố định | `apps/chat-web/vite.config.ts`, `LoginView.tsx` | Live mode để trống; đừng dùng mật khẩu này cho tài khoản thật |
@@ -65,7 +66,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 - Database: `npm run db:up:v3` (PostgreSQL 16 tại `127.0.0.1:55533`, user/db `ati_v3`). Migration: `npm run db:migrate:v3`.
 - `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`.
-- LLM: model `ag/gemini-3.8-flash` qua cổng 9router ở `http://localhost:20128/v1` (gói thuê bao cá nhân). Rủi ro: tài khoản có thể bị khóa; trước buổi bảo vệ cần có đường dự phòng qua Gemini API chính thức (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`).
+- LLM: model `ag/gemini-3.8-flash` qua một cổng tương thích OpenAI chạy ở máy (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`). Cổng này có thể ngừng hoạt động bất cứ lúc nào; trước buổi bảo vệ cần có đường dự phòng qua Gemini API chính thức (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`).
 - Chạy app: `npm run up` (API cổng 3000, web cổng 5174). Chế độ live: `RUNTIME_MODE=live npm run up`, xem mục "Through the app" trong `evaluations/README.md`.
 - Tài nguyên thử nghiệm thật: Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`. Chỉ ghi ra service thật khi người dùng đã duyệt đúng plan đó.
 
