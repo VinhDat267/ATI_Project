@@ -37,4 +37,81 @@ describe('Chat Store State Management', () => {
     store.updateStepStatus('s1', 'running');
     expect(useChatStore.getState().stepStatuses['s1']).toBe('running');
   });
+
+  it('manages planStatus lifecycle transitions', () => {
+    const store = useChatStore.getState();
+    expect(store.planStatus).toBe('idle');
+
+    store.setPlanStatus('preview');
+    expect(useChatStore.getState().planStatus).toBe('preview');
+
+    store.setPlanStatus('approving');
+    expect(useChatStore.getState().planStatus).toBe('approving');
+
+    store.setPlanStatus('executing');
+    expect(useChatStore.getState().planStatus).toBe('executing');
+
+    store.setPlanStatus('completed');
+    expect(useChatStore.getState().planStatus).toBe('completed');
+
+    store.reset();
+    expect(useChatStore.getState().planStatus).toBe('idle');
+  });
+
+  it('manages activeClarification and gatherState', () => {
+    const store = useChatStore.getState();
+    expect(store.activeClarification).toBeNull();
+    expect(store.gatherState).toBeNull();
+
+    store.setClarification({
+      question: 'Which board?',
+      options: ['Board A', 'Board B'],
+    });
+    expect(useChatStore.getState().activeClarification?.question).toBe('Which board?');
+
+    store.setGatherState({
+      isGathering: true,
+      steps: [{ tool: 'trello.search_boards', status: 'running' }],
+      summary: '1 tool running',
+    });
+    expect(useChatStore.getState().gatherState?.isGathering).toBe(true);
+
+    // Test functional update
+    store.setGatherState((prev) =>
+      prev
+        ? {
+            ...prev,
+            steps: [{ tool: 'trello.search_boards', status: 'completed', result: 'Found 2' }],
+            summary: 'Done',
+          }
+        : null
+    );
+    expect(useChatStore.getState().gatherState?.steps[0].status).toBe('completed');
+    expect(useChatStore.getState().gatherState?.steps[0].result).toBe('Found 2');
+
+    store.reset();
+    expect(useChatStore.getState().activeClarification).toBeNull();
+    expect(useChatStore.getState().gatherState).toBeNull();
+  });
+
+  it('preserves conversations list when reset is invoked', () => {
+    const store = useChatStore.getState();
+    store.setConversations([
+      { id: 'c1', title: 'Conversation 1', updatedAt: '2026-10-01' },
+      { id: 'c2', title: 'Conversation 2', updatedAt: '2026-10-01' },
+    ]);
+    store.setConversationId('c1');
+    store.addOptimisticMessage({ id: 'temp-1', content: 'test' });
+    store.setPlanStatus('executing');
+
+    expect(useChatStore.getState().conversations).toHaveLength(2);
+
+    store.reset();
+
+    expect(useChatStore.getState().conversationId).toBeNull();
+    expect(useChatStore.getState().messages).toHaveLength(0);
+    expect(useChatStore.getState().planStatus).toBe('idle');
+    expect(useChatStore.getState().conversations).toHaveLength(2);
+    expect(useChatStore.getState().conversations[0].id).toBe('c1');
+  });
 });
