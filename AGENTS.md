@@ -7,6 +7,8 @@
 > Dù bạn là agent nào, hãy tuân thủ các quy tắc dưới đây khi đọc/ghi code
 > trong repo `ATI_Project`.
 
+> **Bắt đầu ở đây:** trước khi làm bất cứ việc gì, đọc [`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) (dự án đang ở đâu) và [`docs/handoff/README.md`](docs/handoff/README.md) (cách nhận việc và bàn giao). Việc cần làm nằm trong [`docs/handoff/ROADMAP.md`](docs/handoff/ROADMAP.md) và `docs/handoff/tasks/`.
+
 ## 1. Phạm vi & Quyền lực chuẩn tắc (Scope & Source of Truth)
 
 Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repository `ATI_Project`. Toàn bộ phương pháp luận Superpowers và vai trò Antigravity Master Orchestrator được tự động kế thừa từ **Global Rules**.
@@ -61,3 +63,14 @@ Sau khi hoàn thành mỗi task trong kế hoạch thi công (bao gồm các tas
 1. Subagent thi công gửi báo cáo gồm: file đã tạo/sửa, output chạy test thực tế, commit hash.
 2. Reviewer độc lập (`Reality Checker` hoặc `Code Reviewer`) soi xét mã nguồn và chạy lại toàn bộ test suite của package đó.
 3. Nếu phát hiện sai sót → Yêu cầu sửa ngay lập tức trước khi chuyển sang task tiếp theo.
+
+---
+
+## 5. Bàn giao giữa các agent (bắt buộc)
+
+Nhiều agent khác nhau cùng làm dự án này và không agent nào nhớ phiên của agent khác. Trí nhớ chung nằm trong `docs/handoff/`.
+
+1. **Trước khi làm:** đọc `docs/handoff/CURRENT-STATE.md` và 3 mục cuối của `docs/handoff/HANDOFF-LOG.md`. Chạy `git status` và `git log -5 --format='%h %ar %s'`; nếu thư mục đang ở một nhánh có commit mới của agent khác, làm trong `git worktree` riêng, không chuyển nhánh.
+2. **Khi làm:** chỉ làm một task card trong `docs/handoff/tasks/`, trên nhánh riêng, đúng phạm vi. TDD, bằng chứng thật như mục 3.
+3. **Khi xong:** trong cùng PR, cập nhật `CURRENT-STATE.md`, phần "Kết quả" của task card và thêm một mục vào cuối `HANDOFF-LOG.md`. Mô tả PR không có dòng "Generated with …" hay chữ ký AI.
+4. **Merge:** chỉ khi CI xanh và đã được review theo `docs/handoff/REVIEW-CHECKLIST.md`.
