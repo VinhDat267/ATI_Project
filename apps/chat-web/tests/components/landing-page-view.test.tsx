@@ -81,4 +81,53 @@ describe('LandingPageView Component', () => {
     expect(screen.getByText(/Tự động liên kết công việc theo chuỗi/i)).toBeDefined();
     expect(screen.getByText(/Tự phục hồi gián đoạn thông minh/i)).toBeDefined();
   });
+
+  it('toggles mobile menu with hamburger button and closes when a link is clicked', () => {
+    render(<LandingPageView onGoToLogin={vi.fn()} />);
+
+    // Initially mobile nav is not rendered
+    expect(screen.queryByLabelText('Menu di động')).toBeNull();
+
+    // Click hamburger button to open
+    const hamburger = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+    expect(hamburger.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(hamburger);
+    expect(hamburger.getAttribute('aria-expanded')).toBe('true');
+
+    const mobileNav = screen.getByLabelText('Menu di động');
+    expect(mobileNav).toBeDefined();
+
+    // Mobile nav contains comparison, features, ecosystem, security links
+    expect(mobileNav.querySelector('a[href="#comparison"]')).not.toBeNull();
+    expect(mobileNav.querySelector('a[href="#features"]')).not.toBeNull();
+    expect(mobileNav.querySelector('a[href="#ecosystem"]')).not.toBeNull();
+    expect(mobileNav.querySelector('a[href="#security"]')).not.toBeNull();
+
+    // Clicking a link closes the mobile menu
+    const featureLink = mobileNav.querySelector('a[href="#features"]')!;
+    fireEvent.click(featureLink);
+    expect(screen.queryByLabelText('Menu di động')).toBeNull();
+  });
+
+  it('closes mobile menu on Escape key press and triggers onGoToLogin from mobile menu', () => {
+    const onLogin = vi.fn();
+    render(<LandingPageView onGoToLogin={onLogin} />);
+
+    const hamburger = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+    fireEvent.click(hamburger);
+    expect(screen.getByLabelText('Menu di động')).toBeDefined();
+
+    // Press Escape to close
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Menu di động')).toBeNull();
+
+    // Re-open and click login button in mobile menu
+    fireEvent.click(screen.getByRole('button', { name: /Mở menu điều hướng/i }));
+    const mobileNav = screen.getByLabelText('Menu di động');
+    const mobileLoginBtn = mobileNav.querySelector('button')!;
+    fireEvent.click(mobileLoginBtn);
+    expect(onLogin).toHaveBeenCalled();
+    expect(screen.queryByLabelText('Menu di động')).toBeNull();
+  });
 });

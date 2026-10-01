@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
-import type { StepState } from '../types';
+import type { GatherStep, StepState } from '../types';
 
 const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
 const fallbackConversationKey = '__no_conversation__';
@@ -10,7 +10,12 @@ export function resetSSEState(): void {
   lastEventSeq.clear();
 }
 
-export function handleSSEEvent(event: string, dataStr: string, eventId?: number | string, conversationId?: string): void {
+export function handleSSEEvent(
+  event: string,
+  dataStr: string,
+  eventId?: number | string,
+  conversationId?: string
+): void {
   const store = useChatStore.getState();
   if (conversationId && store.conversationId !== conversationId) {
     return;
@@ -60,12 +65,99 @@ export function handleSSEEvent(event: string, dataStr: string, eventId?: number 
         id: planId,
         summary: planObj.summary,
         thinking: planObj.thinking,
-        steps: planObj.steps,
+        steps: Array.isArray(planObj.steps) ? planObj.steps : [],
         warnings: planObj.warnings,
       });
+      store.setPlanStatus('preview');
+      store.setClarification(null);
+      store.setGatherState((prev) =>
+        prev ? { ...prev, isGathering: false } : null
+      );
       store.setIsStreaming(false);
       break;
     }
+
+    case 'gather_progress': {
+      if (Array.isArray(data.steps)) {
+        store.setGatherState((prev) => ({
+          isGathering: true,
+          steps: data.steps.map((s: any) => ({
+            tool: s.tool,
+            result:
+              s.result ?? (typeof s.output === 'string' ? s.output : undefined),
+            status:
+              s.status === 'started' || s.status === 'running'
+                ? 'running'
+                : 'completed',
+          })),
+          summary:
+            data.summary ||
+            prev?.summary ||
+            `${data.steps.length} công cụ đã kiểm tra`,
+        }));
+      } else if (data.tool) {
+        const tool = data.tool;
+        const status: 'running' | 'completed' =
+          data.status === 'started' || data.status === 'running'
+            ? 'running'
+            : 'completed';
+        const result =
+          typeof data.output === 'string'
+            ? data.output
+            : data.result ||
+              (Array.isArray(data.output)
+                ? `${data.output.length} kết quả`
+                : undefined);
+
+        store.setGatherState((prev) => {
+          const currentSteps = prev ? [...prev.steps] : [];
+          const idx = currentSteps.findIndex((s) => s.tool === tool);
+          const newStep: GatherStep = {
+            tool,
+            status,
+            result: result ?? (idx >= 0 ? currentSteps[idx].result : undefined),
+          };
+          if (idx >= 0) {
+            currentSteps[idx] = newStep;
+          } else {
+            currentSteps.push(newStep);
+          }
+          const completedCount = currentSteps.filter(
+            (s) => s.status === 'completed'
+          ).length;
+          const summary =
+            data.summary ||
+            `${completedCount}/${currentSteps.length} công cụ đã khảo sát`;
+
+          return {
+            isGathering: true,
+            steps: currentSteps,
+            summary,
+          };
+        });
+      } else if (data.summary) {
+        store.setGatherState((prev) =>
+          prev
+            ? { ...prev, summary: data.summary, isGathering: true }
+            : { isGathering: true, steps: [], summary: data.summary }
+        );
+      }
+      break;
+    }
+
+    case 'clarification': {
+      store.setIsStreaming(false);
+      store.setClarification({
+        question: data.question || 'Vui lòng làm rõ yêu cầu:',
+        options: Array.isArray(data.options) ? data.options : [],
+        context: data.context,
+      });
+      break;
+    }
+
+    case 'exec_start':
+      store.setPlanStatus('executing');
+      break;
 
     case 'exec_step':
     case 'step_status':
@@ -80,23 +172,22 @@ export function handleSSEEvent(event: string, dataStr: string, eventId?: number 
 
     case 'exec_done':
       store.setIsStreaming(false);
-      break;
-
-    case 'clarification':
-      store.setIsStreaming(false);
-      store.addMessage({
-        id: `msg_clarify_${Date.now()}`,
-        content: data.question || 'Vui lòng làm rõ yêu cầu:',
-        role: 'assistant',
-      });
+      store.setPlanStatus('completed');
       break;
 
     case 'refusal':
       store.setIsStreaming(false);
+      store.setClarification(null);
+      store.setGatherState((prev) =>
+        prev ? { ...prev, isGathering: false } : null
+      );
+      store.setPlanStatus('rejected');
       store.addMessage({
         id: `refusal_${Date.now()}`,
         role: 'assistant',
-        content: `Từ chối yêu cầu: ${data.reason || 'Yêu cầu không được hỗ trợ'}${data.suggestion ? `\nGợi ý: ${data.suggestion}` : ''}`,
+        content: `Từ chối yêu cầu: ${data.reason || 'Yêu cầu không được hỗ trợ'}${
+          data.suggestion ? `\nGợi ý: ${data.suggestion}` : ''
+        }`,
       });
       break;
 
@@ -157,16 +248,53 @@ export function useSSE(conversationId: string | null, token: string | null) {
         'Last-Event-ID': (() => {
           const cursor = lastEventSeq.get(conversationId);
           if (!cursor) return '0';
-          return cursor.epoch === 'legacy' ? String(cursor.seq) : `${cursor.epoch}:${cursor.seq}`;
+          return cursor.epoch === 'legacy'
+            ? String(cursor.seq)
+            : `${cursor.epoch}:${cursor.seq}`;
         })(),
       },
+      async onopen(res) {
+        if (res.status === 401 || res.status === 403) {
+          ctrl.abort();
+          throw new Error(`SSE auth failed (${res.status})`);
+        }
+        const contentType =
+          res.headers?.get?.('content-type') ||
+          (res.headers as any)?.['content-type'];
+        if (res.ok && contentType?.includes('text/event-stream')) {
+          return;
+        }
+        if (res.status >= 400 && res.status < 500) {
+          ctrl.abort();
+          throw new Error(`SSE client error (${res.status})`);
+        }
+        throw new Error(
+          `Expected text/event-stream, got ${contentType || 'none'} (${res.status})`
+        );
+      },
       onmessage(ev) {
-        handleSSEEvent(ev.event || 'message', ev.data, ev.id || undefined, conversationId);
+        handleSSEEvent(
+          ev.event || 'message',
+          ev.data,
+          ev.id || undefined,
+          conversationId
+        );
       },
       onerror(err) {
-        // Will auto-retry with last-event-id
+        if (
+          ctrl.signal.aborted ||
+          String(err).includes('SSE auth failed') ||
+          String(err).includes('SSE client error') ||
+          String(err).includes('getReader') ||
+          String(err).includes('Expected text/event-stream')
+        ) {
+          throw err;
+        }
         console.warn('SSE connection error, auto-retrying:', err);
       },
+    }).catch((err) => {
+      if (ctrl.signal.aborted) return;
+      console.warn('SSE stream closed:', err?.message || err);
     });
 
     return () => {

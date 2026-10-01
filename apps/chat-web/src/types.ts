@@ -30,8 +30,12 @@ export interface ActivePlan {
 
 export interface Conversation {
   id: string;
-  title: string;
-  updatedAt: string;
+  title?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  created_at?: string;
+  status?: string;
+  user_id?: string;
 }
 
 export interface ServiceConfig {
@@ -39,4 +43,40 @@ export interface ServiceConfig {
   title: string;
   connected: boolean;
   allowedScope?: string[];
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected';
+
+export interface ClarificationState {
+  question: string;
+  options: string[];
+  context?: string;
+}
+
+export interface GatherStep {
+  tool: string;
+  result?: string;
+  status: 'running' | 'completed';
+}
+
+export interface GatherState {
+  isGathering: boolean;
+  steps: GatherStep[];
+  summary: string;
+}
+
+export interface ServiceInfo {
+  id: string;
+  name: string;
+  connected: boolean;
+  allowedScope?: string[];
+  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' }>;
+  scopeKey?: string;
+  scopeLabel?: string;
 }

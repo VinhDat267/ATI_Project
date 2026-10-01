@@ -79,6 +79,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
             type="text"
             value={customText}
             onChange={(e) => setCustomText(e.target.value)}
+            aria-label="Nhập câu trả lời làm rõ yêu cầu"
             placeholder="Nhập câu trả lời..."
             className="flex-1 bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />

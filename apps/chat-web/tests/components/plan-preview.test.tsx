@@ -46,7 +46,7 @@ describe('PlanPreview Component', () => {
     expect(screen.getByText(/Lưu ý: Slack channel là public/i)).toBeDefined();
 
     // Check thinking accordion
-    expect(screen.getByText(/Suy luận của AI/i)).toBeDefined();
+    expect(screen.getByText(/Phân tích & lập luận của AI/i)).toBeDefined();
 
     // Check steps rendered
     expect(screen.getByText('trello.create_card')).toBeDefined();
@@ -57,9 +57,14 @@ describe('PlanPreview Component', () => {
     expect(onApprove).toHaveBeenCalled();
   });
 
-  it('triggers onEdit and onCancel handlers', () => {
+  it('triggers onEdit and onCancel handlers and pre-fills input on Sửa qua Chat', () => {
     const onEdit = vi.fn();
     const onCancel = vi.fn();
+    const chatInput = document.createElement('input');
+    chatInput.id = 'chat-input';
+    document.body.appendChild(chatInput);
+    const focusSpy = vi.spyOn(chatInput, 'focus');
+
     const plan = {
       summary: 'Kế hoạch đơn giản',
       steps: [
@@ -79,9 +84,31 @@ describe('PlanPreview Component', () => {
     const editBtn = screen.getByRole('button', { name: /sửa/i });
     fireEvent.click(editBtn);
     expect(onEdit).toHaveBeenCalled();
+    expect(chatInput.value).toBe('Điều chỉnh kế hoạch: ');
+    expect(focusSpy).toHaveBeenCalled();
 
     const cancelBtn = screen.getByRole('button', { name: /hủy/i });
     fireEvent.click(cancelBtn);
     expect(onCancel).toHaveBeenCalled();
+
+    document.body.removeChild(chatInput);
+  });
+
+  it('disables approve button and shows loading state when isApproving is true', () => {
+    const plan = {
+      summary: 'Kế hoạch đang duyệt',
+      steps: [{ id: 's1', tool: 'trello.create_card', description: 'desc', args: {} }],
+    };
+
+    render(
+      <PlanPreview
+        plan={plan}
+        isApproving={true}
+        onApprove={vi.fn()}
+      />
+    );
+
+    const approveBtn = screen.getByRole('button', { name: /đang kích hoạt/i });
+    expect(approveBtn).toBeDisabled();
   });
 });

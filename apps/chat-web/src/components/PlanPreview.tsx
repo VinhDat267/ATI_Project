@@ -19,6 +19,34 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
 }) => {
   const [showThinking, setShowThinking] = useState(false);
 
+  const handleEdit = () => {
+    onEdit?.();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('chat:prefill', {
+          detail: { text: 'Điều chỉnh kế hoạch: ' },
+        })
+      );
+      const inputEl = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+        '#chat-input, input[placeholder*="Mô tả công việc"], textarea[placeholder*="Mô tả công việc"], [aria-label*="Mô tả công việc"]'
+      );
+      if (inputEl) {
+        const nativeSetter =
+          Object.getOwnPropertyDescriptor(window.HTMLInputElement?.prototype || {}, 'value')?.set ||
+          Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement?.prototype || {}, 'value')?.set;
+        if (nativeSetter) {
+          nativeSetter.call(inputEl, 'Điều chỉnh kế hoạch: ');
+        } else {
+          inputEl.value = 'Điều chỉnh kế hoạch: ';
+        }
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+        inputEl.focus();
+        inputEl.setSelectionRange?.(inputEl.value.length, inputEl.value.length);
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 shadow-md p-5 md:p-6 my-4 max-w-2xl">
       {/* Header Bar */}
@@ -44,7 +72,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
           >
             <span className="flex items-center gap-1.5">
               <span>💭</span>
-              <span>Suy luận của AI (Chain-of-Thought)</span>
+              <span>Phân tích & lập luận của AI</span>
             </span>
             <span className="text-zinc-400 font-normal">
               {showThinking ? 'Ẩn ▲' : 'Xem ▼'}
@@ -96,7 +124,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
         {onEdit && (
           <button
             type="button"
-            onClick={onEdit}
+            onClick={handleEdit}
             className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition cursor-pointer"
           >
             Sửa qua Chat
@@ -109,7 +137,33 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
             disabled={isApproving}
             className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 disabled:opacity-50 px-6 py-2.5 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
-            {isApproving ? 'Đang kích hoạt...' : 'Duyệt kế hoạch ✓'}
+            {isApproving ? (
+              <>
+                <svg
+                  className="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  />
+                </svg>
+                <span>Đang kích hoạt...</span>
+              </>
+            ) : (
+              <span>Duyệt kế hoạch ✓</span>
+            )}
           </button>
         )}
       </div>

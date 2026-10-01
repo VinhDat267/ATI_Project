@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import type { ChatMessage, ActivePlan, StepState, Conversation } from '../types';
+import type {
+  ChatMessage,
+  ActivePlan,
+  StepState,
+  Conversation,
+  PlanStatus,
+  ClarificationState,
+  GatherState,
+} from '../types';
 
 export interface ChatStoreState {
   conversationId: string | null;
@@ -8,6 +16,9 @@ export interface ChatStoreState {
   streamingText: string;
   isStreaming: boolean;
   activePlan: ActivePlan | null;
+  planStatus: PlanStatus;
+  activeClarification: ClarificationState | null;
+  gatherState: GatherState | null;
   stepStatuses: Record<string, StepState>;
   stepErrors: Record<string, string>;
 
@@ -22,6 +33,14 @@ export interface ChatStoreState {
   appendStreamingText: (delta: string) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setActivePlan: (plan: ActivePlan | null) => void;
+  setPlanStatus: (status: PlanStatus) => void;
+  setClarification: (clarification: ClarificationState | null) => void;
+  setGatherState: (
+    gather:
+      | GatherState
+      | null
+      | ((prev: GatherState | null) => GatherState | null)
+  ) => void;
   updateStepStatus: (stepId: string, status: StepState, error?: string) => void;
   reset: () => void;
 }
@@ -33,6 +52,9 @@ const initialState = {
   streamingText: '',
   isStreaming: false,
   activePlan: null,
+  planStatus: 'idle' as PlanStatus,
+  activeClarification: null,
+  gatherState: null,
   stepStatuses: {},
   stepErrors: {},
 };
@@ -83,6 +105,17 @@ export const useChatStore = create<ChatStoreState>((set) => ({
 
   setActivePlan: (plan) => set({ activePlan: plan }),
 
+  setPlanStatus: (status) => set({ planStatus: status }),
+
+  setClarification: (clarification) =>
+    set({ activeClarification: clarification }),
+
+  setGatherState: (gather) =>
+    set((state) => ({
+      gatherState:
+        typeof gather === 'function' ? gather(state.gatherState) : gather,
+    })),
+
   updateStepStatus: (stepId, status, error) =>
     set((state) => ({
       stepStatuses: { ...state.stepStatuses, [stepId]: status },
@@ -91,5 +124,18 @@ export const useChatStore = create<ChatStoreState>((set) => ({
         : state.stepErrors,
     })),
 
-  reset: () => set(initialState),
+  reset: () =>
+    set((state) => ({
+      conversationId: null,
+      messages: [],
+      streamingText: '',
+      isStreaming: false,
+      activePlan: null,
+      planStatus: 'idle',
+      activeClarification: null,
+      gatherState: null,
+      stepStatuses: {},
+      stepErrors: {},
+      conversations: state.conversations,
+    })),
 }));

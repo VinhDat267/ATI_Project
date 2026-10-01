@@ -18,6 +18,7 @@ describe('SSE Client Event Handler', () => {
 
     handleSSEEvent('plan', JSON.stringify({ kind: 'plan', summary: 'Test', steps: [] }), 4);
     expect(useChatStore.getState().activePlan?.summary).toBe('Test');
+    expect(useChatStore.getState().planStatus).toBe('preview');
     expect(useChatStore.getState().isStreaming).toBe(false);
   });
 
@@ -56,5 +57,94 @@ describe('SSE Client Event Handler', () => {
     handleSSEEvent('text_delta', JSON.stringify({ delta: 'new' }), 11, 'conversation-a');
     handleSSEEvent('text_delta', JSON.stringify({ delta: 'old' }), 9, 'conversation-a');
     expect(useChatStore.getState().streamingText).toBe('new');
+  });
+
+  it('handles exec_start and exec_done transitions', () => {
+    handleSSEEvent('exec_start', '{}', 1);
+    expect(useChatStore.getState().planStatus).toBe('executing');
+
+    handleSSEEvent('exec_done', '{}', 2);
+    expect(useChatStore.getState().planStatus).toBe('completed');
+  });
+
+  it('accumulates gather_progress steps and sets gatherState', () => {
+    handleSSEEvent(
+      'gather_progress',
+      JSON.stringify({ tool: 'trello.search_boards', status: 'started' }),
+      1
+    );
+    expect(useChatStore.getState().gatherState?.isGathering).toBe(true);
+    expect(useChatStore.getState().gatherState?.steps[0].tool).toBe('trello.search_boards');
+    expect(useChatStore.getState().gatherState?.steps[0].status).toBe('running');
+
+    handleSSEEvent(
+      'gather_progress',
+      JSON.stringify({ tool: 'trello.search_boards', status: 'completed', result: '3 boards' }),
+      2
+    );
+    expect(useChatStore.getState().gatherState?.steps[0].status).toBe('completed');
+    expect(useChatStore.getState().gatherState?.steps[0].result).toBe('3 boards');
+
+    handleSSEEvent(
+      'gather_progress',
+      JSON.stringify({ tool: 'slack.list_channels', status: 'started' }),
+      3
+    );
+    expect(useChatStore.getState().gatherState?.steps).toHaveLength(2);
+  });
+
+  it('handles clarification events and clears them on plan_preview or refusal', () => {
+    handleSSEEvent(
+      'clarification',
+      JSON.stringify({
+        question: 'Which board?',
+        options: ['Board A', 'Board B'],
+      }),
+      1
+    );
+    expect(useChatStore.getState().activeClarification?.question).toBe('Which board?');
+    expect(useChatStore.getState().activeClarification?.options).toEqual(['Board A', 'Board B']);
+
+    // Receiving plan_preview clears clarification and sets gatherState.isGathering = false
+    handleSSEEvent(
+      'plan_preview',
+      JSON.stringify({
+        plan: { id: 'p1', summary: 'Preview', steps: [] },
+      }),
+      2
+    );
+    expect(useChatStore.getState().activeClarification).toBeNull();
+    expect(useChatStore.getState().planStatus).toBe('preview');
+
+    // Reset clarification and test refusal
+    handleSSEEvent(
+      'clarification',
+      JSON.stringify({ question: 'Another question?', options: [] }),
+      3
+    );
+    expect(useChatStore.getState().activeClarification).not.toBeNull();
+
+    handleSSEEvent(
+      'refusal',
+      JSON.stringify({ reason: 'Out of policy' }),
+      4
+    );
+    expect(useChatStore.getState().activeClarification).toBeNull();
+    expect(useChatStore.getState().planStatus).toBe('rejected');
+  });
+
+  it('safely defaults steps to empty array when plan event omits steps', () => {
+    handleSSEEvent(
+      'plan_preview',
+      JSON.stringify({
+        plan: { id: 'p_no_steps', summary: 'No steps provided' },
+      }),
+      10
+    );
+
+    const plan = useChatStore.getState().activePlan;
+    expect(plan).toBeDefined();
+    expect(plan?.steps).toBeInstanceOf(Array);
+    expect(plan?.steps).toHaveLength(0);
   });
 });
