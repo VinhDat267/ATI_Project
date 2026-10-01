@@ -78,6 +78,47 @@ async function login(page: import('@playwright/test').Page) {
   await expect(page.getByRole('heading', { name: 'AI Workflow Platform' })).toBeVisible();
 }
 
+test('real browser and PostgreSQL: login, chat, approval and execution Continue safe pending after reload', async ({ page }, testInfo) => {
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
+    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
+    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, `Continue E2E ${Date.now()}`]);
+    const plan = { kind: 'plan', summary: 'Chạy tiếp sau restart', steps: [
+      { id: 'step_1', tool: 'trello.create_card', description: 'Thẻ đã tạo', args: { listId: 'list_1', title: 'Saved task' }, dependsOn: [] },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo chưa gửi', args: { channel: '#general', text: { $template: 'Saved ${step_1.output.url}' } }, dependsOn: ['step_1'] },
+      { id: 'step_3', tool: 'slack.send_message', description: 'Thông báo tiếp theo', args: { channel: '#general', text: 'Done' }, dependsOn: ['step_2'] },
+    ], warnings: [] };
+    const text = JSON.stringify(plan);
+    const planId = (await pool.query(`INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, status, expires_at, decided_at)
+      VALUES ($1, $2::jsonb, $3, $4, 'reconciliation_required', now() + interval '30 minutes', now()) RETURNING id`,
+      [convId, text, text, createHash('sha256').update(text).digest('hex')])).rows[0].id;
+    for (const [index, step] of plan.steps.entries()) await pool.query(`INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, output_json, requested_by)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7)`,
+      [planId, step.id, step.tool, JSON.stringify(step.args), index === 0 ? 'succeeded' : 'pending',
+        index === 0 ? JSON.stringify({ id: 'saved-continue-card', url: 'https://trello.com/c/saved-continue' }) : null, owner]);
+    const before = (await pool.query("SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = 'step_1'", [planId])).rows[0];
+    const writes: string[] = [];
+    page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });
+    await page.reload();
+    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
+    await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
+    await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('continue-pending.png'), fullPage: true });
+    await notice.getByRole('button', { name: 'Chạy tiếp các bước còn lại' }).click();
+    await expect(page.getByText('Quy trình đã hoàn thành.')).toBeVisible();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0].status).toBe('completed');
+    const rows = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(rows.map(row => row.status)).toEqual(['succeeded', 'succeeded', 'succeeded']);
+    expect(rows[0]).toEqual(before);
+    expect(rows[1].output_json.text).toBe('Saved https://trello.com/c/saved-continue');
+    expect(writes).toEqual([`/api/executions/${planId}/continue`]);
+    await page.screenshot({ path: testInfo.outputPath('continue-completed.png'), fullPage: true });
+  } finally { await pool.end(); }
+});
+
 test('real browser and PostgreSQL: login, chat, approval and execution', async ({ page }, testInfo) => {
   const pool = new pg.Pool({ connectionString });
   try {

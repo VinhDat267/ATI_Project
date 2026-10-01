@@ -61,7 +61,15 @@ export function restoredProgress(steps: PlanStep[], rows: ExecutionStepRow[]) {
   return { states, dbIds };
 }
 
-export function validateRecoveryAction(status: string, states: Record<string, StepState>, stepId: string, action: 'retry' | 'skip') {
+export function validateRecoveryAction(status: string, states: Record<string, StepState>, stepId: string, action: 'retry' | 'skip' | 'continue') {
+  if (action === 'continue') {
+    const progress = Object.values(states);
+    if (status !== 'reconciliation_required' || !progress.some(state => state.status === 'pending')
+      || progress.some(state => !['pending', 'succeeded', 'skipped'].includes(state.status))) {
+      throw recoveryConflict('Cannot continue unless the reconciled snapshot has only safe pending or finished steps');
+    }
+    return;
+  }
   if (status === 'reconciliation_required' && !Object.values(states).some(state => state.status === 'unknown')) {
     throw recoveryConflict('This reconciled execution can only be stopped');
   }

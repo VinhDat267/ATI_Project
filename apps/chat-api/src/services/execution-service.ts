@@ -159,7 +159,7 @@ export class ExecutionService {
     });
   }
 
-  private async restoreController(plan: PlanRow, userId: string, stepId: string, action: 'retry' | 'skip') {
+  private async restoreController(plan: PlanRow, userId: string, stepId: string, action: 'retry' | 'skip' | 'continue') {
     if (!['partial', 'reconciliation_required'].includes(plan.status) || !this.stepRepo?.listSteps || !this.planRepo.claimRecovery) {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
@@ -219,6 +219,31 @@ export class ExecutionService {
 
   async skipStep(planId: string, stepId: string, userId: string): Promise<any> {
     return this.continueStep(planId, stepId, userId, 'skip');
+  }
+
+  async continueExecution(planId: string, userId: string): Promise<any> {
+    const plan = await this.getOwnedPlan(planId, userId);
+    if (this.activeRuns.has(planId) || this.activeControllers.get(planId)?.isExecuting()) {
+      throw recoveryConflict('Execution is already running');
+    }
+    const controller = await this.restoreController(plan, userId, '', 'continue');
+    this.executionOutcomes.delete(planId);
+    this.sseManager?.emitEvent(plan.conv_id, 'exec_start', { planId });
+    const run = (async () => {
+      try {
+        const summary = await controller.runUntilPause();
+        await this.planRepo.updatePlanStatus(planId, summary.status);
+        this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
+        this.sseManager?.emitEvent(plan.conv_id, 'exec_done', { planId, ...summary });
+        return summary;
+      } catch (err) {
+        await this.markExecutionFailed(planId, plan.conv_id, err);
+        throw err;
+      }
+    })();
+    this.activeRuns.set(planId, run);
+    try { return await run; }
+    finally { if (this.activeRuns.get(planId) === run) this.activeRuns.delete(planId); }
   }
 
   private async continueStep(planId: string, stepId: string, userId: string, action: 'retry' | 'skip'): Promise<any> {
@@ -378,6 +403,10 @@ export class ExecutionService {
         const paused = execution.pausedStepId ? progress.states[execution.pausedStepId] : undefined;
         if (paused?.status === 'unknown') recoveryActions = ['skip', 'stop'];
         else if (paused?.status === 'failed' && execution.status === 'partial') recoveryActions = ['retry', 'skip', 'stop'];
+        else {
+          validateRecoveryAction(plan.status, progress.states, '', 'continue');
+          recoveryActions = ['continue', 'stop'];
+        }
       } catch { /* Invalid or unstarted progress can still be stopped. */ }
     }
     return {

@@ -1,4 +1,7 @@
 import type pg from 'pg';
+import type { PlanRow } from '../db/repositories/plan-repo.js';
+import type { ExecutionStepRow } from '../db/repositories/step-repo.js';
+import { restoredProgress, verifiedRecoverySteps } from './execution-recovery.js';
 
 /** Reconcile a stopped API instance's durable progress before accepting requests.
  * The previous executor must be stopped; this is not a lease for multiple replicas.
@@ -8,8 +11,8 @@ export async function reconcileInterruptedExecutions(pool: pg.Pool): Promise<voi
   const summaries: { planId: string; unknownSteps: number }[] = [];
   try {
     await client.query('BEGIN');
-    const plans = await client.query<{ id: string; status: string }>(
-      `SELECT id, status FROM plans
+    const plans = await client.query<PlanRow>(
+      `SELECT * FROM plans
        WHERE status IN ('approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required')
        ORDER BY id FOR UPDATE`,
     );
@@ -31,9 +34,17 @@ export async function reconcileInterruptedExecutions(pool: pg.Pool): Promise<voi
       );
       const requiresReconciliation = uncertain.rows[0]!.exists
         || ['approved', 'executing', 'stopping', 'unknown'].includes(plan.status);
-      const statusChanged = requiresReconciliation && plan.status !== 'reconciliation_required';
+      let nextStatus = requiresReconciliation ? 'reconciliation_required' : plan.status;
+      if (!uncertain.rows[0]!.exists && ['approved', 'executing', 'stopping', 'unknown'].includes(plan.status)) {
+        const saved = await client.query<ExecutionStepRow>('SELECT * FROM execution_steps WHERE plan_id = $1', [plan.id]);
+        try {
+          const progress = restoredProgress(verifiedRecoverySteps(plan), saved.rows);
+          if (Object.values(progress.states).every(state => ['succeeded', 'skipped'].includes(state.status))) nextStatus = 'completed';
+        } catch { /* Invalid or incomplete evidence remains reconciliation_required. */ }
+      }
+      const statusChanged = nextStatus !== plan.status;
       if (statusChanged) {
-        await client.query("UPDATE plans SET status = 'reconciliation_required' WHERE id = $1", [plan.id]);
+        await client.query('UPDATE plans SET status = $2 WHERE id = $1', [plan.id, nextStatus]);
       }
       if (statusChanged || interrupted.rowCount) {
         summaries.push({ planId: plan.id, unknownSteps: interrupted.rowCount ?? 0 });

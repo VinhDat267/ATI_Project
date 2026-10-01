@@ -56,7 +56,14 @@ npm run test:browser:v3
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#23](https://github.com/VinhDat267/ATI_Project/pull/23), base `main`; chưa merge tại thời điểm bàn giao.
+- Commit: implementation `40121e612a3c687d205841df180fbd9591dec6ac`; sửa review/SSE `257536033acd42ffa55a415601acf01f69888d3e`.
+- Test đã chạy và kết quả (01/10/2026):
+  - PostgreSQL 16 riêng: backend/executor RED **16 fail / 26 pass** (exit 1) trước sửa; GREEN **42/42** (exit 0), gồm đủ dòng success/skipped, thiếu/trùng/mismatch/hash, owner 403, safe pending `$ref`/`$template`, CAS hai Continue có đúng một 200 và một 409, không replay success.
+  - Executor vốn đã `await` ghi running: thêm test chặn adapter khi ghi chưa xong hoặc thất bại. Mutation bỏ `await` có **1 fail**, khôi phục source rồi GREEN; không thay đổi executor production.
+  - UI RED **2 fail / 12 pass**, GREEN **14/14**. Review độc lập tại `40121e6` chạy `npm run check` **500 v3 / 66 eval**, browser **8/8**, supplemental PostgreSQL **3/3**, exit 0; phát hiện **2 Important** SSE.
+  - Sửa hai lỗi review một lượt: tracked SSE RED **2 fail / 17 pass** → affected suites **42/42**; giữ saved progress/output/timing khi Continue bắt đầu và nhận event theo execution identity dù có preview khác. `npm run check` cuối **503/503 v3** (11+53+128+25+143+143), **66/66 eval**, typecheck/build, launcher **1/1**, local-env **3/3**, exit 0. Browser cuối **8/8**, targeted Continue **1/1**, exit 0. Reviewer chưa chạy lại fixed head.
+  - Browser dùng PostgreSQL riêng theo cấu hình CI tại `127.0.0.1:5432`, fixture account và sandbox; plan ca A được seed trong DB, mở lại hội thoại, Continue → completed, giữ nguyên success row, chỉ một POST Continue. Không dùng database hiện có hoặc service thật.
+  - Baseline đầu tiên **14 API failures** (`relation does not exist`) do DB mới chưa migrate; đã chạy migration rồi các suite đạt. Không sửa source để che lỗi môi trường.
+  - `git diff --check` đạt; output đầy đủ lưu cùng bằng chứng local của W2-05. CI được báo theo exact head trong PR sau khi chạy; không coi local hoặc CI lịch sử là CI của PR mới.
+- Điều chưa làm hoặc khác với task card: đã sửa đặc tả v3 §5.8 theo task card và nêu rõ trong PR. Startup dùng kiểm tra hash/khớp step giống recovery để dữ liệu hỏng không bị đánh dấu completed. Một API instance, executor cũ đã dừng; zero-row vẫn Stop-only; UNKNOWN/failed giữ quy tắc cũ. Live provider/model **NOT_RUN**, không ghi Trello/Slack/GitHub thật. Không có Minor mới bị hoãn; không sửa CURRENT-STATE/ROADMAP. Task card một task không có header `Task N`, nên theo dõi ledger và chạy lệnh trực tiếp thay scripts task-start/task-done.

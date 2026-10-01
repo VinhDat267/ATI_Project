@@ -256,6 +256,10 @@ export class ApiClient {
     });
   }
 
+  async continueExecution(planId: string): Promise<any> {
+    return this.request<any>(`/api/executions/${planId}/continue`, { method: 'POST' });
+  }
+
   // --- Services ---
   async getServices(): Promise<{ services: ServiceInfo[] }> {
     return this.request<{ services: ServiceInfo[] }>('/api/services');

@@ -243,7 +243,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     setPlanStatus('rejected');
   };
 
-  const recover = async (action: 'retry' | 'skip' | 'stop', stepId?: string) => {
+  const recover = async (action: 'retry' | 'skip' | 'stop' | 'continue', stepId?: string) => {
     const planId = executionSnapshot?.plan.id || activePlan?.id;
     const convId = conversationId;
     if (!planId || !convId || recoveryPending.current) return;
@@ -254,6 +254,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     setRecoveryError(null);
     try {
       if (action === 'stop') await apiClient.stopExecution(planId);
+      else if (action === 'continue') await apiClient.continueExecution(planId);
       else if (stepId) {
         if (action === 'retry') await apiClient.retryStep(planId, stepId);
         else await apiClient.skipStep(planId, stepId);
@@ -480,7 +481,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             {/* Live Execution Progress Card */}
             {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
             {executionSnapshot && needsReconciliation && <ReconciliationNotice
-              snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} />}
+              snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
             {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
             {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
             {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
@@ -504,7 +505,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             {failureId && !needsReconciliation && (
               <PartialFailureModal
                 busy={recoveryBusy}
-                allowedActions={executionSnapshot?.recoveryActions}
+                allowedActions={executionSnapshot?.recoveryActions.filter((action): action is 'retry' | 'skip' | 'stop' => action !== 'continue')}
                 allowEdit={false}
                 stepId={failureId}
                 tool={failureStep?.tool || pausedStep?.tool || 'unknown'}
