@@ -9,6 +9,16 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
   const router = Router();
   const { executionService } = options;
 
+  router.post('/executions/:planId/continue', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      res.status(200).json(await executionService.continueExecution(req.params.planId as string, userId));
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to continue execution' });
+    }
+  });
+
   // GET /api/conversations/:convId/executions/latest (owner-scoped reload data)
   router.get('/conversations/:convId/executions/latest', async (req: Request, res: Response): Promise<void> => {
     try {

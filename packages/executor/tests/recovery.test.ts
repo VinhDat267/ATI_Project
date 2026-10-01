@@ -26,6 +26,38 @@ function restored(status: 'unknown' | 'failed', thirdStatus: 'pending' | 'unknow
 }
 
 describe('restoring ExecutionController from durable progress', () => {
+  it('waits for running persistence before dispatching the adapter', async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const persisted = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const calls: string[] = [];
+    const controller = new ExecutionController({
+      steps: [steps[0]!],
+      runner: new StepRunner({ getAdapter: () => ({ execute: async tool => { calls.push(tool); return { id: 'new-card' }; } }) }),
+      onStepUpdate: async (_id, state) => { if (state.status === 'running') { entered(); await persisted; } },
+    });
+    const run = controller.runUntilPause();
+    await started;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(calls).toEqual([]);
+    release();
+    expect(await run).toMatchObject({ status: 'completed' });
+    expect(calls).toEqual(['trello.create_card']);
+  });
+
+  it('never dispatches when persisting running fails', async () => {
+    const calls: string[] = [];
+    const controller = new ExecutionController({
+      steps: [steps[0]!],
+      runner: new StepRunner({ getAdapter: () => ({ execute: async tool => { calls.push(tool); return {}; } }) }),
+      onStepUpdate: async (_id, state) => { if (state.status === 'running') throw new Error('durable write failed'); },
+    });
+    await expect(controller.runUntilPause()).rejects.toThrow('durable write failed');
+    expect(calls).toEqual([]);
+    expect(controller.isStopped()).toBe(true);
+  });
+
   it('skips UNKNOWN and resolves ref/template from saved success without replaying it', async () => {
     const { controller, calls } = restored('unknown');
     expect(await controller.skipStepAndContinue('step_2')).toMatchObject({ status: 'completed' });

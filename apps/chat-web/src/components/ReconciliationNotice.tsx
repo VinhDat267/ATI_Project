@@ -31,11 +31,12 @@ function savedArguments(value: unknown, snapshot: ExecutionSnapshot): unknown {
   return value;
 }
 
-export function ReconciliationNotice({ snapshot, busy, error, onSkip, onStop }: {
+export function ReconciliationNotice({ snapshot, busy, error, onSkip, onStop, onContinue }: {
   snapshot: ExecutionSnapshot; busy: boolean; error: string | null;
-  onSkip: (stepId: string) => void; onStop: () => void;
+  onSkip: (stepId: string) => void; onStop: () => void; onContinue: () => void;
 }) {
   const unknown = snapshot.steps.filter(step => step.status === 'unknown');
+  const canContinue = snapshot.recoveryActions.includes('continue') && unknown.length === 0;
   const paused = unknown.find(step => step.stepId === snapshot.execution.pausedStepId);
   const services = [...new Set(unknown.map(step => {
     const service = step.tool.split('.')[0];
@@ -45,9 +46,11 @@ export function ReconciliationNotice({ snapshot, busy, error, onSkip, onStop }: 
     <section aria-label="Cần đối soát trước khi tiếp tục" aria-busy={busy}
       className="my-4 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-zinc-800">
       <h2 className="font-semibold text-amber-900">Cần đối soát trước khi tiếp tục</h2>
-      <p className="mt-2">Quy trình bị gián đoạn. Các bước UNKNOWN dưới đây có thể đã tạo thay đổi nhưng hệ thống chưa xác nhận được kết quả.</p>
-      <p className="mt-2">Hãy tự kiểm tra trên {services} trước khi tiếp tục. Skip bỏ qua bước đang đối soát và chạy các bước còn lại; hãy xác nhận thay đổi trên dịch vụ đã đúng. Dừng plan giữ lại bằng chứng để bạn xử lý sau.</p>
-      {unknown.length === 0 && <p className="mt-3">Không có bước UNKNOWN có thể tiếp tục. Bạn chỉ có thể dừng kế hoạch này.</p>}
+      {canContinue ? <p className="mt-2">Quy trình bị gián đoạn giữa các bước. Không có bước nào chưa rõ kết quả; các bước còn lại chưa từng được gửi tới dịch vụ. Bạn có thể chạy tiếp các bước còn lại hoặc dừng kế hoạch.</p> : <>
+        <p className="mt-2">Quy trình bị gián đoạn. Các bước UNKNOWN dưới đây có thể đã tạo thay đổi nhưng hệ thống chưa xác nhận được kết quả.</p>
+        <p className="mt-2">Hãy tự kiểm tra trên {services} trước khi tiếp tục. Skip bỏ qua bước đang đối soát và chạy các bước còn lại; hãy xác nhận thay đổi trên dịch vụ đã đúng. Dừng plan giữ lại bằng chứng để bạn xử lý sau.</p>
+        {unknown.length === 0 && <p className="mt-3">Không có bước UNKNOWN có thể tiếp tục. Bạn chỉ có thể dừng kế hoạch này.</p>}
+      </>}
       <ul className="mt-3 space-y-3">
         {unknown.map(row => {
           const step = snapshot.plan.steps?.find(item => item.id === row.stepId);
@@ -61,6 +64,8 @@ export function ReconciliationNotice({ snapshot, busy, error, onSkip, onStop }: 
       </ul>
       {error && <p role="alert" className="mt-3 text-red-700">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
+        {canContinue && <button type="button" disabled={busy} onClick={onContinue}
+          className="rounded-full bg-[#0071e3] px-4 py-2 text-white disabled:opacity-50">Chạy tiếp các bước còn lại</button>}
         {paused && snapshot.recoveryActions.includes('skip') && <button type="button" disabled={busy}
           onClick={() => onSkip(paused.stepId)} className="rounded-full bg-[#0071e3] px-4 py-2 text-white disabled:opacity-50">
           Skip step này rồi chạy tiếp

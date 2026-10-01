@@ -56,6 +56,49 @@ async function openHistory() {
 }
 
 describe('saved execution recovery in the actual App/history flow', () => {
+  it('offers Continue only for safe pending snapshot and posts to its execution', async () => {
+    snapshot.execution = { status: 'reconciliation_required' };
+    snapshot.steps[1].status = 'pending';
+    snapshot.recoveryActions = ['continue', 'stop'];
+    const notice = await openHistory();
+    expect(within(notice).getByText(/chưa từng được gửi/)).toBeInTheDocument();
+    expect(within(notice).queryByText(/tự kiểm tra trên/)).toBeNull();
+    const button = within(notice).getByRole('button', { name: 'Chạy tiếp các bước còn lại' });
+    let release!: () => void;
+    post = async () => {
+      await new Promise<void>(resolve => { release = resolve; });
+      snapshot.execution = { status: 'completed' }; snapshot.plan.status = 'completed';
+      snapshot.steps[1].status = 'succeeded'; snapshot.steps[2].status = 'succeeded'; snapshot.recoveryActions = [];
+      return snapshot.execution;
+    };
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    fireEvent.click(button);
+    expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeDisabled();
+    expect(request.mock.calls.filter((call: any[]) => call[1]?.method === 'POST').map((call: any[]) => call[0])).toEqual(['/api/executions/p1/continue']);
+    expect(screen.queryByText('Quy trình đã hoàn thành.')).toBeNull();
+    await act(async () => { release(); });
+    expect(await screen.findByText('Quy trình đã hoàn thành.')).toBeInTheDocument();
+  });
+
+  it('never offers Continue for UNKNOWN even when server actions are inconsistent', async () => {
+    snapshot.recoveryActions = ['continue', 'skip', 'stop'];
+    const notice = await openHistory();
+    expect(within(notice).queryByRole('button', { name: 'Chạy tiếp các bước còn lại' })).toBeNull();
+    expect(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeEnabled();
+  });
+
+  it('keeps safe pending snapshot after Continue returns conflict', async () => {
+    snapshot.execution = { status: 'reconciliation_required' }; snapshot.steps[1].status = 'pending';
+    snapshot.recoveryActions = ['continue', 'stop'];
+    post = async () => { throw new Error('Execution changed'); };
+    const notice = await openHistory();
+    fireEvent.click(within(notice).getByRole('button', { name: 'Chạy tiếp các bước còn lại' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Execution changed');
+    expect(screen.queryByText('Quy trình đã hoàn thành.')).toBeNull();
+    expect(useChatStore.getState().executionSnapshot?.execution.status).toBe('reconciliation_required');
+  });
+
   it('loads UNKNOWN, saved output/args, no retry or approval, and preserves raw history time', async () => {
     const notice = await openHistory();
     expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();

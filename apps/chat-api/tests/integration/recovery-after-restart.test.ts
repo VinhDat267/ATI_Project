@@ -82,9 +82,9 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
     await adminPool?.end();
   });
 
-  async function fixture(status: string, states: string[]) {
+  async function fixture(status: string, states: string[], planSteps = steps) {
     const conv = await convRepo.createConversation(ownerId);
-    const planJson = { kind: 'plan', steps, warnings: [] };
+    const planJson = { kind: 'plan', steps: planSteps, warnings: [] };
     const text = JSON.stringify(planJson);
     const plan = await planRepo.createPlan({ convId: conv.id, planJson, planText: text,
       planHash: createHash('sha256').update(text).digest('hex'), expiresAt: new Date(Date.now() + 60_000) });
@@ -93,7 +93,7 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
       await planRepo.updatePlanStatus(plan.id, status);
     }
     for (const [index, state] of states.entries()) {
-      const step = steps[index]!;
+      const step = planSteps[index]!;
       const row = await stepRepo.createStep({ planId: plan.id, stepId: step.id, tool: step.tool, argsJson: step.args, requestedBy: ownerId });
       if (state !== 'pending') await stepRepo.updateStepStatus(row.id, state,
         state === 'succeeded' ? { id: 'preserved-card', name: 'Saved' } : undefined,
@@ -117,6 +117,107 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
       .post(`/api/executions/${planId}/${suffix}`).set('Authorization', `Bearer ${token}`);
     return { service, app, calls, events, post };
   }
+
+  async function latest(recovered: ReturnType<typeof freshService>, convId: string) {
+    return request(recovered.app).get(`/api/conversations/${convId}/executions/latest`).set('Authorization', `Bearer ${ownerToken}`);
+  }
+
+  it.each(['approved', 'executing', 'stopping', 'unknown'])('completes fully persisted success after restart from %s without dispatch', async status => {
+    const plan = await fixture(status, ['succeeded', 'succeeded', 'succeeded']);
+    const before = await stepRepo.listSteps(plan.id);
+    await reconcileInterruptedExecutions(pool);
+    await reconcileInterruptedExecutions(pool);
+    const recovered = freshService();
+    expect((await planRepo.getPlan(plan.id))!.status).toBe('completed');
+    expect((await latest(recovered, plan.conv_id)).body.recoveryActions).toEqual([]);
+    expect(await stepRepo.listSteps(plan.id)).toEqual(before);
+    expect(recovered.calls).toEqual([]);
+  });
+
+  it('completes mixed success/skipped, but never incomplete or duplicate success snapshots', async () => {
+    const complete = await fixture('approved', ['succeeded', 'skipped', 'succeeded']);
+    const missing = await fixture('approved', ['succeeded', 'succeeded']);
+    const duplicate = await fixture('approved', ['succeeded', 'succeeded']);
+    await stepRepo.createStep({ planId: duplicate.id, stepId: 'step_1', tool: steps[0]!.tool, requestedBy: ownerId });
+    await pool.query("UPDATE execution_steps SET status = 'succeeded' WHERE plan_id = $1", [duplicate.id]);
+    await reconcileInterruptedExecutions(pool);
+    expect((await planRepo.getPlan(complete.id))!.status).toBe('completed');
+    expect((await planRepo.getPlan(missing.id))!.status).toBe('reconciliation_required');
+    expect((await planRepo.getPlan(duplicate.id))!.status).toBe('reconciliation_required');
+  });
+
+  it('offers Continue after restart and dispatches only pending with saved refs exactly once', async () => {
+    const refSteps = structuredClone(steps);
+    refSteps[2]!.args.channel = { $ref: 'step_1.output.id' };
+    const plan = await fixture('approved', ['succeeded', 'pending', 'pending'], refSteps);
+    const saved = (await stepRepo.listSteps(plan.id))[0];
+    await reconcileInterruptedExecutions(pool);
+    const recovered = freshService();
+    expect((await latest(recovered, plan.conv_id)).body.recoveryActions).toEqual(['continue', 'stop']);
+    const response = await recovered.post(plan.id, 'continue');
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('completed');
+    expect(recovered.calls).toEqual([
+      { tool: 'slack.send_message', args: { channel: 'fixture-channel', text: 'Before crash' } },
+      { tool: 'slack.send_message', args: { channel: 'preserved-card', text: 'Card preserved-card' } },
+    ]);
+    expect((await stepRepo.listSteps(plan.id))[0]).toEqual(saved);
+    expect((await planRepo.getPlan(plan.id))!.status).toBe('completed');
+    expect((await recovered.post(plan.id, 'continue')).status).toBe(409);
+    expect(recovered.calls).toHaveLength(2);
+  });
+
+  it.each([
+    { status: 'reconciliation_required', states: ['succeeded', 'unknown', 'pending'] },
+    { status: 'reconciliation_required', states: ['succeeded', 'failed', 'pending'] },
+    { status: 'reconciliation_required', states: ['succeeded', 'running', 'pending'] },
+    { status: 'reconciliation_required', states: [] },
+    { status: 'reconciliation_required', states: ['succeeded', 'pending'] },
+    { status: 'reconciliation_required', states: ['succeeded', 'skipped', 'succeeded'] },
+    { status: 'partial', states: ['succeeded', 'pending', 'pending'] },
+    { status: 'approved', states: ['succeeded', 'pending', 'pending'] },
+  ])('rejects unsafe Continue $status / $states before dispatch', async ({ status, states }) => {
+    const plan = await fixture(status, states);
+    const before = await stepRepo.listSteps(plan.id);
+    const recovered = freshService();
+    expect((await recovered.post(plan.id, 'continue')).status).toBe(409);
+    expect(await stepRepo.listSteps(plan.id)).toEqual(before);
+    expect(recovered.calls).toEqual([]);
+    expect((await planRepo.getPlan(plan.id))!.status).toBe(status);
+    expect((await latest(recovered, plan.conv_id)).body.recoveryActions).not.toContain('continue');
+  });
+
+  it('rejects Continue for duplicate, changed tool and corrupt approved hash; owner check is 403', async () => {
+    for (const corruption of ['duplicate', 'tool', 'hash']) {
+      const plan = await fixture('reconciliation_required', ['succeeded', 'pending', 'pending']);
+      if (corruption === 'duplicate') await stepRepo.createStep({ planId: plan.id, stepId: 'step_1', tool: steps[0]!.tool, requestedBy: ownerId });
+      if (corruption === 'tool') await pool.query("UPDATE execution_steps SET tool = 'trello.archive_card' WHERE plan_id = $1 AND step_id = 'step_2'", [plan.id]);
+      if (corruption === 'hash') await pool.query("UPDATE plans SET plan_hash = 'wrong-hash' WHERE id = $1", [plan.id]);
+      const recovered = freshService();
+      expect((await recovered.post(plan.id, 'continue', otherToken)).status).toBe(403);
+      expect((await recovered.post(plan.id, 'continue')).status).toBe(409);
+      expect((await latest(recovered, plan.conv_id)).body.recoveryActions).toEqual(['stop']);
+      expect(recovered.calls).toEqual([]);
+    }
+  });
+
+  it('claims two concurrent Continue requests using real SQL CAS, so only one dispatches', async () => {
+    const plan = await fixture('reconciliation_required', ['succeeded', 'pending', 'pending']);
+    const first = freshService(); const second = freshService();
+    const lock = await pool.connect();
+    await lock.query('BEGIN');
+    await lock.query('SELECT id FROM plans WHERE id = $1 FOR UPDATE', [plan.id]);
+    const requests = [first.post(plan.id, 'continue').then(r => r), second.post(plan.id, 'continue').then(r => r)];
+    try {
+      await waitUntil(async () => {
+        const waiting = await pool.query("SELECT count(*)::integer AS count FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock' AND state = 'active'", [schema]);
+        return waiting.rows[0].count >= 2;
+      });
+    } finally { await lock.query('ROLLBACK'); lock.release(); }
+    expect((await Promise.all(requests)).map(r => r.status).sort()).toEqual([200, 409]);
+    expect([...first.calls, ...second.calls].map(call => call.args.text)).toEqual(['Before crash', 'Card preserved-card']);
+    expect((await planRepo.getPlan(plan.id))!.status).toBe('completed');
+  }, 15_000);
 
   it('kills executor A, reconciles, then skips through B without replaying success and resolves saved output', async () => {
     const plan = await fixture('pending', []);
