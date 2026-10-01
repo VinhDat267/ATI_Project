@@ -15,6 +15,7 @@ import { createRuntimeAdapterFactory, createRuntimePlanner, mayUseMemoryStorage 
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
+import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
 import { AdapterFactory } from './services/adapter-factory.js';
 import { getConfiguredToolCatalog } from './services/registered-services.js';
 import {
@@ -162,6 +163,10 @@ async function bootstrap() {
       listConfiguredServices: async () => [],
     };
   }
+
+  // Reconciliation failures must abort startup, including sandbox mode: never
+  // fall back to memory after failing to reconcile an available database.
+  if (pool && userRepo) await reconcileInterruptedExecutions(pool);
 
   // 2. Initialize LLM Provider
   let provider: any;

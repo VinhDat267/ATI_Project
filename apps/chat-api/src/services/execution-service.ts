@@ -324,7 +324,17 @@ export class ExecutionService {
     if (current) return current;
     const plan = await this.planRepo.getPlan(planId);
     if (!plan || ['pending', 'rejected', 'superseded', 'expired'].includes(plan.status)) return null;
-    if (['approved', 'executing', 'stopping', 'partial', 'unknown'].includes(plan.status)) {
+    if (['approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required'].includes(plan.status)) {
+      const steps = this.stepRepo ? await this.stepRepo.listSteps(planId) : [];
+      const planJson = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+      // Repository order is lexical (step_10 precedes step_2); recovery follows
+      // the approved plan's order and prioritizes uncertain results over failures.
+      const order = new Map<string, number>((planJson?.steps ?? []).map((step: PlanStep, index: number) => [step.id, index]));
+      steps.sort((a, b) => (order.get(a.step_id) ?? Infinity) - (order.get(b.step_id) ?? Infinity));
+      const uncertain = steps.find(step => step.status === 'unknown' || step.status === 'running');
+      if (uncertain) return { status: 'reconciliation_required', pausedStepId: uncertain.step_id };
+      const failed = steps.find(step => step.status === 'failed');
+      if (plan.status === 'partial' && failed) return { status: 'partial', pausedStepId: failed.step_id };
       return { status: 'reconciliation_required' };
     }
     return { status: plan.status };
