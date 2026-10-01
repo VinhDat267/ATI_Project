@@ -1,6 +1,6 @@
 # W3-00b · Giao diện cấu hình chung và câu từ chối nêu tên service
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/w3-00b-frontend-and-refusal-naming` · **Phụ thuộc:** W3-00 đã merge · **Không chặn** các task service; làm song song với W3-01 → W3-05
+**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/w3-00b-frontend-and-refusal-naming` · **Phụ thuộc:** W3-00 đã merge · **Không chặn** các task service; làm song song với W3-01 → W3-05 · **Phần giao diện làm sau FE-01 và FE-02** (FE-01 viết lại phần trạng thái dịch vụ trong `MissionControlLaunchpad.tsx`, FE-02 tách `App.tsx`)
 
 ## Mục tiêu
 

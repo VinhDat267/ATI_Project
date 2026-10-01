@@ -42,7 +42,7 @@
 - **Link trong email** có token ở URL. Frontend đọc token xong phải xóa token khỏi thanh địa chỉ ngay (`history.replaceState`). Trang web đặt `Referrer-Policy: no-referrer`.
 - **Chế độ bộ nhớ (không có PostgreSQL):** các tính năng mới trả 503 "cần PostgreSQL". Đăng nhập kiểu cũ bằng `SANDBOX_USER_*` vẫn chạy như hiện nay.
 - **Test:** logic database test trên PostgreSQL thật; luồng giao diện có browser E2E (sandbox, PostgreSQL thật). Test đọc email từ bảng `email_outbox`, không cần endpoint riêng.
-- **Giao diện** tiếng Việt, theo phong cách các màn hình đăng nhập hiện có (`LoginView.tsx`). Routing dùng tham số `?view=` như `App.tsx` đang làm. Mỗi task chỉ thêm view của mình.
+- **Giao diện** tiếng Việt, theo phong cách các màn hình đăng nhập hiện có (`LoginView.tsx`). Phần giao diện của AUTH-02 → AUTH-05 làm **sau FE-02**: FE-02 tách `App.tsx` và tạo bảng route, nên mỗi task chỉ thêm một file view và một dòng route. Phần backend làm trước được.
 - Không thêm thư viện nào ngoài `nodemailer`.
 
 ## Dữ liệu dùng chung (tạo ở AUTH-01, các task sau chỉ thêm)

@@ -31,6 +31,9 @@ Mốc 02/10/2026: nhóm chốt thêm năm service và mảng tài khoản (đăn
 | 3–4 | Đăng nhập và đăng ký bằng Google | [AUTH-04](tasks/AUTH-04-google-login.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản lý tài khoản: hồ sơ, đổi mật khẩu, phương thức đăng nhập, phiên đăng nhập | [AUTH-05](tasks/AUTH-05-account-page.md) | chờ (sau AUTH-01; liên kết Google sau AUTH-04) |
 | 4 | Cấu hình Gmail SMTP, Google OAuth và kiểm tra chạy thật | [AUTH-06](tasks/AUTH-06-auth-live-setup.md) | chờ (sau AUTH-02, AUTH-04; người dùng chuẩn bị) |
+| 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | chờ (làm ngay, song song với W3-00 và AUTH-01) |
+| 3 | Frontend: điều hướng bằng URL, nút Back, mở lại hội thoại khi tải lại, tách `App.tsx`, tiêu đề và phân trang lịch sử | [FE-02](tasks/FE-02-routing-and-history.md) | chờ (làm ngay; chặn phần giao diện của AUTH-02 → AUTH-05 và W3-00b) |
+| 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | chờ (sau FE-02; trước buổi thử W4-03) |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
@@ -48,6 +51,8 @@ Thứ tự và song song: W3-00 làm trước. Sau khi W3-00 merge, W3-00b, W3-0
 
 **Mảng tài khoản** (chốt 02/10/2026: đăng ký mở nhưng admin duyệt; gửi email bằng Gmail SMTP; thêm đăng nhập Google). Yêu cầu chung: [AUTH-common](tasks/AUTH-common.md). AUTH-01 làm trước, song song với W3-00. Sau đó AUTH-02, AUTH-03, AUTH-04, AUTH-05 làm song song. Đăng ký chỉ mặc định bật khi AUTH-02 và AUTH-03 đều đã merge. Mục tiêu: merge AUTH-01 → AUTH-05 trước 24/10, AUTH-06 trước 28/10.
 
+**Mảng frontend** (review 02/10/2026): FE-01 và FE-02 làm ngay, song song với W3-00 và AUTH-01. Phần giao diện của AUTH-02 → AUTH-05 và W3-00b chờ FE-02. FE-03 xong trước buổi thử W4-03. FE-01 nên xong trước mọi buổi demo.
+
 Phần việc của con người nên bắt đầu ngay: tạo tài khoản và tài nguyên thử nghiệm cho năm service (W3-07); tạo Gmail gửi thư và App Password, OAuth client của Google (AUTH-06); các thành viên viết câu hỏi (W4-01); hẹn người tham gia buổi thử (W4-03).
 
-Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04.
+Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04. Mảng frontend: không bỏ FE-01 (lỗi an toàn và nội dung sai sự thật). FE-02 và FE-03 có thể bỏ các phần nhỏ (phân trang, Shift+Enter, `h-dvh`), không bỏ: mở lại hội thoại khi tải lại, tên tài nguyên trong plan, SSE tự refresh.

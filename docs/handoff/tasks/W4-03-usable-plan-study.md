@@ -1,6 +1,6 @@
 # W4-03 · Đo tỉ lệ plan dùng được với người dùng thật
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-03-usable-plan-study` · **Phụ thuộc:** không · **Có phần việc của con người**
+**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-03-usable-plan-study` · **Phụ thuộc:** buổi thử nên chạy sau FE-01 và FE-03 (plan hiện tên tài nguyên thay vì ID; không còn trạng thái dịch vụ giả) · **Có phần việc của con người**
 
 ## Vấn đề
 
@@ -20,7 +20,7 @@ Lượt bị **Hủy**, phải sửa từ hai lần trở lên, hoặc thực th
 1. Script `evaluations/usable-plan/report.ts`: đọc PostgreSQL theo danh sách conversation ID của buổi thử, tính cho mỗi lượt số plan được tạo, số lần bị thay thế (`superseded`), kết quả (`approved`/`rejected`), trạng thái thực thi cuối và thời gian tới plan preview đầu tiên. Xuất CSV và bảng tóm tắt. Script chỉ đọc, không ghi database.
 2. `evaluations/usable-plan/PROTOCOL.md`: quy trình cho người điều phối:
    - danh sách 10 tình huống công việc mô tả bằng lời thường, **không gợi ý câu chat**;
-   - môi trường: chế độ sandbox (không ghi ra service thật), hoặc live chỉ trên tài nguyên thử nghiệm nếu người dùng đồng ý;
+   - môi trường: **chế độ live với model thật**, vì ở sandbox planner luôn dùng mock trả cùng một plan soạn sẵn cho mọi câu chat (`apps/chat-api/src/server.ts`, phát hiện khi review frontend 02/10), nên đo ở sandbox không có ý nghĩa. Người tham gia đánh giá plan ở màn hình xem trước; người điều phối bấm **Hủy** sau khi ghi nhận, trừ khi chủ dự án đồng ý cho chạy thật trên tài nguyên thử nghiệm;
    - cách ghi câu trả lời "kết quả có đúng ý không";
    - **quyền riêng tư:** không ghi họ tên người tham gia, chỉ ghi mã P01, P02…; câu chat của người tham gia không commit lên repo công khai.
 3. Test cho script tính toán, chạy trên dữ liệu dựng sẵn trong PostgreSQL thật (lượt duyệt ngay, sửa một lần rồi duyệt, sửa hai lần, hủy).
