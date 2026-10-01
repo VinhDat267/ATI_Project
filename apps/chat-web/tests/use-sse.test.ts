@@ -2,6 +2,62 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 import { useChatStore } from '../src/store/chat-store';
 
+describe('Continue execution events with saved progress and another preview', () => {
+  beforeEach(() => {
+    useChatStore.getState().reset(); resetSSEState();
+    useChatStore.getState().setConversationId('c1');
+    useChatStore.getState().setExecutionSnapshot({
+      plan: { id: 'p1', convId: 'c1', status: 'reconciliation_required', steps: [
+        { id: 's1', tool: 'trello.create_card', description: 'Saved', args: {} },
+        { id: 's2', tool: 'slack.send_message', description: 'Remaining', args: {} },
+      ] },
+      execution: { status: 'reconciliation_required' },
+      steps: [
+        { stepId: 's1', tool: 'trello.create_card', status: 'succeeded', output: { id: 'saved-card' }, durationMs: 100 },
+        { stepId: 's2', tool: 'slack.send_message', status: 'pending' },
+      ], recoveryActions: ['continue', 'stop'],
+    });
+  });
+
+  it('keeps succeeded output and timing when resumed execution starts and advances', () => {
+    handleSSEEvent('exec_start', JSON.stringify({ planId: 'p1' }), 1, 'c1');
+    handleSSEEvent('exec_step', JSON.stringify({ planId: 'p1', stepId: 's2', status: 'running' }), 2, 'c1');
+    const store = useChatStore.getState();
+    expect(store.stepStatuses).toEqual({ s1: 'succeeded', s2: 'running' });
+    expect(store.executionSnapshot?.execution.status).toBe('executing');
+    expect(store.executionSnapshot?.steps[0]).toMatchObject({ status: 'succeeded', output: { id: 'saved-card' }, durationMs: 100 });
+    expect(store.executionSnapshot?.recoveryActions).toEqual(['stop']);
+  });
+
+  it('updates only saved execution through completion while keeping another preview', () => {
+    useChatStore.getState().setActivePlan({ id: 'p2', summary: 'New preview', steps: [] });
+    useChatStore.getState().setPlanStatus('preview');
+    handleSSEEvent('exec_start', JSON.stringify({ planId: 'p1' }), 1, 'c1');
+    handleSSEEvent('exec_step', JSON.stringify({ planId: 'p1', stepId: 's2', status: 'running' }), 2, 'c1');
+    expect(useChatStore.getState().executionSnapshot?.execution.status).toBe('executing');
+    expect(useChatStore.getState().stepStatuses.s2).toBe('running');
+    handleSSEEvent('exec_step', JSON.stringify({ planId: 'p1', stepId: 's2', status: 'succeeded', output: { ts: 'saved-message' } }), 3, 'c1');
+    handleSSEEvent('exec_done', JSON.stringify({ planId: 'p1', status: 'completed' }), 4, 'c1');
+    const store = useChatStore.getState();
+    expect(store.activePlan?.id).toBe('p2'); expect(store.planStatus).toBe('preview');
+    expect(store.executionSnapshot?.execution.status).toBe('completed');
+    expect(store.executionSnapshot?.steps[1].output).toEqual({ ts: 'saved-message' });
+    expect(store.stepStatuses).toEqual({ s1: 'succeeded', s2: 'succeeded' });
+    expect(store.executionSnapshot?.recoveryActions).toEqual([]);
+  });
+
+  it('ignores a foreign execution while accepting a genuinely new approved preview start', () => {
+    useChatStore.getState().setActivePlan({ id: 'p2', summary: 'New preview', steps: [] });
+    useChatStore.getState().setPlanStatus('preview');
+    handleSSEEvent('exec_start', JSON.stringify({ planId: 'p3' }), 1, 'c1');
+    expect(useChatStore.getState().executionSnapshot?.plan.id).toBe('p1');
+    handleSSEEvent('exec_start', JSON.stringify({ planId: 'p2' }), 2, 'c1');
+    expect(useChatStore.getState().executionSnapshot).toBeNull();
+    expect(useChatStore.getState().stepStatuses).toEqual({});
+    expect(useChatStore.getState().planStatus).toBe('executing');
+  });
+});
+
 describe('SSE Client Event Handler', () => {
   beforeEach(() => {
     useChatStore.getState().reset();

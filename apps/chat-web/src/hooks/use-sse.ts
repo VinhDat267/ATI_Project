@@ -42,7 +42,10 @@ export function handleSSEEvent(
   }
 
   if (['exec_start', 'exec_step', 'step_status', 'exec_done'].includes(event) &&
-      data.planId && store.activePlan?.id && data.planId !== store.activePlan.id) return;
+      data.planId && (store.activePlan?.id || store.executionSnapshot?.plan.id) &&
+      data.planId !== store.activePlan?.id && data.planId !== store.executionSnapshot?.plan.id) return;
+  const savedExecution = data.planId && data.planId === store.executionSnapshot?.plan.id
+    ? store.executionSnapshot : null;
 
   switch (event) {
     case 'text_start':
@@ -161,25 +164,50 @@ export function handleSSEEvent(
     }
 
     case 'exec_start':
-      store.setExecutionSnapshot(null);
-      store.setPlanStatus('executing');
+      if (savedExecution) {
+        store.setExecutionSnapshot({ ...savedExecution, plan: { ...savedExecution.plan, status: 'executing' },
+          execution: { status: 'executing' }, recoveryActions: ['stop'] });
+      } else {
+        store.setExecutionSnapshot(null);
+        store.setPlanStatus('executing');
+      }
       break;
 
     case 'exec_step':
     case 'step_status':
       if (data.stepId && data.status) {
-        store.updateStepStatus(
-          data.stepId,
-          data.status as StepState,
-          typeof data.error === 'object' ? data.error?.message : data.error
-        );
+        if (savedExecution) {
+          store.setExecutionSnapshot({ ...savedExecution,
+            steps: savedExecution.steps.map(row => row.stepId !== data.stepId ? row : {
+              ...row, status: data.status as StepState,
+              ...(Object.hasOwn(data, 'output') ? { output: data.output } : {}),
+              ...(Object.hasOwn(data, 'error') ? { error: data.error } :
+                ['running', 'succeeded'].includes(data.status) ? { error: undefined } : {}),
+            }),
+          });
+        } else {
+          store.updateStepStatus(
+            data.stepId,
+            data.status as StepState,
+            typeof data.error === 'object' ? data.error?.message : data.error
+          );
+        }
       }
       break;
 
-    case 'exec_done':
-      store.setIsStreaming(false);
-      store.setPlanStatus((['completed', 'partial', 'reconciliation_required', 'stopped', 'failed'].includes(data.status) ? data.status : 'completed') as PlanStatus);
+    case 'exec_done': {
+      const status = (['completed', 'partial', 'reconciliation_required', 'stopped', 'failed'].includes(data.status) ? data.status : 'completed') as PlanStatus;
+      if (savedExecution) {
+        store.setExecutionSnapshot({ ...savedExecution, plan: { ...savedExecution.plan, status },
+          execution: { status, ...(data.pausedAtStepId ? { pausedStepId: data.pausedAtStepId } : {}) },
+          recoveryActions: ['completed', 'stopped', 'failed'].includes(status) ? [] : ['stop'] });
+        if (store.activePlan?.id === data.planId) store.setIsStreaming(false);
+      } else {
+        store.setIsStreaming(false);
+        store.setPlanStatus(status);
+      }
       break;
+    }
 
     case 'refusal':
       store.setIsStreaming(false);

@@ -106,6 +106,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
     await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('continue-pending.png'), fullPage: true });
     await notice.getByRole('button', { name: 'Chạy tiếp các bước còn lại' }).click();
     await expect(page.getByText('Quy trình đã hoàn thành.')).toBeVisible();
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0].status).toBe('completed');
