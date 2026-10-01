@@ -1,12 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage } from '../types';
+import type {
+  ChatMessage,
+  ClarificationState,
+  GatherState,
+} from '../types';
+import { useChatStore } from '../store/chat-store';
 import { MessageItem } from './MessageItem';
+import { GatherProgress } from './GatherProgress';
+import { ClarificationCard } from './ClarificationCard';
 
 export interface ChatContainerProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
   streamingText?: string;
   isStreaming?: boolean;
+  gatherState?: GatherState | null;
+  activeClarification?: ClarificationState | null;
+  onClearClarification?: () => void;
   children?: React.ReactNode;
 }
 
@@ -15,10 +25,49 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   onSendMessage,
   streamingText,
   isStreaming,
+  gatherState: propGatherState,
+  activeClarification: propActiveClarification,
+  onClearClarification,
   children,
 }) => {
   const [inputVal, setInputVal] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handlePrefill = (e: Event) => {
+      const customEvt = e as CustomEvent<{ text: string }>;
+      if (customEvt.detail?.text) {
+        setInputVal(customEvt.detail.text);
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const len = customEvt.detail.text.length;
+          inputRef.current.setSelectionRange?.(len, len);
+        }
+      }
+    };
+    window.addEventListener('chat:prefill', handlePrefill);
+    return () => window.removeEventListener('chat:prefill', handlePrefill);
+  }, []);
+
+  const storeGatherState = useChatStore((s) => s.gatherState);
+  const storeClarification = useChatStore((s) => s.activeClarification);
+  const setStoreClarification = useChatStore((s) => s.setClarification);
+
+  const gatherState =
+    propGatherState !== undefined ? propGatherState : storeGatherState;
+  const activeClarification =
+    propActiveClarification !== undefined
+      ? propActiveClarification
+      : storeClarification;
+
+  const clearClarification = () => {
+    if (onClearClarification) {
+      onClearClarification();
+    } else {
+      setStoreClarification(null);
+    }
+  };
 
   const scrollToBottom = () => {
     if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
@@ -28,7 +77,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingText]);
+  }, [messages, streamingText, gatherState, activeClarification]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +97,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 max-w-3xl mx-auto w-full">
+      <div
+        className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 mx-auto w-full ${
+          messages.length === 0 ? 'max-w-4xl' : 'max-w-3xl'
+        }`}
+      >
         {messages.map((msg) => (
           <MessageItem
             key={msg.id}
@@ -67,7 +120,35 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           />
         )}
 
-        {/* Injected cards (PlanPreview, GatherProgress, etc) */}
+        {/* Gather Progress */}
+        {gatherState &&
+          (gatherState.isGathering || gatherState.steps.length > 0) && (
+            <GatherProgress
+              summary={gatherState.summary}
+              steps={gatherState.steps}
+            />
+          )}
+
+        {/* Clarification Card */}
+        {activeClarification && (
+          <ClarificationCard
+            question={activeClarification.question}
+            options={activeClarification.options}
+            onSelectOption={(option) => {
+              onSendMessage(option);
+              clearClarification();
+            }}
+            onSubmitText={(text) => {
+              onSendMessage(text);
+              clearClarification();
+            }}
+            onSkip={() => {
+              clearClarification();
+            }}
+          />
+        )}
+
+        {/* Injected cards (PlanPreview, ExecutionProgress, etc) */}
         {children}
 
         <div ref={messagesEndRef} />
@@ -80,10 +161,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           className="max-w-3xl mx-auto flex items-center gap-2 bg-[#f5f5f7] border border-zinc-200 rounded-2xl p-1.5 focus-within:border-blue-500 focus-within:bg-white transition shadow-xs"
         >
           <input
+            ref={inputRef}
+            id="chat-input"
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={handleKeyDown}
+            aria-label="Mô tả công việc bạn muốn thực hiện"
             placeholder="Mô tả công việc bạn muốn thực hiện..."
             className="flex-1 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none"
           />

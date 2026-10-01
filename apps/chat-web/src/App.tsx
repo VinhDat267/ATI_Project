@@ -1,89 +1,174 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatStore } from './store/chat-store';
 import { useSSE } from './hooks/use-sse';
+import { authStorage, subscribeAuthTokens } from './services/auth-storage';
+import { apiClient } from './services/api-client';
 import { ChatContainer } from './components/ChatContainer';
 import { PlanPreview } from './components/PlanPreview';
 import { ExecutionProgress } from './components/ExecutionProgress';
 import { PartialFailureModal } from './components/PartialFailureModal';
 import { SettingsModal } from './components/SettingsModal';
+import { LoginView } from './components/LoginView';
+import { LandingPageView } from './components/LandingPageView';
+import { SidebarHistory } from './components/layout/SidebarHistory';
+import { UserNavMenu } from './components/layout/UserNavMenu';
+import { MissionControlLaunchpad } from './components/MissionControlLaunchpad';
+import type { User } from './types';
 
-export const App: React.FC = () => {
+export interface AppProps {
+  initialView?: 'landing' | 'login';
+}
+
+export const App: React.FC<AppProps> = ({ initialView }) => {
   const {
     conversationId,
     messages,
     streamingText,
     isStreaming,
     activePlan,
+    planStatus,
     stepStatuses,
     stepErrors,
     setConversationId,
     addOptimisticMessage,
     setActivePlan,
+    setPlanStatus,
     updateStepStatus,
     reset,
   } = useChatStore();
 
+  const [currentView, setCurrentView] = useState<'landing' | 'login'>(() => {
+    if (initialView) return initialView;
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'login') return 'login';
+      if (params.get('view') === 'landing') return 'landing';
+    }
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      return 'login';
+    }
+    return 'landing';
+  });
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [user, setUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Subscribe to auth token updates to keep React state and SSE in sync
+  useEffect(() => {
+    const unsub = subscribeAuthTokens((tokens) => {
+      setAuthToken(tokens.accessToken);
+      if (tokens.user) {
+        setUser(tokens.user);
+      } else if (!tokens.accessToken) {
+        setUser(null);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Restore stored session on mount
+  useEffect(() => {
+    const { accessToken, user: storedUser } = authStorage.getStoredTokens();
+    if (accessToken) {
+      setAuthToken(accessToken);
+      if (storedUser) {
+        setUser(storedUser);
+      }
+      apiClient
+        .getMe()
+        .then((data) => {
+          if (data?.user) {
+            setUser(data.user);
+            authStorage.setStoredTokens({ user: data.user });
+          }
+        })
+        .catch((err) => {
+          console.warn('Session restore failed:', err);
+          authStorage.clearStoredTokens();
+          setAuthToken(null);
+          setUser(null);
+        });
+    }
+  }, []);
+
+  // Close mobile sidebar drawer on Escape key press
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
 
   const loginUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthError(null);
     setIsLoggingIn(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.accessToken || !data.user) {
-        setAuthError(data.error || 'Không thể xác thực với API backend');
-        return;
-      }
+      const data = await apiClient.login(email, password);
       setAuthToken(data.accessToken);
       setUser(data.user);
       setPassword('');
-    } catch (err) {
-      setAuthError('Không thể kết nối đến máy chủ API: ' + (err instanceof Error ? err.message : ''));
+    } catch (err: any) {
+      setAuthError(err.message || 'Không thể xác thực với API backend');
     } finally {
       setIsLoggingIn(false);
     }
   };
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(nextTheme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
+  const handleLogout = () => {
+    authStorage.clearStoredTokens();
+    setAuthToken(null);
+    setUser(null);
+    reset();
+    useChatStore.getState().setConversations([]);
+    setCurrentView('landing');
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.pushState({}, '', url.toString());
+    }
   };
 
   // Activate SSE connection for current conversation
   useSSE(conversationId, authToken);
 
+  const handleNewConversation = async () => {
+    reset();
+    try {
+      const data = await apiClient.createConversation();
+      const newConv = data.conversation;
+      if (newConv?.id) {
+        setConversationId(newConv.id);
+        useChatStore.getState().setConversations([
+          newConv,
+          ...useChatStore.getState().conversations.filter((c) => c.id !== newConv.id),
+        ]);
+        return;
+      }
+    } catch (err) {
+      console.warn('Could not create conversation via API:', err);
+    }
+    setConversationId(`conv-${Date.now()}`);
+  };
+
   const handleSendMessage = async (content: string) => {
     let currentConvId = conversationId;
     if (!currentConvId) {
       try {
-        const convRes = await fetch('/api/conversations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-        });
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          currentConvId = convData.conversation?.id || convData.id;
-          if (currentConvId) {
-            setConversationId(currentConvId);
-          }
+        const data = await apiClient.createConversation();
+        currentConvId = data.conversation?.id;
+        if (currentConvId) {
+          setConversationId(currentConvId);
         }
       } catch (err) {
         console.warn('Could not create conversation via API:', err);
@@ -102,62 +187,37 @@ export const App: React.FC = () => {
     addOptimisticMessage({ id: tempId, content });
 
     try {
-      const res = await fetch(`/api/conversations/${currentConvId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ content, tempId }),
-      });
-
-      if (!res.ok && res.status !== 202) {
-        useChatStore.getState().markMessageFailed(tempId);
-        const errData = await res.json().catch(() => ({}));
-        useChatStore.getState().addMessage({
-          id: `err-${Date.now()}`,
-          role: 'system',
-          content: `[Lỗi gửi tin nhắn]: ${errData.error || 'Máy chủ từ chối yêu cầu'}`,
-        });
-      } else {
-        const accepted = await res.json().catch(() => ({}));
-        useChatStore.getState().confirmMessage(tempId, accepted.messageId || tempId);
-      }
+      const result = await apiClient.sendMessage(
+        currentConvId,
+        content,
+        tempId
+      );
+      useChatStore
+        .getState()
+        .confirmMessage(tempId, result?.messageId || tempId);
     } catch (err: any) {
       useChatStore.getState().markMessageFailed(tempId);
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
-        content: `[Lỗi kết nối]: Không thể gửi tin nhắn đến máy chủ. ${err?.message || ''}`,
+        content: `[Lỗi gửi tin nhắn]: ${err?.message || 'Máy chủ từ chối yêu cầu'}`,
       });
     }
   };
 
   const handleApprovePlan = async () => {
-    if (!activePlan) return;
+    if (!activePlan || planStatus === 'approving') return;
 
+    setPlanStatus('approving');
     const planId = activePlan.id || 'plan_default';
     try {
-      const res = await fetch(`/api/plans/${planId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        useChatStore.getState().addMessage({
-          id: `err-${Date.now()}`,
-          role: 'system',
-          content: `[Lỗi phê duyệt kế hoạch]: ${err.error || 'Phê duyệt thất bại'}`,
-        });
-      }
+      await apiClient.approvePlan(planId);
     } catch (err: any) {
+      setPlanStatus('preview');
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
-        content: `[Lỗi kết nối khi duyệt kế hoạch]: ${err?.message || 'Không thể liên lạc với máy chủ'}`,
+        content: `[Lỗi phê duyệt kế hoạch]: ${err?.message || 'Phê duyệt thất bại'}`,
       });
     }
   };
@@ -166,27 +226,21 @@ export const App: React.FC = () => {
     if (!activePlan) return;
     const planId = activePlan.id;
     try {
-      await fetch(`/api/plans/${planId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      if (planId) {
+        await apiClient.rejectPlan(planId);
+      }
     } catch (err) {
       console.warn('Reject plan API call failed:', err);
     }
     setActivePlan(null);
+    setPlanStatus('rejected');
   };
 
   const handleRetry = async (stepId: string) => {
     updateStepStatus(stepId, 'running');
     if (activePlan?.id) {
       try {
-        await fetch(`/api/executions/${activePlan.id}/steps/${stepId}/retry`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
+        await apiClient.retryStep(activePlan.id, stepId);
       } catch (err) {
         console.warn('Retry API call failed, running locally:', err);
       }
@@ -197,10 +251,7 @@ export const App: React.FC = () => {
     updateStepStatus(stepId, 'skipped');
     if (activePlan?.id) {
       try {
-        await fetch(`/api/executions/${activePlan.id}/steps/${stepId}/skip`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
+        await apiClient.skipStep(activePlan.id, stepId);
       } catch (err) {
         console.warn('Skip API call failed, running locally:', err);
       }
@@ -210,13 +261,37 @@ export const App: React.FC = () => {
   const handleStop = async () => {
     if (activePlan?.id) {
       try {
-        await fetch(`/api/executions/${activePlan.id}/stop`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
+        await apiClient.stopExecution(activePlan.id);
       } catch (err) {
         console.warn('Stop API call failed:', err);
       }
+    }
+  };
+
+  const handleEditPlan = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('chat:prefill', {
+          detail: { text: 'Điều chỉnh kế hoạch: ' },
+        })
+      );
+    }
+    const chatInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+      '#chat-input, input[placeholder*="Mô tả công việc"], textarea[placeholder*="Mô tả công việc"], [aria-label*="Mô tả công việc"]'
+    );
+    if (chatInput) {
+      const nativeSetter =
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement?.prototype || {}, 'value')?.set ||
+        Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement?.prototype || {}, 'value')?.set;
+      if (nativeSetter) {
+        nativeSetter.call(chatInput, 'Điều chỉnh kế hoạch: ');
+      } else {
+        chatInput.value = 'Điều chỉnh kế hoạch: ';
+      }
+      chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+      chatInput.dispatchEvent(new Event('change', { bubbles: true }));
+      chatInput.focus();
+      chatInput.setSelectionRange?.(chatInput.value.length, chatInput.value.length);
     }
   };
 
@@ -225,41 +300,71 @@ export const App: React.FC = () => {
   )?.[0];
 
   if (!authToken) {
+    if (currentView === 'landing') {
+      return (
+        <LandingPageView
+          onGoToLogin={() => {
+            setCurrentView('login');
+            if (typeof window !== 'undefined' && window.history?.pushState) {
+              const url = new URL(window.location.href);
+              url.searchParams.set('view', 'login');
+              window.history.pushState({}, '', url.toString());
+            }
+          }}
+        />
+      );
+    }
+
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#f5f5f7] p-4">
-        <form onSubmit={loginUser} className="w-full max-w-sm bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-          <h1 className="text-lg font-semibold text-zinc-900">Đăng nhập AI Workflow</h1>
-          <label className="text-sm text-zinc-700">Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="username" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
-          </label>
-          <label className="text-sm text-zinc-700">Mật khẩu
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" className="mt-1 w-full border border-zinc-300 rounded-lg p-2" />
-          </label>
-          {authError && <p role="alert" className="text-sm text-red-700">{authError}</p>}
-          <button type="submit" disabled={isLoggingIn} className="bg-[#0071e3] text-white rounded-lg p-2 disabled:opacity-50">
-            {isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </button>
-        </form>
-      </main>
+      <LoginView
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        isLoggingIn={isLoggingIn}
+        authError={authError}
+        onLogin={loginUser}
+        onQuickFillAdmin={() => {
+          setEmail((import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test');
+          setPassword((import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678');
+        }}
+        onBackToLanding={() => {
+          setCurrentView('landing');
+          if (typeof window !== 'undefined' && window.history?.pushState) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('view');
+            window.history.pushState({}, '', url.toString());
+          }
+        }}
+      />
     );
   }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-[#1d1d1f]">
+      {/* Mobile sidebar backdrop overlay */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/30 backdrop-blur-xs z-30 cursor-pointer md:hidden"
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar for Desktop & Mobile Drawer */}
       <div
         className={`fixed md:static inset-y-0 left-0 z-40 w-72 bg-[#f5f5f7] border-r border-zinc-200 flex flex-col justify-between transition-transform transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="p-4 flex flex-col flex-1 overflow-hidden">
+          <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center font-bold text-xs shadow-xs">
                 AI
               </div>
               <span className="font-semibold text-sm tracking-tight text-zinc-900">
-                AI Workflow v3
+                AI Workflow Platform
               </span>
             </div>
             <button
@@ -273,69 +378,24 @@ export const App: React.FC = () => {
 
           <button
             type="button"
-            onClick={async () => {
-              reset();
-              try {
-                const res = await fetch('/api/conversations', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${authToken}`,
-                  },
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  const newId = data.conversation?.id || data.id;
-                  if (newId) {
-                    setConversationId(newId);
-                    return;
-                  }
-                }
-              } catch {}
-              setConversationId(`conv-${Date.now()}`);
-            }}
-            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5 cursor-pointer"
+            onClick={handleNewConversation}
+            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
           >
             <span>+</span>
             <span>Cuộc hội thoại mới</span>
           </button>
 
-          {/* Conversation history items */}
-          <div className="mt-6">
-            <span className="text-[11px] font-semibold text-zinc-400 tracking-wider uppercase px-1">
-              Hôm nay
-            </span>
-            <div className="mt-2 flex flex-col gap-1">
-              <div className="bg-white border border-zinc-200/80 rounded-xl p-2.5 shadow-2xs border-l-2 border-l-[#0071e3] text-xs font-medium text-zinc-800 flex justify-between items-center cursor-pointer">
-                <span className="truncate">Tạo card Trello cho Sprint 32</span>
-                <span className="text-[10px] text-zinc-400 ml-2">10:42</span>
-              </div>
-              <div className="hover:bg-zinc-200/50 rounded-xl p-2.5 text-xs text-zinc-600 flex justify-between items-center cursor-pointer transition">
-                <span className="truncate">Báo cáo Slack daily standup</span>
-                <span className="text-[10px] text-zinc-400 ml-2">Hôm qua</span>
-              </div>
-            </div>
-          </div>
+          <SidebarHistory
+            currentConversationId={conversationId}
+            onCloseMobileSidebar={() => setIsSidebarOpen(false)}
+          />
         </div>
 
-        {/* User profile row */}
-        <div className="p-4 border-t border-zinc-200/70 flex items-center justify-between bg-zinc-100/40">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-zinc-300 text-zinc-700 flex items-center justify-center font-bold text-xs">
-              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AO'}
-            </div>
-            <div className="text-xs font-medium text-zinc-800">
-              {user?.name || user?.email || 'Người dùng'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="text-zinc-500 hover:text-zinc-800 text-xs cursor-pointer"
-          >
-            ⚙️ Cài đặt
-          </button>
-        </div>
+        <UserNavMenu
+          user={user}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onLogout={handleLogout}
+        />
       </div>
 
       {/* Main Chat Workspace */}
@@ -357,14 +417,6 @@ export const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label="Chuyển chế độ sáng/tối"
-              className="w-8 h-8 rounded-full border border-zinc-200 hover:bg-zinc-50 text-xs flex items-center justify-center transition cursor-pointer"
-            >
-              {theme === 'light' ? '🌙' : '☀️'}
-            </button>
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
@@ -398,52 +450,18 @@ export const App: React.FC = () => {
             streamingText={streamingText}
             isStreaming={isStreaming}
           >
-            {/* Empty state prompt chips */}
+            {/* Mission Control Launchpad when no messages */}
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-[#0071e3] flex items-center justify-center text-xl mb-4 shadow-xs">
-                  ✨
-                </div>
-                <h2 className="text-xl font-bold text-zinc-900 mb-2">
-                  Bạn muốn điều phối tác vụ nào hôm nay?
-                </h2>
-                <p className="text-xs text-zinc-500 mb-6">
-                  Nền tảng tự động hóa quy trình liên dịch vụ với cơ chế kiểm soát Human-in-the-Loop và Write Safety.
-                </p>
-
-                <div className="flex flex-wrap gap-2 justify-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Tạo task cập nhật landing page cho Minh trên Trello board Frontend và báo Slack channel #general'
-                      )
-                    }
-                    className="text-xs bg-[#fafafc] border border-zinc-200 hover:border-blue-400 hover:bg-blue-50/40 text-zinc-700 px-3.5 py-2 rounded-full transition shadow-2xs"
-                  >
-                    ✨ Tạo task Trello gán member và notify Slack
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Kiểm tra danh sách boards trên Trello và các channels trên Slack'
-                      )
-                    }
-                    className="text-xs bg-[#fafafc] border border-zinc-200 hover:border-blue-400 hover:bg-blue-50/40 text-zinc-700 px-3.5 py-2 rounded-full transition shadow-2xs"
-                  >
-                    🔍 Khảo sát các boards và channels liên kết
-                  </button>
-                </div>
-              </div>
+              <MissionControlLaunchpad onSendMessage={handleSendMessage} />
             )}
 
             {/* Plan Preview Card */}
             {activePlan && (
               <PlanPreview
                 plan={activePlan}
+                isApproving={planStatus === 'approving'}
                 onApprove={handleApprovePlan}
-                onEdit={() => {}}
+                onEdit={handleEditPlan}
                 onCancel={handleRejectPlan}
               />
             )}
@@ -472,10 +490,37 @@ export const App: React.FC = () => {
                 errorMessage={
                   stepErrors[failedStepId] || 'Lỗi thực thi bước'
                 }
+                stepArgs={
+                  activePlan?.steps.find((s) => s.id === failedStepId)?.args
+                }
+                prompt={
+                  (activePlan?.steps.find((s) => s.id === failedStepId)?.args?.prompt as string) ||
+                  activePlan?.steps.find((s) => s.id === failedStepId)?.description
+                }
                 onRetry={() => handleRetry(failedStepId)}
-                onEditAndRetry={() => handleRetry(failedStepId)}
+                onEditAndRetry={(updatedArgs, updatedPrompt) => {
+                  if (activePlan) {
+                    const updatedSteps = activePlan.steps.map((s) => {
+                      if (s.id === failedStepId) {
+                        const newArgs = updatedArgs ? { ...updatedArgs } : { ...s.args };
+                        if (updatedPrompt && ('prompt' in newArgs || !updatedArgs)) {
+                          newArgs.prompt = updatedPrompt;
+                        }
+                        return {
+                          ...s,
+                          args: newArgs,
+                          description: updatedPrompt || s.description,
+                        };
+                      }
+                      return s;
+                    });
+                    setActivePlan({ ...activePlan, steps: updatedSteps });
+                  }
+                  handleRetry(failedStepId);
+                }}
                 onSkip={() => handleSkip(failedStepId)}
                 onStop={handleStop}
+                onClose={handleStop}
               />
             )}
           </ChatContainer>

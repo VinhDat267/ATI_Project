@@ -67,4 +67,13 @@ export class UserRepo {
     if (!res.rows[0]) throw new Error('User already exists');
     return res.rows[0];
   }
+
+  async updatePassword(email: string, newPassword: string): Promise<boolean> {
+    const hashedPassword = hashPassword(newPassword);
+    const res = await this.pool.query(
+      'UPDATE users SET password = $1 WHERE email = $2 RETURNING id',
+      [hashedPassword, email.toLowerCase().trim()]
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
 }

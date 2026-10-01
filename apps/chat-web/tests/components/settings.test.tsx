@@ -10,8 +10,8 @@ afterEach(() => {
 });
 
 describe('ServiceCard Component', () => {
-  it('renders service info, credential inputs, allowed scope and test connection button', () => {
-    const onTest = vi.fn();
+  it('renders service info, credential inputs, allowed scope and test connection button', async () => {
+    const onTest = vi.fn().mockResolvedValue({ success: true, message: 'OK' });
     const onSave = vi.fn();
     render(
       <ServiceCard
@@ -30,7 +30,7 @@ describe('ServiceCard Component', () => {
 
     const testBtn = screen.getByRole('button', { name: /kiểm tra kết nối/i });
     fireEvent.click(testBtn);
-    expect(onTest).toHaveBeenCalled();
+    await waitFor(() => expect(onTest).toHaveBeenCalled());
   });
 
   it('allows adding and removing allowed scope chips', () => {
@@ -65,14 +65,38 @@ describe('ServiceCard Component', () => {
 });
 
 describe('SettingsModal Component', () => {
-  it('renders multiple services and close button', () => {
+  it('renders multiple services and close button', async () => {
     const onClose = vi.fn();
     render(<SettingsModal isOpen={true} onClose={onClose} />);
 
-    expect(screen.getByText(/cài đặt/i)).toBeDefined();
+    expect(await screen.findByText(/cài đặt/i)).toBeDefined();
     const closeBtn = screen.getByRole('button', { name: /đóng/i });
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('closes on Escape key press', async () => {
+    const onClose = vi.fn();
+    render(<SettingsModal isOpen={true} onClose={onClose} />);
+
+    expect(await screen.findByText(/cài đặt/i)).toBeDefined();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on backdrop click but not on modal container click', async () => {
+    const onClose = vi.fn();
+    render(<SettingsModal isOpen={true} onClose={onClose} />);
+
+    const backdrop = await screen.findByRole('dialog');
+    // Click inside the modal content
+    const modalContent = screen.getByText(/cài đặt & tích hợp dịch vụ/i);
+    fireEvent.click(modalContent);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Click backdrop
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('reports the API test failure instead of a success fallback', async () => {
