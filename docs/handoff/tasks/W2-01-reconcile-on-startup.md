@@ -48,7 +48,7 @@ npm run test:v3
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#16](https://github.com/VinhDat267/ATI_Project/pull/16), đặt trên `docs/agent-handoff` vì #15 chưa merge. Đổi base về `main` sau #15; trạng thái task chỉ đóng sau review, CI xanh và merge.
+- Commit code/spec/test: `c8d122c916854707cb0da663a1b0e8a6a1cbb779`.
+- Test đã chạy và kết quả (01/10/2026, PostgreSQL 16 riêng, sandbox): baseline `test:v3` 400/400 exit 0; RED test startup mới 9 fail / 7 pass (16), exit 1; GREEN 16/16 exit 0. `npm run check` exit 0: v3 416/416 (11+53+128+18+106+100), eval 66/66, typecheck/build exit 0, launcher 1/1, local-env 3/3. Browser E2E 6/6 exit 0. Reviewer độc lập chạy lại v3 416/416, eval 66/66 và typecheck, đều exit 0; kết luận kỹ thuật Đạt, không có blocker. Test thật chứng minh HTTP chờ row lock, transaction rollback và startup thất bại khi SQL lỗi, tiến trình bị kill giữa write, thứ tự step, giữ output/timestamp và idempotence.
+- Điều chưa làm hoặc khác với task card: đồng bộ mục 5.8 của đặc tả với chính sách card (read/write `running` đều UNKNOWN, không auto retry). Không đổi schema. W2-02 còn controller rehydration và skip/stop/retry lỗi đã rõ; W2-04 còn frontend reload. Plan chưa có step hoặc chỉ có pending không được tạo UNKNOWN giả; luồng recovery Stop-only thuộc W2-02. Startup yêu cầu executor cũ đã dừng, chưa có lease/fencing nhiều replica. Không chạy live model/provider hoặc ghi dịch vụ bên ngoài trong task này. CI và merge được xác minh trên PR; không tự đóng task hoặc sửa CURRENT-STATE/ROADMAP trong PR thi công.
