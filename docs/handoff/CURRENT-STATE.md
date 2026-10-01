@@ -1,11 +1,19 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 01/10/2026, sau khi PR #22 và #23 merge; `main` = `1029e55`. Agent cập nhật: Claude Code (reviewer).
+**Cập nhật lần cuối:** 02/10/2026, sau khi PR #25 merge; `main` = `af82961`. Agent cập nhật: Claude Code (reviewer).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
 
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
+>
+> **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`. Mã nguồn sản phẩm không đổi so với `1029e55`; #24 và #25 chỉ sửa tài liệu. Các task chờ giao gồm bốn mảng:
+> - **service mới:** W3-00 → W3-07, Sheets, Calendar, Notion, Telegram, Jira;
+> - **tài khoản:** AUTH-01 → AUTH-06;
+> - **frontend:** FE-01 → FE-03;
+> - **đánh giá:** W4-01 → W4-04.
+>
+> Thứ tự và các mốc xem `ROADMAP.md`. Nên giao song song trước: W3-00, AUTH-01, FE-01, FE-02.
 
 ## 1. Sản phẩm
 
@@ -60,6 +68,13 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #20 và #18: #20 merge W2-04 vào nhánh W2-02 tại `c30604b` lúc 08:59:25 UTC ngày 01/10; #18 đưa cả hai vào `main` tại `9c652c4` lúc 09:03:35 UTC. W2-02 khôi phục controller từ approved plan và progress đã lưu, kiểm tra integrity/CAS trước dispatch; skip UNKNOWN, retry failed đã biết, Stop giữ bằng chứng, không chạy lại success. API latest execution snapshot theo owner cung cấp plan/steps/output/timing/recoveryActions; invalid recovery là Stop-only theo spec 5.8. W2-04 tải snapshot khi mở lại hội thoại, hiện ngữ cảnh UNKNOWN cùng Skip/Stop theo server, giữ preview mới và target execution đúng; tin nhắn gửi/lịch sử hiển thị giờ/ngày theo máy người dùng. Tham số hiển thị dựng lại từ saved plan/output, không phải log của request đã gửi service.
 - #19: metadata hậu merge #15 được đưa vào `main` tại `abbb55f` lúc 09:04:40 UTC ngày 01/10. File này cập nhật tiếp trạng thái sau #18/#20; không sửa lại task card hoặc nhật ký thi công cũ.
 - #22: kết quả audit tuần 2 và task card W2-05.
+- #24: ghi nhận W2-05 vào `CURRENT-STATE.md`.
+- #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
+  - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
+  - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;
+  - mảng frontend, lập sau khi review `apps/chat-web`.
+
+  Đặc tả v3 §1.4 và §8.1 có đoạn cập nhật 02/10. W4-03 được sửa để đo ở chế độ live.
 - #23 (W2-05): khôi phục an toàn hơn sau khi server khởi động lại. Plan có mọi step `succeeded`/`skipped` tự thành `completed`; plan không có step chưa rõ kết quả mà còn step `pending` được **chạy tiếp** (`POST /api/executions/:planId/continue`, nút "Chạy tiếp các bước còn lại"). Đặc tả v3 §5.8 đã được sửa theo. Bất biến "ghi `running` xong mới gọi service" có test khóa.
 
 ## 5. Lỗi và hạn chế đã biết
@@ -69,7 +84,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
-| Ở sandbox, `vite.config.ts` đưa `CHAT_ADMIN_PASSWORD` vào bundle frontend; mật khẩu mặc định `Admin@12345678` viết cố định | `apps/chat-web/vite.config.ts`, `LoginView.tsx` | Live mode để trống; đừng dùng mật khẩu này cho tài khoản thật |
+| `vite build` không có `RUNTIME_MODE=live` thì **đóng gói `CHAT_ADMIN_PASSWORD` thật vào JS** (reviewer xác nhận bằng build ngày 02/10); mật khẩu mặc định `Admin@12345678` viết cố định | `apps/chat-web/vite.config.ts`, `LoginView.tsx` | FE-01. Không deploy bản build frontend cho tới khi sửa |
+| Trong hộp thoại lỗi thực thi, Esc / bấm ra ngoài / ✕ gọi Stop, tức **dừng hẳn quy trình** | `App.tsx` (`onClose={handleStop}`), `PartialFailureModal.tsx` | FE-01. Khi demo, chỉ bấm các nút trong hộp thoại |
+| Launchpad viết cứng "4/4 dịch vụ hoạt động tốt" (có cả Sheets); quy trình mẫu hứa thao tác không có tool; sandbox luôn trả một plan soạn sẵn mà không báo; trang giới thiệu có số liệu chưa đo | `MissionControlLaunchpad.tsx`, `server.ts`, `LandingPageView.tsx` | FE-01. Không demo bằng sandbox như thể là AI thật |
+| Refresh token là JWT 7 ngày không lưu ở server: đăng xuất không thu hồi được, trái đặc tả §8.1; chưa có đăng ký, quên mật khẩu, chặn đoán mật khẩu | `apps/chat-api/src/auth/jwt.ts`, `routes/auth-routes.ts` | AUTH-01 → AUTH-05 |
+| Plan preview chỉ hiện ID; kết quả thực thi là JSON thô; nút Back không hoạt động; tải lại trang mất hội thoại; lịch sử không có tiêu đề, tối đa 50 mục; SSE có thể ngừng im lặng khi token hết hạn (đọc code, chưa tái hiện) | `apps/chat-web` | FE-02, FE-03 |
 | Tin nhắn Slack chưa đọc lại tự động sau khi gửi | live-execution | |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
@@ -83,6 +102,12 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - Tài nguyên thử nghiệm thật: Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`. Chỉ ghi ra service thật khi người dùng đã duyệt đúng plan đó.
 
 ## 7. Quy tắc đã chốt
+
+- **Phạm vi chốt 02/10/2026:**
+  - thêm Google Sheets, Google Calendar, Notion, Telegram, Jira; mốc chốt catalog 20/10;
+  - đăng ký mở nhưng admin duyệt, vì credentials service dùng chung cả nhóm;
+  - gửi email bằng Gmail SMTP (`nodemailer` là thư viện mới duy nhất được phép cho mảng tài khoản);
+  - đăng nhập Google bằng OIDC.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
