@@ -9,6 +9,18 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
   const router = Router();
   const { executionService } = options;
 
+  // GET /api/conversations/:convId/executions/latest (owner-scoped reload data)
+  router.get('/conversations/:convId/executions/latest', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const snapshot = await executionService.getLatestExecutionSnapshot(req.params.convId as string, userId);
+      res.status(200).json(snapshot);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ error: error?.message || 'Failed to fetch execution snapshot' });
+    }
+  });
+
   // POST /api/plans/:id/approve
   router.post('/plans/:id/approve', async (req: Request, res: Response): Promise<void> => {
     try {

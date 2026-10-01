@@ -76,5 +76,6 @@ export interface ExecutionControllerOptions {
     ) => Promise<{ status: string; output?: any; error?: any; durationMs?: number }>;
   };
   steps: PlanStep[];
+  initialStates?: Readonly<Record<string, StepState>>;
   onStepUpdate?: (stepId: string, state: StepState) => void | Promise<void>;
 }

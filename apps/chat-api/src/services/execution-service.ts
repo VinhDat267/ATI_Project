@@ -1,10 +1,11 @@
-import type { PlanRepo } from '../db/repositories/plan-repo.js';
+import type { PlanRepo, PlanRow } from '../db/repositories/plan-repo.js';
 import type { StepRepo } from '../db/repositories/step-repo.js';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { StepRunner, ExecutionController, type StepState } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import { recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoverySteps } from './execution-recovery.js';
 
 export interface ApproveResult {
   success: boolean;
@@ -144,19 +145,49 @@ export class ExecutionService {
     };
   }
 
+  private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, initialStates?: Record<string, StepState>) {
+    return new ExecutionController({
+      runner: new StepRunner({ getAdapter: serviceName => this.adapterFactory.getAdapterForService(serviceName) }),
+      steps, initialStates,
+      onStepUpdate: async (stepId, state) => {
+        const dbId = dbIds.get(stepId);
+        if (dbId && this.stepRepo) await this.stepRepo.updateStepStatus(dbId, state.status, state.output, state.error);
+        this.sseManager?.emitEvent(convId, 'exec_step', {
+          planId, stepId, status: state.status, output: state.output, error: state.error,
+        });
+      },
+    });
+  }
+
+  private async restoreController(plan: PlanRow, userId: string, stepId: string, action: 'retry' | 'skip') {
+    if (!['partial', 'reconciliation_required'].includes(plan.status) || !this.stepRepo?.listSteps || !this.planRepo.claimRecovery) {
+      throw recoveryConflict('Reconciliation required: execution controller is unavailable');
+    }
+    const steps = verifiedRecoverySteps(plan);
+    const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
+    validateRecoveryAction(plan.status, before.states, stepId, action);
+    if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
+      throw recoveryConflict('Execution changed or recovery is already running');
+    }
+    try {
+      // Read progress after the CAS: a stale request must not replay an earlier snapshot.
+      const saved = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
+      validateRecoveryAction(plan.status, saved.states, stepId, action);
+      const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, saved.states);
+      this.activeControllers.set(plan.id, controller);
+      return controller;
+    } catch (error) {
+      await this.markExecutionFailed(plan.id, plan.conv_id, error);
+      throw error;
+    }
+  }
+
   private async executePlan(
     convId: string,
     planId: string,
     steps: PlanStep[],
     userId: string
   ): Promise<void> {
-    // 1. Setup StepRunner
-    const runner = new StepRunner({
-      getAdapter: (serviceName: string) => {
-        return this.adapterFactory.getAdapterForService(serviceName);
-      },
-    });
-
     try {
       if (this.stopRequests.has(planId)) return;
       const stepDbIdMap = new Map<string, string>();
@@ -171,19 +202,7 @@ export class ExecutionService {
 
       if (this.stopRequests.has(planId)) return;
 
-      const controller = new ExecutionController({
-        runner,
-        steps,
-        onStepUpdate: async (stepId: string, state: StepState) => {
-          const dbId = stepDbIdMap.get(stepId);
-          if (dbId && this.stepRepo) {
-            await this.stepRepo.updateStepStatus(dbId, state.status, state.output, state.error);
-          }
-          this.sseManager?.emitEvent(convId, 'exec_step', {
-            planId, stepId, status: state.status, output: state.output, error: state.error,
-          });
-        },
-      });
+      const controller = this.buildController(convId, planId, steps, stepDbIdMap);
       this.activeControllers.set(planId, controller);
       const summary = await controller.runUntilPause();
       await this.planRepo.updatePlanStatus(planId, summary.status);
@@ -210,16 +229,22 @@ export class ExecutionService {
       await priorRun.catch(() => undefined);
       planRow = await this.getOwnedPlan(planId, userId);
     }
-    if (['completed', 'stopped', 'failed', 'reconciliation_required'].includes(this.executionOutcomes.get(planId)?.status || planRow.status)) {
+    const status = this.executionOutcomes.get(planId)?.status || planRow.status;
+    if (['completed', 'stopped', 'failed', 'pending', 'rejected', 'superseded', 'expired'].includes(status)) {
       throw Object.assign(new Error('Cannot continue a terminal execution'), { status: 409 });
     }
-    const controller = this.activeControllers.get(planId);
-    if (!controller) {
-      throw Object.assign(new Error('Reconciliation required: execution controller is unavailable'), { status: 409 });
+    verifiedRecoverySteps(planRow);
+    let controller = this.activeControllers.get(planId);
+    if (controller?.isStopped()) {
+      this.activeControllers.delete(planId);
+      controller = undefined;
     }
+    if (!controller) controller = await this.restoreController(planRow, userId, stepId, action);
     if (controller.isExecuting()) {
       throw Object.assign(new Error('Execution is already running'), { status: 409 });
     }
+    validateRecoveryAction(status, controller.getAllStepStates(), stepId, action);
+    this.executionOutcomes.delete(planId);
     const convId = planRow?.conv_id || '';
     const run = (async () => {
       let summary;
@@ -258,10 +283,25 @@ export class ExecutionService {
 
   async stop(planId: string, userId: string): Promise<any> {
     const planRow = await this.getOwnedPlan(planId, userId);
-    if (['completed', 'stopped', 'failed', 'reconciliation_required'].includes(this.executionOutcomes.get(planId)?.status || planRow.status)) {
+    const status = this.executionOutcomes.get(planId)?.status || planRow.status;
+    if (['completed', 'stopped', 'failed', 'pending', 'rejected', 'superseded', 'expired'].includes(status)) {
       throw Object.assign(new Error('Cannot stop a terminal execution'), { status: 409 });
     }
-    const controller = this.activeControllers.get(planId);
+    let controller = this.activeControllers.get(planId);
+    if (controller?.isStopped()) {
+      this.activeControllers.delete(planId);
+      controller = undefined;
+    }
+    // No provider operation is active after restart. Stop only closes the plan;
+    // UNKNOWN rows remain intact, including for missing/corrupt step snapshots.
+    if ((!controller || (!controller.isExecuting() && status === 'reconciliation_required'))
+      && ['partial', 'reconciliation_required'].includes(planRow.status) && this.planRepo.claimRecovery) {
+      if (!await this.planRepo.claimRecovery(planRow, userId, 'stopped')) throw recoveryConflict('Execution changed or recovery is already running');
+      await controller?.stop();
+      this.executionOutcomes.set(planId, { status: 'stopped' });
+      this.sseManager?.emitEvent(planRow.conv_id, 'exec_done', { planId, status: 'stopped' });
+      return { status: 'stopped' };
+    }
     if (!controller) {
       if (!this.queuedStarts.has(planId) && !this.activeRuns.has(planId)) {
         throw Object.assign(new Error('Reconciliation required: execution controller is unavailable'), { status: 409 });
@@ -317,6 +357,36 @@ export class ExecutionService {
       return { status: 'completed' };
     }
     return { status: 'executing' };
+  }
+
+  async getLatestExecutionSnapshot(convId: string, userId: string) {
+    const conversation = await this.convRepo?.getConversation(convId);
+    if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
+    if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+    const plan = await this.planRepo.getLatestExecutedPlan(convId);
+    if (!plan) throw Object.assign(new Error('No execution found'), { status: 404 });
+    const parsed = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+    const execution = await this.getExecutionStatusDurable(plan.id);
+    const rows = this.stepRepo ? await this.stepRepo.listSteps(plan.id) : [];
+    const order = new Map<string, number>((parsed?.steps ?? []).map((step: PlanStep, index: number) => [step.id, index]));
+    rows.sort((a, b) => (order.get(a.step_id) ?? Infinity) - (order.get(b.step_id) ?? Infinity));
+    let recoveryActions: string[] = [];
+    if (execution && !['completed', 'stopped', 'failed'].includes(execution.status)) {
+      recoveryActions = ['stop'];
+      try {
+        const progress = restoredProgress(verifiedRecoverySteps(plan), rows);
+        const paused = execution.pausedStepId ? progress.states[execution.pausedStepId] : undefined;
+        if (paused?.status === 'unknown') recoveryActions = ['skip', 'stop'];
+        else if (paused?.status === 'failed' && execution.status === 'partial') recoveryActions = ['retry', 'skip', 'stop'];
+      } catch { /* Invalid or unstarted progress can still be stopped. */ }
+    }
+    return {
+      plan: { ...parsed, id: plan.id, convId: plan.conv_id, status: plan.status },
+      execution,
+      steps: rows.map(row => ({ stepId: row.step_id, tool: row.tool, status: row.status, output: row.output_json,
+        error: row.error_json, startedAt: row.started_at, completedAt: row.completed_at, durationMs: row.duration_ms })),
+      recoveryActions,
+    };
   }
 
   async getExecutionStatusDurable(planId: string): Promise<{ status: string; pausedStepId?: string } | null> {

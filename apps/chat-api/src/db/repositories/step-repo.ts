@@ -53,7 +53,7 @@ export class StepRepo {
       `UPDATE execution_steps
        SET status = $2,
            output_json = COALESCE($3, output_json),
-           error_json = COALESCE($4, error_json),
+           error_json = CASE WHEN $2 IN ('running', 'succeeded') THEN $4::jsonb ELSE COALESCE($4, error_json) END,
            started_at = CASE WHEN $2 = 'running' THEN clock_timestamp() ELSE started_at END,
            completed_at = CASE WHEN $2 IN ('succeeded', 'failed', 'skipped', 'unknown') THEN clock_timestamp()
                                WHEN $2 = 'running' THEN NULL ELSE completed_at END,
