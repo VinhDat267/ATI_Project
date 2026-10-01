@@ -167,8 +167,10 @@ describe('LoginView Component', () => {
     const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản Admin/i });
     fireEvent.click(quickFillBtn);
 
-    expect(setEmail).toHaveBeenCalledWith('admin@localhost.test');
-    expect(setPassword).toHaveBeenCalledWith('Admin@12345678');
+    // vite.config.ts injects the configured admin (CHAT_ADMIN_* differ between machines and CI).
+    const env = (import.meta as any).env;
+    expect(setEmail).toHaveBeenCalledWith(env.VITE_DEFAULT_ADMIN_EMAIL);
+    expect(setPassword).toHaveBeenCalledWith(env.VITE_DEFAULT_ADMIN_PASSWORD);
   });
 
   it('translates generic Invalid email or password error into helpful Vietnamese guidance', () => {

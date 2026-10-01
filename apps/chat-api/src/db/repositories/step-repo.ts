@@ -47,13 +47,22 @@ export class StepRepo {
     errorJson?: any,
     durationMs?: number
   ): Promise<ExecutionStepRow> {
+    // Timing comes from the database clock: a step starts when it turns running
+    // (again, on retry) and its duration runs from that start to the terminal status.
     const res = await this.pool.query(
       `UPDATE execution_steps
        SET status = $2,
            output_json = COALESCE($3, output_json),
            error_json = COALESCE($4, error_json),
-           duration_ms = COALESCE($5, duration_ms),
-           completed_at = CASE WHEN $2 IN ('succeeded', 'failed', 'skipped', 'unknown') THEN now() ELSE completed_at END
+           started_at = CASE WHEN $2 = 'running' THEN clock_timestamp() ELSE started_at END,
+           completed_at = CASE WHEN $2 IN ('succeeded', 'failed', 'skipped', 'unknown') THEN clock_timestamp()
+                               WHEN $2 = 'running' THEN NULL ELSE completed_at END,
+           duration_ms = CASE
+             WHEN $2 = 'running' THEN NULL
+             WHEN $5::integer IS NOT NULL THEN $5::integer
+             WHEN $2 IN ('succeeded', 'failed', 'unknown') AND started_at IS NOT NULL
+               THEN ROUND(EXTRACT(EPOCH FROM clock_timestamp() - started_at) * 1000)::integer
+             ELSE duration_ms END
        WHERE id = $1
        RETURNING *`,
       [

@@ -35,6 +35,43 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
     expect(rows.find((m) => m.metadata?.type === 'working_memory')).toBeDefined();
   });
 
+  it("shows the previous plan to the planner when the user asks to change it", async () => {
+    const rows: any[] = [];
+    const msgRepo = {
+      createMessage: vi.fn().mockImplementation(async (_convId: string, role: string, content: string, metadata?: any) => {
+        const row = { id: `m-${rows.length + 1}`, role, content, metadata };
+        rows.push(row);
+        return row;
+      }),
+      listMessages: async () => [...rows],
+    };
+    const firstPlan = {
+      kind: "plan", thinking: "x", summary: "Tạo card Sửa lỗi đăng nhập",
+      steps: [{ id: "step_1", tool: "trello.create_card", description: "Tạo card", args: { listId: "l1", title: "Sửa lỗi đăng nhập" }, dependsOn: [] }],
+      warnings: [],
+    };
+    const histories: any[] = [];
+    const planner = { processMessage: async (input: any) => { histories.push(input.history); return firstPlan; } };
+    const planRepo = {
+      createPlan: vi.fn().mockImplementation(async () => ({ id: `plan-${histories.length}` })),
+    };
+    const events: Array<{ name: string; payload: any }> = [];
+    const emitter = { emit: (name: string, payload: any) => { events.push({ name, payload }); } };
+    const service = new ChatService({ msgRepo: msgRepo as any, planRepo: planRepo as any, planner: planner as any, eventEmitter: emitter });
+
+    await service.handleUserMessage({ conversationId: "c", userId: "u", content: "Tạo card Sửa lỗi đăng nhập" });
+    await vi.waitFor(() => expect(events.filter((e) => e.name === "plan_preview")).toHaveLength(1));
+    // What the user sees when reopening the conversation is the summary, not raw JSON.
+    const saved = rows.find((m) => m.metadata?.type === "plan");
+    expect(saved).toMatchObject({ role: "assistant", content: "Kế hoạch: Tạo card Sửa lỗi đăng nhập" });
+    expect(saved.metadata.planId).toBe("plan-1");
+
+    await service.handleUserMessage({ conversationId: "c", userId: "u", content: "Điều chỉnh kế hoạch: đổi tiêu đề thành Sửa lỗi OTP" });
+    await vi.waitFor(() => expect(histories).toHaveLength(2));
+    const previous = histories[1].find((m: any) => m.role === "assistant");
+    expect(JSON.parse(previous.content)).toEqual(firstPlan);
+  });
+
   it('saves message to db and returns 202 accepted payload immediately', async () => {
     const mockMsgRepo = {
       createMessage: vi.fn().mockResolvedValue({ id: 'msg-123' }),

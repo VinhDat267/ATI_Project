@@ -9,6 +9,8 @@ export interface OpenAICompatibleProviderConfig {
   fetch?: typeof fetch;
   timeoutMs?: number;
   maxRetries?: number;
+  /** Retries after the per-attempt deadline elapses (default 1). */
+  timeoutRetries?: number;
   retryDelayMs?: number;
 }
 
@@ -47,6 +49,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private fetchFn: typeof fetch;
   private timeoutMs: number;
   private maxRetries: number;
+  private timeoutRetries: number;
   private retryDelayMs: number;
 
   constructor(config: OpenAICompatibleProviderConfig) {
@@ -58,6 +61,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.fetchFn = config.fetch ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.maxRetries = config.maxRetries ?? 2;
+    this.timeoutRetries = config.timeoutRetries ?? 1;
     this.retryDelayMs = config.retryDelayMs ?? 1_000;
   }
 
@@ -92,7 +96,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       }
       return messageText(json.choices?.[0]?.message?.content);
     }, {
-      label: 'LLM gateway', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries,
+      label: 'LLM gateway', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries, timeoutRetries: this.timeoutRetries,
       retryDelayMs: this.retryDelayMs, signal: input.signal,
     });
   }

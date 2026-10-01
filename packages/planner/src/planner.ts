@@ -207,7 +207,11 @@ export class AIPlanner {
       const prepared = prepareSearchCall(call, activeTools);
       if ('error' in prepared) return { tool: call.tool, args: call.args, error: prepared.error };
       const tool = activeTools.find((candidate) => candidate.name === call.tool)!;
-      const outcome = await this.lookup(tool, prepared.args, signal, input);
+      // Remember the parent a scoped search ran under, e.g. the board of a member.
+      const stamp = Object.fromEntries(Object.entries(tool.inputSchema.properties ?? {})
+        .filter(([name, schema]) => typeof (schema as any)['x-resource'] === 'string' && typeof prepared.args[name] === 'string')
+        .map(([name]) => [name, prepared.args[name]]));
+      const outcome = await this.lookup(tool, prepared.args, signal, input, stamp);
       if (outcome.error !== undefined && signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
       return outcome;
     }));

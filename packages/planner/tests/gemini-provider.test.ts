@@ -59,10 +59,18 @@ describe('GeminiProvider transport', () => {
 
   it('aborts a hung request when the per-call timeout elapses', async () => {
     const { client, requests } = scriptedClient([hang]);
-    const provider = new GeminiProvider({ apiKey: 'k', client, timeoutMs: 50, maxRetries: 0 });
+    const provider = new GeminiProvider({ apiKey: 'k', client, timeoutMs: 50, maxRetries: 0, timeoutRetries: 0 });
     const started = Date.now();
     await expect(provider.generatePlan(input)).rejects.toThrow(/timed out after 50ms/i);
     expect(Date.now() - started).toBeLessThan(2000);
+    expect(requests[0]!.config?.abortSignal?.aborted).toBe(true);
+  });
+
+  it('retries once after its own deadline and returns the second answer', async () => {
+    const { client, requests } = scriptedClient([hang, async () => ({ text: '{"kind":"refusal","reason":"x"}' })]);
+    const provider = new GeminiProvider({ apiKey: 'k', client, timeoutMs: 50, retryDelayMs: 1 });
+    await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"x"}');
+    expect(requests).toHaveLength(2);
     expect(requests[0]!.config?.abortSignal?.aborted).toBe(true);
   });
 

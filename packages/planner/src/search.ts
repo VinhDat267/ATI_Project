@@ -1,5 +1,5 @@
 import type { ToolDefinition } from '@wap/tool-schemas';
-import { validateSchemaValue } from './validator.js';
+import { boardsOf, validateSchemaValue } from './validator.js';
 
 /** Bounds on what a model-driven search may ask for and what is kept afterwards. */
 export const MAX_CALLS_PER_REQUEST = 4;
@@ -21,7 +21,7 @@ export interface SearchOutcome {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'url'];
+const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -87,7 +87,14 @@ export function recordObserved(
   const merged = { ...(observed ?? {}) };
   const fresh = results.map(compact).filter((entity): entity is Record<string, unknown> => entity !== undefined);
   const freshIds = new Set(fresh.map((entity) => String(entity.id)));
-  const kept = (merged[resource] ?? []).filter((entity) => !freshIds.has(String(entity.id)));
+  const previous = merged[resource] ?? [];
+  for (const entity of fresh) {
+    // A member can belong to several boards; keep every board it was seen on.
+    const earlier = previous.find((candidate) => String(candidate.id) === String(entity.id));
+    const boards = [...new Set([...boardsOf(earlier), ...boardsOf(entity)])];
+    if (boards.length > 1) entity.boardIds = boards;
+  }
+  const kept = previous.filter((entity) => !freshIds.has(String(entity.id)));
   merged[resource] = [...kept, ...fresh].slice(-MAX_OBSERVED_PER_RESOURCE);
   return merged;
 }

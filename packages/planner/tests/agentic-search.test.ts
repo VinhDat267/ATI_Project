@@ -271,4 +271,35 @@ describe('search protocol prompt', () => {
     expect(prompt).toMatch(/several results share that exact name.*ask/is);
     expect(prompt).toMatch(/only from a name the user gave.*never pick a channel or list just because it looks generic/is);
   });
+
+  it('lists with an empty query instead of inventing a name to search for', () => {
+    const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
+    expect(prompt).toMatch(/empty query.*lists/is);
+    expect(prompt).toMatch(/never invent a name to search for/i);
+  });
+});
+
+describe('member board scoping', () => {
+  it('remembers the board a member search was scoped to and keeps every board a member was seen on', async () => {
+    const { recordObserved } = await import('../src/search.js');
+    let observed = recordObserved(undefined, 'member', [{ id: 'm1', name: 'Lan', boardId: 'board_be' }]);
+    observed = recordObserved(observed, 'member', [{ id: 'm1', name: 'Lan', boardId: 'board_fe' }]);
+    expect(observed.member).toEqual([{ id: 'm1', name: 'Lan', boardId: 'board_fe', boardIds: ['board_be', 'board_fe'] }]);
+  });
+
+  it('turns a plan that assigns a member from another board into a question', async () => {
+    const assign = card('list_9', { idMembers: ['member_be'] });
+    const { provider, inputs } = scripted(
+      search({ tool: 'trello.search_members', args: { query: 'Minh', boardId: 'board_be' } }),
+      assign, assign,
+    );
+    const s = searcher({ 'trello.search_members': [{ id: 'member_be', name: 'Minh' }] });
+    const memory = new WorkingMemory();
+    memory.setEntity('list', { id: 'list_9', name: 'To Do', boardId: 'board_fe' });
+    const response = await planner(provider, s.fn, { requireGroundedResources: true }).processMessage({
+      userMessage: 'Tạo task cho Minh ở list To Do', memory,
+    });
+    expect(lastUserMessage(inputs[2]!)).toMatch(/member_be[\s\S]*board_fe/);
+    expect(response.kind).toBe('clarification');
+  });
 });

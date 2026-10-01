@@ -87,7 +87,9 @@ export class ChatService {
         (m.role === 'user' || m.role === 'assistant'))
       .map((m: any) => ({
         role: m.role as any,
-        content: m.content,
+        // A saved plan goes back to the model as the JSON it produced, so a follow-up
+        // such as "Điều chỉnh kế hoạch: …" can change it; people see only the summary.
+        content: m.metadata?.type === 'plan' && m.metadata.plan ? JSON.stringify(m.metadata.plan) : m.content,
       }));
 
     // Call planner
@@ -120,6 +122,10 @@ export class ChatService {
         });
         planId = createdPlan.id;
       }
+
+      await this.msgRepo.createMessage(conversationId, 'assistant', `Kế hoạch: ${plannerResponse.summary}`, {
+        type: 'plan', planId, plan: plannerResponse,
+      });
 
       this.eventEmitter.emit('plan_preview', {
         conversationId,

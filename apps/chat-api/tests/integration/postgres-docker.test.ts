@@ -218,4 +218,36 @@ describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
     const finalPlan = await planRepo.getPlan(plan.id);
     expect(finalPlan?.status).toBe('completed');
   });
+
+  it("records when each step started and finished and how long it ran", async () => {
+    const user = await userRepo.createUser({ email: `timing_${Date.now()}@wap.local`, name: "Timing Tester", password: "pass" });
+    const conv = await convRepo.createConversation(user.id);
+    const plan = await planRepo.createPlan({
+      convId: conv.id, planJson: { steps: [] }, planHash: "hash-timing", expiresAt: new Date(Date.now() + 60000),
+    });
+    const step = await stepRepo.createStep({ planId: plan.id, stepId: "s1", tool: "trello.create_card" });
+    const skipped = await stepRepo.createStep({ planId: plan.id, stepId: "s2", tool: "slack.send_message" });
+
+    const running = await stepRepo.updateStepStatus(step.id, "running");
+    expect(running.started_at).toBeInstanceOf(Date);
+    expect(running.completed_at).toBeNull();
+    await new Promise((done) => setTimeout(done, 60));
+    const failed = await stepRepo.updateStepStatus(step.id, "failed", undefined, { message: "boom" });
+    expect(failed.completed_at).toBeInstanceOf(Date);
+    expect(failed.duration_ms).toBeGreaterThanOrEqual(50);
+
+    // A retry runs the step again: the earlier finish time and duration no longer describe it.
+    const retried = await stepRepo.updateStepStatus(step.id, "running");
+    expect(retried.completed_at).toBeNull();
+    expect(retried.duration_ms).toBeNull();
+    expect(retried.started_at!.getTime()).toBeGreaterThanOrEqual(failed.completed_at!.getTime());
+    const done = await stepRepo.updateStepStatus(step.id, "succeeded", { id: "card_1" });
+    expect(done.duration_ms).toBeGreaterThanOrEqual(0);
+    expect(done.duration_ms).toBeLessThan(failed.duration_ms!);
+
+    const never = await stepRepo.updateStepStatus(skipped.id, "skipped");
+    expect(never.started_at).toBeNull();
+    expect(never.duration_ms).toBeNull();
+    expect(never.completed_at).toBeInstanceOf(Date);
+  });
 });
