@@ -2,7 +2,7 @@
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
-Mốc 01/10/2026: PR #17 đã merge metadata vào `docs/agent-handoff` tại `adf472c`, rồi PR #15 đưa handoff và W2-01 vào `main` tại `35f454a`. PR #18 (W2-02) vẫn OPEN, đã đổi base về `main`; W2-04 đang triển khai trên nhánh đặt trên W2-02. Trạng thái bên dưới phân biệt đã vào `main` với code/test trên các nhánh chưa merge.
+Mốc 01/10/2026: `main` tại `abbb55f` đã chứa W2-01 qua #15, W2-02 và W2-04 qua #18. #20 merge vào nhánh W2-02 tại `c30604b`, #18 merge `main` tại `9c652c4`, rồi #19 merge metadata tại `abbb55f`. Không còn PR mở lúc đối chiếu; W2-03 vẫn chờ scope và phê duyệt ghi live. Task card và nhật ký cũ giữ nguyên trạng thái tại thời điểm bàn giao; bảng này ghi trạng thái sau merge.
 
 | Tuần | Việc | Task card | Trạng thái |
 |---|---|---|---|
@@ -12,12 +12,14 @@ Mốc 01/10/2026: PR #17 đã merge metadata vào `docs/agent-handoff` tại `ad
 | 1 | Ghi thời lượng từng step | — | xong (PR #13) |
 | 1 | "Sửa qua Chat" hoạt động, plan preview không bị che | — | xong (PR #13) |
 | 2 (08–14/10) | Đối soát các lần thực thi bị gián đoạn khi server khởi động lại | [W2-01](tasks/W2-01-reconcile-on-startup.md) | xong, đã vào `main` qua #15 (`35f454a`), thi công ở #16 |
-| 2 | Tiếp tục hoặc dừng một plan sau khi đối soát | [W2-02](tasks/W2-02-resume-after-restart.md) | đang làm (`vinhdat/fix-w2-02-resume-after-restart`); PR #18 OPEN, base `main`, head `31670bc`, CI xanh; chưa merge |
-| 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ |
-| 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | đang làm (`vinhdat/feat-w2-04-reconciliation-ui`, đặt trên nhánh W2-02 theo yêu cầu người dùng); chưa nghiệm thu/merge |
+| 2 | Tiếp tục hoặc dừng một plan sau khi đối soát | [W2-02](tasks/W2-02-resume-after-restart.md) | xong, #18 đã merge `main` tại `9c652c4` |
+| 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ scope/plan live và người dùng duyệt lệnh ghi; chưa chạy live failure |
+| 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | xong, #20 merge vào #18 tại `c30604b`, đã vào `main` qua #18 |
 | 3 (15–21/10) | Google Sheets làm service thứ tư: tool, adapter, xác thực, allowed scope, UI cấu hình, test liên service; một workflow qua bốn service, sandbox và chạy thật | — | chưa có task card |
 | 4 (22–28/10) | Đánh giá: ≥ 30 câu mới do thành viên khác viết; ≥ 20 lượt người dùng thật duyệt plan để đo tỉ lệ plan dùng được; ≥ 20 lượt đo latency qua frontend; đo lại hành vi khi lịch sử có plan cũ | — | chưa có task card |
 | 5 (29/10–04/11) | Ngừng thêm tính năng; môi trường demo dựng lại được theo hướng dẫn; đường LLM dự phòng qua Gemini API chính thức; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
 | 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
+
+W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/fencing nhiều replica chưa có. Minor `text_*` streaming của frontend được hoãn: chưa tìm thấy production emitter, reachability chưa chứng minh; cần xử lý timestamp/finalized message trước khi nối producer này. Số liệu hiện tại và giới hạn review/live xem [CURRENT-STATE](CURRENT-STATE.md).
 
 Thứ tự ưu tiên khi thiếu thời gian: bỏ Google Sheets (tuần 3) trước, không bỏ phục hồi và an toàn ghi (tuần 2).
