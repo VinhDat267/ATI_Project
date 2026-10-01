@@ -64,6 +64,8 @@ Phạm vi hỗ trợ là các dịch vụ đã được đăng ký, có adapter,
 
 GitHub đã được chọn làm tích hợp thứ ba. Registry, routing theo catalog và cấu hình UI tổng quát đã có mã nguồn và bằng chứng sandbox; nghiệm thu live vẫn **OPEN**. Google Sheets thuộc đợt sau. Xem [trạng thái triển khai và bằng chứng](../../MULTI-SERVICE-SCOPE.md).
 
+**Cập nhật 02/10/2026:** Chủ dự án chốt đợt mở rộng tiếp theo gồm năm dịch vụ: Google Sheets, Google Calendar, Notion, Telegram, Jira. Trước khi thêm, các chỗ còn viết cố định theo tên dịch vụ trong lõi phải được gỡ (task W3-00) để đáp ứng tiêu chí 2. Kế hoạch, mốc chốt catalog và thứ tự bỏ bớt khi thiếu thời gian xem [`docs/handoff/ROADMAP.md`](../../handoff/ROADMAP.md).
+
 ## 2. Nguyên tắc Thiết kế
 
 1. **AI phải làm việc CỦA AI** — nhận đầu vào phi cấu trúc, chuyển thành hành
@@ -782,6 +784,14 @@ GET    /api/auth/me         → { user }
 
 Admin tạo tài khoản qua CLI/seed script. Không có đăng ký tự do.
 JWT Access Token có TTL ngắn. Refresh token hỗ trợ revocation khi cần.
+
+**Cập nhật 02/10/2026 (thay đoạn trên khi mảng AUTH hoàn thành):** chủ dự án chốt mở đăng ký nhưng admin duyệt. Lý do: credentials của service dùng chung cho cả nhóm, nên chỉ người được duyệt mới dùng được.
+- Tài khoản có `status` (`pending` → `active` khi admin duyệt; `disabled` khi bị khóa) và `role` (`member`/`admin`). Admin đầu tiên vẫn tạo bằng CLI.
+- Đăng nhập bằng email/mật khẩu hoặc Google (OpenID Connect, code + PKCE). Có xác minh email và quên mật khẩu; email gửi qua Gmail SMTP.
+- Refresh token là chuỗi ngẫu nhiên lưu dạng hash trong bảng `auth_sessions`, xoay vòng mỗi lần dùng. Đăng xuất, đổi mật khẩu, khóa tài khoản thu hồi phiên ngay.
+- Thêm các nhóm API `/api/auth/*` (signup, verify-email, forgot/reset-password, logout, google), `/api/account/*`, `/api/admin/users/*`.
+
+Chi tiết và tiêu chí nghiệm thu: `docs/handoff/tasks/AUTH-common.md` và AUTH-01 → AUTH-06.
 
 ### 8.2. Conversations
 
