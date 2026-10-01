@@ -73,6 +73,43 @@ test('real browser and PostgreSQL: cancel a pending plan', async ({ page }) => {
   }
 });
 
+test('real browser and PostgreSQL: edit a pending plan through chat', async ({ page }, testInfo) => {
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Tạo task Trello và báo Slack E2E edit ${Date.now()}`;
+    const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    await composer.fill(prompt);
+    await composerSend(page).click();
+    const approve = page.getByRole('button', { name: /Duyệt kế hoạch/ });
+    await expect(approve).toBeVisible();
+    // The whole preview, approve button included, must be reachable above the composer.
+    await approve.scrollIntoViewIfNeeded();
+    const approveBox = (await approve.boundingBox())!;
+    const composerBox = (await composer.boundingBox())!;
+    expect(approveBox.y + approveBox.height).toBeLessThanOrEqual(composerBox.y);
+    await page.screenshot({ path: testInfo.outputPath('plan-preview.png') });
+    const convId = (await pool.query('SELECT conv_id FROM messages WHERE content = $1', [prompt])).rows[0]?.conv_id;
+    const first = (await pool.query("SELECT id FROM plans WHERE conv_id = $1 AND status = 'pending'", [convId])).rows[0]?.id;
+    expect(first).toBeTruthy();
+
+    await page.getByRole('button', { name: 'Sửa qua Chat' }).click();
+    await expect(composer).toHaveValue(/^Điều chỉnh kế hoạch: /);
+    await composer.pressSequentially('đổi tiêu đề thành Sửa CSS trang chủ');
+    await composerSend(page).click();
+
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [first])).rows[0]?.status).toBe('superseded');
+    const plans = (await pool.query("SELECT id, status FROM plans WHERE conv_id = $1 ORDER BY created_at", [convId])).rows;
+    expect(plans.map((p) => p.status)).toEqual(['superseded', 'pending']);
+    const saved = await pool.query("SELECT count(*)::int AS n FROM messages WHERE conv_id = $1 AND metadata->>'type' = 'plan'", [convId]);
+    expect(saved.rows[0].n).toBe(2);
+    await expect(approve).toBeVisible();
+    await page.getByRole('button', { name: 'Hủy', exact: true }).click();
+  } finally {
+    await pool.end();
+  }
+});
+
 test('real browser and PostgreSQL: clarification before plan', async ({ page }) => {
   test.skip(process.env.SANDBOX_SCENARIO !== 'clarification', 'requires the explicit clarification sandbox scenario');
   const pool = new pg.Pool({ connectionString });
