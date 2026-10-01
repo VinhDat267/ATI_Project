@@ -296,3 +296,58 @@ describe('packages/planner resource grounding layer', () => {
     expect(validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_frontend_todo', title: 'Task' } }), catalog).valid).toBe(true);
   });
 });
+
+describe('packages/planner member board check', () => {
+  const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS];
+  const plan = (...steps: Array<{ tool: string; args: unknown; id?: string; dependsOn?: string[] }>) => JSON.stringify({
+    kind: 'plan', thinking: 'Board check', summary: 'Board check', warnings: [],
+    steps: steps.map((step, index) => ({
+      id: step.id ?? `step_${index + 1}`, tool: step.tool, description: 'Step', args: step.args, dependsOn: step.dependsOn ?? [],
+    })),
+  });
+  const memory = {
+    list: [{ id: 'list_fe', name: 'To Do', boardId: 'board_fe' }],
+    member: [{ id: 'member_fe', name: 'Minh', boardId: 'board_fe' }, { id: 'member_be', name: 'Minh', boardId: 'board_be' }],
+  };
+  const grounding = { memory, userTexts: ['Tạo task cho Minh'] };
+
+  it('rejects a new card that assigns a member found only on another board', () => {
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_fe', title: 'Task', idMembers: ['member_be'] } }),
+      catalog, { grounding });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('grounding');
+      expect(result.error).toMatch(/member_be[\s\S]*board_fe/);
+      expect(result.ungrounded).toEqual([{ stepId: 'step_1', argument: 'idMembers', resource: 'member', value: 'member_be' }]);
+    }
+  });
+
+  it('accepts a member found on the board of the card list', () => {
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_fe', title: 'Task', idMembers: ['member_fe'] } }),
+      catalog, { grounding });
+    expect(result.valid).toBe(true);
+  });
+
+  it('accepts a member seen on several boards when one of them is the card board', () => {
+    const shared = { ...memory, member: [{ id: 'member_both', name: 'Lan', boardIds: ['board_be', 'board_fe'] }] };
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_fe', title: 'Task', idMembers: ['member_both'] } }),
+      catalog, { grounding: { memory: shared, userTexts: [] } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('does not guess when the board of the list or the member is unknown', () => {
+    const unknown = { list: [{ id: 'list_x' }], member: [{ id: 'member_y' }] };
+    const result = validatePlan(plan({ tool: 'trello.create_card', args: { listId: 'list_x', title: 'Task', idMembers: ['member_y'] } }),
+      catalog, { grounding: { memory: unknown, userTexts: [] } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('checks add_member against the board of a card created earlier in the plan', () => {
+    const result = validatePlan(plan(
+      { id: 'card', tool: 'trello.create_card', args: { listId: 'list_fe', title: 'Task' } },
+      { id: 'assign', tool: 'trello.add_member', args: { cardId: { $ref: 'card.output.id' }, memberId: 'member_be' }, dependsOn: ['card'] },
+    ), catalog, { grounding });
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.ungrounded).toEqual([{ stepId: 'assign', argument: 'memberId', resource: 'member', value: 'member_be' }]);
+  });
+});

@@ -122,6 +122,51 @@ function memoryValues(memory: Record<string, any>, resource: string, field: stri
     .map(String));
 }
 
+/** Boards an observed entity is known to belong to. */
+export function boardsOf(entity: Record<string, unknown> | undefined): string[] {
+  if (!entity) return [];
+  if (Array.isArray(entity.boardIds)) return entity.boardIds.map(String);
+  return typeof entity.boardId === 'string' ? [entity.boardId] : [];
+}
+
+function entitiesWithId(memory: Record<string, any>, resource: string, id: string): Array<Record<string, unknown>> {
+  const entity = memory[resource];
+  const entries = Array.isArray(entity) ? entity : [entity];
+  return entries.filter((entry) => entry && typeof entry === 'object' && String(entry.id) === id);
+}
+
+/**
+ * Trello only assigns members of the card's board. A member is rejected when
+ * every board it was seen on differs from the card's board; when either board
+ * is unknown nothing is assumed.
+ */
+function findMembersOffBoard(steps: PlanStep[], memory: Record<string, any>): UngroundedArgument[] {
+  const boardOfList = (listId: unknown) => typeof listId === 'string'
+    ? [...new Set(entitiesWithId(memory, 'list', listId).flatMap(boardsOf))] : [];
+  const cardBoards = new Map<string, string[]>();
+  for (const step of steps) {
+    if (step.tool === 'trello.create_card') cardBoards.set(step.id, boardOfList(step.args.listId));
+  }
+  const boardOfCard = (cardId: unknown): string[] => {
+    const ref = cardId && typeof cardId === 'object' ? (cardId as { $ref?: unknown }).$ref : undefined;
+    if (typeof ref === 'string') return cardBoards.get(ref.split('.')[0]!) ?? [];
+    return typeof cardId === 'string' ? [...new Set(entitiesWithId(memory, 'card', cardId).flatMap(boardsOf))] : [];
+  };
+  const offBoard: UngroundedArgument[] = [];
+  const check = (step: PlanStep, argument: string, value: unknown, boards: string[]) => {
+    if (typeof value !== 'string' || boards.length !== 1) return;
+    const seenOn = entitiesWithId(memory, 'member', value).flatMap(boardsOf);
+    if (seenOn.length > 0 && !seenOn.includes(boards[0]!)) offBoard.push({ stepId: step.id, argument, resource: 'member', value });
+  };
+  for (const step of steps) {
+    if (step.tool === 'trello.create_card' && Array.isArray(step.args.idMembers)) {
+      for (const member of step.args.idMembers) check(step, 'idMembers', member, cardBoards.get(step.id) ?? []);
+    }
+    if (step.tool === 'trello.add_member') check(step, 'memberId', step.args.memberId, boardOfCard(step.args.cardId));
+  }
+  return offBoard;
+}
+
 function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
   const typed = userTokens(grounding.userTexts);
   const ungrounded: UngroundedArgument[] = [];
@@ -413,6 +458,22 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         layer: 'grounding',
         error: `Unverified resource arguments: ${listed}. Use values from Working Memory, a $ref to an earlier step, or return a clarification asking the user for the resource.`,
         ungrounded,
+      };
+    }
+    const offBoard = findMembersOffBoard(steps, options.grounding.memory);
+    if (offBoard.length > 0) {
+      const boardFor = (u: UngroundedArgument) => {
+        const step = steps.find((candidate) => candidate.id === u.stepId)!;
+        const listId = step.tool === 'trello.create_card' ? step.args.listId
+          : steps.find((candidate) => candidate.id === String((step.args.cardId as any)?.$ref ?? '').split('.')[0])?.args.listId;
+        return entitiesWithId(options.grounding!.memory, 'list', String(listId)).flatMap(boardsOf)[0] ?? 'the card board';
+      };
+      const listed = offBoard.map((u) => `${u.stepId}.${u.argument}=${JSON.stringify(u.value)} is not a member of board ${boardFor(u)}`).join('; ');
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Member not on the card's board: ${listed}. Search members with that boardId, or ask the user which member to assign.`,
+        ungrounded: offBoard,
       };
     }
   }
