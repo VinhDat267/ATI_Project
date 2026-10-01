@@ -271,6 +271,12 @@ describe('search protocol prompt', () => {
     expect(prompt).toMatch(/several results share that exact name.*ask/is);
     expect(prompt).toMatch(/only from a name the user gave.*never pick a channel or list just because it looks generic/is);
   });
+
+  it('lists with an empty query instead of inventing a name to search for', () => {
+    const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
+    expect(prompt).toMatch(/empty query.*lists/is);
+    expect(prompt).toMatch(/never invent a name to search for/i);
+  });
 });
 
 describe('member board scoping', () => {
