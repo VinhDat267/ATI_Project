@@ -195,21 +195,24 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </svg>
                 <span>Điền nhanh tài khoản Admin</span>
               </button>
-              <div className="p-2.5 rounded-xl bg-zinc-50/90 border border-zinc-200/80 text-[11px] flex flex-col gap-1.5 text-left">
+              <div className="p-3 rounded-2xl bg-zinc-50/90 border border-zinc-200/80 text-[11px] flex flex-col gap-2 text-left">
                 <div className="flex items-center gap-1.5 font-medium text-zinc-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                   <span>Tài khoản Quản trị viên thử nghiệm:</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 pl-3 text-[11px] text-zinc-600">
-                  <span className="text-zinc-400">Email:</span>
-                  <code className="font-mono text-zinc-800 bg-white px-1.5 py-0.5 rounded border border-zinc-200/80 select-all font-semibold">
-                    {defaultAdminEmail}
-                  </code>
-                  <span className="text-zinc-300 mx-0.5">|</span>
-                  <span className="text-zinc-400">Mật khẩu:</span>
-                  <code className="font-mono text-zinc-800 bg-white px-1.5 py-0.5 rounded border border-zinc-200/80 select-all font-semibold">
-                    {defaultAdminPassword}
-                  </code>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-zinc-200/70 shadow-2xs">
+                    <span className="text-zinc-500 font-medium text-[11px]">Email</span>
+                    <code className="font-mono text-zinc-800 font-semibold select-all text-[11px]">
+                      {defaultAdminEmail}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-zinc-200/70 shadow-2xs">
+                    <span className="text-zinc-500 font-medium text-[11px]">Mật khẩu</span>
+                    <code className="font-mono text-zinc-800 font-semibold select-all text-[11px]">
+                      {defaultAdminPassword}
+                    </code>
+                  </div>
                 </div>
               </div>
             </div>
