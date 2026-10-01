@@ -205,81 +205,122 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
       {/* 3. CORE SECTION: Before vs After Comparison */}
       <section id="comparison" className="py-16 sm:py-24 bg-white border-y border-zinc-200/80 scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 font-semibold text-xs tracking-wide uppercase">
+          {/* Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
+            <span className="px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200/70 text-blue-700 font-semibold text-xs tracking-wide uppercase shadow-2xs">
               So sánh hiệu quả vận hành
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mt-3">
-              Sự khác biệt mang tính cách mạng
+              Sự khác biệt vượt trội về hiệu suất
             </h2>
-            <p className="mt-3 text-sm sm:text-base text-zinc-500">
-              Nhìn lại sự lãng phí thời gian của quy trình thủ công rời rạc so với giải pháp tự động hóa bằng AI.
+            <p className="mt-3 text-sm sm:text-base text-zinc-600 leading-relaxed">
+              Đo lường trực quan giá trị thực tế khi chuyển từ quy trình thủ công rời rạc sang giải pháp tự động hóa thông minh bằng AI.
             </p>
           </div>
 
-          {/* Comparison Cards Grid */}
+          {/* 3 Stat ROI Highlight Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 sm:mb-12">
+            <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
+              <div className="text-3xl sm:text-4xl font-extrabold text-blue-600 tracking-tight">95%</div>
+              <div className="text-xs font-bold text-zinc-900 mt-1.5">Tiết kiệm thời gian</div>
+              <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
+                Từ 15–20 phút mở nhiều ứng dụng xuống dưới 10 giây mỗi quy trình
+              </p>
+            </div>
+            <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
+              <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 tracking-tight">1 Câu lệnh</div>
+              <div className="text-xs font-bold text-zinc-900 mt-1.5">Thay thế 8 bước thủ công</div>
+              <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
+                Tự động bóc tách mục tiêu, tạo thẻ, cập nhật dữ liệu và gửi thông báo
+              </p>
+            </div>
+            <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-600 tracking-tight">100%</div>
+              <div className="text-xs font-bold text-zinc-900 mt-1.5">Minh bạch &amp; Kiểm soát</div>
+              <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
+                Người dùng luôn xem trước kế hoạch chi tiết và duyệt trước khi thực thi
+              </p>
+            </div>
+          </div>
+
+          {/* 1-to-1 Balanced Comparison Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-stretch">
             {/* Cột TRƯỚC (Cách làm thủ công truyền thống) */}
-            <div className="bg-red-50/40 border border-red-200/80 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs">
+            <div className="bg-zinc-50/50 hover:bg-zinc-50/80 border border-zinc-200/90 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs transition-all">
               <div>
-                <div className="flex items-center justify-between pb-4 border-b border-red-200/60">
+                <div className="flex items-center justify-between pb-4 border-b border-zinc-200/80">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm">
+                    <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm">
                       ✕
                     </span>
-                    <h3 className="font-bold text-base sm:text-lg text-red-950">
-                      Cách làm truyền thống: 8 bước rườm rà qua 4 ứng dụng
-                    </h3>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 block">
+                        Quy trình truyền thống
+                      </span>
+                      <h3 className="font-bold text-base sm:text-lg text-zinc-900 leading-snug">
+                        Cách làm truyền thống: 8 bước rườm rà qua 4 ứng dụng
+                      </h3>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-2 text-xs font-semibold text-red-600 uppercase tracking-wider">
-                  ⚠️ Chậm chạp • Rời rạc • Tốn 15–20 phút
+                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">
+                  <span>⏱️</span>
+                  <span>Tốn 15–20 phút mỗi nhiệm vụ</span>
                 </div>
 
-                <ul className="mt-5 space-y-3 text-xs sm:text-sm text-zinc-700">
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">1.</span>
-                    <span>Lục tìm board &amp; list, tạo card thủ công trên Trello, Jira hoặc Asana.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">2.</span>
-                    <span>Tìm kiếm tài khoản thành viên để gán người phụ trách từng khâu.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">3.</span>
-                    <span>Mở thêm bảng tính theo dõi hoặc tài liệu dự án để nhập liệu bổ sung.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">4.</span>
-                    <span>Sao chép từng đường link, mã công việc dán ngược qua lại giữa các ứng dụng.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">5.</span>
-                    <span>Chuyển sang phần mềm chat (Slack, Teams), lục tìm kênh làm việc.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">6.</span>
-                    <span>Soạn tin nhắn thông báo kèm đầy đủ đường link và nội dung liên quan.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">7.</span>
-                    <span>Mở Google Sheets cập nhật trạng thái nhật ký tiến độ chung.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500 font-bold shrink-0 mt-0.5">8.</span>
-                    <span>Thao tác lặp đi lặp lại nhiều lần mỗi ngày gây mất tập trung và dễ sai sót.</span>
-                  </li>
-                </ul>
+                {/* 4 Tiêu chí đối chiếu 1-1 */}
+                <div className="mt-6 space-y-4 text-xs sm:text-sm text-zinc-700">
+                  <div className="p-3 rounded-xl bg-white/80 border border-zinc-200/70 shadow-2xs">
+                    <div className="font-semibold text-zinc-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-rose-500">1.</span>
+                      <span>Thao tác ứng dụng rời rạc</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Lục tìm board &amp; list, tạo card thủ công trên Trello, Jira; chuyển tab liên tục để copy dữ liệu.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/80 border border-zinc-200/70 shadow-2xs">
+                    <div className="font-semibold text-zinc-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-rose-500">2.</span>
+                      <span>Phân công &amp; Gắn kết nối</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Tìm kiếm tài khoản thành viên để gán người phụ trách từng khâu; sao chép đường link dán qua lại.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/80 border border-zinc-200/70 shadow-2xs">
+                    <div className="font-semibold text-zinc-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-rose-500">3.</span>
+                      <span>Trao đổi &amp; Cập nhật tiến độ</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Chuyển sang Slack soạn tin nhắn thông báo, rồi mở Google Sheets cập nhật trạng thái nhật ký chung.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/80 border border-zinc-200/70 shadow-2xs">
+                    <div className="font-semibold text-zinc-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-rose-500">4.</span>
+                      <span>Rủi ro sai sót &amp; Mệt mỏi</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Thao tác lặp đi lặp lại nhiều lần mỗi ngày gây mất tập trung, dễ sót việc và sai lệch số liệu.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-red-200/60 text-xs text-red-700 font-medium">
-                Kết quả: Lãng phí thời gian quý báu của nhân sự vào những công việc cơ học.
+              <div className="mt-6 pt-4 border-t border-zinc-200/80 text-xs text-rose-700 font-medium flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Hệ quả: Tiêu tốn 2–3 giờ/ngày của mỗi nhân sự vào những việc vụn vặt cơ học.</span>
               </div>
             </div>
 
             {/* Cột SAU (Với AI Workflow Platform) */}
-            <div className="bg-gradient-to-b from-blue-50/60 via-white to-indigo-50/40 border-2 border-blue-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
+            <div className="bg-gradient-to-b from-blue-50/50 via-white to-indigo-50/30 border-2 border-blue-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 px-3.5 py-1 bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-bl-2xl uppercase tracking-wider">
                 Đột phá
               </div>
@@ -287,47 +328,72 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               <div>
                 <div className="flex items-center justify-between pb-4 border-b border-blue-200/60">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20">
+                    <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/25">
                       ✓
                     </span>
-                    <h3 className="font-bold text-base sm:text-lg text-zinc-900">
-                      Với AI Workflow: 1 câu lệnh tự nhiên duy nhất
-                    </h3>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 block">
+                        Tự động hóa thông minh
+                      </span>
+                      <h3 className="font-bold text-base sm:text-lg text-zinc-900 leading-snug">
+                        Với AI Workflow: 1 câu lệnh tự nhiên duy nhất
+                      </h3>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-2 text-xs font-semibold text-emerald-600 uppercase tracking-wider">
-                  ⚡ Tức thì • Chính xác 100% • Tiết kiệm 80% thời gian
+                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                  <span>⚡</span>
+                  <span>Hoàn thành tức thì dưới 10 giây</span>
                 </div>
 
-                <ul className="mt-5 space-y-3.5 text-xs sm:text-sm text-zinc-800">
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-blue-600 font-bold shrink-0 mt-0.5">1.</span>
-                    <span>
-                      <strong>Bạn chỉ cần chat một câu:</strong>
-                      <span className="block mt-1 p-2 rounded-lg bg-white border border-blue-200 text-xs italic text-blue-900 font-medium">
-                        &ldquo;Giao việc cập nhật kế hoạch cho team dự án trên Trello, ghi nhận vào Google Sheets và thông báo vào nhóm Slack&rdquo;
-                      </span>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-emerald-600 font-bold shrink-0 mt-0.5">2.</span>
-                    <span><strong>AI tự động phân giải đối tượng và lập kế hoạch</strong> đa bước hoàn chỉnh.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-emerald-600 font-bold shrink-0 mt-0.5">3.</span>
-                    <span><strong>Xem trước kế hoạch minh bạch:</strong> Bạn kiểm tra các bước trước khi thực thi.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-emerald-600 font-bold shrink-0 mt-0.5">4.</span>
-                    <span><strong>Đồng bộ đa ứng dụng tức thì:</strong> Thẻ công việc, bảng tính theo dõi và thông báo nội bộ được cập nhật đồng loạt chỉ sau một cú nhấp chuột.</span>
-                  </li>
-                </ul>
+                {/* 4 Tiêu chí đối chiếu 1-1 */}
+                <div className="mt-6 space-y-4 text-xs sm:text-sm text-zinc-800">
+                  <div className="p-3 rounded-xl bg-white border border-blue-200/80 shadow-2xs">
+                    <div className="font-semibold text-blue-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-blue-600">1.</span>
+                      <span>Giao việc tự nhiên bằng 1 câu chat</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed italic bg-blue-50/50 p-1.5 rounded-lg border border-blue-100 text-blue-950 font-medium">
+                      &ldquo;Giao việc cập nhật kế hoạch cho team dự án trên Trello, ghi nhận vào Google Sheets và thông báo vào nhóm Slack&rdquo;
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white border border-blue-200/80 shadow-2xs">
+                    <div className="font-semibold text-blue-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-blue-600">2.</span>
+                      <span>AI tự động phân giải &amp; lập kế hoạch</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      AI tự động phân giải đối tượng và lập kế hoạch đa bước hoàn chỉnh, định danh đúng bảng, danh sách và người phụ trách.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white border border-blue-200/80 shadow-2xs">
+                    <div className="font-semibold text-blue-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-blue-600">3.</span>
+                      <span>Xem trước kế hoạch minh bạch</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Bạn toàn quyền kiểm tra các bước và tham số trước khi thực thi. Không bao giờ lo AI tự ý thao tác sai lệch dữ liệu.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white border border-blue-200/80 shadow-2xs">
+                    <div className="font-semibold text-blue-900 flex items-center gap-1.5 text-xs mb-1">
+                      <span className="text-blue-600">4.</span>
+                      <span>Đồng bộ đa ứng dụng tức thì</span>
+                    </div>
+                    <p className="text-zinc-600 text-xs leading-relaxed">
+                      Thẻ công việc Trello, bảng tính Google Sheets và thông báo Slack được cập nhật đồng loạt chỉ sau một cú nhấp chuột duyệt.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 pt-4 border-t border-blue-200/60 text-xs text-blue-700 font-semibold flex items-center gap-1.5">
-                <span>⚡</span>
-                <span>Kết quả: Tiết kiệm hàng giờ mỗi tuần, công việc được đồng bộ liền mạch.</span>
+                <span>🚀</span>
+                <span>Giá trị: Tiết kiệm hàng giờ mỗi tuần, công việc được đồng bộ liền mạch và loại bỏ 100% sai sót cơ học.</span>
               </div>
             </div>
           </div>
