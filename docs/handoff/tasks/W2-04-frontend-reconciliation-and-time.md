@@ -22,7 +22,7 @@
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#20](https://github.com/VinhDat267/ATI_Project/pull/20), stack trên W2-02 #18; chưa merge.
+- Commit: source `30784eb84aa8e4bd643c55d99cc346307f8a140f`, base `31670bc58f7f93a9c5f76f51369c7c7d0bb39bd5`.
+- Test đã chạy và kết quả: baseline442/442; test mới RED19failed/9passed, thêm quyền partial/time RED3failed/15passed, SSE replay RED2failed/14passed, argument context RED1failed/8passed; browser PostgreSQL thật RED1failed (thiếu region). GREEN `npm run check` exit0: v3 **472/472**, eval66/66, typecheck/build exit0, launcher1/1/local-env3/3; browser đầy đủ **7/7**, exit0. Ảnh desktop/mobile trong `apps/chat-web/docs/evidence/` và PR. Independent review/CI đang chạy trước ready; chi tiết trong nhật ký W2-04.
+- Điều chưa làm hoặc khác với task card: user yêu cầu triển khai ngay sau merge #17→#15, vì vậy stack trên #18 còn OPEN; phải merge #18, retarget main và xác nhận CI trước merge #20. Không retry UNKNOWN, snapshot invalid là Stop-only, không sửa argument của executable plan. Argument hiển thị được dựng từ saved plan/output; không chứng minh request provider thực tế. Chưa chạy live model/provider, không đổi backend/schema/v2 hoặc CURRENT-STATE/ROADMAP.
