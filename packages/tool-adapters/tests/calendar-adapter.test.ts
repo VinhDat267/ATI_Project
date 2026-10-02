@@ -54,6 +54,11 @@ it.each([{}, { calendars: [] }, { calendars: ['outside@group.calendar.google.com
   await expect(adapter.execute('calendar.create_event', args)).rejects.toMatchObject({ category: 'AUTH_ERROR' });
   expect(fetchFn).not.toHaveBeenCalled();
 });
+it.each(['.', '..'])('rejects dot-segment resource ids before any fetch even when allowlisted: %s', async calendarId => {
+  const { adapter, fetchFn } = setup(undefined, { calendars: [calendarId] });
+  await expect(adapter.execute('calendar.create_event', { ...args, calendarId })).rejects.toMatchObject({ category: 'VALIDATION' });
+  expect(fetchFn).not.toHaveBeenCalled();
+});
 it.each([
   { end: '2026-10-09T14:00:00+07:00' }, { end: start }, { end: '2026-10-10T15:00:01+07:00' },
   { start: '2026-10-09T15:00:00' }, { start: '2026-02-30T15:00:00Z' }, { start: '2026-10-09T24:00:00Z' },

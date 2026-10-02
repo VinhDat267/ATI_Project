@@ -20,5 +20,5 @@ it('registers three bounded Calendar contracts and only the calendar directory i
   expect(definition.scopeKey).toBe('calendars');
   expect(definition.scopes).toEqual(['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly']);
   for (const id of ['ati@group.calendar.google.com', 'person@gmail.com', 'en.usa#holiday@group.v.calendar.google.com', 'opaque_calendar_id']) expect(definition.scopePattern!.test(id)).toBe(true);
-  for (const id of ['primary', '', 'bad/id', 'a b', 'x'.repeat(600)]) expect(definition.scopePattern!.test(id)).toBe(false);
+  for (const id of ['primary', '.', '..', '', 'bad/id', 'a b', 'x'.repeat(600)]) expect(definition.scopePattern!.test(id)).toBe(false);
 });

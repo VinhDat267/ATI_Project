@@ -1,7 +1,7 @@
 import type { ToolDefinition } from './types.js';
 
 // Explicit ids (including email/holiday ids); the user-relative alias primary is not a resource scope.
-export const CALENDAR_ID_PATTERN = /^(?!primary$)[A-Za-z0-9_.+#-]{1,254}(?:@[A-Za-z0-9.-]{1,253})?$/;
+export const CALENDAR_ID_PATTERN = /^(?!primary$)(?!\.{1,2}$)[A-Za-z0-9_.+#-]{1,254}(?:@[A-Za-z0-9.-]{1,253})?$/;
 export const CALENDAR_TIME_PATTERN = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$';
 const str = { type: 'string' };
 const time = { type: 'string', pattern: CALENDAR_TIME_PATTERN };
