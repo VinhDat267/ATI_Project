@@ -2,7 +2,7 @@
 
 - Task: `docs/handoff/tasks/W3-01-google-sheets.md`, cùng `W3-service-common.md`.
 - Base: `c7a38c0c79aa7753771315b95759431158054977` (W3-00 PR #29 đã merge).
-- Nhánh: `vinhdat/feat-w3-01-google-sheets`; PR sẽ gắn URL sau khi tạo, chưa merge.
+- Nhánh: `vinhdat/feat-w3-01-google-sheets`; PR [#30](https://github.com/VinhDat267/ATI_Project/pull/30), chưa merge.
 - Implementation: `4df22690aae871fc3372e6e09ecc37bcf4dbb10f`; snapshot riêng: `3a68a65d91494c7f6cd530eda8f24ef264b789ba`.
 
 ## Thay đổi

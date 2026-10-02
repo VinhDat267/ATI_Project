@@ -51,7 +51,7 @@ Kịch bản `sheets_slack`: đọc vài dòng của tab `Tasks` → thêm một
 
 ## Kết quả (agent thi công điền)
 
-- PR: sẽ gắn URL sau khi tạo PR của nhánh này; chưa merge.
+- PR: [#30](https://github.com/VinhDat267/ATI_Project/pull/30), chưa merge.
 - Commit: `4df22690aae871fc3372e6e09ecc37bcf4dbb10f` (implementation); `3a68a65d91494c7f6cd530eda8f24ef264b789ba` (snapshot riêng).
 - Tài liệu API đã đọc (02/10/2026): [service-account JWT](https://developers.google.com/identity/protocols/oauth2/service-account), [spreadsheets.get](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get), [values.get](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get), [values.append](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/append), [A1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts), [USER_ENTERED](https://developers.google.com/workspace/sheets/api/reference/rest/v4/ValueInputOption), [quota](https://developers.google.com/workspace/sheets/api/limits).
 - Test đã chạy và kết quả: RED 13/15 foundation, 27/27 adapter, 2/2 API/sandbox; GREEN 15/15, 27/27, 2/2. `npm run check` exit 0: 613 v3 +85 offline evaluations, typecheck/build/secret scan, 1 launcher +3 local-env. `npm run test:browser:v3` exit 0: 10/10, gồm Sheets → Slack; kiểm output_json trên PostgreSQL thật. Review độc lập và CI trên head cuối đang chờ.
