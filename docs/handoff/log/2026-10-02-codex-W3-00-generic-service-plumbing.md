@@ -50,3 +50,11 @@
 - Trước W3-02 cần quyết định cho rf06: đăng ký Calendar chưa cấu hình làm câu này trở thành [], trong khi item8 cấm mọi 50/18 câu từ có service thành []. Giữ nguyên guard/policy W3-00; không tự thay nhãn hoặc ngoại lệ. Chi phí nếu chưa chốt: W3-02 bị gate chặn.
 - W3-00b dùng scopeLabel API và xử lý các ngoại lệ frontend; không chặn các task service.
 - Worktree FE-01 đã archive sau khi xác minh PR #27 merged, checkout sạch. Primary main và thay đổi ngoài task được giữ nguyên.
+
+## Cập nhật 02/10/2026: chốt ngoại lệ rf06 theo người dùng
+
+- Người dùng đồng ý giữ router từ chối service chưa cấu hình và cho phép đúng `golden:rf06` trong guard; quyết định còn mở ở mục trên đã được giải quyết.
+- Ngoại lệ trong `evaluations/golden-v2/routing-exceptions.json` ràng buộc ID, nguồn, prompt nguyên văn và label refusal. Chỉ áp dụng khi Calendar đã đăng ký, không có trong catalog ba service, và catalog đầy đủ chỉ định tuyến tới Calendar. Snapshot không quyết định ngoại lệ; các câu 50/18 khác vẫn bị chặn nếu thành [].
+- Task card W3-00 item8, yêu cầu chung service và W3-02 đã đồng bộ quyết định. Chưa đăng ký Calendar thật, chưa đổi snapshot, label hoặc router/prompt. W3-02 cập nhật snapshot trong commit riêng; W3-06 xử lý label và ngoại lệ cùng nhau.
+- TDD dùng classifyIntent thật với registry/catalog Calendar chỉ trong test: RED 1 failed/15 -> GREEN 15/15. Check mới nhất exit 0: 569 v3 +84 offline evaluations; strict evaluation harness typecheck exit 0; browser PostgreSQL thật + sandbox 9/9 exit 0.
+- PostgreSQL kiểm thử thuộc container riêng ati-rf06-pg; không dùng database local của người dùng ở cổng 15433. Provider/live services NOT_RUN.
