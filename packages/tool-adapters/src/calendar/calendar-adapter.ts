@@ -7,9 +7,17 @@ export interface CalendarAdapterConfig extends BaseAdapterConfig { credentials: 
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 const apiBase = 'https://www.googleapis.com/calendar/v3/calendars/';
 const sharedLimiter = new GlobalRateLimiter({ maxRequests: 60, windowMs: 60_000 });
+const MAX_RETRY_AFTER_WAIT_MS = 30_000;
 const timePattern = new RegExp(CALENDAR_TIME_PATTERN);
 function invalid(message: string): never { throw new StepError({ message: 'Calendar ' + message, category: 'VALIDATION' }); }
 function badResponse(writing = false): never { throw new StepError({ message: 'Calendar returned an invalid response', category: writing ? 'UNKNOWN' : 'SERVER_ERROR' }); }
+function retryAfterDelayMs(header: string | null): number {
+  if (header == null) return 1000;
+  const trimmed = header.trim();
+  const seconds = /^\d+(?:\.\d+)?$/u.test(trimmed) ? Number(trimmed) * 1000 : Number.NaN;
+  const delay = Number.isFinite(seconds) ? seconds : Date.parse(trimmed) - Date.now();
+  return Number.isFinite(delay) ? Math.max(0, delay) : 1000;
+}
 function text(value: unknown, max: number, nonempty = false): string {
   if (typeof value !== 'string' || value.length > max || (nonempty && !value.trim())) invalid('text is outside its allowed size');
   return value;
@@ -89,6 +97,10 @@ export class CalendarAdapter extends BaseAdapter {
         catch { /* Permission failures stay sanitized AUTH_ERROR. */ }
       }
       if (rateLimited && rateRetries++ === 0) {
+        const retryAfter = retryAfterDelayMs(response.headers.get('Retry-After'));
+        if (retryAfter > MAX_RETRY_AFTER_WAIT_MS) {
+          throw new StepError({ message: 'Calendar rate limit requires a longer wait than this request budget', category: 'RATE_LIMIT', statusCode: response.status, retryable: false });
+        }
         try { await this.waitForRetryAfter(response.headers.get('Retry-After'), signal); }
         catch { throw new StepError({ message: 'Calendar rate-limit retry cancelled', category: 'RATE_LIMIT', statusCode: response.status }); }
         continue;

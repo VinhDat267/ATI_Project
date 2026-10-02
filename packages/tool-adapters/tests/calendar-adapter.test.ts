@@ -106,6 +106,15 @@ it.each([429, 403])('waits Retry-After and retries one definite rate rejection %
   await vi.advanceTimersByTimeAsync(999); expect(calls).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(1); await assertion; expect(calls).toHaveLength(2);
 });
+it.each([
+  ['120', 429],
+  [new Date(Date.now() + 120_000).toUTCString(), 403],
+])('does not retry before a long Retry-After delay (%s, HTTP %s)', async (retryAfter, status) => {
+  vi.useFakeTimers();
+  const { adapter, calls } = setup(() => json({ error: { errors: [{ reason: 'rateLimitExceeded' }] } }, status, { 'Retry-After': retryAfter }));
+  await expect(adapter.execute('calendar.create_event', args)).rejects.toMatchObject({ category: 'RATE_LIMIT', statusCode: status, retryable: false });
+  expect(calls).toHaveLength(1);
+});
 it('retries transient read network twice and server once', async () => {
   let count = 0; const metadata = { id, summary: 'ATI', timeZone: 'UTC' };
   const network = setup(() => { if (count++ < 2) throw Error('secret'); return json(metadata); });

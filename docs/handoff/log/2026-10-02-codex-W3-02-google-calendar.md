@@ -33,5 +33,6 @@
 ## Review và giới hạn
 
 - Đang chờ reviewer độc lập theo REVIEW-CHECKLIST và CI trên head cuối. Chưa có kết luận ready-to-merge.
+- Reviewer độc lập fresh hoàn tất: Critical0, Important1, Minor0. Finding duy nhất là Calendar kế thừa helper cắt `Retry-After` >30s; TDD fix commit tiếp theo giữ nguyên yêu cầu không gửi lại sớm, trả `RATE_LIMIT` trước dispatch thứ hai. Review không re-run sau fix theo quy trình; parent chạy full verification và chờ CI exact-head.
 - Google/model thật **NOT_RUN**; không tài khoản thật được cấu hình, không paid/provider call hay external write. Thời gian tương đối và rf06label/guard dành W3-06, live read/write acceptance dành W3-07.
 - Không sửa CURRENT-STATE/ROADMAP trong PR này; reviewer cập nhật sau merge.
