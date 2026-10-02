@@ -231,6 +231,9 @@ for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQ
   const pool = new pg.Pool({ connectionString });
   try {
     await login(page);
+    const disabledSample = page.getByRole('button', { name: /Cần kết nối/ }).first();
+    await expect(disabledSample).toBeDisabled();
+    expect(await disabledSample.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
     const prompt = `Tạo task Trello rồi báo Slack E2E partial failure ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();

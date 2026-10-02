@@ -442,7 +442,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               </div>
               <h3 className="font-bold text-base text-zinc-900">Xem kế hoạch – Duyệt mới chạy</h3>
               <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
-                Loại bỏ hoàn toàn rủi ro AI tự ý làm sai. Bạn luôn được xem trước danh sách chi tiết các việc AI dự kiến làm và chỉ thực thi khi bạn bấm Duyệt.
+                Bạn xem các bước và tham số trước khi phê duyệt lệnh ghi. Hệ thống có thể đọc tài nguyên trong phạm vi đã cấp để lập kế hoạch; lỗi thực thi cần được kiểm tra và xử lý.
               </p>
             </div>
 

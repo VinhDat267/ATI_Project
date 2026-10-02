@@ -134,7 +134,7 @@ describe('LandingPageView Component', () => {
 
 it('separates supported services from development and makes no unmeasured claims',()=>{
   const {container}=render(<LandingPageView onGoToLogin={vi.fn()} />);
-  expect(container.textContent).not.toMatch(/80%|95%|100%|<\s*10s|10 giây|15[–-]20|2[–-]3 giờ|Gmail|mã hóa đa lớp|triệt để/);
+  expect(container.textContent).not.toMatch(/80%|95%|100%|<\s*10s|10 giây|15[–-]20|2[–-]3 giờ|Gmail|mã hóa đa lớp|triệt để|Loại bỏ hoàn toàn rủi ro/);
   expect(screen.getByRole('heading',{name:'Đã hỗ trợ'})).toBeInTheDocument();
   expect(screen.getByRole('heading',{name:'Đang phát triển'})).toBeInTheDocument();
   expect(screen.getAllByText(/AES-256-GCM/).length).toBeGreaterThan(0);

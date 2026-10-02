@@ -239,7 +239,7 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
           {blueprints.map((bp) => (
             <div
               key={bp.id}
-              className="group relative bg-white border border-zinc-200/90 hover:border-blue-400 rounded-2xl p-4 transition-all duration-150 hover:shadow-md flex flex-col justify-between"
+              className={`group relative bg-white border border-zinc-200/90 hover:border-blue-400 rounded-2xl p-4 transition-all duration-150 hover:shadow-md flex flex-col justify-between ${missingServices(bp).length ? 'opacity-70' : ''}`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
@@ -268,7 +268,7 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
                 type="button"
                 disabled={loading || Boolean(error) || missingServices(bp).length > 0}
                 onClick={() => onSendMessage(bp.prompt)}
-                className="w-full text-left text-xs bg-[#fafafc] hover:bg-blue-50/60 border border-zinc-200 hover:border-blue-300 text-zinc-800 hover:text-blue-700 font-medium px-3 py-2 rounded-xl transition flex items-center justify-between gap-2 shadow-2xs group-hover:shadow-xs"
+                className="w-full text-left text-xs bg-[#fafafc] hover:bg-blue-50/60 border border-zinc-200 hover:border-blue-300 text-zinc-800 hover:text-blue-700 font-medium px-3 py-2 rounded-xl transition flex items-center justify-between gap-2 shadow-2xs group-hover:shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <span className="truncate">{missingServices(bp).length ? `Cần kết nối ${missingServices(bp).join(', ')}` : bp.buttonText}</span>
                 <span className="text-blue-500 group-hover:translate-x-0.5 transition-transform shrink-0 font-bold">
