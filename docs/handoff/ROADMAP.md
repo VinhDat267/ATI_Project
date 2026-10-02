@@ -18,8 +18,8 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | xong, #23 tại `1029e55` |
 | 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | xong, #29 tại `c7a38c0`; đã chốt ngoại lệ `rf06` |
 | 3 | Giao diện cấu hình lấy nhãn/tên từ API, ô `multiline`, câu từ chối nêu tên service còn thiếu | [W3-00b](tasks/W3-00b-frontend-and-refusal-naming.md) | chờ (sau W3-00, không chặn task service) |
-| 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | chờ (sau W3-00) |
-| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | chờ (sau W3-01) |
+| 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | xong, #30 tại `716f568`; Google thật chưa nghiệm thu |
+| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | đang làm, `vinhdat/feat-w3-02-google-calendar` (sau #30) |
 | 3 | Notion | [W3-03](tasks/W3-03-notion.md) | chờ (sau W3-00) |
 | 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | chờ (sau W3-00) |
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | chờ (sau W3-00) |

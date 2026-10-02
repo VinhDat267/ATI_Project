@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 02/10/2026, sau khi PR #29 (W3-00) merge; `main` = `c7a38c0`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code.
+**Cập nhật lần cuối:** 02/10/2026, sau khi PR #30 (W3-01 Sheets) merge; `main` = `716f568`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -8,12 +8,12 @@
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
-> - **service mới:** W3-00b và W3-01 → W3-07, Sheets, Calendar, Notion, Telegram, Jira;
+> - **service mới:** W3-00b và W3-02 → W3-07, Calendar, Notion, Telegram, Jira;
 > - **tài khoản:** AUTH-01 → AUTH-06;
 > - **frontend:** FE-02 → FE-03;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`. W3-01 (Sheets) có thể bắt đầu; AUTH-01 và FE-02 có thể làm song song. W3-02 vẫn chờ W3-01; phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
+> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`. W3-02 Calendar đang triển khai theo người dùng; AUTH-01 và FE-02 có thể làm song song. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
 
 ## 1. Sản phẩm
 
@@ -30,7 +30,7 @@
 | `apps/chat-api` | Backend Express 5: JWT, hội thoại, approval (hash SHA-256, hạn 30 phút), thực thi, SSE |
 | `packages/planner` | Router (keyword rule), prefetch resource directory, model tự gọi search tool, validator 5 lớp (JSON, schema, semantic, an toàn, grounding) |
 | `packages/executor` | Resolve `$ref`/`$template`, chạy tuần tự, timeout qua AbortSignal, trạng thái `unknown` cho lệnh ghi không rõ kết quả |
-| `packages/tool-schemas` | Catalog 16 tool: Trello 9, Slack 2, GitHub 5 (9 read, 7 write) |
+| `packages/tool-schemas` | Catalog 20 tool: Trello 9, Slack 2, GitHub 5, Sheets 4 (12 read, 8 write) |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi |
 | `db/v3` | 6 bảng PostgreSQL |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
@@ -39,19 +39,19 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng lần reviewer độc lập chạy lại ngày 02/10 tại `464e69d`, và [CI PR #29](https://github.com/VinhDat267/ATI_Project/actions/runs/36978230226) xanh trên head `ff67b4c`. Commit merge `c7a38c0` có cây file giống hệt head đã kiểm thử `ff67b4c`; sau review chỉ thêm ghi nhận vào tài liệu. Các bằng chứng golden với model/live cũ giữ nguyên ngày đo và giới hạn; W3-00 chưa chạy lại provider hoặc dịch vụ thật.
+Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-01 ngày 02/10 tại fix `37ddc27`, và [CI PR #30](https://github.com/VinhDat267/ATI_Project/actions/runs/37023913731) xanh trên head `2e2e1ee`. Commit merge `716f568` có cây file giống hệt head đã kiểm thử `2e2e1ee`; sau fix chỉ thêm bàn giao vào tài liệu. Các bằng chứng golden với model/live cũ giữ nguyên ngày đo và giới hạn; W3-01 chưa chạy provider hoặc Google Sheets thật.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 569/569 | 02/10, `464e69d`; reviewer độc lập chạy lại, CI tại `ff67b4c` | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá (offline) | 84/84 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 9/9 ca | như trên; CI PR #29 pass tại `ff67b4c` | `npm run test:browser:v3` |
+| Unit + integration v3 | 626/626 | 02/10, fix `37ddc27`; CI tại `2e2e1ee` | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá (offline) | 85/85 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 10/10 ca | như trên; CI PR #30 pass tại `2e2e1ee` | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối: reviewer độc lập chạy `npm run check` tại `464e69d`, exit 0: v3 569 = 39 schema + 58 adapter + 129 planner + 25 executor + 157 API + 161 web; eval 84; typecheck/build; quét bản build không chứa mật khẩu; launcher 1/1; local-env 3/3. Browser 9/9; routing 15/15 và strict typecheck harness đạt. Ngoại lệ `rf06` đã được người dùng chốt: đúng ca Calendar refusal được mất tuyến trong catalog cũ khi Calendar chưa cấu hình, các câu 50/18 khác vẫn bị chặn; RED 1 lỗi/15 → GREEN 15/15. Registry sản phẩm vẫn có ba service, chưa đổi nhãn golden hoặc snapshot vì chưa thêm Calendar.
+Lần kiểm tra cuối: người thi công chạy `npm run check` tại `37ddc27`, exit0: v3 626 = 41 schema +107 adapters +133 planner +25 executor +159 API +161 web; eval85; typecheck/build, quét bản build, launcher1/local-env3; browser10/10 và strict test harness tsc exit0. Reviewer độc lập trước fix tự chạy check613+85 và browser10/10, phát hiện hai Important (A1 regex backtracking, thiếu retry429); đã sửa qua TDD RED5/34 +4/4 +2/2 → GREEN40/40 adapter và full suite. Không re-review; CI xác nhận head cuối. Registry có bốn service. Snapshot riêng chỉ đổi ba full-catalog fallback rf03/rf06/ff15, legacy72/72 giữ nguyên. Ngoại lệ Calendar rf06 vẫn giữ prompt/label refusal; W3-02 dùng ngoại lệ đã chốt, W3-06 xử lý label trước model campaign.
 
 Bằng chứng FE-01 trước đó: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
 
@@ -73,6 +73,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #24: ghi nhận W2-05 vào `CURRENT-STATE.md`.
 - #27 (FE-01): đóng hộp thoại lỗi (Esc, bấm ngoài, ✕) chỉ ẩn, Stop cần xác nhận; bản build không còn chứa mật khẩu admin/demo (`scripts/test-v3-web-build-security.mjs` trong `npm run check`); trạng thái dịch vụ và quy trình mẫu lấy từ API (`GET /api/services` thêm `tools`, `configured`, `connectionStatus`); dải "Chế độ thử nghiệm" khi sandbox (`GET /api/health` trả `runtimeMode`); trang giới thiệu bỏ số liệu chưa đo; không còn ID giả; lỗi mạng tiếng Việt; chỉ đăng xuất khi refresh trả 401. Kết quả kiểm tra kết nối lưu theo tiến trình, mất khi restart.
 - #29 (W3-00), merge tại `c7a38c0`: registry/transport/sandbox tách theo service; allowlist chung theo scopeKey/scopePattern và scopeLabel API; dữ liệu credentials cũ giữ nguyên; live harness đọc bảng service; grounding giữ thêm key. Có guard keyword/static/routing và hợp đồng mở rộng demo qua HTTP/PostgreSQL/planner/factory. Số file sản phẩm hiện có cần sửa khi thêm service giảm 9 → 7; chưa thêm service thật. Review độc lập Đạt, CI xanh trên `ff67b4c`; ngoại lệ `rf06` đã chốt trong W3-00/common/W3-02. W3-01 → W3-05 được gỡ chặn bởi W3-00, riêng W3-02 vẫn cần W3-01.
+- #30 (W3-01), merge tại `716f568`: service-account Google và bốn Sheets tools có allowlist, local A1, chống công thức, bounded retries và UNKNOWN không replay; API mã hóa/grounding và sandbox Sheets→Slack. Module auth dùng lại cho Calendar; W3-02 đã gỡ chặn. Google thật/model chưa nghiệm thu.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
   - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;
