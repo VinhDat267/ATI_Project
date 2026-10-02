@@ -330,3 +330,29 @@ test('real browser and PostgreSQL: approved Sheets workflow carries updatedRange
     await page.screenshot({ path: testInfo.outputPath('sheets-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
+
+test('real browser and PostgreSQL: approved Calendar workflow carries event url and start to Slack', async ({ page }, testInfo) => {
+  test.skip(process.env.SANDBOX_SCENARIO !== 'calendar_slack', 'requires Calendar sandbox scenario');
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Đặt lịch họp Google Calendar và báo Slack E2E ${Date.now()}`;
+    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await composerSend(page).click();
+    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
+    expect(planId).toBeTruthy();
+    const preview = (await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId])).rows[0].plan_json;
+    expect(preview.steps.map((step: any) => step.tool)).toEqual(['calendar.create_event', 'slack.send_message']);
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+    const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded']);
+    expect(steps[0].output_json.url).toMatch(/^https:\/\/www\.google\.com\/calendar\/event\?/);
+    expect(steps[0].output_json.start).toBe(preview.steps[0].args.start);
+    expect(steps[1].output_json.text).toContain(steps[0].output_json.url);
+    expect(steps[1].output_json.text).toContain(steps[0].output_json.start);
+    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('calendar-slack-approved.png'), fullPage: true });
+  } finally { await pool.end(); }
+});
