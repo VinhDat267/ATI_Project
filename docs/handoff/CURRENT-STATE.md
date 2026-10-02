@@ -1,19 +1,19 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 02/10/2026, sau khi PR #27 (FE-01) merge; `main` = `9d262c6`. Agent cập nhật: Claude Code (reviewer).
+**Cập nhật lần cuối:** 02/10/2026, sau khi PR #29 (W3-00) merge; `main` = `c7a38c0`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
 
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 >
-> **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`. Mã nguồn sản phẩm không đổi so với `1029e55`; #24 và #25 chỉ sửa tài liệu. Các task chờ giao gồm bốn mảng:
-> - **service mới:** W3-00 → W3-07, Sheets, Calendar, Notion, Telegram, Jira;
+> **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
+> - **service mới:** W3-00b và W3-01 → W3-07, Sheets, Calendar, Notion, Telegram, Jira;
 > - **tài khoản:** AUTH-01 → AUTH-06;
-> - **frontend:** FE-01 → FE-03;
+> - **frontend:** FE-02 → FE-03;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> **FE-01 xong** qua #27 tại `9d262c6`. Thứ tự và các mốc xem `ROADMAP.md`. Nên giao song song tiếp: W3-00, AUTH-01, FE-02.
+> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`. W3-01 (Sheets) có thể bắt đầu; AUTH-01 và FE-02 có thể làm song song. W3-02 vẫn chờ W3-01; phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
 
 ## 1. Sản phẩm
 
@@ -39,19 +39,21 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng lần đo local cuối W2-04 ngày 01/10 trên source `63c3c63`. Diff từ source đó đến `main` tại `abbb55f` rỗng trong `apps/`, `packages/`, `db/`, `prompts/`, `evaluations/`. Các bằng chứng golden/live cũ giữ nguyên ngày đo và giới hạn.
+Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng lần reviewer độc lập chạy lại ngày 02/10 tại `464e69d`, và [CI PR #29](https://github.com/VinhDat267/ATI_Project/actions/runs/36978230226) xanh trên head `ff67b4c`. Commit merge `c7a38c0` có cây file giống hệt head đã kiểm thử `ff67b4c`; sau review chỉ thêm ghi nhận vào tài liệu. Các bằng chứng golden với model/live cũ giữ nguyên ngày đo và giới hạn; W3-00 chưa chạy lại provider hoặc dịch vụ thật.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 526/526 | 02/10, `44f022e` (head PR #27); reviewer chạy lại | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá | 66/66 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 9/9 kịch bản | như trên; CI PR #27 pass tại `20119b6` | `npm run test:browser:v3` |
+| Unit + integration v3 | 569/569 | 02/10, `464e69d`; reviewer độc lập chạy lại, CI tại `ff67b4c` | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá (offline) | 84/84 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 9/9 ca | như trên; CI PR #29 pass tại `ff67b4c` | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối: reviewer chạy `npm run check` tại `44f022e`, exit 0: v3 526 = 11 schema + 53 adapter + 128 planner + 25 executor + 148 API + 161 web; eval 66; typecheck/build; quét bản build không chứa mật khẩu; launcher 1/1; local-env 3/3. Browser 9/9. Mutation test FE-01: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
+Lần kiểm tra cuối: reviewer độc lập chạy `npm run check` tại `464e69d`, exit 0: v3 569 = 39 schema + 58 adapter + 129 planner + 25 executor + 157 API + 161 web; eval 84; typecheck/build; quét bản build không chứa mật khẩu; launcher 1/1; local-env 3/3. Browser 9/9; routing 15/15 và strict typecheck harness đạt. Ngoại lệ `rf06` đã được người dùng chốt: đúng ca Calendar refusal được mất tuyến trong catalog cũ khi Calendar chưa cấu hình, các câu 50/18 khác vẫn bị chặn; RED 1 lỗi/15 → GREEN 15/15. Registry sản phẩm vẫn có ba service, chưa đổi nhãn golden hoặc snapshot vì chưa thêm Calendar.
+
+Bằng chứng FE-01 trước đó: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
 
 Audit tuần 2 (Claude Code) chạy probe trên PostgreSQL thật: chết giữa hai step → chạy tiếp được, plan `completed`, không gọi lại step đã xong; chết sau step cuối → tự thành `completed`; skip step `unknown` → step sau dùng đúng output đã lưu.
 
@@ -70,6 +72,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #22: kết quả audit tuần 2 và task card W2-05.
 - #24: ghi nhận W2-05 vào `CURRENT-STATE.md`.
 - #27 (FE-01): đóng hộp thoại lỗi (Esc, bấm ngoài, ✕) chỉ ẩn, Stop cần xác nhận; bản build không còn chứa mật khẩu admin/demo (`scripts/test-v3-web-build-security.mjs` trong `npm run check`); trạng thái dịch vụ và quy trình mẫu lấy từ API (`GET /api/services` thêm `tools`, `configured`, `connectionStatus`); dải "Chế độ thử nghiệm" khi sandbox (`GET /api/health` trả `runtimeMode`); trang giới thiệu bỏ số liệu chưa đo; không còn ID giả; lỗi mạng tiếng Việt; chỉ đăng xuất khi refresh trả 401. Kết quả kiểm tra kết nối lưu theo tiến trình, mất khi restart.
+- #29 (W3-00), merge tại `c7a38c0`: registry/transport/sandbox tách theo service; allowlist chung theo scopeKey/scopePattern và scopeLabel API; dữ liệu credentials cũ giữ nguyên; live harness đọc bảng service; grounding giữ thêm key. Có guard keyword/static/routing và hợp đồng mở rộng demo qua HTTP/PostgreSQL/planner/factory. Số file sản phẩm hiện có cần sửa khi thêm service giảm 9 → 7; chưa thêm service thật. Review độc lập Đạt, CI xanh trên `ff67b4c`; ngoại lệ `rf06` đã chốt trong W3-00/common/W3-02. W3-01 → W3-05 được gỡ chặn bởi W3-00, riêng W3-02 vẫn cần W3-01.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
   - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;

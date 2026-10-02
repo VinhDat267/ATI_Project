@@ -16,7 +16,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ scope/plan live và người dùng duyệt lệnh ghi; chưa chạy live failure |
 | 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | xong, #20 merge vào #18 tại `c30604b`, đã vào `main` qua #18 |
 | 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | xong, #23 tại `1029e55` |
-| 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | chờ (làm đầu tiên, chặn W3-01 → W3-05) |
+| 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | xong, #29 tại `c7a38c0`; đã chốt ngoại lệ `rf06` |
 | 3 | Giao diện cấu hình lấy nhãn/tên từ API, ô `multiline`, câu từ chối nêu tên service còn thiếu | [W3-00b](tasks/W3-00b-frontend-and-refusal-naming.md) | chờ (sau W3-00, không chặn task service) |
 | 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | chờ (sau W3-00) |
 | 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | chờ (sau W3-01) |
@@ -45,7 +45,7 @@ W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/f
 
 Yêu cầu chung cho mọi task thêm service: [W3-service-common](tasks/W3-service-common.md).
 
-Thứ tự và song song: W3-00 làm trước. Sau khi W3-00 merge, W3-00b, W3-01, W3-03, W3-04, W3-05 làm song song (mỗi task service chỉ thêm file mới và một dòng ở các danh sách đăng ký); W3-02 chờ W3-01. W3-07 làm từng service ngay khi service đó merge. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
+Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`, nên có thể bắt đầu W3-01, W3-03, W3-04, W3-05 (mỗi task service chỉ thêm file mới và một dòng ở các danh sách đăng ký). W3-02 chờ W3-01; phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service ngay khi service đó merge. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
 
 **Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
 
