@@ -14,18 +14,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AIPlanner, WorkingMemory, createProviderFromEnv } from '@wap/planner';
-import { GitHubAdapter, SlackAdapter, TrelloAdapter } from '@wap/tool-adapters';
+import { LIVE_SERVICES } from './live-services.js';
 import { ALL_TOOLS, type PlanResponse, type PlannerResponse } from '@wap/tool-schemas';
 import { executeApproved, planDigest, readLiveConfig, writeSteps, type LiveService } from './harness.js';
 
 type Adapter = { execute(tool: string, args: any, options?: { signal?: AbortSignal }): Promise<any> };
 
 function createAdapter(service: string, config: LiveService): Adapter {
-  const { credentials, allowedScope } = config;
-  if (service === 'trello') return new TrelloAdapter({ credentials: credentials as any, allowedScope });
-  if (service === 'slack') return new SlackAdapter({ credentials: credentials as any, allowedScope });
-  if (service === 'github') return new GitHubAdapter({ credentials: { token: credentials.token! }, allowedScope });
-  throw new Error(`No adapter for ${service}`);
+  const definition = LIVE_SERVICES.find(entry => entry.id === service);
+  if (!definition) throw new Error('No adapter for ' + service);
+  return definition.createAdapter(config);
 }
 
 const errorText = (err: any) => `${err?.category ?? 'ERROR'}: ${String(err?.message ?? err).slice(0, 300)}`;

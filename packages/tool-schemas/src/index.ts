@@ -7,7 +7,7 @@ export * from './types.js';
 export * from './trello.js';
 export * from './slack.js';
 export * from './github.js';
-export * from './services.js';
+export * from './registry/index.js';
 
 export const ALL_TOOLS: ToolDefinition[] = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS];
 

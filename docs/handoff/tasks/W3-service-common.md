@@ -42,7 +42,7 @@ Planner chỉ giữ một số trường của kết quả search trong bộ nh�
 
 - Bắt buộc có tên service (`id` và `name`) làm từ khóa. Thêm từ khóa khác chỉ khi nó **chỉ** gợi tới service này.
 - Không dùng từ trong danh sách cấm của test bất biến (W3-00). Từ chung chung của lĩnh vực đặt vào `fallbackIntentKeywords` (chỉ dùng khi không service nào khác khớp).
-- Bộ câu hồi quy định tuyến của W3-00 (`evaluations/golden-v2/routing.test.ts`) phải giữ nguyên snapshot. Nếu đăng ký service mới làm snapshot đổi, cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR; reviewer sẽ không chấp nhận câu của bộ 50/18 bị chuyển thành `[]` khi service mới chưa cấu hình.
+- Bộ câu hồi quy định tuyến của W3-00 (`evaluations/golden-v2/routing.test.ts`) phải giữ nguyên snapshot. Nếu đăng ký service mới làm snapshot đổi, cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR; reviewer sẽ không chấp nhận câu của bộ 50/18 bị chuyển thành `[]` khi service mới chưa cấu hình, ngoài ngoại lệ được người dùng chấp thuận ngày 02/10/2026: đúng `golden:rf06`, prompt và label `refusal` trong `routing-exceptions.json`, Calendar đã đăng ký nhưng không có trong catalog ba service, catalog đầy đủ chỉ chọn `calendar`. Đổi prompt/label hoặc có thêm tuyến thì ngoại lệ không hợp lệ; không tự thêm ID ngoại lệ. W3-06 phải xử lý ngoại lệ cùng thay đổi label trước khi chạy model.
 - Test định tuyến riêng của service, chạy với **tất cả** service đã đăng ký, gồm cả khi service mới **chưa cấu hình**:
   - câu nêu tên service mới → chọn service mới;
   - các ca dễ nhầm ghi trong task card của service.

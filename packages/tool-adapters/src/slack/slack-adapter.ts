@@ -188,7 +188,7 @@ export class SlackAdapter extends BaseAdapter {
     args: { channel: string; text: string },
     options?: { signal?: AbortSignal }
   ): Promise<{ ts: string; channel: string }> {
-    this.assertAllowedScope('channel', args.channel);
+    this.assertAllowedScope('channels', args.channel);
 
     const res = await this.request<any>('/chat.postMessage', {
       method: 'POST',
