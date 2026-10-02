@@ -32,7 +32,7 @@ Không đổi prompt/label hoặc kết quả model.
 - `npm run check` exit 0: **613 v3** (41 schema, 94 adapters, 133 planner, 25 executor, 159 API, 161 web), **85 offline evaluations**; typecheck, build, secret scan, 1 launcher +3 local-env đạt.
 - `npm run test:browser:v3` exit 0: **10/10** (default5, clarification1, partial_failure2, three_service1, sheets_slack1), HTTP/SSE + PostgreSQL thật và planner/adapters sandbox. Ba bước Sheets → Slack succeeded; Slack output_json chứa updatedRange của append.
 - Log đầy đủ và screenshot để ngoài repo tại Codex W3-01 evidence directory; không commit raw logs/private key fixture. Database riêng ati-w301-pg, localhost5432; không dùng database của người dùng localhost15433.
-- Review độc lập và CI head cuối đang chờ; cập nhật trước hoàn tất PR.
+- Review độc lập và fix: xem phần cập nhật bên dưới; CI phải xanh đúng head cuối của PR #30 trước merge.
 
 ## Tài liệu chính thức đọc ngày 02/10/2026
 
@@ -46,3 +46,14 @@ Không đổi prompt/label hoặc kết quả model.
 - Service mới dùng planner search llm, không regex gather theo yêu cầu chung. Grounding chưa giữ parent tab/spreadsheet; adapter kiểm tab trước POST, không sửa core planner theo card.
 - Quyết định phạm vi: bốn tool trong card W3-01 người dùng đã giao thay appendix catalog ứng viên cũ có update_cells. Nếu sai, cần chốt lại scope trước live acceptance; không tool update/delete được mở.
 - PR #28 metadata riêng; reviewer cập nhật CURRENT-STATE/ROADMAP sau merge. W3-02 dùng auth chung sau khi W3-01 merge, tách token scope và giữ quyết định rf06.
+
+## Review và sửa lỗi cuối
+
+- Reviewer độc lập review `c7a38c0..f6d06a4`, tự chạy check exit0 (613 v3 +85 eval) và browser10/10 exit0. Kết luận ban đầu CHƯA ĐẠT, hai Important, không Critical/Minor.
+- Finding1: regex A1 có hai nhánh lặp cùng nhận dấu nháy. Chuỗi 41 ký tự mất 4832ms; 61 ký tự phải dừng child sau5000ms. Fix grammar quoted title chỉ nhận dấu nháy đôi, không backtracking nhập nhằng. Regression child-process giới hạn3000ms, malformed quote zero-fetch và doubled apostrophe hợp lệ.
+- Finding2: HTTP429 phải wait Retry-After và retry một lần theo spec5.4. Fix retry đúng một lần với AbortSignal, reacquire rate slot; 429 lặp dừng sau hai request. Cancel trong wait không dispatch lần hai; network/5xx/invalid success sau lần retry vẫn UNKNOWN, không replay. Đối chiếu spec5.3 bổ sung read network retry2 và server retry1; abort read không retry.
+- Commit fix `37ddc2713bd4c968d4912b0be4171d4757417152`. TDD RED5/34, RED4/4 second-attempt UNKNOWN với adapter revision cũ, RED2/2 read retry → GREEN40/40 adapter. Một fix pass, không dispatch re-review.
+- **Kiểm tra cuối trên fix:** check exit0 **626 v3** (41 schema,107 adapters,133 planner,25 executor,159 API,161 web) +**85 eval**; typecheck/build/secret scan, launcher1/local-env3; strict test harness tsc exit0; browser **10/10 exit0**. Logs check-after-review.log/browser-after-review.log và reviewer-report.md ở evidence directory ngoài repo.
+- Bản head review f6d06a4 có CI SUCCESS run37021497803. Head chứa fix và docs mới cần CI riêng; người thi công xác minh trực tiếp check của PR #30 trước chuyển Ready, không dùng CI của head cũ làm bằng chứng.
+- Giới hạn reviewer đã cân nhắc: live Google/formula/quota W3-07 và model W3-06 chưa chạy; parent-aware grounding/tab rename giữ giới hạn card; legacy auth/UI/fencing ngoài scope; chưa benchmark range lớn/allowlist dài, refresh đồng thời/cache eviction/quota nhiều process hoặc revocation. Nếu các giả định sai, cần hardening và nghiệm thu live/load trước dùng ngoài phạm vi hiện tại. Không tuyên bố production readiness.
+- Bằng chứng RED lịch sử là người thi công quan sát, reviewer không tái dựng mọi dòng/mutation; reviewer tự chạy suite hiện tại. PR text/CI cuối do người thi công xác minh trực tiếp. Không có minor bị hoãn.
