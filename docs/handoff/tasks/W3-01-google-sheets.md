@@ -1,6 +1,6 @@
 # W3-01 · Google Sheets
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/w3-01-google-sheets` · **Phụ thuộc:** W3-00 đã merge · **Làm song song với:** W3-03, W3-04, W3-05 · **Chặn:** W3-02 (Calendar dùng lại phần xác thực Google của task này)
+**Trạng thái:** đã triển khai, chờ review/CI/merge · **Nhánh:** `vinhdat/feat-w3-01-google-sheets` · **Phụ thuộc:** W3-00 đã merge · **Làm song song với:** W3-03, W3-04, W3-05 · **Chặn:** W3-02 (Calendar dùng lại phần xác thực Google của task này)
 
 Đọc trước: [yêu cầu chung cho task thêm service](W3-service-common.md). Card này chỉ ghi phần riêng của Google Sheets.
 
@@ -45,14 +45,14 @@ Kịch bản `sheets_slack`: đọc vài dòng của tab `Tasks` → thêm một
 
 ## Tiêu chí riêng (ngoài tiêu chí chung)
 
-- [ ] Test JWT: header và claims đúng; kiểm chữ ký bằng public key tương ứng; key có `\n` dạng chữ dùng được; token được cache và làm mới khi sắp hết hạn; hai scope khác nhau có hai token khác nhau.
-- [ ] Test chặn chèn công thức với cả bốn ký tự đầu và có khoảng trắng đầu.
-- [ ] Test `read_range` cắt đúng `limit`, và từ chối `range` trỏ sang spreadsheet khác (chỉ chấp nhận dạng `Tab!A1:B2` hoặc `A1:B2`).
+- [x] Test JWT: header và claims đúng; kiểm chữ ký bằng public key tương ứng; key có `\n` dạng chữ dùng được; token được cache và làm mới khi sắp hết hạn; hai scope khác nhau có hai token khác nhau.
+- [x] Test chặn chèn công thức với cả bốn ký tự đầu và có khoảng trắng đầu.
+- [x] Test `read_range` cắt đúng `limit`, và từ chối `range` trỏ sang spreadsheet khác (chỉ chấp nhận dạng `Tab!A1:B2` hoặc `A1:B2`).
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Tài liệu API đã đọc (đường dẫn, ngày):
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: sẽ gắn URL sau khi tạo PR của nhánh này; chưa merge.
+- Commit: `4df22690aae871fc3372e6e09ecc37bcf4dbb10f` (implementation); `3a68a65d91494c7f6cd530eda8f24ef264b789ba` (snapshot riêng).
+- Tài liệu API đã đọc (02/10/2026): [service-account JWT](https://developers.google.com/identity/protocols/oauth2/service-account), [spreadsheets.get](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get), [values.get](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get), [values.append](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/append), [A1 notation](https://developers.google.com/workspace/sheets/api/guides/concepts), [USER_ENTERED](https://developers.google.com/workspace/sheets/api/reference/rest/v4/ValueInputOption), [quota](https://developers.google.com/workspace/sheets/api/limits).
+- Test đã chạy và kết quả: RED 13/15 foundation, 27/27 adapter, 2/2 API/sandbox; GREEN 15/15, 27/27, 2/2. `npm run check` exit 0: 613 v3 +85 offline evaluations, typecheck/build/secret scan, 1 launcher +3 local-env. `npm run test:browser:v3` exit 0: 10/10, gồm Sheets → Slack; kiểm output_json trên PostgreSQL thật. Review độc lập và CI trên head cuối đang chờ.
+- Điều chưa làm hoặc khác với task card: Google Sheets thật NOT_RUN (chưa có tài khoản kiểm thử); lệnh ghi thật thuộc W3-07. Không chạy model/golden campaign (W3-06). Service mới hỗ trợ planner search llm, không thêm regex gather. Giữ giới hạn grounding parent/tab của card; adapter kiểm tab thuộc spreadsheet trước POST. Phạm vi bốn tool của card đã được người dùng giao thay appendix catalog ứng viên cũ; không thêm update/delete. Không sửa frontend sản phẩm, v2, CURRENT-STATE hoặc ROADMAP.
