@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import * as adapters from '../src/index.js';
 
 const privateKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
@@ -73,6 +74,30 @@ it.each(['https://docs.google.com/spreadsheets/d/other/edit#A1', '[other]Tasks!A
   expect(fetchFn).not.toHaveBeenCalled();
 });
 
+it('rejects an adversarial quoted A1 range without blocking the process or calling fetch', () => {
+  const sourceUrl = new URL('../src/sheets/sheets-adapter.ts', import.meta.url).href;
+  const script = 'import { SheetsAdapter } from ' + JSON.stringify(sourceUrl) + ';' +
+    'let fetched=0; const adapter=new SheetsAdapter({credentials:{clientEmail:"synthetic",privateKey:"synthetic"},allowedScope:{spreadsheets:["spreadsheet_fixture_123456"]},fetchFn:async()=>{fetched++;throw Error("unexpected fetch")}});' +
+    'try { await adapter.execute("sheets.read_range",{spreadsheetId:"spreadsheet_fixture_123456",range:String.fromCharCode(39).repeat(60)+"?"}); } catch(error) {console.log(JSON.stringify({category:error.category,fetched}));}';
+  // A separate process makes a regression terminate safely even if its event loop is blocked.
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 3000 });
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout.trim())).toEqual({ category: 'VALIDATION', fetched: 0 });
+});
+
+it('rejects an unescaped apostrophe in a quoted title before any fetch', async () => {
+  const { adapter, fetchFn } = setup();
+  await expect(adapter.execute('sheets.read_range', { spreadsheetId: id, range: "'Team's Tasks'!A1:B2" })).rejects.toMatchObject({ category: 'VALIDATION' });
+  expect(fetchFn).not.toHaveBeenCalled();
+});
+
+it.each(["'Team''s Tasks'!A1:B2", "'Tasks with spaces'!A1:B2"])('accepts a valid local quoted title: %s', async range => {
+  const { adapter, apiCalls } = setup(() => json({ range, values: [] }));
+  expect(await adapter.execute('sheets.read_range', { spreadsheetId: id, range })).toEqual({ range, values: [] });
+  expect(decodeURIComponent(apiCalls[0]!.url.pathname)).toBe('/v4/spreadsheets/' + id + '/values/' + range);
+});
+
 it('rejects a tab from another spreadsheet before the write, and validates input bounds locally', async () => {
   const { adapter, apiCalls, fetchFn } = setup();
   await expect(adapter.execute('sheets.append_rows', { spreadsheetId: id, sheet: 'Other', rows: [['x']] })).rejects.toMatchObject({ category: 'NOT_FOUND' });
@@ -91,14 +116,85 @@ it.each([[401, 'AUTH_ERROR'], [403, 'AUTH_ERROR'], [404, 'NOT_FOUND'], [400, 'VA
   catch (error: any) { expect(error.category).toBe(category); expect(error.message).not.toContain('secret'); expect(error.cause).toBeUndefined(); }
 });
 
-it('honors Retry-After without retrying an append', async () => {
+it('retries a read transport failure at most twice and then returns the successful read', async () => {
+  let attempts = 0;
+  const { adapter, apiCalls } = setup(() => {
+    if (++attempts < 3) throw new Error('fixture-secret-token');
+    return json({ range: 'Tasks!A1:B2', values: [['x']] });
+  });
+  expect(await adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'Tasks!A1:B2' })).toMatchObject({ values: [['x']] });
+  expect(apiCalls).toHaveLength(3);
+  const failing = setup(() => { throw new Error('fixture-secret-token'); });
+  await expect(failing.adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'A1' })).rejects.toMatchObject({ category: 'NETWORK' });
+  expect(failing.apiCalls).toHaveLength(3);
+});
+
+it('retries a read server response once and never retries a cancelled read', async () => {
+  let attempts = 0;
+  const { adapter, apiCalls } = setup(() => ++attempts === 1 ? json({}, 503) : json({ range: 'A1', values: [['x']] }));
+  expect(await adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'A1' })).toMatchObject({ values: [['x']] });
+  expect(apiCalls).toHaveLength(2);
+  const failing = setup(() => json({}, 500));
+  await expect(failing.adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'A1' })).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+  expect(failing.apiCalls).toHaveLength(2);
+  const controller = new AbortController();
+  const cancelled = setup(() => { controller.abort(); throw new Error('cancelled'); });
+  await expect(cancelled.adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'A1' }, { signal: controller.signal })).rejects.toMatchObject({ category: 'NETWORK' });
+  expect(cancelled.apiCalls).toHaveLength(1);
+});
+
+it('honors Retry-After and stops after one retry when an append remains rate limited', async () => {
   vi.useFakeTimers();
   const { adapter, apiCalls } = setup((_url, init) => init.method === 'POST' ? json({}, 429, { 'Retry-After': '2' }) : json(metadata));
   const pending = adapter.execute('sheets.append_rows', { spreadsheetId: id, sheet: 'Tasks', rows: [['x']] });
   const assertion = expect(pending).rejects.toMatchObject({ category: 'RATE_LIMIT', retryable: false });
   await vi.advanceTimersByTimeAsync(1999); expect(apiCalls.filter(call => call.init.method === 'POST')).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(1); await assertion;
+  expect(apiCalls.filter(call => call.init.method === 'POST')).toHaveLength(2);
+});
+
+it.each(['sheets.read_range', 'sheets.append_rows'])('retries a definite 429 once after Retry-After, then succeeds: %s', async tool => {
+  vi.useFakeTimers();
+  let attempts = 0;
+  const { adapter, apiCalls } = setup((url, init) => {
+    if (!url.pathname.includes('/values/')) return json(metadata);
+    attempts++;
+    if (attempts === 1) return json({}, 429, { 'Retry-After': '2' });
+    return init.method === 'POST' ? json({ spreadsheetId: id, updates: { updatedRange: 'Tasks!A4:A4', updatedRows: 1 } }) : json({ range: 'Tasks!A1:B2', values: [['x']] });
+  });
+  const args = tool === 'sheets.append_rows' ? { spreadsheetId: id, sheet: 'Tasks', rows: [['x']] } : { spreadsheetId: id, range: 'Tasks!A1:B2' };
+  const pending = adapter.execute(tool, args).then(output => ({ output }), error => ({ error }));
+  await vi.advanceTimersByTimeAsync(1999); expect(attempts).toBe(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(await pending).toMatchObject({ output: tool === 'sheets.append_rows' ? { updatedRows: 1 } : { values: [['x']] } });
+  expect(attempts).toBe(2);
+  expect(apiCalls.filter(call => call.url.pathname.includes('/values/'))).toHaveLength(2);
+});
+
+it('does not retry a known rate-limited append when its signal aborts during Retry-After', async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const { adapter, apiCalls } = setup((_url, init) => init.method === 'POST' ? json({}, 429, { 'Retry-After': '2' }) : json(metadata));
+  const assertion = expect(adapter.execute('sheets.append_rows', { spreadsheetId: id, sheet: 'Tasks', rows: [['x']] }, { signal: controller.signal })).rejects.toMatchObject({ category: 'RATE_LIMIT', retryable: false });
+  await vi.advanceTimersByTimeAsync(1000);
+  controller.abort();
+  await assertion;
   expect(apiCalls.filter(call => call.init.method === 'POST')).toHaveLength(1);
+});
+
+it.each(['500', 'network', 'json', 'invalid-success'])('remains UNKNOWN without replay after a rate-limit retry ends ambiguously: %s', async mode => {
+  let attempts = 0;
+  const { adapter, apiCalls } = setup((_url, init) => {
+    if (init.method !== 'POST') return json(metadata);
+    attempts++;
+    if (attempts === 1) return json({}, 429, { 'Retry-After': '0' });
+    if (mode === '500') return json({}, 500);
+    if (mode === 'json') return new Response('invalid');
+    if (mode === 'invalid-success') return json({});
+    throw new Error('fixture-secret-token');
+  });
+  await expect(adapter.execute('sheets.append_rows', { spreadsheetId: id, sheet: 'Tasks', rows: [['x']] })).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+  expect(apiCalls.filter(call => call.init.method === 'POST')).toHaveLength(2);
 });
 
 it.each(['500', 'network', 'json', 'invalid-success', 'timeout'])('makes append result UNKNOWN after dispatch: %s', async mode => {

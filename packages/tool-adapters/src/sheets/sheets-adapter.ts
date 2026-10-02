@@ -24,7 +24,7 @@ function queryText(value: unknown): string {
 function a1(value: unknown): string {
   // Only cell addresses in this document. Quoted titles use doubled apostrophes.
   if (typeof value !== 'string' || value.length > 200 ||
-    !/^(?:(?:'[^\[\]\/?#\u0000-\u001f]*(?:''[^\[\]\/?#\u0000-\u001f]*)*'|[\p{L}\p{N}_ -]+)!)?[A-Za-z]{1,3}[1-9]\d*(?::[A-Za-z]{1,3}[1-9]\d*)?$/u.test(value)) invalid('range must be a local A1 cell range');
+    !/^(?:(?:'(?:[^'\[\]\/?#\u0000-\u001f]|'')*'|[\p{L}\p{N}_ -]+)!)?[A-Za-z]{1,3}[1-9]\d*(?::[A-Za-z]{1,3}[1-9]\d*)?$/u.test(value)) invalid('range must be a local A1 cell range');
   return value;
 }
 function titleText(value: unknown): string {
@@ -37,7 +37,7 @@ function safeRows(value: unknown): string[][] {
   return value.map(row => row.map((cell: string) => /^\s*[=+\-@]/u.test(cell) ? "'" + cell : cell));
 }
 
-/** Fixed Sheets v4 endpoints, explicit allowlist and non-replayed writes. */
+/** Fixed Sheets v4 endpoints and allowlist. Only a definite 429 permits one write retry. */
 export class SheetsAdapter extends BaseAdapter {
   readonly service = 'sheets';
   private readonly auth: GoogleServiceAccount;
@@ -67,29 +67,38 @@ export class SheetsAdapter extends BaseAdapter {
     if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     const writing = body !== undefined;
     const token = await this.auth.getAccessToken(SHEETS_SCOPE, signal);
-    try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'sheets:' + this.account, signal); }
-    catch (error) {
-      if (error instanceof StepError) throw error;
-      throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
-    }
-    if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     let response: Response;
-    try {
-      response = await this.fetchFn(apiBase + path, {
-        method: writing ? 'POST' : 'GET', signal, redirect: 'error',
-        headers: { Authorization: 'Bearer ' + token, ...(writing ? { 'Content-Type': 'application/json' } : {}) },
-        ...(writing ? { body: JSON.stringify(body) } : {}),
-      });
-    } catch {
-      throw new StepError({ message: 'Sheets transport failed', category: writing ? 'UNKNOWN' : 'NETWORK', retryable: !writing });
+    let rateRetries = 0; let networkRetries = 0; let serverRetries = 0;
+    for (;;) {
+      try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'sheets:' + this.account, signal); }
+      catch (error) {
+        if (error instanceof StepError) throw error;
+        throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+      }
+      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+      try {
+        response = await this.fetchFn(apiBase + path, {
+          method: writing ? 'POST' : 'GET', signal, redirect: 'error',
+          headers: { Authorization: 'Bearer ' + token, ...(writing ? { 'Content-Type': 'application/json' } : {}) },
+          ...(writing ? { body: JSON.stringify(body) } : {}),
+        });
+      } catch {
+        if (!writing && !signal?.aborted && networkRetries < 2) { networkRetries++; continue; }
+        throw new StepError({ message: 'Sheets transport failed', category: writing ? 'UNKNOWN' : 'NETWORK', retryable: !writing });
+      }
+      if (response.status === 429 && rateRetries === 0) {
+        rateRetries++;
+        try { await this.waitForRetryAfter(response.headers.get('Retry-After'), signal); }
+        catch { throw new StepError({ message: 'Sheets rate-limit retry cancelled', category: 'RATE_LIMIT', statusCode: 429, retryable: false }); }
+        continue;
+      }
+      if (!writing && response.status >= 500 && serverRetries === 0) { serverRetries++; continue; }
+      break;
     }
     if (!response.ok) {
       const status = response.status;
       const category = status === 401 || status === 403 ? 'AUTH_ERROR' : status === 404 ? 'NOT_FOUND'
         : status === 429 ? 'RATE_LIMIT' : status >= 400 && status < 500 ? 'VALIDATION' : writing ? 'UNKNOWN' : 'SERVER_ERROR';
-      if (status === 429) {
-        try { await this.waitForRetryAfter(response.headers.get('Retry-After'), signal); } catch { /* HTTP rejection already known. */ }
-      }
       throw new StepError({ message: 'Sheets request failed with HTTP ' + status, category, statusCode: status, retryable: !writing && (status === 429 || status >= 500) });
     }
     try { return await response.json(); } catch { return badResponse(writing); }
