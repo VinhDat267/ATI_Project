@@ -32,7 +32,25 @@
 
 ## Review và giới hạn
 
-- Đang chờ reviewer độc lập theo REVIEW-CHECKLIST và CI trên head cuối. Chưa có kết luận ready-to-merge.
-- Reviewer độc lập fresh hoàn tất: Critical0, Important1, Minor0. Finding duy nhất là Calendar kế thừa helper cắt `Retry-After` >30s; TDD fix commit tiếp theo giữ nguyên yêu cầu không gửi lại sớm, trả `RATE_LIMIT` trước dispatch thứ hai. Review không re-run sau fix theo quy trình; parent chạy full verification và chờ CI exact-head.
+- Reviewer độc lập toàn nhánh `716f568..441f485`: Critical0/Important1/Minor0, verdict With fixes; check675v3+91eval, strict harness, browser11/11 và tám nhóm edge probes đều exit0. Báo cáo/diagnostics lưu ngoài repo; reviewer không sửa source/index/HEAD và không gọi thêm subagent.
+- Sửa Important trong một pass tại `008969073906f279d5ef75578c6dc4ae8f032ec3`: helper chung cắt Retry-After xuống30giây; Calendar nay dừng RATE_LIMIT khi header giây/HTTP-date vượt ngân sách30giây, không replay sớm. RED2failed/42 → GREEN42/42; fullcheck **677v3+91eval**, strict harness, browser **11/11 exit0** sau sửa. Không re-review, không minor bị hoãn.
+- Bàn giao tiếp ngày **2026-10-03**: CI source441f485 SUCCESS run37030150912; headfix0089690 chưa được coi là PASS vì lần đầu lỗi test reload đọc body response bị navigation bỏ qua, lần sau CANCELLED ở cài Chromium. Chỉ chuyển PR sang ready sau CI head cuối SUCCESS; chưa merge.
 - Google/model thật **NOT_RUN**; không tài khoản thật được cấu hình, không paid/provider call hay external write. Thời gian tương đối và rf06label/guard dành W3-06, live read/write acceptance dành W3-07.
 - Không sửa CURRENT-STATE/ROADMAP trong PR này; reviewer cập nhật sau merge.
+
+## Quyết định và giới hạn sau review
+
+Theo thứ tự ledger; mỗi mục ghi hệ quả nếu giả định không đúng:
+
+1. Chỉ hai reason rate-limit403 được Google tài liệu hóa → RATE_LIMIT;403 khác AUTH_ERROR. Nếu sai, có thể thêm một request sau từ chối rõ ràng; không replay UNKNOWN.
+2. Live CLI kiểm tra directory đã đăng ký và child-resource thay nhánh GitHub cố định; nếu sai, kiểm tra reachability có thể thiếu chẩn đoán riêng nhà cung cấp.
+3. Credentials/quyền/quota, insert-readback, notifications và synchronization thật: NOT_RUN, W3-07; nếu sai, hành vi Google thật còn chưa được xác minh.
+4. Reduced/private-event payload và htmlLink theo mọi sharing role: không có live role matrix, thiếu trường bắt buộc fail closed; nếu sai, cần cập nhật hợp đồng adapter cho response thật.
+5. Provider response có trường chuỗi nhưng nội dung sai: không chứng nhận semantic response; nếu sai, có thể cần thêm kiểm tra timestamp/URL thay vì chỉ hình dạng.
+6. Lỗi đọc body sau headers: SERVER_ERROR, hiển thị thất bại, không retry riêng; nếu sai, một số lỗi đọc tạm thời cần retry thủ công/chính sách mới.
+7. Thời gian tương đối/model quality/semantic acceptance/rf06label: W3-06 và NOT_RUN; nếu sai, routing offline không chứng minh model đạt.
+8. Invitation/domain-wide delegation/recurrence/update/delete/share/user OAuth: ngoài ba tools đã duyệt; hệ quả là các khả năng đó chưa có.
+9. Allowlist rất lớn, throughput, refresh dedup/cache eviction, quota nhiều process và load: chưa benchmark; nếu sai, triển khai production cần bằng chứng vận hành/hiệu năng thêm.
+10. Auth/session/UI/recovery toàn repo và fencing nhiều replica: ngoài diff này, chỉ chạy lại suites cũ; nếu sai, W3-02 không chứng nhận an toàn/khôi phục toàn nền tảng.
+11. Tái dựng mọi RED lịch sử: reviewer chỉ chạy tests/probes hiện tại, giữ logs RED của implementer; nếu sai, các ghi nhận lịch sử chỉ là bằng chứng audit của implementer.
+12. PR formatting/CI head cuối/merge/CURRENT-STATE/ROADMAP: agent chính hoàn tất PR+CI, cập nhật reviewer-owned state sau merge; nếu sai, không được tuyên bố merge readiness trước CI xanh và quyết định merge của người dùng.
