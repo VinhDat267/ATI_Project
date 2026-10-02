@@ -15,16 +15,16 @@ import {
 } from '../src/index.js';
 
 describe('packages/tool-schemas (Task 2)', () => {
-  it('exports 16 unique tools across three registered services', () => {
-    expect(ALL_TOOLS).toHaveLength(16);
+  it('exports 20 unique tools across four registered services', () => {
+    expect(ALL_TOOLS).toHaveLength(20);
     expect(TRELLO_TOOLS).toHaveLength(9);
     expect(SLACK_TOOLS).toHaveLength(2);
     expect(GITHUB_TOOLS).toHaveLength(5);
 
     const names = ALL_TOOLS.map((t) => t.name);
     const uniqueNames = new Set(names);
-    expect(uniqueNames.size).toBe(16);
-    expect(new Set(SERVICE_REGISTRY.map((service) => service.id)).size).toBe(3);
+    expect(uniqueNames.size).toBe(20);
+    expect(new Set(SERVICE_REGISTRY.map((service) => service.id)).size).toBe(4);
     for (const tool of ALL_TOOLS) {
       expect(getServiceDefinition(tool.service)).toBeDefined();
     }
@@ -62,7 +62,7 @@ describe('packages/tool-schemas (Task 2)', () => {
 
   it('should enforce search_* read tools to have query or boardId and limit <= 10', () => {
     const readTools = ALL_TOOLS.filter((t) => t.sideEffect === 'read');
-    expect(readTools).toHaveLength(9);
+    expect(readTools).toHaveLength(12);
 
     for (const tool of readTools) {
       expect(tool.riskLevel).toBe('low');
@@ -78,7 +78,7 @@ describe('packages/tool-schemas (Task 2)', () => {
 
   it('should enforce write tools risk levels per spec v3', () => {
     const writeTools = ALL_TOOLS.filter((t) => t.sideEffect === 'write');
-    expect(writeTools).toHaveLength(7);
+    expect(writeTools).toHaveLength(8);
 
     // Trello writes are low risk
     const trelloWrites = writeTools.filter((t) => t.service === 'trello');
@@ -150,7 +150,7 @@ describe('search tools declare the resources they discover', () => {
 
   it('marks the search tools that can enumerate a resource with an empty query', () => {
     expect(ALL_TOOLS.filter((t) => t.listable).map((t) => t.name).sort()).toEqual([
-      'github.search_repos', 'slack.search_channels', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
+      'github.search_repos', 'sheets.list_sheets', 'sheets.list_spreadsheets', 'slack.search_channels', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
     ]);
     for (const tool of ALL_TOOLS.filter((t) => t.listable)) expect(tool.discovers, tool.name).toBeDefined();
   });

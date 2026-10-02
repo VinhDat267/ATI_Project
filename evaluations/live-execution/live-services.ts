@@ -1,4 +1,4 @@
-import { GitHubAdapter, SlackAdapter, TrelloAdapter } from '@wap/tool-adapters';
+import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter } from '@wap/tool-adapters';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import type { LiveService } from './harness.js';
 
@@ -16,6 +16,15 @@ export interface LiveServiceDefinition {
 
 /** Existing env names remain stable; future services add one entry here. */
 export const LIVE_SERVICES: LiveServiceDefinition[] = [
+  {
+    id: 'sheets', credentials: { clientEmail: 'GOOGLE_CLIENT_EMAIL', privateKey: 'GOOGLE_PRIVATE_KEY' },
+    scopeKey: 'spreadsheets', scopeEnv: 'LIVE_SHEETS_SPREADSHEET_IDS',
+    missingCredentials: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required',
+    missingScope: 'LIVE_SHEETS_SPREADSHEET_IDS must list spreadsheet ids',
+    scopePattern: getServiceDefinition('sheets')!.scopePattern,
+    invalidScope: 'LIVE_SHEETS_SPREADSHEET_IDS entries must be spreadsheet ids',
+    createAdapter: ({ credentials, allowedScope }) => new SheetsAdapter({ credentials: { clientEmail: credentials.clientEmail!, privateKey: credentials.privateKey! }, allowedScope }),
+  },
   {
     id: 'trello', credentials: { apiKey: 'TRELLO_API_KEY', token: 'TRELLO_TOKEN' },
     scopeKey: 'boards', scopeEnv: 'LIVE_TRELLO_BOARD_IDS',

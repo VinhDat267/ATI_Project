@@ -2,8 +2,9 @@ import type { ServiceDefinition } from '../types.js';
 import { TRELLO_SERVICE } from './trello.js';
 import { SLACK_SERVICE } from './slack.js';
 import { GITHUB_SERVICE } from './github.js';
+import { SHEETS_SERVICE } from './sheets.js';
 
-export const SERVICE_REGISTRY: ServiceDefinition[] = [TRELLO_SERVICE, SLACK_SERVICE, GITHUB_SERVICE];
+export const SERVICE_REGISTRY: ServiceDefinition[] = [TRELLO_SERVICE, SLACK_SERVICE, GITHUB_SERVICE, SHEETS_SERVICE];
 
 export function getServiceDefinition(id: string): ServiceDefinition | undefined {
   return SERVICE_REGISTRY.find(service => service.id === id);
