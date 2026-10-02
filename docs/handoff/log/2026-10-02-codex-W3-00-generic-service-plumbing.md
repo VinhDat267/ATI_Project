@@ -36,9 +36,9 @@
 | Schema/types/registry/catalog | types.ts, services.ts, index.ts (3) | registry/index.ts, index.ts (2), thêm file định nghĩa riêng |
 | Adapter chung/export | base-adapter.ts, index.ts (2) | index.ts (1), thêm adapter riêng |
 | API registration/transport | registered-services.ts (1) | registered-services.ts (1), thêm transport riêng |
-| Sandbox | server.ts (1) | sandbox/index.ts (1), thêm fake-results riêng |
+| Sandbox và browser scenario | server.ts (1) | sandbox/index.ts, sandbox/scenarios.ts (2), thêm fake-results và plan riêng |
 | Live evaluation | harness.ts, run.ts (2) | live-services.ts (1) |
-| **Tổng** | **9** | **6 file nối đăng ký; không thêm nhánh theo service trong lõi** |
+| **Tổng** | **9** | **7 file: 6 nối đăng ký và 1 thêm kịch bản sandbox/browser; không thêm nhánh theo service trong lõi** |
 
 ## Giới hạn và việc tiếp theo
 
