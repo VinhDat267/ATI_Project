@@ -82,7 +82,19 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
+- PR: đang chuẩn bị.
+- Commit triển khai: `e33177cf781d55ad9cfb77c538738ae937a0ac81` (base `9d262c6`).
 - Test đã chạy và kết quả:
+  - Baseline `npm run check`: exit 0, 526 test v3 + 66 offline evaluations.
+  - RED: core 8 lỗi/14; extension/guards 4 lỗi/32; sandbox/live extraction 2 lỗi/2. Guard từ khóa có 27 fixture sai cho 23 từ cấm và 4 nguồn trùng từ.
+  - GREEN: 48/48 test mới; `npm run check` exit 0, 569 test v3 + 71 offline evaluations; typecheck/build/production-secret scan/launcher/local-env đều đạt.
+  - `npm run test:browser:v3`: exit 0, 9/9 với PostgreSQL thật và planner/adapter sandbox.
+  - SQL: service giả `demo` đi qua HTTP, lưu/đọc credentials mã hóa, catalog, router, planner/prefetch/grounding và factory; scope ngoài allowlist bị chặn. Ba JSON credentials cũ được đọc và dùng để tạo adapter, ciphertext không đổi.
+  - Review độc lập e33177c: một lỗi Important (guard dựa vào snapshot cập nhật được); đã sửa tại 08431be85aae5cb1fefcc74b1c76a5a3d56c778e bằng RED 1/2 → GREEN 2/2 và chạy lại toàn bộ check. Reviewer độc lập chạy lại 569 v3 +70 eval và browser 9/9, không phát hiện lỗi production khác. Sau fix check đạt 569 +71; không gọi reviewer lần hai.
 - Điều chưa làm hoặc khác với task card:
+  - Gate browser hiện có 9 ca sau FE-01; chạy đủ 9 thay cho số 8 cũ trong card.
+  - Bất biến từ khóa đã đúng ở baseline; dùng fixture sai để kiểm tra guard, giữ nguyên mọi keyword/pattern cũ.
+  - Snapshot 72 câu (50 golden + 18 freeform + 4 launchpad), cả catalog cũ và đầy đủ. Không sửa router, validator, prompt hay nhãn golden; provider/live services NOT_RUN.
+  - Test cũ duy nhất sửa: hai lời gọi `assertAllowedScope` trong `crypto-ratelimit.test.ts` đổi `board/channel` → `boards/channels` theo chữ ký mới.
+  - Xung đột kế hoạch trước W3-02: rf06 yêu cầu Google Calendar; router hiện trả các service cũ, nhưng sau đăng ký Calendar chưa cấu hình sẽ trả []. Gate item8 sẽ chặn đúng theo card. Cần chốt quy tắc ngoại lệ/label hoặc routing trước W3-02; W3-00 giữ nguyên policy và không tự nới guard.
+  - W3-00b, năm service thật, AUTH và FE-02 thuộc task riêng.
