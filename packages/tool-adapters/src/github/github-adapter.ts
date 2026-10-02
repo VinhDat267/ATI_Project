@@ -77,7 +77,10 @@ export class GitHubAdapter extends BaseAdapter {
 
   private checkedRepo(value: unknown): string {
     if (!validRepository(value)) validation('GitHub repo must be owner/repo');
-    if (!this.allowedRepositories().includes(value)) {
+    this.allowedRepositories();
+    try {
+      this.assertAllowedScope('repos', value);
+    } catch {
       throw new StepError({ message: `GitHub repository '${value}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false });
     }
     return value;

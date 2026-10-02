@@ -3,7 +3,7 @@ import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
-import { REGISTERED_SERVICES, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
+import { getRegisteredServices, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 
 export interface ServicesRoutesOptions {
   credentialRepo?: CredentialRepo;
@@ -38,16 +38,17 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // GET /api/services
   router.get('/', async (_req: Request, res: Response): Promise<void> => {
     try {
-      const services = await Promise.all(REGISTERED_SERVICES.map(async ({ id, name, description, scopes, scopeKey, credentialFields }) => {
+      const services = await Promise.all(getRegisteredServices().map(async definition => {
+        const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
         const record = await credentialRepo?.getCredentials(id);
         const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
         const scope = config?.allowedScope as Record<string, unknown> | undefined;
         const entries = scope?.[scopeKey];
-        const configured = Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(scopeKey, scope));
+        const configured = Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
         const savedCheck = checks.get(id);
         const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
         return {
-          id, name, description, scopes, scopeKey, credentialFields,
+          id, name, description, scopes, scopeKey, scopeLabel, credentialFields,
           tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
           configured,
           connected: configured && check?.connectionStatus === 'healthy',
@@ -117,7 +118,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         res.status(400).json({ error: 'Valid service credentials are required' });
         return;
       }
-      const scope = normalizeAllowedScope(registration.definition.scopeKey, allowedScope);
+      const scope = normalizeAllowedScope(registration.definition, allowedScope);
       if (!scope || !encryptionKey) {
         res.status(400).json({ error: 'A non-empty allowed scope and encryption key are required' });
         return;

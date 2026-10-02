@@ -20,10 +20,11 @@ import { AdapterFactory } from './services/adapter-factory.js';
 import { getConfiguredToolCatalog } from './services/registered-services.js';
 import {
   AIPlanner,
-  MockLLMProvider,
   createProviderFromEnv,
 } from '@wap/planner';
 import { ALL_TOOLS } from '@wap/tool-schemas';
+import { createSandboxAdapter } from './sandbox/index.js';
+import { createSandboxProvider, createBackupSandboxProvider } from './sandbox/scenarios.js';
 import { createApp } from './app.js';
 
 async function bootstrap() {
@@ -216,99 +217,11 @@ async function bootstrap() {
     console.log(
       `\x1b[33m[chat-api]\x1b[0m GEMINI_API_KEY chưa thiết lập. Sử dụng Smart Mock LLM Planner cho môi trường dev.`
     );
-    const mockProvider = new MockLLMProvider();
-    // Default smart workflow
-    const sandboxPlan = {
-        kind: 'plan',
-        thinking: 'Khảo sát board Frontend trên Trello và kênh Slack #general. Lập kế hoạch tạo task sửa CSS, gán thành viên Minh và thông báo hoàn tất lên Slack.',
-        summary: 'Tạo thẻ Trello sửa CSS, gán Minh và thông báo kênh Slack #general',
-        steps: [
-          {
-            id: 'step_1',
-            tool: 'trello.create_card',
-            description: 'Tạo thẻ "Sửa lỗi responsive CSS" trên list To Do',
-            args: { listId: 'list_frontend_todo', title: 'Sửa lỗi responsive CSS' },
-            dependsOn: [],
-          },
-          {
-            id: 'step_2',
-            tool: 'trello.add_member',
-            description: 'Gán thành viên Minh vào thẻ vừa tạo',
-            args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'member_minh_dev' },
-            dependsOn: ['step_1'],
-          },
-          {
-            id: 'step_3',
-            tool: 'slack.send_message',
-            description: 'Gửi tin nhắn thông báo lên kênh Slack #general',
-            args: { channel: '#general', text: { $template: 'Đã tạo task mới cho Minh: ${step_1.output.url}' } },
-            dependsOn: ['step_1'],
-          },
-        ],
-        warnings: [],
-      };
-    const threeServicePlan = {
-      kind: 'plan',
-      thinking: 'Tạo issue GitHub, chuyển liên kết vào thẻ Trello, rồi thông báo cả hai liên kết qua Slack.',
-      summary: 'Tạo issue GitHub, thẻ Trello liên kết và thông báo Slack',
-      steps: [
-        {
-          id: 'step_1', tool: 'github.create_issue',
-          description: 'Tạo issue trong repository được cấp quyền',
-          args: { repo: 'owner/repo', title: 'Sửa lỗi responsive CSS' }, dependsOn: [],
-        },
-        {
-          id: 'step_2', tool: 'trello.create_card',
-          description: 'Tạo thẻ Trello dẫn tới GitHub issue',
-          args: { listId: 'list_frontend_todo', title: 'Sửa lỗi responsive CSS', desc: { $template: 'Theo dõi GitHub issue: ${step_1.output.url}' } },
-          dependsOn: ['step_1'],
-        },
-        {
-          id: 'step_3', tool: 'slack.send_message',
-          description: 'Thông báo issue GitHub và thẻ Trello',
-          args: { channel: '#general', text: { $template: 'Issue: ${step_1.output.url}; Trello: ${step_2.output.url}' } },
-          dependsOn: ['step_1', 'step_2'],
-        },
-      ],
-      warnings: [],
-    };
-    mockProvider.setPlanResponses([process.env.SANDBOX_SCENARIO === 'three_service' ? threeServicePlan : sandboxPlan]);
-    provider = mockProvider;
+    provider = createSandboxProvider(process.env.SANDBOX_SCENARIO);
   }
 
   // 3. AI Planner with Resilient Fallback
-  const backupMockProvider = new MockLLMProvider();
-  backupMockProvider.setPlanResponses([
-    {
-      kind: 'plan',
-      thinking: 'Hệ thống phân tích yêu cầu tạo task trên Trello và gửi thông báo qua Slack channel.',
-      summary: 'Tạo thẻ Trello sửa CSS, gán Minh và thông báo Slack #general',
-      steps: [
-        {
-          id: 'step_1',
-          tool: 'trello.create_card',
-          description: 'Tạo thẻ trên board Frontend',
-          args: { listId: 'list_todo', title: 'Sửa lỗi CSS responsive' },
-          dependsOn: [],
-        },
-        {
-          id: 'step_2',
-          tool: 'trello.add_member',
-          description: 'Gán người phụ trách Minh Dev',
-          args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'member_minh' },
-          dependsOn: ['step_1'],
-        },
-        {
-          id: 'step_3',
-          tool: 'slack.send_message',
-          description: 'Gửi thông báo kênh Slack #general',
-          args: { channel: '#general', text: { $template: 'Đã tạo thẻ mới: ${step_1.output.url}' } },
-          dependsOn: ['step_1'],
-        },
-      ],
-      warnings: [],
-    },
-  ]);
+  const backupMockProvider = createBackupSandboxProvider();
 
   let gatherAdapterFactory: { getAdapterForService: (serviceName: string) => Promise<any> | any } | null = null;
   const gatherSearch = async ({ tool, args, signal }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal }) => {
@@ -366,52 +279,7 @@ async function bootstrap() {
 
   const adapterFactory = createRuntimeAdapterFactory(env.RUNTIME_MODE,
     (serviceName: string) => realAdapterFactory.getAdapterForService(serviceName),
-    (serviceName: string) => {
-        console.log(`\x1b[35m[Sandbox Mode]\x1b[0m Using In-Memory Sandbox Adapter for '${serviceName}'`);
-        return {
-          execute: async (tool: string, args: any) => {
-            console.log(`\x1b[35m[Sandbox Execution]\x1b[0m Chạy tool ${tool} với args:`, JSON.stringify(args));
-            if (tool === 'trello.create_card') {
-              return {
-                id: `card_${Date.now()}`,
-                name: args.title || 'Thẻ mới',
-                url: 'https://trello.com/c/sandbox/card',
-                listId: args.listId || 'list_1',
-                desc: args.desc,
-              };
-            }
-            if (tool === 'github.create_issue') {
-              return {
-                id: `issue_${Date.now()}`,
-                number: 42,
-                title: args.title,
-                url: 'https://github.com/owner/repo/issues/42',
-                repo: args.repo,
-              };
-            }
-            if (tool === 'trello.add_member') {
-              return { id: args.cardId, idMembers: [args.memberId] };
-            }
-            if (tool === 'slack.send_message') {
-              if (process.env.SANDBOX_SCENARIO === 'partial_failure') {
-                throw Object.assign(new Error('Sandbox: invalid Slack channel before send'), { category: 'VALIDATION' });
-              }
-              return { ok: true, channel: args.channel, text: args.text, ts: `${Date.now()}.000100` };
-            }
-            if (process.env.SANDBOX_SCENARIO === 'clarification' && tool === 'trello.search_boards') {
-              return [{ id: 'board_frontend', name: 'Frontend' }];
-            }
-            if (process.env.SANDBOX_SCENARIO === 'clarification' && tool === 'trello.search_members') {
-              return [
-                { id: 'member_minh_nguyen', name: 'Minh Nguyễn' },
-                { id: 'member_minh_tran', name: 'Minh Trần' },
-              ];
-            }
-            if (tool.includes('.search_')) return [];
-            return { ok: true, sandbox: true };
-          },
-        };
-    });
+    (serviceName: string) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
 
   // 6. ExecutionService
