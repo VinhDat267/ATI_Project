@@ -93,6 +93,7 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
   - SQL: service giả `demo` đi qua HTTP, lưu/đọc credentials mã hóa, catalog, router, planner/prefetch/grounding và factory; scope ngoài allowlist bị chặn. Ba JSON credentials cũ được đọc và dùng để tạo adapter, ciphertext không đổi.
   - Review độc lập e33177c: một lỗi Important (guard dựa vào snapshot cập nhật được); đã sửa tại 08431be85aae5cb1fefcc74b1c76a5a3d56c778e bằng RED 1/2 → GREEN 2/2 và chạy lại toàn bộ check. Reviewer độc lập chạy lại 569 v3 +70 eval và browser 9/9, không phát hiện lỗi production khác. Sau fix check đạt 569 +71; không gọi reviewer lần hai.
   - Bổ sung ngoại lệ `rf06` ngày 02/10/2026 theo chấp thuận của người dùng: RED 1 lỗi/15 → GREEN 15/15; thêm 13 ca bảo vệ ID, nguồn, prompt, label, catalog và mất tuyến của câu khác sau refresh snapshot. Check mới nhất exit 0, 569 v3 +84 offline evaluations; kiểm tra kiểu strict cho harness exit 0; browser PostgreSQL/sandbox 9/9, exit 0.
+  - Commit ngoại lệ: `9a6eb2f695cdc8688529b27c66c988935936bee0`. Review độc lập mới trên toàn nhánh `9d262c6..464e69d`: **Đạt**, không có Critical/Important/Minor; reviewer tự chạy lại check 569 v3 +84 eval, routing 15/15, strict harness typecheck và browser PostgreSQL/sandbox 9/9, tất cả exit 0. Trước merge vẫn cần CI xanh trên head cuối của PR.
 - Điều chưa làm hoặc khác với task card:
   - Gate browser hiện có 9 ca sau FE-01; chạy đủ 9 thay cho số 8 cũ trong card.
   - Bất biến từ khóa đã đúng ở baseline; dùng fixture sai để kiểm tra guard, giữ nguyên mọi keyword/pattern cũ.
