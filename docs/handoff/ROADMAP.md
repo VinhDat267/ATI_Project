@@ -2,7 +2,7 @@
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
-Mốc 02/10/2026: nhóm chốt thêm năm service và mảng tài khoản (đăng ký, quên mật khẩu, Google, quản lý tài khoản) (Sheets, Calendar, Notion, Telegram, Jira); tuần 1–2 đã xong sớm nên tuần 3 bắt đầu ngay. Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
+Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chốt thêm năm service và mảng tài khoản (đăng ký, quên mật khẩu, Google, quản lý tài khoản) (Sheets, Calendar, Notion, Telegram, Jira); tuần 1–2 đã xong sớm nên tuần 3 bắt đầu ngay. Mốc 01/10/2026: `main` tại `1029e55` đã có W2-01 (#15/#16), W2-02 và W2-04 (#18/#20), W2-05 (#23). W2-03 vẫn chờ người dùng duyệt lệnh ghi thật.
 
 | Tuần | Việc | Task card | Trạng thái |
 |---|---|---|---|
