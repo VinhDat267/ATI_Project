@@ -5,9 +5,10 @@ import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
 import { SLACK_TRANSPORT } from './transports/slack.js';
 import { GITHUB_TRANSPORT } from './transports/github.js';
+import { SHEETS_TRANSPORT } from './transports/sheets.js';
 
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
-  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT].map(transport => [transport.id, transport]),
+  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT].map(transport => [transport.id, transport]),
 );
 
 export function getRegisteredServices(): ServiceDefinition[] {
