@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 export interface ClarificationCardProps {
   question: string;
@@ -15,7 +15,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
   onSubmitText,
   onSkip,
 }) => {
-  const [customText, setCustomText] = useState('');
+  const [customText, setCustomText] = useState("");
   const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
 
   const handleOptionClick = (opt: string) => {
@@ -27,15 +27,12 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
     e.preventDefault();
     if (customText.trim()) {
       onSubmitText?.(customText.trim());
-      setCustomText('');
+      setCustomText("");
     }
   };
 
   return (
-    <div
-      className="bg-white rounded-2xl p-5 border border-zinc-200 shadow-sm max-w-xl my-3 border-l-4"
-      style={{ borderLeftColor: '#0071e3' }}
-    >
+    <div className="clarification-card">
       <div className="flex items-start justify-between gap-3">
         <p className="font-semibold text-zinc-900 text-sm leading-relaxed">
           {question}
@@ -61,9 +58,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
                 type="button"
                 onClick={() => handleOptionClick(opt)}
                 className={`text-xs px-3.5 py-1.5 rounded-lg border transition font-medium ${
-                  isSelected
-                    ? 'bg-[#0071e3] text-white border-[#0071e3] shadow-xs'
-                    : 'bg-[#fafafc] text-zinc-800 border-zinc-200 hover:bg-[#f5f5f7] hover:border-blue-400'
+                  isSelected ? "btn primary" : "btn"
                 }`}
               >
                 {opt}
@@ -86,7 +81,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
           <button
             type="submit"
             disabled={!customText.trim()}
-            className="bg-[#0071e3] text-white text-xs font-medium px-4 py-2 rounded-full hover:bg-blue-600 disabled:opacity-50 transition shadow-xs"
+            className="btn primary"
           >
             Gửi
           </button>

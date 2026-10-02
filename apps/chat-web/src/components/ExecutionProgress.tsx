@@ -1,6 +1,5 @@
-import React from 'react';
-import type { StepState } from '../types';
-
+import type { StepState } from "../types";
+import { Icon } from "./Brand";
 export interface ExecutionStepInfo {
   id: string;
   tool: string;
@@ -10,119 +9,129 @@ export interface ExecutionStepInfo {
   output?: string;
   error?: string;
 }
-
 export interface ExecutionProgressProps {
   steps: ExecutionStepInfo[];
   title?: string;
 }
-
-export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
-  steps,
-  title = '⚡ Tiến trình thực thi liên dịch vụ',
-}) => {
-  const getStatusIcon = (status: StepState) => {
-    switch (status) {
-      case 'succeeded':
-        return (
-          <div className="w-6 h-6 rounded-full bg-[#34c759] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
-            ✓
-          </div>
-        );
-      case 'running':
-        return (
-          <div className="w-6 h-6 rounded-full bg-[#007aff] text-white flex items-center justify-center text-xs font-bold shrink-0 animate-pulse shadow-xs">
-            ⏳
-          </div>
-        );
-      case 'failed':
-        return (
-          <div className="w-6 h-6 rounded-full bg-[#ff3b30] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
-            ✕
-          </div>
-        );
-      case 'paused':
-        return (
-          <div className="w-6 h-6 rounded-full bg-[#ff9500] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
-            ⏸
-          </div>
-        );
-      case 'unknown':
-        return (
-          <div className="w-6 h-6 rounded-full bg-[#af52de] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
-            ?
-          </div>
-        );
-      default:
-        return (
-          <div className="w-6 h-6 rounded-full bg-zinc-200 text-zinc-500 flex items-center justify-center text-xs shrink-0">
-            ○
-          </div>
-        );
+const labels: Record<StepState, string> = {
+  pending: "Chưa chạy",
+  running: "Đang chạy",
+  succeeded: "Thành công",
+  failed: "Lỗi",
+  paused: "Tạm dừng",
+  skipped: "Đã bỏ qua",
+  unknown: "Chưa rõ kết quả",
+};
+function Output({ text }: { text: string }) {
+  let data: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      data = parsed;
+  } catch {
+    /* Plain provider output is preserved in details. */
+  }
+  const raw = data.url || data.html_url || data.permalink;
+  let url: string | undefined;
+  try {
+    if (typeof raw === "string") {
+      const candidate = new URL(raw);
+      if (["http:", "https:"].includes(candidate.protocol))
+        url = candidate.href;
     }
-  };
-
+  } catch {
+    /* Unsafe or malformed links remain text only. */
+  }
+  const title = data.title || data.name || data.text;
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 md:p-6 my-4 max-w-2xl">
-      <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-4">
-        <h3 className="font-semibold text-zinc-900 text-base flex items-center gap-2">
-          {title}
-        </h3>
-        <span className="text-xs text-zinc-500 font-medium">
-          {steps.filter((s) => s.status === 'succeeded').length}/{steps.length} hoàn thành
-        </span>
-      </div>
-
-      <div className="flex flex-col">
-        {steps.map((step, idx) => {
-          const isLast = idx === steps.length - 1;
-          return (
-            <div key={step.id || idx} className="relative flex items-start gap-3.5">
-              {/* Status indicator and line */}
-              <div className="flex flex-col items-center">
-                {getStatusIcon(step.status)}
-                {!isLast && (
-                  <div
-                    className={`w-0.5 h-10 my-1 ${
-                      step.status === 'succeeded' ? 'bg-[#34c759]' : 'bg-zinc-200'
-                    }`}
-                  />
-                )}
-              </div>
-
-              {/* Step info */}
-              <div className="flex-1 pb-4">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="bg-[#5ac8fa]/15 text-[#0071e3] border border-blue-200 font-mono text-[11px] font-semibold px-2 py-0.5 rounded">
-                      {step.tool}
-                    </span>
-                    <span className="text-sm font-semibold text-zinc-900">
-                      {step.description}
-                    </span>
-                  </div>
-                  {step.duration && (
-                    <span className="text-xs text-zinc-400 font-mono">
-                      {step.duration}
-                    </span>
-                  )}
-                </div>
-
-                {step.output && (
-                  <div className="mt-1 text-xs text-[#0066cc] font-mono break-all whitespace-pre-wrap">
-                    {step.output}
-                  </div>
-                )}
-
-                {step.error && (
-                  <div className="mt-1 text-xs text-red-600 font-medium">
-                    {step.error}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="output-summary">
+      {typeof title === "string" && <p>{title}</p>}
+      {url && (
+        <a
+          className="result-link"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Xem kết quả
+          <Icon name="arrow" />
+        </a>
+      )}
+      <details className="output-details">
+        <summary>Chi tiết kết quả</summary>
+        <pre>{text}</pre>
+      </details>
     </div>
   );
-};
+}
+export function ExecutionProgress({
+  steps,
+  title = "Tiến trình thực thi",
+}: ExecutionProgressProps) {
+  const completed =
+    steps.length > 0 &&
+    steps.every((s) => s.status === "succeeded" || s.status === "skipped");
+  return (
+    <section className="process-card">
+      <div className="progress-header">
+        <div>
+          <div className="eyebrow">
+            {completed ? "KẾT QUẢ THỰC THI" : "TIẾN TRÌNH"}
+          </div>
+          <h2>{completed ? "Kế hoạch đã đi đến đích." : title}</h2>
+        </div>
+        <span className="pill ghost">
+          {steps.filter((s) => s.status === "succeeded").length}/{steps.length}{" "}
+          hoàn thành
+        </span>
+      </div>
+      {steps.map((step, index) => (
+        <article className="progress-step" key={step.id}>
+          <span
+            className={
+              "step-state " +
+              (step.status === "succeeded"
+                ? "done"
+                : step.status === "running"
+                  ? "active"
+                  : step.status === "failed"
+                    ? "error"
+                    : step.status === "unknown"
+                      ? "unknown"
+                      : "")
+            }
+          >
+            {step.status === "succeeded" ? (
+              <Icon name="check" />
+            ) : step.status === "running" ? (
+              <span className="spinner" />
+            ) : step.status === "unknown" ? (
+              "?"
+            ) : (
+              String(index + 1).padStart(2, "0")
+            )}
+          </span>
+          <div>
+            <div className="step-tool">{step.tool}</div>
+            <h3>{step.description}</h3>
+            {step.duration && <p>{step.duration}</p>}
+            {step.output && <Output text={step.output} />}{" "}
+            {step.error && <p className="field-error">{step.error}</p>}
+          </div>
+          <span
+            className={
+              "pill " +
+              (step.status === "unknown"
+                ? "unknown"
+                : step.status === "failed"
+                  ? "error"
+                  : "ghost")
+            }
+          >
+            {labels[step.status]}
+          </span>
+        </article>
+      ))}
+    </section>
+  );
+}

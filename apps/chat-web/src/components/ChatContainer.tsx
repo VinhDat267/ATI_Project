@@ -1,14 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import type {
-  ChatMessage,
-  ClarificationState,
-  GatherState,
-} from '../types';
-import { useChatStore } from '../store/chat-store';
-import { MessageItem } from './MessageItem';
-import { GatherProgress } from './GatherProgress';
-import { ClarificationCard } from './ClarificationCard';
-
+import React, { useState, useRef, useEffect } from "react";
+import type { ChatMessage, ClarificationState, GatherState } from "../types";
+import { useChatStore } from "../store/chat-store";
+import { MessageItem } from "./MessageItem";
+import { GatherProgress } from "./GatherProgress";
+import { ClarificationCard } from "./ClarificationCard";
+import { Icon } from "./Brand";
 export interface ChatContainerProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
@@ -18,168 +14,174 @@ export interface ChatContainerProps {
   activeClarification?: ClarificationState | null;
   onClearClarification?: () => void;
   children?: React.ReactNode;
+  actions?: React.ReactNode;
+  busy?: boolean;
 }
-
-export const ChatContainer: React.FC<ChatContainerProps> = ({
+export function ChatContainer({
   messages,
   onSendMessage,
   streamingText,
   isStreaming,
-  gatherState: propGatherState,
-  activeClarification: propActiveClarification,
+  gatherState: propGather,
+  activeClarification: propClarify,
   onClearClarification,
   children,
-}) => {
-  const [inputVal, setInputVal] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
+  actions,
+  busy,
+}: ChatContainerProps) {
+  const [inputVal, setInputVal] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const storeGather = useChatStore((s) => s.gatherState),
+    storeClarification = useChatStore((s) => s.activeClarification),
+    clearStore = useChatStore((s) => s.setClarification);
+  const gatherState = propGather !== undefined ? propGather : storeGather;
+  const clarification =
+    propClarify !== undefined ? propClarify : storeClarification;
+  const blocked = Boolean(busy || isStreaming || gatherState?.isGathering);
   useEffect(() => {
-    const handlePrefill = (e: Event) => {
-      const customEvt = e as CustomEvent<{ text: string }>;
-      if (customEvt.detail?.text) {
-        setInputVal(customEvt.detail.text);
-        if (inputRef.current) {
-          inputRef.current.focus();
-          const len = customEvt.detail.text.length;
-          inputRef.current.setSelectionRange?.(len, len);
-        }
+    const fn = (e: Event) => {
+      const text = (e as CustomEvent<{ text: string }>).detail?.text;
+      if (text) {
+        setInputVal(text);
+        inputRef.current?.focus();
       }
     };
-    window.addEventListener('chat:prefill', handlePrefill);
-    return () => window.removeEventListener('chat:prefill', handlePrefill);
+    window.addEventListener("chat:prefill", fn);
+    return () => window.removeEventListener("chat:prefill", fn);
   }, []);
-
-  const storeGatherState = useChatStore((s) => s.gatherState);
-  const storeClarification = useChatStore((s) => s.activeClarification);
-  const setStoreClarification = useChatStore((s) => s.setClarification);
-
-  const gatherState =
-    propGatherState !== undefined ? propGatherState : storeGatherState;
-  const activeClarification =
-    propActiveClarification !== undefined
-      ? propActiveClarification
-      : storeClarification;
-
-  const clearClarification = () => {
-    if (onClearClarification) {
-      onClearClarification();
-    } else {
-      setStoreClarification(null);
-    }
-  };
-
-  const scrollToBottom = () => {
-    if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingText, gatherState, activeClarification]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (inputVal.trim()) {
-      onSendMessage(inputVal.trim());
-      setInputVal('');
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height =
+        Math.min(Math.max(inputRef.current.scrollHeight, 40), 144) + "px";
+      inputRef.current.style.overflowY =
+        inputRef.current.scrollHeight > 144 ? "auto" : "hidden";
     }
+  }, [inputVal]);
+  useEffect(() => {
+    const feed = feedRef.current;
+    if (!feed) return;
+    if (messages.length === 0) {
+      feed.scrollTop = 0;
+      nearBottom.current = true;
+    } else if (nearBottom.current) feed.scrollTop = feed.scrollHeight;
+  }, [messages, streamingText, gatherState, clarification]);
+  const send = () => {
+    if (blocked || !inputVal.trim()) return;
+    onSendMessage(inputVal.trim());
+    setInputVal("");
+    nearBottom.current = true;
   };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+  const answer = (text: string) => {
+    onSendMessage(text);
+    onClearClarification ? onClearClarification() : clearStore(null);
   };
-
   return (
-    <div className="flex flex-col h-full bg-white relative">
-      {/* Messages Scroll Area */}
+    <div className="chat-container">
       <div
-        className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 mx-auto w-full ${
-          messages.length === 0 ? 'max-w-4xl' : 'max-w-3xl'
-        }`}
+        className="workspace-feed"
+        ref={feedRef}
+        role="log"
+        aria-label="Hội thoại"
+        aria-live="polite"
+        onScroll={() => {
+          const f = feedRef.current;
+          if (f)
+            nearBottom.current =
+              f.scrollHeight - f.scrollTop - f.clientHeight < 100;
+        }}
       >
-        {messages.map((msg) => (
-          <MessageItem
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            status={msg.status}
-            timestamp={msg.timestamp}
-          />
-        ))}
-
-        {/* Streaming text */}
-        {isStreaming && streamingText && (
-          <MessageItem
-            role="assistant"
-            content={`${streamingText} |`}
-          />
-        )}
-
-        {/* Gather Progress */}
-        {gatherState &&
-          (gatherState.isGathering || gatherState.steps.length > 0) && (
-            <GatherProgress
-              summary={gatherState.summary}
-              steps={gatherState.steps}
-            />
+        <div className="feed-inner">
+          {messages.map((msg) => (
+            <MessageItem key={msg.id} {...msg} />
+          ))}
+          {isStreaming && streamingText && (
+            <MessageItem role="assistant" content={streamingText} />
+          )}{" "}
+          {gatherState &&
+            (gatherState.isGathering || gatherState.steps.length > 0) && (
+              <GatherProgress
+                summary={gatherState.summary}
+                steps={gatherState.steps}
+              />
+            )}{" "}
+          {blocked && !gatherState?.isGathering && !streamingText && (
+            <div className="planning-indicator" role="status">
+              <span className="spinner" />
+              ATI đang xử lý yêu cầu…
+            </div>
           )}
-
-        {/* Clarification Card */}
-        {activeClarification && (
-          <ClarificationCard
-            question={activeClarification.question}
-            options={activeClarification.options}
-            onSelectOption={(option) => {
-              onSendMessage(option);
-              clearClarification();
-            }}
-            onSubmitText={(text) => {
-              onSendMessage(text);
-              clearClarification();
-            }}
-            onSkip={() => {
-              clearClarification();
-            }}
-          />
-        )}
-
-        {/* Injected cards (PlanPreview, ExecutionProgress, etc) */}
-        {children}
-
-        <div ref={messagesEndRef} />
+          {clarification && (
+            <ClarificationCard
+              question={clarification.question}
+              options={clarification.options}
+              onSelectOption={answer}
+              onSubmitText={answer}
+              onSkip={() =>
+                onClearClarification ? onClearClarification() : clearStore(null)
+              }
+            />
+          )}{" "}
+          {children}
+        </div>
       </div>
-
-      {/* Fixed/Docked Bottom Input Bar */}
-      <div className="border-t border-zinc-200 bg-white p-3 md:p-4 sticky bottom-0 z-20">
+      {actions && (
+        <section className="review-dock" aria-label="Thao tác kế hoạch">
+          {actions}
+        </section>
+      )}
+      <div className="composer-dock">
         <form
-          onSubmit={handleSubmit}
-          className="max-w-3xl mx-auto flex items-center gap-2 bg-[#f5f5f7] border border-zinc-200 rounded-2xl p-1.5 focus-within:border-blue-500 focus-within:bg-white transition shadow-xs"
+          className="composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
         >
-          <input
+          <label htmlFor="chat-input" className="sr-only">
+            Mô tả công việc bạn muốn thực hiện
+          </label>
+          <textarea
             ref={inputRef}
             id="chat-input"
-            type="text"
+            rows={1}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={handleKeyDown}
-            aria-label="Mô tả công việc bạn muốn thực hiện"
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229
+              ) {
+                e.preventDefault();
+                send();
+              }
+            }}
             placeholder="Mô tả công việc bạn muốn thực hiện..."
-            className="flex-1 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none"
           />
-          <button
-            type="submit"
-            disabled={!inputVal.trim()}
-            className="w-10 h-10 rounded-full bg-[#0071e3] text-white flex items-center justify-center disabled:opacity-40 hover:bg-blue-600 transition shadow-xs shrink-0"
-          >
-            <span className="text-xs font-semibold">Gửi</span>
-          </button>
+          <div className="composer-bottom">
+            <span>
+              {blocked
+                ? "Đang xử lý · chưa gửi thêm yêu cầu"
+                : "Enter để gửi · Shift + Enter xuống dòng"}
+            </span>
+            <button
+              type="submit"
+              className="btn primary square"
+              aria-label="Gửi"
+              disabled={blocked || !inputVal.trim()}
+            >
+              <Icon name="send" />
+            </button>
+          </div>
         </form>
+        <p className="composer-disclaimer">
+          Kiểm tra nội dung và nơi nhận trước khi duyệt kế hoạch.
+        </p>
       </div>
     </div>
   );
-};
+}

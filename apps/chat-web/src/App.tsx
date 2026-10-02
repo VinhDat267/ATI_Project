@@ -1,24 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useChatStore } from './store/chat-store';
-import { useSSE } from './hooks/use-sse';
-import { authStorage, subscribeAuthTokens } from './services/auth-storage';
-import { apiClient } from './services/api-client';
-import { ChatContainer } from './components/ChatContainer';
-import { PlanPreview } from './components/PlanPreview';
-import { ExecutionProgress } from './components/ExecutionProgress';
-import { PartialFailureModal } from './components/PartialFailureModal';
-import { SettingsModal } from './components/SettingsModal';
-import { LoginView } from './components/LoginView';
-import { LandingPageView } from './components/LandingPageView';
-import { SidebarHistory } from './components/layout/SidebarHistory';
-import { UserNavMenu } from './components/layout/UserNavMenu';
-import { MissionControlLaunchpad } from './components/MissionControlLaunchpad';
-import { ReconciliationNotice } from './components/ReconciliationNotice';
-import { refreshExecutionSnapshot } from './services/execution-snapshot';
-import type { User } from './types';
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useChatStore } from "./store/chat-store";
+import { useSSE } from "./hooks/use-sse";
+import { authStorage, subscribeAuthTokens } from "./services/auth-storage";
+import { apiClient } from "./services/api-client";
+import { ChatContainer } from "./components/ChatContainer";
+import { PlanPreview } from "./components/PlanPreview";
+import { ExecutionProgress } from "./components/ExecutionProgress";
+import { PartialFailureModal } from "./components/PartialFailureModal";
+import { Workspace } from "./views/Workspace";
+import { PlanActions } from "./components/PlanPreview";
+import { Modal } from "./components/Modal";
+import { ViewBoundary } from "./components/ViewBoundary";
+import { openConversation } from "./services/conversation-loader";
+import { userError } from "./services/user-error";
+const ServicesView = lazy(() => import("./views/ServicesView"));
+type View = "landing" | "login" | "workspace" | "services";
+import { LoginView } from "./components/LoginView";
+import { LandingPageView } from "./components/LandingPageView";
+
+import { MissionControlLaunchpad } from "./components/MissionControlLaunchpad";
+import { ReconciliationNotice } from "./components/ReconciliationNotice";
+import { refreshExecutionSnapshot } from "./services/execution-snapshot";
+import type { User } from "./types";
 
 export interface AppProps {
-  initialView?: 'landing' | 'login';
+  initialView?: "landing" | "login";
 }
 
 export const App: React.FC<AppProps> = ({ initialView }) => {
@@ -40,31 +46,54 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     reset,
   } = useChatStore();
 
-  const [currentView, setCurrentView] = useState<'landing' | 'login'>(() => {
-    if (initialView) return initialView;
-    if (typeof window !== 'undefined' && window.location?.search) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('view') === 'login') return 'login';
-      if (params.get('view') === 'landing') return 'landing';
-    }
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
-      return 'login';
-    }
-    return 'landing';
-  });
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const readView = (): View => {
+    const view = new URLSearchParams(window.location.search).get("view");
+    if (
+      view === "login" ||
+      view === "landing" ||
+      view === "workspace" ||
+      view === "services"
+    )
+      return view;
+    return (
+      initialView ||
+      (authStorage.getStoredTokens().accessToken ? "workspace" : "landing")
+    );
+  };
+  const [currentView, setCurrentView] = useState<View>(readView);
+  const [routeVersion, setRouteVersion] = useState(0);
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
+  const [confirmStop, setConfirmStop] = useState(false);
+  const navigate = (view: View, id?: string | null) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+    if (id) url.searchParams.set("c", id);
+    else if (view !== "workspace" && view !== "services")
+      url.searchParams.delete("c");
+    window.history.pushState({}, "", url);
+    setCurrentView(view);
+    setRouteVersion((v) => v + 1);
+  };
+  useEffect(() => {
+    const pop = () => {
+      setCurrentView(readView());
+      setRouteVersion((v) => v + 1);
+    };
+    window.addEventListener("popstate", pop);
+    return () => window.removeEventListener("popstate", pop);
+  }, []);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const recoveryPending = useRef(false);
-  useEffect(() => { setRecoveryError(null); }, [conversationId, executionSnapshot?.plan.id]);
+  useEffect(() => {
+    setRecoveryError(null);
+  }, [conversationId, executionSnapshot?.plan.id]);
 
   // Subscribe to auth token updates to keep React state and SSE in sync
   useEffect(() => {
@@ -96,25 +125,17 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
           }
         })
         .catch((err) => {
-          console.warn('Session restore failed:', err);
-          authStorage.clearStoredTokens();
-          setAuthToken(null);
-          setUser(null);
+          console.warn("Session restore failed:", err);
+          if (err?.status === 401) {
+            authStorage.clearStoredTokens();
+            setAuthToken(null);
+            setUser(null);
+          } else {
+            setAuthError(userError(err));
+          }
         });
     }
   }, []);
-
-  // Close mobile sidebar drawer on Escape key press
-  useEffect(() => {
-    if (!isSidebarOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsSidebarOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSidebarOpen]);
 
   const loginUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,9 +145,10 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       const data = await apiClient.login(email, password);
       setAuthToken(data.accessToken);
       setUser(data.user);
-      setPassword('');
+      setPassword("");
+      navigate("workspace");
     } catch (err: any) {
-      setAuthError(err.message || 'Không thể xác thực với API backend');
+      setAuthError(userError(err));
     } finally {
       setIsLoggingIn(false);
     }
@@ -138,37 +160,39 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     setUser(null);
     reset();
     useChatStore.getState().setConversations([]);
-    setCurrentView('landing');
-    if (typeof window !== 'undefined' && window.history?.pushState) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('view');
-      window.history.pushState({}, '', url.toString());
-    }
+    navigate("landing");
   };
 
   // Activate SSE connection for current conversation
   useSSE(conversationId, authToken);
 
   const handleNewConversation = async () => {
-    reset();
     try {
       const data = await apiClient.createConversation();
-      const newConv = data.conversation;
-      if (newConv?.id) {
-        setConversationId(newConv.id);
-        useChatStore.getState().setConversations([
-          newConv,
-          ...useChatStore.getState().conversations.filter((c) => c.id !== newConv.id),
+      if (!data.conversation?.id)
+        throw new Error("Máy chủ chưa tạo được hội thoại.");
+      reset();
+      setConversationId(data.conversation.id);
+      useChatStore
+        .getState()
+        .setConversations([
+          data.conversation,
+          ...useChatStore
+            .getState()
+            .conversations.filter((c) => c.id !== data.conversation.id),
         ]);
-        return;
-      }
+      navigate("workspace", data.conversation.id);
     } catch (err) {
-      console.warn('Could not create conversation via API:', err);
+      useChatStore.getState().addMessage({
+        id: "new-error-" + Date.now(),
+        role: "system",
+        content: userError(err),
+      });
     }
-    setConversationId(`conv-${Date.now()}`);
   };
-
   const handleSendMessage = async (content: string) => {
+    if (useChatStore.getState().isStreaming) return;
+    useChatStore.getState().setIsStreaming(true);
     let currentConvId = conversationId;
     if (!currentConvId) {
       try {
@@ -176,16 +200,18 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         currentConvId = data.conversation?.id;
         if (currentConvId) {
           setConversationId(currentConvId);
+          navigate("workspace", currentConvId);
         }
       } catch (err) {
-        console.warn('Could not create conversation via API:', err);
+        console.warn("Could not create conversation via API:", err);
       }
       if (!currentConvId) {
         useChatStore.getState().addMessage({
           id: `err-${Date.now()}`,
-          role: 'system',
-          content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',
+          role: "system",
+          content: "[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.",
         });
+        useChatStore.getState().setIsStreaming(false);
         return;
       }
     }
@@ -197,136 +223,143 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       const result = await apiClient.sendMessage(
         currentConvId,
         content,
-        tempId
+        tempId,
       );
       useChatStore
         .getState()
         .confirmMessage(tempId, result?.messageId || tempId);
     } catch (err: any) {
+      useChatStore.getState().setIsStreaming(false);
       useChatStore.getState().markMessageFailed(tempId);
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
-        role: 'system',
-        content: `[Lỗi gửi tin nhắn]: ${err?.message || 'Máy chủ từ chối yêu cầu'}`,
+        role: "system",
+        content: `[Lỗi gửi tin nhắn]: ${err?.message || "Máy chủ từ chối yêu cầu"}`,
       });
     }
   };
 
   const handleApprovePlan = async () => {
-    if (!activePlan || planStatus === 'approving') return;
+    if (!activePlan?.id || planStatus === "approving") return;
 
-    setPlanStatus('approving');
-    const planId = activePlan.id || 'plan_default';
+    setPlanStatus("approving");
+    const planId = activePlan.id;
     try {
       await apiClient.approvePlan(planId);
     } catch (err: any) {
-      setPlanStatus('preview');
+      setPlanStatus("preview");
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
-        role: 'system',
-        content: `[Lỗi phê duyệt kế hoạch]: ${err?.message || 'Phê duyệt thất bại'}`,
+        role: "system",
+        content: `[Lỗi phê duyệt kế hoạch]: ${err?.message || "Phê duyệt thất bại"}`,
       });
     }
   };
 
   const handleRejectPlan = async () => {
-    if (!activePlan) return;
-    const planId = activePlan.id;
+    if (!activePlan?.id) return;
     try {
-      if (planId) {
-        await apiClient.rejectPlan(planId);
-      }
+      await apiClient.rejectPlan(activePlan.id);
+      setActivePlan(null);
+      setPlanStatus("rejected");
     } catch (err) {
-      console.warn('Reject plan API call failed:', err);
+      useChatStore.getState().addMessage({
+        id: "reject-error-" + Date.now(),
+        role: "system",
+        content: "Không hủy được kế hoạch: " + userError(err),
+      });
     }
-    setActivePlan(null);
-    setPlanStatus('rejected');
   };
-
-  const recover = async (action: 'retry' | 'skip' | 'stop' | 'continue', stepId?: string) => {
+  const recover = async (
+    action: "retry" | "skip" | "stop" | "continue",
+    stepId?: string,
+  ) => {
     const planId = executionSnapshot?.plan.id || activePlan?.id;
     const convId = conversationId;
     if (!planId || !convId || recoveryPending.current) return;
-    if (executionSnapshot && !executionSnapshot.recoveryActions.includes(action)) return;
-    if (action === 'retry' && stepId && stepStatuses[stepId] === 'unknown') return;
+    if (
+      executionSnapshot &&
+      !executionSnapshot.recoveryActions.includes(action)
+    )
+      return;
+    if (action === "retry" && stepId && stepStatuses[stepId] === "unknown")
+      return;
     recoveryPending.current = true;
     setRecoveryBusy(true);
     setRecoveryError(null);
     try {
-      if (action === 'stop') await apiClient.stopExecution(planId);
-      else if (action === 'continue') await apiClient.continueExecution(planId);
+      if (action === "stop") await apiClient.stopExecution(planId);
+      else if (action === "continue") await apiClient.continueExecution(planId);
       else if (stepId) {
-        if (action === 'retry') await apiClient.retryStep(planId, stepId);
+        if (action === "retry") await apiClient.retryStep(planId, stepId);
         else await apiClient.skipStep(planId, stepId);
       }
-      if (useChatStore.getState().conversationId === convId) await refreshExecutionSnapshot(convId, planId);
+      if (useChatStore.getState().conversationId === convId)
+        await refreshExecutionSnapshot(convId, planId);
     } catch (err) {
       if (useChatStore.getState().conversationId === convId) {
-        setRecoveryError(err instanceof Error ? err.message : 'Không thể cập nhật quy trình. Hãy tải lại trạng thái trước khi quyết định.');
+        setRecoveryError(
+          err instanceof Error
+            ? err.message
+            : "Không thể cập nhật quy trình. Hãy tải lại trạng thái trước khi quyết định.",
+        );
       }
     } finally {
       recoveryPending.current = false;
       setRecoveryBusy(false);
     }
   };
-  const handleRetry = (stepId: string) => recover('retry', stepId);
-  const handleSkip = (stepId: string) => recover('skip', stepId);
-  const handleStop = () => recover('stop');
+  const handleRetry = (stepId: string) => recover("retry", stepId);
+  const handleSkip = (stepId: string) => recover("skip", stepId);
+  const handleStop = () => recover("stop");
 
-  const handleEditPlan = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('chat:prefill', {
-          detail: { text: 'Điều chỉnh kế hoạch: ' },
-        })
-      );
-    }
-    const chatInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-      '#chat-input, input[placeholder*="Mô tả công việc"], textarea[placeholder*="Mô tả công việc"], [aria-label*="Mô tả công việc"]'
+  const handleEditPlan = () =>
+    window.dispatchEvent(
+      new CustomEvent("chat:prefill", {
+        detail: { text: "Điều chỉnh kế hoạch: " },
+      }),
     );
-    if (chatInput) {
-      const nativeSetter =
-        Object.getOwnPropertyDescriptor(window.HTMLInputElement?.prototype || {}, 'value')?.set ||
-        Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement?.prototype || {}, 'value')?.set;
-      if (nativeSetter) {
-        nativeSetter.call(chatInput, 'Điều chỉnh kế hoạch: ');
-      } else {
-        chatInput.value = 'Điều chỉnh kế hoạch: ';
-      }
-      chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-      chatInput.dispatchEvent(new Event('change', { bubbles: true }));
-      chatInput.focus();
-      chatInput.setSelectionRange?.(chatInput.value.length, chatInput.value.length);
-    }
-  };
 
   const executionStatus = executionSnapshot?.execution.status || planStatus;
-  const pausedStep = executionSnapshot?.steps.find(step => step.stepId === executionSnapshot.execution.pausedStepId);
-  const needsReconciliation = executionStatus === 'reconciliation_required' ||
-    (executionStatus === 'partial' && pausedStep?.status === 'unknown');
-  const failedStepId = executionStatus === 'partial' ? Object.entries(stepStatuses).find(
-    ([_, st]) => st === 'failed'
-  )?.[0] : undefined;
+  const pausedStep = executionSnapshot?.steps.find(
+    (step) => step.stepId === executionSnapshot.execution.pausedStepId,
+  );
+  const needsReconciliation =
+    executionStatus === "reconciliation_required" ||
+    (executionStatus === "partial" && pausedStep?.status === "unknown");
+  const failedStepId =
+    executionStatus === "partial"
+      ? Object.entries(stepStatuses).find(([_, st]) => st === "failed")?.[0]
+      : undefined;
   const progressPlan = executionSnapshot?.plan || activePlan;
-  const failureId = pausedStep?.status === 'failed' ? pausedStep.stepId : failedStepId;
-  const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
+  const failureId =
+    pausedStep?.status === "failed" ? pausedStep.stepId : failedStepId;
+  const failureStep = progressPlan?.steps?.find(
+    (step) => step.id === failureId,
+  );
 
-  if (!authToken) {
-    if (currentView === 'landing') {
-      return (
-        <LandingPageView
-          onGoToLogin={() => {
-            setCurrentView('login');
-            if (typeof window !== 'undefined' && window.history?.pushState) {
-              const url = new URL(window.location.href);
-              url.searchParams.set('view', 'login');
-              window.history.pushState({}, '', url.toString());
-            }
-          }}
-        />
-      );
-    }
-
+  useEffect(() => {
+    if (
+      !authToken ||
+      (currentView !== "workspace" && currentView !== "services")
+    )
+      return;
+    const id = new URLSearchParams(window.location.search).get("c");
+    if (id && id !== useChatStore.getState().conversationId)
+      void openConversation(id);
+  }, [authToken, currentView, routeVersion]);
+  if (currentView === "landing")
+    return (
+      <LandingPageView
+        onGoToLogin={() =>
+          navigate(
+            authToken ? "workspace" : "login",
+            authToken ? conversationId : null,
+          )
+        }
+      />
+    );
+  if (!authToken)
     return (
       <LoginView
         email={email}
@@ -336,207 +369,220 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         isLoggingIn={isLoggingIn}
         authError={authError}
         onLogin={loginUser}
-        onQuickFillAdmin={() => {
-          setEmail((import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test');
-          setPassword((import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678');
-        }}
-        onBackToLanding={() => {
-          setCurrentView('landing');
-          if (typeof window !== 'undefined' && window.history?.pushState) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('view');
-            window.history.pushState({}, '', url.toString());
-          }
-        }}
+        onBackToLanding={() => navigate("landing")}
       />
     );
-  }
-
+  const preview = activePlan && ["preview", "approving"].includes(planStatus);
+  const failureKey = `${progressPlan?.id}:${failureId}`;
+  const mode = (import.meta as any).env?.VITE_RUNTIME_MODE;
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white text-[#1d1d1f]">
-      {/* Mobile sidebar backdrop overlay */}
-      {isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black/30 backdrop-blur-xs z-30 cursor-pointer md:hidden"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar for Desktop & Mobile Drawer */}
+    <Workspace
+      user={user}
+      services={currentView === "services"}
+      onServices={() => navigate("services", conversationId)}
+      onWorkspace={() => navigate("workspace", conversationId)}
+      onNew={handleNewConversation}
+      onLanding={() => navigate("landing")}
+      onLogout={handleLogout}
+      onSelect={(id) => navigate("workspace", id)}
+    >
       <div
-        className={`fixed md:static inset-y-0 left-0 z-40 w-72 bg-[#f5f5f7] border-r border-zinc-200 flex flex-col justify-between transition-transform transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
+        className={"mode-notice " + (mode === "sandbox" ? "sandbox" : "")}
+        role="status"
       >
-        <div className="p-4 flex flex-col flex-1 overflow-hidden">
-          <div className="flex items-center justify-between mb-4 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                AI
-              </div>
-              <span className="font-semibold text-sm tracking-tight text-zinc-900">
-                AI Workflow Platform
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden text-zinc-400 hover:text-zinc-600 text-sm"
-            >
-              ✕
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleNewConversation}
-            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-          >
-            <span>+</span>
-            <span>Cuộc hội thoại mới</span>
-          </button>
-
-          <SidebarHistory
-            currentConversationId={conversationId}
-            onCloseMobileSidebar={() => setIsSidebarOpen(false)}
-          />
-        </div>
-
-        <UserNavMenu
-          user={user}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onLogout={handleLogout}
-        />
+        {mode === "sandbox"
+          ? "Giao diện thử nghiệm · Xác nhận API ở sandbox trước khi duyệt. Kế hoạch và kết quả sandbox là dữ liệu minh họa."
+          : mode === "live"
+            ? "Chế độ live · Kế hoạch chỉ tạo thay đổi sau khi bạn duyệt."
+            : "Chưa xác nhận chế độ API. Kiểm tra môi trường trước khi duyệt thao tác ghi."}
       </div>
-
-      {/* Main Chat Workspace */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-        {/* Top bar */}
-        <div className="h-14 border-b border-zinc-200 px-4 md:px-6 flex items-center justify-between bg-white z-10 shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              aria-label="Mở danh sách hội thoại"
-              className="md:hidden p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-600"
-            >
-              ☰
-            </button>
-            <h1 className="font-semibold text-sm md:text-base text-zinc-900">
-              AI Workflow Platform
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              aria-label="Mở cài đặt dịch vụ"
-              className="text-xs text-zinc-600 border border-zinc-200 hover:bg-zinc-50 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5"
-            >
-              <span>⚙️</span>
-              <span className="hidden sm:inline">Cài đặt dịch vụ</span>
-            </button>
-          </div>
-        </div>
-
-        {authError && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between">
-            <span>⚠️ {authError}</span>
-            <button
-              type="button"
-              onClick={() => setAuthError(null)}
-              className="text-amber-600 hover:text-amber-800 font-bold ml-2 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Chat Feed */}
-        <div className="flex-1 overflow-hidden relative">
-          <ChatContainer
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            streamingText={streamingText}
-            isStreaming={isStreaming}
+      {authError && (
+        <p role="alert" className="app-alert">
+          {authError}
+        </p>
+      )}
+      {currentView === "services" ? (
+        <ViewBoundary>
+          <Suspense
+            fallback={
+              <div className="services-body">
+                <div className="skeleton-card" role="status">
+                  Đang mở dịch vụ…
+                  <div className="skeleton" />
+                </div>
+              </div>
+            }
           >
-            {/* Mission Control Launchpad when no messages */}
-            {messages.length === 0 && (
-              <MissionControlLaunchpad onSendMessage={handleSendMessage} />
-            )}
-
-            {/* Plan Preview Card */}
-            {activePlan && ['preview', 'approving'].includes(planStatus) && (
-              <PlanPreview
+            <ServicesView />
+          </Suspense>
+        </ViewBoundary>
+      ) : (
+        <ChatContainer
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          streamingText={streamingText}
+          isStreaming={isStreaming}
+          busy={planStatus === "approving" || planStatus === "executing"}
+          actions={
+            preview && (
+              <PlanActions
                 plan={activePlan}
-                isApproving={planStatus === 'approving'}
+                isApproving={planStatus === "approving"}
                 onApprove={handleApprovePlan}
                 onEdit={handleEditPlan}
                 onCancel={handleRejectPlan}
               />
-            )}
-
-            {/* Live Execution Progress Card */}
-            {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
-            {executionSnapshot && needsReconciliation && <ReconciliationNotice
-              snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
-            {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
-            {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
-            {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
-            {progressPlan && Object.keys(stepStatuses).length > 0 && (
-              <ExecutionProgress
-                steps={(progressPlan.steps || executionSnapshot?.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId })) || []).map((st) => {
-                  const saved = executionSnapshot?.steps.find(row => row.stepId === st.id);
-                  return ({
+            )
+          }
+        >
+          {messages.length === 0 && (
+            <MissionControlLaunchpad onSendMessage={handleSendMessage} />
+          )}
+          {preview && (
+            <PlanPreview
+              plan={activePlan}
+              isApproving={planStatus === "approving"}
+              hideActions
+            />
+          )}
+          {executionLoadError && (
+            <p role="alert" className="app-alert">
+              Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở
+              lại hội thoại.
+            </p>
+          )}
+          {executionSnapshot && needsReconciliation && (
+            <ReconciliationNotice
+              snapshot={executionSnapshot}
+              busy={recoveryBusy}
+              error={recoveryError}
+              onSkip={handleSkip}
+              onStop={() => setConfirmStop(true)}
+              onContinue={() => recover("continue")}
+            />
+          )}
+          {executionStatus === "completed" && (
+            <p role="status" className="execution-summary">
+              Quy trình đã hoàn thành.
+            </p>
+          )}
+          {executionStatus === "stopped" && (
+            <p role="status" className="execution-summary">
+              Quy trình đã dừng.
+            </p>
+          )}
+          {recoveryError && !needsReconciliation && (
+            <p role="alert" className="field-error">
+              {recoveryError}
+            </p>
+          )}
+          {progressPlan && Object.keys(stepStatuses).length > 0 && (
+            <ExecutionProgress
+              steps={(
+                progressPlan.steps ||
+                executionSnapshot?.steps.map((row) => ({
+                  id: row.stepId,
+                  tool: row.tool,
+                  description: row.stepId,
+                })) ||
+                []
+              ).map((st) => {
+                const saved = executionSnapshot?.steps.find(
+                  (row) => row.stepId === st.id,
+                );
+                return {
                   id: st.id,
                   tool: st.tool,
                   description: st.description,
-                  status: stepStatuses[st.id] || 'pending',
+                  status: stepStatuses[st.id] || "pending",
                   error: stepErrors[st.id],
-                  duration: saved?.durationMs != null ? `${saved.durationMs / 1000}s` : undefined,
-                  output: saved?.output != null ? JSON.stringify(saved.output) : undefined,
-                }); })}
+                  duration:
+                    saved?.durationMs != null
+                      ? `${saved.durationMs / 1000}s`
+                      : undefined,
+                  output:
+                    saved?.output != null
+                      ? JSON.stringify(saved.output)
+                      : undefined,
+                };
+              })}
+            />
+          )}
+          {progressPlan && !["preview", "approving"].includes(planStatus) && (
+            <details className="approved-plan">
+              <summary>Kế hoạch đã duyệt</summary>
+              <PlanPreview
+                plan={{
+                  id: progressPlan.id,
+                  summary: progressPlan.summary || "Kế hoạch đã duyệt",
+                  steps: progressPlan.steps || [],
+                }}
+                readOnly
+                hideActions
               />
-            )}
-
-            {/* Partial Failure Recovery Modal */}
-            {failureId && !needsReconciliation && (
-              <PartialFailureModal
-                busy={recoveryBusy}
-                allowedActions={executionSnapshot?.recoveryActions.filter((action): action is 'retry' | 'skip' | 'stop' => action !== 'continue')}
-                allowEdit={false}
-                stepId={failureId}
-                tool={failureStep?.tool || pausedStep?.tool || 'unknown'}
-                errorMessage={
-                  stepErrors[failureId] || 'Lỗi thực thi bước'
-                }
-                stepArgs={
-                  failureStep?.args
-                }
-                prompt={
-                  (typeof failureStep?.args?.prompt === 'string' ? failureStep.args.prompt : undefined) || failureStep?.description
-                }
-                onRetry={() => handleRetry(failureId)}
-                onEditAndRetry={() => handleRetry(failureId)}
-                onSkip={() => handleSkip(failureId)}
-                onStop={handleStop}
-                onClose={handleStop}
-              />
-            )}
-          </ChatContainer>
-        </div>
-      </div>
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        authToken={authToken}
-      />
-    </div>
+            </details>
+          )}
+          {failureId && !needsReconciliation && (
+            <>
+              <div className="recovery-note">
+                Quy trình tạm dừng tại {failureId}.{" "}
+                <button
+                  className="btn"
+                  onClick={() => setDismissedFailure(null)}
+                >
+                  Xem cách xử lý
+                </button>
+              </div>
+              {dismissedFailure !== failureKey && (
+                <PartialFailureModal
+                  key={failureKey}
+                  stepId={failureId}
+                  tool={failureStep?.tool || pausedStep?.tool || "unknown"}
+                  errorMessage={stepErrors[failureId] || "Lỗi thực thi bước"}
+                  stepArgs={failureStep?.args}
+                  prompt={failureStep?.description}
+                  busy={recoveryBusy}
+                  allowEdit={false}
+                  allowedActions={executionSnapshot?.recoveryActions.filter(
+                    (a): a is "retry" | "skip" | "stop" => a !== "continue",
+                  )}
+                  onRetry={() => handleRetry(failureId)}
+                  onEditAndRetry={() => handleRetry(failureId)}
+                  onSkip={() => handleSkip(failureId)}
+                  onStop={handleStop}
+                  onClose={() => setDismissedFailure(failureKey)}
+                />
+              )}
+            </>
+          )}
+        </ChatContainer>
+      )}
+      {confirmStop && (
+        <Modal
+          title="Dừng hẳn quy trình?"
+          onClose={() => setConfirmStop(false)}
+        >
+          <p>
+            Không thể chạy tiếp sau khi dừng. Các thay đổi đã tạo được giữ lại.
+          </p>
+          <div className="dialog-actions">
+            <button className="btn" onClick={() => setConfirmStop(false)}>
+              Quay lại
+            </button>
+            <button
+              className="btn primary"
+              disabled={recoveryBusy}
+              onClick={() => {
+                setConfirmStop(false);
+                void handleStop();
+              }}
+            >
+              Xác nhận dừng
+            </button>
+          </div>
+        </Modal>
+      )}
+    </Workspace>
   );
 };
-
 export default App;

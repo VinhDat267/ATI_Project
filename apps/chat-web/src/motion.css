@@ -1,0 +1,401 @@
+/* ATI B: short, purposeful motion. Hero and landing hooks own interactive transforms. */
+:root {
+  --motion-fast: 160ms;
+  --motion-panel: 320ms;
+  --motion-enter: 520ms;
+  --ease-ati: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ati-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ati-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ati-dialog {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ati-hero-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Four identical groups: shifting one group makes the loop seam identical. */
+@keyframes ati-logo-marquee {
+  to {
+    transform: translateX(-25%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .service-strip-track {
+    animation: ati-logo-marquee 18s linear infinite;
+  }
+  @media (hover: hover) {
+    .service-strip-marquee:hover .service-strip-track {
+      animation-play-state: paused;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .service-strip-marquee {
+    mask-image: none;
+  }
+  .service-strip-track {
+    width: 100%;
+  }
+  .service-strip-logos[aria-hidden] {
+    display: none;
+  }
+  .service-strip-logos:not([aria-hidden]) {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 0;
+  }
+  @media (max-width: 760px) {
+    .service-strip-brand {
+      flex-direction: column;
+      font-size: 16px;
+    }
+  }
+}
+
+.hero-perspective {
+  perspective: 1200px;
+  min-width: 0;
+}
+.hero-float {
+  transform-style: preserve-3d;
+}
+.hero-rotator {
+  --hero-depth: 14px;
+  --hero-roll: -1deg;
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+  cursor: grab;
+  touch-action: pan-y pinch-zoom;
+}
+.hero-rotator:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 6px;
+  border-radius: 24px;
+}
+.hero-rotator[data-dragging],
+.hero-rotator[data-dragging] * {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.hero-front,
+.hero-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow:
+    0 6px 16px #2e382d08,
+    0 22px 42px -16px #2e382d24;
+}
+.hero-edge-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: #d3d7c3;
+  border: 1px solid #c4cbb7;
+  backface-visibility: visible;
+  pointer-events: none;
+}
+.hero-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateZ(var(--hero-roll)) translateZ(calc(-1 * var(--hero-depth))) rotateY(180deg);
+  background: #e9e9dc;
+  border: 1px solid #d7dac9;
+  border-radius: 24px;
+  padding: 23px 24px 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  text-align: center;
+  color: var(--green);
+}
+.hero-back .brand-word {
+  font-size: 64px;
+}
+.hero-back h2 {
+  font: 28px/1.5 var(--serif);
+  max-width: 330px;
+}
+.hero-back p {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@keyframes ati-check {
+  from {
+    transform: scale(0.65);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ati-working {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 #3c574100;
+  }
+  50% {
+    box-shadow: 0 0 0 5px #3c574114;
+  }
+}
+
+/* Only enable movement for people who have not requested reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn {
+    transition:
+      transform var(--motion-fast) var(--ease-ati),
+      background var(--motion-fast) ease,
+      border-color var(--motion-fast) ease,
+      box-shadow var(--motion-fast) ease;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn > .icon {
+    transition: transform var(--motion-fast) var(--ease-ati);
+  }
+  .composer,
+  .field input,
+  .field textarea {
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+  .history-link {
+    transition:
+      background 180ms ease,
+      color 180ms ease;
+  }
+  .nav-arrow {
+    transition: transform 200ms var(--ease-ati);
+  }
+
+  .public-nav {
+    animation: ati-fade 400ms ease both;
+  }
+  .hero > div:first-child > * {
+    animation: ati-rise 650ms var(--ease-ati) var(--entrance-delay, 0ms) both;
+  }
+  .hero h1 {
+    --entrance-delay: 70ms;
+  }
+  .hero-copy {
+    --entrance-delay: 140ms;
+  }
+  .hero-cta {
+    --entrance-delay: 210ms;
+  }
+  .hero-note {
+    --entrance-delay: 280ms;
+  }
+  .hero-float {
+    animation: ati-hero-float 4s ease-in-out infinite;
+  }
+  .mini-request {
+    animation: ati-rise 500ms var(--ease-ati) 220ms both;
+  }
+  .mini-step {
+    animation: ati-rise 500ms var(--ease-ati) 340ms both;
+  }
+  .mini-step:nth-child(3) {
+    animation-delay: 460ms;
+  }
+  .mini-step:nth-child(4) {
+    animation-delay: 580ms;
+  }
+  .mini-approve {
+    animation: ati-rise 500ms var(--ease-ati) 700ms both;
+  }
+
+  .login-editorial,
+  .login-form-wrap,
+  .page-intro,
+  .empty-workspace {
+    animation: ati-rise var(--motion-enter) var(--ease-ati) both;
+  }
+  .login-form-wrap {
+    animation-delay: 100ms;
+  }
+  .editorial-flow-item {
+    animation: ati-rise 450ms var(--ease-ati) 150ms both;
+  }
+  .editorial-flow-item:nth-child(2) {
+    animation-delay: 230ms;
+  }
+  .editorial-flow-item:nth-child(3) {
+    animation-delay: 310ms;
+  }
+  .suggestions > .btn {
+    animation: ati-fade 400ms ease 120ms backwards;
+  }
+  .suggestions > .btn:nth-child(2) {
+    animation-delay: 180ms;
+  }
+  .suggestions > .btn:nth-child(3) {
+    animation-delay: 240ms;
+  }
+
+  .service-card {
+    animation: ati-rise var(--motion-enter) var(--ease-ati) 40ms backwards;
+    transition:
+      box-shadow 240ms ease,
+      border-color 240ms ease;
+  }
+  .service-card:nth-of-type(2) {
+    animation-delay: 120ms;
+  }
+  .service-card:nth-of-type(3) {
+    animation-delay: 200ms;
+  }
+  .service-notice {
+    animation: ati-fade 400ms ease both;
+  }
+  .service-feedback,
+  .app-alert {
+    animation: ati-rise 240ms var(--ease-ati) both;
+  }
+
+  /* Animate mounted messages, never individual streaming text tokens. */
+  .chat-message {
+    animation: ati-rise 260ms var(--ease-ati) backwards;
+  }
+  .plan-card,
+  .process-card,
+  .gather-card,
+  .clarification-card {
+    animation: ati-rise 360ms var(--ease-ati) backwards;
+  }
+  .plan-step {
+    animation: ati-rise 400ms var(--ease-ati) 60ms backwards;
+  }
+  .plan-step:nth-child(2) {
+    animation-delay: 130ms;
+  }
+  .plan-step:nth-child(3) {
+    animation-delay: 200ms;
+  }
+  .plan-thinking > p,
+  .output-details[open] > pre {
+    animation: ati-fade 200ms ease both;
+  }
+  .review-dock {
+    animation: ati-rise 280ms var(--ease-ati) backwards;
+  }
+  .step-state.done > .icon {
+    animation: ati-check 280ms var(--ease-ati) both;
+  }
+  .step-state.active {
+    animation: ati-working 1.8s ease-in-out infinite;
+  }
+  .output-summary {
+    animation: ati-fade 240ms ease both;
+  }
+
+  .modal-backdrop,
+  .drawer-backdrop.open {
+    animation: ati-fade 180ms ease both;
+  }
+  .modal-panel {
+    animation: ati-dialog var(--motion-panel) var(--ease-ati) both;
+  }
+  .sidebar {
+    transition: transform var(--motion-panel) var(--ease-ati);
+  }
+
+  /* Pointer effects stay off touch devices, and never apply to disabled CTAs. */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+    .btn.primary:hover:not(:disabled) {
+      box-shadow: 0 5px 14px #3c574123;
+    }
+    .btn:hover:not(:disabled) > .icon {
+      transform: translateX(2px);
+    }
+    .btn:active:not(:disabled) {
+      transform: translateY(0) scale(0.97);
+    }
+    .service-card:hover {
+      border-color: #aab79c;
+      box-shadow: 0 12px 28px #3c57410d;
+    }
+    .history-link:hover .nav-arrow {
+      transform: translate(2px, -2px);
+    }
+    .suggestions > .btn:hover {
+      border-color: #aab79c;
+    }
+  }
+
+}
+
+@media (max-width: 760px) {
+  .hero-rotator {
+    --hero-depth: 10px;
+    --hero-roll: 0deg;
+  }
+  .hero-edge-layer {
+    border-radius: 19px;
+  }
+  .hero-back {
+    border-radius: 19px;
+    padding: 18px;
+  }
+  .hero-back h2 {
+    font-size: 25px;
+  }
+}
+
+/* Explicit fallback also covers existing spinner/shimmer and native scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

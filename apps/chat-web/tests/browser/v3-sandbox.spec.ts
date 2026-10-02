@@ -43,12 +43,12 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const listed = page.waitForResponse(response => response.url().endsWith('/api/conversations') && response.request().method() === 'GET');
     await page.reload();
     expect((await (await listed).json()).conversations[0].id).toBe(convId);
-    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    await page.getByRole('button', { name: new RegExp('^Hội thoại · ' + convId.slice(0, 8)) }).click();
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice).toBeVisible();
     await expect(notice.getByText('trello.add_member')).toBeVisible();
     await expect(notice.getByText(/saved-browser-card/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /thử lại|retry|Duyệt kế hoạch/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /thử lại|retry|Duyệt và thực thi/i })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('reconciliation-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await notice.scrollIntoViewIfNeeded();
@@ -75,7 +75,7 @@ async function login(page: import('@playwright/test').Page) {
   await page.getByRole('textbox', { name: 'Email' }).fill(email!);
   await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI Workflow Platform' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mở cài đặt dịch vụ' })).toBeVisible();
 }
 
 test('real browser and PostgreSQL: login, chat, approval and execution Continue safe pending after reload', async ({ page }, testInfo) => {
@@ -102,7 +102,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     const writes: string[] = [];
     page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });
     await page.reload();
-    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    await page.getByRole('button', { name: new RegExp('^Hội thoại · ' + convId.slice(0, 8)) }).click();
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
     await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);
@@ -132,12 +132,12 @@ test('real browser and PostgreSQL: login, chat, approval and execution', async (
     const body = await response.json();
     const conversationId = body.conversation?.id || body.id;
     expect(conversationId).toBeTruthy();
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toBeVisible();
     const plan = await pool.query('SELECT id, status FROM plans WHERE conv_id = $1', [conversationId]);
     expect(plan.rows).toHaveLength(1);
     expect(plan.rows[0].status).toBe('pending');
 
-    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await page.getByRole('button', { name: /Duyệt và thực thi/ }).click();
     await expect.poll(async () => {
       const result = await pool.query('SELECT status FROM plans WHERE id = $1', [plan.rows[0].id]);
       return result.rows[0]?.status;
@@ -158,12 +158,12 @@ test('real browser and PostgreSQL: cancel a pending plan', async ({ page }) => {
     const prompt = `Tạo task Trello và báo Slack E2E cancel ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
     expect(planId).toBeTruthy();
     await page.getByRole('button', { name: 'Hủy', exact: true }).click();
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('rejected');
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toHaveCount(0);
   } finally {
     await pool.end();
   }
@@ -177,7 +177,7 @@ test('real browser and PostgreSQL: edit a pending plan through chat', async ({ p
     const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
     await composer.fill(prompt);
     await composerSend(page).click();
-    const approve = page.getByRole('button', { name: /Duyệt kế hoạch/ });
+    const approve = page.getByRole('button', { name: /Duyệt và thực thi/ });
     await expect(approve).toBeVisible();
     // The whole preview, approve button included, must be reachable above the composer.
     await approve.scrollIntoViewIfNeeded();
@@ -189,7 +189,7 @@ test('real browser and PostgreSQL: edit a pending plan through chat', async ({ p
     const first = (await pool.query("SELECT id FROM plans WHERE conv_id = $1 AND status = 'pending'", [convId])).rows[0]?.id;
     expect(first).toBeTruthy();
 
-    await page.getByRole('button', { name: 'Sửa qua Chat' }).click();
+    await page.getByRole('button', { name: 'Sửa qua chat' }).click();
     await expect(composer).toHaveValue(/^Điều chỉnh kế hoạch: /);
     await composer.pressSequentially('đổi tiêu đề thành Sửa CSS trang chủ');
     await composerSend(page).click();
@@ -219,7 +219,7 @@ test('real browser and PostgreSQL: clarification before plan', async ({ page }) 
     expect(clarification.rowCount).toBeGreaterThan(0);
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill('Minh Nguyễn');
     await composerSend(page).click();
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toBeVisible();
     await page.getByRole('button', { name: 'Hủy', exact: true }).click();
   } finally {
     await pool.end();
@@ -234,10 +234,10 @@ test('real browser and PostgreSQL: partial failure and skip', async ({ page }) =
     const prompt = `Tạo task Trello rồi báo Slack E2E partial failure ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
     expect(planId).toBeTruthy();
-    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await page.getByRole('button', { name: /Duyệt và thực thi/ }).click();
     await expect(page.getByText(/Tạm dừng quy trình tại bước: step_3/)).toBeVisible();
     await expect.poll(async () => (await pool.query('SELECT status FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_3'])).rows[0]?.status).toBe('failed');
     await page.getByRole('button', { name: /Bỏ qua bước này/ }).click();
@@ -257,13 +257,13 @@ test('real browser and PostgreSQL: approved three-service workflow resolves prio
     const prompt = `Tạo issue GitHub, thẻ Trello và thông báo Slack E2E ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();
-    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Duyệt và thực thi/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
     expect(planId).toBeTruthy();
     const preview = await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId]);
     const plannedTools = preview.rows[0]?.plan_json?.steps?.map((step: { tool: string }) => step.tool);
     expect(plannedTools).toEqual(['github.create_issue', 'trello.create_card', 'slack.send_message']);
-    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await page.getByRole('button', { name: /Duyệt và thực thi/ }).click();
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
     const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
     expect(steps.map((step) => step.status)).toEqual(['succeeded', 'succeeded', 'succeeded']);

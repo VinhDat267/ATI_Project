@@ -1,5 +1,6 @@
-import React from 'react';
-import type { PlanStep } from '../types';
+import React from "react";
+import type { PlanStep } from "../types";
+import { Icon } from "./Brand";
 
 export interface PlanStepItemProps {
   step: PlanStep;
@@ -9,76 +10,141 @@ export interface PlanStepItemProps {
 
 /** "step_1.output.url" -> "‹kết quả step_1: url›" */
 function describeReference(path: string): string {
-  const [stepId, , ...field] = path.split('.');
-  return `‹kết quả ${stepId}${field.length ? `: ${field.join('.')}` : ''}›`;
+  const [stepId, , ...field] = path.split(".");
+  return `‹kết quả ${stepId}${field.length ? `: ${field.join(".")}` : ""}›`;
 }
 
 /** What an argument will carry, so the reviewer approves text they can read. */
-export function formatArgValue(value: unknown): { text: string; isRef: boolean } {
-  if (typeof value === 'string' && value.startsWith('$step_')) return { text: value, isRef: true };
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const { $ref, $template } = value as { $ref?: unknown; $template?: unknown };
-    if (typeof $ref === 'string') return { text: describeReference($ref), isRef: true };
-    if (typeof $template === 'string') {
-      return { text: $template.replace(/\$\{([^}]+)\}/g, (_, path: string) => describeReference(path)), isRef: false };
+export function formatArgValue(value: unknown): {
+  text: string;
+  isRef: boolean;
+} {
+  if (typeof value === "string" && value.startsWith("$step_"))
+    return { text: value, isRef: true };
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const { $ref, $template } = value as {
+      $ref?: unknown;
+      $template?: unknown;
+    };
+    if (typeof $ref === "string")
+      return { text: describeReference($ref), isRef: true };
+    if (typeof $template === "string") {
+      return {
+        text: $template.replace(/\$\{([^}]+)\}/g, (_, path: string) =>
+          describeReference(path),
+        ),
+        isRef: false,
+      };
     }
     return { text: JSON.stringify(value), isRef: false };
   }
   if (Array.isArray(value)) {
-    return { text: value.map((item) => formatArgValue(item).text).join(', '), isRef: false };
+    return {
+      text: value.map((item) => formatArgValue(item).text).join(", "),
+      isRef: false,
+    };
   }
   return { text: String(value), isRef: false };
 }
 
-export const PlanStepItem: React.FC<PlanStepItemProps> = ({
-  step,
-  index,
-  isLast = false,
-}) => {
+const writes = new Set([
+  "trello.create_card",
+  "trello.add_member",
+  "trello.add_checklist",
+  "trello.update_card",
+  "slack.send_message",
+  "github.create_issue",
+  "github.add_label",
+]);
+const reads = new Set([
+  "trello.search_boards",
+  "trello.search_lists",
+  "trello.search_members",
+  "trello.search_cards",
+  "trello.get_card",
+  "slack.search_channels",
+  "github.search_repos",
+  "github.search_issues",
+  "github.get_issue",
+]);
+const argLabels: Record<string, string> = {
+  listId: "Danh sách (ID)",
+  boardId: "Bảng (ID)",
+  cardId: "Thẻ (ID)",
+  memberId: "Thành viên (ID)",
+  channel: "Kênh",
+  repo: "Repository",
+  owner: "Chủ repository",
+  title: "Tiêu đề",
+  name: "Tên",
+  body: "Nội dung",
+  description: "Mô tả",
+  desc: "Mô tả",
+  text: "Nội dung thông báo",
+  due: "Hạn hoàn thành",
+  query: "Tìm kiếm",
+  limit: "Giới hạn",
+  labels: "Nhãn",
+};
+export const PlanStepItem: React.FC<PlanStepItemProps> = ({ step, index }) => {
+  const service = step.tool.split(".")[0];
+  const resourceKeys = [
+    "repo",
+    "owner",
+    "boardId",
+    "listId",
+    "cardId",
+    "channel",
+    "memberId",
+  ];
+  const entries = Object.entries(step.args || {});
   return (
-    <div className="relative flex items-start gap-3.5">
-      {/* Step Circle & Connector */}
-      <div className="flex flex-col items-center">
-        <div className="w-6 h-6 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
-          {index + 1}
-        </div>
-        {!isLast && <div className="w-0.5 bg-zinc-200 h-10 my-1" />}
+    <article className="plan-step">
+      <div className="step-heading">
+        <span className="step-number">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <Icon name={service} />
       </div>
-
-      {/* Step Details */}
-      <div className="flex-1 pb-4">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="bg-[#5ac8fa]/15 text-[#0071e3] border border-blue-200 font-mono text-xs font-semibold px-2 py-0.5 rounded">
-            {step.tool}
-          </span>
-          <span className="text-sm font-semibold text-zinc-900">
-            {step.description}
+      <div className="step-body">
+        <div className="step-service">
+          <code>{step.tool}</code>
+          <span className="write-tag">
+            {writes.has(step.tool)
+              ? "Ghi"
+              : reads.has(step.tool)
+                ? "Đọc"
+                : "Chưa phân loại"}
           </span>
         </div>
-
-        {/* Arguments display */}
-        {step.args && Object.keys(step.args).length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-zinc-600 bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-            {Object.entries(step.args).map(([k, v]) => {
-              const { text: valStr, isRef } = formatArgValue(v);
-              return (
-                <span key={k} className="inline-flex items-start gap-1">
-                  <span className="text-zinc-400">{k}:</span>
-                  {isRef ? (
-                    <span data-testid={`arg-${k}`} className="font-mono bg-blue-50 text-blue-700 px-1 py-0.5 rounded border border-blue-200 text-[11px]">
-                      {valStr}
-                    </span>
-                  ) : (
-                    <span data-testid={`arg-${k}`} className="font-mono text-zinc-800 text-[11px] whitespace-pre-wrap break-words">
-                      {valStr}
-                    </span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        )}
+        <h3>{step.description}</h3>
+        {entries
+          .filter(([key]) => resourceKeys.includes(key))
+          .map(([key, value]) => (
+            <div key={key}>
+              <div className="resource-label">{argLabels[key] || key}</div>
+              <div className="resource-value" data-testid={`arg-${key}`}>
+                {formatArgValue(value).text}
+              </div>
+            </div>
+          ))}
+        <div className="payload">
+          {entries
+            .filter(([key]) => !resourceKeys.includes(key))
+            .map(([key, value]) => (
+              <div key={key}>
+                <strong>{argLabels[key] || key}</strong>
+                <p data-testid={`arg-${key}`}>{formatArgValue(value).text}</p>
+              </div>
+            ))}
+          {entries.length === 0 && <p>Không có tham số bổ sung.</p>}
+        </div>
+        <p className="dependency">
+          {step.dependsOn?.length
+            ? "Dùng kết quả: " + step.dependsOn.join(", ")
+            : "Khởi đầu quy trình"}
+        </p>
       </div>
-    </div>
+    </article>
   );
 };

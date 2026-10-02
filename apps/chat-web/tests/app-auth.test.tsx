@@ -1,30 +1,52 @@
 /** @vitest-environment jsdom */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { App } from '../src/App';
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { App } from "../src/App";
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState({}, "", "/");
   vi.unstubAllGlobals();
 });
 
-describe('App authentication', () => {
-  it('requires submitted credentials instead of logging in as the demo admin automatically', async () => {
+describe("App authentication", () => {
+  it("requires submitted credentials instead of logging in as the demo admin automatically", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ accessToken: 'jwt', user: { id: 'user-1', email: 'operator@example.com', name: 'Operator' } }),
+      json: async () => ({
+        accessToken: "jwt",
+        user: { id: "user-1", email: "operator@example.com", name: "Operator" },
+      }),
     }));
-    vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialView="login" />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'operator@example.com' } });
-    fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'entered-secret' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "operator@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Mật khẩu"), {
+      target: { value: "entered-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ email: 'operator@example.com', password: 'entered-secret' }),
-    })));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            email: "operator@example.com",
+            password: "entered-secret",
+          }),
+        }),
+      ),
+    );
   });
 });

@@ -1,66 +1,70 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { PartialFailureModal } from '../../src/components/PartialFailureModal';
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { PartialFailureModal } from "../../src/components/PartialFailureModal";
 
 afterEach(() => {
   cleanup();
 });
 
-describe('PartialFailureModal Component', () => {
+describe("PartialFailureModal Component", () => {
   const defaultProps = {
-    stepId: 'step_2',
-    tool: 'trello.create_card',
-    errorMessage: 'Card title cannot be empty',
-    stepArgs: { name: 'Initial Card', listId: 'list_123' },
+    stepId: "step_2",
+    tool: "trello.create_card",
+    errorMessage: "Card title cannot be empty",
+    stepArgs: { name: "Initial Card", listId: "list_123" },
     onRetry: vi.fn(),
     onEditAndRetry: vi.fn(),
     onSkip: vi.fn(),
     onStop: vi.fn(),
   };
 
-  it('renders failure details, tool badge, error message, and data safety guarantee', () => {
+  it("renders failure details, tool badge, error message, and data safety guarantee", () => {
     render(<PartialFailureModal {...defaultProps} />);
 
-    expect(screen.getByRole('alertdialog')).toBeDefined();
+    expect(screen.getByRole("alertdialog")).toBeDefined();
     expect(
-      screen.getByText(/Tạm dừng quy trình tại bước: step_2/i)
+      screen.getByText(/Tạm dừng quy trình tại bước: step_2/i),
     ).toBeDefined();
-    expect(screen.getByText('trello.create_card')).toBeDefined();
+    expect(screen.getByText("trello.create_card")).toBeDefined();
     expect(screen.getByText(/Card title cannot be empty/i)).toBeDefined();
     expect(
       screen.getByText(
-        /Bảo vệ an toàn dữ liệu: Các bước đã hoàn thành được bảo toàn nguyên vẹn/i
-      )
+        /Bảo vệ an toàn dữ liệu: Các bước đã hoàn thành được bảo toàn nguyên vẹn/i,
+      ),
     ).toBeDefined();
 
     // Verify step args preview is rendered
-    expect(screen.getByTestId('step-args-preview')).toBeDefined();
+    expect(screen.getByTestId("step-args-preview")).toBeDefined();
     expect(screen.getByText(/"Initial Card"/)).toBeDefined();
   });
 
-  it('closes on Escape key press by calling onClose or onStop', () => {
+  it("closes on Escape key press by calling onClose without stopping", () => {
     const onStop = vi.fn();
     const onClose = vi.fn();
 
     const { unmount } = render(
-      <PartialFailureModal {...defaultProps} onStop={onStop} onClose={onClose} />
+      <PartialFailureModal
+        {...defaultProps}
+        onStop={onStop}
+        onClose={onClose}
+      />,
     );
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onStop).not.toHaveBeenCalled();
 
     unmount();
 
-    // Fallback to onStop when onClose is not provided
+    // Missing dismissal callback must never turn Escape into a destructive command
     const onStopOnly = vi.fn();
     render(<PartialFailureModal {...defaultProps} onStop={onStopOnly} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(onStopOnly).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onStopOnly).not.toHaveBeenCalled();
   });
 
-  it('closes on backdrop click but does not close when clicking inside content container', () => {
+  it("closes on backdrop click but does not close when clicking inside content container", () => {
     const onClose = vi.fn();
     render(<PartialFailureModal {...defaultProps} onClose={onClose} />);
 
@@ -70,7 +74,7 @@ describe('PartialFailureModal Component', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     // Click the backdrop overlay (outermost dialog wrapper)
-    const backdrop = screen.getByRole('alertdialog');
+    const backdrop = screen.getByRole("alertdialog");
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -79,7 +83,7 @@ describe('PartialFailureModal Component', () => {
     const onRetry = vi.fn();
     render(<PartialFailureModal {...defaultProps} onRetry={onRetry} />);
 
-    const retryBtn = screen.getByRole('button', { name: /Thử lại bước này/i });
+    const retryBtn = screen.getByRole("button", { name: /Thử lại bước này/i });
     fireEvent.click(retryBtn);
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -87,30 +91,30 @@ describe('PartialFailureModal Component', () => {
   it('triggers onEditAndRetry when "Sửa & tiếp tục" is clicked with default arguments', () => {
     const onEditAndRetry = vi.fn();
     render(
-      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />
+      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />,
     );
 
-    const editBtn = screen.getByRole('button', { name: /Sửa & tiếp tục/i });
+    const editBtn = screen.getByRole("button", { name: /Sửa & tiếp tục/i });
     fireEvent.click(editBtn);
     expect(onEditAndRetry).toHaveBeenCalledWith({
-      name: 'Initial Card',
-      listId: 'list_123',
+      name: "Initial Card",
+      listId: "list_123",
     });
   });
 
-  it('allows user to inspect, edit step arguments JSON, and submits edited arguments', () => {
+  it("allows user to inspect, edit step arguments JSON, and submits edited arguments", () => {
     const onEditAndRetry = vi.fn();
     render(
-      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />
+      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />,
     );
 
     // Toggle edit mode
-    const toggleEditBtn = screen.getByRole('button', {
+    const toggleEditBtn = screen.getByRole("button", {
       name: /Chỉnh sửa tham số/i,
     });
     fireEvent.click(toggleEditBtn);
 
-    const textarea = screen.getByRole('textbox', {
+    const textarea = screen.getByRole("textbox", {
       name: /Tham số thực thi/i,
     });
     expect(textarea).toBeDefined();
@@ -118,36 +122,34 @@ describe('PartialFailureModal Component', () => {
     // Change arguments in textarea
     fireEvent.change(textarea, {
       target: {
-        value: JSON.stringify({ name: 'Updated Card', listId: 'list_999' }),
+        value: JSON.stringify({ name: "Updated Card", listId: "list_999" }),
       },
     });
 
-    const submitBtn = screen.getByRole('button', { name: /Sửa & tiếp tục/i });
+    const submitBtn = screen.getByRole("button", { name: /Sửa & tiếp tục/i });
     fireEvent.click(submitBtn);
 
     expect(onEditAndRetry).toHaveBeenCalledWith({
-      name: 'Updated Card',
-      listId: 'list_999',
+      name: "Updated Card",
+      listId: "list_999",
     });
   });
 
-  it('displays error message and prevents submission when JSON is invalid', () => {
+  it("displays error message and prevents submission when JSON is invalid", () => {
     const onEditAndRetry = vi.fn();
     render(
-      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />
+      <PartialFailureModal {...defaultProps} onEditAndRetry={onEditAndRetry} />,
     );
 
     // Toggle edit mode
-    fireEvent.click(
-      screen.getByRole('button', { name: /Chỉnh sửa tham số/i })
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Chỉnh sửa tham số/i }));
 
-    const textarea = screen.getByRole('textbox', {
+    const textarea = screen.getByRole("textbox", {
       name: /Tham số thực thi/i,
     });
-    fireEvent.change(textarea, { target: { value: '{ invalid json' } });
+    fireEvent.change(textarea, { target: { value: "{ invalid json" } });
 
-    const submitBtn = screen.getByRole('button', { name: /Sửa & tiếp tục/i });
+    const submitBtn = screen.getByRole("button", { name: /Sửa & tiếp tục/i });
     fireEvent.click(submitBtn);
 
     expect(onEditAndRetry).not.toHaveBeenCalled();
@@ -158,52 +160,50 @@ describe('PartialFailureModal Component', () => {
     const onSkip = vi.fn();
     render(<PartialFailureModal {...defaultProps} onSkip={onSkip} />);
 
-    const skipBtn = screen.getByRole('button', { name: /Bỏ qua bước này/i });
+    const skipBtn = screen.getByRole("button", { name: /Bỏ qua bước này/i });
     fireEvent.click(skipBtn);
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('allows user to inspect and edit prompt before submitting retry', () => {
+  it("allows user to inspect and edit prompt before submitting retry", () => {
     const onEditAndRetry = vi.fn();
     render(
       <PartialFailureModal
         {...defaultProps}
         prompt="Initial prompt text"
         onEditAndRetry={onEditAndRetry}
-      />
+      />,
     );
 
     // Prompt preview is displayed
-    expect(screen.getByTestId('step-prompt-preview')).toBeDefined();
-    expect(screen.getByText('Initial prompt text')).toBeDefined();
+    expect(screen.getByTestId("step-prompt-preview")).toBeDefined();
+    expect(screen.getByText("Initial prompt text")).toBeDefined();
 
     // Toggle edit mode
-    fireEvent.click(
-      screen.getByRole('button', { name: /Chỉnh sửa tham số/i })
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Chỉnh sửa tham số/i }));
 
-    const promptTextarea = screen.getByRole('textbox', {
+    const promptTextarea = screen.getByRole("textbox", {
       name: /Yêu cầu \/ Prompt/i,
     });
     expect(promptTextarea).toBeDefined();
 
     fireEvent.change(promptTextarea, {
-      target: { value: 'Updated prompt text' },
+      target: { value: "Updated prompt text" },
     });
 
-    const submitBtn = screen.getByRole('button', { name: /Sửa & tiếp tục/i });
+    const submitBtn = screen.getByRole("button", { name: /Sửa & tiếp tục/i });
     fireEvent.click(submitBtn);
 
     expect(onEditAndRetry).toHaveBeenCalledWith(
       {
-        name: 'Initial Card',
-        listId: 'list_123',
+        name: "Initial Card",
+        listId: "list_123",
       },
-      'Updated prompt text'
+      "Updated prompt text",
     );
   });
 
-  it('safely handles missing or empty stepArgs', () => {
+  it("safely handles missing or empty stepArgs", () => {
     const onEditAndRetry = vi.fn();
     render(
       <PartialFailureModal
@@ -214,12 +214,12 @@ describe('PartialFailureModal Component', () => {
         onEditAndRetry={onEditAndRetry}
         onSkip={vi.fn()}
         onStop={vi.fn()}
-      />
+      />,
     );
 
-    expect(screen.getByText('(Không có tham số bổ sung)')).toBeDefined();
+    expect(screen.getByText("(Không có tham số bổ sung)")).toBeDefined();
 
-    const submitBtn = screen.getByRole('button', { name: /Sửa & tiếp tục/i });
+    const submitBtn = screen.getByRole("button", { name: /Sửa & tiếp tục/i });
     fireEvent.click(submitBtn);
     expect(onEditAndRetry).toHaveBeenCalledWith(undefined);
   });
@@ -228,9 +228,10 @@ describe('PartialFailureModal Component', () => {
     const onStop = vi.fn();
     render(<PartialFailureModal {...defaultProps} onStop={onStop} />);
 
-    const stopBtn = screen.getByRole('button', { name: /Dừng lại toàn bộ/i });
+    const stopBtn = screen.getByRole("button", { name: /Dừng lại toàn bộ/i });
     fireEvent.click(stopBtn);
+    expect(onStop).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận dừng" }));
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 });
-

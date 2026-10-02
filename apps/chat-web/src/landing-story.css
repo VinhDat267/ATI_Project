@@ -1,0 +1,96 @@
+/* Editorial workflow: static content first, motion only when the hook is ready. */
+.heading-mask { display: block; overflow: clip; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.heading-mask > span { display: block; }
+.story-label { font-size: 9px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 15px; }
+.how-grid { position: relative; }
+.workflow-rail { display: none; pointer-events: none; }
+.workflow-fragment { margin-top: 20px; min-height: 74px; font-size: 11px; color: var(--green); }
+.workflow-fragment q { display: block; max-width: 265px; border-left: 1px solid #bbc2ac; padding-left: 12px; line-height: 1.85; }
+.workflow-fragment ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.workflow-fragment li { display: flex; align-items: baseline; gap: 9px; }
+.workflow-fragment li strong { min-width: 47px; font-weight: 500; }
+.workflow-fragment li > span:first-child { width: 10px; }
+.roadmap-toggle { cursor: pointer; min-height: 44px; padding: 8px 14px; gap: 12px; background: transparent; }
+.roadmap-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+.roadmap-sign { font-size: 17px; line-height: 1; }
+.roadmap-toggle[aria-expanded="true"] .roadmap-sign { transform: rotate(45deg); }
+.roadmap-unfold { margin-top: 23px; padding-top: 20px; border-top: 1px solid var(--line); }
+.roadmap-unfold[hidden] { display: none; }
+.roadmap-route { display: grid; grid-template-columns: minmax(180px, 0.65fr) 70px minmax(0, 1.8fr); align-items: center; gap: 24px; }
+.roadmap-phase { color: var(--green); font-size: 9px; letter-spacing: 0.09em; text-transform: uppercase; }
+.landing-roadmap .roadmap-stop p { font-size: 13px; color: var(--ink); margin-top: 6px; }
+.roadmap-connector { display: block; height: 1px; background: #9da98c; transform-origin: left; }
+.landing-roadmap .roadmap-disclaimer { font-size: 10px; margin-top: 17px; }
+.landing-bottom { position: relative; isolation: isolate; }
+.landing-bottom::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  background: linear-gradient(110deg, transparent 10%, #fffdf722 48%, transparent 80%);
+  transform: translateX(var(--paper-shift, 0px)); clip-path: inset(0 round 20px); }
+.public-page .nav-anchor { position: relative; }
+.public-page .nav-anchor::after { content: ""; position: absolute; bottom: -4px; left: 0; right: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; }
+.public-page .nav-anchor:hover::after, .public-page .nav-anchor:focus-visible::after { transform: scaleX(1); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .public-page .btn:active:not(:disabled) { transform: scale(0.985); }
+  .public-page .nav-anchor::after { transition: transform 200ms var(--ease-ati); }
+  .roadmap-sign { transition: transform 300ms var(--ease-ati); }
+  .roadmap-toggle { transition: border-color 180ms ease, color 180ms ease; }
+  .roadmap-toggle:hover { border-color: #9da98c; color: var(--green); }
+  .roadmap-unfold:not([hidden]) { animation: ati-unfold 350ms var(--ease-ati) both; }
+  .roadmap-unfold:not([hidden]) .roadmap-connector { animation: ati-route-draw 400ms var(--ease-ati) both; }
+  .roadmap-unfold:not([hidden]) .roadmap-stop { animation: ati-fade 350ms ease 220ms both; }
+  .roadmap-unfold:not([hidden]) .roadmap-stop:last-child { animation-delay: 300ms; }
+  [data-landing-motion] .workflow-rail { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 1px; }
+  .workflow-fill { position: absolute; inset: 0; background: #8b9b7b; transform: scaleX(var(--story-progress, 0)); transform-origin: left; }
+  .workflow-token { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--green); top: 0; left: var(--token-position, 0%); transform: translate(-50%, -50%); }
+  [data-landing-motion] .how-card .serif,
+  [data-landing-motion] .how-card h3,
+  [data-landing-motion] .how-card p,
+  [data-landing-motion] .workflow-fragment { transition: color 380ms ease, opacity 380ms ease, transform 400ms var(--ease-ati); }
+  [data-landing-motion] .how-card[data-stage="waiting"] h3 { color: #626e57; }
+  [data-landing-motion] .how-card[data-stage="waiting"] p { opacity: 0.9; }
+  [data-landing-motion] .how-card[data-stage="waiting"] .workflow-fragment { opacity: 0.65; transform: translateY(6px); }
+  [data-landing-motion] .how-card[data-stage="active"] .serif { color: var(--green); }
+  [data-landing-motion] .how-card[data-stage="active"] h3 { color: var(--ink); }
+  [data-landing-motion] .how-card[data-stage="passed"] .workflow-fragment { opacity: 0.85; }
+  [data-landing-motion] .how-title .eyebrow { transform: translateY(calc(var(--heading-depth, 0px) * 0.4)); }
+  [data-landing-motion] .how-title > p { transform: translateY(var(--heading-depth, 0px)); }
+  [data-landing-motion] .how-title:not([data-revealed]) .heading-mask > span { opacity: 0; transform: translateY(22px); }
+  [data-landing-motion] .heading-mask > span { transition: opacity 650ms ease, transform 750ms var(--ease-ati); }
+  [data-landing-motion] .heading-mask + .heading-mask > span { transition-delay: 90ms; }
+  [data-landing-motion] .landing-bottom { transition: opacity 650ms ease; }
+  [data-landing-motion] .landing-bottom:not([data-revealed]) { opacity: 0; }
+  [data-landing-motion] .landing-bottom:focus-within { opacity: 1; }
+  @media (hover: hover) and (pointer: fine) and (min-width: 761px) {
+    .landing-bottom::before { transition: transform 350ms ease-out; }
+    .public-page .magnetic-cta { transform: translate(var(--magnet-x, 0px), var(--magnet-y, 0px)); transition: transform 160ms ease-out, background 160ms ease; }
+    .public-page .magnetic-cta:hover { transform: translate(var(--magnet-x, 0px), var(--magnet-y, 0px)); box-shadow: none; }
+    .public-page .magnetic-cta:active { transform: translate(var(--magnet-x, 0px), var(--magnet-y, 0px)) scale(0.985); }
+    .public-page .magnetic-cta:hover > .icon { transform: translateX(4px); }
+  }
+  @media (max-width: 760px) {
+    [data-landing-motion] .how-card { border-top: 0; padding-left: 23px; }
+    [data-landing-motion] .workflow-rail { top: 34px; width: 1px; height: var(--story-length, 0px); background: var(--line); }
+    [data-landing-motion] .workflow-fill { transform: scaleY(var(--story-progress, 0)); transform-origin: top; }
+    [data-landing-motion] .workflow-token { left: 0; top: var(--token-position, 0%); }
+  }
+}
+@keyframes ati-route-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ati-unfold { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ati-route-draw-vertical { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (max-width: 760px) {
+  .workflow-fragment { min-height: 0; margin-top: 14px; }
+  .how-grid { gap: 28px; }
+  .landing-roadmap .section-heading { align-items: flex-start; }
+  .landing-roadmap .section-heading h2 { font-size: 25px; }
+  .roadmap-route { grid-template-columns: 1fr; gap: 15px; }
+  .roadmap-connector { width: 1px; height: 24px; transform-origin: top; }
+  @media (prefers-reduced-motion: no-preference) {
+    .roadmap-unfold:not([hidden]) .roadmap-connector { animation-name: ati-route-draw-vertical; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-bottom::before { display: none; }
+  .public-page .magnetic-cta { transform: none !important; }
+  .workflow-rail { display: none; }
+  .how-title .heading-mask > span { opacity: 1; transform: none; }
+}
