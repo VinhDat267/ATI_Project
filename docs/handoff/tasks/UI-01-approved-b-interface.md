@@ -11,7 +11,7 @@ Chủ dự án chọn bộ preview B ngày 02/10/2026 và yêu cầu triển kha
 - Điều hướng giữa bốn giao diện, trạng thái tải/lỗi/trống, responsive và bàn phím.
 - Giữ hợp đồng API/SSE và các ràng buộc recovery; bỏ quick-fill admin và không đóng hộp thoại bằng Stop.
 - Không triển khai backend tài khoản/service mới, resourceLabels, pagination hay dịch thuật planner của FE-01/02/03. Không đánh dấu các task đó hoàn tất.
-- Không ghi lên dịch vụ thật trong khi kiểm thử; không commit/deploy trong lượt này.
+- Không ghi lên dịch vụ thật trong khi kiểm thử. Ban đầu không commit/deploy; ngày03/10 chủ dự án yêu cầu commit/push lên `Frontend_UXUI`, vẫn không deploy.
 
 ## Nghiệm thu
 
@@ -39,3 +39,4 @@ Chủ dự án chọn bộ preview B ngày 02/10/2026 và yêu cầu triển kha
 - Đồng bộ assets theo yêu cầu tiếp theo: ServiceLogo dùng chung mark GitHub/Trello/Slack cho card dịch vụ, hero/marquee, kế hoạch và các vị trí Icon dịch vụ hiện có; thêm logo chính thức cho năm chip roadmap, giữ nhãn chưa tích hợp. Card dùng mark32px, bỏ khung trung tính và hover xoay logo; không đổi hành vi API/nút. Frontend26 files/158 tests và TypeScript/Vite build PASS; CUA desktop1440×900/mobile390×844 xác nhận ảnh tải đúng và không tràn ngang, kế hoạch snapshot có ba mark đúng. Nguồn ở public/logos/README.md; chi tiết log `2026-10-03-codex-ui01-service-logo-sync.md`.
 - Tinh chỉnh motion landing theo yêu cầu chi tiết: giữ hero/marquee, thêm scroll story với token6px và fragment minh họa, mask serif/độ sâu≤10px desktop, roadmap inline có keyboard/Escape và nhóm planned trung thực, CTA light/magnetic≤3px desktop, press0.985/nav underline. Mobile story dọc, không cursor effects. Observer/rAF/ref, cleanup và reduced-motion fallback tĩnh, không dependency. Frontend27 files/163 tests PASS; TypeScript/build PASS;19 tests liên quan PASS sau cập nhật test sự kiện. CUA desktop/mobile có đủ3 stage, roadmap inline không overflow, CTA phản hồi con trỏ và hero vượt912°; giới hạn reduced-motion OS/touch thật ghi ở log `2026-10-03-codex-ui01-landing-story.md`.
 - Trước bàn giao GitHub, chạy `npm run check` exit0:523 tests v3 +66 evaluations =589 Vitest tests, typecheck/API+web và build PASS, launcher1/1 và environment3/3 PASS. `git diff --check` PASS. Chưa review độc lập hoặc CI/merge; không đóng FE-01/02/03.
+- Commit giao diện `51b1f4af4b0a318f296dae9322d4fc8e3ff2ab1b` đã push lên `origin/Frontend_UXUI` theo yêu cầu chủ dự án. Nhánh từ nền `c6d6e89`;71 files chỉ thuộc apps/chat-web và bàn giao UI-01, không .env/build output. Nhật ký xuất bản nhánh: `2026-10-03-codex-ui01-github-branch.md`.
