@@ -88,10 +88,10 @@ describe('packages/tool-adapters (Task 3: Crypto, Rate Limiter & Base Adapter)',
 
         async execute(toolName: string, args: Record<string, any>): Promise<any> {
           if (args.boardId) {
-            this.assertAllowedScope('board', args.boardId);
+            this.assertAllowedScope('boards', args.boardId);
           }
           if (args.channelId) {
-            this.assertAllowedScope('channel', args.channelId);
+            this.assertAllowedScope('channels', args.channelId);
           }
           return { success: true };
         }

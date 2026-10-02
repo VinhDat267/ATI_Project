@@ -75,43 +75,15 @@ export abstract class BaseAdapter {
    * Asserts that the target resource belongs to the AllowedScope whitelist.
    * Throws a non-retryable StepError with category AUTH_ERROR if disallowed.
    */
-  protected assertAllowedScope(
-    type: 'board' | 'channel' | 'repo',
-    targetIdOrName: string
-  ): void {
-    if (!this.allowedScope) return;
-
-    if (type === 'board' && this.allowedScope.boards && this.allowedScope.boards.length > 0) {
-      if (!this.allowedScope.boards.includes(targetIdOrName)) {
-        throw new StepError({
-          message: `Allowed scope restriction: board '${targetIdOrName}' is not in allowed list [${this.allowedScope.boards.join(', ')}]`,
-          category: 'AUTH_ERROR',
-          statusCode: 403,
-          retryable: false,
-        });
-      }
-    }
-
-    if (type === 'channel' && this.allowedScope.channels && this.allowedScope.channels.length > 0) {
-      if (!this.allowedScope.channels.includes(targetIdOrName)) {
-        throw new StepError({
-          message: `Allowed scope restriction: channel '${targetIdOrName}' is not in allowed list [${this.allowedScope.channels.join(', ')}]`,
-          category: 'AUTH_ERROR',
-          statusCode: 403,
-          retryable: false,
-        });
-      }
-    }
-
-    if (type === 'repo' && this.allowedScope.repos && this.allowedScope.repos.length > 0) {
-      if (!this.allowedScope.repos.includes(targetIdOrName)) {
-        throw new StepError({
-          message: `Allowed scope restriction: repo '${targetIdOrName}' is not in allowed list [${this.allowedScope.repos.join(', ')}]`,
-          category: 'AUTH_ERROR',
-          statusCode: 403,
-          retryable: false,
-        });
-      }
-    }
+  protected assertAllowedScope(scopeKey: string, targetIdOrName: string): void {
+    const entries = this.allowedScope?.[scopeKey];
+    if (!entries?.length || entries.includes(targetIdOrName)) return;
+    const label = scopeKey.replace(/s$/, '');
+    throw new StepError({
+      message: `Allowed scope restriction: ${label} '${targetIdOrName}' is not in allowed list [${entries.join(', ')}]`,
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+      retryable: false,
+    });
   }
 }

@@ -1,80 +1,36 @@
-import {
-  GitHubAdapter,
-  SlackAdapter,
-  TrelloAdapter,
-  decryptCredentials,
-  type SlackCredentials,
-  type TrelloCredentials,
-} from '@wap/tool-adapters';
-import { ALL_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
-import type { AllowedScope } from '@wap/tool-schemas';
+import { decryptCredentials } from '@wap/tool-adapters';
+import { ALL_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
+import type { ServiceTransport } from './transports/types.js';
+import { TRELLO_TRANSPORT } from './transports/trello.js';
+import { SLACK_TRANSPORT } from './transports/slack.js';
+import { GITHUB_TRANSPORT } from './transports/github.js';
 
-type CredentialConfig = Record<string, unknown>;
-type Adapter = { execute: (toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }) => Promise<any> };
+export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
+  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT].map(transport => [transport.id, transport]),
+);
 
-interface ServiceTransport {
-  createAdapter: (config: CredentialConfig, allowedScope: AllowedScope) => Adapter;
-  checkConnection: (config: CredentialConfig, fetchFn: typeof fetch, signal: AbortSignal) => Promise<boolean>;
+export function getRegisteredServices(): ServiceDefinition[] {
+  return SERVICE_REGISTRY.filter(service => SERVICE_TRANSPORTS[service.id]);
 }
-
-const transports: Record<string, ServiceTransport> = {
-  trello: {
-    createAdapter: (config, allowedScope) => new TrelloAdapter({ credentials: config as unknown as TrelloCredentials, allowedScope }),
-    checkConnection: async (config, fetchFn, signal) => {
-      const url = new URL('https://api.trello.com/1/members/me');
-      url.searchParams.set('key', String(config.apiKey));
-      url.searchParams.set('token', String(config.token));
-      const response = await fetchFn(url, { method: 'GET', signal });
-      const body = await response.json().catch(() => ({})) as { id?: unknown };
-      return response.ok && typeof body.id === 'string' && body.id.length > 0;
-    },
-  },
-  slack: {
-    createAdapter: (config, allowedScope) => new SlackAdapter({ credentials: config as unknown as SlackCredentials, allowedScope }),
-    checkConnection: async (config, fetchFn, signal) => {
-      const response = await fetchFn('https://slack.com/api/auth.test', {
-        method: 'POST', headers: { Authorization: `Bearer ${config.botToken}` }, signal,
-      });
-      const body = await response.json().catch(() => ({})) as { ok?: unknown };
-      return response.ok && body.ok === true;
-    },
-  },
-  github: {
-    createAdapter: (config, allowedScope) => new GitHubAdapter({ credentials: { token: String(config.token) }, allowedScope }),
-    checkConnection: async (config, fetchFn, signal) => {
-      const response = await fetchFn('https://api.github.com/user', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-        signal,
-      });
-      const body = await response.json().catch(() => ({})) as { id?: unknown; login?: unknown };
-      return response.ok && (typeof body.id === 'number' || typeof body.id === 'string') && typeof body.login === 'string';
-    },
-  },
-};
-
-export const REGISTERED_SERVICES = SERVICE_REGISTRY.filter((service) => transports[service.id]);
 
 export function getRegisteredService(id: string) {
-  const definition = REGISTERED_SERVICES.find((service) => service.id === id);
-  return definition ? { definition, transport: transports[id]! } : undefined;
+  const definition = getRegisteredServices().find(service => service.id === id);
+  return definition ? { definition, transport: SERVICE_TRANSPORTS[id]! } : undefined;
 }
 
-export function normalizeAllowedScope(scopeKey: 'boards' | 'channels' | 'repos', value: unknown): AllowedScope | null {
+export function normalizeAllowedScope(definition: ServiceDefinition, value: unknown): AllowedScope | null {
+  const { scopeKey, scopePattern } = definition;
   const raw = Array.isArray(value)
     ? value
     : typeof value === 'object' && value !== null
       ? (value as Record<string, unknown>)[scopeKey]
       : null;
-  if (!Array.isArray(raw) || raw.length === 0 || !raw.every((entry) => typeof entry === 'string' && entry.trim())) return null;
+  if (!Array.isArray(raw) || raw.length === 0 || !raw.every(entry => typeof entry === 'string' && entry.trim())) return null;
   const entries = [...new Set(raw.map((entry: string) => entry.trim()))];
-  if (scopeKey === 'repos' && !entries.every((entry) => /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(entry))) return null;
-  return { [scopeKey]: entries } as AllowedScope;
+  // RegExp instances with g/y flags must not carry state between entries or requests.
+  if (scopePattern && !entries.every(entry => new RegExp(scopePattern.source, scopePattern.flags).test(entry))) return null;
+  return { [scopeKey]: entries };
 }
 
 export function hasValidCredentials(fields: readonly { key: string }[], value: unknown): value is Record<string, string> {
@@ -86,13 +42,13 @@ export function hasValidCredentials(fields: readonly { key: string }[], value: u
 /** Only scoped, configured services may be described to the live planner. */
 export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, encryptionKey: string) {
   const available = new Set<string>();
-  for (const definition of REGISTERED_SERVICES) {
+  for (const definition of getRegisteredServices()) {
     const record = await credentialRepo.getCredentials(definition.id);
     if (!record) continue;
     try {
       const config = decryptCredentials(record.config, encryptionKey);
       if (!hasValidCredentials(definition.credentialFields, config)) continue;
-      if (!normalizeAllowedScope(definition.scopeKey, config.allowedScope)) continue;
+      if (!normalizeAllowedScope(definition, config.allowedScope)) continue;
       available.add(definition.id);
     } catch {
       // Corrupt or stale credentials do not authorize a service.

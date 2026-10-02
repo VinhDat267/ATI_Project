@@ -1,0 +1,6 @@
+[
+  {"id":"launchpad-onboarding","prompt":"Tạo công việc trên Trello, phân công nhân sự và thông báo qua Slack"},
+  {"id":"launchpad-audit","prompt":"Kiểm tra danh sách bảng việc Trello và kênh Slack liên kết"},
+  {"id":"launchpad-release","prompt":"Tìm issue trên GitHub, tạo thẻ Trello cho issue đã chọn và thông báo qua Slack"},
+  {"id":"launchpad-digest","prompt":"Kiểm tra các task đang thực hiện trên Trello và tạo bản tin tóm tắt tiến độ gửi qua Slack channel #general"}
+]

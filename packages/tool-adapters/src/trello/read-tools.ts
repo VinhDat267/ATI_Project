@@ -36,7 +36,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     args: { boardId: string; query?: string; limit?: number },
     options?: { signal?: AbortSignal }
   ): Promise<Array<{ id: string; name: string; boardId: string }>> {
-    this.assertAllowedScope('board', args.boardId);
+    this.assertAllowedScope('boards', args.boardId);
 
     const rawLists = await this.request<any[]>(`/boards/${args.boardId}/lists`, { signal: options?.signal });
     const queryLower = (args.query || '').toLowerCase();
@@ -71,7 +71,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
         retryable: false,
       });
     }
-    this.assertAllowedScope('board', args.boardId);
+    this.assertAllowedScope('boards', args.boardId);
     const endpoint = `/boards/${args.boardId}/members`;
 
     const rawMembers = await this.request<any[]>(endpoint, { signal: options?.signal });
@@ -101,7 +101,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     limit?: number;
   }): Promise<Array<{ id: string; name: string; url: string; listId: string }>> {
     if (args.boardId) {
-      this.assertAllowedScope('board', args.boardId);
+      this.assertAllowedScope('boards', args.boardId);
     }
 
     const res = await this.request<any>(

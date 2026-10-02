@@ -27,7 +27,7 @@ export class TrelloBaseAdapter extends BaseAdapter {
         retryable: false,
       });
     }
-    this.assertAllowedScope('board', boardId);
+    this.assertAllowedScope('boards', boardId);
   }
 
   /**

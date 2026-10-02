@@ -8,7 +8,7 @@ export type JSONSchema = Record<string, any>;
 
 export interface ToolDefinition {
   name: string;
-  service: 'trello' | 'slack' | string;
+  service: string;
   description: string;
   sideEffect: 'read' | 'write';
   /** For a search tool: the working-memory resource its results identify, e.g. 'board'. */
@@ -45,8 +45,10 @@ export interface ServiceDefinition {
   name: string;
   description: string;
   scopes: string[];
-  scopeKey: 'boards' | 'channels' | 'repos';
-  credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' }>;
+  scopeKey: string;
+  scopeLabel: string;
+  scopePattern?: RegExp;
+  credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' | 'multiline' }>;
   intentKeywords: string[];
   /** Phrases that select the service even when another service is named, e.g. "create a task". */
   intentPatterns?: RegExp[];
@@ -96,8 +98,4 @@ export interface RefusalResponse {
 
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse;
 
-export interface AllowedScope {
-  boards?: string[];
-  channels?: string[];
-  repos?: string[];
-}
+export type AllowedScope = Partial<Record<string, string[]>>;

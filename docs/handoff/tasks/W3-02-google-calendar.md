@@ -41,6 +41,8 @@ Kịch bản `calendar_slack`: tạo sự kiện → báo Slack kèm `url` và g
 
 Câu `rf06` của bộ 50 câu ("Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm") đang có label `refusal` vì trước đây chưa có Calendar. Task này **không sửa label**; W3-06 xử lý trong commit riêng trước khi chạy model. Ghi điều này trong PR.
 
+Ngày 02/10/2026, người dùng đã chấp thuận ngoại lệ định tuyến cho đúng câu này: Calendar đã đăng ký nhưng catalog chỉ có Trello/Slack/GitHub → `[]`; catalog đầy đủ → đúng `['calendar']`. `routing-exceptions.json` và guard W3-00 ràng buộc ID, nguồn, prompt, label và hai cấu hình catalog; không nới cho các câu khác. Khi thêm Calendar, cập nhật snapshot định tuyến trong **commit riêng** và giải thích thay đổi của `rf06` trong PR. Khi W3-06 đổi label, phải xử lý ngoại lệ và test liên quan cùng commit; không giữ ngoại lệ `refusal` cho ca đã thành workflow.
+
 ## Tiêu chí riêng (ngoài tiêu chí chung)
 
 - [ ] Test kiểm tra thời gian: `end` trước `start`, quá 24 giờ, thiếu múi giờ đều bị từ chối trước khi gọi API.

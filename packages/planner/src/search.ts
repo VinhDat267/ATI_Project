@@ -21,7 +21,7 @@ export interface SearchOutcome {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url'];
+const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

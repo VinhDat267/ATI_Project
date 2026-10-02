@@ -1,0 +1,11 @@
+[
+  {
+    "source": "golden",
+    "id": "rf06",
+    "prompt": "Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm",
+    "expectedKind": "refusal",
+    "service": "calendar",
+    "approvedOn": "2026-10-02",
+    "reason": "User approved empty legacy routing for this unsupported Calendar refusal; W3-06 owns any later label change."
+  }
+]
