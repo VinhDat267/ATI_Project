@@ -5,6 +5,7 @@ import { ALL_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
 import golden from './cases.json';
 import freeform from './cases-freeform.json';
 import launchpad from './launchpad-prompts.json';
+import { legacyRoutingFailures } from './legacy-routing-guard.js';
 
 const corpus = [
   ...golden.cases.map(item => ({ ...item, source: 'golden' })),
@@ -24,8 +25,19 @@ it('preserves routing for the 50 golden, 18 freeform and 4 launchpad requests in
   expect(() => readFileSync(snapshotUrl, 'utf8'), 'routing baseline must be committed').not.toThrow();
   const expected = JSON.parse(readFileSync(snapshotUrl, 'utf8'));
   expect(actual).toEqual(expected);
-  for (const row of actual.filter(row => row.source !== 'launchpad')) {
-    const baseline = expected.find((entry: typeof row) => entry.id === row.id && entry.source === row.source);
-    if (baseline?.legacyCatalog.length) expect(row.legacyCatalog.length, row.id).toBeGreaterThan(0);
-  }
+  expect(legacyRoutingFailures(actual)).toEqual([]);
+});
+
+it('rejects legacy prompts emptied by an unavailable service even when the comparison snapshot has been refreshed', () => {
+  const item = golden.cases.find(row => row.id === 'ss03')!;
+  const unavailable = {
+    ...SERVICE_REGISTRY[0]!, id: 'demo', name: 'Demo', intentKeywords: ['họp sprint'],
+    intentPatterns: [], fallbackIntentKeywords: [], gatherRules: [],
+  };
+  expect(classifyIntent(item.prompt, legacyCatalog, SERVICE_REGISTRY)).toEqual(['slack']);
+  const row = { id: 'ss03', source: 'golden', legacyCatalog: classifyIntent(item.prompt, legacyCatalog, [...SERVICE_REGISTRY, unavailable]) };
+  expect(row.legacyCatalog).toEqual([]);
+  // A valid, uniquely registered phrase can still steal a complete legacy request.
+  const refreshedSnapshot = [{ ...row }];
+  expect(legacyRoutingFailures(refreshedSnapshot)).toEqual(['golden:ss03']);
 });
