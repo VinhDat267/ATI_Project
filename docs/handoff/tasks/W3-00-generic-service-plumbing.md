@@ -46,7 +46,8 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
 8. **Bộ câu hồi quy định tuyến** `evaluations/golden-v2/routing.test.ts` (chạy trong `npm run test:eval:v3`):
    - kho câu: mọi `prompt` trong `cases.json`, `cases-freeform.json`, và các câu mẫu của `MissionControlLaunchpad.tsx` (chép vào một file fixture trong `evaluations/`, không import từ `apps/chat-web`);
    - chạy `classifyIntent` với hai cấu hình: (a) catalog chỉ có Trello, Slack, GitHub nhưng registry đủ mọi service đã đăng ký; (b) catalog đủ mọi service;
-   - so với file snapshot đã commit. Task thêm service nào làm snapshot đổi phải cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR. Ở cấu hình (a), không câu nào của bộ 50 và bộ 18 được chuyển từ "có service" thành `[]`.
+   - so với file snapshot đã commit. Task thêm service nào làm snapshot đổi phải cập nhật snapshot trong commit riêng và giải thích từng câu đổi trong PR. Ở cấu hình (a), không câu nào của bộ 50 và bộ 18 được chuyển từ "có service" thành `[]`, trừ ngoại lệ đã được người dùng chấp thuận bên dưới.
+   - **Ngoại lệ chốt ngày 02/10/2026:** chỉ `golden:rf06`, đúng prompt và label `refusal` ghi trong `evaluations/golden-v2/routing-exceptions.json`, được trả `[]` khi Calendar đã đăng ký nhưng chưa có trong catalog (a), đồng thời cấu hình (b) chỉ chọn `calendar`. Guard đọc metadata thật của corpus/registry/catalog, không suy ra ngoại lệ từ snapshot cập nhật được. Prompt, label hoặc tuyến đầy đủ đổi thì ngoại lệ không còn hợp lệ; các câu 50/18 khác vẫn bị chặn nếu mất tuyến. Không đổi policy của router hay label golden trong W3-00; W3-06 xử lý label riêng.
 9. **Kiểm tra tĩnh chống viết cố định:** test lấy danh sách `id` từ `SERVICE_REGISTRY`, quét `packages/planner/src`, `packages/executor/src`, `apps/chat-api/src/routes`, `apps/chat-api/src/services` (trừ `transports/`), `apps/chat-web/src` (trừ test), và fail nếu gặp:
    - tên tool dạng `'<id>.<tên>'`;
    - chuỗi `'<id>'` đứng riêng;
@@ -67,7 +68,7 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Toàn bộ test cũ vẫn đạt; test cũ chỉ đổi ở chỗ đổi chữ ký hàm (ghi rõ từng chỗ trong PR).
+- [ ] Toàn bộ test cũ vẫn đạt; test cũ chỉ đổi ở chỗ đổi chữ ký hàm, ngoài cập nhật harness định tuyến cho ngoại lệ `rf06` đã chấp thuận ngày 02/10/2026 (ghi rõ từng chỗ trong PR).
 - [ ] Test mới fail trước khi sửa:
   - bất biến từ khóa;
   - bộ câu hồi quy định tuyến;
@@ -91,10 +92,11 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
   - `npm run test:browser:v3`: exit 0, 9/9 với PostgreSQL thật và planner/adapter sandbox.
   - SQL: service giả `demo` đi qua HTTP, lưu/đọc credentials mã hóa, catalog, router, planner/prefetch/grounding và factory; scope ngoài allowlist bị chặn. Ba JSON credentials cũ được đọc và dùng để tạo adapter, ciphertext không đổi.
   - Review độc lập e33177c: một lỗi Important (guard dựa vào snapshot cập nhật được); đã sửa tại 08431be85aae5cb1fefcc74b1c76a5a3d56c778e bằng RED 1/2 → GREEN 2/2 và chạy lại toàn bộ check. Reviewer độc lập chạy lại 569 v3 +70 eval và browser 9/9, không phát hiện lỗi production khác. Sau fix check đạt 569 +71; không gọi reviewer lần hai.
+  - Bổ sung ngoại lệ `rf06` ngày 02/10/2026 theo chấp thuận của người dùng: RED 1 lỗi/15 → GREEN 15/15; thêm 13 ca bảo vệ ID, nguồn, prompt, label, catalog và mất tuyến của câu khác sau refresh snapshot. Check mới nhất exit 0, 569 v3 +84 offline evaluations; kiểm tra kiểu strict cho harness exit 0; browser PostgreSQL/sandbox 9/9, exit 0.
 - Điều chưa làm hoặc khác với task card:
   - Gate browser hiện có 9 ca sau FE-01; chạy đủ 9 thay cho số 8 cũ trong card.
   - Bất biến từ khóa đã đúng ở baseline; dùng fixture sai để kiểm tra guard, giữ nguyên mọi keyword/pattern cũ.
   - Snapshot 72 câu (50 golden + 18 freeform + 4 launchpad), cả catalog cũ và đầy đủ. Không sửa router, validator, prompt hay nhãn golden; provider/live services NOT_RUN.
-  - Test cũ duy nhất sửa: hai lời gọi `assertAllowedScope` trong `crypto-ratelimit.test.ts` đổi `board/channel` → `boards/channels` theo chữ ký mới.
-  - Xung đột kế hoạch trước W3-02: rf06 yêu cầu Google Calendar; router hiện trả các service cũ, nhưng sau đăng ký Calendar chưa cấu hình sẽ trả []. Gate item8 sẽ chặn đúng theo card. Cần chốt quy tắc ngoại lệ/label hoặc routing trước W3-02; W3-00 giữ nguyên policy và không tự nới guard.
+  - Test cũ sửa: hai lời gọi `assertAllowedScope` trong `crypto-ratelimit.test.ts` đổi `board/channel` → `boards/channels` theo chữ ký mới; harness định tuyến nhận metadata của corpus/registry/catalog cho ngoại lệ đã được người dùng chấp thuận.
+  - Xung đột `rf06` đã được người dùng chốt ngày 02/10/2026: giữ policy từ chối service chưa cấu hình, cho phép đúng ngoại lệ refusal trong item8. Registry sản phẩm vẫn chỉ có ba service, snapshot 72 câu và label golden chưa đổi. W3-02 cập nhật snapshot trong commit riêng khi thêm Calendar; W3-06 xử lý label và ngoại lệ cùng nhau trước khi chạy model.
   - W3-00b, năm service thật, AUTH và FE-02 thuộc task riêng.
