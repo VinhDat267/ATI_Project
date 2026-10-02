@@ -128,9 +128,20 @@ export class CalendarAdapter extends BaseAdapter {
       windowSize(args.timeMin, args.timeMax, 31); const maximum = limit(args.limit, 20);
       const params = new URLSearchParams({ timeMin: args.timeMin, timeMax: args.timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
       if (args.query !== undefined) params.set('q', text(args.query, 4000));
-      const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
-      if (value?.items !== undefined && !Array.isArray(value.items)) badResponse();
-      return { events: (value?.items ?? []).filter((item: any) => item?.status !== 'cancelled').slice(0, maximum).map((item: any) => normalizedEvent(item)) };
+      const events = []; const seenPages = new Set<string>();
+      // Calendar can return an empty page with nextPageToken; empty is not necessarily complete.
+      for (let page = 0; page < 20; page++) {
+        const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
+        if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) badResponse();
+        for (const item of value.items ?? []) {
+          if (item?.status === 'cancelled') continue;
+          events.push(normalizedEvent(item)); if (events.length >= maximum) break;
+        }
+        if (events.length >= maximum || value.nextPageToken === undefined || value.nextPageToken === '') return { events };
+        if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
+        seenPages.add(value.nextPageToken); params.set('pageToken', value.nextPageToken); params.set('maxResults', String(maximum - events.length));
+      }
+      throw new StepError({ message: 'Calendar event pagination exceeded its read budget; narrow the time interval', category: 'SERVER_ERROR' });
     }
     if (toolName === 'calendar.create_event') {
       only(args, ['calendarId', 'summary', 'description', 'start', 'end', 'location']); const id = this.checkedId(args.calendarId);

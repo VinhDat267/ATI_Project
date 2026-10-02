@@ -49,6 +49,17 @@ it('creates once with explicit time offsets, no attendees, sendUpdates none and 
   expect(calls[0]!.init).toMatchObject({ method: 'POST', signal, headers: { 'Content-Type': 'application/json' } });
   expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ summary: 'Review', description: '&lt;b&gt;hello&lt;/b&gt; &amp; text', location: 'Room A', start: { dateTime: start }, end: { dateTime: end } });
 });
+it('follows an empty Calendar event page instead of reporting no events and bounds returned rows', async () => {
+  const { adapter, calls } = setup(url => url.searchParams.has('pageToken') ? json({ items: [event, { ...event, id: 'next' }], nextPageToken: 'more' }) : json({ items: [], nextPageToken: 'page & two' }));
+  const value = await adapter.execute('calendar.list_events', { calendarId: id, timeMin: start, timeMax: end, limit: 1 });
+  expect(value.events.map((row: any) => row.id)).toEqual([event.id]);
+  expect(calls).toHaveLength(2); expect(calls[1]!.url.searchParams.get('pageToken')).toBe('page & two');
+});
+it('rejects a repeated pagination token rather than silently returning an incomplete read', async () => {
+  const { adapter, calls } = setup(() => json({ items: [], nextPageToken: 'repeat' }));
+  await expect(adapter.execute('calendar.list_events', { calendarId: id, timeMin: start, timeMax: end })).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+  expect(calls).toHaveLength(2);
+});
 it.each([{}, { calendars: [] }, { calendars: ['outside@group.calendar.google.com'] }])('blocks unscoped/outside resource before any fetch %j', async scope => {
   const { adapter, fetchFn } = setup(undefined, scope);
   await expect(adapter.execute('calendar.create_event', args)).rejects.toMatchObject({ category: 'AUTH_ERROR' });
