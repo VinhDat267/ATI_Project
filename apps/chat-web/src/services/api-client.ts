@@ -47,7 +47,7 @@ export class ApiClient {
         }
         return retryRes;
       } catch (refreshErr) {
-        authStorage.clearStoredTokens();
+        if ((refreshErr as any)?.status === 401) authStorage.clearStoredTokens();
         throw refreshErr;
       }
     }
@@ -128,7 +128,7 @@ export class ApiClient {
     this.refreshPromise = (async () => {
       const { refreshToken } = authStorage.getStoredTokens();
       if (!refreshToken) {
-        throw new Error('No refresh token available');
+        throw Object.assign(new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.'), { status: 401 });
       }
 
       const res = await fetch('/api/auth/refresh', {
@@ -139,7 +139,7 @@ export class ApiClient {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        authStorage.clearStoredTokens();
+        if (res.status === 401) authStorage.clearStoredTokens();
         const err: any = new Error(errData.error || 'Failed to refresh token');
         err.status = res.status;
         throw err;
@@ -160,6 +160,10 @@ export class ApiClient {
 
   async getMe(): Promise<{ user: User }> {
     return this.request<{ user: User }>('/api/auth/me');
+  }
+
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live' }> {
+    return this.request('/api/health');
   }
 
   // --- Conversations ---

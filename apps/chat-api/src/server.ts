@@ -426,6 +426,7 @@ async function bootstrap() {
   // 7. Express App
   const app = createApp({
     jwtSecret: env.JWT_SECRET,
+    runtimeMode: env.RUNTIME_MODE,
     userRepo,
     validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD
       ? (email, password) => email === process.env.SANDBOX_USER_EMAIL && password === process.env.SANDBOX_USER_PASSWORD

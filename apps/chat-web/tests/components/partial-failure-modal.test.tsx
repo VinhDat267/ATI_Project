@@ -39,7 +39,7 @@ describe('PartialFailureModal Component', () => {
     expect(screen.getByText(/"Initial Card"/)).toBeDefined();
   });
 
-  it('closes on Escape key press by calling onClose or onStop', () => {
+  it('dismisses on Escape without ever falling back to Stop', () => {
     const onStop = vi.fn();
     const onClose = vi.fn();
 
@@ -53,11 +53,11 @@ describe('PartialFailureModal Component', () => {
 
     unmount();
 
-    // Fallback to onStop when onClose is not provided
+    // FE-01: dismissing a dialog must never irreversibly stop a paused plan.
     const onStopOnly = vi.fn();
     render(<PartialFailureModal {...defaultProps} onStop={onStopOnly} />);
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(onStopOnly).toHaveBeenCalledTimes(1);
+    expect(onStopOnly).not.toHaveBeenCalled();
   });
 
   it('closes on backdrop click but does not close when clicking inside content container', () => {
@@ -230,7 +230,9 @@ describe('PartialFailureModal Component', () => {
 
     const stopBtn = screen.getByRole('button', { name: /Dừng lại toàn bộ/i });
     fireEvent.click(stopBtn);
+    expect(onStop).not.toHaveBeenCalled();
+    expect(screen.getByText(/Không thể chạy tiếp sau khi dừng/)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Dừng hẳn quy trình' }));
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 });
-

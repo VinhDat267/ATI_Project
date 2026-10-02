@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
+import { ALL_TOOLS } from '@wap/tool-schemas';
+import { createHash } from 'node:crypto';
 import { REGISTERED_SERVICES, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 
 export interface ServicesRoutesOptions {
@@ -29,7 +31,9 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   const router = Router();
   const { credentialRepo, encryptionKey } = options;
   const fetchFn = options.fetchFn || fetch;
-  const verified = new Set<string>();
+  const generations = new Map<string, number>();
+  const versionOf = (config: string) => createHash('sha256').update(config).digest('hex');
+  const checks = new Map<string, { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }>();
 
   // GET /api/services
   router.get('/', async (_req: Request, res: Response): Promise<void> => {
@@ -39,9 +43,16 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
         const scope = config?.allowedScope as Record<string, unknown> | undefined;
         const entries = scope?.[scopeKey];
+        const configured = Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(scopeKey, scope));
+        const savedCheck = checks.get(id);
+        const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
         return {
           id, name, description, scopes, scopeKey, credentialFields,
-          connected: Boolean(record) && verified.has(id),
+          tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
+          configured,
+          connected: configured && check?.connectionStatus === 'healthy',
+          connectionStatus: configured ? (check?.connectionStatus ?? 'unchecked') : 'unconfigured',
+          lastCheckedAt: check?.lastCheckedAt ?? null,
           allowedScope: Array.isArray(entries) ? entries : [],
         };
       }));
@@ -53,24 +64,29 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
 
   // POST /api/services/:service/test
   router.post('/:service/test', async (req: Request, res: Response): Promise<void> => {
+    const service = String(req.params.service);
+    const generation = generations.get(service) ?? 0;
+    let credentialVersion: string | null = null;
     try {
-      const service = String(req.params.service);
       if (!getRegisteredService(service)) {
         res.status(400).json({ error: `Unsupported service: ${service}` });
         return;
       }
 
       const record = await credentialRepo?.getCredentials(service);
+      credentialVersion = record ? versionOf(record.config) : null;
       if (!record || !encryptionKey) {
+        if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
         res.status(409).json({ service, status: 'unconfigured', message: `${service} credentials are not configured` });
         return;
       }
       const config = decryptCredentials(record.config, encryptionKey);
       const result = await verifyService(service, config, fetchFn);
-      if (result.healthy) verified.add(service);
-      else verified.delete(service);
+      // An in-flight check belongs to the credentials it read, never to a replacement.
+      if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: result.healthy ? 'healthy' : 'unhealthy', lastCheckedAt: new Date().toISOString() });
       res.status(result.healthy ? 200 : 502).json({ service, status: result.healthy ? 'healthy' : 'unhealthy', ...result });
     } catch (err: any) {
+      if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
       res.status(502).json({ status: 'unhealthy', error: 'Service connection verification failed' });
     }
   });
@@ -108,7 +124,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
       const encrypted = encryptCredentials({ ...Object.fromEntries(fields.map(({ key }) => [key, credentials[key]])), allowedScope: scope }, encryptionKey);
       await credentialRepo.saveCredentials(service, encrypted);
-      verified.delete(service);
+      generations.set(service, (generations.get(service) ?? 0) + 1);
+      checks.delete(service);
       options.onCredentialsChanged?.(service);
       res.status(200).json({ success: true, message: `Credentials saved for ${service}` });
     } catch (err: any) {

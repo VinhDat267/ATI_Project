@@ -5,6 +5,7 @@ import { LoginView } from '../../src/components/LoginView';
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 describe('LoginView Component', () => {
@@ -68,8 +69,12 @@ describe('LoginView Component', () => {
     expect(onLogin).toHaveBeenCalled();
   });
 
-  it('triggers quick fill admin credentials when clicked', () => {
-    const onQuickFillAdmin = vi.fn();
+  it('triggers quick fill demo credentials when clicked', () => {
+    vi.stubEnv('DEV', true);
+    vi.stubEnv('VITE_SHOW_DEMO_LOGIN', 'true');
+    vi.stubEnv('VITE_DEMO_EMAIL', 'demo@localhost.test');
+    vi.stubEnv('VITE_DEMO_PASSWORD', 'demo-test-only');
+    const onQuickFillDemo = vi.fn();
 
     render(
       <LoginView
@@ -80,15 +85,15 @@ describe('LoginView Component', () => {
         isLoggingIn={false}
         authError={null}
         onLogin={vi.fn()}
-        onQuickFillAdmin={onQuickFillAdmin}
+        onQuickFillDemo={onQuickFillDemo}
       />
     );
 
-    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản Admin/i });
+    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản demo/i });
     expect(quickFillBtn).toBeDefined();
 
     fireEvent.click(quickFillBtn);
-    expect(onQuickFillAdmin).toHaveBeenCalled();
+    expect(onQuickFillDemo).toHaveBeenCalled();
   });
 
   it('displays auth error alert when authError is present', () => {
@@ -148,7 +153,11 @@ describe('LoginView Component', () => {
     expect(onBackToLanding).toHaveBeenCalledTimes(1);
   });
 
-  it('uses standardized admin credentials when quick-fill button is clicked without onQuickFillAdmin prop', () => {
+  it('uses dedicated opt-in sandbox demo credentials when quick-fill button is clicked without onQuickFillDemo prop', () => {
+    vi.stubEnv('DEV', true);
+    vi.stubEnv('VITE_SHOW_DEMO_LOGIN', 'true');
+    vi.stubEnv('VITE_DEMO_EMAIL', 'demo@localhost.test');
+    vi.stubEnv('VITE_DEMO_PASSWORD', 'demo-test-only');
     const setEmail = vi.fn();
     const setPassword = vi.fn();
 
@@ -164,13 +173,11 @@ describe('LoginView Component', () => {
       />
     );
 
-    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản Admin/i });
+    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản demo/i });
     fireEvent.click(quickFillBtn);
 
-    // vite.config.ts injects the configured admin (CHAT_ADMIN_* differ between machines and CI).
-    const env = (import.meta as any).env;
-    expect(setEmail).toHaveBeenCalledWith(env.VITE_DEFAULT_ADMIN_EMAIL);
-    expect(setPassword).toHaveBeenCalledWith(env.VITE_DEFAULT_ADMIN_PASSWORD);
+    expect(setEmail).toHaveBeenCalledWith('demo@localhost.test');
+    expect(setPassword).toHaveBeenCalledWith('demo-test-only');
   });
 
   it('translates generic Invalid email or password error into helpful Vietnamese guidance', () => {
@@ -188,6 +195,17 @@ describe('LoginView Component', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toContain('Email hoặc mật khẩu không chính xác');
-    expect(alert.textContent).toContain('Điền nhanh tài khoản Admin');
+    expect(alert.textContent).not.toContain('Điền nhanh');
   });
 });
+
+for (const dev of [true, false]) {
+  it(`hides demo credentials unless development explicitly opts in (DEV=${dev})`, () => {
+    vi.stubEnv('DEV', dev);
+    vi.stubEnv('VITE_SHOW_DEMO_LOGIN', dev ? 'false' : 'true');
+    vi.stubEnv('VITE_DEMO_PASSWORD', 'must-not-appear');
+    render(<LoginView email="" password="" setEmail={vi.fn()} setPassword={vi.fn()} isLoggingIn={false} authError={null} onLogin={vi.fn()} />);
+    expect(screen.queryByRole('button', {name: /Điền nhanh/})).toBeNull();
+    expect(screen.queryByText('must-not-appear')).toBeNull();
+  });
+}
