@@ -3,7 +3,7 @@
 - **Task:** `docs/handoff/tasks/W3-00-generic-service-plumbing.md`.
 - **Base:** `9d262c6`; implementation: `e33177cf781d55ad9cfb77c538738ae937a0ac81`.
 - **Branch:** `vinhdat/refactor-w3-00-generic-service-plumbing`.
-- **PR:** đang chuẩn bị.
+- **PR:** [#29](https://github.com/VinhDat267/ATI_Project/pull/29).
 
 ## Đã làm
 

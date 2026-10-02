@@ -82,7 +82,7 @@ Các chỗ viết cố định tìm thấy trên `main` `2ae2a16`:
 
 ## Kết quả (agent thi công điền)
 
-- PR: đang chuẩn bị.
+- PR: [#29](https://github.com/VinhDat267/ATI_Project/pull/29).
 - Commit triển khai: `e33177cf781d55ad9cfb77c538738ae937a0ac81` (base `9d262c6`).
 - Test đã chạy và kết quả:
   - Baseline `npm run check`: exit 0, 526 test v3 + 66 offline evaluations.
