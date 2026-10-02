@@ -31,7 +31,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3–4 | Đăng nhập và đăng ký bằng Google | [AUTH-04](tasks/AUTH-04-google-login.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản lý tài khoản: hồ sơ, đổi mật khẩu, phương thức đăng nhập, phiên đăng nhập | [AUTH-05](tasks/AUTH-05-account-page.md) | chờ (sau AUTH-01; liên kết Google sau AUTH-04) |
 | 4 | Cấu hình Gmail SMTP, Google OAuth và kiểm tra chạy thật | [AUTH-06](tasks/AUTH-06-auth-live-setup.md) | chờ (sau AUTH-02, AUTH-04; người dùng chuẩn bị) |
-| 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | chờ (làm ngay, song song với W3-00 và AUTH-01) |
+| 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | xong, #27 tại `9d262c6` |
 | 3 | Frontend: điều hướng bằng URL, nút Back, mở lại hội thoại khi tải lại, tách `App.tsx`, tiêu đề và phân trang lịch sử | [FE-02](tasks/FE-02-routing-and-history.md) | chờ (làm ngay; chặn phần giao diện của AUTH-02 → AUTH-05 và W3-00b) |
 | 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | chờ (sau FE-02; trước buổi thử W4-03) |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |

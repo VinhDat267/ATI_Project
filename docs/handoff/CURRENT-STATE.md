@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 02/10/2026, sau khi PR #25 merge; `main` = `af82961`. Agent cập nhật: Claude Code (reviewer).
+**Cập nhật lần cuối:** 02/10/2026, sau khi PR #27 (FE-01) merge; `main` = `9d262c6`. Agent cập nhật: Claude Code (reviewer).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -13,7 +13,7 @@
 > - **frontend:** FE-01 → FE-03;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> Thứ tự và các mốc xem `ROADMAP.md`. Nên giao song song trước: W3-00, AUTH-01, FE-01, FE-02.
+> **FE-01 xong** qua #27 tại `9d262c6`. Thứ tự và các mốc xem `ROADMAP.md`. Nên giao song song tiếp: W3-00, AUTH-01, FE-02.
 
 ## 1. Sản phẩm
 
@@ -43,15 +43,15 @@ Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng lần đo 
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 503/503 | 01/10, `722000b` (head PR #23); reviewer chạy lại | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 526/526 | 02/10, `44f022e` (head PR #27); reviewer chạy lại | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá | 66/66 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 8/8 kịch bản | như trên; CI PR #23 pass | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 9/9 kịch bản | như trên; CI PR #27 pass tại `20119b6` | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối: reviewer chạy `npm run check` tại `722000b`, exit 0: v3 503 = 11 schema + 53 adapter + 128 planner + 25 executor + 143 API + 143 web; eval 66; typecheck/build; launcher 1/1; local-env 3/3. Browser 8/8. Mutation test: gỡ việc đánh dấu `completed`, gỡ `await` khi ghi `running`, cho chạy tiếp khi có step `failed` — cả ba đều bị test bắt.
+Lần kiểm tra cuối: reviewer chạy `npm run check` tại `44f022e`, exit 0: v3 526 = 11 schema + 53 adapter + 128 planner + 25 executor + 148 API + 161 web; eval 66; typecheck/build; quét bản build không chứa mật khẩu; launcher 1/1; local-env 3/3. Browser 9/9. Mutation test FE-01: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
 
 Audit tuần 2 (Claude Code) chạy probe trên PostgreSQL thật: chết giữa hai step → chạy tiếp được, plan `completed`, không gọi lại step đã xong; chết sau step cuối → tự thành `completed`; skip step `unknown` → step sau dùng đúng output đã lưu.
 
@@ -69,6 +69,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #19: metadata hậu merge #15 được đưa vào `main` tại `abbb55f` lúc 09:04:40 UTC ngày 01/10. File này cập nhật tiếp trạng thái sau #18/#20; không sửa lại task card hoặc nhật ký thi công cũ.
 - #22: kết quả audit tuần 2 và task card W2-05.
 - #24: ghi nhận W2-05 vào `CURRENT-STATE.md`.
+- #27 (FE-01): đóng hộp thoại lỗi (Esc, bấm ngoài, ✕) chỉ ẩn, Stop cần xác nhận; bản build không còn chứa mật khẩu admin/demo (`scripts/test-v3-web-build-security.mjs` trong `npm run check`); trạng thái dịch vụ và quy trình mẫu lấy từ API (`GET /api/services` thêm `tools`, `configured`, `connectionStatus`); dải "Chế độ thử nghiệm" khi sandbox (`GET /api/health` trả `runtimeMode`); trang giới thiệu bỏ số liệu chưa đo; không còn ID giả; lỗi mạng tiếng Việt; chỉ đăng xuất khi refresh trả 401. Kết quả kiểm tra kết nối lưu theo tiến trình, mất khi restart.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
   - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;
@@ -84,9 +85,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
-| `vite build` không có `RUNTIME_MODE=live` thì **đóng gói `CHAT_ADMIN_PASSWORD` thật vào JS** (reviewer xác nhận bằng build ngày 02/10); mật khẩu mặc định `Admin@12345678` viết cố định | `apps/chat-web/vite.config.ts`, `LoginView.tsx` | FE-01. Không deploy bản build frontend cho tới khi sửa |
-| Trong hộp thoại lỗi thực thi, Esc / bấm ra ngoài / ✕ gọi Stop, tức **dừng hẳn quy trình** | `App.tsx` (`onClose={handleStop}`), `PartialFailureModal.tsx` | FE-01. Khi demo, chỉ bấm các nút trong hộp thoại |
-| Launchpad viết cứng "4/4 dịch vụ hoạt động tốt" (có cả Sheets); quy trình mẫu hứa thao tác không có tool; sandbox luôn trả một plan soạn sẵn mà không báo; trang giới thiệu có số liệu chưa đo | `MissionControlLaunchpad.tsx`, `server.ts`, `LandingPageView.tsx` | FE-01. Không demo bằng sandbox như thể là AI thật |
+| Sandbox dùng planner mock trả một plan soạn sẵn (giao diện đã báo "Chế độ thử nghiệm"); minor sau FE-01: tiêu đề mẫu "Phát hành Sprint" không khớp nội dung, chấm xanh nhấp nháy luôn hiện, dòng "Chưa xác định chế độ chạy" hiện thoáng khi tải | `server.ts`, `MissionControlLaunchpad.tsx`, `App.tsx` | Không demo sandbox như AI thật; minor gom vào FE-03 |
 | Refresh token là JWT 7 ngày không lưu ở server: đăng xuất không thu hồi được, trái đặc tả §8.1; chưa có đăng ký, quên mật khẩu, chặn đoán mật khẩu | `apps/chat-api/src/auth/jwt.ts`, `routes/auth-routes.ts` | AUTH-01 → AUTH-05 |
 | Plan preview chỉ hiện ID; kết quả thực thi là JSON thô; nút Back không hoạt động; tải lại trang mất hội thoại; lịch sử không có tiêu đề, tối đa 50 mục; SSE có thể ngừng im lặng khi token hết hạn (đọc code, chưa tái hiện) | `apps/chat-web` | FE-02, FE-03 |
 | Tin nhắn Slack chưa đọc lại tự động sau khi gửi | live-execution | |
