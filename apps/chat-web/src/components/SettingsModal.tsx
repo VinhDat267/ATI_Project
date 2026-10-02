@@ -2,20 +2,31 @@ import React from 'react';
 import { ServiceCard, type ServiceActionResult } from './ServiceCard';
 import { apiClient } from '../services/api-client';
 import type { ServiceInfo } from '../types';
+import { userErrorMessage } from '../services/user-error';
 
 export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   authToken?: string | null;
+  onServicesChanged?: () => Promise<void> | void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   authToken,
+  onServicesChanged,
 }) => {
   const [services, setServices] = React.useState<ServiceInfo[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const refreshServices = async () => {
+    try {
+      const data = await apiClient.getServices();
+      if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
+      setServices(data.services); setLoadError(null);
+    } catch (error) { setServices([]); setLoadError(userErrorMessage(error)); }
+    await onServicesChanged?.();
+  };
 
   React.useEffect(() => {
     if (isOpen) {
@@ -39,6 +50,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ): Promise<ServiceActionResult> => {
     try {
       const data = await apiClient.testConnection(serviceId);
+      await refreshServices();
       return {
         success: Boolean(data.success),
         message:
@@ -47,6 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         latencyMs: data.latencyMs,
       };
     } catch (err) {
+      await refreshServices();
       return {
         success: false,
         message: `Lỗi kết nối: ${err instanceof Error ? err.message : 'Không thể kết nối dịch vụ'}`,
@@ -71,6 +84,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             data?.error || data?.message || 'Không thể lưu cấu hình',
         };
       }
+      await refreshServices();
       return { success: true, message: data.message || 'Đã lưu cấu hình' };
     } catch (err: any) {
       return {
@@ -166,7 +180,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 key={svc.id}
                 service={svc.id}
                 title={`${svc.name} Workspace`}
-                connected={Boolean(svc.connected)}
+                connected={Boolean(svc.configured)}
                 allowedScope={svc.allowedScope || []}
                 credentialFields={svc.credentialFields || []}
                 scopeLabel={

@@ -8,6 +8,7 @@ export interface PlanPreviewProps {
   onEdit?: () => void;
   onCancel?: () => void;
   isApproving?: boolean;
+  approvalDisabled?: boolean;
 }
 
 export const PlanPreview: React.FC<PlanPreviewProps> = ({
@@ -16,6 +17,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
   onEdit,
   onCancel,
   isApproving = false,
+  approvalDisabled = false,
 }) => {
   const [showThinking, setShowThinking] = useState(false);
 
@@ -134,7 +136,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
           <button
             type="button"
             onClick={onApprove}
-            disabled={isApproving}
+            disabled={isApproving || approvalDisabled}
             className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 disabled:opacity-50 px-6 py-2.5 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
             {isApproving ? (

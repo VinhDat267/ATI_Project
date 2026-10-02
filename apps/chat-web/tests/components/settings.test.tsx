@@ -65,6 +65,23 @@ describe('ServiceCard Component', () => {
 });
 
 describe('SettingsModal Component', () => {
+  it('uses configured state rather than provider verification and refreshes metadata after saving', async () => {
+    let configured = true;
+    const onServicesChanged = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/services') return {ok:true,status:200,json:async()=>({services:[{id:'slack',name:'Slack',configured,connected:false,allowedScope:['C1'],credentialFields:[{key:'botToken',label:'Bot Token'}],scopeKey:'channels'}]})};
+      if (url.endsWith('/credentials')) { configured = false; return {ok:true,status:200,json:async()=>({success:true})}; }
+      throw new Error('Unexpected endpoint');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<SettingsModal isOpen onClose={vi.fn()} onServicesChanged={onServicesChanged} />);
+    expect(await screen.findByText('Đã cấu hình')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Bot Token'),{target:{value:'test-only'}});
+    fireEvent.click(screen.getByRole('button',{name:'Lưu cấu hình'}));
+    expect(await screen.findByText('Chưa cấu hình')).toBeInTheDocument();
+    expect(onServicesChanged).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([url])=>url==='/api/services')).toHaveLength(2);
+  });
   it('renders multiple services and close button', async () => {
     const onClose = vi.fn();
     render(<SettingsModal isOpen={true} onClose={onClose} />);

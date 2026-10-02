@@ -158,7 +158,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
           {/* Subtitle */}
           <p className="mt-6 text-base sm:text-lg text-zinc-600 max-w-2xl mx-auto leading-relaxed">
             Giải phóng đội ngũ của bạn khỏi hàng giờ nhập liệu thủ công. 
-            Chỉ cần giao việc bằng một câu nói tự nhiên, AI sẽ tự động phân công, kết nối dữ liệu và đồng bộ trên mọi phần mềm bạn đang dùng chỉ trong vài giây.
+            Mô tả công việc bằng ngôn ngữ tự nhiên, xem kế hoạch và phê duyệt các lệnh ghi trên dịch vụ đã kết nối.
           </p>
 
           {/* Call to Actions */}
@@ -187,16 +187,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
           {/* Key Value Metrics */}
           <div className="mt-12 pt-8 border-t border-zinc-200/60 grid grid-cols-3 gap-4 max-w-xl mx-auto text-center">
             <div>
-              <div className="text-xl sm:text-2xl font-extrabold text-blue-600">&lt; 10s</div>
-              <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">Xử lý toàn bộ quy trình</div>
+              <div className="text-xl sm:text-2xl font-extrabold text-blue-600">Theo bước</div>
+              <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">Theo dõi quá trình thực thi</div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-extrabold text-emerald-600">100%</div>
+              <div className="text-xl sm:text-2xl font-extrabold text-emerald-600">Có phê duyệt</div>
               <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">Quyền kiểm duyệt của bạn</div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-extrabold text-indigo-600">80%</div>
-              <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">Tiết kiệm thời gian thao tác</div>
+              <div className="text-xl sm:text-2xl font-extrabold text-indigo-600">Đa dịch vụ</div>
+              <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">Kết nối công việc giữa dịch vụ</div>
             </div>
           </div>
         </div>
@@ -211,31 +211,31 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               So sánh hiệu quả vận hành
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mt-3">
-              Sự khác biệt vượt trội về hiệu suất
+              Từ thao tác thủ công đến kế hoạch có phê duyệt
             </h2>
             <p className="mt-3 text-sm sm:text-base text-zinc-600 leading-relaxed">
-              Đo lường trực quan giá trị thực tế khi chuyển từ quy trình thủ công rời rạc sang giải pháp tự động hóa thông minh bằng AI.
+              Ví dụ về cách tổ chức cùng một công việc thủ công và bằng kế hoạch do AI đề xuất.
             </p>
           </div>
 
           {/* 3 Stat ROI Highlight Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 sm:mb-12">
             <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
-              <div className="text-3xl sm:text-4xl font-extrabold text-blue-600 tracking-tight">95%</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-blue-600 tracking-tight">Bớt chuyển tab</div>
               <div className="text-xs font-bold text-zinc-900 mt-1.5">Tiết kiệm thời gian</div>
               <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
-                Từ 15–20 phút mở nhiều ứng dụng xuống dưới 10 giây mỗi quy trình
+                Gom yêu cầu vào một hội thoại và xem kế hoạch trước khi chạy
               </p>
             </div>
             <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
               <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 tracking-tight">1 Câu lệnh</div>
-              <div className="text-xs font-bold text-zinc-900 mt-1.5">Thay thế 8 bước thủ công</div>
+              <div className="text-xs font-bold text-zinc-900 mt-1.5">Mô tả mục tiêu công việc</div>
               <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
                 Tự động bóc tách mục tiêu, tạo thẻ, cập nhật dữ liệu và gửi thông báo
               </p>
             </div>
             <div className="bg-slate-50/80 hover:bg-slate-50 border border-zinc-200/80 rounded-2xl p-5 text-center shadow-2xs transition-all">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-600 tracking-tight">100%</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-600 tracking-tight">Có phê duyệt</div>
               <div className="text-xs font-bold text-zinc-900 mt-1.5">Minh bạch &amp; Kiểm soát</div>
               <p className="text-[11px] text-zinc-500 mt-1 leading-snug">
                 Người dùng luôn xem trước kế hoạch chi tiết và duyệt trước khi thực thi
@@ -258,7 +258,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                         Quy trình truyền thống
                       </span>
                       <h3 className="font-bold text-base sm:text-lg text-zinc-900 leading-snug">
-                        Cách làm truyền thống: 8 bước rườm rà qua 4 ứng dụng
+                        Cách làm truyền thống: thao tác qua nhiều ứng dụng
                       </h3>
                     </div>
                   </div>
@@ -266,7 +266,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
                 <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">
                   <span>⏱️</span>
-                  <span>Tốn 15–20 phút mỗi nhiệm vụ</span>
+                  <span>Chuyển tab và nhập liệu nhiều lần</span>
                 </div>
 
                 {/* 4 Tiêu chí đối chiếu 1-1 */}
@@ -277,7 +277,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                       <span>Thao tác ứng dụng rời rạc</span>
                     </div>
                     <p className="text-zinc-600 text-xs leading-relaxed">
-                      Lục tìm board &amp; list, tạo card thủ công trên Trello, Jira; chuyển tab liên tục để copy dữ liệu.
+                      Lục tìm board &amp; list, tạo card thủ công trên Trello; chuyển tab liên tục để copy dữ liệu.
                     </p>
                   </div>
 
@@ -297,7 +297,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                       <span>Trao đổi &amp; Cập nhật tiến độ</span>
                     </div>
                     <p className="text-zinc-600 text-xs leading-relaxed">
-                      Chuyển sang Slack soạn tin nhắn thông báo, rồi mở Google Sheets cập nhật trạng thái nhật ký chung.
+                      Chuyển sang Slack soạn thông báo rồi sao chép liên kết thẻ Trello.
                     </p>
                   </div>
 
@@ -315,7 +315,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
               <div className="mt-6 pt-4 border-t border-zinc-200/80 text-xs text-rose-700 font-medium flex items-center gap-1.5">
                 <span>⚠️</span>
-                <span>Hệ quả: Tiêu tốn 2–3 giờ/ngày của mỗi nhân sự vào những việc vụn vặt cơ học.</span>
+                <span>Hệ quả: Thao tác lặp lại và khó theo dõi công việc giữa các ứng dụng.</span>
               </div>
             </div>
 
@@ -344,7 +344,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
                 <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">
                   <span>⚡</span>
-                  <span>Hoàn thành tức thì dưới 10 giây</span>
+                  <span>Xem kế hoạch và theo dõi kết quả từng bước</span>
                 </div>
 
                 {/* 4 Tiêu chí đối chiếu 1-1 */}
@@ -355,7 +355,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                       <span>Giao việc tự nhiên bằng 1 câu chat</span>
                     </div>
                     <p className="text-zinc-600 text-xs leading-relaxed italic bg-blue-50/50 p-1.5 rounded-lg border border-blue-100 text-blue-950 font-medium">
-                      &ldquo;Giao việc cập nhật kế hoạch cho team dự án trên Trello, ghi nhận vào Google Sheets và thông báo vào nhóm Slack&rdquo;
+                      &ldquo;Tạo thẻ công việc trên Trello và gửi liên kết vào kênh Slack đã chọn&rdquo;
                     </p>
                   </div>
 
@@ -375,17 +375,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                       <span>Xem trước kế hoạch minh bạch</span>
                     </div>
                     <p className="text-zinc-600 text-xs leading-relaxed">
-                      Bạn toàn quyền kiểm tra các bước và tham số trước khi thực thi. Không bao giờ lo AI tự ý thao tác sai lệch dữ liệu.
+                      Bạn xem các bước và tham số của lệnh ghi trước khi phê duyệt kế hoạch.
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-white border border-blue-200/80 shadow-2xs">
                     <div className="font-semibold text-blue-900 flex items-center gap-1.5 text-xs mb-1">
                       <span className="text-blue-600">4.</span>
-                      <span>Đồng bộ đa ứng dụng tức thì</span>
+                      <span>Chạy theo thứ tự kế hoạch</span>
                     </div>
                     <p className="text-zinc-600 text-xs leading-relaxed">
-                      Thẻ công việc Trello, bảng tính Google Sheets và thông báo Slack được cập nhật đồng loạt chỉ sau một cú nhấp chuột duyệt.
+                      Sau khi duyệt, hệ thống chạy lần lượt các bước và ghi nhận kết quả; khi có lỗi, người dùng xem trạng thái để xử lý.
                     </p>
                   </div>
                 </div>
@@ -393,7 +393,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
               <div className="mt-6 pt-4 border-t border-blue-200/60 text-xs text-blue-700 font-semibold flex items-center gap-1.5">
                 <span>🚀</span>
-                <span>Giá trị: Tiết kiệm hàng giờ mỗi tuần, công việc được đồng bộ liền mạch và loại bỏ 100% sai sót cơ học.</span>
+                <span>Giá trị: Theo dõi các bước, kết quả và lỗi trong cùng một hội thoại.</span>
               </div>
             </div>
           </div>
@@ -440,7 +440,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg mb-4">
                 👁️
               </div>
-              <h3 className="font-bold text-base text-zinc-900">Minh bạch 100% – Duyệt mới chạy</h3>
+              <h3 className="font-bold text-base text-zinc-900">Xem kế hoạch – Duyệt mới chạy</h3>
               <p className="text-xs sm:text-sm text-zinc-600 mt-2 leading-relaxed">
                 Loại bỏ hoàn toàn rủi ro AI tự ý làm sai. Bạn luôn được xem trước danh sách chi tiết các việc AI dự kiến làm và chỉ thực thi khi bạn bấm Duyệt.
               </p>
@@ -486,47 +486,27 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
             Khả năng tích hợp mở rộng
           </span>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mt-3">
-            Hệ sinh thái ứng dụng không giới hạn
+            Dịch vụ hiện có và hướng mở rộng
           </h2>
           <p className="mt-3 text-sm sm:text-base text-zinc-500">
-            Được xây dựng trên kiến trúc adapter mở, sẵn sàng tích hợp các công cụ làm việc yêu thích của bạn.
+            Các dịch vụ đã hỗ trợ cần được cấu hình credentials và phạm vi tài nguyên trước khi sử dụng.
           </p>
         </div>
 
-        {/* Integration Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">GitHub</div>
-            <p className="text-xs text-zinc-500 mt-1">Đồng bộ Issue, Repository và trạng thái code.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Trello</div>
-            <p className="text-xs text-zinc-500 mt-1">Quản lý thẻ công việc, danh sách và thành viên.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Slack</div>
-            <p className="text-xs text-zinc-500 mt-1">Gửi thông báo tức thì đến các kênh làm việc.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Google Sheets</div>
-            <p className="text-xs text-zinc-500 mt-1">Ghi chép bảng tính và xuất báo cáo tự động.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Jira</div>
-            <p className="text-xs text-zinc-500 mt-1">Điều phối công việc chuẩn Agile cho doanh nghiệp.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Notion</div>
-            <p className="text-xs text-zinc-500 mt-1">Đồng bộ cơ sở tri thức và tài liệu dự án.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all">
-            <div className="font-bold text-sm text-zinc-900">Gmail / Calendar</div>
-            <p className="text-xs text-zinc-500 mt-1">Gửi email xác nhận và đặt lịch họp tự động.</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/80 shadow-xs flex flex-col justify-center text-center">
-            <div className="font-bold text-sm text-blue-700">+ Kết Nối Theo Yêu Cầu</div>
-            <p className="text-[11px] text-blue-600 mt-0.5">Sẵn sàng tích hợp mọi phần mềm doanh nghiệp</p>
-          </div>
+        <div className="space-y-6">
+          <section aria-labelledby="supported-services">
+            <h3 id="supported-services" className="font-bold mb-3">Đã hỗ trợ</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {[['GitHub', 'Tìm repository, đọc/tạo issue và thêm bình luận.'], ['Trello', 'Tìm, tạo và cập nhật thẻ; gán thành viên và thêm checklist.'], ['Slack', 'Tìm kênh và gửi tin nhắn trong phạm vi đã cấp.']].map(([name, description]) => <div key={name} className="p-4 rounded-2xl bg-white border border-zinc-200 shadow-xs"><div className="font-bold text-sm text-zinc-900">{name}</div><p className="text-xs text-zinc-500 mt-1">{description}</p></div>)}
+            </div>
+          </section>
+          <section aria-labelledby="planned-services">
+            <h3 id="planned-services" className="font-bold mb-3">Đang phát triển</h3>
+            <p className="text-xs text-zinc-500 mb-3">Theo lộ trình dự án; chưa có tool thực thi trong phiên bản hiện tại.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {['Google Sheets', 'Google Calendar', 'Notion', 'Telegram', 'Jira'].map(name => <div key={name} className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-500">{name}</div>)}
+            </div>
+          </section>
         </div>
       </section>
 
@@ -538,33 +518,33 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               Bảo mật &amp; Minh bạch
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-3">
-              An toàn tuyệt đối cho dữ liệu doanh nghiệp
+              Kiểm soát dữ liệu và phạm vi thực thi
             </h2>
             <p className="mt-2 text-xs sm:text-sm text-zinc-400">
-              Thiết kế theo các nguyên tắc an toàn dữ liệu và kiểm soát nghiêm ngặt nhất.
+              Phê duyệt kế hoạch, mã hóa thông tin kết nối và giới hạn tài nguyên được phép thao tác.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10">
-              <div className="text-emerald-400 text-xl font-bold mb-2">🛡️ Quyền kiểm soát 100%</div>
+              <div className="text-emerald-400 text-xl font-bold mb-2">🛡️ Phê duyệt lệnh ghi</div>
               <h3 className="text-sm font-semibold text-white">Phê duyệt trước mọi thay đổi</h3>
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Hệ thống không bao giờ tự ý thao tác hay gửi dữ liệu ra ngoài khi chưa có sự xác nhận rõ ràng từ bạn.
+                Các lệnh ghi cần bạn duyệt kế hoạch. Bước thu thập có thể đọc tài nguyên trong phạm vi được cấp để lập kế hoạch.
               </p>
             </div>
             <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10">
-              <div className="text-blue-400 text-xl font-bold mb-2">🔒 Mã hóa cấp cao (AES-256)</div>
+              <div className="text-blue-400 text-xl font-bold mb-2">🔒 Mã hóa AES-256-GCM</div>
               <h3 className="text-sm font-semibold text-white">Bảo vệ thông tin kết nối</h3>
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Toàn bộ mật khẩu, khóa truy cập của doanh nghiệp đều được mã hóa đa lớp, ngăn chặn triệt để rò rỉ dữ liệu.
+                Credentials kết nối dịch vụ được mã hóa AES-256-GCM khi lưu trữ.
               </p>
             </div>
             <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10">
               <div className="text-purple-400 text-xl font-bold mb-2">🎯 Phân quyền ranh giới chặt chẽ</div>
               <h3 className="text-sm font-semibold text-white">Kiểm soát phạm vi thao tác</h3>
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Chỉ cho phép AI hoạt động trong các phòng ban, kênh trao đổi và dự án cụ thể đã được người quản trị cấp phép.
+                Allowlist giới hạn bảng Trello, kênh Slack và repository GitHub được phép sử dụng.
               </p>
             </div>
           </div>

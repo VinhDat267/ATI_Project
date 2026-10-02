@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
+import { ALL_TOOLS } from '@wap/tool-schemas';
 import { REGISTERED_SERVICES, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 
 export interface ServicesRoutesOptions {
@@ -30,6 +31,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   const { credentialRepo, encryptionKey } = options;
   const fetchFn = options.fetchFn || fetch;
   const verified = new Set<string>();
+  const checks = new Map<string, { connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }>();
 
   // GET /api/services
   router.get('/', async (_req: Request, res: Response): Promise<void> => {
@@ -39,9 +41,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
         const scope = config?.allowedScope as Record<string, unknown> | undefined;
         const entries = scope?.[scopeKey];
+        const configured = Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(scopeKey, scope));
         return {
           id, name, description, scopes, scopeKey, credentialFields,
-          connected: Boolean(record) && verified.has(id),
+          tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
+          configured,
+          connected: configured && verified.has(id),
+          connectionStatus: configured ? (checks.get(id)?.connectionStatus ?? 'unchecked') : 'unconfigured',
+          lastCheckedAt: checks.get(id)?.lastCheckedAt ?? null,
           allowedScope: Array.isArray(entries) ? entries : [],
         };
       }));
@@ -62,6 +69,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
 
       const record = await credentialRepo?.getCredentials(service);
       if (!record || !encryptionKey) {
+        verified.delete(service);
+        checks.set(service, { connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
         res.status(409).json({ service, status: 'unconfigured', message: `${service} credentials are not configured` });
         return;
       }
@@ -69,8 +78,12 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const result = await verifyService(service, config, fetchFn);
       if (result.healthy) verified.add(service);
       else verified.delete(service);
+      checks.set(service, { connectionStatus: result.healthy ? 'healthy' : 'unhealthy', lastCheckedAt: new Date().toISOString() });
       res.status(result.healthy ? 200 : 502).json({ service, status: result.healthy ? 'healthy' : 'unhealthy', ...result });
     } catch (err: any) {
+      const service = String(req.params.service);
+      verified.delete(service);
+      checks.set(service, { connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
       res.status(502).json({ status: 'unhealthy', error: 'Service connection verification failed' });
     }
   });
@@ -109,6 +122,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const encrypted = encryptCredentials({ ...Object.fromEntries(fields.map(({ key }) => [key, credentials[key]])), allowedScope: scope }, encryptionKey);
       await credentialRepo.saveCredentials(service, encrypted);
       verified.delete(service);
+      checks.delete(service);
       options.onCredentialsChanged?.(service);
       res.status(200).json({ success: true, message: `Credentials saved for ${service}` });
     } catch (err: any) {

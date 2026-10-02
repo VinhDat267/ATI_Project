@@ -17,6 +17,7 @@ import type { ExecutionService } from './services/execution-service.js';
 
 export interface AppOptions {
   jwtSecret: string;
+  runtimeMode?: 'sandbox' | 'live';
   userRepo?: UserRepo;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
@@ -51,7 +52,7 @@ export function createApp(options: AppOptions): Express {
 
   // Health check
   app.get('/api/health', (_req, res) => {
-    res.status(200).json({ status: 'ok', version: 'v3' });
+    res.status(200).json({ status: 'ok', version: 'v3', runtimeMode: options.runtimeMode ?? 'sandbox' });
   });
 
   // Auth routes (public login/refresh, protected /me)

@@ -39,8 +39,13 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
     () => prompt ?? (typeof stepArgs?.prompt === 'string' ? stepArgs.prompt : '')
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [confirmStop, setConfirmStop] = useState(false);
 
-  const handleClose = () => { if (!busy && allowedActions.includes('stop')) (onClose || onStop)(); };
+  const handleClose = () => {
+    if (busy) return;
+    if (confirmStop) setConfirmStop(false);
+    else onClose?.();
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -99,7 +104,6 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
           <button
             type="button"
             disabled={busy}
-            hidden={!allowedActions.includes('stop')}
             onClick={handleClose}
             aria-label="Đóng hộp thoại"
             className="text-zinc-400 hover:text-zinc-600 text-sm font-semibold p-1 rounded-md"
@@ -230,12 +234,19 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             type="button"
             disabled={busy}
             hidden={!allowedActions.includes('stop')}
-            onClick={onStop}
+            onClick={() => setConfirmStop(true)}
             className="text-xs font-medium text-red-500 hover:bg-red-50 px-3.5 py-2 rounded-full transition cursor-pointer ml-auto"
           >
             ⏹ Dừng lại toàn bộ
           </button>
         </div>
+        {confirmStop && (
+          <div className="mt-3 p-3 border border-red-200 rounded-xl" role="group" aria-label="Xác nhận dừng">
+            <p>Dừng hẳn? Không thể chạy tiếp sau khi dừng.</p>
+            <button type="button" disabled={busy} onClick={onStop} className="text-red-600 p-2">Dừng hẳn quy trình</button>
+            <button type="button" disabled={busy} onClick={() => setConfirmStop(false)} className="p-2">Quay lại xử lý lỗi</button>
+          </div>
+        )}
       </div>
     </div>
   );

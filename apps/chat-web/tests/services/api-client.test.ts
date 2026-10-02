@@ -3,6 +3,18 @@ import { apiClient } from '../../src/services/api-client';
 import { authStorage } from '../../src/services/auth-storage';
 
 describe('ApiClient', () => {
+  it.each([503, 'network'])('preserves credentials after a temporary refresh failure (%s)', async failure => {
+    authStorage.setStoredTokens({accessToken:'old',refreshToken:'valid'});
+    vi.stubGlobal('fetch', vi.fn(async url => {
+      if (url === '/api/auth/refresh') {
+        if (failure === 'network') throw new TypeError('Failed to fetch');
+        return new Response('{}', {status:503});
+      }
+      return new Response('{}', {status:401});
+    }));
+    await expect(apiClient.getMe()).rejects.toThrow();
+    expect(authStorage.getStoredTokens()).toMatchObject({accessToken:'old',refreshToken:'valid'});
+  });
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();

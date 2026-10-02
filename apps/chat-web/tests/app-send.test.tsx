@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { App } from '../src/App';
 import { useChatStore } from '../src/store/chat-store';
 import { authStorage } from '../src/services/auth-storage';
+import { ALL_TOOLS } from '@wap/tool-schemas';
 
 afterEach(() => {
   cleanup();
@@ -59,6 +60,7 @@ describe('App message sending', () => {
 
   it('renders business-friendly prompt chips, lacks placebo dark mode, and toggles mobile backdrop', async () => {
     const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/services') return {ok:true,status:200,json:async()=>({services:['trello','slack','github'].map(id=>({id,name:id,configured:true,connected:false,tools:ALL_TOOLS.filter(t=>t.service===id).map(t=>t.name)}))})};
       if (url === '/api/auth/login') {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'jwt', user: { id: 'u1', email: 'a@b.c', name: 'A' } }) };
       }
@@ -73,10 +75,10 @@ describe('App message sending', () => {
 
     // Verify empty state text and prompt chips
     expect(
-      await screen.findByText(/toàn quyền kiểm duyệt trước khi chạy và dữ liệu luôn được bảo vệ an toàn/i)
+      await screen.findByText(/phê duyệt các lệnh ghi trước khi chạy/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/✨ Tạo công việc trên Trello, phân công nhân sự và thông báo qua Slack/i)
+      await screen.findByText(/✨ Tạo công việc trên Trello, phân công nhân sự và thông báo qua Slack/i)
     ).toBeInTheDocument();
     expect(
       screen.getByText(/🔍 Kiểm tra danh sách bảng việc Trello và kênh Slack liên kết/i)

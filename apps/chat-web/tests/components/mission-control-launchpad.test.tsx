@@ -1,14 +1,25 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { MissionControlLaunchpad } from '../../src/components/MissionControlLaunchpad';
+import { MissionControlLaunchpad as Launchpad, BLUEPRINTS } from '../../src/components/MissionControlLaunchpad';
+
+import { ALL_TOOLS } from '@wap/tool-schemas';
+const services = ['trello','slack','github'].map(id=>({id,name:id==='github'?'GitHub':id==='slack'?'Slack':'Trello',connected:true,configured:true,connectionStatus:'healthy',tools:ALL_TOOLS.filter(t=>t.service===id).map(t=>t.name)}));
+const MissionControlLaunchpad = (props:any) => <Launchpad services={services} runtimeMode="live" {...props} />;
+it('references only registered services and existing tools in every blueprint', () => {
+  for (const blueprint of BLUEPRINTS) for (const name of blueprint.requiredTools) {
+    const tool = ALL_TOOLS.find(tool => tool.name === name);
+    expect(tool).toBeDefined();
+    expect(services.find(service => service.id === tool!.service)).toBeDefined();
+  }
+});
 
 afterEach(() => {
   cleanup();
 });
 
 describe('MissionControlLaunchpad Component', () => {
-  it('renders live integrations status bar with 4 core services', () => {
+  it('renders live integrations status bar from the API catalog', () => {
     render(<MissionControlLaunchpad onSendMessage={vi.fn()} />);
 
     expect(
@@ -17,7 +28,7 @@ describe('MissionControlLaunchpad Component', () => {
     expect(screen.getByText('Trello')).toBeInTheDocument();
     expect(screen.getByText('Slack')).toBeInTheDocument();
     expect(screen.getByText('GitHub')).toBeInTheDocument();
-    expect(screen.getByText('Google Sheets')).toBeInTheDocument();
+    expect(screen.queryByText('Google Sheets')).toBeNull();
   });
 
   it('renders hero title, description, and security safeguards', () => {
@@ -27,12 +38,12 @@ describe('MissionControlLaunchpad Component', () => {
       screen.getByText('Trung Tâm Điều Phối Quy Trình Tự Động Hóa')
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/toàn quyền kiểm duyệt trước khi chạy và dữ liệu luôn được bảo vệ an toàn/i)
+      screen.getByText(/phê duyệt các lệnh ghi trước khi chạy/i)
     ).toBeInTheDocument();
 
     // Safeguard badges
     expect(screen.getByText('Kiểm duyệt trước khi chạy')).toBeInTheDocument();
-    expect(screen.getByText('Bảo vệ dữ liệu tuyệt đối')).toBeInTheDocument();
+    expect(screen.getByText('Giới hạn phạm vi dịch vụ')).toBeInTheDocument();
     expect(screen.getByText('Dừng khẩn cấp & Phục hồi')).toBeInTheDocument();
   });
 
@@ -61,11 +72,11 @@ describe('MissionControlLaunchpad Component', () => {
     );
 
     // Blueprint 3
-    const card3Btn = screen.getByText(/🚀 Phát hành Sprint từ Trello sang Slack/i);
+    const card3Btn = screen.getByText(/🚀 Tạo công việc từ GitHub issue sang Trello & Slack/i);
     expect(card3Btn).toBeInTheDocument();
     fireEvent.click(card3Btn);
     expect(onSend).toHaveBeenCalledWith(
-      'Tạo thông báo phát hành sprint từ Trello sang Slack channel #general và cập nhật trạng thái các task'
+      'Tìm issue trên GitHub, tạo thẻ Trello cho issue đã chọn và thông báo qua Slack'
     );
 
     // Blueprint 4
@@ -115,4 +126,17 @@ describe('MissionControlLaunchpad Component', () => {
     fireEvent.click(slackTagBtn);
     expect(commandInput.value).toBe('@Trello @Slack ');
   });
+});
+
+it('uses configured counts, disables unconfigured blueprints and never shows LIVE in sandbox',()=>{
+  render(<MissionControlLaunchpad services={services.map(s=>s.id==='github'?{...s,configured:false,connected:false}:s)} runtimeMode="sandbox" onSendMessage={vi.fn()} />);
+  expect(screen.getByText('2/3 dịch vụ đã cấu hình')).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:/Cần kết nối GitHub/})).toBeDisabled();
+  expect(screen.queryByText(/LIVE/)).toBeNull();
+  expect(screen.queryByText(/Google Sheets/)).toBeNull();
+});
+it('hides samples and service tags that require an absent service/tool',()=>{
+  render(<MissionControlLaunchpad services={services.filter(s=>s.id!=='github')} onSendMessage={vi.fn()} />);
+  expect(screen.queryByRole('button',{name:/GitHub issue/})).toBeNull();
+  expect(screen.queryByRole('button',{name:'@GitHub'})).toBeNull();
 });

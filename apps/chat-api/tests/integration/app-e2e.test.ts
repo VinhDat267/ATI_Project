@@ -86,7 +86,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     const res = await fetch(`${baseUrl}/api/health`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ status: 'ok', version: 'v3' });
+    expect(body).toEqual({ status: 'ok', version: 'v3', runtimeMode: 'sandbox' });
   });
 
   it('rejects unauthenticated requests to protected endpoints with 401', async () => {

@@ -226,7 +226,7 @@ test('real browser and PostgreSQL: clarification before plan', async ({ page }) 
   }
 });
 
-test('real browser and PostgreSQL: partial failure and skip', async ({ page }) => {
+for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQL: partial failure and skip — ${action}`, async ({ page }, testInfo) => {
   test.skip(process.env.SANDBOX_SCENARIO !== 'partial_failure', 'requires the explicit failure sandbox scenario');
   const pool = new pg.Pool({ connectionString });
   try {
@@ -240,6 +240,28 @@ test('real browser and PostgreSQL: partial failure and skip', async ({ page }) =
     await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
     await expect(page.getByText(/Tạm dừng quy trình tại bước: step_3/)).toBeVisible();
     await expect.poll(async () => (await pool.query('SELECT status FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_3'])).rows[0]?.status).toBe('failed');
+    await expect(page.getByText('Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật')).toBeVisible();
+    const writes: string[] = [];
+    page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    expect((await pool.query('SELECT status FROM plans WHERE id=$1',[planId])).rows[0].status).toBe('partial');
+    expect(writes).toEqual([]);
+    await page.screenshot({path:testInfo.outputPath('paused-dismissed-desktop.png'),fullPage:true});
+    await page.getByRole('button',{name:'Mở lại xử lý lỗi'}).click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    if(action === 'stop') {
+      await page.getByRole('button',{name:/Dừng lại toàn bộ/}).click();
+      await expect(page.getByText(/Không thể chạy tiếp sau khi dừng/)).toBeVisible();
+      expect(writes).toEqual([]);
+      expect((await pool.query('SELECT status FROM plans WHERE id=$1',[planId])).rows[0].status).toBe('partial');
+      await page.getByRole('button',{name:'Dừng hẳn quy trình'}).click();
+      await expect.poll(async()=> (await pool.query('SELECT status FROM plans WHERE id=$1',[planId])).rows[0].status).toBe('stopped');
+      expect(writes).toEqual([`/api/executions/${planId}/stop`]);
+      return;
+    }
+    await page.setViewportSize({width:390,height:844});
+    await page.getByRole('alertdialog').screenshot({path:testInfo.outputPath('paused-reopened-mobile.png')});
     await page.getByRole('button', { name: /Bỏ qua bước này/ }).click();
     await expect.poll(async () => (await pool.query('SELECT status FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_3'])).rows[0]?.status).toBe('skipped');
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');

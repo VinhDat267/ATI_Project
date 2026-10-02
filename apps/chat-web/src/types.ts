@@ -94,6 +94,10 @@ export interface ServiceInfo {
   id: string;
   name: string;
   connected: boolean;
+  configured?: boolean;
+  tools?: string[];
+  connectionStatus?: 'healthy' | 'unhealthy' | 'unconfigured' | 'unchecked';
+  lastCheckedAt?: string | null;
   allowedScope?: string[];
   credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' }>;
   scopeKey?: string;

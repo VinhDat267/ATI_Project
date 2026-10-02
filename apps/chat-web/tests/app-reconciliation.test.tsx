@@ -191,6 +191,8 @@ describe('saved execution recovery in the actual App/history flow', () => {
     let finish!: () => void;
     post = () => new Promise(resolve => { finish = () => resolve({ status: 'stopped' }); });
     fireEvent.click(within(modal).getByRole('button', { name: /Dừng lại toàn bộ/ }));
+    expect(request.mock.calls.filter(([, options]: [string, RequestInit?]) => options?.method === 'POST')).toEqual([]);
+    fireEvent.click(within(modal).getByRole('button', { name: 'Dừng hẳn quy trình' }));
     expect(within(modal).getByRole('button', { name: /Dừng lại toàn bộ/ })).toBeDisabled();
     await act(async () => finish());
   });

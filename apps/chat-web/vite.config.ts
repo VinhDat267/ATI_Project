@@ -1,17 +1,19 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { configDefaults } from 'vitest/config';
 
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
+  const demo = command === 'serve' && env.RUNTIME_MODE === 'sandbox' &&
+    env.VITE_SHOW_DEMO_LOGIN === 'true' && Boolean(env.SANDBOX_USER_EMAIL && env.SANDBOX_USER_PASSWORD) &&
+    env.SANDBOX_USER_EMAIL !== env.CHAT_ADMIN_EMAIL;
+  return {
   plugins: [react(), tailwindcss()],
   define: {
-    'import.meta.env.VITE_DEFAULT_ADMIN_EMAIL': JSON.stringify(
-      process.env.CHAT_ADMIN_EMAIL || 'admin@localhost.test'
-    ),
-    'import.meta.env.VITE_DEFAULT_ADMIN_PASSWORD': JSON.stringify(
-      process.env.RUNTIME_MODE === 'live' ? '' : (process.env.CHAT_ADMIN_PASSWORD || 'Admin@12345678')
-    ),
+    'import.meta.env.VITE_SHOW_DEMO_LOGIN': JSON.stringify(demo ? 'true' : 'false'),
+    'import.meta.env.VITE_DEMO_EMAIL': JSON.stringify(demo ? env.SANDBOX_USER_EMAIL : ''),
+    'import.meta.env.VITE_DEMO_PASSWORD': JSON.stringify(demo ? env.SANDBOX_USER_PASSWORD : ''),
   },
   server: {
     host: '127.0.0.1',
@@ -29,4 +31,5 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     exclude: [...configDefaults.exclude, 'tests/browser/**'],
   },
+  };
 });

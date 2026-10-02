@@ -8,7 +8,7 @@ export interface LoginViewProps {
   isLoggingIn: boolean;
   authError: string | null;
   onLogin: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
-  onQuickFillAdmin?: () => void;
+  onQuickFillDemo?: () => void;
   onBackToLanding?: () => void;
 }
 
@@ -20,21 +20,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
   isLoggingIn,
   authError,
   onLogin,
-  onQuickFillAdmin,
+  onQuickFillDemo,
   onBackToLanding,
 }) => {
-  const defaultAdminEmail = (import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test';
-  const defaultAdminPassword =
-    (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD !== undefined
-      ? (import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD
-      : 'Admin@12345678';
+  const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
+  const demoPassword = import.meta.env.VITE_DEMO_PASSWORD;
+  const showDemo = import.meta.env.DEV && import.meta.env.VITE_SHOW_DEMO_LOGIN === 'true' &&
+    Boolean(demoEmail && demoPassword);
 
   const handleQuickFill = () => {
-    if (onQuickFillAdmin) {
-      onQuickFillAdmin();
+    if (onQuickFillDemo) {
+      onQuickFillDemo();
     } else {
-      setEmail(defaultAdminEmail);
-      setPassword(defaultAdminPassword);
+      setEmail(demoEmail);
+      setPassword(demoPassword);
     }
   };
 
@@ -151,7 +150,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </svg>
                 <span className="leading-tight text-left">
                   {authError.toLowerCase().includes('invalid email or password')
-                    ? 'Email hoặc mật khẩu không chính xác. Bạn có thể sử dụng nút "Điền nhanh tài khoản Admin" bên dưới để đăng nhập tài khoản quản trị thử nghiệm.'
+                    ? 'Email hoặc mật khẩu không chính xác.'
                     : authError}
                 </span>
               </div>
@@ -183,7 +182,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </form>
 
           {/* Quick-Fill Admin Helper for Local Testing (Only in sandbox/dev mode) */}
-          {defaultAdminPassword && (
+          {showDemo && (
             <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-2">
               <button
                 type="button"
@@ -193,7 +192,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <svg className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
-                <span>Điền nhanh tài khoản Admin</span>
+                <span>Điền nhanh tài khoản demo</span>
               </button>
               <div className="p-3 rounded-2xl bg-zinc-50/90 border border-zinc-200/80 text-[11px] flex flex-col gap-2 text-left">
                 <div className="flex items-center gap-1.5 font-medium text-zinc-700">
@@ -204,13 +203,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <div className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-zinc-200/70 shadow-2xs">
                     <span className="text-zinc-500 font-medium text-[11px]">Email</span>
                     <code className="font-mono text-zinc-800 font-semibold select-all text-[11px]">
-                      {defaultAdminEmail}
+                      {demoEmail}
                     </code>
                   </div>
                   <div className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-zinc-200/70 shadow-2xs">
                     <span className="text-zinc-500 font-medium text-[11px]">Mật khẩu</span>
                     <code className="font-mono text-zinc-800 font-semibold select-all text-[11px]">
-                      {defaultAdminPassword}
+                      {demoPassword}
                     </code>
                   </div>
                 </div>
@@ -243,7 +242,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </span>
           <span className="w-1 h-1 rounded-full bg-zinc-300" />
           <span className="flex items-center gap-1">
-            <span className="text-emerald-500">🛡️</span> Phê duyệt 100% trước khi chạy
+            <span className="text-emerald-500">🛡️</span> Phê duyệt lệnh ghi trước khi chạy
           </span>
           <span className="w-1 h-1 rounded-full bg-zinc-300" />
           <span className="flex items-center gap-1">

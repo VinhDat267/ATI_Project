@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from './store/chat-store';
 import { useSSE } from './hooks/use-sse';
 import { authStorage, subscribeAuthTokens } from './services/auth-storage';
@@ -15,7 +15,8 @@ import { UserNavMenu } from './components/layout/UserNavMenu';
 import { MissionControlLaunchpad } from './components/MissionControlLaunchpad';
 import { ReconciliationNotice } from './components/ReconciliationNotice';
 import { refreshExecutionSnapshot } from './services/execution-snapshot';
-import type { User } from './types';
+import { userErrorMessage } from './services/user-error';
+import type { ServiceInfo, User } from './types';
 
 export interface AppProps {
   initialView?: 'landing' | 'login';
@@ -63,6 +64,36 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
+  const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
+  const [services, setServices] = useState<ServiceInfo[]>([]);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const serviceRequest = useRef(0);
+  const loadServices = useCallback(async () => {
+    const request = ++serviceRequest.current;
+    setServicesLoading(true);
+    try {
+      const data = await apiClient.getServices();
+      if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
+      if (request === serviceRequest.current) { setServices(data.services); setServicesError(null); }
+    } catch (error) {
+      if (request === serviceRequest.current) { setServices([]); setServicesError(userErrorMessage(error)); }
+    } finally { if (request === serviceRequest.current) setServicesLoading(false); }
+  }, []);
+  useEffect(() => {
+    let current = true;
+    apiClient.getRuntime().then(data => {
+      if (current && ['sandbox', 'live'].includes(data?.runtimeMode)) setRuntimeMode(data.runtimeMode);
+    }).catch(() => { if (current) setRuntimeMode(null); });
+    return () => { current = false; };
+  }, []);
+  useEffect(() => {
+    if (authToken) void loadServices();
+    else { serviceRequest.current++; setServices([]); }
+    return () => { serviceRequest.current++; };
+  }, [authToken, loadServices]);
   const recoveryPending = useRef(false);
   useEffect(() => { setRecoveryError(null); }, [conversationId, executionSnapshot?.plan.id]);
 
@@ -96,10 +127,9 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
           }
         })
         .catch((err) => {
-          console.warn('Session restore failed:', err);
-          authStorage.clearStoredTokens();
-          setAuthToken(null);
-          setUser(null);
+          if (err?.status === 401) {
+            authStorage.clearStoredTokens(); setAuthToken(null); setUser(null);
+          } else setAuthError(userErrorMessage(err));
         });
     }
   }, []);
@@ -126,7 +156,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       setUser(data.user);
       setPassword('');
     } catch (err: any) {
-      setAuthError(err.message || 'Không thể xác thực với API backend');
+      setAuthError(userErrorMessage(err, 'Không thể xác thực với API backend'));
     } finally {
       setIsLoggingIn(false);
     }
@@ -150,22 +180,17 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   useSSE(conversationId, authToken);
 
   const handleNewConversation = async () => {
-    reset();
+    setActionError(null);
     try {
       const data = await apiClient.createConversation();
       const newConv = data.conversation;
-      if (newConv?.id) {
-        setConversationId(newConv.id);
-        useChatStore.getState().setConversations([
-          newConv,
-          ...useChatStore.getState().conversations.filter((c) => c.id !== newConv.id),
-        ]);
-        return;
-      }
-    } catch (err) {
-      console.warn('Could not create conversation via API:', err);
-    }
-    setConversationId(`conv-${Date.now()}`);
+      if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
+      reset();
+      setConversationId(newConv.id);
+      useChatStore.getState().setConversations([
+        newConv, ...useChatStore.getState().conversations.filter(c => c.id !== newConv.id),
+      ]);
+    } catch (error) { setActionError(userErrorMessage(error)); }
   };
 
   const handleSendMessage = async (content: string) => {
@@ -207,16 +232,16 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
-        content: `[Lỗi gửi tin nhắn]: ${err?.message || 'Máy chủ từ chối yêu cầu'}`,
+        content: `[Lỗi gửi tin nhắn]: ${userErrorMessage(err, 'Máy chủ từ chối yêu cầu')}`,
       });
     }
   };
 
   const handleApprovePlan = async () => {
-    if (!activePlan || planStatus === 'approving') return;
+    if (!activePlan?.id || planStatus === 'approving') return;
 
     setPlanStatus('approving');
-    const planId = activePlan.id || 'plan_default';
+    const planId = activePlan.id;
     try {
       await apiClient.approvePlan(planId);
     } catch (err: any) {
@@ -224,23 +249,18 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
-        content: `[Lỗi phê duyệt kế hoạch]: ${err?.message || 'Phê duyệt thất bại'}`,
+        content: `[Lỗi phê duyệt kế hoạch]: ${userErrorMessage(err, 'Phê duyệt thất bại')}`,
       });
     }
   };
 
   const handleRejectPlan = async () => {
-    if (!activePlan) return;
-    const planId = activePlan.id;
+    if (!activePlan?.id) { setActionError('Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại.'); return; }
+    setActionError(null);
     try {
-      if (planId) {
-        await apiClient.rejectPlan(planId);
-      }
-    } catch (err) {
-      console.warn('Reject plan API call failed:', err);
-    }
-    setActivePlan(null);
-    setPlanStatus('rejected');
+      await apiClient.rejectPlan(activePlan.id);
+      setActivePlan(null); setPlanStatus('rejected');
+    } catch (error) { setActionError(userErrorMessage(error)); }
   };
 
   const recover = async (action: 'retry' | 'skip' | 'stop' | 'continue', stepId?: string) => {
@@ -262,7 +282,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       if (useChatStore.getState().conversationId === convId) await refreshExecutionSnapshot(convId, planId);
     } catch (err) {
       if (useChatStore.getState().conversationId === convId) {
-        setRecoveryError(err instanceof Error ? err.message : 'Không thể cập nhật quy trình. Hãy tải lại trạng thái trước khi quyết định.');
+        setRecoveryError(userErrorMessage(err, 'Không thể cập nhật quy trình. Hãy tải lại trạng thái trước khi quyết định.'));
       }
     } finally {
       recoveryPending.current = false;
@@ -309,6 +329,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   )?.[0] : undefined;
   const progressPlan = executionSnapshot?.plan || activePlan;
   const failureId = pausedStep?.status === 'failed' ? pausedStep.stepId : failedStepId;
+  const failureKey = `${conversationId}:${progressPlan?.id}:${failureId}`;
   const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
 
   if (!authToken) {
@@ -336,10 +357,6 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         isLoggingIn={isLoggingIn}
         authError={authError}
         onLogin={loginUser}
-        onQuickFillAdmin={() => {
-          setEmail((import.meta as any).env?.VITE_DEFAULT_ADMIN_EMAIL || 'admin@localhost.test');
-          setPassword((import.meta as any).env?.VITE_DEFAULT_ADMIN_PASSWORD || 'Admin@12345678');
-        }}
         onBackToLanding={() => {
           setCurrentView('landing');
           if (typeof window !== 'undefined' && window.history?.pushState) {
@@ -454,6 +471,9 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
           </div>
         )}
 
+        {runtimeMode === 'sandbox' && <p role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900">Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật</p>}
+        {runtimeMode === null && <p role="status" className="px-4 py-2 text-xs text-zinc-600">Chưa xác định được chế độ chạy của máy chủ.</p>}
+        {actionError && <p role="alert" className="px-4 py-2 text-sm text-red-700">{actionError}</p>}
         {/* Chat Feed */}
         <div className="flex-1 overflow-hidden relative">
           <ChatContainer
@@ -464,7 +484,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
           >
             {/* Mission Control Launchpad when no messages */}
             {messages.length === 0 && (
-              <MissionControlLaunchpad onSendMessage={handleSendMessage} />
+              <MissionControlLaunchpad onSendMessage={handleSendMessage} services={services} runtimeMode={runtimeMode} loading={servicesLoading} error={servicesError} />
             )}
 
             {/* Plan Preview Card */}
@@ -472,12 +492,18 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
               <PlanPreview
                 plan={activePlan}
                 isApproving={planStatus === 'approving'}
+                approvalDisabled={!activePlan.id}
                 onApprove={handleApprovePlan}
                 onEdit={handleEditPlan}
                 onCancel={handleRejectPlan}
               />
             )}
 
+            {activePlan && !activePlan.id && <p role="alert">Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại trước khi duyệt.</p>}
+            {failureId && !needsReconciliation && dismissedFailure === failureKey && <div role="status" className="my-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <p>Quy trình vẫn đang tạm dừng tại bước {failureId}.</p>
+              <button type="button" onClick={() => setDismissedFailure(null)} className="text-blue-700 p-2">Mở lại xử lý lỗi</button>
+            </div>}
             {/* Live Execution Progress Card */}
             {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
             {executionSnapshot && needsReconciliation && <ReconciliationNotice
@@ -502,7 +528,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             )}
 
             {/* Partial Failure Recovery Modal */}
-            {failureId && !needsReconciliation && (
+            {failureId && !needsReconciliation && dismissedFailure !== failureKey && (
               <PartialFailureModal
                 busy={recoveryBusy}
                 allowedActions={executionSnapshot?.recoveryActions.filter((action): action is 'retry' | 'skip' | 'stop' => action !== 'continue')}
@@ -522,7 +548,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
                 onEditAndRetry={() => handleRetry(failureId)}
                 onSkip={() => handleSkip(failureId)}
                 onStop={handleStop}
-                onClose={handleStop}
+                onClose={() => setDismissedFailure(failureKey)}
               />
             )}
           </ChatContainer>
@@ -534,6 +560,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         authToken={authToken}
+        onServicesChanged={loadServices}
       />
     </div>
   );
