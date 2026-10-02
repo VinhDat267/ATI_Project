@@ -56,7 +56,16 @@ export function createSandboxProvider(scenario?: string) {
       ],
       warnings: [],
     };
-  mockProvider.setPlanResponses([scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  const sheetsPlan = {
+    kind: 'plan', thinking: 'Đọc bảng tính thử nghiệm, thêm dòng và báo vùng cập nhật qua Slack.',
+    summary: 'Đọc và thêm dòng Google Sheets, thông báo Slack', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'sheets.read_range', description: 'Đọc tab Tasks', args: { spreadsheetId: 'spreadsheet_fixture_123456', range: 'Tasks!A1:B3', limit: 3 }, dependsOn: [] },
+      { id: 'step_2', tool: 'sheets.append_rows', description: 'Thêm dòng vào tab Tasks', args: { spreadsheetId: 'spreadsheet_fixture_123456', sheet: 'Tasks', rows: [['Sandbox task']] }, dependsOn: ['step_1'] },
+      { id: 'step_3', tool: 'slack.send_message', description: 'Thông báo vùng đã cập nhật', args: { channel: '#general', text: { $template: 'Đã thêm dòng vào Google Sheets: ${step_2.output.updatedRange}' } }, dependsOn: ['step_2'] },
+    ],
+  };
+  mockProvider.setPlanResponses([scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
   return mockProvider;
 }
 

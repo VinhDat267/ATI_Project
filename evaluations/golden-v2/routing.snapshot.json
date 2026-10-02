@@ -546,7 +546,8 @@
     "fullCatalog": [
       "trello",
       "slack",
-      "github"
+      "github",
+      "sheets"
     ]
   },
   {
@@ -583,7 +584,8 @@
     "fullCatalog": [
       "trello",
       "slack",
-      "github"
+      "github",
+      "sheets"
     ]
   },
   {
@@ -775,7 +777,8 @@
     "fullCatalog": [
       "trello",
       "slack",
-      "github"
+      "github",
+      "sheets"
     ]
   },
   {
