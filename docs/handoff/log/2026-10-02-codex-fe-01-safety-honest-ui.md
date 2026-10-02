@@ -3,7 +3,7 @@
 - Task: `docs/handoff/tasks/FE-01-safety-and-honest-ui.md`.
 - Base: `c6d6e89`; implementation commit: `1698506c90807fe1e5ec6ec3a68070b047b7a292`.
 - Branch: `vinhdat/fix-fe-01-safety-honest-ui`.
-- PR: pending independent review.
+- PR: [#27](https://github.com/VinhDat267/ATI_Project/pull/27).
 
 ## Behavior delivered
 
@@ -18,12 +18,14 @@
 ## Evidence
 
 - RED: partial modal 2 failures; login helper 5 failures; API metadata 3 failures; temporary-refresh retention 2 failures; App safety and honest launchpad/landing failures. Additional copy and settings regressions each failed before correction.
-- `npm run check`: exit 0; 524 v3 tests (11 schema + 53 adapters + 128 planner + 25 executor + 146 API + 161 web), 66 offline evaluations; typecheck/build, production-secret scan, 1 launcher and 3 local-environment checks pass.
+- `npm run check`: exit 0; 526 v3 tests (11 schema + 53 adapters + 128 planner + 25 executor + 148 API + 161 web), 66 offline evaluations; typecheck/build, production-secret scan, 1 launcher and 3 local-environment checks pass.
 - `npm run test:browser:v3`: exit 0, 9/9 (default 5, clarification 1, partial failure 2, three-service 1). Real HTTP/SSE + PostgreSQL; sandbox planner/adapters. Esc leaves SQL plan status partial and sends no Stop; reopening allows Skip, and Stop transitions only after confirmation.
-- Desktop/mobile failure screenshots captured in a separate output directory. Local evidence: `C:/Users/VinhDat/.codex/visualizations/2026/10/01/01a0f5ad-f541-7050-a1fd-85db4dc484de/FE-01`. Raw logs/screenshots are not committed.
+- Desktop/mobile failure screenshots captured in a separate output directory. Local logs/screenshots are retained in the Codex FE-01 evidence directory. Raw logs/screenshots are not committed.
 - Setup failures were isolated: one fresh database lacked migrations; the second migration started before PostgreSQL accepted connections. Readiness was verified, migrations applied and the full gate rerun to exit 0.
 - Existing assertions changed only where they encoded the removed behavior: auto-admin quick fill, Esc-to-Stop, static healthy/unsupported samples, premature sample rendering, health JSON shape and inaccurate copy.
-- Independent review: pending. CI: pending PR.
+- Independent review: initial `ce98b60` not accepted until three findings were fixed; focused re-review accepts implementation `77743f6fce7d97e9d206258fdd2e1e8770477cc0`.
+- One fix pass: obsolete connection checks are ignored after a credential save and cache results are bound to a credential fingerprint. Two HTTP/PostgreSQL regressions were RED → GREEN, including obsolete success and obsolete failure after a newer successful check. A remaining absolute safety statement is replaced with write-approval/read-scope copy; disabled sample dimming is verified from real browser computed opacity (1 before fix, less than 1 after fix).
+- CI: the draft baseline passed; latest-head CI must be checked before Ready/merge. See PR checks for the current gate.
 
 ## Limits and next handoff
 
