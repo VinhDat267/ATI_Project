@@ -15,7 +15,7 @@ const text = (v: unknown, min: number, max: number): v is string => typeof v ===
 const identifier = (v: unknown): v is string => typeof v === 'string' && /^\d+$/.test(v);
 const adf = (value: string) => ({ version: 1, type: 'doc', content: value.split(/\r\n|\r|\n/).map(line => ({ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] })) });
 export function validJiraCredentials(value: Record<string, unknown>): boolean {
-  return typeof value.siteUrl === 'string' && value.siteUrl.trim() === value.siteUrl && JIRA_SITE_PATTERN.test(value.siteUrl) &&
+  return typeof value.siteUrl === 'string' && JIRA_SITE_PATTERN.test(value.siteUrl) &&
     typeof value.email === 'string' && /^[^\s:@]+@[^\s:@]+$/.test(value.email) && typeof value.apiToken === 'string' && Boolean(value.apiToken.trim());
 }
 

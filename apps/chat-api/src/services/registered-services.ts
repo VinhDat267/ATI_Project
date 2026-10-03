@@ -40,7 +40,7 @@ export function normalizeAllowedScope(definition: ServiceDefinition, value: unkn
 
 export function hasValidCredentials(fields: readonly { key: string; pattern?: string }[], value: unknown): value is Record<string, string> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && fields.every(
-    ({ key, pattern }) => typeof (value as Record<string, unknown>)[key] === 'string' && Boolean((value as Record<string, string>)[key]?.trim()) && (!pattern || new RegExp(pattern).exec((value as Record<string, string>)[key]!)?.[0] === (value as Record<string, string>)[key]),
+    ({ key, pattern }) => typeof (value as Record<string, unknown>)[key] === 'string' && Boolean((value as Record<string, string>)[key]?.trim()) && (!pattern || new RegExp(pattern).test((value as Record<string, string>)[key]!)),
   );
 }
 
