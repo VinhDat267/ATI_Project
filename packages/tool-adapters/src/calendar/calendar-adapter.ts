@@ -2,6 +2,7 @@ import { CALENDAR_ID_PATTERN, CALENDAR_TIME_PATTERN } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import { GlobalRateLimiter } from '../rate-limiter.js';
 import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../google/service-account.js';
+import { CALENDAR_MAX_TITLE_CHARS, clipText } from '../bounds.js';
 
 export interface CalendarAdapterConfig extends BaseAdapterConfig { credentials: GoogleServiceAccountCredentials; fetchFn?: typeof fetch }
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
@@ -49,7 +50,8 @@ function normalizedEvent(value: any, writing = false) {
   const start = value?.start?.dateTime ?? value?.start?.date;
   const end = value?.end?.dateTime ?? value?.end?.date;
   if (typeof value?.id !== 'string' || !value.id || typeof value.htmlLink !== 'string' || !value.htmlLink || typeof start !== 'string' || typeof end !== 'string') badResponse(writing);
-  return { id: value.id, title: typeof value.summary === 'string' ? value.summary : '(Không có tiêu đề)', start, end, url: value.htmlLink };
+  const title = clipText(typeof value.summary === 'string' ? value.summary : '(Không có tiêu đề)', CALENDAR_MAX_TITLE_CHARS);
+  return { id: value.id, title: title.text, start, end, url: value.htmlLink, ...(title.clipped ? { clipped: true } : {}) };
 }
 
 /** Calendar v3, explicit resource scope; indeterminate writes are never replayed. */
@@ -140,7 +142,11 @@ export class CalendarAdapter extends BaseAdapter {
       windowSize(args.timeMin, args.timeMax, 31); const maximum = limit(args.limit, 20);
       const params = new URLSearchParams({ timeMin: args.timeMin, timeMax: args.timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
       if (args.query !== undefined) params.set('q', text(args.query, 4000));
-      const events = []; const seenPages = new Set<string>();
+      const events: Array<ReturnType<typeof normalizedEvent>> = []; const seenPages = new Set<string>();
+      const done = () => {
+        const truncated = events.some(event => event.clipped);
+        return { events: events.map(({ clipped: _clipped, ...event }) => event), ...(truncated ? { truncated: true } : {}) };
+      };
       // Calendar can return an empty page with nextPageToken; empty is not necessarily complete.
       for (let page = 0; page < 20; page++) {
         const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
@@ -149,7 +155,7 @@ export class CalendarAdapter extends BaseAdapter {
           if (item?.status === 'cancelled') continue;
           events.push(normalizedEvent(item)); if (events.length >= maximum) break;
         }
-        if (events.length >= maximum || value.nextPageToken === undefined || value.nextPageToken === '') return { events };
+        if (events.length >= maximum || value.nextPageToken === undefined || value.nextPageToken === '') return done();
         if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
         seenPages.add(value.nextPageToken); params.set('pageToken', value.nextPageToken); params.set('maxResults', String(maximum - events.length));
       }
@@ -162,7 +168,8 @@ export class CalendarAdapter extends BaseAdapter {
         ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
         ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),
       };
-      return normalizedEvent(await this.request(encodeURIComponent(id) + '/events?sendUpdates=none', signal, body), true);
+      const { clipped: _clipped, ...created } = normalizedEvent(await this.request(encodeURIComponent(id) + '/events?sendUpdates=none', signal, body), true);
+      return created;
     }
     return invalid('tool is unsupported');
   }

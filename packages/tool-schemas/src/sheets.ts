@@ -21,9 +21,9 @@ export const SHEETS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'sheets.read_range', service: 'sheets', sideEffect: 'read', riskLevel: 'low',
-    description: 'Đọc vùng ô A1:B2 hoặc Tasks!A1:B2 trong bảng tính được cấp quyền, tối đa 50 dòng.',
+    description: 'Đọc vùng ô A1:B2 hoặc Tasks!A1:B2 trong bảng tính được cấp quyền, tối đa 50 dòng; mỗi dòng tối đa 26 cột, mỗi ô tối đa 500 ký tự, phần dài hơn bị cắt và kết quả có truncated: true.',
     inputSchema: input({ spreadsheetId, range: { type: 'string', minLength: 1, maxLength: 200 }, limit: { type: 'integer', minimum: 1, maximum: 50, default: 50 } }, ['spreadsheetId', 'range']),
-    outputSchema: output({ range: str, values: { type: 'array', items: { type: 'array', items: str } } }, ['range', 'values']),
+    outputSchema: output({ range: str, values: { type: 'array', items: { type: 'array', items: str } }, truncated: { type: 'boolean' } }, ['range', 'values']),
   },
   {
     name: 'sheets.append_rows', service: 'sheets', sideEffect: 'write', riskLevel: 'medium',
