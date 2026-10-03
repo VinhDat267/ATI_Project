@@ -85,6 +85,32 @@ it('classifies actual HTTP status before contradictory JSON codes', async () => 
   expect(fetchFn).toHaveBeenCalledTimes(2);
 });
 
+it.each([400, 401, 403, 404, 429, 503])('keeps a write UNKNOWN after HTTP %i conflicts with a success envelope, without replay', async status => {
+  const conflicting = new Response(JSON.stringify({ ok: true, result: message, parameters: { retry_after: 0 } }), { status });
+  const fetchFn = vi.fn().mockResolvedValueOnce(ok(chat)).mockResolvedValueOnce(conflicting).mockResolvedValueOnce(ok({ ...message, message_id: 43 }));
+  const thrown = await dispatch(make(fetchFn)).catch((e: any) => e);
+  expect(thrown).toBeInstanceOf(adapters.StepError);
+  expect(thrown).toMatchObject({ category: 'UNKNOWN', statusCode: status, retryable: false });
+  expect(fetchFn).toHaveBeenCalledTimes(2);
+  expect(thrown.message).not.toContain(token); expect(thrown.cause).toBeUndefined(); expect(thrown.details).toBeUndefined();
+});
+
+it('preserves a definite HTTP429 rejection retry with its body delay', async () => {
+  vi.useFakeTimers();
+  const fetchFn = vi.fn().mockResolvedValueOnce(ok(chat)).mockResolvedValueOnce(error(429, 429, { retry_after: 1 })).mockResolvedValueOnce(ok(message));
+  const pending = dispatch(make(fetchFn));
+  await vi.advanceTimersByTimeAsync(999); expect(fetchFn).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1); expect(await pending).toMatchObject({ messageId: 42 }); expect(fetchFn).toHaveBeenCalledTimes(3);
+});
+
+it('cancels the provider 429 wait without another send and sanitizes the abort reason', async () => {
+  const controller = new AbortController();
+  const fetchFn = vi.fn().mockResolvedValueOnce(ok(chat)).mockResolvedValueOnce(error(429, 200, { retry_after: 10 }));
+  const pending = dispatch(make(fetchFn), controller.signal).catch((e: any) => e);
+  await new Promise(resolve => setTimeout(resolve, 5)); controller.abort(new Error(token));
+  expect(await pending).toMatchObject({ category: 'NETWORK', retryable: false }); expect(fetchFn).toHaveBeenCalledTimes(2);
+});
+
 it('never auto-migrates an allowlisted group to a new unapproved ID', async () => {
   const fetchFn = vi.fn().mockResolvedValueOnce(ok(chat)).mockResolvedValueOnce(error(400, 200, { migrate_to_chat_id: -1009999999999 }));
   await expect(dispatch(make(fetchFn))).rejects.toMatchObject({ category: 'VALIDATION', retryable: false }); expect(fetchFn).toHaveBeenCalledTimes(2);

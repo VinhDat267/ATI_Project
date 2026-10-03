@@ -132,6 +132,11 @@ export class TelegramAdapter extends BaseAdapter {
       }
       let envelope: unknown;
       try { envelope = await response.json(); } catch { envelope = null; }
+      // A success envelope contradicting HTTP failure is not definite rejection:
+      // the provider may already have sent the message. Never recover/replay it.
+      if (write && (response.status < 200 || response.status >= 300) && record(envelope) && envelope.ok === true) {
+        throw fail('UNKNOWN', response.status);
+      }
       const code = response.status >= 400 ? response.status
         : record(envelope) && envelope.ok === false && integer(envelope.error_code, 400) ? envelope.error_code : undefined;
       if (code === 429) {

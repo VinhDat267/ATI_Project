@@ -48,7 +48,11 @@ it('integrates Telegram encrypted SQL credentials, HTTP health, factory and obse
     const seen: any[] = [];
     const plan = { kind: 'plan', thinking: 'Use observed chat', summary: 'Send plain text', warnings: [], steps: [{ id: 'send', tool: 'telegram.send_message', description: 'Send', args: { chatId: id, text: 'Plain' }, dependsOn: [] }] };
     const planner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm', gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }), provider: { name: 'contract-scripted', async generatePlan(input) { seen.push(input); return JSON.stringify(plan); } } });
-    expect((await planner.processMessage({ userMessage: 'Gửi Telegram', memory: new WorkingMemory() })).kind).toBe('plan');
+    const notification = 'Báo nhóm Telegram ATI Test là đã tạo issue';
+    expect((await planner.processMessage({ userMessage: notification, memory: new WorkingMemory() })).kind).toBe('plan');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].conversationHistory.at(-1)).toEqual({ role: 'user', content: notification });
+    expect(seen[0].toolCatalog.map((t: any) => t.name)).toEqual(['telegram.list_chats', 'telegram.send_message']);
     expect(seen[0].workingMemory.__observed.chat).toEqual([{ id, title: 'ATI Test' }]);
     const fabricated = structuredClone(plan); fabricated.steps[0]!.args.chatId = '-1009999999999';
     expect(validatePlan(JSON.stringify(fabricated), catalog, { grounding: { memory: seen[0].workingMemory, userTexts: [] } }).valid).toBe(false);
