@@ -1,0 +1,24 @@
+# Single account/workspace instance. No paid resource or local demo data.
+services:
+  - type: web
+    name: planora-api
+    runtime: node
+    plan: free
+    region: singapore
+    numInstances: 1
+    buildCommand: npm ci --include=dev && node apps/chat-api/deploy/build.mjs
+    startCommand: node db/v3/migrate.mjs && node apps/chat-api/deploy/dist/server.mjs
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_BASE_URL
+        value: https://planora-ivory-tau.vercel.app/
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true

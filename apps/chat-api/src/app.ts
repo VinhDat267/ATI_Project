@@ -34,16 +34,25 @@ export interface AppOptions {
   chatService?: ChatService;
   sseManager?: SSEManager;
   executionService?: ExecutionService;
+  allowedOrigins?: string[];
+  trustProxy?: number;
 }
 
 export function createApp(options: AppOptions): Express {
   const app = express();
 
+  if (options.trustProxy !== undefined) app.set('trust proxy', options.trustProxy);
+
   app.use(express.json());
 
   // CORS middleware
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const origin = req.get('origin');
+    if (!options.allowedOrigins) res.setHeader('Access-Control-Allow-Origin', '*');
+    else {
+      res.vary('Origin');
+      if (origin && options.allowedOrigins.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
     if (req.method === 'OPTIONS') {
@@ -86,7 +95,7 @@ export function createApp(options: AppOptions): Express {
   }
 
   // Conversation routes (protected via Bearer header)
-  if (options.convRepo && options.msgRepo && options.chatService) {
+  if (options.convRepo && options.msgRepo) {
     app.use(
       '/api/conversations',
       authMiddleware,
