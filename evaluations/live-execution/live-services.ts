@@ -1,5 +1,5 @@
-import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter } from '@wap/tool-adapters';
-import { getServiceDefinition } from '@wap/tool-schemas';
+import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter } from '@wap/tool-adapters';
+import { ALL_TOOLS, getServiceDefinition } from '@wap/tool-schemas';
 import type { LiveService } from './harness.js';
 
 export interface LiveServiceDefinition {
@@ -16,6 +16,15 @@ export interface LiveServiceDefinition {
 
 /** Existing env names remain stable; future services add one entry here. */
 export const LIVE_SERVICES: LiveServiceDefinition[] = [
+  {
+    id: 'calendar', credentials: { clientEmail: 'GOOGLE_CLIENT_EMAIL', privateKey: 'GOOGLE_PRIVATE_KEY' },
+    scopeKey: 'calendars', scopeEnv: 'LIVE_CALENDAR_IDS',
+    missingCredentials: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required',
+    missingScope: 'LIVE_CALENDAR_IDS must list calendar ids',
+    scopePattern: getServiceDefinition('calendar')!.scopePattern,
+    invalidScope: 'LIVE_CALENDAR_IDS entries must be explicit calendar ids',
+    createAdapter: ({ credentials, allowedScope }) => new CalendarAdapter({ credentials: { clientEmail: credentials.clientEmail!, privateKey: credentials.privateKey! }, allowedScope }),
+  },
   {
     id: 'sheets', credentials: { clientEmail: 'GOOGLE_CLIENT_EMAIL', privateKey: 'GOOGLE_PRIVATE_KEY' },
     scopeKey: 'spreadsheets', scopeEnv: 'LIVE_SHEETS_SPREADSHEET_IDS',
@@ -47,3 +56,21 @@ export const LIVE_SERVICES: LiveServiceDefinition[] = [
     createAdapter: ({ credentials, allowedScope }) => new GitHubAdapter({ credentials: { token: credentials.token! }, allowedScope }),
   },
 ];
+
+/** Read-only reachability based on directory contracts, including observed child scopes. */
+export async function checkLiveService(service: string, adapter: ReturnType<LiveServiceDefinition['createAdapter']>): Promise<number> {
+  const listable = ALL_TOOLS.filter(tool => tool.service === service && tool.sideEffect === 'read' && tool.listable);
+  const resourceArguments = (tool: typeof ALL_TOOLS[number]) => Object.entries<any>(tool.inputSchema.properties ?? {})
+    .filter(([, property]) => property['x-resource']);
+  const directory = listable.find(tool => resourceArguments(tool).length === 0);
+  if (!directory) throw new Error('Service has no registered directory');
+  const resources = await adapter.execute(directory.name, { query: '', limit: 10 });
+  if (!Array.isArray(resources) || resources.length === 0) throw new Error('Service has no allowlisted resource visible to these credentials');
+  // Preserve the existing board/list reachability check; Sheets tabs follow the same contract.
+  const children = listable.filter(tool => resourceArguments(tool).length === 1 && resourceArguments(tool)[0]![1]['x-resource'] === directory.discovers);
+  for (const child of children) for (const resource of resources) {
+    const argument = resourceArguments(child)[0]![0];
+    await adapter.execute(child.name, { query: '', limit: 10, [argument]: resource.id });
+  }
+  return resources.length;
+}

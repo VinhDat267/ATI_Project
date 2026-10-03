@@ -65,7 +65,15 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_3', tool: 'slack.send_message', description: 'Thông báo vùng đã cập nhật', args: { channel: '#general', text: { $template: 'Đã thêm dòng vào Google Sheets: ${step_2.output.updatedRange}' } }, dependsOn: ['step_2'] },
     ],
   };
-  mockProvider.setPlanResponses([scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  const calendarPlan = {
+    kind: 'plan', thinking: 'Tạo sự kiện trong lịch thử nghiệm đã tìm thấy, rồi gửi liên kết và giờ bắt đầu qua Slack.',
+    summary: 'Tạo lịch họp Google Calendar và thông báo Slack', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'calendar.create_event', description: 'Tạo sự kiện review', args: { calendarId: 'ati@group.calendar.google.com', summary: 'ATI Review', start: '2026-10-09T15:00:00+07:00', end: '2026-10-09T16:00:00+07:00' }, dependsOn: [] },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo liên kết và giờ bắt đầu', args: { channel: '#general', text: { $template: 'Lịch họp: ${step_1.output.url}; bắt đầu: ${step_1.output.start}' } }, dependsOn: ['step_1'] },
+    ],
+  };
+  mockProvider.setPlanResponses([scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
   return mockProvider;
 }
 
