@@ -81,7 +81,23 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo liên kết biên bản', args: { channel: '#general', text: { $template: 'Biên bản: ${step_1.output.url}' } }, dependsOn: ['step_1'] },
     ],
   };
-  mockProvider.setPlanResponses([scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  const telegramPlan = {
+    kind: 'plan', thinking: 'Gửi văn bản vào chat Telegram đã tìm thấy, rồi chuyển messageId qua Slack.',
+    summary: 'Gửi Telegram và thông báo mã tin nhắn qua Slack', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'telegram.send_message', description: 'Gửi văn bản thuần', args: { chatId: '-1001234567890', text: 'ATI Test sandbox' }, dependsOn: [] },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo mã tin nhắn', args: { channel: '#general', text: { $template: 'Telegram message: ${step_1.output.messageId}' } }, dependsOn: ['step_1'] },
+    ],
+  };
+  const jiraPlan = {
+    kind: 'plan', thinking: 'Tạo ticket Jira trong project đã tìm thấy và chuyển key/URL sang thông báo Slack.',
+    summary: 'Tạo ticket Jira và thông báo Slack', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'jira.create_issue', description: 'Tạo ticket lỗi đăng nhập', args: { projectKey: 'ATI', summary: 'Login bug', description: 'Mô tả thuần trong sandbox' }, dependsOn: [] },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo key và liên kết ticket', args: { channel: '#general', text: { $template: 'Jira: ${step_1.output.key}; ${step_1.output.url}' } }, dependsOn: ['step_1'] },
+    ],
+  };
+  mockProvider.setPlanResponses([scenario === 'jira_slack' ? jiraPlan : scenario === 'telegram_slack' ? telegramPlan : scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
   return mockProvider;
 }
 

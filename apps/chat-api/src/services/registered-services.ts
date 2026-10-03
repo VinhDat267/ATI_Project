@@ -8,9 +8,11 @@ import { GITHUB_TRANSPORT } from './transports/github.js';
 import { SHEETS_TRANSPORT } from './transports/sheets.js';
 import { CALENDAR_TRANSPORT } from './transports/calendar.js';
 import { NOTION_TRANSPORT } from './transports/notion.js';
+import { TELEGRAM_TRANSPORT } from './transports/telegram.js';
+import { JIRA_TRANSPORT } from './transports/jira.js';
 
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
-  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT].map(transport => [transport.id, transport]),
+  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT, TELEGRAM_TRANSPORT, JIRA_TRANSPORT].map(transport => [transport.id, transport]),
 );
 
 export function getRegisteredServices(): ServiceDefinition[] {
@@ -36,9 +38,9 @@ export function normalizeAllowedScope(definition: ServiceDefinition, value: unkn
   return { [scopeKey]: [...new Set(entries.map(entry => definition.normalizeScopeEntry?.(entry) ?? entry))] };
 }
 
-export function hasValidCredentials(fields: readonly { key: string }[], value: unknown): value is Record<string, string> {
+export function hasValidCredentials(fields: readonly { key: string; pattern?: string }[], value: unknown): value is Record<string, string> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && fields.every(
-    ({ key }) => typeof (value as Record<string, unknown>)[key] === 'string' && Boolean((value as Record<string, string>)[key]?.trim()),
+    ({ key, pattern }) => typeof (value as Record<string, unknown>)[key] === 'string' && Boolean((value as Record<string, string>)[key]?.trim()) && (!pattern || new RegExp(pattern).test((value as Record<string, string>)[key]!)),
   );
 }
 

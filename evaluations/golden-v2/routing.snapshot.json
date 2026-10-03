@@ -549,7 +549,9 @@
       "github",
       "sheets",
       "calendar",
-      "notion"
+      "notion",
+      "telegram",
+      "jira"
     ]
   },
   {
@@ -775,7 +777,9 @@
       "github",
       "sheets",
       "calendar",
-      "notion"
+      "notion",
+      "telegram",
+      "jira"
     ]
   },
   {

@@ -15,16 +15,16 @@ import {
 } from '../src/index.js';
 
 describe('packages/tool-schemas (Task 2)', () => {
-  it('exports 27 unique tools across six registered services', () => {
-    expect(ALL_TOOLS).toHaveLength(27);
+  it('exports 33 unique tools across eight registered services', () => {
+    expect(ALL_TOOLS).toHaveLength(33);
     expect(TRELLO_TOOLS).toHaveLength(9);
     expect(SLACK_TOOLS).toHaveLength(2);
     expect(GITHUB_TOOLS).toHaveLength(5);
 
     const names = ALL_TOOLS.map((t) => t.name);
     const uniqueNames = new Set(names);
-    expect(uniqueNames.size).toBe(27);
-    expect(new Set(SERVICE_REGISTRY.map((service) => service.id)).size).toBe(6);
+    expect(uniqueNames.size).toBe(33);
+    expect(new Set(SERVICE_REGISTRY.map((service) => service.id)).size).toBe(8);
     for (const tool of ALL_TOOLS) {
       expect(getServiceDefinition(tool.service)).toBeDefined();
     }
@@ -60,9 +60,9 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(getToolDefinition('unknown.tool')).toBeUndefined();
   });
 
-  it('should enforce search_* read tools to have query or boardId and limit <= 10', () => {
+  it('bounds search tools by directory limit10 or explicit search limit20', () => {
     const readTools = ALL_TOOLS.filter((t) => t.sideEffect === 'read');
-    expect(readTools).toHaveLength(16);
+    expect(readTools).toHaveLength(19);
 
     for (const tool of readTools) {
       expect(tool.riskLevel).toBe('low');
@@ -71,14 +71,14 @@ describe('packages/tool-schemas (Task 2)', () => {
 
       if (tool.name.includes('.search_')) {
         expect(tool.inputSchema.properties.limit).toBeDefined();
-        expect(tool.inputSchema.properties.limit.maximum).toBeLessThanOrEqual(10);
+        expect(tool.inputSchema.properties.limit.maximum).toBeLessThanOrEqual(tool.listable ? 10 : 20);
       }
     }
   });
 
   it('should enforce write tools risk levels per spec v3', () => {
     const writeTools = ALL_TOOLS.filter((t) => t.sideEffect === 'write');
-    expect(writeTools).toHaveLength(11);
+    expect(writeTools).toHaveLength(14);
 
     // Trello writes are low risk
     const trelloWrites = writeTools.filter((t) => t.service === 'trello');
@@ -146,12 +146,14 @@ describe('search tools declare the resources they discover', () => {
       'github.search_repos': 'repository',
       'github.search_issues': 'issue',
       'notion.search_databases': 'database',
+      'jira.search_projects': 'project',
+      'jira.search_issues': 'jira_issue',
     });
   });
 
   it('marks the search tools that can enumerate a resource with an empty query', () => {
     expect(ALL_TOOLS.filter((t) => t.listable).map((t) => t.name).sort()).toEqual([
-      'calendar.list_calendars', 'github.search_repos', 'notion.search_databases', 'sheets.list_sheets', 'sheets.list_spreadsheets', 'slack.search_channels', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
+      'calendar.list_calendars', 'github.search_repos', 'jira.search_projects', 'notion.search_databases', 'sheets.list_sheets', 'sheets.list_spreadsheets', 'slack.search_channels', 'telegram.list_chats', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
     ]);
     for (const tool of ALL_TOOLS.filter((t) => t.listable)) expect(tool.discovers, tool.name).toBeDefined();
   });
