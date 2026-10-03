@@ -19,7 +19,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | xong, #29 tại `c7a38c0`; đã chốt ngoại lệ `rf06` |
 | 3 | Giao diện cấu hình lấy nhãn/tên từ API, ô `multiline`, câu từ chối nêu tên service còn thiếu | [W3-00b](tasks/W3-00b-frontend-and-refusal-naming.md) | chờ (sau W3-00, không chặn task service) |
 | 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | xong, #30 tại `716f568`; Google thật chưa nghiệm thu |
-| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | đang làm, `vinhdat/feat-w3-02-google-calendar` (sau #30) |
+| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | xong, #31 tại `ab2c599`; Google thật chưa nghiệm thu |
 | 3 | Notion | [W3-03](tasks/W3-03-notion.md) | chờ (sau W3-00) |
 | 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | chờ (sau W3-00) |
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | chờ (sau W3-00) |
@@ -45,7 +45,7 @@ W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/f
 
 Yêu cầu chung cho mọi task thêm service: [W3-service-common](tasks/W3-service-common.md).
 
-Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`, nên có thể bắt đầu W3-01, W3-03, W3-04, W3-05 (mỗi task service chỉ thêm file mới và một dòng ở các danh sách đăng ký). W3-02 chờ W3-01; phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service ngay khi service đó merge. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
+Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`; W3-01 Sheets qua #30 tại `716f568`, W3-02 Calendar qua #31 tại `ab2c599`. Task service tiếp theo là W3-03 Notion, rồi W3-04 Telegram và W3-05 Jira (mỗi task service thêm file mới và nối vào các danh sách đăng ký, không thêm nhánh theo service trong lõi). Phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service ngay khi service đó merge; Google/model thật chưa được nghiệm thu qua test sandbox/CI. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
 
 **Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
 
