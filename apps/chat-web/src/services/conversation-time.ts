@@ -21,4 +21,3 @@ export function formatConversationTime(dateStr?: string): string {
   }
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
-
