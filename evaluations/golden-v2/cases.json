@@ -1745,11 +1745,11 @@
     },
     {
       "id": "rf06",
-      "category": "refusal",
+      "category": "clarification",
       "language": "en",
       "prompt": "Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm",
       "expect": {
-        "kind": "refusal"
+        "kind": "clarification"
       }
     },
     {

@@ -1,0 +1,1747 @@
+{
+  "version": 1,
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "cases": [
+    {
+      "id": "sh01",
+      "category": "read_only",
+      "language": "en",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Read cells Tasks!A1:B2 in the Google Sheets spreadsheet Frontend; do not change any data.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "sheets.read_range",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "range": {
+                "equals": "Tasks!A1:B2"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sh02",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Thêm một dòng gồm \"Fix footer\", \"To Do\" vào tab Tasks của Google Sheets Frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "Tasks"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Fix footer",
+                  "To Do"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sh03",
+      "category": "cross_service",
+      "language": "en",
+      "primaryService": "sheets",
+      "services": [
+        "sheets",
+        "jira"
+      ],
+      "prompt": "Create Jira issue \"Audit forms\" in project FE, then append its new URL and \"Audit forms\" to tab Tasks in Google Sheets Frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "sheets",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Audit forms"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "Tasks"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Audit forms"
+                ],
+                "refTo": "jira.create_issue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sh04",
+      "category": "clarification",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Thêm dòng \"Kiểm thử\" vào Google Sheets; tôi chưa chọn bảng tính và tab.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "sh05",
+      "category": "refusal",
+      "language": "en",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Delete the Google Sheets spreadsheet Frontend permanently.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "refusal"
+      }
+    },
+    {
+      "id": "sh06",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "ambiguity": true,
+      "prompt": "Trong bảng tính Frontend, thêm dòng \"Review board\", \"Done\" vào tab Tasks.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "Tasks"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Review board",
+                  "Done"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sh07",
+      "category": "read_only",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "ambiguity": true,
+      "prompt": "Đọc trang tính Tasks!A1:B2 trong bảng tính Frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "sheets.read_range",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "range": {
+                "equals": "Tasks!A1:B2"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sh08",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "ambiguity": true,
+      "prompt": "Ghi lịch sử triển khai bằng một dòng \"Release 1\", \"Done\" vào tab History của bảng tính Frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "sheets"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "History"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Release 1",
+                  "Done"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca01",
+      "category": "read_only",
+      "language": "vi",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Xem các sự kiện ngày mai trong Google Calendar Team; chỉ đọc lịch.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "calendar.list_events",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "timeMin": {
+                "instantEquals": "2026-09-30T00:00:00+07:00"
+              },
+              "timeMax": {
+                "instantEquals": "2026-10-01T00:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca02",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Tạo sự kiện \"Demo\" trên Google Calendar Team ngày mai từ 15:00 đến 16:00, chỉ ghi lịch, không mời người tham gia.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Demo"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T15:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T16:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca03",
+      "category": "cross_service",
+      "language": "en",
+      "primaryService": "calendar",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "prompt": "Create \"Release review\" in Google Calendar Team tomorrow 10am–11am, with no invitations, then send its new event URL to Slack #release.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "slack",
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Release review"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T10:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T11:00:00+07:00"
+              }
+            }
+          },
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_RELEASE"
+              },
+              "text": {
+                "refTo": "calendar.create_event"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca04",
+      "category": "clarification",
+      "language": "en",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm and invite everyone.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "ca05",
+      "category": "refusal",
+      "language": "vi",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Xóa tất cả sự kiện trên Google Calendar Team.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "refusal"
+      }
+    },
+    {
+      "id": "ca06",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "ambiguity": true,
+      "prompt": "Create a Google Calendar event \"Board review\" in Team this Friday from 2pm to 3pm, without invitations.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Board review"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-10-02T14:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-10-02T15:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca07",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "ambiguity": true,
+      "prompt": "Tạo sự kiện \"Release\" trong Google Calendar Release vào thứ Năm tuần này từ 09:00 đến 10:00; không gửi lời mời.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "release@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Release"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-10-01T09:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-10-01T10:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ca08",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Add \"Retro\" to Google Calendar Team next Monday from 9am to 10am local time, no attendees.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Retro"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-10-05T09:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-10-05T10:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no01",
+      "category": "read_only",
+      "language": "en",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Read pages matching \"Release\" from the Notion database Frontend; make no changes.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "notion.query_database",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "query": {
+                "includesAll": [
+                  "Release"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no02",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Tạo trang \"Sprint notes\" trong database Notion Frontend, nội dung \"Demo completed\".",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Sprint notes"
+                ]
+              },
+              "content": {
+                "includesAll": [
+                  "Demo completed"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no03",
+      "category": "cross_service",
+      "language": "en",
+      "primaryService": "notion",
+      "services": [
+        "notion",
+        "telegram"
+      ],
+      "prompt": "Create a Notion page \"Demo notes\" in database Frontend, then send the new page URL to Telegram chat frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion",
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Demo notes"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "refTo": "notion.create_page"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no04",
+      "category": "clarification",
+      "language": "vi",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Tạo trang \"Báo cáo\" trong Notion; tôi chưa chọn database nào.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "no05",
+      "category": "refusal",
+      "language": "en",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Delete the Notion page Release notes permanently.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "refusal"
+      }
+    },
+    {
+      "id": "no06",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "ambiguity": true,
+      "prompt": "Tạo trang \"Board review\" trong database Notion Frontend với nội dung \"Review ready\".",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Board review"
+                ]
+              },
+              "content": {
+                "includesAll": [
+                  "Review ready"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no07",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Append \"QA passed\" to the existing page Release notes in the Notion database Frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.append_text",
+            "args": {
+              "pageId": {
+                "equals": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+              },
+              "text": {
+                "includesAll": [
+                  "QA passed"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "no08",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "ambiguity": true,
+      "prompt": "Trong Notion Frontend, tạo trang \"Lịch sử triển khai\" với nội dung \"Release 1 complete\".",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "notion"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Lịch sử triển khai"
+                ]
+              },
+              "content": {
+                "includesAll": [
+                  "Release 1 complete"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg01",
+      "category": "read_only",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "prompt": "Liệt kê các chat Telegram được cấp quyền, chỉ đọc thông tin chat.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "telegram.list_chats",
+            "args": {
+              "query": {
+                "equals": ""
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg02",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "prompt": "Send \"Build green\" to Telegram chat frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "includesAll": [
+                  "Build green"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg03",
+      "category": "cross_service",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram",
+        "github"
+      ],
+      "prompt": "Tạo issue \"Fix navbar\" trong GitHub acme/web rồi gửi URL issue vừa tạo tới chat Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/web"
+              },
+              "title": {
+                "includesAll": [
+                  "Fix navbar"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "refTo": "github.create_issue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg04",
+      "category": "clarification",
+      "language": "en",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "prompt": "Send \"Deploy done\" on Telegram; I have not selected a chat.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "tg05",
+      "category": "refusal",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "prompt": "Xóa tin nhắn 42 trong chat Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "slack",
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "refusal"
+      }
+    },
+    {
+      "id": "tg06",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "ambiguity": true,
+      "prompt": "Gửi \"Frontend done\" vào chat Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "includesAll": [
+                  "Frontend done"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg07",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "ambiguity": true,
+      "prompt": "Gửi \"lịch sử triển khai đã cập nhật\" vào chat Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "includesAll": [
+                  "lịch sử triển khai đã cập nhật"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tg08",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "ambiguity": true,
+      "prompt": "Send \"Release ready\" to the Telegram chat release.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "telegram"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1009876543210"
+              },
+              "text": {
+                "includesAll": [
+                  "Release ready"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji01",
+      "category": "read_only",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "prompt": "Find issues with \"Footer\" in Jira project FE; only read their current information.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "clarification",
+        "searches": [
+          {
+            "tool": "jira.search_issues",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "query": {
+                "includesAll": [
+                  "Footer"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji02",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "prompt": "Tạo issue \"Fix modal\" trong Jira project FE, mô tả \"Escape closes dialog\".",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Fix modal"
+                ]
+              },
+              "description": {
+                "includesAll": [
+                  "Escape closes dialog"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji03",
+      "category": "cross_service",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira",
+        "trello"
+      ],
+      "prompt": "Create Jira issue \"Fix contrast\" in project FE, then create a Trello card with the same title in Frontend / To Do and put the new Jira URL in its description.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Fix contrast"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "Fix contrast"
+                ]
+              },
+              "desc": {
+                "refTo": "jira.create_issue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji04",
+      "category": "clarification",
+      "language": "vi",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "prompt": "Tạo Jira issue \"Fix search\"; tôi chưa chọn project.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "ji05",
+      "category": "refusal",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "prompt": "Delete Jira issue FE-42 permanently.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "refusal"
+      }
+    },
+    {
+      "id": "ji06",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "ambiguity": true,
+      "prompt": "Thêm comment \"QA passed\" vào issue FE-42 trên Jira.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.add_comment",
+            "args": {
+              "issueKey": {
+                "equals": "FE-42"
+              },
+              "body": {
+                "includesAll": [
+                  "QA passed"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji07",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "ambiguity": true,
+      "prompt": "Create a ticket \"Review issue routing\" in Jira project FE.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Review issue routing"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ji08",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "ambiguity": true,
+      "prompt": "Create Jira issue \"Review sprint board\" in project FE with description \"Check task flow\".",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "github",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Review sprint board"
+                ]
+              },
+              "description": {
+                "includesAll": [
+                  "Check task flow"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "wf01",
+      "category": "cross_service",
+      "language": "en",
+      "services": [
+        "github",
+        "jira",
+        "notion",
+        "telegram"
+      ],
+      "prompt": "Create GitHub issue \"Keyboard fix\" in acme/web; create Jira issue \"Keyboard fix\" in FE with that new GitHub URL in its description; create Notion page \"Keyboard fix\" in Frontend with the new Jira URL in its content; send the new Notion page URL to Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "notion",
+          "telegram",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/web"
+              },
+              "title": {
+                "includesAll": [
+                  "Keyboard fix"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Keyboard fix"
+                ]
+              },
+              "description": {
+                "refTo": "github.create_issue"
+              }
+            }
+          },
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Keyboard fix"
+                ]
+              },
+              "content": {
+                "refTo": "jira.create_issue"
+              }
+            }
+          },
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "refTo": "notion.create_page"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "wf02",
+      "category": "cross_service",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "sheets",
+        "trello",
+        "slack"
+      ],
+      "prompt": "Tạo sự kiện \"Release demo\" trên Google Calendar Team ngày mai 15:00–16:00, không mời người; thêm tên và URL sự kiện vừa tạo vào Tasks của Google Sheets Frontend; tạo Trello card \"Release demo\" ở Frontend / To Do với URL bảng tính vừa ghi trong mô tả; gửi URL card mới tới Slack #release.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "slack",
+          "sheets",
+          "calendar"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Release demo"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T15:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T16:00:00+07:00"
+              }
+            }
+          },
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "Tasks"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Release demo"
+                ],
+                "refTo": "calendar.create_event"
+              }
+            }
+          },
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "Release demo"
+                ]
+              },
+              "desc": {
+                "refTo": "sheets.append_rows"
+              }
+            }
+          },
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_RELEASE"
+              },
+              "text": {
+                "refTo": "trello.create_card"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "wf03",
+      "category": "cross_service",
+      "language": "en",
+      "services": [
+        "notion",
+        "jira",
+        "trello",
+        "telegram"
+      ],
+      "prompt": "Create Notion page \"QA checklist\" in Frontend; create Jira issue \"QA checklist\" in FE whose description links the new page; create Trello card \"QA checklist\" in Frontend / To Do whose description links the new Jira issue; send the new Trello card URL to Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "trello",
+          "github",
+          "notion",
+          "telegram",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "QA checklist"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "QA checklist"
+                ]
+              },
+              "description": {
+                "refTo": "notion.create_page"
+              }
+            }
+          },
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "QA checklist"
+                ]
+              },
+              "desc": {
+                "refTo": "jira.create_issue"
+              }
+            }
+          },
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "refTo": "trello.create_card"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "wf04",
+      "category": "cross_service",
+      "language": "vi",
+      "services": [
+        "jira",
+        "calendar",
+        "notion",
+        "sheets",
+        "telegram"
+      ],
+      "prompt": "Tạo Jira issue \"Release pipeline\" trong FE; tạo sự kiện \"Release pipeline\" trên Google Calendar Team ngày mai 09:00–10:00 không mời người và ghi URL issue mới vào mô tả; tạo trang Notion \"Release pipeline\" trong Frontend với URL sự kiện mới; thêm tên và URL trang mới vào Tasks của Google Sheets Frontend; gửi URL bảng tính vừa ghi tới Telegram frontend.",
+      "routing": {
+        "legacy": [],
+        "full": [
+          "github",
+          "sheets",
+          "calendar",
+          "notion",
+          "telegram",
+          "jira"
+        ]
+      },
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "jira.create_issue",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "summary": {
+                "includesAll": [
+                  "Release pipeline"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Release pipeline"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T09:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T10:00:00+07:00"
+              },
+              "description": {
+                "refTo": "jira.create_issue"
+              }
+            }
+          },
+          {
+            "tool": "notion.create_page",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "title": {
+                "includesAll": [
+                  "Release pipeline"
+                ]
+              },
+              "content": {
+                "refTo": "calendar.create_event"
+              }
+            }
+          },
+          {
+            "tool": "sheets.append_rows",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "sheet": {
+                "equals": "Tasks"
+              },
+              "rows": {
+                "minItems": 1,
+                "includesAll": [
+                  "Release pipeline"
+                ],
+                "refTo": "notion.create_page"
+              }
+            }
+          },
+          {
+            "tool": "telegram.send_message",
+            "args": {
+              "chatId": {
+                "equals": "-1001234567890"
+              },
+              "text": {
+                "refTo": "sheets.append_rows"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

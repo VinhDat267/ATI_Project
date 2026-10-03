@@ -3,8 +3,11 @@
 ## Golden set v2 (labelled)
 
 `golden-v2/cases.json` holds 50 planner cases across the spec's five
-categories: 10 single-step, 10 multi-step, 15 cross-service, 8 clarification
-and 7 refusal, in Vietnamese and English, twelve of them using GitHub.
+categories: 10 single-step, 10 multi-step, 15 cross-service, 9 clarification
+and 6 refusal, in Vietnamese and English, twelve of them using GitHub.
+W3-06 changes only `rf06` to the user-approved clarification label; historical
+reports below retain their original labels. See the
+[label audit](golden-v2/label-audit-w3-06.md).
 
 - **Labels.** Each expected step labels its arguments: exact resource IDs,
   deadline dates relative to the fixed clock in the file (Tuesday 2026-09-29,
@@ -38,6 +41,142 @@ LIVE_EVAL=1 EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/
 `EVAL_DRY_RUN=1` replaces the provider with a mock to check the wiring without
 LLM calls. Evidence is written to `docs/ai-evidence/V3-GOLDEN-V2/`. Plans are
 never executed, so a pass says nothing about live Trello/Slack/GitHub behaviour.
+
+### W3-06: eight-service catalog
+
+`golden-v2/cases-services.json` preregisters 44 cases: eight for each new
+service and four workflows spanning at least four services (at least two new).
+Thirteen cases exercise ambiguous vocabulary or names shared between services.
+Fixtures expose the real adapter output shapes for spreadsheets/tabs, calendars,
+Notion databases/pages, Telegram chats and Jira projects/issues. Only synthetic
+fixture data is read; no service adapter executes a plan.
+
+- User-approved `rf06` label: commit `1ab7f08`, before provider calls.
+- New-service labels: commit `20fa6f0`, before provider calls.
+- The other 49 core cases and all 18 freeform cases retain their prompts,
+  categories, memory and expectations. Compare those 67 cases separately to
+  the 2026-10-01 single-run baseline; report `rf06` separately.
+- The bounded legacy routing exception for unavailable Calendar remains
+  attached only to that exact `rf06` request. The other 67 legacy requests
+  cannot become unavailable-service refusals. All 44 new requests fail closed
+  with only the three old services configured; the full-catalog routes are
+  preregistered in each case.
+
+```bash
+LIVE_EVAL=1 EVAL_SET=services PLANNER_SEARCH_MODE=llm EVAL_RUNS=3 EVAL_CONCURRENCY=2 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+Run the same command with `EVAL_SET=core` and `EVAL_SET=freeform`.
+`PLANNER_SEARCH_MODE` and `EVAL_SEARCH_MODE` are aliases; conflicting values
+are rejected. Live runs reject uncommitted labels or evaluation source.
+Reports record label commits/hashes, source commit/trees, fixture/catalog
+fingerprints, served models, successful/failed read traces, completed attempts
+and latency. A provider failure cancels in-flight requests and stops scheduling;
+the incomplete campaign is kept separate. Restart measurement only after a
+fresh probe following a relevant gateway/provider state change.
+
+Per-service tool/argument scores use only that service's labelled steps within
+each workflow, with explicit denominators. Read requests require actual
+successful gather calls with labelled arguments; returning a clarification
+alone is insufficient. Clarification/refusal cases contribute to kind and
+strict-pass scores, not the tool denominator. Argument quality is conditional
+on correct tools; latency is the entire request involving the service.
+
+The planner protocol currently has no read-answer response kind. The prompt
+instructs write-only plan steps, but the production validator does not enforce
+that side-effect restriction: it accepted three read-only plans in this run.
+Read-only cases preregister a clarification plus successful read calls;
+read-tool scores and response-kind failures are reported separately. These
+results do not establish usable answers to read-only requests. Answer policy
+and enforcement of the prompt rule require a separate product follow-up.
+Text matchers check selected keywords/references rather than complete semantic
+correctness. Quoted A1 ranges and other unlabelled equivalent representations
+may conservatively miss an exact matcher. Calendar timestamps use equivalent
+explicit-offset instants; new row matchers inspect nested text/references.
+Usable-plan acceptance remains unmeasured, and the product quality gate stays
+incomplete even if the two numeric targets pass. Changing prompt/planner to
+improve scores requires a separate task and a fresh full measurement.
+
+#### W3-06 measured results — 2026-10-03
+
+Source `7ba60ef`, 33 tools/eight services, model `ag/gemini-3.8-flash` through
+the existing local gateway; every successful completion reported
+`gemini-3.8-flash`. All three complete campaigns used `llm` search, concurrency
+two, three runs per case, and the same source/fixture/catalog fingerprints.
+
+| Set | Strict pass | Tool selection | Arguments | p50 / p95 |
+|---|---|---|---|---|
+| [Core 50](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-10-03T10-59-01-095Z/summary.md) | 150/150 | 100% | 100% | 5.454 / 13.105 s |
+| [Freeform 18](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-10-03T11-07-19-521Z/summary.md) | 51/54 | 92.3% | 100% | 5.942 / 13.092 s |
+| [Services 44](../docs/ai-evidence/V3-GOLDEN-V2/services-llm-2026-10-03T11-10-25-012Z/summary.md) | 111/132 | 100% | 97.1% | 6.105 / 31.097 s |
+
+The new-service scores below meet the 85% tool/75% argument thresholds. They
+do **not** establish usable-plan acceptance or correct read-only answers.
+
+| Service | Distinct cases | Tool attempts | Correct-tool argument attempts | Tools | Arguments | p50 / p95 |
+|---|---|---|---|---|---|---|
+| Sheets | 10 | 24 | 24 | 100% | 100% | 7.037 / 29.239 s |
+| Calendar | 10 | 24 | 24 | 100% | 87.5% | 7.653 / 32.040 s |
+| Notion | 11 | 27 | 27 | 100% | 100% | 7.515 / 25.306 s |
+| Telegram | 12 | 30 | 30 | 100% | 100% | 5.185 / 33.187 s |
+| Jira | 12 | 30 | 30 | 100% | 100% | 7.325 / 24.818 s |
+
+Per-service case totals overlap because the same workflow can involve several
+services. The numeric scores isolate each service's labelled arguments; strict
+pass remains the complete request score. All four large workflows passed all
+three runs (12/12).
+
+**Unchanged-label comparison.** The baseline reports from
+[core on 01/10](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-10-01T03-27-51-184Z/summary.md)
+and [freeform on 01/10](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-10-01T03-24-59-750Z/summary.md)
+record label commits `5fccffd` and `695ad87`. A semantic comparison confirms
+that only `rf06` changed. The other 49 core cases passed 147/147, versus 49/49
+in the historical run. Changed-label `rf06` passed 3/3 separately.
+Freeform fell from 18/18 to 51/54; `ff15` was 0/3. Its unchanged prompt,
+“Let the frontend team know the deploy finished”, expects Slack. The expanded
+workspace has both Slack `#frontend` and Telegram `frontend`; the model asks
+which service to use in all three runs. The spec requires clarification for
+ambiguity. This is an observed score decline under the old oracle and expanded
+context, not proof that a safer clarification is a semantic regression.
+No label was changed to fit the result, and the no-decline criterion is unmet.
+
+**Other failures.** `sh01`, `sh07`, `ca01`, `no01`, `tg01`, `ji01` were 0/3:
+the required read calls succeeded, but the 18 final responses were
+**15 refusals / 3 plans / 0 clarifications**. The production validator accepted
+`sh07` runs 1 and 3 with `sheets.read_range` and `ca01` run 1 with
+`calendar.list_events`; the other 15 attempts refused. All 18 failed the
+preregistered clarification kind. `ca01` also used an upper date boundary
+that missed the exact next-midnight matcher. `ca04` was 0/3: the model refused
+explicit invitations, which Calendar cannot support, instead of asking about
+an event without invitations. These response-kind labels expose a policy/oracle
+question; the refusals are not evidence of an unsafe write. Protocol/label
+decisions belong in a separate follow-up, rather than forcing a plan or
+changing these registered labels after observation.
+
+An independent schema audit also found 531 legacy `trello.search_members`
+trace outputs missing required `fullName` while supplying `name`. This fixture
+behavior is unchanged at the base commit; new-service input/output traces had
+zero schema mismatches. Correcting the legacy fixture changes measurement
+context and needs a separately documented rerun.
+
+The service-set p95 exceeds the 15 s preview target; its maximum was 53.021 s.
+The longest cases are read-only requests with several model calls. Real service
+HTTP latency and end-user acceptance were not measured. The overall product
+quality gate remains incomplete.
+
+**Interrupted measurement.** A prior
+[services campaign](../docs/ai-evidence/V3-GOLDEN-V2/interrupted-services-llm-2026-10-03T10-47-08-073Z/summary.md)
+stopped after 79/132 attempts when the gateway process changed. It retains one
+complete run and 35 attempts of the second, at source `823cf1f`. Its categorical
+case-count field was an average per attempted run; `7ba60ef` corrected partial
+counts to unique cases. Its historical files are preserved, and its scores are
+excluded from the complete campaigns above. A fresh probe after the process
+change succeeded before the full rerun. No account, model or label was switched.
+
+Local verification: `npm run check` exit 0 (874 v3 + 151 evaluation tests),
+`npx tsc -p evaluations/golden-v2/tsconfig.json` exit 0; real local HTTP abort
+test passed. Browser/live-service runs were not repeated for this evaluation
+change. See the [verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
 
 ### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
 

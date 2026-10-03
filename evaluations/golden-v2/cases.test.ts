@@ -19,7 +19,7 @@ describe('golden set v2 composition', () => {
     expect({
       single_step: count('single_step'), multi_step: count('multi_step'), cross_service: count('cross_service'),
       clarification: count('clarification'), refusal: count('refusal'),
-    }).toEqual({ single_step: 10, multi_step: 10, cross_service: 15, clarification: 8, refusal: 7 });
+    }).toEqual({ single_step: 10, multi_step: 10, cross_service: 15, clarification: 9, refusal: 6 });
   });
 
   it('expects the response kind implied by each category', () => {

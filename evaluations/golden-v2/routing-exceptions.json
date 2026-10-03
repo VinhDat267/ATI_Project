@@ -3,9 +3,10 @@
     "source": "golden",
     "id": "rf06",
     "prompt": "Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm",
-    "expectedKind": "refusal",
+    "expectedKind": "clarification",
     "service": "calendar",
     "approvedOn": "2026-10-02",
-    "reason": "User approved empty legacy routing for this unsupported Calendar refusal; W3-06 owns any later label change."
+    "labelApprovedOn": "2026-10-03",
+    "reason": "User approved clarification for full-catalog rf06 on 2026-10-03; retain the 2026-10-02 exception solely for unavailable Calendar in the legacy catalog. Prompt unchanged."
   }
 ]
