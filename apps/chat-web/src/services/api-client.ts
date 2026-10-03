@@ -167,8 +167,16 @@ export class ApiClient {
   }
 
   // --- Conversations ---
-  async getConversations(): Promise<{ conversations: Conversation[] }> {
-    return this.request<{ conversations: Conversation[] }>('/api/conversations');
+  async getConversations(options: { limit?: number; cursor?: string; search?: string } = {}): Promise<{ conversations: Conversation[]; nextCursor?: string | null }> {
+    const query = new URLSearchParams();
+    if (options.limit !== undefined) query.set('limit', String(options.limit));
+    if (options.cursor) query.set('cursor', options.cursor);
+    if (options.search) query.set('search', options.search);
+    return this.request(`/api/conversations${query.size ? `?${query}` : ''}`);
+  }
+
+  async renameConversation(id: string, title: string): Promise<{ conversation: Conversation }> {
+    return this.request(`/api/conversations/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ title }) });
   }
 
   async getConversation(

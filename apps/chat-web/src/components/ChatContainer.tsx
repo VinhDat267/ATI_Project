@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type {
   ChatMessage,
   ClarificationState,
@@ -31,7 +31,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   children,
 }) => {
   const [inputVal, setInputVal] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const previousContent = useRef({ count: 0, streamingText });
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,15 +71,15 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }
   };
 
-  const scrollToBottom = () => {
-    if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  useLayoutEffect(() => {
+    const area = scrollArea.current;
+    if (!area) return;
+    if (!messages.length) { area.scrollTop = 0; nearBottom.current = true; }
+    else if (nearBottom.current) {
+      area.scrollTop = area.scrollHeight;
     }
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingText, gatherState, activeClarification]);
+    previousContent.current = { count: messages.length, streamingText };
+  }, [messages.length, streamingText, children, gatherState, activeClarification]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +100,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     <div className="flex flex-col h-full bg-white relative">
       {/* Messages Scroll Area */}
       <div
+        ref={scrollArea}
+        onScroll={event => { const area = event.currentTarget; nearBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 120; }}
         className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 mx-auto w-full ${
           messages.length === 0 ? 'max-w-4xl' : 'max-w-3xl'
         }`}
@@ -151,7 +155,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         {/* Injected cards (PlanPreview, ExecutionProgress, etc) */}
         {children}
 
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Fixed/Docked Bottom Input Bar */}

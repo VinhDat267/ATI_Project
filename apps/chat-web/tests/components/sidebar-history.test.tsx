@@ -51,8 +51,7 @@ describe('SidebarHistory Component', () => {
       steps: [{ id: 's1', tool: 'trello.create_card', description: 'Step 1', args: {} }],
     });
 
-    const onSelect = vi.fn();
-    render(<SidebarHistory currentConversationId={null} onSelectConversation={onSelect} />);
+    render(<SidebarHistory currentConversationId={null} />);
 
     const item = await screen.findByText('Hội thoại 1');
     fireEvent.click(item);
@@ -63,7 +62,6 @@ describe('SidebarHistory Component', () => {
       expect(useChatStore.getState().activePlan?.id).toBe('plan-active-1');
       expect(useChatStore.getState().planStatus).toBe('preview');
       expect(useChatStore.getState().conversations).toHaveLength(1);
-      expect(onSelect).toHaveBeenCalledWith('conv-1');
     });
   });
 

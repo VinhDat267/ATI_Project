@@ -33,7 +33,7 @@ export interface ActivePlan {
 
 export interface Conversation {
   id: string;
-  title?: string;
+  title?: string | null;
   updatedAt?: string;
   updated_at?: string;
   created_at?: string;

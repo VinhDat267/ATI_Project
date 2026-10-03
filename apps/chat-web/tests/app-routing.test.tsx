@@ -1,0 +1,74 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
+import { App } from '../src/App';
+import { apiClient } from '../src/services/api-client';
+import { authStorage } from '../src/services/auth-storage';
+import { useChatStore } from '../src/store/chat-store';
+import { StrictMode } from 'react';
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn() }));
+const user = { id: 'u1', email: 'owner@example.test', name: 'Owner' };
+beforeEach(() => {
+  window.history.replaceState({}, '', '/');
+  authStorage.clearStoredTokens(); useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
+  vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
+  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [] });
+  vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
+  vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [{ id: 'saved', title: 'Saved history' }] });
+  vi.spyOn(apiClient, 'getConversation').mockResolvedValue({ conversation: { id: 'saved' }, messages: [{ id: 'm1', role: 'user', content: 'Saved request' }] });
+  vi.spyOn(apiClient, 'getActivePlan').mockResolvedValue({ id: 'pending', summary: 'Pending preview', status: 'pending', steps: [] });
+  vi.spyOn(apiClient, 'getLatestExecutionSnapshot').mockResolvedValue({ plan: { id: 'old', convId: 'saved', summary: 'Old execution', status: 'reconciliation_required', steps: [] }, execution: { status: 'reconciliation_required' }, steps: [], recoveryActions: ['stop'] });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); });
+it('changes public views on browser Back and Forward', async () => {
+  render(<App initialView="landing" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập vào hệ thống' }));
+  expect(window.location.pathname).toBe('/login');
+  expect(screen.getByLabelText('Email')).toBeInTheDocument();
+  await act(async () => { window.history.back(); await new Promise(resolve => setTimeout(resolve, 20)); });
+  expect(screen.getByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeInTheDocument();
+  await act(async () => { window.history.forward(); await new Promise(resolve => setTimeout(resolve, 20)); });
+  expect(screen.getByLabelText('Email')).toBeInTheDocument();
+});
+it('leaves the login URL after successful login', async () => {
+  window.history.replaceState({}, '', '/login');
+  vi.spyOn(apiClient, 'login').mockImplementation(async () => { authStorage.setStoredTokens({ accessToken: 'access', user }); return { accessToken: 'access', user }; });
+  render(<App />);
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: user.email } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'long-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  expect(window.location.pathname).toBe('/');
+});
+it('reloads a direct conversation link with pending preview and execution snapshot', async () => {
+  window.history.replaceState({}, '', '/c/saved'); authStorage.setStoredTokens({ accessToken: 'access', user });
+  render(<App />);
+  expect(await screen.findByText('Saved request')).toBeInTheDocument();
+  expect(await screen.findByText('Pending preview')).toBeInTheDocument();
+  await waitFor(() => expect(useChatStore.getState().executionSnapshot?.plan.id).toBe('old'));
+  expect(useChatStore.getState().planStatus).toBe('preview');
+});
+it('hydrates a direct route when StrictMode restarts mount effects', async () => {
+  window.history.replaceState({}, '', '/c/saved'); authStorage.setStoredTokens({ accessToken: 'access', user });
+  render(<StrictMode><App /></StrictMode>);
+  expect(await screen.findByText('Saved request')).toBeInTheDocument();
+  expect(await screen.findByText('Pending preview')).toBeInTheDocument();
+  expect(screen.queryByText('Đang tải hội thoại...')).toBeNull();
+});
+it('shows an owner-scoped not-found view and clears prior data for a foreign link', async () => {
+  window.history.replaceState({}, '', '/c/foreign'); authStorage.setStoredTokens({ accessToken: 'access', user });
+  useChatStore.getState().addMessage({ id: 'previous', role: 'user', content: 'Previous private message' });
+  vi.mocked(apiClient.getConversation).mockRejectedValue(Object.assign(new Error('Not found'), { status: 404 }));
+  render(<App />);
+  expect(await screen.findByText('Không tìm thấy hội thoại.')).toBeInTheDocument();
+  expect(screen.queryByText('Previous private message')).toBeNull();
+  expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull();
+  expect(apiClient.getActivePlan).not.toHaveBeenCalled();
+});
+it('puts selected history in the URL and clears it when browser Back returns home', async () => {
+  authStorage.setStoredTokens({ accessToken: 'access', user }); render(<App />);
+  fireEvent.click(await screen.findByText('Saved history'));
+  expect(window.location.pathname).toBe('/c/saved'); await screen.findByText('Saved request');
+  await act(async () => { window.history.back(); await new Promise(resolve => setTimeout(resolve, 20)); });
+  await waitFor(() => expect(useChatStore.getState().conversationId).toBeNull());
+  expect(screen.queryByText('Saved request')).toBeNull();
+});
