@@ -1,4 +1,4 @@
-import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter, NotionAdapter, TelegramAdapter } from '@wap/tool-adapters';
+import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter, NotionAdapter, TelegramAdapter, JiraAdapter } from '@wap/tool-adapters';
 import { ALL_TOOLS, getServiceDefinition } from '@wap/tool-schemas';
 import type { LiveService } from './harness.js';
 
@@ -16,6 +16,12 @@ export interface LiveServiceDefinition {
 
 /** Existing env names remain stable; future services add one entry here. */
 export const LIVE_SERVICES: LiveServiceDefinition[] = [
+  {
+    id: 'jira', credentials: { siteUrl: 'JIRA_SITE_URL', email: 'JIRA_EMAIL', apiToken: 'JIRA_API_TOKEN' }, scopeKey: 'projects', scopeEnv: 'LIVE_JIRA_PROJECT_KEYS',
+    missingCredentials: 'JIRA_SITE_URL, JIRA_EMAIL and JIRA_API_TOKEN are required', missingScope: 'LIVE_JIRA_PROJECT_KEYS must list project keys',
+    scopePattern: getServiceDefinition('jira')!.scopePattern, invalidScope: 'LIVE_JIRA_PROJECT_KEYS entries must be uppercase project keys',
+    createAdapter: ({ credentials, allowedScope }) => new JiraAdapter({ credentials: { siteUrl: credentials.siteUrl!, email: credentials.email!, apiToken: credentials.apiToken! }, allowedScope }),
+  },
   {
     id: 'telegram', credentials: { botToken: 'TELEGRAM_BOT_TOKEN' }, scopeKey: 'chats', scopeEnv: 'LIVE_TELEGRAM_CHAT_IDS',
     missingCredentials: 'TELEGRAM_BOT_TOKEN is required', missingScope: 'LIVE_TELEGRAM_CHAT_IDS must list chat ids',

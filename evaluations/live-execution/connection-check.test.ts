@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import * as live from './live-services.js';
 
 it.each([
+  ['jira', 'jira.search_projects'],
   ['telegram', 'telegram.list_chats'],
   ['notion', 'notion.search_databases'],
   ['calendar', 'calendar.list_calendars'], ['sheets', 'sheets.list_spreadsheets'],
