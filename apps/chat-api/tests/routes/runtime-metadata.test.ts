@@ -18,7 +18,7 @@ it('reports registered tools, configured scope and the latest connection check, 
   const list=()=>request(app).get('/api/services').set('Authorization',`Bearer ${token}`);
   const check=()=>request(app).post('/api/services/slack/test').set('Authorization',`Bearer ${token}`);
   const before=(await list()).body.services;
-  expect(before.map((s:any)=>s.id)).toEqual(['trello','slack','github','sheets','calendar']);
+  expect(before.map((s:any)=>s.id)).toEqual(['trello','slack','github','sheets','calendar','notion']);
   for(const service of before) expect(service.tools).toEqual(ALL_TOOLS.filter(t=>t.service===service.id).map(t=>t.name));
   expect(before.find((s:any)=>s.id==='slack')).toMatchObject({configured:true,connected:false,connectionStatus:'unchecked'});
   await check(); expect((await list()).body.services.find((s:any)=>s.id==='slack')).toMatchObject({connected:true,connectionStatus:'healthy',lastCheckedAt:expect.any(String)});

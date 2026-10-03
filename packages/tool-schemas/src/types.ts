@@ -48,6 +48,8 @@ export interface ServiceDefinition {
   scopeKey: string;
   scopeLabel: string;
   scopePattern?: RegExp;
+  /** Canonical resource spelling, applied after validating the supplied scope. */
+  normalizeScopeEntry?: (entry: string) => string;
   credentialFields: Array<{ key: string; label: string; type: 'text' | 'password' | 'multiline' }>;
   intentKeywords: string[];
   /** Phrases that select the service even when another service is named, e.g. "create a task". */
