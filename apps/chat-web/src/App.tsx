@@ -62,6 +62,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
+  useEffect(() => { let current = true; apiClient.getAuthConfig().then(data => { if (current) setAuthConfig(data); }).catch(() => {}); return () => { current = false; }; }, []);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -162,17 +164,20 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     }
   };
 
-  const handleLogout = () => {
-    authStorage.clearStoredTokens();
-    setAuthToken(null);
-    setUser(null);
-    reset();
-    useChatStore.getState().setConversations([]);
-    setCurrentView('landing');
-    if (typeof window !== 'undefined' && window.history?.pushState) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('view');
-      window.history.pushState({}, '', url.toString());
+  const handleLogout = async () => {
+    try { await apiClient.logout(); } catch { /* Local logout still succeeds if the server cannot be reached. */ }
+    finally {
+      authStorage.clearStoredTokens();
+      setAuthToken(null);
+      setUser(null);
+      reset();
+      useChatStore.getState().setConversations([]);
+      setCurrentView('landing');
+      if (typeof window !== 'undefined' && window.history?.pushState) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('view');
+        window.history.pushState({}, '', url.toString());
+      }
     }
   };
 
@@ -350,6 +355,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
 
     return (
       <LoginView
+        authConfig={authConfig}
         email={email}
         setEmail={setEmail}
         password={password}

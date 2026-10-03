@@ -139,6 +139,15 @@ export class ApiClient {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
+        if (res.status === 409 && errData.code === 'REFRESH_ROTATED') {
+          const stored = authStorage.getStoredTokens();
+          if (stored.accessToken && stored.refreshToken && stored.refreshToken !== refreshToken) {
+            authStorage.setStoredTokens(stored);
+            return { accessToken: stored.accessToken, refreshToken: stored.refreshToken };
+          }
+          authStorage.clearStoredTokens();
+          throw Object.assign(new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.'), { status: 401 });
+        }
         if (res.status === 401) authStorage.clearStoredTokens();
         const err: any = new Error(errData.error || 'Failed to refresh token');
         err.status = res.status;
@@ -160,6 +169,21 @@ export class ApiClient {
 
   async getMe(): Promise<{ user: User }> {
     return this.request<{ user: User }>('/api/auth/me');
+  }
+
+  async getAuthConfig(): Promise<{ signupEnabled: boolean; googleEnabled: boolean }> {
+    const response = await fetch('/api/auth/config');
+    if (!response.ok) throw new Error('Không tải được cấu hình đăng nhập.');
+    const data = await response.json();
+    return { signupEnabled: data.signupEnabled === true, googleEnabled: data.googleEnabled === true };
+  }
+
+  async logout(): Promise<{ success: boolean }> {
+    return this.request('/api/auth/logout', { method: 'POST' });
+  }
+
+  async logoutAll(): Promise<{ success: boolean }> {
+    return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
   async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live' }> {
