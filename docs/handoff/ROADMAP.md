@@ -25,6 +25,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | xong, #34 tại `dc80de4`; Jira thật chưa nghiệm thu |
 | 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | đo xong, #35 tại `a75ac35`; numeric gate cả năm đạt, parity ff15 và latency chưa đạt; product acceptance incomplete |
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
+| 3 | Giới hạn kích thước kết quả đọc (Sheets, Notion, Calendar, giới hạn chung trong planner), test 403 Calendar, phân loại lỗi token Google (từ audit W3 03/10) | [W3-08](tasks/W3-08-bounded-read-results.md) | chờ (nên xong trước W3-07 và đo tuần 4) |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | chờ (làm đầu tiên trong mảng tài khoản; song song với W3-00) |
 | 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | chờ (sau AUTH-01) |
