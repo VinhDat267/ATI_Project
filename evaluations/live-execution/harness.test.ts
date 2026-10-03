@@ -38,7 +38,7 @@ describe('readLiveConfig', () => {
     expect(services.trello!.allowedScope).toEqual({ boards: ['b1', 'b2'] });
     expect(services.slack!.allowedScope).toEqual({ channels: ['C1'] });
     expect(services.github!.allowedScope).toEqual({ repos: ['acme/sandbox'] });
-    expect(skipped).toEqual({ sheets: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required', calendar: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required' });
+    expect(skipped).toEqual({ sheets: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required', calendar: 'GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY are required', notion: 'NOTION_TOKEN is required' });
   });
 
   it('skips a service without a token or without an allowlist and says why', () => {

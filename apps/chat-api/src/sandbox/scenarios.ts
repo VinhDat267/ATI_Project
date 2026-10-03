@@ -73,7 +73,15 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo liên kết và giờ bắt đầu', args: { channel: '#general', text: { $template: 'Lịch họp: ${step_1.output.url}; bắt đầu: ${step_1.output.start}' } }, dependsOn: ['step_1'] },
     ],
   };
-  mockProvider.setPlanResponses([scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  const notionPlan = {
+    kind: 'plan', thinking: 'Tạo page trong database Notion đã tìm thấy, rồi chuyển URL vào thông báo Slack.',
+    summary: 'Tạo biên bản Notion và thông báo Slack', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'notion.create_page', description: 'Tạo biên bản ATI', args: { databaseId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', title: 'ATI Review', content: 'Biên bản thử nghiệm sandbox' }, dependsOn: [] },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo liên kết biên bản', args: { channel: '#general', text: { $template: 'Biên bản: ${step_1.output.url}' } }, dependsOn: ['step_1'] },
+    ],
+  };
+  mockProvider.setPlanResponses([scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
   return mockProvider;
 }
 

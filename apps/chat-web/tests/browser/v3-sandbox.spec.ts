@@ -356,3 +356,26 @@ test('real browser and PostgreSQL: approved Calendar workflow carries event url 
     await page.screenshot({ path: testInfo.outputPath('calendar-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
+test('real browser and PostgreSQL: approved Notion workflow carries page url to Slack', async ({ page }, testInfo) => {
+  test.skip(process.env.SANDBOX_SCENARIO !== 'notion_slack', 'requires Notion sandbox scenario');
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Tạo page Notion biên bản và báo Slack E2E ${Date.now()}`;
+    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await composerSend(page).click();
+    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
+    expect(planId).toBeTruthy();
+    const preview = (await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId])).rows[0].plan_json;
+    expect(preview.steps.map((step: any) => step.tool)).toEqual(['notion.create_page', 'slack.send_message']);
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+    const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded']);
+    expect(steps[0].output_json.url).toBe('https://www.notion.so/22222222333344445555666666666666');
+    expect(steps[1].output_json.text).toContain(steps[0].output_json.url);
+    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('notion-slack-approved.png'), fullPage: true });
+  } finally { await pool.end(); }
+});

@@ -1,4 +1,4 @@
-import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter } from '@wap/tool-adapters';
+import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter, NotionAdapter } from '@wap/tool-adapters';
 import { ALL_TOOLS, getServiceDefinition } from '@wap/tool-schemas';
 import type { LiveService } from './harness.js';
 
@@ -16,6 +16,12 @@ export interface LiveServiceDefinition {
 
 /** Existing env names remain stable; future services add one entry here. */
 export const LIVE_SERVICES: LiveServiceDefinition[] = [
+  {
+    id: 'notion', credentials: { token: 'NOTION_TOKEN' }, scopeKey: 'databases', scopeEnv: 'LIVE_NOTION_DATABASE_IDS',
+    missingCredentials: 'NOTION_TOKEN is required', missingScope: 'LIVE_NOTION_DATABASE_IDS must list database ids',
+    scopePattern: getServiceDefinition('notion')!.scopePattern, invalidScope: 'LIVE_NOTION_DATABASE_IDS entries must be UUID database ids',
+    createAdapter: ({ credentials, allowedScope }) => new NotionAdapter({ credentials: { token: credentials.token! }, allowedScope }),
+  },
   {
     id: 'calendar', credentials: { clientEmail: 'GOOGLE_CLIENT_EMAIL', privateKey: 'GOOGLE_PRIVATE_KEY' },
     scopeKey: 'calendars', scopeEnv: 'LIVE_CALENDAR_IDS',
