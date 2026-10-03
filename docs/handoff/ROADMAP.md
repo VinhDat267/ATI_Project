@@ -23,7 +23,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Notion | [W3-03](tasks/W3-03-notion.md) | xong, #32 tại `fca384d`; Notion thật chưa nghiệm thu |
 | 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | xong, #33 tại `4a4553b`; Telegram thật chưa nghiệm thu |
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | xong, #34 tại `dc80de4`; Jira thật chưa nghiệm thu |
-| 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | chờ (sau mốc chốt catalog) |
+| 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | đo xong, #35 tại `a75ac35`; numeric gate cả năm đạt, parity ff15 và latency chưa đạt; product acceptance incomplete |
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | chờ (làm đầu tiên trong mảng tài khoản; song song với W3-00) |
 | 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | chờ (sau AUTH-01) |
@@ -45,7 +45,7 @@ W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/f
 
 Yêu cầu chung cho mọi task thêm service: [W3-service-common](tasks/W3-service-common.md).
 
-Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`; W3-01 Sheets qua #30 tại `716f568`, W3-02 Calendar qua #31 tại `ab2c599`, W3-03 Notion qua #32 tại `fca384d`; W3-04 Telegram qua #33 tại `4a4553b`; W3-05 Jira qua #34 tại `dc80de4`. Cả năm adapter mới đã merge: tiếp theo chuẩn bị W3-06, chốt label rf06 trước commit/chạy model; phép đo chính thức trên catalog đã chốt. Phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service khi người dùng đã chuẩn bị; service/model thật chưa được nghiệm thu qua sandbox/CI. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
+Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`; W3-01 Sheets qua #30 tại `716f568`, W3-02 Calendar qua #31 tại `ab2c599`, W3-03 Notion qua #32 tại `fca384d`; W3-04 Telegram qua #33 tại `4a4553b`; W3-05 Jira qua #34 tại `dc80de4`; W3-06 đo xong qua #35 tại `a75ac35` trên catalog đóng băng33tool/8service. Người dùng đã chốt rf06 clarification trước label commit/model calls. Core150/150, freeform51/54, services111/132; numeric tools/args đạt nhưng parity ff15, services p95 và read-only policy/enforcement còn mở, cần task sản phẩm riêng trước sửa/rerun. AUTH-01 và FE-02 có thể triển khai song song. Phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service khi người dùng đã chuẩn bị và duyệt đúng plan ghi thật; model đã đo với fixtures, chưa nghiệm thu service thật. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
 
 **Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
 

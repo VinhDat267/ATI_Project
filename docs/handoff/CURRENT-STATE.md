@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau khi PR #34 (W3-05 Jira) merge; source `main` = `dc80de4`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code. Commit merge metadata có thể khác, không đổi source sản phẩm.
+**Cập nhật lần cuối:** 03/10/2026, sau khi PR #35 (W3-06 đánh giá planner) merge tại `a75ac35`; runtime evaluator = `7ba60ef`, mã sản phẩm giữ nguyên từ `dc80de4`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code. Commit merge metadata có thể khác, không đổi source sản phẩm.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -8,12 +8,12 @@
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
-> - **service mới:** W3-00b, W3-06 và W3-07; cả năm adapter mới đã merge, nghiệm thu service/model thật còn chờ W3-07/W3-06;
+> - **service mới:** W3-00b và W3-07; cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures; nghiệm thu service thật còn chờ W3-07. Parity/latency và policy chỉ đọc cần follow-up riêng, chưa có task card sửa sản phẩm;
 > - **tài khoản:** AUTH-01 → AUTH-06;
 > - **frontend:** FE-02 → FE-03;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`. Tiếp theo chuẩn bị W3-06: rà label/fixtures, chốt label `rf06` trước commit/chạy model; phép đo chính thức theo catalog đã chốt. AUTH-01 và FE-02 có thể làm song song. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
+> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. AUTH-01 và FE-02 có thể làm song song; W3-07 khi người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
 
 ## 1. Sản phẩm
 
@@ -33,25 +33,29 @@
 | `packages/tool-schemas` | Catalog 33 tool/8 service: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3, Notion 4, Telegram 2, Jira 4 (19 read, 14 write) |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi |
 | `db/v3` | 6 bảng PostgreSQL |
-| `evaluations/` | Golden set v2 (50 câu + 18 câu tự do), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
+| `evaluations/` | Golden set v2 (50 câu + 18 câu tự do + 44 câu services), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
 
 Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `db/migrations`) là lưu trữ, **không sửa**.
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-05 và [CI PR #34](https://github.com/VinhDat267/ATI_Project/actions/runs/37103091131) SUCCESS trên head `089a871`, ngày03/10/2026. Merge `dc80de4` có cây file bằng head đã kiểm thử (git diff exit0). Provider/model thật của service mới NOT_RUN; các bằng chứng live cũ giữ ngày và giới hạn.
+Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-06 và [CI PR #35](https://github.com/VinhDat267/ATI_Project/actions/runs/37121066067) SUCCESS trên head `0b34b64`, ngày03/10/2026. Merge `a75ac35` có cây file bằng head đã kiểm thử (git diff exit0). Ba phép đo model thật dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; không thực thi plan hoặc gọi service thật. Các bằng chứng live cũ giữ ngày và giới hạn.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 874/874 | kiểm tra cuối W3-05; CI 03/10 tại `089a871` | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá (offline) | 94/94 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 14/14 ca | như trên; CI PR #34 pass tại `089a871` | `npm run test:browser:v3` |
+| Unit + integration v3 | 874/874 | kiểm tra cuối W3-06; CI 03/10 tại `0b34b64` | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá (offline) | 151/151 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 14/14 ca | CI PR #35 pass tại `0b34b64`; local không chạy lại browser | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
-| Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
-| Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
+| Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
+| Golden 18 câu tự do, model thật, 3 lần | 51/54; p50/p95 5,942/13,092 s; ff15=0/3 | như trên | như trên |
+| Golden 44 câu services, model thật, 3 lần | 111/132; p50/p95 6,105/31,097 s; max53,021 s | như trên | như trên |
+| Năm service mới: tools/args | tools100% cả năm; args Calendar87,5%, bốn service còn lại100% | như trên; successful read traces + labelled writes, args conditional đúng tool | `EVAL_SET=services`, xem denominator trong README |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối: npm run check exit0:874v3 =47schema+301adapters+167planner+25executor+173API+161web;94offline evaluations; strict NodeNext exit0; browser14/14 trên PostgreSQL thật. Reviewer độc lập trước fix chạy check868+94/strict/browser14; C0/I1/M0. Root sửa một lượt TDD corrected RED6fail25pass → GREEN31/31: planner unwrap một resource collection theo outputSchema, ghi issue Jira vào memory từ search thật rồi chấp nhận comment; key giả vẫn từ chối. Root rerun nguyên adversarial/native HTTP probes17/17, redirect không chuyển credentials và aborted201 body UNKNOWN không replay. Không re-review; CI xác nhận head cuối. Registry tám service. Snapshot chỉ thêm Jira vào full-catalog fallback rf03/ff15;72legacy giữ nguyên. Ngoại lệ Calendar rf06 chưa đổi, W3-06 cần người dùng chốt label trước commit/model campaign.
+Lần kiểm tra cuối W3-06: npm run check exit0:874v3 =47schema+301adapters+167planner+25executor+173API+161web;151offline evaluations; strict eval typecheck exit0; CI browser14/14 trên PostgreSQL thật. Review độc lập `aaa345d..49dfc61`: C0/I1/M0, rerun check874+151/strict và audit415attempts/1921traces/276plans. I1 mô tả read-only sai được sửa một lượt: audit báo cáo thật RED→GREEN, 15refusal/3plan/0clarification; validator chấp nhận ba plan chỉ đọc, write-only là chỉ dẫn prompt chưa được validator enforce. Raw reports/labels/fingerprints/scores giữ nguyên; không re-review. CI xác nhận head cuối `0b34b64`; tree merge bằng head. Bốn workflow ≥4service đạt12/12. ff15 model hỏi Slack/Telegram khi cùng có frontend: giữ label Slack cũ, ghi parity chưa đạt; không tự kết luận semantic regression. Services p95 vượt15s; usable-plan rate null, quality gate incomplete. Xem [verification W3-06](../ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
+
+Bằng chứng W3-05 trước đó: sửa generic resource collection grounding tại `979a196`, corrected RED6fail25pass→GREEN31/31; SQL/factory/planner search→comment không chèn memory thủ công. Native/adversarial HTTP probes17/17; redirect không chuyển credentials, aborted201 body UNKNOWN không replay. Snapshot72legacy giữ nguyên; W3-06 cập nhật label rf06 trong commit riêng `1ab7f08` theo người dùng và giữ ngoại lệ Calendar unavailable legacy.
 
 Bằng chứng FE-01 trước đó: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
 
@@ -78,6 +82,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #32 (W3-03), merge tại `fca384d` lúc 09:55:14 ngày03/10/2026 (Việt Nam): bốn tool Notion search_databases/query_database/create_page/append_text; UUID chuẩn hóa, Database ID allowlist, mapping data source theo API2026-03-11. Query/create yêu cầu một data source; append kiểm source cha tại execution trước ghi. Property values giữ formula/rollup/files/unique_id/place/verification và marker khi snapshot chưa đầy đủ; select chỉ option có sẵn. Limiter3request/giây/token, mọi lệnh ghi không rõ kết quả UNKNOWN không replay. Browser Notion→Slack kiểm URL từ PostgreSQL. CI head dd111c4 xanh, cây merge giống head; primary main đã đồng bộ, giữ nguyên năm file riêng của người dùng. Google/Notion/model thật chưa nghiệm thu.
 - #33 (W3-04), merge `4a4553b` lúc11:29:10 Việt Nam ngày03/10: Telegram list_chats/send_message, signed Chat ID chuẩn hóa BigInt, allowlist trước fetch và getChat trước gửi, text thuần, redirect chặn; limiter per token/chat trong process. Indeterminate writes UNKNOWN không replay, 429 chờ có giới hạn. Browser Telegram→Slack kiểm messageId từ output_json PostgreSQL. Primary main đã đồng bộ, năm file riêng SHA256 giữ nguyên, worktree Telegram đã archive và nhánh local/remote đã xóa sau kiểm tích hợp. Telegram thật W3-07 và model W3-06 NOT_RUN.
 - #34 (W3-05), merge `dc80de4` lúc13:40:43 Việt Nam ngày03/10: Jira search_projects/search_issues/create_issue/add_comment; Basic email/token, exact site domain, project allowlist, POST search/jql, hai lớp Lucene/JQL escape, plaintext ADF. Create đọc issue types, comment đọc lại project thật; write UNKNOWN không replay. Sửa generic search collection grounding tại `979a196`, SQL/factory/planner search→comment không chèn memory thủ công. Browser Jira→Slack kiểm key/URL từ PostgreSQL. CI head `089a871` xanh, cây merge giống head; primary main đồng bộ, năm file riêng giữ nguyên. Task DB tạm đã dọn, user DB15433 giữ nguyên. Jira/model thật NOT_RUN.
+- #35 (W3-06), merge `a75ac35` lúc19:02:09 Việt Nam ngày03/10: 44 câu services đăng ký trước, 10 read-tool fixtures mới, scorer theo service và successful read traces, bounded provider pool/AbortSignal/checkpoint, routing116câu ở legacy/full. Label rf06 clarification commit riêng `1ab7f08`; 67 câu khác không đổi. Ba campaign đủ336attempts/source7ba60ef, model ag/gemini-3.8-flash/served gemini-3.8-flash; core150/150, freeform51/54, services111/132. Numeric tools/args đạt cả năm, parity/latency chưa đạt; không sửa sản phẩm/prompt, không thực thi plan. Campaign gián đoạn79/132 giữ riêng, fresh probe trước full rerun. CI head0b34b64 xanh/tree merge bằng head; review I1 docs đã sửa, các giới hạn còn mở ở mục5.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
   - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;
@@ -90,6 +95,9 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
+| Pure-read response kind và write-only prompt chưa được validator enforce | planner / W3-06 evidence | 18attempts:15refusal/3plan/0clarification; sh07 lượt1/3 và ca01 lượt1 có read plan hợp lệ theo validator. Sáu case0/3kind, ca04 invitation0/3; policy/enforcement cần task riêng, không fit label sau quan sát |
+| Parity freeform và latency services chưa đạt | evaluations / W3-06 | ff15=0/3 vì Slack/Telegram cùng frontend; giữ label cũ. Services p95=31,097s vượt15s, max53,021s; usable-plan null, không nghiệm thu sản phẩm từ numeric PASS |
+| Legacy Trello member fixture sai output schema | evaluations/golden-v2/fixtures.ts | 531trace thiếu fullName nhưng có name, đã tồn tại ở base; service mới zero schema mismatch. Sửa fixture cần documented rerun, không sửa ngầm context |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
 | Notion query/create chưa chọn được data source trong database đa nguồn; relation/rollup là snapshot có giới hạn; page có thể bị di chuyển sau kiểm cha, trước PATCH | `packages/tool-adapters/src/notion/` | Ambiguous source trả VALIDATION; `[incomplete]` khi provider báo thiếu; không tuyên bố kiểm quyền nguyên tử tại API ngoài. Nghiệm thu provider thật W3-07 còn mở |
@@ -120,6 +128,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
 - Label của golden set được đăng ký trước. Chỉ sửa label trong commit riêng, có giải thích, không sửa để khớp kết quả.
+- W3-06: người dùng chốt rf06 clarification trước commit `1ab7f08`; labels44services `20fa6f0` trước provider calls. Catalog33tool/8service đóng băng cho phép đo03/10; giữ mốc20/10 và đo lại nếu catalog đổi.
 - Mô tả PR và commit **không** có dòng "Generated with …" hay chữ ký của AI.
 - Conventional Commits. Một task một nhánh một PR. Chỉ merge khi CI xanh.
 - Repo công khai: không commit `.env`, token, `docs/ai-evidence/V3-LIVE-EXECUTION/` hay báo cáo môn học.

@@ -1,6 +1,6 @@
 # W3-06 · Đánh giá planner với năm service mới
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w3-06-new-services-eval` · **Phụ thuộc:** các task service (W3-01 → W3-05) **được giữ lại trong phạm vi** đã merge (xem mốc chốt catalog trong ROADMAP)
+**Trạng thái:** đo xong, PR #35 đã merge tại `a75ac35` ngày03/10/2026; numeric gate đạt, parity bộ cũ chưa đạt, nghiệm thu sản phẩm incomplete · **Nhánh thi công:** `vinhdat/test-w3-06-services-eval` · **Phụ thuộc:** các task service (W3-01 → W3-05) **được giữ lại trong phạm vi** đã merge (xem mốc chốt catalog trong ROADMAP)
 
 ## Mục tiêu
 
