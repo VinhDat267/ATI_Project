@@ -47,7 +47,7 @@ export class ApiClient {
         }
         return retryRes;
       } catch (refreshErr) {
-        authStorage.clearStoredTokens();
+        if ((refreshErr as {status?:number}).status !== 409) authStorage.clearStoredTokens();
         throw refreshErr;
       }
     }
@@ -91,6 +91,27 @@ export class ApiClient {
   }
 
   // --- Auth ---
+  async getAuthConfig(): Promise<{signupEnabled:boolean;googleEnabled:boolean}> {
+    return this.request('/api/auth/config');
+  }
+  async signup(data:{name:string;email:string;password:string}):Promise<{message:string}> {
+    return this.request('/api/auth/signup',{method:'POST',body:JSON.stringify(data)});
+  }
+  async verifyEmail(token:string):Promise<{message:string}> {
+    return this.request('/api/auth/verify-email',{method:'POST',body:JSON.stringify({token})});
+  }
+  async resendVerification(email:string):Promise<{message:string}> {
+    return this.request('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({email})});
+  }
+  async logout():Promise<void> {
+    return this.request('/api/auth/logout',{method:'POST',signal:AbortSignal.timeout(5000)});
+  }
+  async getPendingUsers(page=1,q=''):Promise<{users:Array<User & {createdAt:string}>;total:number;page:number}> {
+    return this.request(`/api/admin/users?page=${page}&q=${encodeURIComponent(q)}`);
+  }
+  async approveUser(id:string):Promise<{user:User}> {
+    return this.request(`/api/admin/users/${encodeURIComponent(id)}/approve`,{method:'POST'});
+  }
   async login(
     email: string,
     password: string
@@ -139,7 +160,17 @@ export class ApiClient {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        authStorage.clearStoredTokens();
+        if(res.status===409&&errData.code==='REFRESH_ROTATED') {
+          // The winning tab may still be receiving its response. Keep its
+          // session intact and briefly wait for the shared storage update.
+          for (const delay of [0,150,300,500,800]) {
+            if (delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            const latest=authStorage.getStoredTokens();
+            if(latest.refreshToken&&latest.refreshToken!==refreshToken&&latest.accessToken)
+              return {accessToken:latest.accessToken,refreshToken:latest.refreshToken};
+          }
+        }
+        if(res.status!==409) authStorage.clearStoredTokens();
         const err: any = new Error(errData.error || 'Failed to refresh token');
         err.status = res.status;
         throw err;
@@ -163,8 +194,20 @@ export class ApiClient {
   }
 
   // --- Conversations ---
-  async getConversations(): Promise<{ conversations: Conversation[] }> {
-    return this.request<{ conversations: Conversation[] }>('/api/conversations');
+  async getConversations(filter: 'active' | 'archived' | 'deleted' = 'active'): Promise<{ conversations: Conversation[] }> {
+    return this.request<{ conversations: Conversation[] }>(filter === 'active' ? '/api/conversations' : `/api/conversations?filter=${filter}`);
+  }
+
+  async archiveConversation(id: string): Promise<{ conversation: Conversation }> {
+    return this.request(`/api/conversations/${encodeURIComponent(id)}/archive`, { method: 'POST' });
+  }
+
+  async restoreConversation(id: string): Promise<{ conversation: Conversation }> {
+    return this.request(`/api/conversations/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    return this.request(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   async getConversation(

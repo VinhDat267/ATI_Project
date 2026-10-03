@@ -1,0 +1,441 @@
+.ati-login {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.ati-login .public-nav {
+  width: 100%;
+  max-width: 1360px;
+  padding: 26px 40px;
+  flex-shrink: 0;
+}
+.ati-login .login-main {
+  width: 100%;
+  max-width: 1360px;
+  flex: 1;
+  min-height: 0;
+  padding: 24px 40px 64px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  gap: clamp(52px, 6vw, 100px);
+  align-items: center;
+}
+.ati-login .login-editorial {
+  display: flex;
+  padding: 34px 36px 27px;
+  min-height: 590px;
+  background: #e7eadb;
+  border-color: #d8dfca;
+  border-radius: 26px;
+  overflow: hidden;
+}
+.login-editorial-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+.login-editorial-top .eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  max-width: 240px;
+}
+.editorial-edition {
+  font-size: 10px;
+  color: #7c8872;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.ati-login .login-editorial h2 {
+  font: 46px/1.1 var(--serif);
+  margin: 37px 0 0;
+  max-width: none;
+  letter-spacing: -0.027em;
+}
+.ati-login .login-editorial h2 em {
+  font-weight: 400;
+  color: var(--green);
+}
+.planora-paper-art {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.planora-paper-art > svg {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  overflow: visible;
+}
+.planora-paper-art > svg > g svg {
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+}
+.paper-art-stack {
+  animation: planora-paper-float 6s ease-in-out infinite;
+}
+.paper-art-seal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: planora-seal-drift 6s ease-in-out infinite;
+}
+@keyframes planora-paper-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes planora-seal-drift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(2deg); }
+}
+.paper-art-caption {
+  position: relative;
+  margin-top: -13px;
+  font: italic 12px/1.4 var(--serif);
+  color: #819075;
+  letter-spacing: 0.01em;
+}
+.editorial-quiet-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 30px 0 37px;
+}
+.quiet-note-line {
+  width: 30px;
+  height: 1px;
+  background: #a8b699;
+  flex-shrink: 0;
+}
+.editorial-quiet-note p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 0;
+}
+.ati-login .editorial-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid #cfd7c1;
+}
+.ati-login .editorial-bottom .brand-word {
+  font-size: 27px;
+  letter-spacing: -0.04em;
+}
+.ati-login .editorial-bottom > span:last-child {
+  font-size: 9px;
+  color: var(--muted);
+}
+.ati-login .login-form-wrap {
+  max-width: 420px;
+  justify-self: center;
+  padding: 25px 0;
+}
+.login-form-kicker {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.login-form-kicker > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.login-form-kicker .eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.ati-login .login-form-wrap h1 {
+  font: 50px/1.05 var(--serif);
+  margin: 22px 0 17px;
+  letter-spacing: -0.025em;
+}
+.ati-login .login-form-wrap > p {
+  font-size: 13px;
+  line-height: 1.8;
+  max-width: 320px;
+  margin-bottom: 30px;
+}
+.ati-login .field {
+  margin-top: 22px;
+  gap: 9px;
+}
+.ati-login .field > label {
+  font-size: 12px;
+}
+.login-input-wrap,
+.ati-login .password-field {
+  position: relative;
+}
+.login-input-wrap > .icon,
+.login-input-icon {
+  position: absolute;
+  left: 15px;
+  top: 18px;
+  width: 17px;
+  height: 17px;
+  color: #858e77;
+  pointer-events: none;
+}
+.ati-login .field input {
+  min-height: 54px;
+  padding: 14px 45px;
+  border-radius: 12px;
+  border-color: #d1d6c6;
+  font-size: 14px;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
+}
+.ati-login .field input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px #3c574111;
+}
+.ati-login .field input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 100px var(--paper) inset;
+  -webkit-text-fill-color: var(--ink);
+}
+.ati-login .password-field button {
+  width: 44px;
+  height: 44px;
+  top: 5px;
+  right: 5px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.ati-login .password-field button:hover:not(:disabled) {
+  background: #edf0e4;
+}
+.ati-login .login-form-wrap .submit {
+  margin-top: 25px;
+  min-height: 54px;
+  font-size: 13px;
+  justify-content: space-between;
+  padding: 14px 22px;
+}
+.login-help {
+  padding: 20px 0;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.login-help summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 36px;
+  list-style: none;
+  cursor: pointer;
+}
+.login-help summary::-webkit-details-marker {
+  display: none;
+}
+.login-help summary .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--green);
+  transition: transform 180ms;
+}
+.login-help[open] summary .icon {
+  transform: rotate(90deg);
+}
+.login-help p {
+  padding: 13px 15px;
+  margin: 8px 0 0;
+  background: #e9ecdf;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--green);
+}
+.login-form-endnote {
+  border-top: 1px solid var(--line);
+  padding-top: 19px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.login-form-endnote .icon {
+  width: 15px;
+  height: 15px;
+}
+.login-caps-lock {
+  font-size: 11px;
+  color: var(--clay);
+}
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  margin-top: 25px;
+  padding-top: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-switch button {
+  color: var(--green);
+  font: 600 12px var(--sans);
+  background: none;
+  border: 0;
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.auth-password-hint {
+  display: block;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 9px;
+}
+.auth-policy {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 18px 0 0;
+}
+.auth-result {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 25px;
+  border-radius: 16px;
+  margin: 27px 0 0;
+}
+.auth-result > .icon {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
+  margin-bottom: 15px;
+}
+.auth-result h2 {
+  font: 28px/1.2 var(--serif);
+  margin: 0 0 14px;
+}
+.auth-result p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.auth-result .btn {
+  margin-top: 14px;
+  width: 100%;
+}
+.verification-resend {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 10px;
+  margin-top: 16px;
+}
+@media (max-width: 1100px) {
+  .ati-login .login-main {
+    gap: 45px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+  }
+  .ati-login .login-editorial {
+    padding: 30px;
+    min-height: 560px;
+  }
+  .ati-login .login-editorial h2 {
+    font-size: 39px;
+  }
+}
+@media (max-width: 760px) {
+  .ati-login .public-nav {
+    padding: 20px;
+  }
+  .ati-login .login-main {
+    grid-template-columns: 1fr;
+    padding: 28px 20px 42px;
+    gap: 46px;
+  }
+  .ati-login .login-form-wrap {
+    order: -1;
+    max-width: 440px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .ati-login .login-form-wrap h1 {
+    font-size: 44px;
+  }
+  .ati-login .login-editorial {
+    min-height: 0;
+    padding: 28px 24px;
+    border-radius: 22px;
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .ati-login .login-editorial h2 {
+    font-size: 36px;
+    margin-top: 30px;
+  }
+  .planora-paper-art {
+    max-width: 390px;
+  }
+  .ati-login .field input {
+    font-size: 16px;
+  }
+  .ati-login .login-form-wrap .submit {
+    min-height: 52px;
+  }
+  .editorial-quiet-note {
+    margin: 26px 0;
+  }
+  .login-editorial-top .eyebrow {
+    font-size: 8px;
+  }
+  .ati-login .public-nav .brand-word {
+    font-size: 29px;
+  }
+  .ati-login .public-nav .brand-symbol {
+    width: 38px;
+    height: 38px;
+  }
+  .ati-login .public-nav .btn {
+    font-size: 10px;
+    padding: 11px 0 11px 12px;
+  }
+}
+@media (max-width: 360px) {
+  .ati-login .login-main {
+    padding: 24px 16px 38px;
+  }
+  .ati-login .public-nav {
+    padding: 18px 16px;
+  }
+  .ati-login .login-editorial h2 {
+    font-size: 31px;
+  }
+  .ati-login .login-editorial {
+    padding: 24px 20px;
+  }
+  .ati-login .public-nav .brand-sub {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .paper-art-stack,
+  .paper-art-seal {
+    animation: none;
+  }
+  .ati-login .field input,
+  .ati-login .password-field button {
+    transition: none;
+  }
+}

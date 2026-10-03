@@ -5,6 +5,13 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  sid?: string;
+  role?: 'member' | 'admin';
+  status?: 'pending' | 'active' | 'disabled';
+  emailVerified?: boolean;
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface TokenPair {
@@ -16,6 +23,7 @@ export interface TokenPair {
 export interface GenerateTokenOptions {
   accessTtlSeconds?: number;
   refreshTtlSeconds?: number;
+  sessionId?: string;
 }
 
 interface JWTPayload {
@@ -25,6 +33,7 @@ interface JWTPayload {
   type: 'access' | 'refresh';
   iat: number;
   exp: number;
+  sid?: string;
 }
 
 function base64UrlEncode(data: string): string {
@@ -75,6 +84,8 @@ function verifyToken(token: string, secret: string, expectedType: 'access' | 're
 
   let payload: JWTPayload;
   try {
+    const header = JSON.parse(base64UrlDecode(headerB64));
+    if (header.alg !== 'HS256' || header.typ !== 'JWT') throw new Error('Invalid JWT header');
     payload = JSON.parse(base64UrlDecode(payloadB64));
   } catch {
     throw new Error('Malformed token payload');
@@ -85,14 +96,18 @@ function verifyToken(token: string, secret: string, expectedType: 'access' | 're
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  if (payload.exp && nowSeconds > payload.exp) {
+  if (!Number.isFinite(payload.exp) || nowSeconds >= payload.exp) {
     throw new Error('Token expired');
+  }
+  if (typeof payload.sub !== 'string' || !payload.sub || typeof payload.email !== 'string' || typeof payload.name !== 'string') {
+    throw new Error('Malformed token payload');
   }
 
   return {
     id: payload.sub,
     email: payload.email,
     name: payload.name,
+    sid: payload.sid,
   };
 }
 
@@ -112,6 +127,7 @@ export function generateTokens(
     type: 'access',
     iat: now,
     exp: now + accessTtl,
+    sid: options?.sessionId,
   };
 
   const refreshPayload: JWTPayload = {
@@ -140,10 +156,11 @@ export function verifyRefreshToken(token: string, secret: string): AuthUser {
 
 export interface AuthMiddlewareOptions {
   allowQueryToken?: boolean;
+  validateSession?: (sid: string, userId: string) => Promise<AuthUser | null>;
 }
 
 export function createAuthMiddleware(secret: string, options?: AuthMiddlewareOptions) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     let token: string | undefined;
 
     const authHeader = req.headers.authorization;
@@ -159,11 +176,17 @@ export function createAuthMiddleware(secret: string, options?: AuthMiddlewareOpt
     }
 
     try {
-      const user = verifyAccessToken(token, secret);
+      let user = verifyAccessToken(token, secret);
+      if (options?.validateSession) {
+        if (!user.sid) { res.status(401).json({error:'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'}); return; }
+        const validated = await options.validateSession(user.sid,user.id);
+        if (!validated) { res.status(401).json({error:'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'}); return; }
+        user = {...validated,sid:user.sid};
+      }
       (req as any).user = user;
       next();
-    } catch (err: any) {
-      res.status(401).json({ error: err?.message || 'Unauthorized' });
+    } catch {
+      res.status(401).json({ error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' });
     }
   };
 }

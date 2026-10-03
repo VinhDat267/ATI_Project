@@ -97,10 +97,10 @@ export function ServiceCard({
       ))}
       <div className="scope-editor">
         <label className="small" htmlFor={`${service}-scope`}>
-          Phạm vi được phép truy cập (Allowed Scope)
+          Phạm vi được phép truy cập
         </label>
         <p className="small muted">
-          Giới hạn {scopeLabel} mà ATI được phép đọc và ghi.
+          Giới hạn {scopeLabel} mà Planora được phép đọc và ghi.
         </p>
         <div className="scope-chips">
           {scopes.map((scope) => (

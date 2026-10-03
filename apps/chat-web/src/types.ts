@@ -39,6 +39,8 @@ export interface Conversation {
   created_at?: string;
   status?: string;
   user_id?: string;
+  archived_at?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface ServiceConfig {
@@ -49,6 +51,12 @@ export interface ServiceConfig {
 }
 
 export interface User {
+  role?: 'member' | 'admin';
+  status?: 'pending' | 'active' | 'disabled';
+  isAdmin?: boolean;
+  emailVerified?: boolean;
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
   id: string;
   email: string;
   name: string;

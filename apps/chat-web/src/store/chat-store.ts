@@ -12,6 +12,7 @@ import type {
 
 export interface ChatStoreState {
   conversationId: string | null;
+  conversationArchived: boolean;
   conversations: Conversation[];
   messages: ChatMessage[];
   streamingText: string;
@@ -31,6 +32,7 @@ export interface ChatStoreState {
 
   // Actions
   setConversationId: (id: string | null) => void;
+  setConversationArchived: (archived: boolean) => void;
   setConversations: (conversations: Conversation[]) => void;
   addMessage: (message: ChatMessage) => void;
   addOptimisticMessage: (params: { id: string; content: string }) => void;
@@ -54,6 +56,7 @@ export interface ChatStoreState {
 
 const initialState = {
   conversationId: null,
+  conversationArchived: false,
   conversations: [],
   messages: [],
   streamingText: '',
@@ -74,6 +77,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
   ...initialState,
 
   setConversationId: (id) => set({ conversationId: id }),
+  setConversationArchived: (archived) => set({ conversationArchived: archived }),
   setConversations: (conversations) => set({ conversations }),
 
   addMessage: (message) =>
@@ -161,6 +165,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
   reset: () =>
     set((state) => ({
       conversationId: null,
+      conversationArchived: false,
       messages: [],
       streamingText: '',
       isStreaming: false,

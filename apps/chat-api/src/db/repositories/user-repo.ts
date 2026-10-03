@@ -7,6 +7,10 @@ export interface UserRow {
   password: string;
   name: string;
   created_at: Date;
+  status?: 'pending' | 'active' | 'disabled';
+  role?: 'member' | 'admin';
+  email_verified?: boolean;
+  google_sub?: string | null;
 }
 
 const HASH_ITERATIONS = 210_000;
@@ -36,7 +40,7 @@ export function verifyPassword(password: string, storedHash?: string | null): bo
 }
 
 export class UserRepo {
-  constructor(private pool: pg.Pool) {}
+  constructor(readonly pool: pg.Pool) {}
 
   async findByEmail(email: string): Promise<UserRow | null> {
     const res = await this.pool.query(

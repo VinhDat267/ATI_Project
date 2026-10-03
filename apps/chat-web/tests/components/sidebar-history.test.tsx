@@ -85,7 +85,7 @@ describe('SidebarHistory Component', () => {
 
     expect(await screen.findByText('Hội thoại backend')).toBeInTheDocument();
     // Expected time format "10:30"
-    const expectedTime = today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const expectedTime = today.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
     expect(screen.getByText(expectedTime)).toBeInTheDocument();
   });
 
@@ -113,5 +113,64 @@ describe('SidebarHistory Component', () => {
     await waitFor(() => {
       expect(useChatStore.getState().planStatus).toBe('executing');
     });
+  });
+
+  it('searches Vietnamese titles without accents and clears without changing the open conversation', async () => {
+    vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [
+      { id: 'login', title: 'Cải thiện đăng nhập' },
+      { id: 'slack', title: 'Thông báo Slack' },
+    ] });
+    const onSelect = vi.fn();
+    render(<SidebarHistory currentConversationId="login" onSelectConversation={onSelect} />);
+    await screen.findByText('Cải thiện đăng nhập');
+    const search = screen.getByRole('searchbox', { name: 'Tìm hội thoại' });
+    fireEvent.change(search, { target: { value: 'DANG NHAP' } });
+    expect(screen.getByRole('button', { name: 'Cải thiện đăng nhập' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByText('Thông báo Slack')).toBeNull();
+    fireEvent.change(search, { target: { value: 'không tìm thấy' } });
+    expect(screen.getByText('Không tìm thấy hội thoại')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa tìm kiếm' }));
+    expect(search).toHaveFocus();
+    expect(screen.getByText('Thông báo Slack')).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('groups and sorts real timestamps while keeping undated history separate', async () => {
+    const today = new Date();
+    today.setHours(10, 0, 0, 0);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const old = new Date(today); old.setDate(today.getDate() - 10);
+    vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [
+      { id: 'old', title: 'Cũ', updated_at: old.toISOString() },
+      { id: 'missing', title: 'Không có ngày' },
+      { id: 'yesterday', title: 'Hôm trước', created_at: yesterday.toISOString() },
+      { id: 'today', title: 'Mới nhất', updatedAt: today.toISOString() },
+    ] });
+    render(<SidebarHistory currentConversationId={null} />);
+    await screen.findByText('Mới nhất');
+    expect(screen.getByRole('group', { name: 'Hôm nay' })).toHaveTextContent('Mới nhất');
+    expect(screen.getByRole('group', { name: 'Hôm qua' })).toHaveTextContent('Hôm trước');
+    expect(screen.getByRole('group', { name: 'Trước đây' })).toHaveTextContent('Cũ');
+    expect(screen.getByRole('group', { name: 'Khác' })).toHaveTextContent('Không có ngày');
+    const rows = screen.getAllByRole('button').filter(button => button.classList.contains('conversation-link'));
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['Mới nhất', 'Hôm trước', 'Cũ', 'Không có ngày']);
+  });
+
+  it('refreshes history without discarding the search or cached rows on failure', async () => {
+    const list = vi.spyOn(apiClient, 'getConversations')
+      .mockResolvedValueOnce({ conversations: [{ id: 'one', title: 'Trello sprint' }] })
+      .mockRejectedValueOnce(new Error('Máy chủ chưa sẵn sàng'))
+      .mockResolvedValueOnce({ conversations: [{ id: 'one', title: 'Trello sprint' }, { id: 'two', title: 'Trello mới' }] });
+    render(<SidebarHistory currentConversationId="one" />);
+    await screen.findByText('Trello sprint');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'trello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Làm mới lịch sử' }));
+    await screen.findByRole('alert');
+    expect(screen.getByText('Trello sprint')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại lịch sử' }));
+    await screen.findByText('Trello mới');
+    expect(screen.getByRole('searchbox')).toHaveValue('trello');
+    expect(list).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

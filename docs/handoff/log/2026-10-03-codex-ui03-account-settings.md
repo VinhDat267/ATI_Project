@@ -1,0 +1,20 @@
+# UI-03 · Cài đặt tài khoản
+
+Ngày03/10/2026. Yêu cầu: bỏ banner “Chế độ thử nghiệm · Xác nhận môi trường trước khi duyệt kế hoạch.” và làm trang Cài đặt tài khoản; kế thừa yêu cầu đưa Lưu trữ/Đã xóa khỏi sidebar chính vào Cài đặt. Đọc CURRENT-STATE/README, ba log floating-dropdown/recent-only-sidebar/navigation-and-history-actions, kiểm git status/log5 trước code. HEAD995f5f7/Frontend_UXUI; các dirty files là công việc các lượt trước của cùng agent. Tạo task UI-03 trước code, không sửa backend/v2/dependency/CURRENT-STATE/ROADMAP, không commit/push/deploy.
+
+Files: App.tsx, Workspace.tsx, ChatContainer.tsx, SidebarHistory.tsx, RuntimeNotice.tsx, ViewBoundary.tsx, sidebar.css; mới views/AccountSettingsView.tsx/settings.css; tests app-navigation/runtime-notice/account-settings; DESIGN và task/log này. Giữ cream/forest/editorial B. Account entry cuối sidebar có icon Settings; trang protected lazy-load, fallback/boundary có thông báo đúng ngữ cảnh. Tên/email từ user phiên/getMe chỉ đọc; không form sửa/Save/đổi mật khẩu/role/avatar upload giả. Môi trường cấu hình đặt nhỏ trong card, không dùng làm bằng chứng backend health. Quản lý dịch vụ chuyển route có sẵn, Đăng xuất xóa phiên trình duyệt hiện tại.
+
+Sections account/archived/deleted whitelist, query section persist khi reload/Back; auth redirect giữ settings/section/c. Rời Settings bỏ section. Cùng shell và SidebarHistory/API lifecycle đã có, không backend trùng. Search/empty/loading/error/retry/confirmation và native dropdown dùng lại. Restore chỉ cập nhật sau API success, giữ title lấy từ first message nếu lifecycle response không có title. Sidebar chính chỉ Gần đây. Chọn hội thoại hiện tại từ Settings/Services vẫn quay workspace. Bản nháp riêng theo conversationId trong React giữ khi đổi view, xóa khi mất phiên; không ghi nội dung vào localStorage. Chat prefill listener cập nhật theo controlled draft và cleanup.
+
+Kiểm chứng:
+
+- RED banner/navigation-draft2fail/7pass; focused GREEN15pass trước bổ sung guest settings/title/error boundary.
+- Full cuối `npm run test -w @wap/chat-web`: exit0,34files/191tests,4.02s. Bao gồm guest→login đích settings/section, giữ chat/draft, readonly info/actions, restore failure giữ dữ liệu + success/title, popstate/section whitelist, runtime known/unknown và lỗi view có reload.
+- `npm run build -w @wap/chat-web`: exit0, TypeScript+Vite1919modules,417ms; Settings JS5.36kB/gzip2.05, CSS5.18kB/gzip1.46; không thêm thư viện. Git diff-check PASS. Không chạy lại API/packages vì lượt này không đổi logic đó; kiểm lifecycle thật bằng browser riêng.
+- Browser CUA5176 trên PostgreSQL schema `ui_lifecycle_preview_20261003`/fixture Kiểm thử hiện có: desktop1440×900/mobile390×844; pageWidth bằngviewport, nội dung cuộn xuống logout, drawer Account entry đóng drawer/mởsettings. Settings→Workspace giữ bản nháp kiểm thử; Quản lý dịch vụ và Back quay đúng account section.
+- Fixture “Kiểm thử: sắp xếp công việc tuần mới”: archive ở sidebar, xuất hiện Settings archived; xóa mềm với xác nhận, xuất hiện Settings deleted/row disabled; ArrowDown mở options, Enter Restore, trở về Gần đây. Fixture cuối đã khôi phục, không xóa vật lý hoặc ghi provider thật. GET/API hiện có; API cũ3000 không restart, preview riêng5176/API3006 như log UI-02.
+- Reduced-motion có CSS tắt entrance/transition; cleanup popstate, inherited dropdown/list effects. Không tuyên bố kiểm trên thiết bị touch vật lý hay giả lập reduced-motion OS. Chưa review độc lập/CI/PR.
+
+Ảnh ngoài repo: `C:/Users/Admin/.codex/visualizations/2026/10/02/01a0faf0-f9b9-7432-89ab-cfec274816e2/ati-implementation/account-settings-desktop.png`, `account-settings-mobile.png`, `settings-archived-desktop.png`. Viewport đã reset, tab Cài đặt giữ deliverable. Preview dùng dữ liệu Kiểm thử local; UI thực vẫn dùng API/user của phiên tương ứng.
+
+Giới hạn còn lại: chưa có auth API chỉnh sửa hồ sơ/đổi mật khẩu/đăng xuất mọi thiết bị; danh sách tối đa50, không pagination/server search. Không coi trang này hoàn tất toàn bộ roadmap tài khoản hay FE-02.

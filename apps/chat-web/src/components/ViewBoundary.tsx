@@ -1,7 +1,7 @@
 import { Component, type ReactNode } from "react";
 
 export class ViewBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; label?: string },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -13,7 +13,7 @@ export class ViewBoundary extends Component<
       return (
         <section className="services-body">
           <div className="service-notice" role="alert">
-            Không tải được giao diện dịch vụ. Hãy tải lại trang để thử lại.
+            Không tải được giao diện {this.props.label || "dịch vụ"}. Hãy tải lại trang để thử lại.
           </div>
           <button className="btn" onClick={() => window.location.reload()}>
             Tải lại trang

@@ -83,11 +83,11 @@ describe("API-backed services page", () => {
       .mockResolvedValue({ services: [] });
     render(<ServicesView />);
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByText(/Chưa có dịch vụ được đăng ký/)).toBeNull();
+    expect(screen.queryByText(/Chưa có dịch vụ nào khả dụng/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tải lại" }));
     await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
     expect(
-      await screen.findByText(/Chưa có dịch vụ được đăng ký/),
+      await screen.findByText(/Chưa có dịch vụ nào khả dụng/),
     ).toBeInTheDocument();
   });
 });

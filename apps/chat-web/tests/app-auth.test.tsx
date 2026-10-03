@@ -17,9 +17,9 @@ afterEach(() => {
 
 describe("App authentication", () => {
   it("requires submitted credentials instead of logging in as the demo admin automatically", async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (url) => ({
       ok: true,
-      json: async () => ({
+      json: async () => url==='/api/auth/config'?{signupEnabled:true,googleEnabled:false}:({
         accessToken: "jwt",
         user: { id: "user-1", email: "operator@example.com", name: "Operator" },
       }),
@@ -27,7 +27,8 @@ describe("App authentication", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App initialView="login" />);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await screen.findByRole('button',{name:/Tạo tài khoản/});
+    expect(fetchMock.mock.calls.every(([url])=>url==='/api/auth/config')).toBe(true);
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "operator@example.com" },
     });

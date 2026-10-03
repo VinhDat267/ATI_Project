@@ -38,12 +38,34 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      const conversations = await convRepo.listConversations(userId);
+      const filter = req.query.filter || 'active';
+      if (!['active', 'archived', 'deleted'].includes(filter as string)) {
+        res.status(400).json({ error: 'Bộ lọc hội thoại không hợp lệ.' });
+        return;
+      }
+      const conversations = await convRepo.listConversations(userId, 50, filter as 'active' | 'archived' | 'deleted');
       res.status(200).json({ conversations });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list conversations' });
     }
   });
+
+  for (const action of ['archive', 'delete', 'restore'] as const) {
+    const handler = async (req: Request, res: Response): Promise<void> => {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      try {
+        const conversation = await convRepo.changeVisibility(req.params.id as string, userId, action);
+        if (action === 'delete') res.status(204).end();
+        else res.status(200).json({ conversation });
+      } catch (error: any) {
+        if (error.code === '22P02') { res.status(404).json({ error: 'Không tìm thấy hội thoại.' }); return; }
+        res.status(error.status || 500).json({ error: error.message || 'Không cập nhật được hội thoại.' });
+      }
+    };
+    if (action === 'delete') router.delete('/:id', handler);
+    else router.post(`/:id/${action}`, handler);
+  }
 
   // GET /api/conversations/:id/plans/active
   router.get('/:id/plans/active', async (req: Request, res: Response): Promise<void> => {
@@ -161,6 +183,11 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const { content } = req.body || {};
+
+      if (conv.archived_at) {
+        res.status(409).json({ error: 'Hãy khôi phục hội thoại trước khi gửi tin nhắn.' });
+        return;
+      }
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content string is required' });

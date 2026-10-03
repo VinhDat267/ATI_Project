@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { ChatMessage, ClarificationState, GatherState } from "../types";
 import { useChatStore } from "../store/chat-store";
 import { MessageItem } from "./MessageItem";
@@ -16,6 +16,9 @@ export interface ChatContainerProps {
   children?: React.ReactNode;
   actions?: React.ReactNode;
   busy?: boolean;
+  readOnly?: boolean;
+  draft?: string;
+  onDraftChange?: (value: string) => void;
 }
 export function ChatContainer({
   messages,
@@ -28,8 +31,16 @@ export function ChatContainer({
   children,
   actions,
   busy,
+  readOnly = false,
+  draft,
+  onDraftChange,
 }: ChatContainerProps) {
-  const [inputVal, setInputVal] = useState("");
+  const [localDraft, setLocalDraft] = useState("");
+  const inputVal = draft ?? localDraft;
+  const setInputVal = useCallback((value: string) => {
+    if (onDraftChange) onDraftChange(value);
+    else setLocalDraft(value);
+  }, [onDraftChange]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -39,18 +50,19 @@ export function ChatContainer({
   const gatherState = propGather !== undefined ? propGather : storeGather;
   const clarification =
     propClarify !== undefined ? propClarify : storeClarification;
-  const blocked = Boolean(busy || isStreaming || gatherState?.isGathering);
+  const processing = Boolean(busy || isStreaming || gatherState?.isGathering);
+  const blocked = readOnly || processing;
   useEffect(() => {
     const fn = (e: Event) => {
       const text = (e as CustomEvent<{ text: string }>).detail?.text;
-      if (text) {
+      if (text && !readOnly) {
         setInputVal(text);
         inputRef.current?.focus();
       }
     };
     window.addEventListener("chat:prefill", fn);
     return () => window.removeEventListener("chat:prefill", fn);
-  }, []);
+  }, [readOnly, setInputVal]);
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
@@ -75,6 +87,7 @@ export function ChatContainer({
     nearBottom.current = true;
   };
   const answer = (text: string) => {
+    if (blocked) return;
     onSendMessage(text);
     onClearClarification ? onClearClarification() : clearStore(null);
   };
@@ -107,13 +120,13 @@ export function ChatContainer({
                 steps={gatherState.steps}
               />
             )}{" "}
-          {blocked && !gatherState?.isGathering && !streamingText && (
+          {processing && !gatherState?.isGathering && !streamingText && (
             <div className="planning-indicator" role="status">
               <span className="spinner" />
-              ATI đang xử lý yêu cầu…
+              Planora đang xử lý yêu cầu…
             </div>
           )}
-          {clarification && (
+          {clarification && !readOnly && (
             <ClarificationCard
               question={clarification.question}
               options={clarification.options}
@@ -147,6 +160,7 @@ export function ChatContainer({
             ref={inputRef}
             id="chat-input"
             rows={1}
+            readOnly={readOnly}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={(e) => {
@@ -164,7 +178,7 @@ export function ChatContainer({
           />
           <div className="composer-bottom">
             <span>
-              {blocked
+              {readOnly ? "Khôi phục hội thoại để gửi yêu cầu" : blocked
                 ? "Đang xử lý · chưa gửi thêm yêu cầu"
                 : "Enter để gửi · Shift + Enter xuống dòng"}
             </span>

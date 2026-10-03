@@ -67,7 +67,7 @@ let post: (url: string) => Promise<any>;
 let request: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/?view=workspace");
   useChatStore.getState().reset();
   useChatStore.getState().setConversations([]);
   authStorage.clearStoredTokens();
@@ -120,7 +120,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/?view=workspace");
   vi.restoreAllMocks();
   authStorage.clearStoredTokens();
 });
@@ -128,7 +128,7 @@ afterEach(() => {
 async function openHistory() {
   render(<App />);
   fireEvent.click(
-    await screen.findByRole("button", { name: /Đối soát đã lưu/ }),
+    await screen.findByRole("button", { name: "Đối soát đã lưu" }),
   );
   return screen.findByRole("region", {
     name: "Cần đối soát trước khi tiếp tục",
@@ -138,7 +138,7 @@ async function openHistory() {
 describe("saved execution recovery in the actual App/history flow", () => {
   it("restores a conversation on browser Back within the same workspace view", async () => {
     await openHistory();
-    fireEvent.click(screen.getByRole("button", { name: /Hội thoại khác/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Hội thoại khác" }));
     await screen.findByText("Hội thoại B");
     window.history.replaceState({}, "", "/?view=workspace&c=c1");
     fireEvent.popState(window);
@@ -367,7 +367,7 @@ describe("saved execution recovery in the actual App/history flow", () => {
     );
     render(<App />);
     fireEvent.click(
-      await screen.findByRole("button", { name: /Đối soát đã lưu/ }),
+      await screen.findByRole("button", { name: "Đối soát đã lưu" }),
     );
     fireEvent.click(screen.getByText("Hội thoại khác"));
     await screen.findByText("Hội thoại B");
@@ -415,7 +415,7 @@ describe("saved execution recovery in the actual App/history flow", () => {
     snapshot.recoveryActions = ["stop"];
     render(<App />);
     fireEvent.click(
-      await screen.findByRole("button", { name: /Đối soát đã lưu/ }),
+      await screen.findByRole("button", { name: "Đối soát đã lưu" }),
     );
     const modal = await screen.findByRole("alertdialog");
     expect(
@@ -485,7 +485,7 @@ describe("saved execution recovery in the actual App/history flow", () => {
     );
     render(<App />);
     fireEvent.click(
-      await screen.findByRole("button", { name: /Đối soát đã lưu/ }),
+      await screen.findByRole("button", { name: "Đối soát đã lưu" }),
     );
     const modal = await screen.findByRole("alertdialog");
     expect(within(modal).getByText("trello.add_member")).toBeInTheDocument();

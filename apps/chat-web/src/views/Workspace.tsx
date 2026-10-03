@@ -3,13 +3,16 @@ import type { User } from "../types";
 import { Brand, Icon } from "../components/Brand";
 import { SidebarHistory } from "../components/layout/SidebarHistory";
 import { useChatStore } from "../store/chat-store";
+import { Settings2 } from "lucide-react";
 export interface WorkspaceProps {
   user: User | null;
   services: boolean;
+  settings?: boolean;
+  onSettings?: () => void;
   onServices: () => void;
   onWorkspace: () => void;
   onNew: () => void;
-  onLanding: () => void;
+  onConversationRemoved?: (id: string) => void;
   onLogout: () => void;
   onSelect: (id: string) => void;
   children: ReactNode;
@@ -17,10 +20,12 @@ export interface WorkspaceProps {
 export function Workspace({
   user,
   services,
+  settings = false,
+  onSettings,
   onServices,
   onWorkspace,
   onNew,
-  onLanding,
+  onConversationRemoved,
   onLogout,
   onSelect,
   children,
@@ -56,6 +61,7 @@ export function Workspace({
     previous.current = open;
     const key = (e: KeyboardEvent) => {
       if (!open) return;
+      if ((e.target as Element)?.closest?.('[role="dialog"]')) return;
       if (e.key === "Escape") {
         setOpen(false);
         return;
@@ -63,7 +69,7 @@ export function Workspace({
       if (e.key === "Tab") {
         const items = [
           ...side.current!.querySelectorAll<HTMLElement>(
-            "button:not(:disabled),a[href]",
+            "button:not(:disabled),a[href],input:not(:disabled)",
           ),
         ];
         if (e.shiftKey && document.activeElement === items[0]) {
@@ -103,7 +109,7 @@ export function Workspace({
           ref={side}
           aria-label="Điều hướng workspace"
         >
-          <Brand onClick={() => action(onLanding)} />
+          <Brand label="Planora — workspace" onClick={() => action(onWorkspace)} />
           <button
             className="btn square sidebar-close"
             data-close-menu
@@ -119,6 +125,16 @@ export function Workspace({
             <Icon name="plus" />
             Hội thoại mới
           </button>
+          <nav className="sidebar-navigation" aria-label="Không gian làm việc">
+            <button className={"history-link " + (!services && !settings ? "active" : "")}
+              aria-current={!services && !settings ? "page" : undefined} onClick={() => action(onWorkspace)}>
+              <Icon name="chat" />Hội thoại
+            </button>
+            <button className={"history-link " + (services ? "active" : "")}
+              aria-current={services ? "page" : undefined} onClick={() => action(onServices)}>
+              <Icon name="grid" />Dịch vụ<Icon name="arrow" />
+            </button>
+          </nav>
           <SidebarHistory
             currentConversationId={conversationId}
             onSelectConversation={(id) => {
@@ -126,32 +142,24 @@ export function Workspace({
               setOpen(false);
             }}
             onCloseMobileSidebar={() => setOpen(false)}
+            onConversationRemoved={onConversationRemoved}
           />
-          <section className="sidebar-section sidebar-services">
-            <button
-              className={"history-link " + (services ? "active" : "")}
-              onClick={() => action(onServices)}
-            >
-              <Icon name="grid" />
-              Dịch vụ<span className="nav-arrow">↗</span>
-            </button>
-            <p className="small muted">Cấu hình và phạm vi tài nguyên</p>
-          </section>
           <div className="sidebar-footer">
-            <div className="account-summary">
+            <button className={"account-summary account-settings-button " + (settings ? "active" : "")}
+              type="button" aria-label="Cài đặt tài khoản" aria-current={settings ? "page" : undefined}
+              onClick={() => onSettings && action(onSettings)} disabled={!onSettings}>
               <span className="avatar">
                 {(user?.name || user?.email || "U").slice(0, 1).toUpperCase()}
               </span>
-              <span>
+              <span className="account-identity">
                 <strong>{user?.name || "Người dùng"}</strong>
                 <span className="account-email">{user?.email}</span>
               </span>
-            </div>
-            <p className="account-roadmap">Quản lý tài khoản · Roadmap</p>
+              <Settings2 className="icon account-settings-icon" aria-hidden="true" />
+            </button>
             <div className="sidebar-bottom">
-              <button onClick={() => action(onLanding)}>Về giới thiệu</button>
               <button onClick={onLogout} aria-label="Đăng xuất">
-                <Icon name="logout" />
+                <Icon name="logout" /> Đăng xuất
               </button>
             </div>
           </div>
@@ -170,19 +178,19 @@ export function Workspace({
               </button>
               <div>
                 <div className="eyebrow">
-                  {services ? "DỊCH VỤ CỦA NHÓM" : "WORKSPACE ATI"}
+                  {settings ? "KHÔNG GIAN CỦA BẠN" : services ? "DỊCH VỤ CỦA NHÓM" : "WORKSPACE Planora"}
                 </div>
-                <h1>{services ? "Dịch vụ của nhóm" : title}</h1>
+                <h1>{settings ? "Cài đặt tài khoản" : services ? "Dịch vụ của nhóm" : title}</h1>
               </div>
             </div>
             <div className="header-actions">
               <button
                 className="btn"
-                onClick={services ? onWorkspace : onServices}
-                aria-label={services ? "Về hội thoại" : "Mở cài đặt dịch vụ"}
+                onClick={services || settings ? onWorkspace : onServices}
+                aria-label={services || settings ? "Về hội thoại" : "Mở cài đặt dịch vụ"}
               >
-                <Icon name={services ? "back" : "grid"} />
-                <span>{services ? "Về hội thoại" : "Dịch vụ"}</span>
+                <Icon name={services || settings ? "back" : "grid"} />
+                <span>{services || settings ? "Về hội thoại" : "Dịch vụ"}</span>
               </button>
             </div>
           </header>

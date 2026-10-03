@@ -1,6 +1,11 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+} from "@testing-library/react";
 import { LoginView } from "../../src/components/LoginView";
 
 afterEach(() => {
@@ -8,7 +13,42 @@ afterEach(() => {
 });
 
 describe("LoginView Component", () => {
-  it("renders split-screen branding and essential form elements", () => {
+  it("warns about Caps Lock only while typing a password and blocks submission while pending", () => {
+    const onLogin = vi.fn((event) => event.preventDefault());
+    const props = {
+      email: "user@example.test",
+      setEmail: vi.fn(),
+      password: "fixture-only",
+      setPassword: vi.fn(),
+      isLoggingIn: false,
+      authError: null,
+      onLogin,
+    };
+    const { rerender } = render(<LoginView {...props} />);
+    const password = screen.getByLabelText("Mật khẩu");
+    fireEvent.keyUp(password, { key: "A", modifierCapsLock: true });
+    expect(screen.getByRole("status")).toHaveTextContent("Caps Lock đang bật.");
+    expect(password).toHaveAttribute("aria-describedby", "login-caps-lock");
+    fireEvent.blur(password);
+    expect(screen.queryByRole("status")).toBeNull();
+    rerender(<LoginView {...props} isLoggingIn />);
+    expect(
+      screen.getByRole("button", { name: "Hiện mật khẩu" }),
+    ).toBeDisabled();
+    fireEvent.submit(screen.getByRole("form", { name: "Đăng nhập Planora" }));
+    expect(onLogin).not.toHaveBeenCalled();
+  });
+  it("offers account creation only when the API enables it", () => {
+    const onSignup=vi.fn();
+    const props={email:"",password:"",setEmail:vi.fn(),setPassword:vi.fn(),isLoggingIn:false,authError:null,onLogin:vi.fn(),onSignup};
+    const {rerender}=render(<LoginView {...props}/>);
+    expect(screen.queryByRole("button",{name:/Tạo tài khoản/})).toBeNull();
+    rerender(<LoginView {...props} signupEnabled/>);
+    fireEvent.click(screen.getByRole("button",{name:/Tạo tài khoản/}));
+    expect(onSignup).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("heading",{name:/Điều lớn lao/})).toBeInTheDocument();
+  });  it("renders split-screen branding and essential form elements", () => {
     const setEmail = vi.fn();
     const setPassword = vi.fn();
     const onLogin = vi.fn();
@@ -25,12 +65,9 @@ describe("LoginView Component", () => {
       />,
     );
 
-    // Brand and platform title
-    expect(screen.getByText(/AI Workflow Automation Platform/i)).toBeDefined();
-    expect(screen.getAllByText(/GitHub/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Trello/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Slack/i).length).toBeGreaterThan(0);
-
+    // Product identity and public footer share a single destination.
+    expect(screen.getByRole("contentinfo",{name:"Chân trang Planora"})).toBeInTheDocument();
+    expect(screen.getByRole("link",{name:"Dịch vụ"})).toHaveAttribute("href","/?view=landing#services");
     // Form inputs accessible by label
     expect(screen.getByLabelText("Email")).toBeDefined();
     expect(screen.getByLabelText("Mật khẩu")).toBeDefined();
@@ -167,9 +204,9 @@ describe("LoginView Component", () => {
 
     const alert = screen.getByRole("alert");
     expect(alert.textContent).toContain("Email hoặc mật khẩu không chính xác");
-    expect(screen.getByText("Roadmap")).toBeInTheDocument();
+    expect(screen.queryByText("Roadmap")).toBeNull();
     expect(
-      screen.getByText(/Đăng ký.*quên mật khẩu.*Google/),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Google|Đăng ký|Quên mật khẩu/ }),
+    ).toBeNull();
   });
 });

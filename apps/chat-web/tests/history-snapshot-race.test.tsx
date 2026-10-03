@@ -33,7 +33,7 @@ const saved: ExecutionSnapshot = {
 };
 let finishPreview: (plan: ActivePlan) => void;
 beforeEach(() => {
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/?view=workspace");
   useChatStore.getState().reset();
   useChatStore.getState().setConversations([]);
   resetSSEState();
@@ -57,14 +57,14 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/?view=workspace");
   vi.restoreAllMocks();
   vi.clearAllMocks();
   authStorage.clearStoredTokens();
 });
 async function selectHistory() {
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: /History/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "History" }));
   await waitFor(() => expect(fetchEventSource).toHaveBeenCalled());
   await waitFor(() => expect(apiClient.getActivePlan).toHaveBeenCalled());
   return vi.mocked(fetchEventSource).mock.calls.at(-1)![1];

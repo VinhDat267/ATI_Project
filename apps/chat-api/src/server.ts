@@ -25,6 +25,7 @@ import {
 } from '@wap/planner';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createApp } from './app.js';
+import { createSmtpSender, OutboxEmailSender } from './services/email/sender.js';
 
 async function bootstrap() {
   const env = validateEnv();
@@ -81,13 +82,33 @@ async function bootstrap() {
     convRepo = {
       createConversation: async (userId: string) => {
         const id = `conv_${Date.now()}`;
-        const row = { id, user_id: userId, title: 'Cuộc hội thoại mới', created_at: new Date(), updated_at: new Date() };
+        const row = { id, user_id: userId, title: 'Cuộc hội thoại mới', status: 'chatting', archived_at: null, deleted_at: null, created_at: new Date(), updated_at: new Date() };
         convMap.set(id, row);
         msgMap.set(id, []);
         return row;
       },
-      listConversations: async (userId: string) => Array.from(convMap.values()).filter((c) => c.user_id === userId),
-      getConversation: async (id: string) => convMap.get(id) || null,
+      listConversations: async (userId: string, limit = 50, filter = 'active') => Array.from(convMap.values())
+        .filter((c) => c.user_id === userId && (filter === 'deleted' ? c.deleted_at : !c.deleted_at && (filter === 'archived' ? c.archived_at : !c.archived_at)))
+        .sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at)).slice(0, limit),
+      getConversation: async (id: string) => {
+        const row = convMap.get(id);
+        return row && !row.deleted_at ? row : null;
+      },
+      changeVisibility: async (id: string, userId: string, action: string) => {
+        const row = convMap.get(id);
+        if (!row || row.user_id !== userId || (row.deleted_at && action === 'archive'))
+          throw Object.assign(new Error('Không tìm thấy hội thoại.'), { status: 404 });
+        const unresolved = Array.from(planMap.values()).some((plan) => plan.conv_id === id &&
+          !['completed', 'failed', 'rejected', 'expired', 'superseded', 'stopped'].includes(plan.status) &&
+          !(plan.status === 'pending' && +new Date(plan.expires_at) <= Date.now()));
+        if (action !== 'restore' && unresolved)
+          throw Object.assign(new Error('Hãy hủy kế hoạch chờ duyệt hoặc kết thúc quy trình trước khi lưu trữ hay xóa hội thoại.'), {status:409});
+        if (action === 'restore') { row.archived_at = null; row.deleted_at = null; }
+        else if (action === 'archive') row.archived_at ||= new Date();
+        else row.deleted_at ||= new Date();
+        row.updated_at = new Date();
+        return {...row};
+      },
     };
 
     msgRepo = {
@@ -425,6 +446,9 @@ async function bootstrap() {
 
   // 7. Express App
   const app = createApp({
+    signupEnabled: process.env.AUTH_SIGNUP_ENABLED !== 'false',
+    appBaseUrl: process.env.APP_BASE_URL,
+    emailSender: env.RUNTIME_MODE === 'live' ? createSmtpSender(process.env) : pool ? new OutboxEmailSender(pool) : undefined,
     jwtSecret: env.JWT_SECRET,
     userRepo,
     validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD

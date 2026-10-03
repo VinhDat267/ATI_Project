@@ -95,7 +95,7 @@ function ServiceTile({
               </span>
             ))
           ) : (
-            <p className="small muted">Chưa có phạm vi được phép</p>
+            <p className="small muted">Chưa chọn tài nguyên</p>
           )}
         </div>
         <div className="service-card-footer">
@@ -130,8 +130,8 @@ function ServiceTile({
       {open && (
         <Modal title={"Cấu hình " + service.name} onClose={close}>
           <p className="small muted">
-            Thông tin truy cập dùng chung cho nhóm. Máy chủ kiểm tra quyền lưu
-            cấu hình; không lưu khóa trong trình duyệt.
+            Thông tin kết nối được dùng chung cho nhóm. Bạn cần quyền quản trị
+            dịch vụ để thay đổi cấu hình.
           </p>
           <ServiceCard
             service={service.id}
@@ -193,16 +193,14 @@ export default function ServicesView() {
               Một phần của kế hoạch.
             </h2>
             <p>
-              Cấu hình tài nguyên mà ATI được phép sử dụng. Thông tin truy cập
-              dùng chung cho nhóm, còn mỗi kế hoạch vẫn cần bạn duyệt.
+              Kết nối các công cụ của nhóm và chọn tài nguyên Planora được phép sử dụng.
             </p>
           </div>
         </section>
         <div className="service-notice">
           <Icon name="shield" />
           <span>
-            Lưu cấu hình và kiểm tra kết nối là hai bước riêng biệt. Trạng thái
-            lấy từ máy chủ và lần kiểm tra trong phiên này.
+            Sau khi lưu cấu hình, kiểm tra kết nối để bắt đầu sử dụng.
           </span>
         </div>
         {loading ? (
@@ -236,16 +234,16 @@ export default function ServicesView() {
               />
             ))}
             {services.length === 0 && (
-              <p>Chưa có dịch vụ được đăng ký trên máy chủ.</p>
+              <p>Chưa có dịch vụ nào khả dụng.</p>
             )}
           </section>
         )}
         <section className="roadmap-section">
           <div className="section-heading">
             <h2>Những kết nối tiếp theo.</h2>
-            <span className="pill ghost">Roadmap</span>
+            <span className="pill ghost">Dự kiến</span>
           </div>
-          <p>Các dịch vụ đang được phát triển; chưa thể cấu hình tại đây.</p>
+          <p>Các kết nối này chưa khả dụng.</p>
           <div className="roadmap-chips">
             {[
               "Google Sheets",

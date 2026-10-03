@@ -69,7 +69,7 @@ test('v3 launcher starts the sandbox API and web proxy together', { timeout: 35_
     assert.equal(login.status, 200);
     assert.ok((await login.json()).accessToken);
     const web = await waitFor(`http://127.0.0.1:${webPort}/`, child, () => output);
-    assert.match(await web.text(), /AI Workflow Platform v3/);
+    assert.match(await web.text(), /<title>Planora · Từ ý tưởng đến hành động<\/title>/);
     const proxiedApi = await waitFor(`http://127.0.0.1:${webPort}/api/health`, child, () => output);
     assert.equal(proxiedApi.status, 200);
   } finally {

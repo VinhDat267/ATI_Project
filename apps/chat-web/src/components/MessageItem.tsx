@@ -1,5 +1,5 @@
 import React from "react";
-import { AtiMark } from "./Brand";
+import { PlanoraMark } from "./Brand";
 import type { MessageRole, MessageStatus } from "../types";
 
 export interface MessageItemProps {
@@ -88,11 +88,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       }
     >
       <span className="ati-avatar">
-        <AtiMark />
+        <PlanoraMark />
       </span>
       <div className="message-content">
         <div className="message-meta">
-          <strong>{role === "system" ? "Thông báo" : "ATI"}</strong>
+          <strong>{role === "system" ? "Thông báo" : "Planora"}</strong>
           {time}
         </div>
         <div>{renderFormattedContent(content)}</div>

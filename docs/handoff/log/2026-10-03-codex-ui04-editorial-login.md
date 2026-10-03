@@ -1,0 +1,16 @@
+# UI-04 · Login editorial trực quan
+
+Ngày03/10/2026. Chủ dự án yêu cầu hoàn thiện trang login và làm phần editorial sáng tạo/trực quan đẹp hơn. Đọc state/README/AGENTS/team-workflow, ba log ui03-account-settings/ui02-floating-dropdown/ui02-recent-only-sidebar; kiểm status/log5. HEAD995f5f7/Frontend_UXUI không đổi, dirty files trước thuộc cùng agent. Đọc auth spec §8.1 và auth-routes thực tế: login/refresh/me hiện có, signup/Google/reset-password vẫn roadmap. Tạo UI-04 trước code. Không sửa backend/v2/dependency/CURRENT-STATE/ROADMAP/commit/push/deploy.
+
+Files: LoginView.tsx, mới LoginStory.tsx/login.css, tests/components/login-view.test.tsx, DESIGN/task/log này. Composition max1360px, editorial lớn/tỷ lệ1.2:0.8, form420px; cream/forest, serif48px/italic, paper16px/lớp lệch1.2°, ATI seal và logo tự host chung. Stage tabs mặc định Lời nhắn, request→plan→result có một nhãn ví dụ, không API/links/status thật. Keyboard role/tabindex/Arrow/Home/End; inactive aria-hidden/inert/visibilityhidden. Grid chồng scene reserve chiều cao lớn nhất theo viewport, không JS đo layout/timer/rAF/listener. CSS entrance220ms/translate4px và reduced-motion; không ambient motion lặp.
+
+Form email/password hiện có, required/autocomplete, pending/error rõ, icon/focus/autofill, passwordtoggle44px/aria-pressed và disabled pending, form aria-busy/submit guard, error-describedby, Caps Lock hint khi typing/clearblur. Native details xin tài khoản do quản trị cấp theo cơ chế hiện có; không form/CTA signup/Google/forgot giả. Mobile form trước/editorial sau vẫn tương tác được, không ẩn giới thiệu. Không credential injection hoặc persistence mới.
+
+Kiểm chứng:
+
+- RED tabcase exit1,1fail/7pass; GREEN focused login+navigation13pass; bổ sung Caps Lock/blur/pending form test, login9pass. Frontend mocks chỉ kiểm UI/callback, không chứng nhận DB race/timeout.
+- Full cuối `npm run test -w @wap/chat-web`: exit0,34files/193tests,4.77s. `npm run build -w @wap/chat-web`: exit0,tsc/Vite1921modules/438ms; main331.01kB/gzip102.29, CSS98.55kB/gzip20.86. Prettier4files phạm vi login, không thêm thư viện. Diff-check PASS. Không chạy lại backend/packages vì không đổi chúng.
+- Browser CUA5176: desktop1440×900/mobile390×844/320×740, scrollWidth≤viewport, form trước/editorial sau trên mobile. Ba stage bằng click/End, focus đúng. Mobile paper312.0625px trước/sau đổi Kết nối→Lời nhắn; intrinsic grid tại320px tăng đủ chiều cao, không overflow/clipping. Form/help details xem được bằng cuộn; password mask/pending/error giữ. Reduced-motion CSS reviewed, không claim giả lập OS/touch hardware.
+- API local3006 với PostgreSQL schema fixture `ui_lifecycle_preview_20261003`: sai password kiểm thử trả auth error thật; password fixture đúng vào workspace, loginflow vẫn hoạt động. Logout fixture rồi về login/clear fields, không ghi chat/service/provider, không đổi credentials/account/DB/config. API cũ không restart.
+
+Ảnh ngoài repo: `C:/Users/Admin/.codex/visualizations/2026/10/02/01a0faf0-f9b9-7432-89ab-cfec274816e2/ati-implementation/login-editorial-desktop.png` và `login-editorial-mobile.png`. Preview5176 `?view=login`, viewport reset/tab giữ deliverable. Không tuyên bố hoàn thành các AUTH roadmap; chưa review độc lập/CI/PR.

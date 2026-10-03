@@ -1,4 +1,4 @@
-import { AtiMark, Icon } from "./Brand";
+import { PlanoraMark, Icon } from "./Brand";
 export interface MissionControlLaunchpadProps {
   onSendMessage: (message: string) => void;
 }
@@ -8,14 +8,14 @@ export function MissionControlLaunchpad(_: MissionControlLaunchpadProps) {
   return (
     <section className="empty-workspace">
       <span className="ati-avatar">
-        <AtiMark />
+        <PlanoraMark />
       </span>
-      <div className="eyebrow">CÙNG ATI SẮP XẾP CÔNG VIỆC</div>
+      <div className="eyebrow">CÙNG Planora SẮP XẾP CÔNG VIỆC</div>
       <h2>Bắt đầu bằng một lời nhắn.</h2>
       <p>
         Điều bạn muốn làm, những nơi bạn đang làm việc.
         <br />
-        ATI giúp nối chúng thành một kế hoạch rõ ràng.
+        Planora giúp nối chúng thành một kế hoạch rõ ràng.
       </p>
       <div className="suggestions">
         <button
@@ -53,8 +53,7 @@ export function MissionControlLaunchpad(_: MissionControlLaunchpadProps) {
         </button>
       </div>
       <p className="empty-note">
-        Gợi ý chỉ điền vào ô nhập. ATI sẽ kiểm tra dịch vụ và tài nguyên khi bạn
-        gửi yêu cầu.
+        Chọn một gợi ý hoặc viết điều bạn muốn làm.
       </p>
     </section>
   );

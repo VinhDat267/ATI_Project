@@ -3,6 +3,27 @@ import { apiClient } from '../../src/services/api-client';
 import { authStorage } from '../../src/services/auth-storage';
 
 describe('ApiClient', () => {
+  it('waits for a delayed winning refresh response from another tab', async () => {
+    authStorage.setStoredTokens({accessToken:'old',refreshToken:'old-refresh'});
+    let publish!:()=>void;
+    vi.stubGlobal('fetch', vi.fn(async()=>({ok:false,status:409,json:async()=>{
+      publish=()=>authStorage.setStoredTokens({accessToken:'late-access',refreshToken:'late-refresh'});
+      return {code:'REFRESH_ROTATED'};
+    }})));
+    const refreshing=apiClient.refreshToken();
+    await Promise.resolve(); await Promise.resolve();
+    publish();
+    await expect(refreshing).resolves.toEqual({accessToken:'late-access',refreshToken:'late-refresh'});
+  });
+  it('uses the winner of a cross-tab refresh instead of clearing its session', async () => {
+    authStorage.setStoredTokens({accessToken:'old',refreshToken:'old-refresh'});
+    vi.stubGlobal('fetch', vi.fn(async()=>{
+      authStorage.setStoredTokens({accessToken:'winning-access',refreshToken:'winning-refresh'});
+      return {ok:false,status:409,json:async()=>({code:'REFRESH_ROTATED'})};
+    }));
+    await expect(apiClient.refreshToken()).resolves.toEqual({accessToken:'winning-access',refreshToken:'winning-refresh'});
+    expect(authStorage.getStoredTokens().accessToken).toBe('winning-access');
+  });
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();

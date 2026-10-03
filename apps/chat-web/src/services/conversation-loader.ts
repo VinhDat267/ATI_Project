@@ -13,6 +13,7 @@ export async function openConversation(id: string) {
   try {
     const data = await apiClient.getConversation(id);
     if (!current()) return false;
+    store.setConversationArchived(Boolean(data.conversation?.archived_at));
     for (const m of data.messages || []) {
       if (m.metadata?.type === "working_memory" && !m.content) continue;
       store.addMessage({ ...m, timestamp: m.created_at || m.timestamp });

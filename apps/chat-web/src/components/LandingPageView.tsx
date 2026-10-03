@@ -1,13 +1,24 @@
 import { Brand, Icon, ServiceLogo } from "./Brand";
 import { useHeroMotion } from "../hooks/use-hero-motion";
-import { useId, useState } from "react";
+import { useId, useState, useLayoutEffect } from "react";
 import { useLandingStory } from "../hooks/use-landing-story";
+import { PublicFooter } from './PublicFooter';
+import { PublicServices } from './PublicServices';
 export interface LandingPageViewProps {
   onGoToLogin: () => void;
+  isAuthenticated?: boolean;
+  onGoToServices?: () => void;
 }
-export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
+export function LandingPageView({ onGoToLogin, onGoToServices, isAuthenticated = false }: LandingPageViewProps) {
   const heroMotion = useHeroMotion();
   const motion = useLandingStory();
+  useLayoutEffect(() => {
+    // React renders anchor targets after the browser's initial fragment lookup.
+    const target = window.location.hash.slice(1);
+    if (['services', 'how', 'ecosystem', 'main'].includes(target)) {
+      document.getElementById(target)?.scrollIntoView?.({ behavior: 'instant' });
+    }
+  }, []);
   return (
     <div className="public-page" ref={motion.root}>
       <a className="skip-link" href="#main">
@@ -19,15 +30,15 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
           <a className="nav-anchor" href="#how">
             Cách hoạt động
           </a>
-          <a className="nav-anchor" href="#ecosystem">
+          <a className="nav-anchor" href="#services">
             Dịch vụ
           </a>
           <button
             className="btn primary"
             onClick={onGoToLogin}
-            aria-label="Đăng nhập vào hệ thống"
+            aria-label={isAuthenticated ? "Mở workspace" : "Đăng nhập vào hệ thống"}
           >
-            Đăng nhập
+            {isAuthenticated ? "Mở workspace" : "Đăng nhập"}
             <Icon name="arrow" />
           </button>
         </nav>
@@ -35,7 +46,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
       <main id="main">
         <section className="hero">
           <div>
-            <div className="eyebrow">CÙNG ATI SẮP XẾP CÔNG VIỆC</div>
+            <div className="eyebrow">CÙNG Planora SẮP XẾP CÔNG VIỆC</div>
             <h1>
               Một lời nhắn.
               <br />
@@ -45,11 +56,11 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
             </h1>
             <p className="hero-copy">
               Biến ý tưởng thành kế hoạch trên những dịch vụ bạn đã quen. Bạn
-              kiểm tra, bạn quyết định — ATI phối hợp các bước còn lại.
+              kiểm tra, bạn quyết định — Planora phối hợp các bước còn lại.
             </p>
             <div className="hero-cta">
               <button className="btn primary" onClick={onGoToLogin}>
-                Bắt đầu cùng ATI
+                Bắt đầu cùng Planora
                 <Icon name="arrow" />
               </button>
               <a className="btn subtle" href="#how">
@@ -69,7 +80,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
                 {...heroMotion.events}
                 tabIndex={0}
                 role="group"
-                aria-label="Mẫu quy trình ATI. Kéo ngang để xoay, hoặc dùng phím mũi tên trái và phải."
+                aria-label="Ví dụ quy trình Planora. Kéo ngang để xoay, hoặc dùng phím mũi tên trái và phải."
               >
                 {/* Rounded solid slices give the card a visible edge at any angle. */}
                 {Array.from({ length: 14 }, (_, index) => (
@@ -84,8 +95,8 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
                 ))}
                 <div className="hero-visual hero-front" ref={heroMotion.front}>
                   <div className="hero-visual-label">
-                    <span>WORKSPACE ATI</span>
-                    <span>VÍ DỤ MINH HỌA</span>
+                    <span>WORKSPACE Planora</span>
+                    <span>Ví dụ quy trình</span>
                   </div>
                   <div className="mini-request">
                     <span className="avatar">L</span>Tạo issue đăng nhập, đưa
@@ -100,7 +111,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
                       </span>
                     </div>
                     {[
-                      ["github", "Tạo issue trên GitHub", "ati-demo/web-app"],
+                      ["github", "Tạo issue trên GitHub", "frontend/web-app"],
                       ["trello", "Tạo thẻ trên Trello", "Frontend / Cần làm"],
                       ["slack", "Thông báo tới nhóm", "#frontend"],
                     ].map(([service, title, resource], index) => (
@@ -131,7 +142,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
                   aria-hidden="true"
                   inert
                 >
-                  <span className="brand-word">ati</span>
+                  <span className="brand-word">planora</span>
                   <h2>Ý tưởng → Kế hoạch → Hành động</h2>
                   <p>GitHub · Trello · Slack</p>
                 </div>
@@ -143,6 +154,8 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
           className="service-strip"
           id="ecosystem"
           aria-labelledby="integrations-title"
+          data-landing-reveal
+          data-scroll-surface
         >
           <h2 className="service-strip-title" id="integrations-title">
             Các dịch vụ đã có tích hợp
@@ -184,7 +197,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
               chuyển qua lại giữa từng dịch vụ.
             </p>
           </div>
-          <p className="story-label">QUY TRÌNH MINH HỌA</p>
+          <p className="story-label">VÍ DỤ: MỘT YÊU CẦU, BA BƯỚC</p>
           <div className="how-grid" ref={motion.story}>
             <div className="workflow-rail" aria-hidden="true">
               <span className="workflow-fill" />
@@ -193,7 +206,7 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
             {[
               [
                 "Nói điều bạn cần.",
-                "Mô tả công việc bằng một lời nhắn. ATI tìm tài nguyên liên quan và hỏi thêm nếu có điều chưa rõ.",
+                "Mô tả công việc bằng một lời nhắn. Planora tìm tài nguyên liên quan và hỏi thêm nếu có điều chưa rõ.",
               ],
               [
                 "Xem trước, rồi quyết định.",
@@ -204,48 +217,80 @@ export function LandingPageView({ onGoToLogin }: LandingPageViewProps) {
                 "Xem tiến trình từng bước. Khi có lỗi hoặc chưa rõ kết quả, bạn được hướng dẫn xử lý trước khi tiếp tục.",
               ],
             ].map(([title, copy], i) => (
-              <article className="how-card" key={title}>
+              <article className="how-card" key={title} data-landing-reveal data-scroll-surface>
                 <span className="serif">0{i + 1}</span>
                 <h3>{title}</h3>
                 <p>{copy}</p>
                 <div className="workflow-fragment">
-                  {i === 0 ? (
-                    <q>Tạo issue đăng nhập và báo cho nhóm frontend.</q>
-                  ) : (
-                    <ul>
-                      {(i === 1 ? [
-                        ["GitHub", "Tạo issue"], ["Trello", "Tạo thẻ"], ["Slack", "Thông báo nhóm"],
-                      ] : [
-                        ["GitHub", "Đã tạo issue"], ["Trello", "Đã tạo thẻ"], ["Slack", "Đã thông báo nhóm"],
-                      ]).map(([service, action]) => (
-                        <li key={service}>
-                          <span aria-hidden="true">{i === 1 ? "→" : "✓"}</span>
-                          <strong>{service}</strong><span>{action}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <WorkflowIllustration step={i} />
                 </div>
               </article>
             ))}
           </div>
           <LandingRoadmap />
         </section>
-        <section className="landing-bottom" ref={motion.panel} {...motion.pointer} data-landing-reveal>
+        <PublicServices isAuthenticated={isAuthenticated} onOpen={onGoToServices || onGoToLogin}/>
+        <section className="landing-bottom" ref={motion.panel} {...motion.pointer} data-landing-reveal data-scroll-surface>
           <div>
             <h2>Dành chỗ cho điều bạn muốn làm.</h2>
             <p>Bắt đầu trong workspace, duyệt trước khi tạo thay đổi.</p>
           </div>
           <button className="btn primary magnetic-cta" ref={motion.magnet} onClick={onGoToLogin}>
-            Bắt đầu cùng ATI
+            Bắt đầu cùng Planora
             <Icon name="arrow" />
           </button>
         </section>
       </main>
-      <footer className="public-footer">
-        <span>ati · Từ ý tưởng đến hành động.</span>
-        <span>AI Workflow Automation Platform</span>
-      </footer>
+      <PublicFooter/>
+    </div>
+  );
+}
+
+const illustratedWorkflow = [
+  { service: "github", name: "GitHub", action: "Tạo issue", result: "Đã tạo issue", resource: "frontend/web-app" },
+  { service: "trello", name: "Trello", action: "Tạo thẻ", result: "Đã tạo thẻ", resource: "Frontend / Cần làm" },
+  { service: "slack", name: "Slack", action: "Thông báo nhóm", result: "Đã thông báo nhóm", resource: "#frontend" },
+];
+
+/** Static, labelled examples; none of these miniature controls call the API. */
+function WorkflowIllustration({ step }: { step: number }) {
+  const title = ["Yêu cầu", "Kế hoạch", "Kết quả"][step];
+  return (
+    <div className={`workflow-preview workflow-preview-${step}`} role="group" aria-label={`Ví dụ về ${title.toLowerCase()}`}>
+      <div className="workflow-preview-bar">
+        <span><Icon name={["chat", "shield", "check"][step]} />{title}</span>
+      </div>
+      {step === 0 ? (
+        <div className="workflow-chat">
+          <div className="workflow-chat-author"><span className="workflow-avatar"><Icon name="chat" /></span><strong>Bạn</strong></div>
+          <div className="workflow-chat-message">Tạo issue đăng nhập, thêm vào Trello và báo cho nhóm frontend.</div>
+          <div className="workflow-chat-footer">
+            <span>Một lời nhắn, nhiều kết nối.</span>
+            <span className="workflow-send" aria-hidden="true"><Icon name="send" /></span>
+          </div>
+        </div>
+      ) : (
+        <ul className="workflow-preview-rows">
+          {illustratedWorkflow.map(({ service, name, action, result, resource }) => (
+            <li key={service}>
+              <span className="workflow-service-mark"><ServiceLogo name={service} size={20} /></span>
+              <div className="workflow-row-copy">
+                <strong>{step === 1 ? action : result}</strong>
+                <span>{name} · {resource}</span>
+              </div>
+              <span className={step === 2 ? "workflow-result-check" : "workflow-row-arrow"}>
+                <Icon name={step === 2 ? "check" : "arrow"} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {step > 0 && (
+        <div className={`workflow-preview-foot ${step === 2 ? "workflow-preview-complete" : ""}`}>
+          <Icon name={step === 1 ? "clock" : "check"} />
+          <span>{step === 1 ? "Chờ bạn duyệt" : "Công việc đã được kết nối"}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -254,17 +299,17 @@ function LandingRoadmap() {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
-    <div className="roadmap-section landing-roadmap" onKeyDown={(event) => {
+    <div className="roadmap-section landing-roadmap" data-landing-reveal data-scroll-surface onKeyDown={(event) => {
       if (event.key === "Escape" && open) { setOpen(false); event.stopPropagation(); }
     }}>
       <div className="section-heading">
         <h2>Những kết nối tiếp theo.</h2>
         <button className="pill ghost roadmap-toggle" aria-expanded={open} aria-controls={id}
           onClick={() => setOpen(!open)} type="button">
-          Roadmap <span className="roadmap-sign" aria-hidden="true">+</span>
+          Dự kiến <span className="roadmap-sign" aria-hidden="true">+</span>
         </button>
       </div>
-      <p>Google Sheets, Google Calendar, Notion, Telegram và Jira nằm trong kế hoạch mở rộng.</p>
+      <p>Dự kiến bổ sung Google Sheets, Google Calendar, Notion, Telegram và Jira.</p>
       <div className="roadmap-unfold" id={id} hidden={!open}>
         <div className="roadmap-route">
           <div className="roadmap-stop">
@@ -277,7 +322,7 @@ function LandingRoadmap() {
             <p>Google Sheets · Google Calendar · Notion · Telegram · Jira</p>
           </div>
         </div>
-        <p className="roadmap-disclaimer">Chưa thể cấu hình các dịch vụ dự kiến. Thời điểm phát hành chưa được xác định.</p>
+        <p className="roadmap-disclaimer">Các kết nối dự kiến chưa khả dụng.</p>
       </div>
     </div>
   );

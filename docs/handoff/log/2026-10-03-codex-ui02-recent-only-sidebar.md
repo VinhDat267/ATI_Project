@@ -1,0 +1,13 @@
+# UI-02 · Workspace chỉ giữ Gần đây
+
+Ngày03/10/2026. Chủ dự án muốn sidebar gọn, chỉ để Gần đây; danh sách Lưu trữ/Đã xóa chuyển vào Cài đặt ở lượt sau. Tiếp tục UI-02/Frontend_UXUI HEAD995f5f7, đã đọc state/README và ba log mới nhất navigation-and-history-actions/sidebar-utilities/product-copy, kiểm status/log5. Dirty changes thuộc các lượt trước của cùng agent, bảo toàn checkout; không đổi nhánh, backend, migration, data hay v2. Không commit/push/deploy/CURRENT-STATE/ROADMAP.
+
+- SidebarHistory: bỏ bộ ba tab; Gần đây thành heading nhỏ, danh sách là region có accessible name đúng. Workspace mặc định chỉ GET active. Component nhận filter do owning view truyền để giữ khả năng dùng lại ở Cài đặt sau, không có control chuyển filter trong UI hiện tại. Search/date/refresh/race guards/menu ⋯/archive/delete/modal giữ nguyên. Không thêm Cài đặt giả; deleted list recovery chưa có đường UI tới, backend restore còn nguyên. Direct archived URL vẫn có banner restore.
+- Copy xóa: nói hội thoại ẩn khỏi danh sách, nội dung được giữ; CTA Xác nhận xóa và feedback Đã xóa hội thoại, không dẫn đến mục chưa có. Bỏ CSS history-tabs. DESIGN và kết quả UI-02 cập nhật giới hạn/settings roadmap rõ ràng. Không xóa dữ liệu đã archive/deleted.
+- Chỉ sửa SidebarHistory.tsx/sidebar.css, test conversation-actions hiện có (controlled filter thay tab, vẫn kiểm archive/restore/API failure, thêm assertion region/no-tab vào case hiện có), DESIGN/task/log này. Không thêm test cho trang Cài đặt chưa làm.
+
+Kiểm chứng: full `npm run test -w @wap/chat-web` exit0,33 files/184 tests,8.27s; build exit0. Sau sửa feedback cuối,9 focused tests trong conversation-actions/sidebar-history PASS, exit0; build cuối exit0,1917 modules,529ms, CSS86.97kB/gzip18.43, main321.72kB/gzip99.90, service7.70kB/gzip2.82. Không chạy lại backend/package regressions vì không sửa chúng. Git diff-check PASS.
+
+CUA: tab đang mở5175 đã hot-update với GẦN ĐÂY, không còn tabs; proxy API cũ vẫn báo lỗi kết nối, không thêm data giả. Preview5176 đã có session/dữ liệu kiểm thử schema riêng từ lượt trước: sidebar populated, region Gần đây,0 tabs; desktop no overflow, mobile390×844 scrollWidth390; drawer mở menu có Lưu trữ/Xóa, Escape đóng menu/đóng drawer bình thường. Không thực hiện mutation/provider writes trong lượt này. Viewport reset, preview5176 giữ deliverable; không restart API phiên cũ.
+
+Ảnh: `C:/Users/Admin/.codex/visualizations/2026/10/02/01a0faf0-f9b9-7432-89ab-cfec274816e2/ati-implementation/recent-sidebar-desktop.jpg` và `recent-sidebar-mobile.jpg`. Các hội thoại có prefix Kiểm thử, không dữ liệu người dùng. Màn Cài đặt/lists phục hồi là việc sau theo yêu cầu; chưa tuyên bố đã triển khai chúng.

@@ -4,7 +4,8 @@ import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createServicesRoutes } from './routes/services-routes.js';
-import { createAuthMiddleware } from './auth/jwt.js';
+import { authContext, adminUserRoutes } from './routes/auth/index.js';
+import type { EmailSender } from './services/email/sender.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
@@ -18,6 +19,9 @@ import type { ExecutionService } from './services/execution-service.js';
 export interface AppOptions {
   jwtSecret: string;
   userRepo?: UserRepo;
+  signupEnabled?: boolean;
+  emailSender?: EmailSender;
+  appBaseUrl?: string;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
@@ -54,13 +58,16 @@ export function createApp(options: AppOptions): Express {
     res.status(200).json({ status: 'ok', version: 'v3' });
   });
 
+  const context = authContext({jwtSecret:options.jwtSecret,userRepo:options.userRepo,validateCredentials:options.validateCredentials,
+    adminIds:options.serviceAdminUserIds,signupEnabled:options.signupEnabled,emailSender:options.emailSender,appBaseUrl:options.appBaseUrl});
   // Auth routes (public login/refresh, protected /me)
   app.use(
     '/api/auth',
-    createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, validateCredentials: options.validateCredentials })
+    createAuthRoutes(context)
   );
 
-  const authMiddleware = createAuthMiddleware(options.jwtSecret);
+  const authMiddleware = context.middleware;
+  app.use('/api/admin/users',adminUserRoutes(context));
 
   // Services routes (protected via Bearer header)
   app.use(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useChatStore } from "./store/chat-store";
 import { useSSE } from "./hooks/use-sse";
 import { authStorage, subscribeAuthTokens } from "./services/auth-storage";
@@ -13,8 +13,12 @@ import { Modal } from "./components/Modal";
 import { ViewBoundary } from "./components/ViewBoundary";
 import { openConversation } from "./services/conversation-loader";
 import { userError } from "./services/user-error";
+import { RuntimeNotice } from "./components/RuntimeNotice";
 const ServicesView = lazy(() => import("./views/ServicesView"));
-type View = "landing" | "login" | "workspace" | "services";
+const AccountSettingsView = lazy(() => import("./views/AccountSettingsView"));
+type View = "landing" | "login" | "signup" | "verify-email" | "workspace" | "services" | "settings";
+const SignupView = lazy(()=>import('./components/SignupView').then(module=>({default:module.SignupView})));
+const VerifyEmailView = lazy(()=>import('./components/VerifyEmailView').then(module=>({default:module.VerifyEmailView})));
 import { LoginView } from "./components/LoginView";
 import { LandingPageView } from "./components/LandingPageView";
 
@@ -30,6 +34,7 @@ export interface AppProps {
 export const App: React.FC<AppProps> = ({ initialView }) => {
   const {
     conversationId,
+    conversationArchived,
     messages,
     streamingText,
     isStreaming,
@@ -50,26 +55,31 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     const view = new URLSearchParams(window.location.search).get("view");
     if (
       view === "login" ||
+      view === "signup" || view === "verify-email" ||
       view === "landing" ||
       view === "workspace" ||
-      view === "services"
+      view === "services" || view === "settings"
     )
       return view;
-    return (
-      initialView ||
-      (authStorage.getStoredTokens().accessToken ? "workspace" : "landing")
-    );
+    return initialView || "landing";
   };
   const [currentView, setCurrentView] = useState<View>(readView);
   const [routeVersion, setRouteVersion] = useState(0);
   const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftKey = conversationId || "new";
+  const updateDraft = useCallback((value: string) => {
+    setDrafts((previous) => ({ ...previous, [draftKey]: value }));
+  }, [draftKey]);
   const navigate = (view: View, id?: string | null) => {
     const url = new URL(window.location.href);
     url.searchParams.set("view", view);
     if (id) url.searchParams.set("c", id);
-    else if (view !== "workspace" && view !== "services")
-      url.searchParams.delete("c");
+    else url.searchParams.delete("c");
+    url.searchParams.delete("next");
+    if (view !== "settings") url.searchParams.delete("section");
+    url.hash = "";
     window.history.pushState({}, "", url);
     setCurrentView(view);
     setRouteVersion((v) => v + 1);
@@ -82,15 +92,54 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
   }, []);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(() => authStorage.getStoredTokens().accessToken);
+  const [user, setUser] = useState<User | null>(() => authStorage.getStoredTokens().user);
   const [authError, setAuthError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [signupEnabled,setSignupEnabled] = useState<boolean|null>(null);
+  const [verificationToken] = useState(()=>new URLSearchParams(window.location.search).get('token'));
+  useLayoutEffect(() => {
+    if (currentView === 'login' || currentView === 'signup' || currentView === 'verify-email') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [currentView]);
+  useEffect(()=>{
+    let active=true;
+    apiClient.getAuthConfig().then(data=>{if(active)setSignupEnabled(data.signupEnabled);}).catch(()=>{if(active)setSignupEnabled(false);});
+    return()=>{active=false;};
+  },[]);
+  const navigateAuth = (view:'login'|'signup') => {
+    setAuthError(null);setPassword('');
+    const url=new URL(window.location.href);url.searchParams.set('view',view);url.searchParams.delete('token');url.hash='';
+    window.history.pushState({},'',url);setCurrentView(view);setRouteVersion(v=>v+1);
+  };
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const recoveryPending = useRef(false);
+  useEffect(() => {
+    const protectedView = currentView === "workspace" || currentView === "services" || currentView === "settings";
+    if (protectedView && !authToken) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("next", currentView);
+      url.searchParams.set("view", "login");
+      url.hash = "";
+      window.history.replaceState({}, "", url);
+      setCurrentView("login");
+    } else if ((currentView === "login" || currentView === "signup") && authToken) {
+      const url = new URL(window.location.href);
+      const destination = url.searchParams.get("next");
+      const next = destination === "services" || destination === "settings" ? destination : "workspace";
+      url.searchParams.set("view", next);
+      url.searchParams.delete("next");
+      window.history.replaceState({}, "", url);
+      setCurrentView(next);
+    }
+  }, [authToken, currentView]);
+  useEffect(() => {
+    if (!authToken) setDrafts({});
+  }, [authToken]);
   useEffect(() => {
     setRecoveryError(null);
   }, [conversationId, executionSnapshot?.plan.id]);
@@ -146,7 +195,9 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
       setAuthToken(data.accessToken);
       setUser(data.user);
       setPassword("");
-      navigate("workspace");
+      const route = new URLSearchParams(window.location.search);
+      const next = route.get("next");
+      navigate(next === "services" || next === "settings" ? next : "workspace", route.get("c"));
     } catch (err: any) {
       setAuthError(userError(err));
     } finally {
@@ -154,7 +205,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await apiClient.logout(); } catch { /* Local sign-out must remain available offline. */ }
     authStorage.clearStoredTokens();
     setAuthToken(null);
     setUser(null);
@@ -341,7 +393,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   useEffect(() => {
     if (
       !authToken ||
-      (currentView !== "workspace" && currentView !== "services")
+      (currentView !== "workspace" && currentView !== "services" && currentView !== "settings")
     )
       return;
     const id = new URLSearchParams(window.location.search).get("c");
@@ -351,6 +403,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
   if (currentView === "landing")
     return (
       <LandingPageView
+        onGoToServices={()=>navigate('services',conversationId)}
+        isAuthenticated={Boolean(authToken)}
         onGoToLogin={() =>
           navigate(
             authToken ? "workspace" : "login",
@@ -359,6 +413,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         }
       />
     );
+  if(currentView==='verify-email') return <ViewBoundary label="xác minh email"><Suspense fallback={<p role="status">Đang mở trang xác minh…</p>}><VerifyEmailView token={verificationToken} onLogin={()=>navigateAuth('login')} onBackToLanding={()=>navigate('landing')}/></Suspense></ViewBoundary>;
+  if(currentView==='signup'&&!authToken) return <ViewBoundary label="tạo tài khoản"><Suspense fallback={<p role="status">Đang mở trang tạo tài khoản…</p>}><SignupView signupEnabled={signupEnabled} onLogin={()=>navigateAuth('login')} onBackToLanding={()=>navigate('landing')}/></Suspense></ViewBoundary>;
   if (!authToken)
     return (
       <LoginView
@@ -370,6 +426,8 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
         authError={authError}
         onLogin={loginUser}
         onBackToLanding={() => navigate("landing")}
+        signupEnabled={signupEnabled===true}
+        onSignup={()=>navigateAuth('signup')}
       />
     );
   const preview = activePlan && ["preview", "approving"].includes(planStatus);
@@ -379,27 +437,43 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
     <Workspace
       user={user}
       services={currentView === "services"}
+      settings={currentView === "settings"}
+      onSettings={() => navigate("settings", conversationId)}
       onServices={() => navigate("services", conversationId)}
       onWorkspace={() => navigate("workspace", conversationId)}
       onNew={handleNewConversation}
-      onLanding={() => navigate("landing")}
       onLogout={handleLogout}
       onSelect={(id) => navigate("workspace", id)}
+      onConversationRemoved={(id) => {
+        if (useChatStore.getState().conversationId !== id) return;
+        reset();
+        navigate(currentView === "settings" ? "settings" : "workspace", null);
+      }}
     >
-      <div
-        className={"mode-notice " + (mode === "sandbox" ? "sandbox" : "")}
-        role="status"
-      >
-        {mode === "sandbox"
-          ? "Giao diện thử nghiệm · Xác nhận API ở sandbox trước khi duyệt. Kế hoạch và kết quả sandbox là dữ liệu minh họa."
-          : mode === "live"
-            ? "Chế độ live · Kế hoạch chỉ tạo thay đổi sau khi bạn duyệt."
-            : "Chưa xác nhận chế độ API. Kiểm tra môi trường trước khi duyệt thao tác ghi."}
-      </div>
+      <RuntimeNotice mode={mode} />
       {authError && (
         <p role="alert" className="app-alert">
           {authError}
         </p>
+      )}
+      {conversationArchived && currentView === "workspace" && (
+        <div className="archived-notice" role="status">
+          <span>Hội thoại đã lưu trữ. Khôi phục để tiếp tục làm việc.</span>
+          <button className="text-button" disabled={recoveryBusy} onClick={async () => {
+            if (!conversationId) return;
+            const restoringId = conversationId;
+            setRecoveryBusy(true);
+            try {
+              await apiClient.restoreConversation(restoringId);
+              if (useChatStore.getState().conversationId === restoringId)
+                useChatStore.getState().setConversationArchived(false);
+            } catch (error) {
+              if (useChatStore.getState().conversationId === restoringId)
+                setAuthError(userError(error));
+            }
+            finally { setRecoveryBusy(false); }
+          }}>Khôi phục hội thoại</button>
+        </div>
       )}
       {currentView === "services" ? (
         <ViewBoundary>
@@ -416,15 +490,36 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             <ServicesView />
           </Suspense>
         </ViewBoundary>
+      ) : currentView === "settings" ? (
+        <ViewBoundary key="settings" label="cài đặt tài khoản">
+          <Suspense fallback={<div className="settings-loading"><div className="skeleton-card" role="status">Đang mở cài đặt…<div className="skeleton" /></div></div>}>
+            <AccountSettingsView
+              user={user}
+              mode={mode}
+              currentConversationId={conversationId}
+              onOpenConversation={(id) => navigate("workspace", id)}
+              onConversationRemoved={(id) => {
+                if (useChatStore.getState().conversationId !== id) return;
+                reset();
+                navigate("settings", null);
+              }}
+              onServices={() => navigate("services", conversationId)}
+              onLogout={handleLogout}
+            />
+          </Suspense>
+        </ViewBoundary>
       ) : (
         <ChatContainer
+          draft={drafts[draftKey] || ""}
+          onDraftChange={updateDraft}
           messages={messages}
           onSendMessage={handleSendMessage}
           streamingText={streamingText}
           isStreaming={isStreaming}
           busy={planStatus === "approving" || planStatus === "executing"}
+          readOnly={conversationArchived}
           actions={
-            preview && (
+            preview && !conversationArchived && (
               <PlanActions
                 plan={activePlan}
                 isApproving={planStatus === "approving"}
@@ -435,7 +530,7 @@ export const App: React.FC<AppProps> = ({ initialView }) => {
             )
           }
         >
-          {messages.length === 0 && (
+          {messages.length === 0 && !conversationArchived && (
             <MissionControlLaunchpad onSendMessage={handleSendMessage} />
           )}
           {preview && (

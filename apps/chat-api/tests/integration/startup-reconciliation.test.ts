@@ -12,6 +12,7 @@ import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { generateTokens } from '../../src/auth/jwt.js';
+import { AccountRepo } from '../../src/auth/accounts.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
@@ -81,7 +82,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql']) {
+    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0003_conversation_visibility.sql', '0004_auth_sessions.sql', '0005_auth_signup.sql']) {
       await pool.query(await readFile(resolve(root, 'db/v3', migration), 'utf8'));
     }
     planRepo = new PlanRepo(pool);
@@ -89,7 +90,9 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     convRepo = new ConversationRepo(pool);
     const user = await new UserRepo(pool).createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
     userId = user.id;
-    token = generateTokens(user, secret).accessToken;
+    await pool.query("UPDATE users SET status='active',email_verified=TRUE WHERE id=$1",[user.id]);
+    const session=await new AccountRepo(pool).createSession(user.id);
+    token = generateTokens(user, secret, {sessionId:session.sid}).accessToken;
   });
 
   afterEach(async () => {

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
 import { REGISTERED_SERVICES, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
+import { isAdmin } from '../auth/accounts.js';
 
 export interface ServicesRoutesOptions {
   credentialRepo?: CredentialRepo;
@@ -79,7 +80,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   router.post('/:service/credentials', async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user?.id;
-      if (!userId || !options.adminUserIds?.includes(userId)) {
+      if (!userId || !isAdmin((req as any).user,options.adminUserIds)) {
         res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
         return;
       }

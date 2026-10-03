@@ -75,34 +75,33 @@ export function Icon({ name }: { name: string }) {
   const Component = icons[name as keyof typeof icons] || Grid2X2;
   return <Component className="icon" aria-hidden="true" />;
 }
-export function AtiMark() {
+export function PlanoraMark() {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" fill="none">
+    <svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" fill="none">
       <path
-        d="M8 24V10a5 5 0 0 1 10 0v14M8 16h10m0 0 6-8"
+        d="M10 25V7h8a6 6 0 0 1 0 12h-8m0 6 13-13"
         stroke="currentColor"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
-      <circle cx="8" cy="24" r="2" fill="currentColor" />
-      <circle cx="18" cy="16" r="2" fill="currentColor" />
-      <circle cx="24" cy="8" r="2" fill="currentColor" />
+      <circle cx="10" cy="25" r="2" fill="currentColor" />
+      <circle cx="23" cy="12" r="2" fill="currentColor" />
     </svg>
   );
 }
-export function Brand({ onClick }: { onClick?: () => void }) {
+export function Brand({ onClick, label = "Planora — trang giới thiệu" }: { onClick?: () => void; label?: string }) {
   return (
     <button
       type="button"
       className="brand brand-button"
       onClick={onClick}
-      aria-label="ATI — trang giới thiệu"
+      aria-label={label}
     >
       <span className="brand-symbol">
-        <AtiMark />
+        <PlanoraMark />
       </span>
       <span>
-        <span className="brand-word">ati</span>
+        <span className="brand-word">planora</span>
         <span className="brand-sub" style={{ display: "block" }}>
           Workflow workspace
         </span>

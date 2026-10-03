@@ -15,7 +15,7 @@ class TestPointerEvent extends MouseEvent {
   }
 }
 
-describe("Existing ATI hero physical card", () => {
+describe("Existing Planora hero physical card", () => {
   let frames: Map<number, FrameRequestCallback>;
   let nextFrame: number;
   let reduced: boolean;

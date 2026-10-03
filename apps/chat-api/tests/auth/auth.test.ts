@@ -51,6 +51,7 @@ describe('apps/chat-api (Task 15: Auth & JWT Handling)', () => {
     const { accessToken } = generateTokens(user, secret, { accessTtlSeconds: -10 });
 
     expect(() => verifyAccessToken(accessToken, secret)).toThrow(/token expired/i);
+    expect(() => verifyAccessToken(generateTokens(user, secret, { accessTtlSeconds: 0 }).accessToken, secret)).toThrow(/token expired/i);
   });
 
   it('creates authMiddleware that attaches user to req or returns 401 on failure', async () => {

@@ -65,7 +65,7 @@ export class ExecutionService {
     });
   }
 
-  async getOwnedPlan(planId: string, userId: string) {
+  async getOwnedPlan(planId: string, userId: string, requireActive = false) {
     const plan = await this.planRepo.getPlan(planId);
     if (!plan) throw Object.assign(new Error('Plan not found'), { status: 404 });
     if (!userId || !this.convRepo) throw Object.assign(new Error('Ownership verification unavailable'), { status: 403 });
@@ -73,13 +73,15 @@ export class ExecutionService {
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
     }
+    if (requireActive && conversation.archived_at)
+      throw Object.assign(new Error('Hãy khôi phục hội thoại trước khi duyệt kế hoạch.'), { status: 409 });
     return plan;
   }
 
   async approveAndStart(planId: string, userId: string): Promise<ApproveResult> {
     let planRow;
     try {
-      planRow = await this.getOwnedPlan(planId, userId);
+      planRow = await this.getOwnedPlan(planId, userId, true);
     } catch (err: any) {
       return { success: false, status: err.status || 500, error: err.message };
     }
