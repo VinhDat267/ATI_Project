@@ -1,4 +1,5 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS } from '@wap/tool-schemas';
 
 export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only';
 
@@ -50,7 +51,7 @@ export interface GoldenCase {
 
 export interface CaseScore {
   kindOk: boolean;
-  /** null when the case does not expect a plan. */
+  /** null when no plan or read-tool selection is labelled. */
   toolsOk: boolean | null;
   argsOk: boolean | null;
   passed: boolean;
@@ -64,8 +65,11 @@ export interface CaseRun {
   error?: string;
   latencyMs: number;
   llmCalls: number;
+  searches?: SearchTrace[];
   score: CaseScore;
 }
+
+export interface SearchTrace { tool: string; args: Record<string, unknown>; result?: unknown; error?: string }
 
 type PlanResponse = Extract<PlannerResponse, { kind: 'plan' }>;
 
@@ -74,13 +78,15 @@ const lower = (value: string) => value.toLocaleLowerCase('vi');
 function textOf(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && typeof (value as any).$template === 'string') return (value as any).$template;
+  if (Array.isArray(value)) return value.map(textOf).filter((s): s is string => s !== undefined).join('\n');
   return undefined;
 }
 
 function referencedSteps(value: unknown): string[] {
   if (!value || typeof value !== 'object') return [];
+  if (Array.isArray(value)) return value.flatMap(referencedSteps);
   const ref = (value as any).$ref ?? (value as any).$template;
-  if (typeof ref !== 'string') return [];
+  if (typeof ref !== 'string') return Object.values(value).flatMap(referencedSteps);
   if ((value as any).$ref) return [ref.split('.')[0]!];
   return [...ref.matchAll(/\$\{([^.}]+)\./g)].map((m) => m[1]!);
 }
@@ -91,6 +97,10 @@ function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boo
   if (value === undefined) return false;
   const text = textOf(value);
   if (matcher.equals !== undefined && value !== matcher.equals) return false;
+  if (matcher.instantEquals !== undefined) {
+    if (typeof value !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ||
+        !Number.isFinite(Date.parse(value)) || Date.parse(value) !== Date.parse(matcher.instantEquals)) return false;
+  }
   if (matcher.startsWith !== undefined && !(typeof value === 'string' && value.startsWith(matcher.startsWith))) return false;
   if (matcher.endsWith !== undefined && !(typeof value === 'string' && value.endsWith(matcher.endsWith))) return false;
   if (matcher.includesAny && !(text !== undefined && matcher.includesAny.some((s) => lower(text).includes(lower(s))))) return false;
@@ -153,10 +163,18 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
   return { toolsAssigned, argsOk, passed, total, failures };
 }
 
-export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[]): CaseScore {
+export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[], searches: SearchTrace[] = []): CaseScore {
   const kindOk = response?.kind === golden.expect.kind;
   const failures: string[] = [];
   if (!kindOk) failures.push(`kind: expected ${golden.expect.kind}, got ${response?.kind ?? 'error'}`);
+  if (golden.expect.searches?.length) {
+    const traced: PlanResponse = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: searches
+      .filter(s => s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
+      .map((s, index) => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [] })) };
+    const scored = scoreAlternative(golden.expect.searches, traced);
+    return { kindOk, toolsOk: scored.toolsAssigned, argsOk: scored.argsOk,
+      passed: kindOk && scored.toolsAssigned && scored.argsOk, matchers: { passed: scored.passed, total: scored.total }, failures: [...failures, ...scored.failures] };
+  }
   if (golden.expect.kind !== 'plan') {
     return { kindOk, toolsOk: null, argsOk: null, passed: kindOk, matchers: { passed: 0, total: 0 }, failures };
   }
@@ -186,7 +204,7 @@ const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + 
 const rate = (flags: boolean[]) => mean(flags.map(Number));
 
 function runMetrics(run: CaseRun[]) {
-  const planCases = run.filter((r) => r.case.expect.kind === 'plan');
+  const planCases = run.filter((r) => r.score.toolsOk !== null);
   const withTools = planCases.filter((r) => r.score.toolsOk);
   const matched = planCases.reduce((sum, r) => sum + r.score.matchers.passed, 0);
   const labelled = planCases.reduce((sum, r) => sum + r.score.matchers.total, 0);
@@ -204,7 +222,7 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? 0;
 }
 
-export function aggregateRuns(runs: CaseRun[][]) {
+export function aggregateRuns(runs: CaseRun[][], catalog: ToolDefinition[] = ALL_TOOLS) {
   const perRun = runs.map(runMetrics);
   const keys = Object.keys(perRun[0] ?? {}) as Array<keyof ReturnType<typeof runMetrics>>;
   const meanMetrics = Object.fromEntries(keys.map((key) =>
@@ -223,10 +241,31 @@ export function aggregateRuns(runs: CaseRun[][]) {
   }));
 
   const latencies = all.map((r) => r.latencyMs).sort((a, b) => a - b);
+  const services = [...new Set(all.flatMap(r => r.case.services ?? []))];
+  const byService = Object.fromEntries(services.map(service => {
+    const serviceRuns = runs.map(run => run.filter(r => r.case.services?.includes(service)).map(r => {
+      const options = r.case.expect.anyOf ?? [r.case.expect.steps ?? []];
+      const narrowed: GoldenCase = { ...r.case, expect: { ...r.case.expect,
+        steps: undefined, anyOf: options.map(option => option.filter(s => s.tool.split('.')[0] === service)),
+        searches: r.case.expect.searches?.filter(s => s.tool.split('.')[0] === service),
+        allowExtraTools: [...options.flat().filter(s => s.tool.split('.')[0] !== service).map(s => s.tool), ...r.case.expect.allowExtraTools ?? []],
+      } };
+      return { ...r, score: scoreCase(narrowed, r.response, catalog, r.searches) };
+    }));
+    const rows = serviceRuns.flat();
+    const perServiceRun = serviceRuns.map(runMetrics);
+    return [service, { cases: new Set(rows.map(r => r.case.id)).size, attempts: rows.length,
+      scoredAttempts: rows.filter(r => r.score.toolsOk !== null).length,
+      argumentAttempts: rows.filter(r => r.score.toolsOk === true).length,
+      runs: perServiceRun, mean: Object.fromEntries(keys.map(key => [key, mean(perServiceRun.map(m => m[key]).filter((v): v is number => v !== null))])),
+      latencyMs: { p50: percentile(rows.map(r => r.latencyMs).sort((a,b) => a-b), 0.5), p95: percentile(rows.map(r => r.latencyMs).sort((a,b) => a-b), 0.95) },
+    }];
+  }));
   return {
     runs: perRun,
     mean: meanMetrics,
     byCategory,
+    byService,
     stability,
     latencyMs: { p50: percentile(latencies, 0.5), p95: percentile(latencies, 0.95), max: latencies.at(-1) ?? 0 },
     /** Requires user acceptance of previews; not measurable from labels. */

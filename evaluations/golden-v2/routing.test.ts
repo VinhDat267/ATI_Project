@@ -5,6 +5,7 @@ import { ALL_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
 import golden from './cases.json';
 import freeform from './cases-freeform.json';
 import launchpad from './launchpad-prompts.json';
+import services from './cases-services.json';
 import { legacyRoutingFailures } from './legacy-routing-guard.js';
 
 const corpus = [
@@ -53,6 +54,27 @@ it('preserves routing for the 50 golden, 18 freeform and 4 launchpad requests in
     registeredServiceIds: SERVICE_REGISTRY.map(service => service.id),
     legacyCatalogServiceIds: [...new Set(legacyCatalog.map(tool => tool.service))],
   })).toEqual([]);
+});
+
+it('matches preregistered routing for all new-service cases in both availability configurations', () => {
+  for (const row of services.cases) {
+    expect(classifyIntent(row.prompt, legacyCatalog, SERVICE_REGISTRY), `${row.id}:legacy`).toEqual(row.routing.legacy);
+    expect(classifyIntent(row.prompt, ALL_TOOLS, SERVICE_REGISTRY), `${row.id}:full`).toEqual(row.routing.full);
+    // These requests explicitly require unavailable services; no partial legacy write plan is permitted.
+    expect(row.routing.legacy, row.id).toEqual([]);
+    for (const spec of row.expect.steps ?? []) expect(row.routing.full, `${row.id}:${spec.tool}`).toContain(spec.tool.split('.')[0]);
+  }
+});
+
+it('does not confuse message history with Calendar or spreadsheet tabs with Notion pages', () => {
+  for (const id of ['sh08', 'no08', 'tg07']) {
+    const row = services.cases.find(c => c.id === id)!;
+    expect(classifyIntent(row.prompt, ALL_TOOLS, SERVICE_REGISTRY), id).not.toContain('calendar');
+  }
+  expect(classifyIntent(services.cases.find(c => c.id === 'sh07')!.prompt, ALL_TOOLS, SERVICE_REGISTRY)).toEqual(['sheets']);
+  // Existing GitHub metadata also reserves "issue". Preserve the broader route;
+  // the model evaluation checks that the actual write selects Jira, never GitHub.
+  expect(classifyIntent(services.cases.find(c => c.id === 'ji06')!.prompt, ALL_TOOLS, SERVICE_REGISTRY)).toEqual(['github', 'jira']);
 });
 
 it('rejects legacy prompts emptied by an unavailable service even when the comparison snapshot has been refreshed', () => {
