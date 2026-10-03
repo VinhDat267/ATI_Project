@@ -69,8 +69,8 @@ it('rejects legacy prompts emptied by an unavailable service even when the compa
   expect(legacyRoutingFailures(refreshedSnapshot)).toEqual(['golden:ss03']);
 });
 
-it('allows the approved rf06 refusal only when registered Calendar is absent from the legacy catalog', () => {
-  expect(rf06.expect.kind).toBe('refusal');
+it('binds the approved rf06 clarification label to the existing unavailable-Calendar legacy exception', () => {
+  expect(rf06.expect.kind).toBe('clarification');
   expect(classifyIntent(rf06.prompt, legacyCatalog, registryWithoutCalendar)).toEqual(['trello', 'slack', 'github']);
   const row = rf06Row();
   expect(row.legacyCatalog).toEqual([]);
