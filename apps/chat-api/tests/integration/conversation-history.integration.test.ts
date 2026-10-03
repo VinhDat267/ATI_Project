@@ -109,6 +109,16 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     expect(third.nextCursor).toBeNull();
   });
 
+  it('treats percent, underscore and backslash literally and excludes wildcard decoys', async () => {
+    await pool.query(await migration());
+    const owner = await user();
+    const titles = ['Percent % literal', 'Underscore _ literal', 'Backslash \\ literal', 'Percent X literal', 'Underscore X literal', 'Backslash X literal'];
+    for (const title of titles) await repo.renameConversation((await repo.createConversation(owner)).id, owner, title);
+    for (const [search, expected] of [['%', titles[0]], ['_', titles[1]], ['\\', titles[2]]]) {
+      expect((await repo.listConversationPage(owner, { search })).conversations.map(row => row.title)).toEqual([expected]);
+    }
+  });
+
   it('HTTP rename and detail hide foreign conversations; invalid cursor/title are rejected', async () => {
     const owner = await user(), other = await user();
     const conversation = await repo.createConversation(owner);

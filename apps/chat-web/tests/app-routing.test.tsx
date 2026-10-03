@@ -54,6 +54,22 @@ it('hydrates a direct route when StrictMode restarts mount effects', async () =>
   expect(await screen.findByText('Pending preview')).toBeInTheDocument();
   expect(screen.queryByText('Đang tải hội thoại...')).toBeNull();
 });
+it.each([false, true])('keeps loaded detail and preview after optional snapshot failure, with newer SSE=%s', async newerExecution => {
+  let rejectSnapshot!: (reason: Error) => void;
+  vi.mocked(apiClient.getLatestExecutionSnapshot).mockImplementation(() => new Promise((_resolve, reject) => { rejectSnapshot = reject; }));
+  window.history.replaceState({}, '', '/c/saved'); authStorage.setStoredTokens({ accessToken: 'access', user });
+  render(<App />);
+  await waitFor(() => expect(useChatStore.getState().activePlan?.id).toBe('pending'));
+  await waitFor(() => expect(rejectSnapshot).toBeDefined());
+  if (newerExecution) act(() => useChatStore.getState().updateStepStatus('step_live', 'succeeded'));
+  await act(async () => rejectSnapshot(Object.assign(new Error('Snapshot unavailable'), { status: 503 })));
+  expect(await screen.findByText('Saved request')).toBeInTheDocument();
+  expect(screen.getByText('Pending preview')).toBeInTheDocument();
+  expect(useChatStore.getState().conversationId).toBe('saved');
+  expect(useChatStore.getState().planStatus).toBe('preview');
+  expect(useChatStore.getState().executionLoadError).toBe(newerExecution ? null : 'Snapshot unavailable');
+  if (newerExecution) expect(useChatStore.getState().stepStatuses.step_live).toBe('succeeded');
+});
 it('shows an owner-scoped not-found view and clears prior data for a foreign link', async () => {
   window.history.replaceState({}, '', '/c/foreign'); authStorage.setStoredTokens({ accessToken: 'access', user });
   useChatStore.getState().addMessage({ id: 'previous', role: 'user', content: 'Previous private message' });

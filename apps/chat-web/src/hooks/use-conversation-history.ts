@@ -25,7 +25,10 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
     }
   } catch { /* A missing pending plan still permits loading durable execution evidence. */ }
-  if (isCurrent()) await refreshExecutionSnapshot(id);
+  if (isCurrent()) {
+    try { await refreshExecutionSnapshot(id); }
+    catch { /* Optional snapshot errors use the helper's error state/revision guards; keep loaded detail and preview. */ }
+  }
 }
 
 export function useConversationHistory(id: string | null) {
