@@ -189,10 +189,15 @@ describe('AUTH-01 server sessions with real PostgreSQL and HTTP', () => {
     expect((await login()).status).toBe(200);
   });
 
-  it('counts concurrent password failures toward the same login limit', async () => {
-    const results = await Promise.all(Array.from({ length: 5 }, () => request(app).post('/api/auth/login').send({ email, password: 'wrong-password' })));
-    expect(results.every(result => result.status === 401)).toBe(true);
+  it('bounds concurrent password verification to five failures for the same IP/email', async () => {
+    const results = await Promise.all(Array.from({ length: 12 }, () => request(app).post('/api/auth/login').send({ email, password: 'wrong-password' })));
+    expect(results.filter(result => result.status === 401)).toHaveLength(5);
+    const blocked = results.filter(result => result.status === 429);
+    expect(blocked).toHaveLength(7);
+    expect(blocked.every(result => result.headers['retry-after'] === '900')).toBe(true);
     expect((await login()).status).toBe(429);
+    now += 15 * 60 * 1000;
+    expect((await login()).status).toBe(200);
   });
 
   it('rejects malformed credential bodies without reaching password verification', async () => {
