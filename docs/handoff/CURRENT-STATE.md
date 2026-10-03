@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau khi PR #31 (W3-02 Calendar) merge; `main` = `ab2c599`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code.
+**Cập nhật lần cuối:** 03/10/2026, sau khi PR #32 (W3-03 Notion) merge; `main` = `fca384d`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -8,16 +8,16 @@
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
-> - **service mới:** W3-00b và W3-03 → W3-07, Notion, Telegram, Jira; nghiệm thu Google thật còn chờ W3-07;
+> - **service mới:** W3-00b và W3-04 → W3-07, Telegram, Jira; nghiệm thu Google/Notion thật còn chờ W3-07;
 > - **tài khoản:** AUTH-01 → AUTH-06;
 > - **frontend:** FE-02 → FE-03;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`. Task service tiếp theo là W3-03 Notion; AUTH-01 và FE-02 có thể làm song song. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
+> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`. Task service tiếp theo là W3-04 Telegram; AUTH-01 và FE-02 có thể làm song song. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
 
 ## 1. Sản phẩm
 
-Đề tài môn ATI (thay khóa luận): **AI Workflow Automation Platform**. Người dùng mô tả công việc bằng một câu chat; AI chọn tool, lập plan nhiều bước, người dùng duyệt, hệ thống có adapter cho Trello, Slack, GitHub, Google Sheets và Google Calendar. Google thật còn chờ nghiệm thu W3-07. Mục tiêu: một câu chat thay 4–5 thao tác thủ công trên ít nhất hai hệ thống.
+Đề tài môn ATI (thay khóa luận): **AI Workflow Automation Platform**. Người dùng mô tả công việc bằng một câu chat; AI chọn tool, lập plan nhiều bước, người dùng duyệt, hệ thống có adapter cho Trello, Slack, GitHub, Google Sheets, Google Calendar và Notion. Google/Notion thật còn chờ nghiệm thu W3-07. Mục tiêu: một câu chat thay 4–5 thao tác thủ công trên ít nhất hai hệ thống.
 
 - Khởi động dự án 10/09/2026. Giữa kỳ nộp 30/09. Cuối kỳ (nộp + bảo vệ) dự kiến khoảng 11/11/2026.
 - Báo cáo môn học chỉ lưu ở máy nhóm trưởng, không commit lên repo công khai.
@@ -30,7 +30,7 @@
 | `apps/chat-api` | Backend Express 5: JWT, hội thoại, approval (hash SHA-256, hạn 30 phút), thực thi, SSE |
 | `packages/planner` | Router (keyword rule), prefetch resource directory, model tự gọi search tool, validator 5 lớp (JSON, schema, semantic, an toàn, grounding) |
 | `packages/executor` | Resolve `$ref`/`$template`, chạy tuần tự, timeout qua AbortSignal, trạng thái `unknown` cho lệnh ghi không rõ kết quả |
-| `packages/tool-schemas` | Catalog 23 tool: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3 (14 read, 9 write) |
+| `packages/tool-schemas` | Catalog 27 tool: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3, Notion 4 (16 read, 11 write) |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi |
 | `db/v3` | 6 bảng PostgreSQL |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
@@ -39,19 +39,19 @@ Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-02 tại fix `0089690`, và [CI PR #31](https://github.com/VinhDat267/ATI_Project/actions/runs/37079513310) xanh trên head `13e1583`, hoàn tất 03/10/2026 theo giờ Việt Nam. Commit merge `ab2c599` có cây file giống hệt head đã kiểm thử `13e1583` (đã kiểm bằng `git diff --exit-code`). Các bằng chứng golden với model/live cũ giữ nguyên ngày đo và giới hạn; W3-01/W3-02 chưa chạy provider hoặc Google thật.
+Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-03 sau fix `c6b8d07`, và [CI PR #32](https://github.com/VinhDat267/ATI_Project/actions/runs/37091065971) xanh trên head `dd111c4`, hoàn tất 03/10/2026 theo giờ Việt Nam. Commit merge `fca384d` có cây file giống hệt head đã kiểm thử `dd111c4` (đã kiểm bằng `git diff --exit-code`). Các bằng chứng golden với model/live cũ giữ nguyên ngày đo và giới hạn; W3-01/W3-02/W3-03 chưa chạy provider hoặc Google/Notion thật.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 677/677 | kiểm tra cuối W3-02; CI 03/10 tại `13e1583` | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá (offline) | 91/91 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 11/11 ca | như trên; CI PR #31 pass tại `13e1583` | `npm run test:browser:v3` |
+| Unit + integration v3 | 742/742 | kiểm tra cuối W3-03; CI 03/10 tại `dd111c4` | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá (offline) | 92/92 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 12/12 ca | như trên; CI PR #32 pass tại `dd111c4` | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 1 lần | 50/50; p50/p95 5,5/14,8 s | 01/10, trước việc 5 của PR #13 | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 1 lần | 18/18; p50/p95 7,8/12,1 s | như trên | như trên |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
 
-Lần kiểm tra cuối: người thi công chạy `npm run check` tại `0089690`, exit0: v3 677 = 42 schema +149 adapters +138 planner +25 executor +162 API +161 web; eval91; typecheck/build, quét bản build, launcher1/local-env3; browser11/11 và strict test harness tsc exit0. Reviewer độc lập trước fix tự chạy check675+91, browser11/11 và strict typecheck, phát hiện một Important: Retry-After dài bị cắt ngắn, có thể gửi lại lệnh ghi sớm. Đã sửa một lượt qua TDD RED2/42 → GREEN42/42 Calendar adapter; Retry-After >30 giây dừng với RATE, không gửi lại. Không re-review; CI xác nhận head cuối. Registry có năm service. Snapshot riêng chỉ đổi ba tuyến full catalog rf03/rf06/ff15; legacy72/72 giữ nguyên, các câu khác giữ nguyên. Ngoại lệ Calendar rf06 vẫn giữ prompt/label refusal; full catalog định tuyến câu này tới Calendar, catalog ba service trả []; W3-06 xử lý label và ngoại lệ cùng nhau trước model campaign.
+Lần kiểm tra cuối: người thi công chạy `npm run check` sau fix `c6b8d07`, exit0: v3 742 = 44 schema +204 adapters +142 planner +25 executor +166 API +161 web; eval92; typecheck/build, quét bản build, launcher1/local-env3; browser12/12 và strict test harness tsc exit0. Reviewer độc lập trước fix tự chạy check734+92, browser12/12 và strict typecheck; edge probes16/20, bốn lỗi cùng I1 query làm mất properties. Đã sửa một lượt qua TDD RED8/55 → GREEN55/55 Notion adapter. M1 relation bị cắt ngắn được regrade Important và giữ `[incomplete]`, không mở rộng tài nguyên ngoài scope. Không re-review; CI xác nhận head cuối. Registry có sáu service. Snapshot Notion riêng chỉ đổi hai fallback full catalog rf03/ff15; legacy72/72 và các câu khác giữ nguyên. Ngoại lệ Calendar rf06 vẫn giữ prompt/label refusal; full catalog định tuyến câu này tới Calendar, catalog ba service trả []; W3-06 xử lý label và ngoại lệ cùng nhau trước model campaign.
 
 Bằng chứng FE-01 trước đó: đóng hộp thoại lỗi gọi lại Stop → 3 test fail; modal gọi `onStop` khi thiếu `onClose` → 1 test fail; gỡ cả hai lớp chặn demo login → quét bản build fail (sau sửa của reviewer ở `20119b6`).
 
@@ -75,6 +75,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #29 (W3-00), merge tại `c7a38c0`: registry/transport/sandbox tách theo service; allowlist chung theo scopeKey/scopePattern và scopeLabel API; dữ liệu credentials cũ giữ nguyên; live harness đọc bảng service; grounding giữ thêm key. Có guard keyword/static/routing và hợp đồng mở rộng demo qua HTTP/PostgreSQL/planner/factory. Số file sản phẩm hiện có cần sửa khi thêm service giảm 9 → 7; chưa thêm service thật. Review độc lập Đạt, CI xanh trên `ff67b4c`; ngoại lệ `rf06` đã chốt trong W3-00/common/W3-02. W3-01 → W3-05 được gỡ chặn bởi W3-00, riêng W3-02 vẫn cần W3-01.
 - #30 (W3-01), merge tại `716f568`: service-account Google và bốn Sheets tools có allowlist, local A1, chống công thức, bounded retries và UNKNOWN không replay; API mã hóa/grounding và sandbox Sheets→Slack. Module auth dùng lại cho Calendar; W3-02 đã gỡ chặn. Google thật/model chưa nghiệm thu.
 - #31 (W3-02), merge tại `ab2c599`: ba tool Calendar (list_calendars, list_events, create_event), scope/token riêng khi dùng chung service account với Sheets; allowlist trước mạng, kiểm thời gian và phân trang có giới hạn, create không mời attendees và dùng sendUpdates=none. Lỗi ghi không rõ kết quả thành UNKNOWN, không replay; retry lỗi rate có giới hạn và AbortSignal. API dùng credentials mã hóa, catalog có điều kiện, grounding; browser Calendar→Slack đọc output thực thi từ PostgreSQL. Google thật/model chưa nghiệm thu. Primary `main` đã đồng bộ; worktree Calendar được archive sau khi xác minh tích hợp, giữ nguyên các file riêng của người dùng.
+- #32 (W3-03), merge tại `fca384d` lúc 09:55:14 ngày03/10/2026 (Việt Nam): bốn tool Notion search_databases/query_database/create_page/append_text; UUID chuẩn hóa, Database ID allowlist, mapping data source theo API2026-03-11. Query/create yêu cầu một data source; append kiểm source cha tại execution trước ghi. Property values giữ formula/rollup/files/unique_id/place/verification và marker khi snapshot chưa đầy đủ; select chỉ option có sẵn. Limiter3request/giây/token, mọi lệnh ghi không rõ kết quả UNKNOWN không replay. Browser Notion→Slack kiểm URL từ PostgreSQL. CI head dd111c4 xanh, cây merge giống head; primary main đã đồng bộ, giữ nguyên năm file riêng của người dùng. Google/Notion/model thật chưa nghiệm thu.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
   - mảng tài khoản: đăng ký có admin duyệt, Gmail SMTP, Google, đăng xuất thu hồi token, trang tài khoản;
@@ -89,6 +90,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 |---|---|---|
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật (token hết hạn, ngoài scope, 429, timeout) mới test bằng dữ liệu giả | adapters | W2-03 chờ scope/plan live và người dùng duyệt lệnh ghi; live failure chưa chạy |
+| Notion query/create chưa chọn được data source trong database đa nguồn; relation/rollup là snapshot có giới hạn; page có thể bị di chuyển sau kiểm cha, trước PATCH | `packages/tool-adapters/src/notion/` | Ambiguous source trả VALIDATION; `[incomplete]` khi provider báo thiếu; không tuyên bố kiểm quyền nguyên tử tại API ngoài. Nghiệm thu provider thật W3-07 còn mở |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
 | Sandbox dùng planner mock trả một plan soạn sẵn (giao diện đã báo "Chế độ thử nghiệm"); minor sau FE-01: tiêu đề mẫu "Phát hành Sprint" không khớp nội dung, chấm xanh nhấp nháy luôn hiện, dòng "Chưa xác định chế độ chạy" hiện thoáng khi tải | `server.ts`, `MissionControlLaunchpad.tsx`, `App.tsx` | Không demo sandbox như AI thật; minor gom vào FE-03 |
 | Refresh token là JWT 7 ngày không lưu ở server: đăng xuất không thu hồi được, trái đặc tả §8.1; chưa có đăng ký, quên mật khẩu, chặn đoán mật khẩu | `apps/chat-api/src/auth/jwt.ts`, `routes/auth-routes.ts` | AUTH-01 → AUTH-05 |
@@ -100,7 +102,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 ## 6. Môi trường chạy
 
 - Database: `npm run db:up:v3` (PostgreSQL 16 tại `127.0.0.1:55533`, user/db `ati_v3`). Migration: `npm run db:migrate:v3`.
-- `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`.
+- `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LIVE_SHEETS_SPREADSHEET_IDS`, `LIVE_CALENDAR_IDS`, `NOTION_TOKEN`, `LIVE_NOTION_DATABASE_IDS`.
 - LLM: model `ag/gemini-3.8-flash` qua một cổng tương thích OpenAI chạy ở máy (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`). Cổng này có thể ngừng hoạt động bất cứ lúc nào; trước buổi bảo vệ cần có đường dự phòng qua Gemini API chính thức (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`).
 - Chạy app: `npm run up` (API cổng 3000, web cổng 5174). Chế độ live: `RUNTIME_MODE=live npm run up`, xem mục "Through the app" trong `evaluations/README.md`.
 - Tài nguyên thử nghiệm thật: Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`. Chỉ ghi ra service thật khi người dùng đã duyệt đúng plan đó.
