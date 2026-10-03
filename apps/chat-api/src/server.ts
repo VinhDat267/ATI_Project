@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
 import { validateEnv } from './config/env.js';
 import { getPool } from './db/pool.js';
 import {
@@ -74,34 +75,11 @@ async function bootstrap() {
     );
 
     // In-memory fallback repositories
-    const convMap = new Map<string, any>();
-    const msgMap = new Map<string, any[]>();
+    const { convRepo: memoryConvRepo, msgRepo: memoryMsgRepo, convMap } = createMemoryConversationRepositories();
+    convRepo = memoryConvRepo;
+    msgRepo = memoryMsgRepo;
     const planMap = new Map<string, any>();
     const stepMap = new Map<string, any>();
-
-    convRepo = {
-      createConversation: async (userId: string) => {
-        const id = `conv_${Date.now()}`;
-        const row = { id, user_id: userId, title: 'Cuộc hội thoại mới', created_at: new Date(), updated_at: new Date() };
-        convMap.set(id, row);
-        msgMap.set(id, []);
-        return row;
-      },
-      listConversations: async (userId: string) => Array.from(convMap.values()).filter((c) => c.user_id === userId),
-      getConversation: async (id: string) => convMap.get(id) || null,
-    };
-
-    msgRepo = {
-      createMessage: async (convId: string, role: string, content: string, metadata?: any) => {
-        const id = `msg_${Date.now()}`;
-        const row = { id, conv_id: convId, role, content, metadata: metadata || null, created_at: new Date() };
-        const list = msgMap.get(convId) || [];
-        list.push(row);
-        msgMap.set(convId, list);
-        return row;
-      },
-      listMessages: async (convId: string) => msgMap.get(convId) || [],
-    };
 
     const setMemoryPlanStatus = (plan: any, status: string) => {
       plan.status = status;
