@@ -53,7 +53,15 @@ Mảng tài khoản sẽ thêm khoảng 8 view (signup, verify-email, forgot/res
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
+- PR: [#42](https://github.com/VinhDat267/ATI_Project/pull/42), xếp trên AUTH-01 [#41](https://github.com/VinhDat267/ATI_Project/pull/41); chưa merge.
+- Commit: API `4fdd375`, frontend `c4631dc`, tích hợp AUTH-01 `caf1bd6` và các merge tiếp theo; sửa giữ bằng chứng snapshot `3449f07`. Bản kết hợp có W3-08 từ `main` `c5ce8a0` và AUTH-01 head `4f5aa47`.
 - Test đã chạy và kết quả:
+  - RED→GREEN: routing/history, hydration khi StrictMode chạy lại effect, refresh title, PostgreSQL API, browser empty/reading scroll; regression snapshot lỗi 503 (2 ca, có/không có tiến triển SSE mới) fail trước sửa và giữ đúng detail/preview/evidence sau sửa.
+  - PostgreSQL/memory history **9/9**: first-user title 60 code points, rename/owner isolation, 57 dòng trùng timestamp không trùng/mất dòng, timestamp microsecond trong cùng millisecond, literal `%`/`_`/backslash loại decoy, migration hai lần giữ dữ liệu. Mutation bỏ escaping bị regression decoy bắt; lần probe đầu thiếu setup migration được giữ riêng và không tính là bằng chứng sản phẩm.
+  - `npm run check` sau sửa review: exit 0; v3 **948/948** = schemas 47, adapters 317, planner 172, executor 25, API 203, web 184; evaluation **165/165**; strict typecheck/build/production credential scan/launcher 1/1/environment guards 3/3 đều đạt.
+  - Browser PostgreSQL thật qua đủ 9 scenario: **20/20** trên bản kết hợp; default **11/11** chạy lại sau sửa snapshot. Có Back/Forward, direct URL reload cả pending plan/snapshot, foreign link không lộ dữ liệu, history >50/search/rename, scrollTop 0 và không kéo người đọc phía trên xuống.
+  - Review độc lập: probe retention ban đầu fail, sau `3449f07` exit 0; route/history/snapshot 17/17, history DB/memory 9/9, strict exit 0; kết luận kỹ thuật đạt. CI head đầu đã xanh; CI kiểm tra lại head bàn giao có fix review và tài liệu.
 - Điều chưa làm hoặc khác với task card:
+  - Chọn path route `/`, `/login`, `/c/:id`, không thêm thư viện. App còn **12 dòng**, form/auth ở AuthGate, bố cục ở Workspace, recovery ở hook, view ở `src/views/`.
+  - Cursor gồm `updated_at` PostgreSQL microsecond + UUID; memory fallback giữ cùng contract. Migration title dùng `0004`; task AUTH tiếp theo chọn số chưa dùng theo AUTH-common.
+  - Merge AUTH-01 #41 trước, retarget FE-02 #42 sang main và kiểm tra lại CI. Local browser dùng cấu hình ngoài repo trỏ đúng DB tạm, giữ nguyên guard local/CI; canonical `npm run test:browser:v3` do GitHub CI chạy. Chưa thay CURRENT-STATE/ROADMAP, không redesign giao diện hay thêm dependency.
