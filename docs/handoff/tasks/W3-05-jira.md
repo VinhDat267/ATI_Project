@@ -56,8 +56,8 @@ Kịch bản `jira_slack`: tạo issue Jira → báo Slack kèm `key` và `url` 
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Tài liệu API đã đọc (đường dẫn, ngày):
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#34](https://github.com/VinhDat267/ATI_Project/pull/34), Draft chờ review độc lập và CI final head; chưa merge.
+- Commit: feature `89266ad`, snapshot riêng `8bd61e5`, hai lớp JQL `a6a5a8f`; base `4a4553b` sau Telegram#33. Task/log cuối đi cùng PR.
+- Tài liệu API đã đọc03/10/2026: [Issue search](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/), [Issues](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/), [Projects](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/), [Comments](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-comments/), [Basic auth](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/), [Rate limits](https://developer.atlassian.com/cloud/jira/platform/rate-limiting/), [ADF](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/), [official OpenAPI](https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json). Endpoint mới search/jql, create metadata issueTypes phân trang.
+- Test đã chạy: foundation RED5/7→GREEN7/7; adapter RED43/43→GREEN43/43; SQL integration RED1/1→GREEN1/1; sandbox/live RED2/2→GREEN2/2; browser Jira RED1/1→GREEN1/1; JQL RED2/44→GREEN44/44. Final check exit0 **868v3+94offline eval**, strict NodeNext tsc exit0; full browser **14/14 exit0** với PostgreSQL thật và key/URL step trước đi vào Slack output_json. Extra LF/CRLF site tests đã đạt từ trước; không ghi là fix RED/GREEN.
+- Điều chưa làm/khác card: live Jira/token/permission/custom required fields và model acceptance NOT_RUN (W3-07/W3-06), không live write; llm search, không regex gather theo common. Generic credential pattern thêm để chặn domain trước save/catalog, constructor độc lập. Subtask không hỗ trợ parent; metadata cap10x50, không partial default; shared5requests/sec process-local,429>30s dừng; Lucene punctuation bỏ theo card và quote/backslash escape hai lớp. Parent GET/comment không nguyên tử, allowlist lớn/đa process chưa benchmark. Không sửa v2/CURRENT-STATE/ROADMAP/UI sản phẩm/dependencies. Chi tiết và evidence trong [log](../log/2026-10-03-codex-W3-05-jira.md).
