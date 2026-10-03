@@ -146,12 +146,14 @@ describe('search tools declare the resources they discover', () => {
       'github.search_repos': 'repository',
       'github.search_issues': 'issue',
       'notion.search_databases': 'database',
+      'jira.search_projects': 'project',
+      'jira.search_issues': 'jira_issue',
     });
   });
 
   it('marks the search tools that can enumerate a resource with an empty query', () => {
     expect(ALL_TOOLS.filter((t) => t.listable).map((t) => t.name).sort()).toEqual([
-      'calendar.list_calendars', 'github.search_repos', 'notion.search_databases', 'sheets.list_sheets', 'sheets.list_spreadsheets', 'slack.search_channels', 'telegram.list_chats', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
+      'calendar.list_calendars', 'github.search_repos', 'jira.search_projects', 'notion.search_databases', 'sheets.list_sheets', 'sheets.list_spreadsheets', 'slack.search_channels', 'telegram.list_chats', 'trello.search_boards', 'trello.search_lists', 'trello.search_members',
     ]);
     for (const tool of ALL_TOOLS.filter((t) => t.listable)) expect(tool.discovers, tool.name).toBeDefined();
   });
