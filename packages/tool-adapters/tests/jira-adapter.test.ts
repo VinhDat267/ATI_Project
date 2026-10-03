@@ -39,10 +39,16 @@ it('constructs new endpoint POST JQL, escaping injection and Lucene punctuation;
   const f = scripted(); const a = make(f); const query = 'x" OR project = OTHER OR text ~ "y + - & | ! ( ) { } [ ] ^ ~ * ? \\ :';
   expect(await a.execute('jira.search_issues', { projectKey: 'ATI', query, limit: 20 })).toEqual({ issues: [{ id: '10042', key: 'ATI-42', title: 'Login bug', status: 'Open', url: credentials.siteUrl + '/browse/ATI-42' }] });
   const [url, init] = f.mock.calls[0]!; expect(url).toBe(credentials.siteUrl + '/rest/api/3/search/jql'); expect(init.method).toBe('POST');
-  const body = JSON.parse(init.body); expect(body.jql).toMatch(/^project = "ATI" AND text ~ "/); expect(body.jql).toContain('x\\" OR project'); expect(body.jql).toContain('\\"y'); expect(body.jql).not.toContain('~ "x" OR'); expect(body.fields).toEqual(['summary', 'status', 'project']); expect(body.maxResults).toBe(20);
+  const body = JSON.parse(init.body); expect(body.jql).toMatch(/^project = "ATI" AND text ~ "/); expect(body.jql).toContain('x' + '\\'.repeat(3) + '" OR project'); expect(body.jql).toContain('\\'.repeat(3) + '"y'); expect(body.jql).not.toContain('~ "x" OR'); expect(body.fields).toEqual(['summary', 'status', 'project']); expect(body.maxResults).toBe(20);
   // Every double quote in the text operand is escaped; symbols are removed as permitted by the card.
   const operand = body.jql.slice(body.jql.indexOf('text ~ "') + 8, -'" ORDER BY updated DESC'.length); expect(operand).not.toMatch(/[+&|!(){}\[\]^~*?:]/);
   f.mockClear(); await a.execute('jira.search_issues', { projectKey: 'ATI', query: '' }); expect(JSON.parse(f.mock.calls[0]![1].body).jql).toBe('project = "ATI" ORDER BY updated DESC');
+});
+it('escapes quote and backslash at both Lucene and JQL layers, including unpaired quote', async () => {
+  const f = scripted(); await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'a"b\\c' });
+  const jql = JSON.parse(f.mock.calls[0]![1].body).jql;
+  const operand = jql.slice('project = "ATI" AND text ~ '.length, -' ORDER BY updated DESC'.length);
+  expect(JSON.parse(operand)).toBe('a\\"b\\\\c');
 });
 it('does not leak out-of-project search results or missing identities', async () => {
   for (const result of [{ ...issue, key: 'OTHER-42', fields: { ...issue.fields, project: { key: 'OTHER' } } }, { ...issue, id: undefined }]) {

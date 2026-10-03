@@ -71,7 +71,8 @@ export class JiraAdapter extends BaseAdapter {
       if (args.query !== undefined && !text(args.query, 0, 2000)) throw fail('VALIDATION');
       // Strip Lucene metacharacters permitted by the card, then escape JQL string quotes/backslashes.
       const query = (args.query ?? '').replace(/[+\-&|!(){}\[\]^~*?:]/g, ' ').trim();
-      const escaped = query.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const lucene = query.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const escaped = lucene.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const jql = 'project = "' + key + '"' + (query ? ' AND text ~ "' + escaped + '"' : '') + ' ORDER BY updated DESC';
       const value = await this.request('/search/jql', false, signal, 'POST', { jql, maxResults: limit, fields: ['summary', 'status', 'project'] });
       if (!record(value) || !Array.isArray(value.issues) || value.issues.length > limit) throw fail('SERVER_ERROR');
