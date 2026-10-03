@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau khi PR #39 (W3-08) merge tại `c5ce8a0`. Agent cập nhật: Claude Code; phần W3-00 → W3-06 do Codex (reviewer) ghi.
+**Cập nhật lần cuối:** 03/10/2026, sau khi PR #41 (AUTH-01) merge tại `fbd993f` và #42 (FE-02) merge tại `8b6c8e6`. Codex đồng bộ sau merge; hai task đã qua review độc lập. Giữ kết luận W3-08 của Claude Code.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -9,11 +9,11 @@
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
 > - **service mới:** W3-00b và W3-07; cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures; nghiệm thu service thật còn chờ W3-07. Parity/latency và policy chỉ đọc cần follow-up riêng, chưa có task card sửa sản phẩm;
-> - **tài khoản:** AUTH-01 → AUTH-06;
-> - **frontend:** FE-02 → FE-03;
+> - **tài khoản:** AUTH-02 → AUTH-06; AUTH-01 đã merge;
+> - **frontend:** FE-03; FE-02 đã merge;
 > - **đánh giá:** W4-01 → W4-04.
 >
-> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. AUTH-01 và FE-02 có thể làm song song; W3-07 khi người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
+> **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02 → AUTH-05, FE-03 và phần UI của W3-00b đã gỡ chặn; đăng ký vẫn tắt cho tới khi cả AUTH-02 và AUTH-03 merge. W3-07 chờ người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Thứ tự và các mốc xem `ROADMAP.md`.
 >
 > **Audit độc lập W3** (Claude Code, #37 tại `4171298`): đạt có điều kiện. Chạy lại check 874 + 151, browser 14/14; mutation 19 lần chạy: 17 bị bắt, 1 lọt (Calendar 403), 1 không hợp lệ; probe HTTP + PostgreSQL không lộ bí mật, `siteUrl` Jira độc hại bị chặn. Lỗi trung bình: kết quả đọc không giới hạn kích thước. Task card **W3-08** nên xong trước W3-07 và các phép đo tuần 4.
 >
@@ -36,26 +36,28 @@
 | `packages/executor` | Resolve `$ref`/`$template`, chạy tuần tự, timeout qua AbortSignal, trạng thái `unknown` cho lệnh ghi không rõ kết quả |
 | `packages/tool-schemas` | Catalog 33 tool/8 service: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3, Notion 4, Telegram 2, Jira 4 (19 read, 14 write) |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi |
-| `db/v3` | 6 bảng PostgreSQL |
+| `db/v3` | 8 bảng PostgreSQL, gồm phiên đăng nhập và lịch sử hash refresh token; migrations 0001–0004 |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do + 44 câu services), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
 
 Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `db/migrations`) là lưu trữ, **không sửa**.
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra cuối W3-06 và [CI PR #35](https://github.com/VinhDat267/ATI_Project/actions/runs/37121066067) SUCCESS trên head `0b34b64`, ngày03/10/2026. Merge `a75ac35` có cây file bằng head đã kiểm thử (git diff exit0). Ba phép đo model thật dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; không thực thi plan hoặc gọi service thật. Các bằng chứng live cũ giữ ngày và giới hạn.
+Mỗi số liệu ghi kèm ngày đo và commit. Số liệu phần mềm hiện tại từ [CI PR #42 sau retarget sang main](https://github.com/VinhDat267/ATI_Project/actions/runs/37128235604), SUCCESS trên head `c68b4b6`, ngày 03/10/2026. Merge `8b6c8e6` có cây file bằng head đã kiểm thử (`git diff --exit-code` đạt). Ba phép đo model thật W3-06 vẫn dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; không chạy lại model sau W3-08/AUTH-01/FE-02, không thực thi plan hoặc gọi service thật trong hai task mới. Các bằng chứng live cũ giữ ngày và giới hạn.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 895/895 | 03/10, `fbab62b` (W3-08); CI PR #39 pass tại `4e8bd99` | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 948/948 | 03/10, CI PR #42 head `c68b4b6`; merge `8b6c8e6` cùng cây file | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 14/14 ca | 03/10, `fbab62b`, chạy local trên PostgreSQL tạm; CI PR #39 pass | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 20/20 ca, 9 scenario | 03/10, CI PR #42 head `c68b4b6`; default 11 ca, 8 scenario còn lại 9 ca | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 3 lần | 51/54; p50/p95 5,942/13,092 s; ff15=0/3 | như trên | như trên |
 | Golden 44 câu services, model thật, 3 lần | 111/132; p50/p95 6,105/31,097 s; max53,021 s | như trên | như trên |
 | Năm service mới: tools/args | tools100% cả năm; args Calendar87,5%, bốn service còn lại100% | như trên; successful read traces + labelled writes, args conditional đúng tool | `EVAL_SET=services`, xem denominator trong README |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
+
+Lần kiểm tra kết hợp AUTH-01/FE-02 sau retarget main: CI `37128235604` SUCCESS trên `c68b4b6`, `npm run check` đạt **948 v3** = 47 schema + 317 adapters + 172 planner + 25 executor + 203 API + 184 web; **165 offline evaluations**; typecheck/build/credential scan/launcher/guards đạt. Canonical browser script đạt **20/20** qua đủ 9 scenario trên PostgreSQL thật. Root đã chạy cùng toàn bộ suite local trong phiên thi công; hai reviewer độc lập chạy các test và probe thuộc phạm vi của mình, không gọi kết quả CI là nghiệm thu service/model thật.
 
 Lần kiểm tra cuối W3-08 (Claude Code, `fbab62b`): `npm run check` exit 0: v3 895 = 47 schema + 317 adapters + 172 planner + 25 executor + 173 API + 161 web; eval 165; typecheck/build; quét bản build PASS. Browser 14/14. RED 14 test mới; mutation 10/10 bị bắt (gồm M15 Calendar 403 của audit). Model thật chưa chạy lại sau khi mô tả ba tool đổi nhẹ.
 
@@ -71,6 +73,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- #41 (AUTH-01), merge `fbd993f` lúc 21:01:00 Việt Nam ngày 03/10: access JWT gắn `sid`, refresh token ngẫu nhiên lưu SHA-256 ở PostgreSQL; CAS rotation một winner, grace 30 giây cho hash ngay trước, replay cũ thu hồi phiên; logout/logout-all và CLI đổi mật khẩu thu hồi phiên. Middleware kiểm phiên và trạng thái tài khoản; role admin và env allowlist dùng chung cho quyền cấu hình. Chặn đoán mật khẩu theo IP/email trong một API instance, burst 12 request sai cho 5×401 + 7×429 sau sửa review. Review độc lập đạt; [CI head `4f5aa47`](https://github.com/VinhDat267/ATI_Project/actions/runs/37126813181) SUCCESS, check927+165 và browser16/16. Chưa làm signup/email/Google/quản trị tài khoản.
+- #42 (FE-02), merge `8b6c8e6` lúc 21:05:01 Việt Nam ngày 03/10: route `/`, `/login`, `/c/:id`, Back/Forward và direct reload phục hồi detail/preview/execution; App còn 12 dòng, AuthGate/Workspace/views/recovery hook. Lịch sử title 60 Unicode code points, tìm kiếm, đổi tên và cursor microsecond+UUID; migration0004 backfill một lần. Scroll giữ vị trí khi đọc phía trên. Review độc lập phát hiện rồi xác nhận sửa optional snapshot lỗi làm mất detail/SSE evidence; regression 2 ca và probe độc lập đạt. Retarget từ AUTH-01 sang `main`, tích hợp main chỉ thêm metadata #40, [CI head `c68b4b6`](https://github.com/VinhDat267/ATI_Project/actions/runs/37128235604) SUCCESS: check948+165, browser20/20; cây merge giống head. Không đổi catalog/prompt hoặc đo lại model.
 - #6–#9: chặn ID bịa (grounding), LLM qua cổng tương thích OpenAI, golden set có label, model tự gọi search tool.
 - #10–#12: công cụ chạy thật có kiểm soát; giảm latency 31–37 s → 8–10 s; chạy thật qua frontend; sửa plan preview hiện `[object Object]`.
 - #14: thiết kế lại frontend (trang giới thiệu, đăng nhập, lịch sử hội thoại, gợi ý yêu cầu, hộp thoại lỗi).
@@ -110,8 +114,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Notion query/create chưa chọn được data source trong database đa nguồn; relation/rollup là snapshot có giới hạn; page có thể bị di chuyển sau kiểm cha, trước PATCH | `packages/tool-adapters/src/notion/` | Ambiguous source trả VALIDATION; `[incomplete]` khi provider báo thiếu; không tuyên bố kiểm quyền nguyên tử tại API ngoài. Nghiệm thu provider thật W3-07 còn mở |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
 | Sandbox dùng planner mock trả một plan soạn sẵn (giao diện đã báo "Chế độ thử nghiệm"); minor sau FE-01: tiêu đề mẫu "Phát hành Sprint" không khớp nội dung, chấm xanh nhấp nháy luôn hiện, dòng "Chưa xác định chế độ chạy" hiện thoáng khi tải | `server.ts`, `MissionControlLaunchpad.tsx`, `App.tsx` | Không demo sandbox như AI thật; minor gom vào FE-03 |
-| Refresh token là JWT 7 ngày không lưu ở server: đăng xuất không thu hồi được, trái đặc tả §8.1; chưa có đăng ký, quên mật khẩu, chặn đoán mật khẩu | `apps/chat-api/src/auth/jwt.ts`, `routes/auth-routes.ts` | AUTH-01 → AUTH-05 |
-| Plan preview chỉ hiện ID; kết quả thực thi là JSON thô; nút Back không hoạt động; tải lại trang mất hội thoại; lịch sử không có tiêu đề, tối đa 50 mục; SSE có thể ngừng im lặng khi token hết hạn (đọc code, chưa tái hiện) | `apps/chat-web` | FE-02, FE-03 |
+| Chưa có đăng ký/xác minh email, quên mật khẩu, Google login, trang quản trị/hồ sơ; giới hạn đoán mật khẩu vẫn theo một API instance | `apps/chat-api`, `apps/chat-web` | AUTH-01 đã đóng khoảng cách thu hồi phiên và thêm role/status/rate limit; AUTH-02 → AUTH-06 còn chờ |
+| Plan preview chỉ hiện ID; kết quả thực thi là JSON thô; SSE có thể ngừng im lặng khi token hết hạn (đọc code, chưa tái hiện) | `apps/chat-web` | FE-02 đã sửa Back/reload/title/pagination; các phần còn lại FE-03 |
 | Tin nhắn Slack chưa đọc lại tự động sau khi gửi | live-execution | |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
