@@ -1,6 +1,7 @@
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import { GlobalRateLimiter } from '../rate-limiter.js';
 import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../google/service-account.js';
+import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
 
 export interface SheetsAdapterConfig extends BaseAdapterConfig {
   credentials: GoogleServiceAccountCredentials;
@@ -72,7 +73,8 @@ export class SheetsAdapter extends BaseAdapter {
     for (;;) {
       try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'sheets:' + this.account, signal); }
       catch (error) {
-        if (error instanceof StepError) throw error;
+        // The limiter message carries its key (the service-account email); keep only the category.
+        if (error instanceof StepError) throw new StepError({ message: 'Sheets request stopped before dispatch', category: error.category, statusCode: error.statusCode, retryable: error.retryable });
         throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
       }
       if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
@@ -132,7 +134,16 @@ export class SheetsAdapter extends BaseAdapter {
       const id = this.checkedId(args.spreadsheetId); const range = a1(args.range); const limit = bounded(args.limit, 50);
       const value = await this.request(id + '/values/' + encodeURIComponent(range), signal);
       if (typeof value?.range !== 'string' || (value.values !== undefined && (!Array.isArray(value.values) || value.values.some((row: unknown) => !Array.isArray(row))))) badResponse();
-      return { range: value.range, values: (value.values ?? []).slice(0, limit).map((row: unknown[]) => row.map(cell => cell == null ? '' : String(cell))) };
+      let truncated = false;
+      const values = (value.values ?? []).slice(0, limit).map((row: unknown[]) => {
+        if (row.length > SHEETS_MAX_COLUMNS) truncated = true;
+        return row.slice(0, SHEETS_MAX_COLUMNS).map(cell => {
+          const clipped = clipText(cell == null ? '' : String(cell), SHEETS_MAX_CELL_CHARS);
+          if (clipped.clipped) truncated = true;
+          return clipped.text;
+        });
+      });
+      return { range: value.range, values, ...(truncated ? { truncated: true } : {}) };
     }
     if (toolName === 'sheets.append_rows') {
       const id = this.checkedId(args.spreadsheetId); const sheet = titleText(args.sheet); const rows = safeRows(args.rows);
