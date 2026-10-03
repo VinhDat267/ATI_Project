@@ -16,7 +16,7 @@ function scripted(overrides?: (url: string, init: any) => Response | undefined) 
 const create = (a: any, signal?: AbortSignal) => a.execute('jira.create_issue', { projectKey: 'ATI', summary: 'Login bug', description: '<b>plain</b>\n* wiki' }, { signal });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-it.each(['http://ati-test.atlassian.net', 'https://ati-test.atlassian.net/', 'https://ati-test.atlassian.net:443', 'https://evil.com', 'https://ati.atlassian.net.evil.com', 'https://user@ati.atlassian.net', 'https://ati.atlassian.net?q=1', 'https://ATI.atlassian.net'])('rejects SSRF site before transport: %s', siteUrl => {
+it.each(['http://ati-test.atlassian.net', 'https://ati-test.atlassian.net/', 'https://ati-test.atlassian.net:443', 'https://evil.com', 'https://ati.atlassian.net.evil.com', 'https://user@ati.atlassian.net', 'https://ati.atlassian.net?q=1', 'https://ATI.atlassian.net', 'https://ati-test.atlassian.net\n', 'https://ati-test.atlassian.net\r\n'])('rejects SSRF site before transport: %s', siteUrl => {
   const fetchFn = vi.fn(); make(fetchFn); expect(() => make(fetchFn, { credentials: { ...credentials, siteUrl } })).toThrow(); expect(fetchFn).not.toHaveBeenCalled();
 });
 it('lists exactly allowlisted projects, filtered by key/name and respects limit', async () => {

@@ -36,7 +36,7 @@ it('integrates Jira SQL encryption, HTTP SSRF gates, conditional catalog, factor
     expect(await getConfiguredToolCatalog(repo, key)).toEqual([]);
     const initial = (await request(app).get('/api/services').set(headers)).body.services.find((s: any) => s.id === 'jira');
     expect(initial).toMatchObject({ configured: false, scopeLabel: 'Project key', credentialFields: [{ key: 'siteUrl', type: 'text' }, { key: 'email', type: 'text' }, { key: 'apiToken', type: 'password' }] });
-    for (const siteUrl of ['http://ati.atlassian.net', 'https://ati.atlassian.net/', 'https://ati.atlassian.net:443', 'https://evil.com', 'https://x.atlassian.net.evil.com', 'https://a@ati.atlassian.net', 'https://ati.atlassian.net?q=1']) {
+    for (const siteUrl of ['http://ati.atlassian.net', 'https://ati.atlassian.net/', 'https://ati.atlassian.net:443', 'https://evil.com', 'https://x.atlassian.net.evil.com', 'https://a@ati.atlassian.net', 'https://ati.atlassian.net?q=1', 'https://ati-test.atlassian.net\n']) {
       expect((await request(app).post('/api/services/jira/credentials').set(headers).send({ credentials: { ...credentials, siteUrl }, allowedScope: ['ATI'] })).status).toBe(400);
     }
     expect(await repo.getCredentials('jira')).toBeNull(); expect(calls).toEqual([]);
