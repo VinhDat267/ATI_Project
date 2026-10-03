@@ -8,9 +8,10 @@ import { GITHUB_TRANSPORT } from './transports/github.js';
 import { SHEETS_TRANSPORT } from './transports/sheets.js';
 import { CALENDAR_TRANSPORT } from './transports/calendar.js';
 import { NOTION_TRANSPORT } from './transports/notion.js';
+import { TELEGRAM_TRANSPORT } from './transports/telegram.js';
 
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
-  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT].map(transport => [transport.id, transport]),
+  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT, TELEGRAM_TRANSPORT].map(transport => [transport.id, transport]),
 );
 
 export function getRegisteredServices(): ServiceDefinition[] {

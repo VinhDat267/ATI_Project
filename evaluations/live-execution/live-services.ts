@@ -1,4 +1,4 @@
-import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter, NotionAdapter } from '@wap/tool-adapters';
+import { GitHubAdapter, SlackAdapter, TrelloAdapter, SheetsAdapter, CalendarAdapter, NotionAdapter, TelegramAdapter } from '@wap/tool-adapters';
 import { ALL_TOOLS, getServiceDefinition } from '@wap/tool-schemas';
 import type { LiveService } from './harness.js';
 
@@ -16,6 +16,12 @@ export interface LiveServiceDefinition {
 
 /** Existing env names remain stable; future services add one entry here. */
 export const LIVE_SERVICES: LiveServiceDefinition[] = [
+  {
+    id: 'telegram', credentials: { botToken: 'TELEGRAM_BOT_TOKEN' }, scopeKey: 'chats', scopeEnv: 'LIVE_TELEGRAM_CHAT_IDS',
+    missingCredentials: 'TELEGRAM_BOT_TOKEN is required', missingScope: 'LIVE_TELEGRAM_CHAT_IDS must list chat ids',
+    scopePattern: getServiceDefinition('telegram')!.scopePattern, invalidScope: 'LIVE_TELEGRAM_CHAT_IDS entries must be signed numeric chat ids',
+    createAdapter: ({ credentials, allowedScope }) => new TelegramAdapter({ credentials: { botToken: credentials.botToken! }, allowedScope }),
+  },
   {
     id: 'notion', credentials: { token: 'NOTION_TOKEN' }, scopeKey: 'databases', scopeEnv: 'LIVE_NOTION_DATABASE_IDS',
     missingCredentials: 'NOTION_TOKEN is required', missingScope: 'LIVE_NOTION_DATABASE_IDS must list database ids',
