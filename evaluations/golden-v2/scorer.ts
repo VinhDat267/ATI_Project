@@ -1,10 +1,12 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout';
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only';
 
 /** Label for one argument; every key present must hold. */
 export interface Matcher {
   equals?: string | number | boolean;
+  /** Equivalent ISO timestamps with an explicit offset match the same instant. */
+  instantEquals?: string;
   startsWith?: string;
   endsWith?: string;
   /** Case-insensitive substrings; at least one must occur (templates are matched as written). */
@@ -27,11 +29,18 @@ export interface GoldenCase {
   category: Category;
   language: 'vi' | 'en';
   prompt: string;
+  /** Service-set attribution, preregistered rather than inferred from a model answer. */
+  primaryService?: string;
+  services?: string[];
+  ambiguity?: boolean;
+  routing?: { legacy: string[]; full: string[] };
   /** Resources resolved in earlier turns: entity key -> fixture id. */
   memory?: Record<string, string>;
   expect: {
     kind: PlannerResponse['kind'];
     steps?: StepSpec[];
+    /** Actual successful gather calls required for a read-only request. */
+    searches?: StepSpec[];
     /** Alternative complete step lists; the case passes when any one passes. */
     anyOf?: StepSpec[][];
     /** Write tools a correct plan may add beyond the expected steps. */
