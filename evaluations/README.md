@@ -82,11 +82,13 @@ alone is insufficient. Clarification/refusal cases contribute to kind and
 strict-pass scores, not the tool denominator. Argument quality is conditional
 on correct tools; latency is the entire request involving the service.
 
-The planner protocol currently has no read-answer response kind and excludes
-read tools from executable plans. Read-only cases therefore preregister a
-clarification plus successful read calls; read-tool scores and response-kind
-failures are reported separately. This exposes a product limitation rather
-than proving that users receive usable answers to read-only requests.
+The planner protocol currently has no read-answer response kind. The prompt
+instructs write-only plan steps, but the production validator does not enforce
+that side-effect restriction: it accepted three read-only plans in this run.
+Read-only cases preregister a clarification plus successful read calls;
+read-tool scores and response-kind failures are reported separately. These
+results do not establish usable answers to read-only requests. Answer policy
+and enforcement of the prompt rule require a separate product follow-up.
 Text matchers check selected keywords/references rather than complete semantic
 correctness. Quoted A1 ranges and other unlabelled equivalent representations
 may conservatively miss an exact matcher. Calendar timestamps use equivalent
@@ -139,14 +141,23 @@ context, not proof that a safer clarification is a semantic regression.
 No label was changed to fit the result, and the no-decline criterion is unmet.
 
 **Other failures.** `sh01`, `sh07`, `ca01`, `no01`, `tg01`, `ji01` were 0/3:
-the required read calls succeeded, but the final response was refusal instead
-of the preregistered clarification. `ca01` also used an upper date boundary
+the required read calls succeeded, but the 18 final responses were
+**15 refusals / 3 plans / 0 clarifications**. The production validator accepted
+`sh07` runs 1 and 3 with `sheets.read_range` and `ca01` run 1 with
+`calendar.list_events`; the other 15 attempts refused. All 18 failed the
+preregistered clarification kind. `ca01` also used an upper date boundary
 that missed the exact next-midnight matcher. `ca04` was 0/3: the model refused
 explicit invitations, which Calendar cannot support, instead of asking about
 an event without invitations. These response-kind labels expose a policy/oracle
 question; the refusals are not evidence of an unsafe write. Protocol/label
 decisions belong in a separate follow-up, rather than forcing a plan or
 changing these registered labels after observation.
+
+An independent schema audit also found 531 legacy `trello.search_members`
+trace outputs missing required `fullName` while supplying `name`. This fixture
+behavior is unchanged at the base commit; new-service input/output traces had
+zero schema mismatches. Correcting the legacy fixture changes measurement
+context and needs a separately documented rerun.
 
 The service-set p95 exceeds the 15 s preview target; its maximum was 53.021 s.
 The longest cases are read-only requests with several model calls. Real service
