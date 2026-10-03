@@ -40,9 +40,12 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
     // PostgreSQL conversations currently have no title field; select the newest row
     // after verifying the real list endpoint returned the seeded conversation first.
-    const listed = page.waitForResponse(response => response.url().endsWith('/api/conversations') && response.request().method() === 'GET');
     await page.reload();
-    expect((await (await listed).json()).conversations[0].id).toBe(convId);
+    // APIRequestContext is independent of navigation; an in-flight response from
+    // before reload can lose its body when the browser replaces the document.
+    const access = await page.evaluate(() => localStorage.getItem('wap_access_token'));
+    const listed = await page.request.get('/api/conversations', { headers: { Authorization: `Bearer ${access}` } });
+    expect((await listed.json()).conversations[0].id).toBe(convId);
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice).toBeVisible();
