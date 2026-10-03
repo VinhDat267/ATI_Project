@@ -38,9 +38,8 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const before = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_1'])).rows[0];
     const writes: string[] = [];
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
-    // PostgreSQL conversations currently have no title field; select the newest row
-    // after verifying the real list endpoint returned the seeded conversation first.
-    const listed = page.waitForResponse(response => response.url().endsWith('/api/conversations') && response.request().method() === 'GET');
+    // SQL fixtures omit title; the newest seeded row retains the fallback label.
+    const listed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/conversations' && response.request().method() === 'GET');
     await page.reload();
     expect((await (await listed).json()).conversations[0].id).toBe(convId);
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
