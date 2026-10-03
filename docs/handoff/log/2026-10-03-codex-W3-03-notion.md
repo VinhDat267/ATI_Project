@@ -42,3 +42,32 @@ Không đổi routing policy/prompt/label/ngoại lệ. rf06 vẫn full→Calend
 4. Select chỉ dùng option có sẵn vì tên mới có thể thay schema ngoài preview create-page. Chi phí nếu sai: không tạo option mới qua tool này; cần capability schema riêng.
 
 Notion thật/provider NOT_RUN; read/write acceptance W3-07 và model W3-06 còn mở. Không sửa v2, frontend sản phẩm, prompt/policy router/executor, CURRENT-STATE hoặc ROADMAP. PR #28 metadata sau Calendar vẫn riêng; reviewer cập nhật state sau khi Notion merge. Review độc lập/CI head cuối được ghi bổ sung sau khi chạy, không dùng green suite thay live acceptance.
+
+## Review độc lập và một lượt sửa
+
+- PR [#32](https://github.com/VinhDat267/ATI_Project/pull/32), chưa merge. Reviewer độc lập chạy lại immutable range `ab2c599..b3971d5`: check734v3+92eval, strict và browser12/12 exit0. Probes tại biên HTTP:16/20 đạt, bốn lỗi cùng I1; không gọi provider thật. CI của head b3971d5 xanh, nhưng chỉ là bằng chứng trước lượt sửa.
+- I1 Important: query bỏ mất formula string/boolean, rollup, files, unique_id, place và verification. Regression RED8/55 (47 test cũ đạt) trước sửa; GREEN55/55 sau sửa. Giữ giá trị false/0, tên files (không URL tải ký số), mã ID, địa điểm, state/period/verifier; `[unsupported]`/`[unavailable]` phân biệt với giá trị rỗng.
+- M1 đánh lại Important: relation.has_more bị bỏ có thể dẫn tới workflow thiếu dữ liệu. Sửa trong cùng pass bằng `[incomplete]`; rollup incomplete cũng có marker. Không truy vấn mở rộng property hoặc database liên quan, catalog mô tả snapshot có giới hạn. Chi phí nếu sai: marker ảnh hưởng consumer mong đợi chuỗi ID thuần. Không có minor hoãn lại.
+- Không yêu cầu lượt review thứ hai; chủ task chịu trách nhiệm kiểm patch sửa, chạy lại toàn bộ bộ check và xác minh CI head cuối.
+
+## Quyết định về phần reviewer không kết luận
+
+| Phần reviewer chưa kết luận | Quyết định | Chi phí nếu sai |
+| --- | --- | --- |
+| 1. Provider/token/sharing/persistence/429/529 thật | W3-07, NOT_RUN; fixture không chứng minh live acceptance | Integration có thể chưa dùng được với tài khoản thật |
+| 2. Model/Vietnamese/golden/semantic acceptance/rf06 | W3-06, NOT_RUN; chỉ ghi evidence offline hiện có | Model thực tế có thể hiểu sai yêu cầu |
+| 3. Multi-source selector | Giữ quyết định chỉ một source vì input không có selector | Query/create từ chối database đa nguồn hợp lệ |
+| 4. Select option mới/schema edit | Giữ quyết định chỉ option có sẵn, không thêm side effect | Một số yêu cầu create chưa hỗ trợ |
+| 5. Regex gather | Theo common brief: service mới dùng llm search | Notion không được discovery trong regex mode |
+| 6. Per-property pagination/synced/linked sources | Snapshot có giới hạn, có marker; không thêm fetch ngoài scope | Snapshot có thể chưa đầy đủ hoặc nguồn chưa đọc được |
+| 7. Page bị di chuyển giữa parent read và PATCH | Giữ kiểm cha mới tại execution; không tuyên bố nguyên tử API ngoài | Page có thể bị di chuyển ra scope sau kiểm tra, trước ghi |
+| 8. Throttle nhiều process/allowlist lớn/load | Limiter process-local, chưa benchmark production | Có thể vượt rate toàn integration hoặc chậm với allowlist lớn |
+| 9. Auth/session/recovery/fencing toàn nền tảng | Ngoài diff service; regression không chứng nhận toàn hệ thống | Các rủi ro nền tảng hiện có vẫn tồn tại |
+| 10. Lịch sử RED/mutation testing | RED do implementer ghi; reviewer chỉ rerun và probe độc lập | Provenance phụ thuộc log đã giữ; regression và commit bất biến bù lại |
+| 11. CI/PR/merge/metadata | Root xác minh CI head cuối rồi Ready; chưa có yêu cầu merge32; state sửa sau merge | PR Ready có thể drift; metadata tiếp tục chờ merge/reviewer cập nhật |
+
+## Kết quả sau sửa
+
+- Commit sửa `c6b8d07`: property flattening và marker cùng tám regression mới. `npm run check` exit0: **742 v3 =44schema+204adapters+142planner+25executor+166API+161web**, **92 offline evaluations**; typecheck/build, production-secret scan, launcher1/local-env3 đạt. Strict test/harness typecheck exit0; full browser **12/12 exit0**.
+- Browser lượt sau sửa đầu tiên dừng ở khởi động API với57P01 (terminating connection due to administrator command); container riêng ati-w303-pg đã dừng. Kiểm đúng ID ba308375b3ba7a5cc7104e04692b6ad5003f2ebc6c4c35bb5d361651dfb328e9 và nhãn ati.task=W3-03, khởi động lại, pg_isready đạt rồi chạy lại toàn bộ12/12. Không sửa source/guard, không restart database người dùng15433. Giữ cả failed log và rerun log riêng, không tính lần lỗi là PASS.
+- Xác minh SHA256 năm file ngoài scope trên primary đều nguyên vẹn. Không commit .env/raw logs/provider details. CI cuối/Ready lấy theo [PR #32 checks](https://github.com/VinhDat267/ATI_Project/pull/32/checks); review độc lập không chạy lại, root chịu trách nhiệm patch sửa và CI đúng head trước Ready.
