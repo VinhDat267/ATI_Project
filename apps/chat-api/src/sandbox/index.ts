@@ -3,8 +3,9 @@ import { SLACK_FAKE } from './fake-results/slack.js';
 import { GITHUB_FAKE } from './fake-results/github.js';
 import { SHEETS_FAKE } from './fake-results/sheets.js';
 import { CALENDAR_FAKE } from './fake-results/calendar.js';
+import { NOTION_FAKE } from './fake-results/notion.js';
 
-const handlers = Object.fromEntries([TRELLO_FAKE, SLACK_FAKE, GITHUB_FAKE, SHEETS_FAKE, CALENDAR_FAKE].map(service => [service.id, service.tools]));
+const handlers = Object.fromEntries([TRELLO_FAKE, SLACK_FAKE, GITHUB_FAKE, SHEETS_FAKE, CALENDAR_FAKE, NOTION_FAKE].map(service => [service.id, service.tools]));
 
 export function createSandboxAdapter(serviceName: string, scenario?: string) {
   console.log("[Sandbox Mode] Using In-Memory Sandbox Adapter for '" + serviceName + "'");

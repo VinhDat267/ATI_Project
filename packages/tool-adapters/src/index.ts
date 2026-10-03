@@ -8,3 +8,4 @@ export * from './github/github-adapter.js';
 export * from './google/service-account.js';
 export * from './sheets/sheets-adapter.js';
 export * from './calendar/calendar-adapter.js';
+export * from './notion/notion-adapter.js';

@@ -7,9 +7,10 @@ import { SLACK_TRANSPORT } from './transports/slack.js';
 import { GITHUB_TRANSPORT } from './transports/github.js';
 import { SHEETS_TRANSPORT } from './transports/sheets.js';
 import { CALENDAR_TRANSPORT } from './transports/calendar.js';
+import { NOTION_TRANSPORT } from './transports/notion.js';
 
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
-  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT].map(transport => [transport.id, transport]),
+  [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT].map(transport => [transport.id, transport]),
 );
 
 export function getRegisteredServices(): ServiceDefinition[] {
@@ -32,7 +33,7 @@ export function normalizeAllowedScope(definition: ServiceDefinition, value: unkn
   const entries = [...new Set(raw.map((entry: string) => entry.trim()))];
   // RegExp instances with g/y flags must not carry state between entries or requests.
   if (scopePattern && !entries.every(entry => new RegExp(scopePattern.source, scopePattern.flags).test(entry))) return null;
-  return { [scopeKey]: entries };
+  return { [scopeKey]: [...new Set(entries.map(entry => definition.normalizeScopeEntry?.(entry) ?? entry))] };
 }
 
 export function hasValidCredentials(fields: readonly { key: string }[], value: unknown): value is Record<string, string> {
