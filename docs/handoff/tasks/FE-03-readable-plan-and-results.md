@@ -34,6 +34,7 @@ W4-03 đo "tỉ lệ plan dùng được" với người dùng thật. Nếu pla
    - giờ hiện "06:24 AM" (định dạng theo locale trình duyệt) lẫn với "Hôm qua";
    - `h-screen` trên điện thoại bị thanh trình duyệt che, nên dùng `h-dvh`;
    - chức năng "Sửa qua Chat" điền sẵn ô nhập bằng ba cơ chế chồng nhau (DOM trong `PlanPreview`, DOM trong `App`, hai `CustomEvent`). Giữ lại **một** cơ chế.
+   - Còn lại sau FE-01 (review PR #27): tiêu đề mẫu "Tổng hợp Phát hành Sprint & Báo cáo Kỹ thuật" không khớp nội dung (issue → card → Slack); chấm xanh nhấp nháy ở thanh dịch vụ luôn hiện kể cả khi 0 dịch vụ được cấu hình; dòng "Chưa xác định được chế độ chạy" hiện thoáng trong lúc đang tải `runtimeMode`.
 
 ## Việc cần làm
 
