@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau khi PR #37 (audit độc lập W3, chỉ tài liệu) merge tại `4171298`; mã sản phẩm giữ nguyên từ `dc80de4`. Agent cập nhật: Claude Code (reviewer); phần W3-00 → W3-06 do Codex (reviewer) ghi.
+**Cập nhật lần cuối:** 03/10/2026, sau khi PR #39 (W3-08) merge tại `c5ce8a0`. Agent cập nhật: Claude Code; phần W3-00 → W3-06 do Codex (reviewer) ghi.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -16,6 +16,8 @@
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. AUTH-01 và FE-02 có thể làm song song; W3-07 khi người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
 >
 > **Audit độc lập W3** (Claude Code, #37 tại `4171298`): đạt có điều kiện. Chạy lại check 874 + 151, browser 14/14; mutation 19 lần chạy: 17 bị bắt, 1 lọt (Calendar 403), 1 không hợp lệ; probe HTTP + PostgreSQL không lộ bí mật, `siteUrl` Jira độc hại bị chặn. Lỗi trung bình: kết quả đọc không giới hạn kích thước. Task card **W3-08** nên xong trước W3-07 và các phép đo tuần 4.
+>
+> **W3-08 xong** qua #39 tại `c5ce8a0`: giới hạn kích thước kết quả đọc (Sheets 26 cột × 500 ký tự/ô, Notion 500 ký tự/property, Calendar 200 ký tự/tiêu đề, planner 20.000 ký tự/kết quả search) và phân loại lỗi token Google. **Merge khi chưa có review độc lập** theo yêu cầu chủ dự án; Claude Code vừa viết task card, audit và thi công. Nên có reviewer khác review lại `fbab62b` khi tiện.
 
 ## 1. Sản phẩm
 
@@ -45,15 +47,17 @@ Mỗi số liệu ghi kèm ngày đo và commit. Bảng dưới dùng kiểm tra
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 874/874 | kiểm tra cuối W3-06; CI 03/10 tại `0b34b64` | `npm run test:v3` (trong `npm run check`) |
-| Test của bộ đánh giá (offline) | 151/151 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 14/14 ca | CI PR #35 pass tại `0b34b64`; local không chạy lại browser | `npm run test:browser:v3` |
+| Unit + integration v3 | 895/895 | 03/10, `fbab62b` (W3-08); CI PR #39 pass tại `4e8bd99` | `npm run test:v3` (trong `npm run check`) |
+| Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
+| Browser E2E (sandbox, PostgreSQL thật) | 14/14 ca | 03/10, `fbab62b`, chạy local trên PostgreSQL tạm; CI PR #39 pass | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 3 lần | 51/54; p50/p95 5,942/13,092 s; ff15=0/3 | như trên | như trên |
 | Golden 44 câu services, model thật, 3 lần | 111/132; p50/p95 6,105/31,097 s; max53,021 s | như trên | như trên |
 | Năm service mới: tools/args | tools100% cả năm; args Calendar87,5%, bốn service còn lại100% | như trên; successful read traces + labelled writes, args conditional đúng tool | `EVAL_SET=services`, xem denominator trong README |
 | Chạy thật qua frontend | GitHub issue → Trello card → Slack: thành công; thực thi 3,8 s | 30/09, trước PR #13 | `evaluations/live-app/` |
+
+Lần kiểm tra cuối W3-08 (Claude Code, `fbab62b`): `npm run check` exit 0: v3 895 = 47 schema + 317 adapters + 172 planner + 25 executor + 173 API + 161 web; eval 165; typecheck/build; quét bản build PASS. Browser 14/14. RED 14 test mới; mutation 10/10 bị bắt (gồm M15 Calendar 403 của audit). Model thật chưa chạy lại sau khi mô tả ba tool đổi nhẹ.
 
 Lần kiểm tra cuối W3-06: npm run check exit0:874v3 =47schema+301adapters+167planner+25executor+173API+161web;151offline evaluations; strict eval typecheck exit0; CI browser14/14 trên PostgreSQL thật. Review độc lập `aaa345d..49dfc61`: C0/I1/M0, rerun check874+151/strict và audit415attempts/1921traces/276plans. I1 mô tả read-only sai được sửa một lượt: audit báo cáo thật RED→GREEN, 15refusal/3plan/0clarification; validator chấp nhận ba plan chỉ đọc, write-only là chỉ dẫn prompt chưa được validator enforce. Raw reports/labels/fingerprints/scores giữ nguyên; không re-review. CI xác nhận head cuối `0b34b64`; tree merge bằng head. Bốn workflow ≥4service đạt12/12. ff15 model hỏi Slack/Telegram khi cùng có frontend: giữ label Slack cũ, ghi parity chưa đạt; không tự kết luận semantic regression. Services p95 vượt15s; usable-plan rate null, quality gate incomplete. Xem [verification W3-06](../ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
 
@@ -84,6 +88,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - #32 (W3-03), merge tại `fca384d` lúc 09:55:14 ngày03/10/2026 (Việt Nam): bốn tool Notion search_databases/query_database/create_page/append_text; UUID chuẩn hóa, Database ID allowlist, mapping data source theo API2026-03-11. Query/create yêu cầu một data source; append kiểm source cha tại execution trước ghi. Property values giữ formula/rollup/files/unique_id/place/verification và marker khi snapshot chưa đầy đủ; select chỉ option có sẵn. Limiter3request/giây/token, mọi lệnh ghi không rõ kết quả UNKNOWN không replay. Browser Notion→Slack kiểm URL từ PostgreSQL. CI head dd111c4 xanh, cây merge giống head; primary main đã đồng bộ, giữ nguyên năm file riêng của người dùng. Google/Notion/model thật chưa nghiệm thu.
 - #33 (W3-04), merge `4a4553b` lúc11:29:10 Việt Nam ngày03/10: Telegram list_chats/send_message, signed Chat ID chuẩn hóa BigInt, allowlist trước fetch và getChat trước gửi, text thuần, redirect chặn; limiter per token/chat trong process. Indeterminate writes UNKNOWN không replay, 429 chờ có giới hạn. Browser Telegram→Slack kiểm messageId từ output_json PostgreSQL. Primary main đã đồng bộ, năm file riêng SHA256 giữ nguyên, worktree Telegram đã archive và nhánh local/remote đã xóa sau kiểm tích hợp. Telegram thật W3-07 và model W3-06 NOT_RUN.
 - #34 (W3-05), merge `dc80de4` lúc13:40:43 Việt Nam ngày03/10: Jira search_projects/search_issues/create_issue/add_comment; Basic email/token, exact site domain, project allowlist, POST search/jql, hai lớp Lucene/JQL escape, plaintext ADF. Create đọc issue types, comment đọc lại project thật; write UNKNOWN không replay. Sửa generic search collection grounding tại `979a196`, SQL/factory/planner search→comment không chèn memory thủ công. Browser Jira→Slack kiểm key/URL từ PostgreSQL. CI head `089a871` xanh, cây merge giống head; primary main đồng bộ, năm file riêng giữ nguyên. Task DB tạm đã dọn, user DB15433 giữ nguyên. Jira/model thật NOT_RUN.
+- #39 (W3-08), merge `c5ce8a0`: `tool-adapters/src/bounds.ts` (`clipText`, không cắt đôi surrogate, dấu `…[đã cắt]`); `truncated: true` chỉ khi có cắt; `MAX_SEARCH_RESULT_CHARS = 20_000` đo bằng JSON thật trong prompt (mảng giữ phần tử vừa ngân sách + `omittedItems`, còn lại `resultPreview`); token Google: 429 → RATE_LIMIT, 5xx/body hỏng → SERVER_ERROR, mạng/hủy → NETWORK; lỗi limiter Sheets không còn email. Chưa có review độc lập.
 - #35 (W3-06), merge `a75ac35` lúc19:02:09 Việt Nam ngày03/10: 44 câu services đăng ký trước, 10 read-tool fixtures mới, scorer theo service và successful read traces, bounded provider pool/AbortSignal/checkpoint, routing116câu ở legacy/full. Label rf06 clarification commit riêng `1ab7f08`; 67 câu khác không đổi. Ba campaign đủ336attempts/source7ba60ef, model ag/gemini-3.8-flash/served gemini-3.8-flash; core150/150, freeform51/54, services111/132. Numeric tools/args đạt cả năm, parity/latency chưa đạt; không sửa sản phẩm/prompt, không thực thi plan. Campaign gián đoạn79/132 giữ riêng, fresh probe trước full rerun. CI head0b34b64 xanh/tree merge bằng head; review I1 docs đã sửa, các giới hạn còn mở ở mục5.
 - #25 (chỉ tài liệu): kế hoạch tuần 3–4. Thêm task card cho:
   - năm service mới, có W3-00 gỡ các chỗ viết cố định theo service trước khi thêm;
@@ -97,7 +102,6 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Kết quả tool đọc không giới hạn kích thước: một `sheets.read_range` hợp lệ (10 dòng × 300 cột × 5.000 ký tự) tạo prompt search khoảng 15 triệu ký tự; Notion tương tự. Thêm: thiếu test 403 quyền của Calendar, lỗi token Google đều thành `AUTH_ERROR`, email service account trong lỗi rate limiter Sheets | `packages/planner/src/search.ts`, adapters Sheets/Notion/Calendar, `google/service-account.ts` | W3-08 (audit 03/10) |
 | Pure-read response kind và write-only prompt chưa được validator enforce | planner / W3-06 evidence | 18attempts:15refusal/3plan/0clarification; sh07 lượt1/3 và ca01 lượt1 có read plan hợp lệ theo validator. Sáu case0/3kind, ca04 invitation0/3; policy/enforcement cần task riêng, không fit label sau quan sát |
 | Parity freeform và latency services chưa đạt | evaluations / W3-06 | ff15=0/3 vì Slack/Telegram cùng frontend; giữ label cũ. Services p95=31,097s vượt15s, max53,021s; usable-plan null, không nghiệm thu sản phẩm từ numeric PASS |
 | Legacy Trello member fixture sai output schema | evaluations/golden-v2/fixtures.ts | 531trace thiếu fullName nhưng có name, đã tồn tại ở base; service mới zero schema mismatch. Sửa fixture cần documented rerun, không sửa ngầm context |
