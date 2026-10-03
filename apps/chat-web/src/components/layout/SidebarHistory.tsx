@@ -1,178 +1,92 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../store/chat-store';
 import { apiClient } from '../../services/api-client';
-import type { ChatMessage } from '../../types';
-import { refreshExecutionSnapshot } from '../../services/execution-snapshot';
+import { userErrorMessage } from '../../services/user-error';
+import { formatConversationTime } from '../../services/conversation-time';
+import { loadConversationHistory } from '../../hooks/use-conversation-history';
 
 export interface SidebarHistoryProps {
   currentConversationId: string | null;
   onSelectConversation?: (id: string) => void;
   onCloseMobileSidebar?: () => void;
 }
-
-function formatTime(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  const now = new Date();
-  const isToday =
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear();
-  if (isToday) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (
-    d.getDate() === yesterday.getDate() &&
-    d.getMonth() === yesterday.getMonth() &&
-    d.getFullYear() === yesterday.getFullYear()
-  ) {
-    return 'Hôm qua';
-  }
-  return `${d.getDate()}/${d.getMonth() + 1}`;
-}
-
-export const SidebarHistory: React.FC<SidebarHistoryProps> = ({
-  currentConversationId,
-  onSelectConversation,
-  onCloseMobileSidebar,
-}) => {
-  const conversations = useChatStore((s) => s.conversations);
-  const setConversations = useChatStore((s) => s.setConversations);
+export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar }: SidebarHistoryProps) {
+  const conversations = useChatStore(state => state.conversations);
+  const firstConfirmedUserMessage = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
+  const [search, setSearch] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+  const request = useRef(0);
+  const busy = useRef(false);
   const selection = useRef(0);
-  useEffect(() => () => { selection.current++; }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-    apiClient
-      .getConversations()
-      .then((data) => {
-        if (isMounted && data?.conversations) {
-          setConversations(data.conversations);
-        }
-      })
-      .catch((err) => {
-        console.warn('Could not load conversations:', err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentConversationId, setConversations]);
-
-  const handleSelect = async (id: string) => {
-    if (id === currentConversationId) {
-      onCloseMobileSidebar?.();
-      return;
-    }
-
-    const selected = ++selection.current;
-    const store = useChatStore.getState();
-    store.reset();
-    store.setConversationId(id);
-    const isCurrent = () => selected === selection.current && useChatStore.getState().conversationId === id;
+  const load = async (cursor?: string, generation = request.current) => {
+    busy.current = true; setIsLoading(true); setError(null);
     try {
-      const data = await apiClient.getConversation(id);
-      if (!isCurrent()) return;
-      const loadedMessages: ChatMessage[] = (data.messages || [])
-        .filter((m) => !(m.metadata?.type === 'working_memory' && !m.content))
-        .map((m) => ({
-          id: m.id,
-          role: m.role || 'user',
-          content: m.content || '',
-          timestamp: m.created_at || m.timestamp,
-        }));
-
-      for (const msg of loadedMessages) {
-        store.addMessage(msg);
-      }
-
-      try {
-        const revision = useChatStore.getState().planRevision;
-        const activePlan = await apiClient.getActivePlan(id);
-        if (!isCurrent()) return;
-        const current = useChatStore.getState();
-        const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
-          (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
-        if (activePlan && current.planRevision === revision && !alreadyExecuted) {
-          store.setActivePlan(activePlan);
-          const status = activePlan.status;
-          store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
-        }
-      } catch (planErr) {
-        console.warn('Could not check active plan:', planErr);
-      }
-      if (!isCurrent()) return;
-      await refreshExecutionSnapshot(id);
-    } catch (err) {
-      console.error('Failed to load conversation details:', err);
-    }
-
-    if (isCurrent()) {
-      onSelectConversation?.(id);
-      onCloseMobileSidebar?.();
-    }
+      const data = await apiClient.getConversations({ search, cursor });
+      if (generation !== request.current) return;
+      const store = useChatStore.getState();
+      const rows = cursor ? [...store.conversations, ...data.conversations] : data.conversations;
+      store.setConversations([...new Map(rows.map(row => [row.id, row])).values()]);
+      setNextCursor(data.nextCursor || null);
+    } catch (reason) { if (generation === request.current) setError(userErrorMessage(reason)); }
+    finally { if (generation === request.current) { busy.current = false; setIsLoading(false); } }
   };
-
-  return (
-    <div className="mt-6 flex-1 flex flex-col min-h-0">
-      <span className="text-[11px] font-semibold text-zinc-400 tracking-wider uppercase px-1 shrink-0">
-        Lịch sử hội thoại
-      </span>
-
-      <div className="mt-2 flex-1 overflow-y-auto flex flex-col gap-1 pr-1">
-        {isLoading && conversations.length === 0 ? (
-          <div className="px-2 py-3 text-xs text-zinc-400 italic">
-            Đang tải danh sách...
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="px-2 py-3 text-xs text-zinc-400 italic">
-            Chưa có hội thoại nào
-          </div>
-        ) : (
-          conversations.map((conv) => {
-            const isSelected = conv.id === currentConversationId;
-            const timeStr = formatTime(
-              conv.updatedAt || conv.updated_at || conv.created_at
-            );
-            return (
-              <div
-                key={conv.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleSelect(conv.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleSelect(conv.id);
-                  }
-                }}
-                className={`rounded-xl p-2.5 text-xs font-medium flex justify-between items-center cursor-pointer transition select-none ${
-                  isSelected
-                    ? 'bg-white border border-zinc-200/80 shadow-2xs border-l-2 border-l-[#0071e3] text-zinc-900'
-                    : 'hover:bg-zinc-200/50 text-zinc-600'
-                }`}
-              >
-                <span className="truncate flex-1">
-                  {conv.title || 'Hội thoại mới'}
-                </span>
-                {timeStr && (
-                  <span className="text-[10px] text-zinc-400 ml-2 shrink-0">
-                    {timeStr}
-                  </span>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+  useEffect(() => {
+    const generation = ++request.current;
+    setNextCursor(null);
+    void load(undefined, generation);
+    return () => { request.current++; selection.current++; };
+  }, [currentConversationId, search, firstConfirmedUserMessage]);
+  const select = async (id: string) => {
+    onCloseMobileSidebar?.();
+    if (id === currentConversationId) return;
+    if (onSelectConversation) { onSelectConversation(id); return; }
+    const selected = ++selection.current;
+    const store = useChatStore.getState(); store.reset(); store.setConversationId(id);
+    try { await loadConversationHistory(id, () => selection.current === selected && useChatStore.getState().conversationId === id); }
+    catch (reason) { if (selection.current === selected) { store.reset(); setError(userErrorMessage(reason)); } }
+  };
+  const rename = async (id: string) => {
+    if (saving) return;
+    const trimmed = title.trim();
+    if (!trimmed || Array.from(trimmed).length > 60) { setError('Tiêu đề cần từ 1 đến 60 ký tự.'); return; }
+    setSaving(true); setError(null);
+    try {
+      const data = await apiClient.renameConversation(id, trimmed);
+      const store = useChatStore.getState();
+      store.setConversations(store.conversations.map(row => row.id === id ? data.conversation : row));
+      setEditing(null);
+    } catch (reason) { setError(userErrorMessage(reason)); }
+    finally { setSaving(false); }
+  };
+  return <div className="mt-6 flex-1 flex flex-col min-h-0">
+    <span className="text-[11px] font-semibold text-zinc-400 tracking-wider uppercase px-1 shrink-0">Lịch sử hội thoại</span>
+    <input type="search" aria-label="Tìm hội thoại theo tiêu đề" value={search} onChange={event => setSearch(event.target.value)}
+      className="mt-2 w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white" placeholder="Tìm hội thoại..." />
+    {error && <p role="alert" className="text-xs text-red-700 py-2">{error}</p>}
+    <div role="region" aria-label="Danh sách hội thoại" className="mt-2 flex-1 overflow-y-auto flex flex-col gap-1 pr-1"
+      onScroll={event => { const area = event.currentTarget; if (area.scrollHeight - area.scrollTop - area.clientHeight < 100 && nextCursor && !busy.current) void load(nextCursor); }}>
+      {conversations.map(conv => {
+        const label = conv.title || 'Hội thoại mới';
+        const time = formatConversationTime(conv.updatedAt || conv.updated_at || conv.created_at);
+        return <div key={conv.id} className={`rounded-xl p-2.5 text-xs font-medium flex gap-1 items-center transition ${conv.id === currentConversationId
+          ? 'bg-white border border-zinc-200/80 shadow-2xs border-l-2 border-l-[#0071e3] text-zinc-900' : 'hover:bg-zinc-200/50 text-zinc-600'}`}>
+          {editing === conv.id ? <form className="flex-1 min-w-0" onSubmit={event => { event.preventDefault(); void rename(conv.id); }}>
+            <input autoFocus aria-label="Tiêu đề hội thoại" value={title} onChange={event => setTitle(event.target.value)} className="w-full border border-zinc-200 rounded p-1" />
+            <div className="flex gap-2 mt-1"><button type="submit" disabled={saving} aria-label="Lưu tên hội thoại" className="text-blue-700">Lưu</button>
+              <button type="button" disabled={saving} onClick={() => setEditing(null)}>Hủy đổi tên</button></div>
+          </form> : <><button type="button" onClick={() => void select(conv.id)} className="min-w-0 flex-1 text-left cursor-pointer flex items-center">
+            <span className="truncate flex-1">{label}</span>{time && <span className="text-[10px] text-zinc-400 ml-2 shrink-0">{time}</span>}
+          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="text-zinc-500 p-1">✎</button></>}
+        </div>;
+      })}
+      {isLoading && <p role="status" className="px-2 py-3 text-xs text-zinc-400 italic">Đang tải danh sách...</p>}
+      {!isLoading && !conversations.length && <p className="px-2 py-3 text-xs text-zinc-400 italic">{search ? 'Không có hội thoại phù hợp' : 'Chưa có hội thoại nào'}</p>}
+      {nextCursor && <button type="button" disabled={isLoading} onClick={() => void load(nextCursor)} className="text-xs text-blue-700 p-2">Tải thêm hội thoại</button>}
     </div>
-  );
-};
+  </div>;
+}

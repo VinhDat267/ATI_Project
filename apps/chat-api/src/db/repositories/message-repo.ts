@@ -19,9 +19,17 @@ export class MessageRepo {
     metadata?: any
   ): Promise<MessageRow> {
     const res = await this.pool.query(
-      `INSERT INTO messages (conv_id, role, content, metadata)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+      `WITH locked_conversation AS (
+         SELECT id FROM conversations WHERE id=$1 FOR UPDATE
+       ), inserted AS (
+         INSERT INTO messages (conv_id, role, content, metadata)
+         SELECT id, $2, $3, $4 FROM locked_conversation RETURNING *
+       ), touched AS (
+         UPDATE conversations SET
+           title=CASE WHEN $2='user' THEN COALESCE(title, left($3, 60)) ELSE title END,
+           updated_at=now()
+         WHERE id=(SELECT conv_id FROM inserted) RETURNING id
+       ) SELECT inserted.* FROM inserted JOIN touched ON touched.id=inserted.conv_id`,
       [convId, role, content, metadata ? JSON.stringify(metadata) : null]
     );
     return res.rows[0];

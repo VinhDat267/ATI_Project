@@ -22,6 +22,9 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     listConversations: vi.fn().mockImplementation(async (userId: string) => [
       { id: 'conv-e2e-1', user_id: userId, title: 'New Conversation' },
     ]),
+    listConversationPage: vi.fn().mockImplementation(async (userId: string) => ({
+      conversations: [{ id: 'conv-e2e-1', user_id: userId, title: 'New Conversation' }], nextCursor: null,
+    })),
     getConversation: vi.fn().mockImplementation(async (id: string) => ({
       id,
       user_id: DEMO_ADMIN_ID,

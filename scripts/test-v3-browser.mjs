@@ -9,7 +9,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
-  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:' },
+  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|FE-02:' },
   { name: 'clarification', grep: 'clarification before plan' },
   { name: 'partial_failure', grep: 'partial failure and skip' },
   { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },

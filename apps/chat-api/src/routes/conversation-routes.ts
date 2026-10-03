@@ -3,6 +3,7 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
+import { HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
 
 export interface ConversationRoutesOptions {
   convRepo: ConversationRepo;
@@ -38,10 +39,16 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      const conversations = await convRepo.listConversations(userId);
-      res.status(200).json({ conversations });
+      const { limit, cursor, search } = req.query;
+      if ([limit, cursor, search].some(value => value !== undefined && typeof value !== 'string')) throw new HistoryValidationError('Tham số lịch sử không hợp lệ.');
+      const page = await convRepo.listConversationPage(userId, {
+        ...(limit !== undefined ? { limit: Number(limit) } : {}),
+        ...(cursor !== undefined ? { cursor: cursor as string } : {}),
+        ...(search !== undefined ? { search: search as string } : {}),
+      });
+      res.status(200).json(page);
     } catch (err: any) {
-      res.status(500).json({ error: err?.message || 'Failed to list conversations' });
+      res.status(err instanceof HistoryValidationError ? 400 : 500).json({ error: err instanceof HistoryValidationError ? err.message : 'Không tải được lịch sử hội thoại.' });
     }
   });
 
@@ -132,13 +139,26 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       if (conversation.user_id !== userId) {
-        res.status(403).json({ error: 'Forbidden' });
+        res.status(404).json({ error: 'Conversation not found' });
         return;
       }
       const messages = await msgRepo.listMessages(conversationId);
       res.status(200).json({ conversation, messages });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch conversation' });
+    }
+  });
+
+  router.patch('/:id', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const title = validateConversationTitle(req.body?.title);
+      const conversation = await convRepo.renameConversation(req.params.id as string, userId, title);
+      if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return; }
+      res.status(200).json({ conversation });
+    } catch (error) {
+      res.status(error instanceof HistoryValidationError ? 400 : 500).json({ error: error instanceof HistoryValidationError ? error.message : 'Không đổi được tên hội thoại.' });
     }
   });
 

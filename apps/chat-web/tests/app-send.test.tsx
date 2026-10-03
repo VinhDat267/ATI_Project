@@ -42,7 +42,7 @@ describe('App message sending', () => {
       return { ok: true, status: 200, json: async () => ({}), body: null };
     });
     vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
+    render(<App initialView="login" />);
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.c' } });
     fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'entered-secret' } });
@@ -67,7 +67,7 @@ describe('App message sending', () => {
       return { ok: true, status: 200, json: async () => ({}) };
     });
     vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
+    render(<App initialView="login" />);
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.c' } });
     fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'entered-secret' } });

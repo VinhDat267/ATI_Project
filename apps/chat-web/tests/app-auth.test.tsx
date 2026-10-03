@@ -15,7 +15,7 @@ describe('App authentication', () => {
       json: async () => ({ accessToken: 'jwt', user: { id: 'user-1', email: 'operator@example.com', name: 'Operator' } }),
     }));
     vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
+    render(<App initialView="login" />);
 
     // The public health request must not log in before credential submission.
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/auth/login')).toBe(false);

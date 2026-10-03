@@ -88,6 +88,9 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
     listConversations: async (userId: string) => {
       return Array.from(convMap.values()).filter((c) => c.user_id === userId);
     },
+    listConversationPage: async (userId: string) => ({
+      conversations: Array.from(convMap.values()).filter(c => c.user_id === userId), nextCursor: null,
+    }),
     getConversation: async (id: string) => {
       return convMap.get(id) || null;
     },
