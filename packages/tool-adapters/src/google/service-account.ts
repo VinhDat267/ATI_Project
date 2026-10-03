@@ -53,7 +53,11 @@ export class GoogleServiceAccount {
       if (response.status >= 500) throw tokenFailure('SERVER_ERROR', response.status);
       if (!response.ok) throw authError();
       let body: { access_token?: unknown; token_type?: unknown; expires_in?: unknown };
-      try { body = await response.json(); } catch { throw tokenFailure('SERVER_ERROR'); }
+      try { body = await response.json(); } catch (error) {
+        // JSON syntax errors mean a completed but unusable response. Cancellation
+        // and stream failures during body consumption are transport failures.
+        throw tokenFailure(error instanceof SyntaxError && !signal?.aborted ? 'SERVER_ERROR' : 'NETWORK');
+      }
       if (typeof body?.access_token !== 'string' || !body.access_token.trim() || body.token_type !== 'Bearer' ||
         typeof body.expires_in !== 'number' || !Number.isFinite(body.expires_in) || body.expires_in <= 0) throw tokenFailure('SERVER_ERROR');
       if (signal?.aborted) throw tokenFailure('NETWORK');

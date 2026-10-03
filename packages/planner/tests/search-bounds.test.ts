@@ -1,6 +1,23 @@
 import { expect, it } from 'vitest';
 import { MAX_SEARCH_RESULT_CHARS, formatSearchResults } from '../src/search.js';
 
+it.each([
+  { tool: 'slack.search_channels', args: { query: 'x'.repeat(30_000) }, result: [] },
+  { tool: 'sheets.read_range', args: { nested: { query: '\\"\n😀'.repeat(10_000) } }, result: { values: ['large'.repeat(10_000)] } },
+  { tool: 'invalid'.repeat(5_000), args: {}, error: 'not an available tool' },
+  { tool: 'slack.search_channels', args: {}, error: 'failure\n'.repeat(5_000) },
+])('bounds the complete serialized outcome, including metadata: %#', outcome => {
+  const before = structuredClone(outcome);
+  const prompt = formatSearchResults([outcome]);
+  const body = prompt.split('<search_results>\n')[1]!.split('\n</search_results>')[0]!;
+  expect(body.length).toBeLessThanOrEqual(20_000);
+  const [bounded] = JSON.parse(body);
+  expect(bounded.truncated).toBeDefined();
+  expect(outcome).toEqual(before); // Execution arguments and provider data are never mutated.
+  const preview = bounded.outcomePreview ?? bounded.resultPreview;
+  if (preview) expect(preview).not.toMatch(/[\uD800-\uDBFF]$/u);
+});
+
 // W3-08: one oversized read result must not flood the planner prompt.
 const previousFormat = (outcomes: Array<{ tool: string; args: Record<string, unknown>; result?: unknown; error?: string }>) => {
   const body = JSON.stringify(outcomes.map(({ tool, args, result, error }) => (error ? { tool, args, error } : { tool, args, result })), null, 2);
