@@ -1,6 +1,6 @@
 # W3-02 · Google Calendar
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/w3-02-google-calendar` · **Phụ thuộc:** W3-00 và W3-01 đã merge (dùng lại `google/service-account.ts`) · **Làm song song với:** W3-03, W3-04, W3-05
+**Trạng thái:** đang review · **Nhánh:** `vinhdat/feat-w3-02-google-calendar` · **Phụ thuộc:** W3-00 và W3-01 đã merge (dùng lại `google/service-account.ts`) · **Làm song song với:** W3-03, W3-04, W3-05
 
 Đọc trước: [yêu cầu chung cho task thêm service](W3-service-common.md). Card này chỉ ghi phần riêng của Google Calendar.
 
@@ -45,15 +45,20 @@ Ngày 02/10/2026, người dùng đã chấp thuận ngoại lệ định tuyế
 
 ## Tiêu chí riêng (ngoài tiêu chí chung)
 
-- [ ] Test kiểm tra thời gian: `end` trước `start`, quá 24 giờ, thiếu múi giờ đều bị từ chối trước khi gọi API.
-- [ ] Test `list_events` từ chối khoảng thời gian > 31 ngày.
-- [ ] Test body `create_event` không có `attendees` và query có `sendUpdates=none`.
-- [ ] Test hai service Google (Sheets, Calendar) cấu hình cùng service account vẫn lấy hai token đúng scope.
+- [x] Test kiểm tra thời gian: `end` trước `start`, quá 24 giờ, thiếu múi giờ đều bị từ chối trước khi gọi API.
+- [x] Test `list_events` từ chối khoảng thời gian > 31 ngày.
+- [x] Test body `create_event` không có `attendees` và query có `sendUpdates=none`.
+- [x] Test hai service Google (Sheets, Calendar) cấu hình cùng service account vẫn lấy hai token đúng scope.
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Tài liệu API đã đọc (đường dẫn, ngày):
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#31](https://github.com/VinhDat267/ATI_Project/pull/31), triển khai và sửa review xong; chưa merge, trạng thái CI head cuối theo PR.
+- Commit: implementation `6979777d7f21b55a31563ff828ef02ca9f3121c6`; snapshot riêng `93cd06cb41099ccb71f375115a4e319f86feff1b`; hardening ID `eededde64e9add0701efe2e2c0a4ae2dddc33dd5`; pagination `e426215575a062f13b15be002ec5f5c8556527ae`.
+- Tài liệu API đã đọc ngày **2026-10-02**: [calendars.get](https://developers.google.com/workspace/calendar/api/v3/reference/calendars/get), [events.list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), [events.insert](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert), [events resource](https://developers.google.com/workspace/calendar/api/v3/reference/events), [CalendarList resource](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList), [errors](https://developers.google.com/workspace/calendar/api/guides/errors), [quota](https://developers.google.com/workspace/calendar/api/guides/quota). Events scope + readonly cho metadata lịch; limiter nội bộ bảo thủ 60 request/phút/account, không coi đây là quota được cấp cho tài khoản thật.
+- Test đã chạy: RED foundation5/6, adapter36/36, HTTP/PostgreSQL/sandbox3/3, browser1/1, live CLI6/6; GREEN tương ứng exit0. Dot-segment RED2/38 → GREEN39/39 cùng schema; pagination RED2/40 → GREEN40/40. Snapshot RED1/15 → GREEN15/15; guard không có legacy regression khác rf06.
+- Full `npm run check` after review fix: **677 v3** (42 schema,149 adapters,138 planner,25 executor,162 API,161 web) +**91 offline eval**, exit0; typecheck/build/secret scan, launcher1/local-env3 đạt. Strict Calendar/Sheets/Google test + evaluation harness tsc exit0. Browser PostgreSQL/sandbox **11/11 exit0** after fix.
+- Independent review: Critical0, Important1 fixed in one TDD pass, Minor0, eight bounded edge-probe groups passed; ten explicitly declined behaviors are recorded in the SDD ledger. Long `Retry-After` now returns typed `RATE_LIMIT` before a second dispatch when the requested wait exceeds 30 seconds.
+- Điều chưa làm: Google live/model **NOT_RUN**; thời gian tương đối với model thật dành W3-06; chỉ search mode llm, không thêm gather regex. Label `rf06=refusal` và exception guard giữ nguyên cho W3-06.
+- Chốt bàn giao **2026-10-03**: review độc lập toàn nhánh `716f568..441f485`, Critical0/Important1/Minor0; reviewer chạy lại check675+91, strict harness và browser11/11 exit0. Important đã sửa tại `008969073906f279d5ef75578c6dc4ae8f032ec3`: RED2failed/42 → GREEN42/42, fullcheck **677 v3 +91 eval**, strict harness và browser **11/11**, exit0. Không re-review; kết luận sau sửa dựa trên regression và full suite. Không có minor cần hoãn.
+- CI `441f485` SUCCESS run37030150912. CI headfix0089690 từng lỗi Playwright đọc body response đã bị navigation bỏ qua ở test reload cũ; lần chạy sau bị hủy trong cài Chromium, nên không coi hai lần đó là PASS. Kiểm tra lại CI head cuối trước khi chuyển PR sang ready.
+- Khác biệt: rate-limit 403 chỉ với hai reason được Google tài liệu hóa → RATE_LIMIT, Retry-After + tối đa một retry; các 403 khác AUTH_ERROR. Live CLI check dùng directory hợp đồng đã đăng ký (giữ child checks) thay nhánh cố định GitHub vốn làm service mới thất bại; khôi phục import discovery cũ còn thiếu. Description escape HTML; ISO yêu cầu giây/múi giờ; location≤1000; explicit calendar ID, không alias primary/dot-segment. List events theo nextPageToken, tối đa 20 trang rồi báo lỗi thay vì trả danh sách thiếu âm thầm.

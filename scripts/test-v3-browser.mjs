@@ -14,6 +14,7 @@ const scenarios = [
   { name: 'partial_failure', grep: 'partial failure and skip' },
   { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },
   { name: 'sheets_slack', grep: 'approved Sheets workflow carries updatedRange to Slack' },
+  { name: 'calendar_slack', grep: 'approved Calendar workflow carries event url and start to Slack' },
 ];
 
 for (const scenario of scenarios) {

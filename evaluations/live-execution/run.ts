@@ -1,5 +1,5 @@
 /**
- * Controlled live execution against real Trello, Slack and GitHub.
+ * Controlled live execution against configured registered services.
  *
  *   node --env-file=.env --import tsx evaluations/live-execution/run.ts discover
  *   node --env-file=.env --import tsx evaluations/live-execution/run.ts check
@@ -14,7 +14,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AIPlanner, WorkingMemory, createProviderFromEnv } from '@wap/planner';
-import { LIVE_SERVICES } from './live-services.js';
+import { TrelloAdapter, SlackAdapter } from '@wap/tool-adapters';
+import { LIVE_SERVICES, checkLiveService } from './live-services.js';
 import { ALL_TOOLS, type PlanResponse, type PlannerResponse } from '@wap/tool-schemas';
 import { executeApproved, planDigest, readLiveConfig, writeSteps, type LiveService } from './harness.js';
 
@@ -60,23 +61,8 @@ async function check(services: Record<string, LiveService>, skipped: Record<stri
   for (const [service, config] of Object.entries(services)) {
     const adapter = createAdapter(service, config);
     try {
-      if (service === 'trello') {
-        const boards = await adapter.execute('trello.search_boards', { query: '', limit: 10 });
-        if (boards.length === 0) throw new Error('no allowlisted board is visible to this token');
-        for (const board of boards) {
-          const lists = await adapter.execute('trello.search_lists', { boardId: board.id, limit: 10 });
-          console.log(`trello: OK - board "${board.name}" (${board.id}), lists: ${lists.map((l: any) => l.name).join(', ')}`);
-        }
-      } else if (service === 'slack') {
-        const channels = await adapter.execute('slack.search_channels', { query: '', limit: 10 });
-        if (channels.length === 0) throw new Error('no allowlisted channel is visible to the bot');
-        console.log(`slack: OK - channels: ${channels.map((c: any) => `#${c.name} (${c.id})`).join(', ')}`);
-      } else {
-        const repos = (await Promise.all(config.allowedScope.repos!.map((repo) =>
-          adapter.execute('github.search_repos', { query: repo.split('/')[1], limit: 10 })))).flat();
-        if (repos.length === 0) throw new Error('no allowlisted repository is visible to this token');
-        console.log(`github: OK - repos: ${[...new Set(repos.map((r: any) => r.fullName))].join(', ')}`);
-      }
+      const count = await checkLiveService(service, adapter);
+      console.log(`${service}: OK - ${count} allowlisted resources; registered read checks passed`);
     } catch (err) {
       ok = false;
       console.log(`${service}: FAILED - ${errorText(err)}`);

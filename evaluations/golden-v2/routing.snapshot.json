@@ -547,7 +547,8 @@
       "trello",
       "slack",
       "github",
-      "sheets"
+      "sheets",
+      "calendar"
     ]
   },
   {
@@ -576,16 +577,9 @@
     "id": "rf06",
     "source": "golden",
     "prompt": "Schedule a Google Calendar meeting with the frontend team tomorrow at 3pm",
-    "legacyCatalog": [
-      "trello",
-      "slack",
-      "github"
-    ],
+    "legacyCatalog": [],
     "fullCatalog": [
-      "trello",
-      "slack",
-      "github",
-      "sheets"
+      "calendar"
     ]
   },
   {
@@ -778,7 +772,8 @@
       "trello",
       "slack",
       "github",
-      "sheets"
+      "sheets",
+      "calendar"
     ]
   },
   {
