@@ -7,7 +7,7 @@ import type { ChatService } from '../services/chat-service.js';
 export interface ConversationRoutesOptions {
   convRepo: ConversationRepo;
   msgRepo: MessageRepo;
-  chatService: ChatService;
+  chatService?: ChatService;
   planRepo?: PlanRepo;
 }
 
@@ -191,6 +191,14 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content string is required' });
+        return;
+      }
+
+      if (!chatService) {
+        res.status(503).json({
+          code: 'PLANNING_NOT_CONFIGURED',
+          error: 'Tính năng lập kế hoạch chưa được cấu hình. Bạn vẫn có thể quản lý tài khoản và hội thoại.',
+        });
         return;
       }
 
