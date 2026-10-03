@@ -44,8 +44,12 @@ Kịch bản `telegram_slack`: gửi tin Telegram → báo Slack kèm `messageId
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Tài liệu API đã đọc (đường dẫn, ngày):
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#33](https://github.com/VinhDat267/ATI_Project/pull/33), nhánh `vinhdat/feat-w3-04-telegram`, chưa merge. Ba tiêu chí riêng ở trên có test đạt; trạng thái/checklist phần yêu cầu giữ cho reviewer cập nhật.
+- Commit: implementation `90529d26a4b9807052240893477f76d355825012`; snapshot riêng `bd304379ac3f1959d24c0ae343685916c7e96cec`; sửa review `743df4bb9382db0421aef2a48f29363b549ec461`.
+- Tài liệu API đã đọc ngày03/10/2026: [Bot API](https://core.telegram.org/bots/api), [sendMessage](https://core.telegram.org/bots/api#sendmessage), [getChat](https://core.telegram.org/bots/api#getchat), [getMe](https://core.telegram.org/bots/api#getme), [ResponseParameters](https://core.telegram.org/bots/api#responseparameters), [limits FAQ](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this). Endpoint unversioned; JSON POST qua fetch, không SDK.
+- Test: baseline check742v3+92eval exit0. Foundation RED7/8, adapter RED43/43, API/sandbox/live config RED3/3; browser Telegram RED1/1 → GREEN1/1. Reviewer độc lập chạy lại797v3+93eval/strict/browser13/13, phát hiện I1/I2 Important. Một fix pass: RED10/65 → GREEN80/80 gồm golden routing; final `npm run check` **812v3+93eval exit0**, strict NodeNext exit0, browser đầy đủ **13/13 exit0**. PostgreSQL/HTTP/SSE thật, planner/provider sandbox; không gọi reviewer lần hai. [CI đúng head cuối](https://github.com/VinhDat267/ATI_Project/pull/33/checks) là gate trước Ready/merge.
+- Khác card: getChat trước gửi; group/supergroup được giãn3giây/tin (20/phút), private/channel1giây/tin, limiter chung trong process. Chuẩn hóa ID bằng BigInt; kết quả provider phải là integer an toàn và khớp ID. Retry_after thiếu/sai/>30giây dừng RATE_LIMIT, không clamp xuống để retry sớm; token shape kiểm trước URL, chặn redirect.
+- Review I1 đã sửa: router bỏ payload “là/rằng đã tạo …” khỏi chọn service khi đây là thông báo có tên service, giữ action tiếp theo và từng dòng hội thoại. Câu đúng card chọn Telegram riêng, request tạo issue thật vẫn cần GitHub; original message tới model nguyên vẹn. Grammar có giới hạn, chưa là nghiệm thu ngôn ngữ/model.
+- Review I2 đã sửa: HTTP lỗi nhưng body ok:true sau gửi → UNKNOWN, không retry/classify failed; genuine429 vẫn retry đúng một lần. Không có minor hoãn lại. Toàn bộ12 phần reviewer không kết luận có quyết định/chi phí trong nhật ký.
+- Provider/bot/live send **NOT_RUN** (W3-07); model/golden thật **NOT_RUN** (W3-06). Không sửa v2/frontend sản phẩm/prompt/policy executor/CURRENT-STATE/ROADMAP; router chỉ sửa tối thiểu cho I1.
+- Bàn giao: [nhật ký W3-04](../log/2026-10-03-codex-W3-04-telegram.md).

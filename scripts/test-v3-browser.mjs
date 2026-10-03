@@ -16,6 +16,7 @@ const scenarios = [
   { name: 'sheets_slack', grep: 'approved Sheets workflow carries updatedRange to Slack' },
   { name: 'calendar_slack', grep: 'approved Calendar workflow carries event url and start to Slack' },
   { name: 'notion_slack', grep: 'approved Notion workflow carries page url to Slack' },
+  { name: 'telegram_slack', grep: 'approved Telegram workflow carries messageId to Slack' },
 ];
 
 for (const scenario of scenarios) {
