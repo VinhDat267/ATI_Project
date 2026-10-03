@@ -264,7 +264,7 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
         name: 'jira.create_ticket', service: 'jira', description: 'Create Jira ticket', sideEffect: 'write',
         riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
       };
-      expect(classifyIntent('Open a ticket and notify Slack', [...SLACK_TOOLS, jiraTool], [...SERVICE_REGISTRY, jira]))
+      expect(classifyIntent('Open a ticket and notify Slack', [...SLACK_TOOLS, jiraTool], [...SERVICE_REGISTRY.filter(service => service.id !== 'jira'), jira]))
         .toEqual(['slack', 'jira']);
     });
 
@@ -277,8 +277,8 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
         name: 'jira.create_ticket', service: 'jira', description: 'Create Jira ticket', sideEffect: 'write',
         riskLevel: 'low', inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
       };
-      expect(classifyIntent('Open a Jira ticket', [jiraTool], [...SERVICE_REGISTRY, jira])).toEqual(['jira']);
-      expect(classifyIntent('Open a Jira ticket', tools, [...SERVICE_REGISTRY, jira])).toEqual([]);
+      expect(classifyIntent('Open a Jira ticket', [jiraTool], [...SERVICE_REGISTRY.filter(service => service.id !== 'jira'), jira])).toEqual(['jira']);
+      expect(classifyIntent('Open a Jira ticket', tools, [...SERVICE_REGISTRY.filter(service => service.id !== 'jira'), jira])).toEqual([]);
     });
   });
 
@@ -313,7 +313,7 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     provider.setPlanResponses([{ kind: 'clarification', question: 'Next action?', context: 'Ticket resolved' }]);
     const memory = new WorkingMemory();
     const queries: string[] = [];
-    const planner = new AIPlanner({ provider, toolCatalog: [jiraSearch], serviceRegistry: [...SERVICE_REGISTRY, jira],
+    const planner = new AIPlanner({ provider, toolCatalog: [jiraSearch], serviceRegistry: [...SERVICE_REGISTRY.filter(service => service.id !== 'jira'), jira],
       gatherSearch: async ({ tool, args }) => {
         queries.push(`${tool}:${args.query}`);
         return [{ id: 'JIRA-42', name: 'ABC-42' }];
