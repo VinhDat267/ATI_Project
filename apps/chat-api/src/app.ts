@@ -1,5 +1,5 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import { createAuthRoutes } from './routes/auth-routes.js';
+import { createAuthRoutes } from './routes/auth/index.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
@@ -9,6 +9,7 @@ import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
 import type { UserRepo } from './db/repositories/user-repo.js';
+import type { SessionRepo } from './db/repositories/session-repo.js';
 import type { AuthUser } from './auth/jwt.js';
 import type { CredentialRepo } from './db/repositories/credential-repo.js';
 import type { ChatService } from './services/chat-service.js';
@@ -19,6 +20,8 @@ export interface AppOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
   userRepo?: UserRepo;
+  sessionRepo?: SessionRepo;
+  authClock?: () => number;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
@@ -58,10 +61,11 @@ export function createApp(options: AppOptions): Express {
   // Auth routes (public login/refresh, protected /me)
   app.use(
     '/api/auth',
-    createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, validateCredentials: options.validateCredentials })
+    createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, sessionRepo: options.sessionRepo,
+      clock: options.authClock, validateCredentials: options.validateCredentials })
   );
 
-  const authMiddleware = createAuthMiddleware(options.jwtSecret);
+  const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
 
   // Services routes (protected via Bearer header)
   app.use(

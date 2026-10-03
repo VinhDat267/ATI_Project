@@ -10,6 +10,9 @@ export interface LoginViewProps {
   onLogin: (e: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   onQuickFillDemo?: () => void;
   onBackToLanding?: () => void;
+  authConfig?: { signupEnabled: boolean; googleEnabled: boolean };
+  onSignup?: () => void;
+  onGoogleLogin?: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
@@ -22,6 +25,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onLogin,
   onQuickFillDemo,
   onBackToLanding,
+  authConfig,
+  onSignup,
+  onGoogleLogin,
 }) => {
   const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
   const demoPassword = import.meta.env.VITE_DEMO_PASSWORD;
@@ -180,6 +186,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
               )}
             </button>
           </form>
+
+          {authConfig?.signupEnabled && onSignup && <button type="button" onClick={onSignup}>Đăng ký tài khoản</button>}
+          {authConfig?.googleEnabled && onGoogleLogin && <button type="button" onClick={onGoogleLogin}>Đăng nhập bằng Google</button>}
 
           {/* Quick-Fill Admin Helper for Local Testing (Only in sandbox/dev mode) */}
           {showDemo && (

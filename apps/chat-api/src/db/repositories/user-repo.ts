@@ -1,12 +1,25 @@
 import type pg from 'pg';
 import crypto from 'node:crypto';
+import { SessionRepo } from './session-repo.js';
+import type { AuthUser } from '../../auth/jwt.js';
 
 export interface UserRow {
   id: string;
   email: string;
-  password: string;
+  password: string | null;
   name: string;
   created_at: Date;
+  updated_at: Date;
+  email_verified: boolean;
+  status: 'pending' | 'active' | 'disabled';
+  role: 'member' | 'admin';
+  google_sub: string | null;
+}
+
+export function toAuthUser(user: UserRow): AuthUser {
+  return { id: user.id, email: user.email, name: user.name, role: user.role,
+    status: user.status, emailVerified: user.email_verified,
+    hasPassword: user.password !== null, hasGoogle: user.google_sub !== null };
 }
 
 const HASH_ITERATIONS = 210_000;
@@ -36,7 +49,10 @@ export function verifyPassword(password: string, storedHash?: string | null): bo
 }
 
 export class UserRepo {
-  constructor(private pool: pg.Pool) {}
+  readonly sessions: SessionRepo;
+  constructor(private pool: pg.Pool) {
+    this.sessions = new SessionRepo(pool);
+  }
 
   async findByEmail(email: string): Promise<UserRow | null> {
     const res = await this.pool.query(
@@ -75,5 +91,29 @@ export class UserRepo {
       [hashedPassword, email.toLowerCase().trim()]
     );
     return (res.rowCount ?? 0) > 0;
+  }
+
+  async provisionAdmin(data: { email: string; password: string; name: string }): Promise<UserRow> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query<UserRow>(
+        `INSERT INTO users(email,password,name,role,status,email_verified)
+         VALUES($1,$2,$3,'admin','active',true)
+         ON CONFLICT(email) DO UPDATE SET password=EXCLUDED.password,
+           role='admin',status='active',email_verified=true,updated_at=now()
+         RETURNING *`,
+        [data.email.trim().toLowerCase(), hashPassword(data.password), data.name],
+      );
+      const user = result.rows[0]!;
+      await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE user_id=$1', [user.id]);
+      await client.query('COMMIT');
+      return user;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

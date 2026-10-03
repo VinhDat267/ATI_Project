@@ -52,6 +52,11 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  role?: 'member' | 'admin';
+  status?: 'pending' | 'active' | 'disabled';
+  emailVerified?: boolean;
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
 }
 
 export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected' | 'partial' | 'reconciliation_required' | 'stopped' | 'failed';

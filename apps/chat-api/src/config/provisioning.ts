@@ -11,6 +11,6 @@ export function readProvisioningConfig(env: Record<string, string | undefined>):
   const email = env.CHAT_ADMIN_EMAIL?.trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('CHAT_ADMIN_EMAIL must be a valid email');
   const password = env.CHAT_ADMIN_PASSWORD;
-  if (!password || password.length < 12) throw new Error('CHAT_ADMIN_PASSWORD must be at least 12 characters');
+  if (!password || password.length < 12 || password.length > 128) throw new Error('CHAT_ADMIN_PASSWORD must be 12–128 characters');
   return { databaseUrl, email, password, name: env.CHAT_ADMIN_NAME?.trim() || 'Service Administrator' };
 }

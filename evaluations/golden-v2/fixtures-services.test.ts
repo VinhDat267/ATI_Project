@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_TOOLS } from '@wap/tool-schemas';
-import { validateSchemaValue } from '@wap/planner';
+import { formatSearchResults, validateSchemaValue } from '@wap/planner';
 import { buildMemory, fixtureSearch, knownResourceValues } from './fixtures.js';
 
 const spreadsheetId = 'spreadsheet_frontend_2026';
@@ -48,6 +48,18 @@ describe('new-service fixture contracts', () => {
       ['project', 'key', 'FE'], ['jira_issue', 'key', 'FE-42'],
     ]) expect(knownResourceValues(resource!, field!).has(value!), resource).toBe(true);
     expect(buildMemory({ page: pageId })).toHaveProperty('page.title', 'Release notes');
+  });
+  // W3-08: the search budget must not change any fixture-backed golden case.
+  it.each([
+    ...calls.map(([tool, args]) => [tool, 'query' in args ? { ...args, query: '' } : args] as const),
+    ['trello.search_boards', { query: '' }], ['trello.search_cards', { query: '' }],
+    ['slack.search_channels', { query: '' }], ['github.search_repos', { query: '' }],
+  ] as const)('keeps the broadest %s fixture result within the search budget, untruncated', async (tool, args) => {
+    const result = await fixtureSearch({ tool, args: args as Record<string, unknown> });
+    const prompt = formatSearchResults([{ tool, args: args as Record<string, unknown>, result }]);
+    expect(prompt).not.toContain('"resultPreview"');
+    expect(prompt).not.toContain('"omittedItems"');
+    expect(JSON.stringify(result)).not.toContain('"truncated"');
   });
   it('fails closed on unsupported tools and unknown parents', async () => {
     await expect(fixtureSearch({ tool: 'calendar.create_event', args: {} })).rejects.toThrow();

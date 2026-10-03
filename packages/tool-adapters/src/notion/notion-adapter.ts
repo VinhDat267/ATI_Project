@@ -1,6 +1,7 @@
 import { NOTION_ID_PATTERN, normalizeNotionId } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
+import { NOTION_MAX_PROPERTY_CHARS, clipText } from '../bounds.js';
 
 export interface NotionAdapterConfig extends BaseAdapterConfig { credentials: { token: string }; fetchFn?: typeof fetch }
 export const NOTION_VERSION = '2026-03-11';
@@ -198,7 +199,7 @@ export class NotionAdapter extends BaseAdapter {
     if (toolName === 'notion.query_database') {
       only(args, ['databaseId', 'query', 'limit']); const id = this.checkedDatabase(args.databaseId); const maximum = limit(args.limit, 20);
       const query = args.query === undefined ? '' : text(args.query, 2000); const source = await this.schema(id, signal);
-      const pages = []; const cursors = new Set<string>(); let cursor: string | undefined;
+      const pages = []; const cursors = new Set<string>(); let cursor: string | undefined; let truncated = false;
       for (let index = 0; index < 20; index++) {
         const value = await this.request('data_sources/' + source.id + '/query', signal, 'POST', { page_size: maximum - pages.length,
           ...(query ? { filter: { property: source.title, title: { contains: query } } } : {}), ...(cursor ? { start_cursor: cursor } : {}),
@@ -207,11 +208,15 @@ export class NotionAdapter extends BaseAdapter {
         for (const item of value.results) {
           if (item?.in_trash === true) continue;
           if (item?.object !== 'page' || item.parent?.type !== 'data_source_id' || uuid(item.parent.data_source_id, true) !== source.id || !item.properties || Array.isArray(item.properties)) badResponse();
-          const properties = Object.fromEntries(Object.entries(item.properties).map(([key, prop]) => [key, propertyText(prop)]));
+          const properties = Object.fromEntries(Object.entries(item.properties).map(([key, prop]) => {
+            const clipped = clipText(propertyText(prop), NOTION_MAX_PROPERTY_CHARS);
+            if (clipped.clipped) truncated = true;
+            return [key, clipped.text];
+          }));
           pages.push({ id: uuid(item.id, true), title: properties[source.title] || '(Không có tiêu đề)', url: link(item), properties });
           if (pages.length >= maximum) break;
         }
-        if (pages.length >= maximum || !value.has_more) return { pages };
+        if (pages.length >= maximum || !value.has_more) return { pages, ...(truncated ? { truncated: true } : {}) };
         if (typeof value.next_cursor !== 'string' || !value.next_cursor || cursors.has(value.next_cursor)) badResponse();
         const nextCursor: string = value.next_cursor; cursor = nextCursor; cursors.add(nextCursor);
       }

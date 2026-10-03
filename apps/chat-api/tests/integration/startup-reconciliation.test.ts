@@ -11,7 +11,7 @@ import { UserRepo } from '../../src/db/repositories/user-repo.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { StepRepo } from '../../src/db/repositories/step-repo.js';
-import { generateTokens } from '../../src/auth/jwt.js';
+import { generateAccessToken } from '../../src/auth/jwt.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
@@ -87,9 +87,12 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     convRepo = new ConversationRepo(pool);
-    const user = await new UserRepo(pool).createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
+    const users = new UserRepo(pool);
+    const user = await users.createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
+    await pool.query(await readFile(resolve(root, 'db/v3/0003_auth_sessions.sql'), 'utf8'));
     userId = user.id;
-    token = generateTokens(user, secret).accessToken;
+    const session = await users.sessions.create(user.id, 'Startup reconciliation fixture');
+    token = generateAccessToken(user, secret, session.sessionId).accessToken;
   });
 
   afterEach(async () => {
