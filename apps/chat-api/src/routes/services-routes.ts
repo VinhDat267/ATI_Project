@@ -4,6 +4,7 @@ import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { getRegisteredServices, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
+import { isAdmin } from '../auth/jwt.js';
 
 export interface ServicesRoutesOptions {
   credentialRepo?: CredentialRepo;
@@ -95,8 +96,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // POST /api/services/:service/credentials
   router.post('/:service/credentials', async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = (req as any).user?.id;
-      if (!userId || !options.adminUserIds?.includes(userId)) {
+      if (!isAdmin((req as any).user, options.adminUserIds)) {
         res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
         return;
       }

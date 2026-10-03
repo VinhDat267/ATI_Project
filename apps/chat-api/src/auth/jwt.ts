@@ -1,10 +1,17 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
+import type { SessionRepo } from '../db/repositories/session-repo.js';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  sid?: string;
+  role?: 'member' | 'admin';
+  status?: 'pending' | 'active' | 'disabled';
+  emailVerified?: boolean;
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
 }
 
 export interface TokenPair {
@@ -25,6 +32,7 @@ interface JWTPayload {
   type: 'access' | 'refresh';
   iat: number;
   exp: number;
+  sid?: string;
 }
 
 function base64UrlEncode(data: string): string {
@@ -93,7 +101,18 @@ function verifyToken(token: string, secret: string, expectedType: 'access' | 're
     id: payload.sub,
     email: payload.email,
     name: payload.name,
+    ...(payload.sid ? { sid: payload.sid } : {}),
   };
+}
+
+export function generateAccessToken(user: AuthUser, secret: string, sessionId: string, now = Date.now()): Pick<TokenPair, 'accessToken' | 'expiresIn'> {
+  const issued = Math.floor(now / 1000);
+  return { accessToken: signToken({ sub: user.id, email: user.email, name: user.name,
+    sid: sessionId, type: 'access', iat: issued, exp: issued + 15 * 60 }, secret), expiresIn: 15 * 60 };
+}
+
+export function isAdmin(user: AuthUser | undefined, administratorIds: readonly string[] = []): boolean {
+  return Boolean(user && (user.role === 'admin' || administratorIds.includes(user.id)));
 }
 
 export function generateTokens(
@@ -140,6 +159,8 @@ export function verifyRefreshToken(token: string, secret: string): AuthUser {
 
 export interface AuthMiddlewareOptions {
   allowQueryToken?: boolean;
+  sessionRepo?: SessionRepo;
+  clock?: () => number;
 }
 
 export function createAuthMiddleware(secret: string, options?: AuthMiddlewareOptions) {
@@ -160,6 +181,25 @@ export function createAuthMiddleware(secret: string, options?: AuthMiddlewareOpt
 
     try {
       const user = verifyAccessToken(token, secret);
+      if (user.sid && !options?.sessionRepo) {
+        res.status(503).json({ error: 'PostgreSQL is required for this session' });
+        return;
+      }
+      if (options?.sessionRepo) {
+        if (!user.sid || !/^[a-f0-9-]{36}$/i.test(user.sid)) {
+          res.status(401).json({ error: 'Invalid or revoked session' });
+          return;
+        }
+        void options.sessionRepo.findActiveUser(user.sid, user.id, options.clock?.() ?? Date.now()).then(current => {
+          if (!current) {
+            res.status(401).json({ error: 'Invalid or revoked session' });
+            return;
+          }
+          (req as any).user = current;
+          next();
+        }).catch(() => res.status(503).json({ error: 'Authentication database is unavailable' }));
+        return;
+      }
       (req as any).user = user;
       next();
     } catch (err: any) {
