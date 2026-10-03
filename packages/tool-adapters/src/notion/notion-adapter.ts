@@ -49,12 +49,18 @@ function propertyText(value: any): string {
     case 'multi_select': return Array.isArray(data) ? data.map(item => item.name).join(', ') : badResponse();
     case 'date': return data ? [data.start, data.end].filter(Boolean).join(' → ') : '';
     case 'people': return Array.isArray(data) ? data.map(item => item.name ?? item.id).join(', ') : badResponse();
-    case 'relation': return Array.isArray(data) ? data.map(item => item.id).join(', ') : badResponse();
+    case 'relation': return Array.isArray(data) ? data.map(item => item.id).join(', ') + (value.has_more === true ? ' [incomplete]' : '') : badResponse();
+    case 'files': return Array.isArray(data) ? data.map(item => typeof item?.name === 'string' ? item.name : badResponse()).join(', ') : badResponse();
     case 'formula': return data ? propertyText(data) : '';
     case 'rollup': return data?.type === 'array' ? data.array.map(propertyText).join(', ') : data ? propertyText(data) : '';
-    case 'number': case 'checkbox': case 'url': case 'email': case 'phone_number': case 'created_time': case 'last_edited_time': return data == null ? '' : String(data);
+    case 'number': case 'checkbox': case 'string': case 'boolean': case 'url': case 'email': case 'phone_number': case 'created_time': case 'last_edited_time': return data == null ? '' : String(data);
     case 'created_by': case 'last_edited_by': return data?.name ?? data?.id ?? '';
-    default: return '';
+    case 'unique_id': return data ? [data.prefix, data.number].filter(item => item != null && item !== '').join('-') : '';
+    case 'place': return data ? [data.name, data.address, typeof data.lat === 'number' && typeof data.lon === 'number' ? `${data.lat}, ${data.lon}` : null].filter(item => item != null && item !== '').join('; ') : '';
+    case 'verification': return data ? [data.state, propertyText({ type: 'date', date: data.date }), data.verified_by?.name ?? data.verified_by?.id].filter(item => item != null && item !== '').join('; ') : '';
+    case 'incomplete': return '[incomplete]';
+    case 'button': return '[unavailable]';
+    default: return '[unsupported]';
   }
 }
 function dateValue(value: string): boolean {

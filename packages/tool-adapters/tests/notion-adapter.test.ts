@@ -50,6 +50,90 @@ it('resolves database to data source and queries title with flattened properties
   expect(calls[2]!.method).toBe('POST'); expect(calls[2]!.body).toEqual({ page_size: 20, filter: { property: 'Name', title: { contains: 'ATI' } } });
   expect(calls.every(c => c.headers.get('Notion-Version') === '2026-03-11' && c.signal === signal)).toBe(true);
 });
+async function queryProperties(properties: Record<string, any>) {
+  const { adapter, calls } = setup(call => ok(call.url.endsWith('/query')
+    ? { object: 'list', results: [{ ...page(), properties: { ...page().properties, ...properties } }], has_more: false }
+    : call.url.includes('/databases/') ? database() : source()));
+  const result = await adapter.execute('notion.query_database', { databaseId: DB });
+  return { properties: result.pages[0].properties, calls };
+}
+it('preserves formula primitives, false and zero, dates and explicitly unavailable results', async () => {
+  const values = {
+    Label: { type: 'string', string: 'Ready for release' }, Approved: { type: 'boolean', boolean: true },
+    Rejected: { type: 'boolean', boolean: false }, Zero: { type: 'number', number: 0 },
+    Period: { type: 'date', date: { start: '2026-10-03', end: '2026-10-04' } },
+    Empty: { type: 'string', string: null }, Unsupported: { type: 'unsupported', unsupported: {} },
+  };
+  const { properties } = await queryProperties(Object.fromEntries(Object.entries(values).map(([key, formula]) => [key, { type: 'formula', formula }])));
+  expect(properties).toMatchObject({ Label: 'Ready for release', Approved: 'true', Rejected: 'false', Zero: '0', Period: '2026-10-03 → 2026-10-04', Empty: '', Unsupported: '[unsupported]' });
+});
+it('preserves recursive rollup values and marks incomplete rollups', async () => {
+  const { properties } = await queryProperties({
+    Labels: { type: 'rollup', rollup: { type: 'array', array: [
+      { type: 'formula', formula: { type: 'string', string: 'One' } },
+      { type: 'formula', formula: { type: 'string', string: 'Two' } },
+      { type: 'formula', formula: { type: 'boolean', boolean: false } },
+    ] } },
+    Total: { type: 'rollup', rollup: { type: 'number', number: 0 } },
+    Pending: { type: 'rollup', rollup: { type: 'incomplete', incomplete: {} } },
+  });
+  expect(properties).toMatchObject({ Labels: 'One, Two, false', Total: '0', Pending: '[incomplete]' });
+});
+it('returns file display names without signed download URLs', async () => {
+  const { properties } = await queryProperties({
+    Attachments: { type: 'files', files: [
+      { name: 'Project brief.pdf', type: 'file', file: { url: 'https://files.example.test/signed?secret=fixture', expiry_time: '2026-10-04T00:00:00Z' } },
+      { name: 'Notes.txt', type: 'external', external: { url: 'https://example.test/notes.txt' } },
+    ] }, EmptyFiles: { type: 'files', files: [] },
+  });
+  expect(properties.Attachments).toBe('Project brief.pdf, Notes.txt'); expect(properties.EmptyFiles).toBe('');
+  expect(JSON.stringify(properties)).not.toContain('signed?secret'); expect(JSON.stringify(properties)).not.toContain('/notes.txt');
+});
+it('preserves unique ID labels, zero and nullable prefix or number', async () => {
+  const { properties } = await queryProperties({
+    TaskID: { type: 'unique_id', unique_id: { prefix: 'TASK', number: 42 } },
+    ZeroID: { type: 'unique_id', unique_id: { prefix: null, number: 0 } },
+    PrefixOnly: { type: 'unique_id', unique_id: { prefix: 'TASK', number: null } },
+    EmptyID: { type: 'unique_id', unique_id: { prefix: null, number: null } },
+  });
+  expect(properties).toMatchObject({ TaskID: 'TASK-42', ZeroID: '0', PrefixOnly: 'TASK', EmptyID: '' });
+});
+it('preserves place names, addresses and coordinates including zero', async () => {
+  const { properties } = await queryProperties({
+    Office: { type: 'place', place: { name: 'ATI Office', address: '123 Test Street', lat: 10.5, lon: 106.5, google_place_id: 'provider-private-id' } },
+    Origin: { type: 'place', place: { name: null, address: null, lat: 0, lon: 0 } },
+    EmptyPlace: { type: 'place', place: null },
+  });
+  expect(properties).toMatchObject({ Office: 'ATI Office; 123 Test Street; 10.5, 106.5', Origin: '0, 0', EmptyPlace: '' });
+  expect(JSON.stringify(properties)).not.toContain('provider-private-id');
+});
+it('preserves wiki verification state, period and verifier without unrelated user details', async () => {
+  const { properties } = await queryProperties({
+    Verified: { type: 'verification', verification: { state: 'verified', date: { start: '2026-10-03T00:00:00Z', end: '2026-10-04T00:00:00Z' }, verified_by: { id: OTHER, name: 'Reviewer', person: { email: 'private@example.test' } } } },
+    Unverified: { type: 'verification', verification: { state: 'unverified', date: null, verified_by: null } },
+    Expired: { type: 'verification', verification: { state: 'expired', date: null, verified_by: null } },
+    EmptyVerification: { type: 'verification', verification: null },
+  });
+  expect(properties).toMatchObject({ Verified: 'verified; 2026-10-03T00:00:00Z → 2026-10-04T00:00:00Z; Reviewer', Unverified: 'unverified', Expired: 'expired', EmptyVerification: '' });
+  expect(JSON.stringify(properties)).not.toContain('private@example.test');
+});
+it('marks unknown and API-unavailable property values instead of silently reporting empty', async () => {
+  const { properties } = await queryProperties({
+    Future: { type: 'future_property', future_property: { internal: 'provider-private-payload' } },
+    Button: { type: 'button', button: {} },
+  });
+  expect(properties).toMatchObject({ Future: '[unsupported]', Button: '[unavailable]' });
+  expect(JSON.stringify(properties)).not.toContain('provider-private-payload');
+});
+it('marks a partial relation snapshot without following resources beyond its scope', async () => {
+  const ids = Array.from({ length: 25 }, () => ({ id: OTHER }));
+  const { properties, calls } = await queryProperties({
+    Related: { type: 'relation', relation: ids, has_more: true },
+    Complete: { type: 'relation', relation: [{ id: PAGE }], has_more: false },
+  });
+  expect(properties.Related).toBe(ids.map(item => item.id).join(', ') + ' [incomplete]');
+  expect(properties.Complete).toBe(PAGE); expect(calls).toHaveLength(3);
+});
 it('creates with data-source parent and validated property conversions; splits content into plain 2000-char paragraphs', async () => {
   const { adapter, calls } = setup(); const content = '# ' + 'x'.repeat(3998);
   expect(await adapter.execute('notion.create_page', { databaseId: DB, title: 'Review', content, properties: { Notes: '*plain*', Stage: 'Ready', Day: '2026-10-03', Link: 'https://example.test', Score: '2.5' } })).toEqual({ id: PAGE, url: page().url });

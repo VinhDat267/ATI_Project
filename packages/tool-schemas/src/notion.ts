@@ -19,7 +19,7 @@ export const NOTION_TOOLS: ToolDefinition[] = [
     inputSchema: input({ query: { ...str, maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: 10, default: 10 } }, ['query']),
     outputSchema: { type: 'array', items: output({ id: str, title: str, url: str }, ['id', 'title', 'url']) } },
   { name: 'notion.query_database', service: 'notion', sideEffect: 'read', riskLevel: 'low', discovers: 'page',
-    description: 'Đọc tối đa 20 page từ database đã tìm thấy có đúng một data source; query tùy chọn lọc theo tiêu đề, properties là chuỗi thuần.',
+    description: 'Đọc tối đa 20 page từ database đã tìm thấy có đúng một data source; query tùy chọn lọc theo tiêu đề, properties là chuỗi thuần từ snapshot API có giới hạn. Relation/rollup chưa đầy đủ có [incomplete], kiểu chưa hỗ trợ có [unsupported], button có [unavailable]; files chỉ trả tên, không tải file hoặc mở rộng relation.',
     inputSchema: input({ databaseId: resource('database'), query: { ...str, maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: 20, default: 20 } }, ['databaseId']),
     outputSchema: output({ pages: { type: 'array', items: page } }, ['pages']) },
   { name: 'notion.create_page', service: 'notion', sideEffect: 'write', riskLevel: 'medium',
