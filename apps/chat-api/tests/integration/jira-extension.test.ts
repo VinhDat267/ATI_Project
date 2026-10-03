@@ -57,11 +57,21 @@ it('integrates Jira SQL encryption, HTTP SSRF gates, conditional catalog, factor
     const grounding = { memory: { project: seen[0].workingMemory.__observed.project }, userTexts: [] }; const validated = validatePlan(JSON.stringify(plan), catalog, { grounding }); expect(validated.valid, JSON.stringify(validated)).toBe(true);
     const forged = structuredClone(plan); forged.steps[0]!.args.projectKey = 'OTHER'; expect(validatePlan(JSON.stringify(forged), catalog, { grounding }).valid).toBe(false);
     const before = calls.length; await expect(adapter.execute('jira.create_issue', forged.steps[0]!.args)).rejects.toMatchObject({ category: 'AUTH_ERROR' }); expect(calls).toHaveLength(before);
-    const issues = await adapter.execute('jira.search_issues', { projectKey: 'ATI', query: 'Login' });
-    const memory = new WorkingMemory(); memory.setEntity('jira_issue', issues.issues);
     const comment = { kind: 'plan', thinking: 'Use observed issue key', summary: 'Comment', warnings: [], steps: [{ id: 'comment', tool: 'jira.add_comment', description: 'Comment', args: { issueKey: 'ATI-42', body: 'Plain' }, dependsOn: [] }] };
-    expect(validatePlan(JSON.stringify(comment), catalog, { grounding: { memory: memory.toJSON(), userTexts: [] } }).valid).toBe(true);
-    comment.steps[0]!.args.issueKey = 'ATI-999'; expect(validatePlan(JSON.stringify(comment), catalog, { grounding: { memory: memory.toJSON(), userTexts: [] } }).valid).toBe(false);
+    const memory = new WorkingMemory(); let round = 0; const commentInputs: any[] = [];
+    const commentPlanner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm', gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }), provider: { name: 'scripted-search-comment', async generatePlan(input) {
+      commentInputs.push(structuredClone(input));
+      return JSON.stringify(round++ === 0 ? { kind: 'search', calls: [{ tool: 'jira.search_issues', args: { projectKey: 'ATI', query: 'Login' } }] } : comment);
+    } } });
+    expect((await commentPlanner.processMessage({ userMessage: 'Add a comment to the Jira ticket for the login bug', memory })).kind).toBe('plan');
+    expect(commentInputs).toHaveLength(2);
+    const observed = memory.getEntity<{ jira_issue: unknown[] }>('__observed')!.jira_issue;
+    expect(observed).toEqual([{ id: '10042', key: 'ATI-42', title: 'Login bug', url: credentials.siteUrl + '/browse/ATI-42' }]);
+    expect(commentInputs[1].conversationHistory.at(-1).content).toContain('ATI-42');
+    const commentGrounding = { memory: { jira_issue: observed }, userTexts: [] };
+    expect(validatePlan(JSON.stringify(comment), catalog, { grounding: commentGrounding }).valid).toBe(true);
+    const forgedComment = structuredClone(comment); forgedComment.steps[0]!.args.issueKey = 'ATI-999';
+    expect(validatePlan(JSON.stringify(forgedComment), catalog, { grounding: commentGrounding }).valid).toBe(false);
     expect(await adapter.execute('jira.create_issue', plan.steps[0]!.args)).toEqual({ id: '10042', key: 'ATI-42', url: credentials.siteUrl + '/browse/ATI-42' });
     // Simulate stale credentials bypassing the save boundary: unavailable, no SSRF check, factory rejects.
     await repo.saveCredentials('jira', encryptCredentials({ ...credentials, siteUrl: 'https://evil.com', allowedScope: { projects: ['ATI'] } }, key)); factory.clearCache('jira');

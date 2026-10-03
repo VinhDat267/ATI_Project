@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AIPlanner, WorkingMemory, buildSystemPrompt, type LLMGeneratePlanInput, type LLMProvider } from '../src/index.js';
-import { ALL_TOOLS, TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, TRELLO_TOOLS, SLACK_TOOLS, type ToolDefinition } from '@wap/tool-schemas';
 
 /** Provider that plays back scripted model outputs and records every input it receives. */
 function scripted(...outputs: unknown[]) {
@@ -196,8 +196,8 @@ describe('AI-driven search', () => {
     await planner(provider, counting).processMessage({ userMessage: 'Create a card on the frontend board', memory });
     const observed = memory.getEntity<Record<string, Array<{ id: string }>>>('__observed')!;
     expect(observed.board).toHaveLength(20);
-    expect(observed.board.map((b) => b.id)).toEqual(Array.from({ length: 20 }, (_, i) => `board_${i + 10}`));
-    expect(observed.board[0]).not.toHaveProperty('secret');
+    expect(observed.board!.map((b) => b.id)).toEqual(Array.from({ length: 20 }, (_, i) => `board_${i + 10}`));
+    expect(observed.board![0]).not.toHaveProperty('secret');
   });
 
   it('truncates one search to ten results and dedupes a repeated search', async () => {
@@ -245,6 +245,54 @@ describe('AI-driven search', () => {
     const { provider } = scripted(search(boards), card('board_fe'), card('board_fe'));
     const response = await planner(provider, searcher().fn).processMessage({ userMessage: 'Create a card on the frontend board', memory: new WorkingMemory() });
     expect(response.kind).toBe('clarification');
+  });
+});
+
+describe('schema-declared search envelopes', () => {
+  const item = { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['id'] };
+  const resourceList = { type: 'array', items: item };
+  const tool: ToolDefinition = { ...ALL_TOOLS.find(t => t.name === 'github.get_issue')!, discovers: 'issue',
+    outputSchema: { type: 'object', properties: { matches: resourceList }, required: ['matches'] } };
+  async function lookup(raw: unknown, outputSchema = tool.outputSchema) {
+    const { provider, inputs } = scripted(search({ tool: tool.name, args: { repo: 'acme/api', issueNumber: 42 } }), ask('Which issue?'));
+    const memory = new WorkingMemory(); const events: any[] = [];
+    await planner(provider, async () => raw, { toolCatalog: [{ ...tool, outputSchema }] }).processMessage({
+      userMessage: 'Look up GitHub issue 42', memory, onGatherEvent: event => events.push(event),
+    });
+    return { inputs, memory, events };
+  }
+  it('unwraps the declared resource list, caps it at ten and records actual entities', async () => {
+    const matches = Array.from({ length: 25 }, (_, i) => ({ id: 'issue_' + i, title: 'Issue ' + i }));
+    const result = await lookup({ matches });
+    expect(result.memory.getEntity<any>('__observed').issue).toEqual(matches.slice(0, 10));
+    expect(result.events.at(-1).output).toEqual(matches.slice(0, 10));
+    expect(lastUserMessage(result.inputs[1]!)).toContain('issue_9');
+    expect(lastUserMessage(result.inputs[1]!)).not.toContain('issue_10');
+  });
+  it('returns an empty declared list as zero results', async () => {
+    const result = await lookup({ matches: [] });
+    expect(result.events.at(-1)).toMatchObject({ status: 'completed', output: [] });
+    expect(result.memory.getEntity<any>('__observed').issue).toEqual([]);
+  });
+  it.each([{}, { matches: { id: 'invented' } }])('rejects a malformed resource envelope: %j', async raw => {
+    const result = await lookup(raw);
+    expect(result.events.at(-1)).toMatchObject({ status: 'completed', output: [] });
+    expect(lastUserMessage(result.inputs[1]!)).toContain('did not return the declared resource list');
+    expect(result.memory.getEntity('__observed')).toBeUndefined();
+  });
+  it('refuses to guess between multiple declared resource lists', async () => {
+    const result = await lookup({ matches: [{ id: 'a' }], others: [{ id: 'b' }] }, {
+      type: 'object', properties: { matches: resourceList, others: resourceList }, required: ['matches', 'others'],
+    });
+    expect(result.events.at(-1)).toMatchObject({ status: 'completed', output: [] });
+    expect(lastUserMessage(result.inputs[1]!)).toContain('did not return the declared resource list');
+    expect(result.memory.getEntity('__observed')).toBeUndefined();
+  });
+  it('preserves a singleton resource with its own nested resource array', async () => {
+    const singleton = { id: 'parent', title: 'Parent', matches: [{ id: 'child' }] };
+    const result = await lookup(singleton, { type: 'object', properties: { ...item.properties, matches: resourceList }, required: ['id'] });
+    expect(result.events.at(-1).output).toEqual([singleton]);
+    expect(result.memory.getEntity<any>('__observed').issue).toEqual([{ id: 'parent', title: 'Parent' }]);
   });
 });
 

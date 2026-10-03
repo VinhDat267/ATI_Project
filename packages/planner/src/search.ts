@@ -1,4 +1,4 @@
-import type { ToolDefinition } from '@wap/tool-schemas';
+import type { JSONSchema, ToolDefinition } from '@wap/tool-schemas';
 import { boardsOf, validateSchemaValue } from './validator.js';
 
 /** Bounds on what a model-driven search may ask for and what is kept afterwards. */
@@ -18,6 +18,26 @@ export interface SearchOutcome {
   args: Record<string, unknown>;
   result?: unknown[];
   error?: string;
+}
+
+/** Normalize direct lists, singleton resources and one schema-declared resource collection. */
+export function searchEntities(raw: unknown, schema: JSONSchema): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== 'object') throw new Error('The tool did not return a result');
+  // A resource with its own identity remains a singleton, even when it has nested arrays.
+  if (schema.type === 'object' && schema.properties && !schema.properties.id) {
+    const collections = Object.entries(schema.properties).filter(([, field]) => {
+      const property = field as JSONSchema;
+      return property.type === 'array' && property.items?.type === 'object' && property.items.properties?.id;
+    });
+    if (collections.length) {
+      if (collections.length !== 1) throw new Error('The tool did not return the declared resource list');
+      const result = (raw as Record<string, unknown>)[collections[0]![0]];
+      if (!Array.isArray(result)) throw new Error('The tool did not return the declared resource list');
+      return result;
+    }
+  }
+  return [raw];
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */

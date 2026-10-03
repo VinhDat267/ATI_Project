@@ -5,7 +5,7 @@ import { classifyIntent } from './router.js';
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
-  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved,
+  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, searchEntities,
   type SearchOutcome,
 } from './search.js';
 
@@ -230,9 +230,7 @@ export class AIPlanner {
     onGatherEvent?.({ tool: tool.name, status: 'started' });
     try {
       const raw = await this.gatherSearch({ tool: tool.name, args, signal });
-      // Search tools return lists; get_* tools return one object.
-      const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : undefined;
-      if (!list) throw new Error('The tool did not return a result');
+      const list = searchEntities(raw, tool.outputSchema);
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
       const result = list.slice(0, MAX_RESULTS_PER_CALL);
       if (tool.discovers) {
