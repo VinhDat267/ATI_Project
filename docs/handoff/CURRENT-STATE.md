@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau khi PR #35 (W3-06 đánh giá planner) merge tại `a75ac35`; runtime evaluator = `7ba60ef`, mã sản phẩm giữ nguyên từ `dc80de4`. Agent cập nhật: Codex (reviewer); giữ cập nhật FE-01 của Claude Code. Commit merge metadata có thể khác, không đổi source sản phẩm.
+**Cập nhật lần cuối:** 03/10/2026, sau khi PR #37 (audit độc lập W3, chỉ tài liệu) merge tại `4171298`; mã sản phẩm giữ nguyên từ `dc80de4`. Agent cập nhật: Claude Code (reviewer); phần W3-00 → W3-06 do Codex (reviewer) ghi.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -14,6 +14,8 @@
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. AUTH-01 và FE-02 có thể làm song song; W3-07 khi người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Phần UI của W3-00b chờ FE-02. Thứ tự và các mốc xem `ROADMAP.md`.
+>
+> **Audit độc lập W3** (Claude Code, #37 tại `4171298`): đạt có điều kiện. Chạy lại check 874 + 151, browser 14/14; mutation 19 lần chạy: 17 bị bắt, 1 lọt (Calendar 403), 1 không hợp lệ; probe HTTP + PostgreSQL không lộ bí mật, `siteUrl` Jira độc hại bị chặn. Lỗi trung bình: kết quả đọc không giới hạn kích thước. Task card **W3-08** nên xong trước W3-07 và các phép đo tuần 4.
 
 ## 1. Sản phẩm
 
@@ -95,6 +97,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
+| Kết quả tool đọc không giới hạn kích thước: một `sheets.read_range` hợp lệ (10 dòng × 300 cột × 5.000 ký tự) tạo prompt search khoảng 15 triệu ký tự; Notion tương tự. Thêm: thiếu test 403 quyền của Calendar, lỗi token Google đều thành `AUTH_ERROR`, email service account trong lỗi rate limiter Sheets | `packages/planner/src/search.ts`, adapters Sheets/Notion/Calendar, `google/service-account.ts` | W3-08 (audit 03/10) |
 | Pure-read response kind và write-only prompt chưa được validator enforce | planner / W3-06 evidence | 18attempts:15refusal/3plan/0clarification; sh07 lượt1/3 và ca01 lượt1 có read plan hợp lệ theo validator. Sáu case0/3kind, ca04 invitation0/3; policy/enforcement cần task riêng, không fit label sau quan sát |
 | Parity freeform và latency services chưa đạt | evaluations / W3-06 | ff15=0/3 vì Slack/Telegram cùng frontend; giữ label cũ. Services p95=31,097s vượt15s, max53,021s; usable-plan null, không nghiệm thu sản phẩm từ numeric PASS |
 | Legacy Trello member fixture sai output schema | evaluations/golden-v2/fixtures.ts | 531trace thiếu fullName nhưng có name, đã tồn tại ở base; service mới zero schema mismatch. Sửa fixture cần documented rerun, không sửa ngầm context |
