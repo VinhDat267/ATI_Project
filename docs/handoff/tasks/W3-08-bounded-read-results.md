@@ -74,3 +74,13 @@ Lỗi tạm thời vì vậy bị báo thành lỗi credentials, người dùng 
   - `truncated: true` chỉ xuất hiện khi có cắt, nên kết quả nhỏ giữ nguyên.
   - Ba test cũ đổi expectation theo hành vi mới: hủy trước khi lấy token → `NETWORK`; lỗi đổi token (mạng / body hỏng / thiếu trường) → `NETWORK` / `SERVER_ERROR`, riêng 401 vẫn `AUTH_ERROR`; relation Notion dài bị cắt ở 500 ký tự và dấu `…[đã cắt]` thay `[incomplete]`.
   - Mô tả tool `sheets.read_range`, `notion.query_database`, `calendar.list_events` thêm câu về giới hạn, nên prompt của các tool này thay đổi nhẹ. Fixtures golden không bị cắt (14 test mới); chưa chạy lại model thật.
+
+### Sửa hai phát hiện review độc lập (03/10/2026)
+
+- Nguồn: review W3-08 trong PR #44, trên main `b13ca2e`; người dùng yêu cầu sửa cả hai lỗi. Commit code/test `d1bd367`, nhánh `vinhdat/fix-w3-08-review-findings`.
+- Planner tính ngân sách cả tool/args/error/result và metadata cắt. Nếu envelope tối thiểu vẫn quá 20.000 ký tự JSON, trả `outcomePreview` kèm cảnh báo rõ phần bị bỏ; prefix không cắt đôi surrogate. Kết quả nhỏ giữ nguyên từng byte, không sửa arguments dùng để thực thi. `SearchOutcome.result` nhận `unknown` để đúng cả kết quả object đã được formatter hỗ trợ.
+- Token Google: AbortError/transport failure khi đọc body trả `NETWORK`; SyntaxError khi không bị hủy vẫn `SERVER_ERROR`. Giữ sanitization và không cache token từ response lỗi.
+- TDD: bảy regression/control mới; RED **6 fail / 15 pass** (bốn envelope vượt cap, hai native body failures sai category); malformed JSON control pass từ trước. GREEN **21/21**. Native HTTP loopback dùng body đang stream, AbortController/socket thật; kiểm recovery bằng request thứ hai và không lộ body/key/cause.
+- `npm run check` exit 0: **955 v3** = 47 schema + 320 adapters + 176 planner + 25 executor + 203 API + 184 web; **165 eval**; typecheck/build/credential scan/launcher1/local-env3 đạt. Strict NodeNext typecheck riêng hai file test exit 0.
+- Probe review gốc chạy lại **5/5 đạt**. Probe AIPlanner → SlackAdapter → native HTTP: 2 lượt provider giả lập, 1 HTTP read; JSON **18.275/20.000** ký tự (trước sửa 30.290), có dấu cắt, planner trả clarification. Bộ đếm phụ của probe được cập nhật vì envelope bị cắt không còn trường `result`; không thay tiêu chí cap.
+- Browser **20/20**, review độc lập **Đạt**; chi tiết và giới hạn xem [nhật ký bản sửa](../log/2026-10-03-codex-W3-08-review-fixes.md). CI đúng head cuối được xác minh ở PR. Model thật và service thật **NOT_RUN**; không thay template prompt hay gọi provider trả phí.
