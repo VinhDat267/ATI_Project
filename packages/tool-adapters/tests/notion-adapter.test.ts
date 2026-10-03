@@ -131,7 +131,10 @@ it('marks a partial relation snapshot without following resources beyond its sco
     Related: { type: 'relation', relation: ids, has_more: true },
     Complete: { type: 'relation', relation: [{ id: PAGE }], has_more: false },
   });
-  expect(properties.Related).toBe(ids.map(item => item.id).join(', ') + ' [incomplete]');
+  // W3-08: a long relation list is clipped at 500 characters; the marker still signals an incomplete list.
+  expect(properties.Related.length).toBeLessThanOrEqual(500);
+  expect(properties.Related.startsWith(ids.slice(0, 5).map(item => item.id).join(', '))).toBe(true);
+  expect(properties.Related.endsWith('…[đã cắt]')).toBe(true);
   expect(properties.Complete).toBe(PAGE); expect(calls).toHaveLength(3);
 });
 it('creates with data-source parent and validated property conversions; splits content into plain 2000-char paragraphs', async () => {

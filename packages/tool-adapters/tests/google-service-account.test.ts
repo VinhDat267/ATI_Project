@@ -41,6 +41,8 @@ it('shares cache across adapter instances but isolates email, key and scope, ref
   expect(fetchFn).toHaveBeenCalledTimes(5);
 });
 
+// W3-08: only definite credential rejections are AUTH_ERROR; transport and malformed responses are not.
+const exchangeCategory: Record<string, string> = { http: 'AUTH_ERROR', network: 'NETWORK', json: 'SERVER_ERROR', missing: 'SERVER_ERROR', 'bad-expiry': 'SERVER_ERROR', 'wrong-type': 'SERVER_ERROR' };
 it.each(['http', 'network', 'json', 'missing', 'bad-expiry', 'wrong-type'])('sanitizes token exchange failure: %s', async mode => {
   const fetchFn = vi.fn(async () => {
     if (mode === 'network') throw new Error(pem + ' assertion=secret');
@@ -52,7 +54,7 @@ it.each(['http', 'network', 'json', 'missing', 'bad-expiry', 'wrong-type'])('san
   }) as unknown as typeof fetch;
   try { await auth(fetchFn).getAccessToken('scope-a'); expect.fail('exchange must fail'); }
   catch (error: any) {
-    expect(error.category).toBe('AUTH_ERROR');
+    expect(error.category).toBe(exchangeCategory[mode]);
     expect(JSON.stringify(error) + error.message).not.toContain('secret');
     expect(JSON.stringify(error) + error.message).not.toContain(pem);
     expect(error.cause).toBeUndefined();
@@ -63,6 +65,7 @@ it('rejects invalid RSA credentials and honors cancellation without a network ca
   const fetchFn = vi.fn(async () => tokenResponse()) as unknown as typeof fetch;
   await expect(auth(fetchFn, { ...credentials, privateKey: 'invalid-secret-key' }).getAccessToken('scope-a')).rejects.toMatchObject({ category: 'AUTH_ERROR' });
   const controller = new AbortController(); controller.abort();
-  await expect(auth(fetchFn).getAccessToken('scope-a', controller.signal)).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+  // W3-08: cancellation is a transport outcome, not a credential failure.
+  await expect(auth(fetchFn).getAccessToken('scope-a', controller.signal)).rejects.toMatchObject({ category: 'NETWORK' });
   expect(fetchFn).not.toHaveBeenCalled();
 });
