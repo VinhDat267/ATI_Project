@@ -16,13 +16,13 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 2 | Chạy thật các ca lỗi của service | [W2-03](tasks/W2-03-live-failure-cases.md) | chờ scope/plan live và người dùng duyệt lệnh ghi; chưa chạy live failure |
 | 2 | Frontend: hiện trạng thái cần đối soát, sửa định dạng thời gian | [W2-04](tasks/W2-04-frontend-reconciliation-and-time.md) | xong, #20 merge vào #18 tại `c30604b`, đã vào `main` qua #18 |
 | 2 | Chạy tiếp plan bị gián đoạn khi không có step chưa rõ kết quả; plan đã chạy xong thì thành `completed` (phát hiện khi audit tuần 2) | [W2-05](tasks/W2-05-continue-safe-plans.md) | xong, #23 tại `1029e55` |
-| 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | chờ (làm đầu tiên, chặn W3-01 → W3-05) |
+| 3 (02–21/10) | Gỡ các chỗ viết cố định theo service: registry/transport/sandbox tách theo service, allowlist chung, bất biến từ khóa, bộ câu hồi quy định tuyến, kiểm tra tĩnh, test hợp đồng | [W3-00](tasks/W3-00-generic-service-plumbing.md) | xong, #29 tại `c7a38c0`; đã chốt ngoại lệ `rf06` |
 | 3 | Giao diện cấu hình lấy nhãn/tên từ API, ô `multiline`, câu từ chối nêu tên service còn thiếu | [W3-00b](tasks/W3-00b-frontend-and-refusal-naming.md) | chờ (sau W3-00, không chặn task service) |
-| 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | chờ (sau W3-00) |
-| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | chờ (sau W3-01) |
-| 3 | Notion | [W3-03](tasks/W3-03-notion.md) | chờ (sau W3-00) |
-| 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | chờ (sau W3-00) |
-| 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | chờ (sau W3-00) |
+| 3 | Google Sheets (gồm xác thực service account dùng chung cho Google) | [W3-01](tasks/W3-01-google-sheets.md) | xong, #30 tại `716f568`; Google thật chưa nghiệm thu |
+| 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | xong, #31 tại `ab2c599`; Google thật chưa nghiệm thu |
+| 3 | Notion | [W3-03](tasks/W3-03-notion.md) | xong, #32 tại `fca384d`; Notion thật chưa nghiệm thu |
+| 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | xong, #33 tại `4a4553b`; Telegram thật chưa nghiệm thu |
+| 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | xong, #34 tại `dc80de4`; Jira thật chưa nghiệm thu |
 | 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | chờ (sau mốc chốt catalog) |
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | chờ (làm đầu tiên trong mảng tài khoản; song song với W3-00) |
@@ -31,7 +31,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3–4 | Đăng nhập và đăng ký bằng Google | [AUTH-04](tasks/AUTH-04-google-login.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản lý tài khoản: hồ sơ, đổi mật khẩu, phương thức đăng nhập, phiên đăng nhập | [AUTH-05](tasks/AUTH-05-account-page.md) | chờ (sau AUTH-01; liên kết Google sau AUTH-04) |
 | 4 | Cấu hình Gmail SMTP, Google OAuth và kiểm tra chạy thật | [AUTH-06](tasks/AUTH-06-auth-live-setup.md) | chờ (sau AUTH-02, AUTH-04; người dùng chuẩn bị) |
-| 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | chờ (làm ngay, song song với W3-00 và AUTH-01) |
+| 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | xong, #27 tại `9d262c6` |
 | 3 | Frontend: điều hướng bằng URL, nút Back, mở lại hội thoại khi tải lại, tách `App.tsx`, tiêu đề và phân trang lịch sử | [FE-02](tasks/FE-02-routing-and-history.md) | chờ (làm ngay; chặn phần giao diện của AUTH-02 → AUTH-05 và W3-00b) |
 | 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | chờ (sau FE-02; trước buổi thử W4-03) |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
@@ -45,7 +45,7 @@ W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/f
 
 Yêu cầu chung cho mọi task thêm service: [W3-service-common](tasks/W3-service-common.md).
 
-Thứ tự và song song: W3-00 làm trước. Sau khi W3-00 merge, W3-00b, W3-01, W3-03, W3-04, W3-05 làm song song (mỗi task service chỉ thêm file mới và một dòng ở các danh sách đăng ký); W3-02 chờ W3-01. W3-07 làm từng service ngay khi service đó merge. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
+Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`; W3-01 Sheets qua #30 tại `716f568`, W3-02 Calendar qua #31 tại `ab2c599`, W3-03 Notion qua #32 tại `fca384d`; W3-04 Telegram qua #33 tại `4a4553b`; W3-05 Jira qua #34 tại `dc80de4`. Cả năm adapter mới đã merge: tiếp theo chuẩn bị W3-06, chốt label rf06 trước commit/chạy model; phép đo chính thức trên catalog đã chốt. Phần UI của W3-00b vẫn chờ FE-02. W3-07 làm từng service khi người dùng đã chuẩn bị; service/model thật chưa được nghiệm thu qua sandbox/CI. W4-02, W4-04 (phần công cụ) và khung của W4-01, W4-03 làm song song được với tuần 3.
 
 **Mốc chốt catalog: 20/10/2026.** Service nào chưa merge đạt review trước mốc này thì không đưa vào phạm vi môn học (không đăng ký vào registry). W3-06 và các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) chạy trên catalog đã chốt, để số liệu khớp với hệ thống đem đi bảo vệ.
 

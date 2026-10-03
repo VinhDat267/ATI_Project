@@ -1,0 +1,10 @@
+# 2026-10-03 · Codex reviewer · Sau merge W3-02
+
+- Người dùng yêu cầu merge Calendar; [PR #31](https://github.com/VinhDat267/ATI_Project/pull/31) đã merge vào `main` tại `ab2c5994c209143f7a047deb464a2b46f60f534e`, lúc 00:01:45 UTC ngày 03/10 (07:01:45 Việt Nam).
+- Head được duyệt và merge: `13e158385cdbec916bb0dfb694204a3cfc0b7a89`. [CI run 37079513310](https://github.com/VinhDat267/ATI_Project/actions/runs/37079513310) SUCCESS, gồm check và browser, hoàn tất 23:53:27 UTC ngày 02/10 (06:53:27 Việt Nam ngày 03/10). Dùng `--match-head-commit` khi merge.
+- Review độc lập và sửa lỗi đã ghi ở task card/nhật ký W3-02: một Important Retry-After, đã sửa trong `0089690`; TDD RED2/42 → GREEN42/42. Check cuối exit0: 677 v3, 91 offline evaluations, typecheck/build, quét build, launcher1/local-env3. Browser11/11 với HTTP/SSE + PostgreSQL thật, planner/adapters sandbox; strict test harness typecheck exit0. Không re-review sau lượt sửa; xác minh CI đúng head cuối.
+- `git merge-base --is-ancestor 13e1583 main` và `git diff --exit-code 13e1583 ab2c599` exit0: commit tích hợp và cây merge giống head đã kiểm thử. Không cần chạy lại cùng bộ test sau merge vì cây không đổi.
+- Primary `main` fast-forward `716f568` → `ab2c599`; SHA-256 của năm file riêng trước/sau giống nhau: DESIGN.md, PRODUCT.md, .github/hooks/impeccable.json, docs/reports/MIDTERM-PROGRESS-2026-09-30.docx, skills-lock.json. Không stage các file này.
+- Worktree Calendar sạch, head tích hợp vào `origin/main`; archive qua Codex sau merge. Evidence và scratch đã lưu ngoài repo, không mất cùng worktree. Giữ worktree metadata `state-after-w3-00` vì [PR #28](https://github.com/VinhDat267/ATI_Project/pull/28) còn mở; cập nhật cùng PR đó, chưa merge metadata.
+- Reviewer cập nhật CURRENT-STATE/ROADMAP: 23 tools, năm service, W3-02 xong; service tiếp theo W3-03 Notion. Giữ các cập nhật FE-01/W3-00/W3-01 trước đó và không sửa nhật ký thi công cũ.
+- Giới hạn: provider/Google thật NOT_RUN; W3-06 xử lý label/ngoại lệ rf06 trước model campaign, W3-07 nghiệm thu service thật. Không dùng CI/sandbox thay bằng chứng live.
