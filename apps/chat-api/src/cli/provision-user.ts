@@ -7,16 +7,8 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 1 });
   try {
     const userRepo = new UserRepo(pool);
-    const existing = await userRepo.findByEmail(config.email);
-    if (existing) {
-      await userRepo.updatePassword(config.email, config.password);
-      console.log(`Updated password for existing v3 user ${config.email}.`);
-    } else {
-      const user = await userRepo.createUser({
-        email: config.email, password: config.password, name: config.name,
-      });
-      console.log(`Created v3 user ${user.email} with ID ${user.id}. Set SERVICE_ADMIN_USER_IDS to this ID to grant shared credential management.`);
-    }
+    const user = await userRepo.provisionAdmin(config);
+    console.log(`Provisioned active, verified v3 administrator ${user.email} with ID ${user.id}.`);
   } finally {
     await pool.end();
   }
