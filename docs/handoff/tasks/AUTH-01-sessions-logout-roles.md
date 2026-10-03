@@ -59,7 +59,14 @@
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
+- PR: [#41](https://github.com/VinhDat267/ATI_Project/pull/41), base `main`; chưa merge.
+- Commit: backend `d7efd9f`, frontend `6cd89f8`, sửa giới hạn request đồng thời `66c4d29`, ổn định browser fixture `b24a223`. Đã tích hợp W3-08 từ `main` `c5ce8a0`.
 - Test đã chạy và kết quả:
+  - RED→GREEN: migration PostgreSQL, session/HTTP, frontend session client (8 ca), logout order/network failure, và burst đoán mật khẩu. Burst 12 request sai trước sửa: 12×401; sau sửa: 5×401 + 7×429 kèm `Retry-After=900`; hết 15 phút đăng nhập được.
+  - `npm run check` trên bản sửa burst: exit 0; v3 **927/927** = schemas 47, adapters 317, planner 172, executor 25, API 194, web 172; evaluation **165/165**; strict typecheck, build, production credential scan, launcher 1/1, environment guards 3/3 đều đạt.
+  - Browser sandbox/PostgreSQL thật: **16/16**, gồm logout → Back/Reload không vào chat, access/refresh cũ 401, logout-all thu hồi hai browser sessions. Local chạy cùng 9 scenario qua cấu hình ngoài repo trỏ DB tạm được kiểm tra chính xác; canonical `npm run test:browser:v3` chạy ở GitHub CI.
+  - Review độc lập tái hiện rồi xác nhận đóng lỗi burst tại `66c4d29`; probe sid khác chủ, CLI thu hồi phiên cũ, migration chạy lại đạt. CI head đầu đã qua `check`, phát hiện race của browser fixture cũ khi reload; `b24a223` sửa test lấy response bằng `APIRequestContext`, CI sẽ chạy lại trên head bàn giao.
 - Điều chưa làm hoặc khác với task card:
+  - Thêm bảng lịch sử **hash** refresh có FK/cascade để nhận diện replay sau hơn một lần xoay; chỉ token liền trước được grace 30 giây. Không lưu token gốc.
+  - Bộ đếm/quản lý request đăng nhập theo một API instance, như AUTH-common; chưa có signup/email/Google/account/admin-user UI.
+  - FE-02 [#42](https://github.com/VinhDat267/ATI_Project/pull/42) xếp trên nhánh AUTH-01 vì cùng sửa frontend auth. Thứ tự merge AUTH-01 trước, retarget FE-02 sang main rồi kiểm tra CI. Không sửa CURRENT-STATE/ROADMAP trong PR thi công.
