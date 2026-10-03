@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MockLLMProvider, type LLMProvider } from '@wap/planner';
+import { createServer } from 'node:http';
+import { MockLLMProvider, OpenAICompatibleProvider, type LLMProvider } from '@wap/planner';
 import { loadEvalFile, parseEvalOptions, runCase, runPool, safeGateway } from './run.js';
 
 describe('service evaluation runner', () => {
@@ -37,5 +38,44 @@ describe('service evaluation runner', () => {
   });
   it('removes credentials and query/fragment values from a gateway recorded in public evidence', () => {
     expect(safeGateway('https://user:secret@example.test/v1?token=secret#secret')).toBe('https://example.test/v1');
+  });
+  it('aborts a real in-flight HTTP response when its concurrent sibling provider fails', async () => {
+    let received = 0;
+    let secondStarted!: () => void;
+    let observeClose!: () => void;
+    const second = new Promise<void>(resolve => { secondStarted = resolve; });
+    const closed = new Promise<void>(resolve => { observeClose = resolve; });
+    const server = createServer(async (_request, response) => {
+      received++;
+      if (received === 1) {
+        await second;
+        response.writeHead(503, { 'content-type': 'application/json' });
+        response.end('{"error":{"message":"synthetic capacity fault"}}');
+      } else {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.write('{');
+        response.on('close', observeClose);
+        secondStarted();
+      }
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing local server address');
+      const { file } = loadEvalFile('services');
+      const result = await runPool(file.cases.slice(0, 3), 2, (c, signal) => runCase(c, file, false, 'llm', {
+        signal, provider: new OpenAICompatibleProvider({ baseUrl: `http://127.0.0.1:${address.port}`, model: 'test-model', maxRetries: 0, timeoutRetries: 0, timeoutMs: 2000 }),
+      }));
+      let closeTimeout: ReturnType<typeof setTimeout> | undefined;
+      try { await Promise.race([closed, new Promise((_, reject) => { closeTimeout = setTimeout(() => reject(new Error('Abort did not close the HTTP response')), 1000); })]); }
+      finally { clearTimeout(closeTimeout); }
+      expect(received).toBe(2);
+      expect(result.rows.find(row => row.case.id === 'sh02')!.providerError).toContain('Evaluation stopped after provider failure');
+      expect(result.stopped).toBe(true);
+      expect(result.pendingIds).toEqual(['sh03']);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
 });

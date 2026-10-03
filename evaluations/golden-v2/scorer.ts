@@ -232,7 +232,7 @@ export function aggregateRuns(runs: CaseRun[][], catalog: ToolDefinition[] = ALL
   const categories = [...new Set(all.map((r) => r.case.category))];
   const byCategory = Object.fromEntries(categories.map((category) => {
     const rows = all.filter((r) => r.case.category === category);
-    return [category, { cases: rows.length / runs.length, strictPassRate: rate(rows.map((r) => r.score.passed)) }];
+    return [category, { cases: new Set(rows.map(r => r.case.id)).size, strictPassRate: rate(rows.map((r) => r.score.passed)) }];
   })) as Record<Category, { cases: number; strictPassRate: number | null }>;
 
   const stability = Object.fromEntries([...new Set(all.map((r) => r.case.id))].map((id) => {

@@ -55,4 +55,8 @@ describe('service scoring evidence', () => {
     expect(result.mean.toolSelectionAccuracy).toBe(1);
     expect(result.mean.argumentQuality).toBe(0.5);
   });
+  it('counts unique cases in an interrupted campaign rather than fractional cases per requested run', () => {
+    const a: CaseRun = { case: read, response: answer, searches: searched, latencyMs: 10, llmCalls: 1, score: scoreCase(read, answer, ALL_TOOLS, searched) };
+    expect(aggregateRuns([[a], []]).byCategory.read_only.cases).toBe(1);
+  });
 });
