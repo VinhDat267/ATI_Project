@@ -78,6 +78,14 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     }
   });
 
+  it('refuses approval with 503 and keeps the account pending when no email sender is configured', async () => {
+    const tokens = await login(actor);
+    app = createApp({ jwtSecret: secret, userRepo: users, adminUserRepo: new AdminUserRepo(pool), adminAuditLogger: audit });
+    const response = await mutate(tokens.accessToken, target, 'approve');
+    expect(response.status).toBe(503); expect(response.body.code).toBe('APPROVAL_EMAIL_UNAVAILABLE');
+    expect((await pool.query('SELECT status FROM users WHERE id=$1', [target])).rows[0].status).toBe('pending');
+  });
+
   it('approves only a verified pending account once and permits password login after approval', async () => {
     const tokens = await login(actor);
     await pool.query('UPDATE users SET email_verified=false WHERE id=$1', [target]);
