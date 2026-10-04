@@ -26,6 +26,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | đo xong, #35 tại `a75ac35`; numeric gate cả năm đạt, parity ff15 và latency chưa đạt; product acceptance incomplete |
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
 | 3 | Giới hạn kích thước kết quả đọc (Sheets, Notion, Calendar, giới hạn chung trong planner), test 403 Calendar, phân loại lỗi token Google (từ audit W3 03/10) | [W3-08](tasks/W3-08-bounded-read-results.md) | xong: #39 và bản sửa #45 tại `81225de`; hai P2 đã sửa, review độc lập đạt, CI955+165/browser20 xanh; xem [bằng chứng](log/2026-10-03-codex-W3-08-review-fixes.md) |
+| 3 | Jira: tìm kiếm với dấu gạch ngang, báo đúng lỗi token khi đọc (phát hiện khi chạy thật W3-07) | [W3-09](tasks/W3-09-jira-live-findings.md) | chờ |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | xong, #41 tại `fbd993f`; review độc lập đạt, CI xanh |
 | 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | chờ (sau AUTH-01) |
