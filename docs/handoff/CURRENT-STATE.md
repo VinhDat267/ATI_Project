@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 03/10/2026, sau merge #45 tại `81225de`: hai P2 của W3-08 đã sửa, review độc lập đạt và CI xanh. [Review trước sửa](log/2026-10-03-codex-W3-08-review.md) giữ làm lịch sử; xem [bằng chứng bản sửa](log/2026-10-03-codex-W3-08-review-fixes.md).
+**Cập nhật lần cuối:** 04/10/2026, sau khi #52 (AUTH-02), #53 (AUTH-03), #54 (FE-03) merge; `main` = `9709a2d`. Agent cập nhật: Claude Code (reviewer). Các mục trước đó do Codex và Claude Code ghi.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -9,8 +9,8 @@
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Các task còn mở gồm bốn mảng:
 > - **service mới:** W3-00b và W3-07; cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures; nghiệm thu service thật còn chờ W3-07. Parity/latency và policy chỉ đọc cần follow-up riêng, chưa có task card sửa sản phẩm;
-> - **tài khoản:** AUTH-02 → AUTH-06; AUTH-01 đã merge;
-> - **frontend:** FE-03; FE-02 đã merge;
+> - **tài khoản:** AUTH-02b, AUTH-04 → AUTH-06; AUTH-01 → AUTH-03 đã merge;
+> - **frontend:** FE-01 → FE-03 đã merge;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02 → AUTH-05, FE-03 và phần UI của W3-00b đã gỡ chặn; đăng ký vẫn tắt cho tới khi cả AUTH-02 và AUTH-03 merge. W3-07 chờ người dùng chuẩn bị tài khoản/tài nguyên và duyệt plan ghi thật. Thứ tự và các mốc xem `ROADMAP.md`.
@@ -18,6 +18,8 @@
 > **Audit độc lập W3** (Claude Code, #37 tại `4171298`): đạt có điều kiện. Chạy lại check 874 + 151, browser 14/14; mutation 19 lần chạy: 17 bị bắt, 1 lọt (Calendar 403), 1 không hợp lệ; probe HTTP + PostgreSQL không lộ bí mật, `siteUrl` Jira độc hại bị chặn. Lỗi trung bình: kết quả đọc không giới hạn kích thước. Task card **W3-08** nên xong trước W3-07 và các phép đo tuần 4.
 >
 > **W3-08 xong, review độc lập đạt:** bản đầu #39 tại `c5ce8a0`; hai P2 phát hiện sau merge đã sửa qua #45 tại `81225de` (code `d1bd367`, head `44873b0`). Ngân sách search bao gồm tool/args/error/metadata; hủy hoặc mất kết nối khi đọc body token Google trả NETWORK, JSON sai vẫn SERVER_ERROR. Check955+165 và browser20/20 đạt, CI đúng head xanh. Giới hạn áp dụng từng outcome, không phải toàn bộ lịch sử hội thoại; model/service thật chưa nghiệm thu lại.
+>
+> **AUTH-02, AUTH-03, FE-03 xong** qua #52 (`e578520`), #53 (`46cc6e6`), #54 (`9709a2d`); review của Claude Code: #53, #54 đạt; #52 đạt có điều kiện. P2 lộ tài khoản qua thời gian phản hồi của quên mật khẩu/gửi lại xác minh (832 ms vs 6 ms với SMTP chậm 800 ms) → **AUTH-02b**, phải xong trước AUTH-06. Đăng ký giờ **bật mặc định**. Chế độ live **bắt buộc đủ biến SMTP**, nên `RUNTIME_MODE=live npm run up` lỗi cho tới khi cấu hình Gmail hoặc AUTH-02b mục 2 xong. W3-07: Telegram, Notion, Jira, workflow 4 service đã chạy thật.
 
 ## 1. Sản phẩm
 
@@ -47,9 +49,9 @@ Mỗi số liệu ghi kèm ngày đo và commit. Số liệu phần mềm hiện
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 955/955 | 03/10, CI PR #45 head `44873b0`; merge `81225de` cùng cây file | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 1.063/1.063 | 04/10, head #54 `4859788` (cùng code với `9709a2d`); Claude Code chạy lại trên PostgreSQL tạm; CI #52–#54 pass | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 20/20 ca, 9 scenario | 03/10, CI PR #45 head `44873b0`; default 11 ca, 8 scenario còn lại 9 ca | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 25/25 ca, 10 scenario | như trên | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
 | Golden 18 câu tự do, model thật, 3 lần | 51/54; p50/p95 5,942/13,092 s; ff15=0/3 | như trên | như trên |
@@ -73,6 +75,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- #52 (AUTH-02), #53 (AUTH-03), #54 (FE-03), merge 04/10 theo thứ tự: đăng ký/xác minh email/quên mật khẩu (token SHA-256 một lần, reset thu hồi phiên, outbox ở sandbox, SMTP TLS ở live); trang quản trị duyệt/khóa/phân quyền trong transaction có khóa; plan hiện tên tài nguyên (`resource_labels` ngoài hash duyệt), kết quả có link an toàn, SSE tự refresh khi 401, chuỗi tiếng Việt. Review: [log](log/2026-10-04-claude-code-review-auth02-03-fe03.md). Golden cần đo lại vì câu chữ planner/registry đổi.
 - #41 (AUTH-01), merge `fbd993f` lúc 21:01:00 Việt Nam ngày 03/10: access JWT gắn `sid`, refresh token ngẫu nhiên lưu SHA-256 ở PostgreSQL; CAS rotation một winner, grace 30 giây cho hash ngay trước, replay cũ thu hồi phiên; logout/logout-all và CLI đổi mật khẩu thu hồi phiên. Middleware kiểm phiên và trạng thái tài khoản; role admin và env allowlist dùng chung cho quyền cấu hình. Chặn đoán mật khẩu theo IP/email trong một API instance, burst 12 request sai cho 5×401 + 7×429 sau sửa review. Review độc lập đạt; [CI head `4f5aa47`](https://github.com/VinhDat267/ATI_Project/actions/runs/37126813181) SUCCESS, check927+165 và browser16/16. Chưa làm signup/email/Google/quản trị tài khoản.
 - #42 (FE-02), merge `8b6c8e6` lúc 21:05:01 Việt Nam ngày 03/10: route `/`, `/login`, `/c/:id`, Back/Forward và direct reload phục hồi detail/preview/execution; App còn 12 dòng, AuthGate/Workspace/views/recovery hook. Lịch sử title 60 Unicode code points, tìm kiếm, đổi tên và cursor microsecond+UUID; migration0004 backfill một lần. Scroll giữ vị trí khi đọc phía trên. Review độc lập phát hiện rồi xác nhận sửa optional snapshot lỗi làm mất detail/SSE evidence; regression 2 ca và probe độc lập đạt. Retarget từ AUTH-01 sang `main`, tích hợp main chỉ thêm metadata #40, [CI head `c68b4b6`](https://github.com/VinhDat267/ATI_Project/actions/runs/37128235604) SUCCESS: check948+165, browser20/20; cây merge giống head. Không đổi catalog/prompt hoặc đo lại model.
 - #6–#9: chặn ID bịa (grounding), LLM qua cổng tương thích OpenAI, golden set có label, model tự gọi search tool.
@@ -114,8 +117,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Notion query/create chưa chọn được data source trong database đa nguồn; relation/rollup là snapshot có giới hạn; page có thể bị di chuyển sau kiểm cha, trước PATCH | `packages/tool-adapters/src/notion/` | Ambiguous source trả VALIDATION; `[incomplete]` khi provider báo thiếu; không tuyên bố kiểm quyền nguyên tử tại API ngoài. Nghiệm thu provider thật W3-07 còn mở |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
 | Sandbox dùng planner mock trả một plan soạn sẵn (giao diện đã báo "Chế độ thử nghiệm"); minor sau FE-01: tiêu đề mẫu "Phát hành Sprint" không khớp nội dung, chấm xanh nhấp nháy luôn hiện, dòng "Chưa xác định chế độ chạy" hiện thoáng khi tải | `server.ts`, `MissionControlLaunchpad.tsx`, `App.tsx` | Không demo sandbox như AI thật; minor gom vào FE-03 |
-| Chưa có đăng ký/xác minh email, quên mật khẩu, Google login, trang quản trị/hồ sơ; giới hạn đoán mật khẩu vẫn theo một API instance | `apps/chat-api`, `apps/chat-web` | AUTH-01 đã đóng khoảng cách thu hồi phiên và thêm role/status/rate limit; AUTH-02 → AUTH-06 còn chờ |
-| Plan preview chỉ hiện ID; kết quả thực thi là JSON thô; SSE có thể ngừng im lặng khi token hết hạn (đọc code, chưa tái hiện) | `apps/chat-web` | FE-02 đã sửa Back/reload/title/pagination; các phần còn lại FE-03 |
+| Lộ tài khoản qua thời gian phản hồi của quên mật khẩu/gửi lại xác minh khi gửi SMTP thật; live không khởi động khi thiếu biến SMTP; chưa có Google login và trang hồ sơ; giới hạn đoán mật khẩu theo một API instance và chưa có giới hạn chung theo IP | `apps/chat-api/src/routes/auth/`, `config/env.ts` | AUTH-02b (trước AUTH-06), AUTH-04, AUTH-05 |
+| Golden set chưa đo lại sau FE-03 (câu chữ planner/registry đổi) và sau W3-08 (mô tả tool đổi); thiếu test cho `openWhenHidden` của SSE | evaluations, `apps/chat-web/src/hooks/use-sse.ts` | Đo lại khi có quyền gọi model |
 | Tin nhắn Slack chưa đọc lại tự động sau khi gửi | live-execution | |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |

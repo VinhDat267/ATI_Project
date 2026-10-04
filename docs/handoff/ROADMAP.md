@@ -27,14 +27,15 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
 | 3 | Giới hạn kích thước kết quả đọc (Sheets, Notion, Calendar, giới hạn chung trong planner), test 403 Calendar, phân loại lỗi token Google (từ audit W3 03/10) | [W3-08](tasks/W3-08-bounded-read-results.md) | xong: #39 và bản sửa #45 tại `81225de`; hai P2 đã sửa, review độc lập đạt, CI955+165/browser20 xanh; xem [bằng chứng](log/2026-10-03-codex-W3-08-review-fixes.md) |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | xong, #41 tại `fbd993f`; review độc lập đạt, CI xanh |
-| 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | chờ (sau AUTH-01) |
-| 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | chờ (sau AUTH-01) |
+| 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | xong, #52 tại `e578520`; P2 thời gian phản hồi → AUTH-02b |
+| 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | xong, #53 tại `46cc6e6` |
+| 3–4 | Gửi email không chặn phản hồi (chống lộ tài khoản qua thời gian); live chạy được khi chưa có SMTP | [AUTH-02b](tasks/AUTH-02b-async-email-and-live-startup.md) | chờ (trước AUTH-06 và đo tuần 4 qua app thật) |
 | 3–4 | Đăng nhập và đăng ký bằng Google | [AUTH-04](tasks/AUTH-04-google-login.md) | chờ (sau AUTH-01) |
 | 3–4 | Trang quản lý tài khoản: hồ sơ, đổi mật khẩu, phương thức đăng nhập, phiên đăng nhập | [AUTH-05](tasks/AUTH-05-account-page.md) | chờ (sau AUTH-01; liên kết Google sau AUTH-04) |
 | 4 | Cấu hình Gmail SMTP, Google OAuth và kiểm tra chạy thật | [AUTH-06](tasks/AUTH-06-auth-live-setup.md) | chờ (sau AUTH-02, AUTH-04; người dùng chuẩn bị) |
 | 3 (02–14/10) | Frontend: đóng hộp thoại lỗi không còn dừng quy trình, bỏ mật khẩu admin khỏi bundle, trạng thái dịch vụ thật, báo chế độ sandbox, sửa số liệu chưa đo trên trang giới thiệu | [FE-01](tasks/FE-01-safety-and-honest-ui.md) | xong, #27 tại `9d262c6` |
 | 3 | Frontend: điều hướng bằng URL, nút Back, mở lại hội thoại khi tải lại, tách `App.tsx`, tiêu đề và phân trang lịch sử | [FE-02](tasks/FE-02-routing-and-history.md) | xong, #42 tại `8b6c8e6`; review độc lập đạt, CI xanh sau retarget main |
-| 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | chờ (sau FE-02; trước buổi thử W4-03) |
+| 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | xong, #54 tại `9709a2d`; golden cần đo lại |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
