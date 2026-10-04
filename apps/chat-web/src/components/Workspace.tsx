@@ -97,9 +97,12 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   // Activate SSE connection for current conversation
   const { disconnected } = useSSE(conversationId, authToken);
 
+  // A message sent before "Cuộc hội thoại mới" gets its ID belongs to that conversation (FE-03b).
+  const newConversation = useRef<Promise<string | null> | null>(null);
   const handleNewConversation = async () => {
+    if (newConversation.current) return;
     setActionError(null);
-    try {
+    const request = (async () => {
       const data = await apiClient.createConversation();
       const newConv = data.conversation;
       if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
@@ -109,17 +112,23 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
       useChatStore.getState().setConversations([
         newConv, ...useChatStore.getState().conversations.filter(c => c.id !== newConv.id),
       ]);
-    } catch (error) { setActionError(userErrorMessage(error)); }
+      return newConv.id as string;
+    })();
+    newConversation.current = request.catch(() => null);
+    try { await request; }
+    catch (error) { setActionError(userErrorMessage(error)); }
+    finally { newConversation.current = null; }
   };
 
   const handleSendMessage = async (content: string) => {
     const tempId = `temp-${crypto.randomUUID()}`;
-    let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
+    const pendingConversation = newConversation.current;
+    let currentConvId = !pendingConversation && route.kind === 'conversation' ? route.conversationId : null;
     if (!useChatStore.getState().beginPlanning(currentConvId, tempId)) return;
     if (!currentConvId) {
       try {
-        const data = await apiClient.createConversation();
-        currentConvId = data.conversation?.id;
+        if (pendingConversation) currentConvId = await pendingConversation;
+        else currentConvId = (await apiClient.createConversation()).conversation?.id;
         if (currentConvId) {
           useChatStore.getState().transferPlanning(null, currentConvId, tempId);
           if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {

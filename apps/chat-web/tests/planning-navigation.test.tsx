@@ -208,3 +208,26 @@ it('creates one conversation when New conversation is clicked twice before the f
   await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
   expect(creations).toHaveLength(1);
 });
+it('creates another conversation when New conversation is clicked again after the first one opened', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(2));
+  await act(async () => reply(creations[1]!, { conversation: { id: 'c-next' } }, 201));
+  await waitFor(() => expect(window.location.pathname).toBe('/c/c-next'));
+  send('Plan in the second new conversation');
+  await waitFor(() => expect(sends.map(row => row.convId)).toEqual(['c-next']));
+});
+it('releases a message sent while New conversation fails and reports the failure', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  send('Plan without a conversation');
+  await act(async () => reply(creations[0]!, { error: 'Máy chủ lỗi' }, 500));
+  expect(await screen.findByText(/Không thể tạo phiên hội thoại mới/)).toBeInTheDocument();
+  expect(sends).toHaveLength(0); expect(creations).toHaveLength(1);
+  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Try again' } });
+  expect(sendButton()).toBeEnabled();
+});
