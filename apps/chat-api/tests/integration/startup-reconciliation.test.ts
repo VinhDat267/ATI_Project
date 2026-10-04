@@ -81,7 +81,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql']) {
+    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0006_fe03_resource_labels.sql']) {
       await pool.query(await readFile(resolve(root, 'db/v3', migration), 'utf8'));
     }
     planRepo = new PlanRepo(pool);

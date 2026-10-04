@@ -205,7 +205,7 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
       'error',
       expect.objectContaining({
         conversationId: 'conv-3',
-        message: 'LLM rate limit',
+        message: 'Không thể lập kế hoạch lúc này. Hãy thử lại.',
       })
     );
   });

@@ -124,8 +124,8 @@ export class AIPlanner {
         c.id === choice || c.name.toLocaleLowerCase() === choice.toLocaleLowerCase()
       ) ?? (Number.isInteger(Number(choice)) ? pending.candidates[Number(choice) - 1] : undefined);
       if (!selected) {
-        return { kind: 'clarification', question: `Which ${pending.key} do you mean?`,
-          options: pending.candidates.map((c) => c.name), context: `Select a result for ${pending.query}` };
+        return { kind: 'clarification', question: `Bạn muốn chọn ${pending.key} nào?`,
+          options: pending.candidates.map((c) => c.name), context: `Chọn một kết quả cho ${pending.query}` };
       }
       memory.setEntity(pending.key, selected);
       bindings[pending.key] = pending.query;
@@ -147,8 +147,8 @@ export class AIPlanner {
     if (missing) memory.deleteEntity('__gatherMissing');
     if (requests.length === 0) return;
     if (!this.gatherSearch) {
-      return { kind: 'clarification', question: 'Please provide the verified IDs for the named resources.',
-        context: 'Search tools are unavailable, so names cannot be resolved safely.' };
+      return { kind: 'clarification', question: 'Vui lòng cung cấp ID đã xác minh của các tài nguyên được nêu.',
+        context: 'Công cụ tra cứu chưa khả dụng nên chưa thể xác định tài nguyên an toàn.' };
     }
     for (const request of requests) {
       const resolved = memory.getEntity<GatherCandidate>(request.key);
@@ -176,8 +176,8 @@ export class AIPlanner {
       if (candidates.length === 0) {
         memory.setEntity('__gatherIntent', intent);
         memory.setEntity('__gatherMissing', { key: request.key });
-        return { kind: 'clarification', question: `I could not find ${request.query}. Please provide another ${request.key} name.`,
-          context: `No ${request.key} matched the search.` };
+        return { kind: 'clarification', question: `Không tìm thấy ${request.query}. Vui lòng cung cấp tên ${request.key} khác.`,
+          context: `Không có ${request.key} phù hợp với kết quả tra cứu.` };
       }
       const exact = candidates.filter((c) => c.name.toLocaleLowerCase() === request.query.toLocaleLowerCase());
       if (exact.length === 1 || candidates.length === 1) {
@@ -187,8 +187,8 @@ export class AIPlanner {
       } else {
         memory.setEntity('__gatherPending', { key: request.key, query: request.query, candidates });
         memory.setEntity('__gatherIntent', intent);
-        return { kind: 'clarification', question: `Which ${request.key} do you mean?`,
-          options: candidates.map((c) => c.name), context: `Multiple results matched ${request.query}.` };
+        return { kind: 'clarification', question: `Bạn muốn chọn ${request.key} nào?`,
+          options: candidates.map((c) => c.name), context: `Có nhiều kết quả phù hợp với ${request.query}.` };
       }
     }
     memory.deleteEntity('__gatherIntent');
@@ -303,8 +303,8 @@ export class AIPlanner {
     const targetServices = classifyIntent(userTexts.join('\n'), this.toolCatalog, this.serviceRegistry);
     const activeTools = this.toolCatalog.filter((tool) => targetServices.includes(tool.service));
     if (activeTools.length === 0) {
-      return { kind: 'refusal', reason: 'The requested service is not available or authorized in this connection.',
-        suggestion: 'Connect the service with an allowed resource scope before planning this workflow.' };
+      return { kind: 'refusal', reason: 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
+        suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
     }
 
     if (this.prefetchDirectory && this.gatherSearch) await this.listDirectory(activeTools, input);
@@ -343,9 +343,9 @@ export class AIPlanner {
           const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
           return {
             kind: 'clarification',
-            question: `Which ${resources.join(', ')} should I use?`,
-            context: `These values could not be verified against your connected services: ${validation.ungrounded
-              .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Name the resource or give its exact ID.`,
+            question: `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
+            context: `Chưa xác minh được các giá trị này qua dịch vụ đã kết nối: ${validation.ungrounded
+              .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Vui lòng nêu tên tài nguyên hoặc ID chính xác.`,
           };
         }
         throw new Error(`Validation failed after retry: [${validation.layer}] ${validation.error}`);
@@ -359,8 +359,8 @@ export class AIPlanner {
 
     return {
       kind: 'clarification',
-      question: 'I could not finish looking up the resources for this request. Which board, list or channel do you mean?',
-      context: 'The lookup limit was reached before a plan could be built.',
+      question: 'Chưa hoàn tất việc tra cứu tài nguyên. Bạn muốn dùng board, list hoặc channel nào?',
+      context: 'Đã đạt giới hạn tra cứu trước khi có thể lập kế hoạch.',
     };
   }
 
@@ -385,8 +385,8 @@ export class AIPlanner {
       targetServices.includes(tool.service)
     );
     if (activeTools.length === 0) {
-      return { kind: 'refusal', reason: 'The requested service is not available or authorized in this connection.',
-        suggestion: 'Connect the service with an allowed resource scope before planning this workflow.' };
+      return { kind: 'refusal', reason: 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
+        suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
     }
 
     // 2. Prepare System Prompt & Conversation
@@ -445,9 +445,9 @@ export class AIPlanner {
       const resources = [...new Set(retryValidation.ungrounded.map((u) => u.resource))];
       return {
         kind: 'clarification',
-        question: `Which ${resources.join(', ')} should I use?`,
-        context: `These values could not be verified against your connected services: ${retryValidation.ungrounded
-          .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Name the resource (for example "board Frontend list To Do") or give its exact ID.`,
+        question: `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
+        context: `Chưa xác minh được các giá trị này qua dịch vụ đã kết nối: ${retryValidation.ungrounded
+          .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Vui lòng nêu tên tài nguyên (ví dụ "board Frontend list To Do") hoặc ID chính xác.`,
       };
     }
 

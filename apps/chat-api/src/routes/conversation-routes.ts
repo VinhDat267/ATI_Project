@@ -88,6 +88,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         convId: planRow.conv_id,
         status: planRow.status,
         ...parsed,
+        resourceLabels: planRow.resource_labels ?? {},
       });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch active plan' });

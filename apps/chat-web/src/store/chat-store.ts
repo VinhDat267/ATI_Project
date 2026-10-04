@@ -16,6 +16,8 @@ export interface ChatStoreState {
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
+  isPlanning: boolean;
+  setIsPlanning: (value: boolean) => void;
   activePlan: ActivePlan | null;
   planStatus: PlanStatus;
   activeClarification: ClarificationState | null;
@@ -58,6 +60,7 @@ const initialState = {
   messages: [],
   streamingText: '',
   isStreaming: false,
+  isPlanning: false,
   activePlan: null,
   planStatus: 'idle' as PlanStatus,
   activeClarification: null,
@@ -113,6 +116,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
     set((state) => ({ streamingText: state.streamingText + delta })),
 
   setIsStreaming: (isStreaming) => set({ isStreaming }),
+  setIsPlanning: (isPlanning) => set({ isPlanning }),
 
   // A read-only execution snapshot may hydrate activePlan, but cannot supersede a pending-plan read.
   setActivePlan: (plan) => set(state => ({ activePlan: plan, planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
@@ -127,6 +131,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       id: snapshot.plan.id,
       summary: snapshot.plan.summary || 'Quy trình đã lưu',
       steps: snapshot.plan.steps || snapshot.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId, args: {} })),
+      resourceLabels: snapshot.plan.resourceLabels,
     };
     return {
       executionSnapshot: snapshot,
@@ -164,6 +169,7 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       messages: [],
       streamingText: '',
       isStreaming: false,
+      isPlanning: false,
       activePlan: null,
       planStatus: 'idle',
       activeClarification: null,

@@ -1,10 +1,12 @@
 import React from 'react';
 import type { PlanStep } from '../types';
+import { getToolDefinition } from '@wap/tool-schemas';
 
 export interface PlanStepItemProps {
   step: PlanStep;
   index: number;
   isLast?: boolean;
+  resourceLabels?: Record<string, string>;
 }
 
 /** "step_1.output.url" -> "‹kết quả step_1: url›" */
@@ -34,7 +36,9 @@ export const PlanStepItem: React.FC<PlanStepItemProps> = ({
   step,
   index,
   isLast = false,
+  resourceLabels = {},
 }) => {
+  const tool = getToolDefinition(step.tool);
   return (
     <div className="relative flex items-start gap-3.5">
       {/* Step Circle & Connector */}
@@ -54,6 +58,7 @@ export const PlanStepItem: React.FC<PlanStepItemProps> = ({
           <span className="text-sm font-semibold text-zinc-900">
             {step.description}
           </span>
+          {tool && <><span className="text-xs font-semibold">{tool.sideEffect === 'write' ? 'Ghi' : 'Đọc'}</span><span className="text-xs text-zinc-600">Rủi ro {({ low: 'thấp', medium: 'trung bình', high: 'cao' })[tool.riskLevel]}</span></>}
         </div>
 
         {/* Arguments display */}
@@ -61,9 +66,12 @@ export const PlanStepItem: React.FC<PlanStepItemProps> = ({
           <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-zinc-600 bg-zinc-50 p-2 rounded-lg border border-zinc-100">
             {Object.entries(step.args).map(([k, v]) => {
               const { text: valStr, isRef } = formatArgValue(v);
+              const isResource = Boolean(tool?.inputSchema.properties?.[k]?.['x-resource']);
+              const label = isResource && (typeof v === 'string' || typeof v === 'number') ? resourceLabels[String(v)] : undefined;
               return (
                 <span key={k} className="inline-flex items-start gap-1">
                   <span className="text-zinc-400">{k}:</span>
+                  {label && <span className="font-semibold text-zinc-900">{label}</span>}
                   {isRef ? (
                     <span data-testid={`arg-${k}`} className="font-mono bg-blue-50 text-blue-700 px-1 py-0.5 rounded border border-blue-200 text-[11px]">
                       {valStr}

@@ -56,7 +56,7 @@ export const BLUEPRINTS: BlueprintCard[] = [
     category: 'GitHub ➔ Trello ➔ Slack',
     categoryTheme: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     badge: 'Engineering',
-    title: 'Tổng hợp Phát hành Sprint & Báo cáo Kỹ thuật',
+    title: 'Theo dõi GitHub issue trên Trello và Slack',
     description:
       'Tìm issue GitHub, tạo thẻ Trello cho issue đã chọn và gửi thông báo qua kênh Slack.',
     buttonText: '🚀 Tạo công việc từ GitHub issue sang Trello & Slack',
@@ -119,8 +119,8 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
         <div className="flex items-center justify-between mb-2.5 px-1">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              {runtimeMode === 'live' && services.some(service => service.connected) && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${runtimeMode === 'live' && services.some(service => service.connected) ? 'bg-emerald-500' : 'bg-zinc-400'}`}></span>
             </span>
             <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
               Hệ thống kết nối liên dịch vụ
@@ -166,9 +166,9 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
           <span>⚡</span>
           <span>ENTERPRISE MISSION CONTROL v3.1</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight mb-2.5">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight mb-2.5">
           Trung Tâm Điều Phối Quy Trình Tự Động Hóa
-        </h1>
+        </h2>
         <p className="text-xs sm:text-sm text-zinc-600 max-w-2xl mx-auto leading-relaxed">
           Nền tảng tự động hóa quy trình đa dịch vụ — bạn phê duyệt các lệnh ghi trước khi chạy và giới hạn tài nguyên được phép sử dụng.
         </p>

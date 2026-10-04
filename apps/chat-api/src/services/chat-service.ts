@@ -4,6 +4,7 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import { WorkingMemory, type AIPlanner, type ChatMessage } from '@wap/planner';
 import type { PlannerResponse } from '@wap/tool-schemas';
+import { resourceLabels } from './resource-labels.js';
 
 export interface HandleUserMessageInput {
   conversationId: string;
@@ -56,7 +57,7 @@ export class ChatService {
       this.executePlannerPipeline(conversationId, userId, content, message.id).catch((err) => {
         this.eventEmitter.emit('error', {
           conversationId,
-          message: err?.message || 'Unexpected error in planning pipeline',
+          message: 'Không thể lập kế hoạch lúc này. Hãy thử lại.',
         });
       });
     });
@@ -106,6 +107,7 @@ export class ChatService {
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
 
     if (plannerResponse.kind === 'plan') {
+      const labels = resourceLabels(plannerResponse, memory);
       const planHash = createHash('sha256')
         .update(JSON.stringify(plannerResponse))
         .digest('hex');
@@ -119,18 +121,20 @@ export class ChatService {
           planText: JSON.stringify(plannerResponse),
           planHash,
           expiresAt,
+          resourceLabels: labels,
         });
         planId = createdPlan.id;
       }
 
       await this.msgRepo.createMessage(conversationId, 'assistant', `Kế hoạch: ${plannerResponse.summary}`, {
-        type: 'plan', planId, plan: plannerResponse,
+        type: 'plan', planId, plan: plannerResponse, resourceLabels: labels,
       });
 
       this.eventEmitter.emit('plan_preview', {
         conversationId,
         planId,
         plan: plannerResponse,
+        resourceLabels: labels,
       });
 
       this.eventEmitter.emit('agent_state', {

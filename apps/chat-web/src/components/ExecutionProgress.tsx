@@ -1,5 +1,5 @@
 import React from 'react';
-import type { StepState } from '../types';
+import type { StepState, PlanStatus } from '../types';
 
 export interface ExecutionStepInfo {
   id: string;
@@ -7,18 +7,33 @@ export interface ExecutionStepInfo {
   description: string;
   status: StepState;
   duration?: string;
-  output?: string;
+  output?: unknown;
+  completedAt?: string | null;
   error?: string;
 }
 
 export interface ExecutionProgressProps {
   steps: ExecutionStepInfo[];
   title?: string;
+  status?: PlanStatus;
+}
+
+function ResultFields({ output }: { output: unknown }) {
+  let value = output;
+  if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
+  const fields = value && typeof value === 'object' && !Array.isArray(value) ? Object.entries(value) : [];
+  const names: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật' };
+  const safeURL = (text: string) => { try { const url = new URL(text); return ['http:', 'https:'].includes(url.protocol); } catch { return false; } };
+  return <div className="mt-2 text-xs text-zinc-700 break-words">
+    {fields.length ? <dl>{fields.filter(([key, field]) => key in names && (typeof field === 'string' || typeof field === 'number')).map(([key, field]) => <div key={key} className="flex gap-2"><dt>{names[key]}:</dt><dd>{typeof field === 'string' && safeURL(field) ? <a href={field} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{field}</a> : String(field)}</dd></div>)}</dl> : <p>{typeof value === 'object' ? `${Array.isArray(value) ? value.length : 0} kết quả` : String(value)}</p>}
+    <details className="mt-2"><summary className="cursor-pointer">Chi tiết</summary><pre className="whitespace-pre-wrap break-all mt-1">{JSON.stringify(value, null, 2)}</pre></details>
+  </div>;
 }
 
 export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
   steps,
   title = '⚡ Tiến trình thực thi liên dịch vụ',
+  status,
 }) => {
   const getStatusIcon = (status: StepState) => {
     switch (status) {
@@ -107,11 +122,8 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
                   )}
                 </div>
 
-                {step.output && (
-                  <div className="mt-1 text-xs text-[#0066cc] font-mono break-all whitespace-pre-wrap">
-                    {step.output}
-                  </div>
-                )}
+                {step.completedAt && <time className="text-xs text-zinc-500" dateTime={step.completedAt}>{new Date(step.completedAt).toLocaleString('vi-VN', { hour12: false })}</time>}
+                {step.output != null && <ResultFields output={step.output} />}
 
                 {step.error && (
                   <div className="mt-1 text-xs text-red-600 font-medium">
@@ -123,6 +135,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
           );
         })}
       </div>
+      {status === 'completed' && <p role="status" className="text-sm text-green-700">Đã hoàn thành {steps.filter(step => step.status === 'succeeded').length}/{steps.length} bước{steps.some(step => step.status === 'skipped') ? `; ${steps.filter(step => step.status === 'skipped').length} bước đã bỏ qua` : ''}.</p>}
     </div>
   );
 };

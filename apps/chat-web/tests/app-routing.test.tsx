@@ -5,7 +5,7 @@ import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
 import { StrictMode } from 'react';
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn() }));
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = { id: 'u1', email: 'owner@example.test', name: 'Owner' };
 beforeEach(() => {
   window.history.replaceState({}, '', '/');

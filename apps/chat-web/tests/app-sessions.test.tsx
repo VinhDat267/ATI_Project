@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { App } from '../src/App';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn() }));
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 beforeEach(() => { localStorage.clear(); useChatStore.getState().reset(); vi.restoreAllMocks(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe('AUTH-01 App logout', () => {

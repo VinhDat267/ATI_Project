@@ -21,33 +21,6 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
 }) => {
   const [showThinking, setShowThinking] = useState(false);
 
-  const handleEdit = () => {
-    onEdit?.();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('chat:prefill', {
-          detail: { text: 'Điều chỉnh kế hoạch: ' },
-        })
-      );
-      const inputEl = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-        '#chat-input, input[placeholder*="Mô tả công việc"], textarea[placeholder*="Mô tả công việc"], [aria-label*="Mô tả công việc"]'
-      );
-      if (inputEl) {
-        const nativeSetter =
-          Object.getOwnPropertyDescriptor(window.HTMLInputElement?.prototype || {}, 'value')?.set ||
-          Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement?.prototype || {}, 'value')?.set;
-        if (nativeSetter) {
-          nativeSetter.call(inputEl, 'Điều chỉnh kế hoạch: ');
-        } else {
-          inputEl.value = 'Điều chỉnh kế hoạch: ';
-        }
-        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-        inputEl.focus();
-        inputEl.setSelectionRange?.(inputEl.value.length, inputEl.value.length);
-      }
-    }
-  };
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 shadow-md p-5 md:p-6 my-4 max-w-2xl">
@@ -106,6 +79,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
           <PlanStepItem
             key={st.id || idx}
             step={st}
+            resourceLabels={plan.resourceLabels}
             index={idx}
             isLast={idx === plan.steps.length - 1}
           />
@@ -126,7 +100,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
         {onEdit && (
           <button
             type="button"
-            onClick={handleEdit}
+            onClick={onEdit}
             className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition cursor-pointer"
           >
             Sửa qua Chat

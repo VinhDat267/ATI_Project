@@ -8,12 +8,14 @@ import { useChatStore } from '../store/chat-store';
 import { MessageItem } from './MessageItem';
 import { GatherProgress } from './GatherProgress';
 import { ClarificationCard } from './ClarificationCard';
+import { PlanPreview } from './PlanPreview';
 
 export interface ChatContainerProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
   streamingText?: string;
   isStreaming?: boolean;
+  isPlanning?: boolean;
   gatherState?: GatherState | null;
   activeClarification?: ClarificationState | null;
   onClearClarification?: () => void;
@@ -25,6 +27,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   onSendMessage,
   streamingText,
   isStreaming,
+  isPlanning = false,
   gatherState: propGatherState,
   activeClarification: propActiveClarification,
   onClearClarification,
@@ -34,7 +37,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const scrollArea = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
   const previousContent = useRef({ count: 0, streamingText });
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 144)}px`;
+  }, [inputVal]);
 
   useEffect(() => {
     const handlePrefill = (e: Event) => {
@@ -83,14 +92,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputVal.trim()) {
+    if (inputVal.trim() && !isPlanning) {
       onSendMessage(inputVal.trim());
       setInputVal('');
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -101,12 +110,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       {/* Messages Scroll Area */}
       <div
         ref={scrollArea}
+        role="log" aria-live="polite" aria-label="Hội thoại"
         onScroll={event => { const area = event.currentTarget; nearBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 120; }}
         className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-28 mx-auto w-full ${
           messages.length === 0 ? 'max-w-4xl' : 'max-w-3xl'
         }`}
       >
-        {messages.map((msg) => (
+        {messages.map((msg) => msg.metadata?.type === 'plan' && msg.metadata.plan ? <details key={msg.id} className="my-3"><summary className="cursor-pointer text-sm">Kế hoạch đã lưu: {msg.metadata.plan.summary}</summary><PlanPreview plan={{ ...msg.metadata.plan, resourceLabels: msg.metadata.resourceLabels }} /></details> : (
           <MessageItem
             key={msg.id}
             role={msg.role}
@@ -163,25 +173,26 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           onSubmit={handleSubmit}
           className="max-w-3xl mx-auto flex items-center gap-2 bg-[#f5f5f7] border border-zinc-200 rounded-2xl p-1.5 focus-within:border-blue-500 focus-within:bg-white transition shadow-xs"
         >
-          <input
+          <textarea
             ref={inputRef}
             id="chat-input"
-            type="text"
+            rows={1}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={handleKeyDown}
             aria-label="Mô tả công việc bạn muốn thực hiện"
             placeholder="Mô tả công việc bạn muốn thực hiện..."
-            className="flex-1 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none"
+            className="flex-1 bg-transparent px-3 py-2 text-sm leading-6 max-h-36 resize-none overflow-y-auto text-zinc-900 placeholder-zinc-400 focus:outline-none"
           />
           <button
             type="submit"
-            disabled={!inputVal.trim()}
+            disabled={!inputVal.trim() || isPlanning}
             className="w-10 h-10 rounded-full bg-[#0071e3] text-white flex items-center justify-center disabled:opacity-40 hover:bg-blue-600 transition shadow-xs shrink-0"
           >
             <span className="text-xs font-semibold">Gửi</span>
           </button>
         </form>
+        {isPlanning && <p role="status" className="max-w-3xl mx-auto text-xs text-zinc-600 mt-1">Đang lập kế hoạch…</p>}
       </div>
     </div>
   );

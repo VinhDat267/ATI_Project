@@ -15,6 +15,7 @@ import type { CredentialRepo } from './db/repositories/credential-repo.js';
 import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
+import { userFacingError } from './services/user-facing-error.js';
 
 export interface AppOptions {
   jwtSecret: string;
@@ -40,6 +41,17 @@ export function createApp(options: AppOptions): Express {
   const app = express();
 
   app.use(express.json());
+  app.use((_req, res, next) => {
+    const json = res.json.bind(res);
+    res.json = (body: any) => {
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        if (typeof body.error === 'string') body = { ...body, error: userFacingError(body.error) };
+        if (typeof body.message === 'string' && (res.statusCode >= 400 || /^(Successfully connected|Provider rejected)/.test(body.message))) body = { ...body, message: userFacingError(body.message) };
+      }
+      return json(body);
+    };
+    next();
+  });
 
   // CORS middleware
   app.use((req, res, next) => {

@@ -5,7 +5,7 @@ import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn() }));
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = { id: 'u1', email: 'fixture@example.test', name: 'Fixture' };
 const plan = { id: 'p1', convId: 'c1', summary: 'Quy trình đã lưu', status: 'reconciliation_required', steps: [
   { id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ', args: { title: 'Task đã tạo' } },

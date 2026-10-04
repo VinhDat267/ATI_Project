@@ -30,6 +30,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
     messages,
     streamingText,
     isStreaming,
+    isPlanning,
     activePlan,
     planStatus,
     stepStatuses,
@@ -47,6 +48,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [servicesError, setServicesError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
     let current = true;
     apiClient.getRuntime().then(data => {
       if (current && ['sandbox', 'live'].includes(data?.runtimeMode)) setRuntimeMode(data.runtimeMode);
-    }).catch(() => { if (current) setRuntimeMode(null); });
+    }).catch(() => { if (current) setRuntimeMode(null); }).finally(() => { if (current) setRuntimeLoading(false); });
     return () => { current = false; };
   }, []);
   useEffect(() => {
@@ -91,7 +93,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   }, [isSidebarOpen]);
 
   // Activate SSE connection for current conversation
-  useSSE(conversationId, authToken);
+  const { disconnected } = useSSE(conversationId, authToken);
 
   const handleNewConversation = async () => {
     setActionError(null);
@@ -109,6 +111,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   };
 
   const handleSendMessage = async (content: string) => {
+    if (useChatStore.getState().isPlanning) return;
+    useChatStore.getState().setIsPlanning(true);
     let currentConvId = conversationId;
     if (!currentConvId) {
       try {
@@ -127,6 +131,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           role: 'system',
           content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',
         });
+        useChatStore.getState().setIsPlanning(false);
         return;
       }
     }
@@ -144,6 +149,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
         .getState()
         .confirmMessage(tempId, result?.messageId || tempId);
     } catch (err: any) {
+      useChatStore.getState().setIsPlanning(false);
       useChatStore.getState().markMessageFailed(tempId);
       useChatStore.getState().addMessage({
         id: `err-${Date.now()}`,
@@ -191,23 +197,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
         })
       );
     }
-    const chatInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-      '#chat-input, input[placeholder*="Mô tả công việc"], textarea[placeholder*="Mô tả công việc"], [aria-label*="Mô tả công việc"]'
-    );
-    if (chatInput) {
-      const nativeSetter =
-        Object.getOwnPropertyDescriptor(window.HTMLInputElement?.prototype || {}, 'value')?.set ||
-        Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement?.prototype || {}, 'value')?.set;
-      if (nativeSetter) {
-        nativeSetter.call(chatInput, 'Điều chỉnh kế hoạch: ');
-      } else {
-        chatInput.value = 'Điều chỉnh kế hoạch: ';
-      }
-      chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-      chatInput.dispatchEvent(new Event('change', { bubbles: true }));
-      chatInput.focus();
-      chatInput.setSelectionRange?.(chatInput.value.length, chatInput.value.length);
-    }
+
   };
 
   const executionStatus = executionSnapshot?.execution.status || planStatus;
@@ -223,7 +213,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white text-[#1d1d1f]">
+    <div className="flex h-dvh w-screen overflow-hidden bg-white text-[#1d1d1f]">
       {/* Mobile sidebar backdrop overlay */}
       {isSidebarOpen && (
         <div
@@ -234,7 +224,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
       )}
 
       {/* Sidebar for Desktop & Mobile Drawer */}
-      <div
+      <aside aria-label="Danh sách hội thoại"
         className={`fixed md:static inset-y-0 left-0 z-40 w-72 bg-[#f5f5f7] border-r border-zinc-200 flex flex-col justify-between transition-transform transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
@@ -252,6 +242,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
+              aria-label="Đóng danh sách hội thoại"
               className="md:hidden text-zinc-400 hover:text-zinc-600 text-sm"
             >
               ✕
@@ -279,10 +270,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           onOpenSettings={() => setIsSettingsOpen(true)}
           onLogout={onLogout}
         />
-      </div>
+      </aside>
 
       {/* Main Chat Workspace */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-white">
         {/* Top bar */}
         <div className="h-14 border-b border-zinc-200 px-4 md:px-6 flex items-center justify-between bg-white z-10 shrink-0">
           <div className="flex items-center gap-3">
@@ -318,6 +309,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             <button
               type="button"
               onClick={onClearAuthError}
+              aria-label="Đóng thông báo đăng nhập"
               className="text-amber-600 hover:text-amber-800 font-bold ml-2 cursor-pointer"
             >
               ✕
@@ -326,7 +318,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
         )}
 
         {runtimeMode === 'sandbox' && <p role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900">Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật</p>}
-        {runtimeMode === null && <p role="status" className="px-4 py-2 text-xs text-zinc-600">Chưa xác định được chế độ chạy của máy chủ.</p>}
+        {runtimeMode === null && !runtimeLoading && <p role="status" className="px-4 py-2 text-xs text-zinc-600">Chưa xác định được chế độ chạy của máy chủ.</p>}
+        {disconnected && <p role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-900">Mất kết nối, đang thử lại…</p>}
         {actionError && <p role="alert" className="px-4 py-2 text-sm text-red-700">{actionError}</p>}
         {/* Chat Feed */}
         <div className="flex-1 overflow-hidden relative">
@@ -335,6 +328,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             onSendMessage={handleSendMessage}
             streamingText={streamingText}
             isStreaming={isStreaming}
+            isPlanning={isPlanning}
           >
             {/* Mission Control Launchpad when no messages */}
             {messages.length === 0 && (
@@ -353,6 +347,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
               />
             )}
 
+            {activePlan && !['preview', 'approving', 'idle', 'rejected'].includes(planStatus) && <details className="my-3"><summary className="cursor-pointer text-sm">Kế hoạch đã duyệt: {activePlan.summary}</summary><PlanPreview plan={activePlan} /></details>}
             {activePlan && !activePlan.id && <p role="alert">Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại trước khi duyệt.</p>}
             {failureId && !needsReconciliation && dismissedFailure === failureKey && <div role="status" className="my-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
               <p>Quy trình vẫn đang tạm dừng tại bước {failureId}.</p>
@@ -367,6 +362,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
             {progressPlan && Object.keys(stepStatuses).length > 0 && (
               <ExecutionProgress
+                status={executionStatus}
                 steps={(progressPlan.steps || executionSnapshot?.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId })) || []).map((st) => {
                   const saved = executionSnapshot?.steps.find(row => row.stepId === st.id);
                   return ({
@@ -376,7 +372,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
                   status: stepStatuses[st.id] || 'pending',
                   error: stepErrors[st.id],
                   duration: saved?.durationMs != null ? `${saved.durationMs / 1000}s` : undefined,
-                  output: saved?.output != null ? JSON.stringify(saved.output) : undefined,
+                  output: saved?.output,
+                  completedAt: saved?.completedAt,
                 }); })}
               />
             )}
@@ -407,7 +404,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             )}
           </ChatContainer>}
         </div>
-      </div>
+      </main>
 
       {/* Settings Modal */}
       <SettingsModal
