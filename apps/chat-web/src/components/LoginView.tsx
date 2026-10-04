@@ -12,6 +12,8 @@ export interface LoginViewProps {
   onBackToLanding?: () => void;
   authConfig?: { signupEnabled: boolean; googleEnabled: boolean };
   onSignup?: () => void;
+  onForgotPassword?: () => void;
+  onResendVerification?: () => void;
   onGoogleLogin?: () => void;
 }
 
@@ -27,6 +29,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onBackToLanding,
   authConfig,
   onSignup,
+  onForgotPassword,
+  onResendVerification,
   onGoogleLogin,
 }) => {
   const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
@@ -187,7 +191,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           </form>
 
-          {authConfig?.signupEnabled && onSignup && <button type="button" onClick={onSignup}>Đăng ký tài khoản</button>}
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-[#0071e3]">
+            {onForgotPassword && <button type="button" className="hover:underline" onClick={onForgotPassword}>Quên mật khẩu?</button>}
+            {onResendVerification && <button type="button" className="hover:underline" onClick={onResendVerification}>Gửi lại email xác minh</button>}
+          </div>
+          {authConfig?.signupEnabled && onSignup && <button type="button" className="text-sm text-[#0071e3] hover:underline" onClick={onSignup}>Tạo tài khoản</button>}
           {authConfig?.googleEnabled && onGoogleLogin && <button type="button" onClick={onGoogleLogin}>Đăng nhập bằng Google</button>}
 
           {/* Quick-Fill Admin Helper for Local Testing (Only in sandbox/dev mode) */}

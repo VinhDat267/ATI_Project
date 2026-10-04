@@ -10,6 +10,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
   { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|FE-02:' },
+  { name: 'auth02', grep: 'AUTH-02:' },
   { name: 'clarification', grep: 'clarification before plan' },
   { name: 'partial_failure', grep: 'partial failure and skip' },
   { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },
@@ -23,8 +24,9 @@ const scenarios = [
 for (const scenario of scenarios) {
   process.stdout.write(`Running v3 browser scenario: ${scenario.name}\n`);
   const env = { ...process.env };
-  if (scenario.name === 'default') delete env.SANDBOX_SCENARIO;
+  if (scenario.name === 'default' || scenario.name === 'auth02') delete env.SANDBOX_SCENARIO;
   else env.SANDBOX_SCENARIO = scenario.name;
+  if (scenario.name === 'auth02') env.AUTH_SIGNUP_ENABLED = 'true';
   const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', '--grep', scenario.grep], {
     env,
     stdio: 'inherit',

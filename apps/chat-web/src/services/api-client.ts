@@ -7,6 +7,7 @@ import type {
   User,
   ExecutionSnapshot,
   AdminUser, AdminUserPage,
+  AuthMessageResponse,
 } from '../types';
 
 export class ApiClient {
@@ -92,6 +93,18 @@ export class ApiClient {
   }
 
   // --- Auth ---
+  private async publicAuthAction(path: string, body: object): Promise<AuthMessageResponse> {
+    const response = await fetch(`/api/auth/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error(data.error || 'Không thể hoàn tất yêu cầu tài khoản.'), { status: response.status, data });
+    return data;
+  }
+  signup(name: string, email: string, password: string) { return this.publicAuthAction('signup', { name, email, password }); }
+  verifyEmail(token: string) { return this.publicAuthAction('verify-email', { token }); }
+  resendVerification(email: string) { return this.publicAuthAction('resend-verification', { email }); }
+  forgotPassword(email: string) { return this.publicAuthAction('forgot-password', { email }); }
+  resetPassword(token: string, password: string) { return this.publicAuthAction('reset-password', { token, password }); }
+
   async login(
     email: string,
     password: string

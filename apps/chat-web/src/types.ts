@@ -1,4 +1,5 @@
 export type MessageRole = 'user' | 'assistant' | 'system';
+export interface AuthMessageResponse { message: string }
 export type MessageStatus = 'sending' | 'sent' | 'failed';
 
 export interface ChatMessage {
