@@ -69,18 +69,19 @@ export class JiraAdapter extends BaseAdapter {
     if (tool === 'jira.search_issues') {
       this.input(args, ['projectKey', 'query', 'limit']); const key = this.project(args.projectKey); const limit = this.limit(args.limit, 20);
       if (args.query !== undefined && !text(args.query, 0, 2000)) throw fail('VALIDATION');
-      // Strip Lucene metacharacters permitted by the card, then escape JQL string quotes/backslashes.
-      const query = (args.query ?? '').replace(/[+\-&|!(){}\[\]^~*?:]/g, ' ').trim();
-      const lucene = query.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const query = (args.query ?? '').trim();
+      // Jira text search reads these characters as query syntax ('-' excludes a term). A Lucene backslash keeps
+      // "W3-07" one term as indexed (W3-09); the JQL layer then escapes backslashes and quotes again.
+      const lucene = query.replace(/[+\-&|!(){}\[\]^~*?:\\\/"]/g, '\\$&');
       const escaped = lucene.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const issueKey = query.toUpperCase();
+      // Text search does not cover the issue key, and JQL `key = ...` fails the whole search for a missing key.
+      const direct = JIRA_ISSUE_PATTERN.test(issueKey) && issueKey.split('-')[0] === key ? await this.issueByKey(issueKey, key, signal) : null;
       const jql = 'project = "' + key + '"' + (query ? ' AND text ~ "' + escaped + '"' : '') + ' ORDER BY updated DESC';
       const value = await this.request('/search/jql', false, signal, 'POST', { jql, maxResults: limit, fields: ['summary', 'status', 'project'] });
       if (!record(value) || !Array.isArray(value.issues) || value.issues.length > limit) throw fail('SERVER_ERROR');
-      return { issues: value.issues.map((issue: any) => {
-        const identity = this.identity(issue, key);
-        if (issue.fields?.project?.key !== key || !text(issue.fields?.summary, 1, 255) || !text(issue.fields?.status?.name, 1, 255)) throw fail('SERVER_ERROR');
-        return { ...identity, title: issue.fields.summary, status: issue.fields.status.name };
-      }) };
+      const found = value.issues.map((issue: any) => this.issueRow(issue, key));
+      return { issues: direct ? [direct, ...found.filter((row: { id: string }) => row.id !== direct.id)].slice(0, limit) : found };
     }
     if (tool === 'jira.create_issue') {
       this.input(args, ['projectKey', 'summary', 'description', 'issueType']); const key = this.project(args.projectKey);
@@ -103,6 +104,30 @@ export class JiraAdapter extends BaseAdapter {
       return { id: value.id, issueKey: identity.key, url: identity.url + '?focusedCommentId=' + value.id };
     }
     throw fail('VALIDATION');
+  }
+  private issueRow(issue: any, key: string): { id: string; key: string; url: string; title: string; status: string } {
+    const identity = this.identity(issue, key);
+    if (issue.fields?.project?.key !== key || !text(issue.fields?.summary, 1, 255) || !text(issue.fields?.status?.name, 1, 255)) throw fail('SERVER_ERROR');
+    return { ...identity, title: issue.fields.summary, status: issue.fields.status.name };
+  }
+  // A missing issue, or one moved to another project, is simply not a direct hit.
+  private async issueByKey(issueKey: string, key: string, signal?: AbortSignal) {
+    let value: any;
+    try { value = await this.request('/issue/' + issueKey + '?fields=summary,status,project', false, signal); }
+    catch (error) { if (error instanceof StepError && error.category === 'NOT_FOUND') return null; throw error; }
+    if (!record(value) || !record(value.fields?.project)) throw fail('SERVER_ERROR');
+    return value.fields.project.key === key ? this.issueRow(value, key) : null;
+  }
+  // Jira Cloud hides projects and issues from an invalid Basic token behind 404 while /myself answers 401 (W3-09).
+  // One unretried request tells them apart; any other outcome keeps the read NOT_FOUND.
+  private async rejectInvalidCredentials(signal?: AbortSignal): Promise<void> {
+    let status = 0;
+    try {
+      await this.waitForTransportSlot(this.rateLimiter!, this.site + ':' + this.authorization, signal);
+      const response = await this.fetchFn(this.site + '/rest/api/3/myself', { method: 'GET', signal, redirect: 'error', headers: { Accept: 'application/json', Authorization: this.authorization } });
+      status = response.status; await response.body?.cancel().catch(() => {});
+    } catch { if (signal?.aborted) throw fail('NETWORK'); }
+    if (status === 401 || status === 403) throw fail('AUTH_ERROR', status);
   }
   private async issueTypes(key: string, signal?: AbortSignal): Promise<Array<{ id: string; name: string; subtask: boolean }>> {
     const types: Array<{ id: string; name: string; subtask: boolean }> = []; let start = 0;
@@ -140,7 +165,10 @@ export class JiraAdapter extends BaseAdapter {
         throw fail('RATE_LIMIT', 429);
       }
       if (response.status === 401 || response.status === 403) throw fail('AUTH_ERROR', response.status);
-      if (response.status === 404) throw fail('NOT_FOUND', 404);
+      if (response.status === 404) {
+        if (!writing && path !== '/myself') await this.rejectInvalidCredentials(signal);
+        throw fail('NOT_FOUND', 404);
+      }
       if (response.status >= 500) { if (!writing && !signal?.aborted && server++ < 1) continue; throw fail(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status); }
       if (!response.ok) throw fail(response.status >= 400 ? 'VALIDATION' : writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status);
       return value;
