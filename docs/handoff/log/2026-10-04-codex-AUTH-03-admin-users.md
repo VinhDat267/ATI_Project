@@ -31,6 +31,7 @@ Lần full API chạy trước khi public schema được migrate từng lỗi 1
 ## Môi trường và bàn giao
 
 - PostgreSQL 16 Alpine riêng, container `ati-auth03-codex-test`, ID `8421a0a86649c49469a6cd118ea3a79b9637bc2aec69028120cd5cce960a6a0c`, labels `ati.task=AUTH-03`, `ati.owner=codex`, tmpfs dữ liệu, loopback **52788**. DB `ati_v3` đã migrate 0001–0005; DB ban đầu `ati_auth03` chỉ dùng focused tests. Không dùng cổng người dùng 15433 hoặc cổng canonical 55533.
+- Sau các phép kiểm tra, container thử nghiệm này đã được xóa theo đúng ID/name/labels đã xác minh; `docker ps -a --filter id=8421a0a86649` trả rỗng. Không xóa volume hoặc DB của người dùng. Bản sửa assertion no-referrer browser AUTH-02 `4f50970` cũng đã ghép để PR xếp trên base cuối không chứa thay đổi của task phụ thuộc.
 - `AUTH_SIGNUP_ENABLED` đã bật mặc định true sau khi cả backend/UI AUTH-02 và AUTH-03 có mặt. Env explicit false vẫn đóng được đăng ký; `.env.example` ghi mốc hiện tại.
 - Browser `AUTH-03:` đã thêm vào grep default của `scripts/test-v3-browser.mjs`; selector AUTH-02 từ merge phụ thuộc được giữ nguyên. Root giữ thêm selector FE-03 khi ghép nhánh.
 - **Chờ root:** canonical check/browser tuần tự trên head cuối, review độc lập và CI đúng head, mở PR xếp trên AUTH-02. Không push/mở PR/merge main trong phiên này.
