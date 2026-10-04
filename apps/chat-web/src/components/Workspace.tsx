@@ -55,6 +55,18 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const [servicesLoading, setServicesLoading] = useState(false);
   const currentRoute = useRef(route);
   currentRoute.current = route;
+  const workspaceMounted = useRef(true);
+  const unsentDraftRequest = useRef<string | null>(null);
+  useEffect(() => {
+    workspaceMounted.current = true;
+    return () => {
+      workspaceMounted.current = false;
+      if (unsentDraftRequest.current) {
+        useChatStore.getState().setIsPlanning(false, null, unsentDraftRequest.current);
+        unsentDraftRequest.current = null;
+      }
+    };
+  }, []);
   const serviceRequest = useRef(0);
   const loadServices = useCallback(async () => {
     const request = ++serviceRequest.current;
@@ -101,14 +113,21 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const newConversation = useRef<Promise<string | null> | null>(null);
   const handleNewConversation = async () => {
     if (newConversation.current) return;
+    const previous = useChatStore.getState();
+    const previousRoute = route;
     setActionError(null);
+    reset({ preservePlanning: true });
+    setConversationId(null);
+    navigate('/');
     const request = (async () => {
       const data = await apiClient.createConversation();
+      if (!workspaceMounted.current) return null;
       const newConv = data.conversation;
       if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
-      reset({ preservePlanning: true });
-      setConversationId(newConv.id);
-      navigate(conversationPath(newConv.id));
+      if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
+        setConversationId(newConv.id);
+        navigate(conversationPath(newConv.id), true);
+      }
       useChatStore.getState().setConversations([
         newConv, ...useChatStore.getState().conversations.filter(c => c.id !== newConv.id),
       ]);
@@ -116,27 +135,45 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
     })();
     newConversation.current = request.catch(() => null);
     try { await request; }
-    catch (error) { setActionError(userErrorMessage(error)); }
+    catch (error) {
+      if (!workspaceMounted.current) return;
+      if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
+        useChatStore.setState({
+          messages: previous.messages, streamingText: previous.streamingText, isStreaming: previous.isStreaming,
+          activePlan: previous.activePlan, planStatus: previous.planStatus,
+          activeClarification: previous.activeClarification, gatherState: previous.gatherState,
+          stepStatuses: previous.stepStatuses, stepErrors: previous.stepErrors,
+          executionSnapshot: previous.executionSnapshot, executionLoadError: previous.executionLoadError,
+        });
+        setConversationId(previous.conversationId);
+        if (previousRoute.kind === 'conversation') navigate(conversationPath(previousRoute.conversationId));
+      }
+      setActionError(userErrorMessage(error));
+    }
     finally { newConversation.current = null; }
   };
 
   const handleSendMessage = async (content: string) => {
     const tempId = `temp-${crypto.randomUUID()}`;
     const pendingConversation = newConversation.current;
-    let currentConvId = !pendingConversation && route.kind === 'conversation' ? route.conversationId : null;
+    let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
     if (!useChatStore.getState().beginPlanning(currentConvId, tempId)) return;
     if (!currentConvId) {
+      unsentDraftRequest.current = tempId;
       try {
         if (pendingConversation) currentConvId = await pendingConversation;
         else currentConvId = (await apiClient.createConversation()).conversation?.id;
+        if (!workspaceMounted.current) return;
         if (currentConvId) {
           useChatStore.getState().transferPlanning(null, currentConvId, tempId);
+          if (unsentDraftRequest.current === tempId) unsentDraftRequest.current = null;
           if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
             setConversationId(currentConvId);
             navigate(conversationPath(currentConvId));
           }
         }
       } catch (err) {
+        if (!workspaceMounted.current) return;
         console.warn('Could not create conversation via API:', err);
       }
       if (!currentConvId) {
@@ -146,6 +183,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',
         });
         useChatStore.getState().setIsPlanning(false, null, tempId);
+        if (unsentDraftRequest.current === tempId) unsentDraftRequest.current = null;
         return;
       }
     }
@@ -160,12 +198,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
       );
       const store = useChatStore.getState();
       store.confirmPlanningRequest(currentConvId, tempId, result?.messageId || tempId);
+      if (!workspaceMounted.current) return;
       if (store.conversationId === currentConvId) store.confirmMessage(tempId, result?.messageId || tempId);
     } catch (err: any) {
       const store = useChatStore.getState();
       const ownsAttempt = store.planningByConversation[currentConvId]?.requestId === tempId;
       store.setIsPlanning(false, currentConvId, tempId);
-      if (store.conversationId !== currentConvId || !ownsAttempt) return;
+      if (!workspaceMounted.current || store.conversationId !== currentConvId || !ownsAttempt) return;
       store.markMessageFailed(tempId);
       store.addMessage({
         id: `err-${Date.now()}`,
