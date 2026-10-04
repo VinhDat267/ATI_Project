@@ -1,5 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth/index.js';
+import { createAccountRoutes } from './routes/auth/account.js';
+import { LoginFailures } from './auth/login-failures.js';
 import { createAdminUsersRoutes, type AdminUsersOptions } from './routes/auth/admin-users.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
@@ -88,14 +90,17 @@ export function createApp(options: AppOptions): Express {
   });
 
   // Auth routes (public login/refresh, protected /me)
+  const loginFailures = new LoginFailures(options.authClock);
   app.use(
     '/api/auth',
     createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, sessionRepo: options.sessionRepo,
       clock: options.authClock, validateCredentials: options.validateCredentials,
       signupEnabled: options.signupEnabled, appBaseUrl: options.appBaseUrl, emailSender: options.emailSender,
       runtimeMode: options.runtimeMode, googleOAuth: options.googleOAuth, googleFetchFn: options.googleFetchFn,
-      googleSignupEnabled: options.googleSignupEnabled })
+      googleSignupEnabled: options.googleSignupEnabled, loginFailures })
   );
+  app.use('/api/account', createAccountRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo,
+    sessionRepo: options.sessionRepo, clock: options.authClock, loginFailures }));
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
 

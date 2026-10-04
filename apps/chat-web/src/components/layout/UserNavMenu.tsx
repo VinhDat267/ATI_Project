@@ -6,6 +6,7 @@ export interface UserNavMenuProps {
   onOpenSettings: () => void;
   onLogout: () => void;
   onManageUsers?: () => void;
+  onOpenAccount?: () => void;
 }
 
 export const UserNavMenu: React.FC<UserNavMenuProps> = ({
@@ -13,6 +14,7 @@ export const UserNavMenu: React.FC<UserNavMenuProps> = ({
   onOpenSettings,
   onLogout,
   onManageUsers,
+  onOpenAccount,
 }) => {
   const initials = user?.name
     ? user.name.slice(0, 2).toUpperCase()
@@ -36,6 +38,7 @@ export const UserNavMenu: React.FC<UserNavMenuProps> = ({
         </div>
       </div>
 
+      {onOpenAccount && <button type="button" onClick={onOpenAccount} className="text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 px-2.5 py-1.5 rounded-lg text-xs font-medium transition text-left">Tài khoản</button>}
       {user?.role === 'admin' && <button type="button" onClick={onManageUsers} className="text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 px-2.5 py-1.5 rounded-lg text-xs font-medium transition text-left">Quản lý người dùng</button>}
       <div className="flex items-center justify-between pt-1 border-t border-zinc-200/40">
         <button

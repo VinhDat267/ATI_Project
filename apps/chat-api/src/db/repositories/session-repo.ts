@@ -105,6 +105,31 @@ export class SessionRepo {
     await this.pool.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,$3) WHERE id=$1 AND user_id=$2', [sessionId, userId, new Date(now)]);
   }
 
+  async listActive(userId: string, now = Date.now()): Promise<Array<{ id: string; created_at: Date; last_used_at: Date; user_agent: string | null }>> {
+    return (await this.pool.query(
+      `SELECT id,created_at,last_used_at,user_agent FROM auth_sessions
+       WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>$2 ORDER BY last_used_at DESC,created_at DESC`,
+      [userId, new Date(now)],
+    )).rows;
+  }
+
+  /** Revokes one open session of this user; false when it is someone else's, closed or unknown. */
+  async revokeOwn(sessionId: string, userId: string, now = Date.now()): Promise<boolean> {
+    const result = await this.pool.query(
+      'UPDATE auth_sessions SET revoked_at=$3 WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>$3',
+      [sessionId, userId, new Date(now)],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async revokeOthers(userId: string, keepSessionId: string, now = Date.now()): Promise<number> {
+    const result = await this.pool.query(
+      'UPDATE auth_sessions SET revoked_at=$3 WHERE user_id=$1 AND id<>$2 AND revoked_at IS NULL AND expires_at>$3',
+      [userId, keepSessionId, new Date(now)],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async revokeAll(userId: string, now = Date.now()): Promise<void> {
     await this.pool.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,$2) WHERE user_id=$1', [userId, new Date(now)]);
   }

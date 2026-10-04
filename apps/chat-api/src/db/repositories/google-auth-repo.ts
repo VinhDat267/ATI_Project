@@ -78,6 +78,10 @@ export class GoogleAuthRepo {
           }
         }
       }
+      // The account page shows the linked Google address; keep it current on every link and sign-in (AUTH-05).
+      if (user && user.google_sub === profile.sub && user.google_email !== profile.email) {
+        user = (await client.query<UserRow>('UPDATE users SET google_email=$2 WHERE id=$1 RETURNING *', [user.id, profile.email])).rows[0]!;
+      }
       await client.query('COMMIT');
       return { user: user!, linked, created };
     } catch (error) {
@@ -98,7 +102,7 @@ export class GoogleAuthRepo {
       const user = (await client.query<UserRow>('SELECT * FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
       if (!user || user.status !== 'active' || !await this.lockActiveSession(client, sessionId, userId, now)) throw new GoogleAccountError('INVALID_SESSION');
       if (!user.password) throw new GoogleAccountError('PASSWORD_REQUIRED');
-      await client.query('UPDATE users SET google_sub=NULL,updated_at=$2 WHERE id=$1', [userId, new Date(now)]);
+      await client.query('UPDATE users SET google_sub=NULL,google_email=NULL,updated_at=$2 WHERE id=$1', [userId, new Date(now)]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }

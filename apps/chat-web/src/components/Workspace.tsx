@@ -325,6 +325,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           onOpenSettings={() => setIsSettingsOpen(true)}
           onLogout={onLogout}
           onManageUsers={() => navigate('/admin/users')}
+          onOpenAccount={() => navigate('/account')}
         />
       </aside>
 

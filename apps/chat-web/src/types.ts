@@ -68,6 +68,12 @@ export interface AdminUser extends User {
 }
 export interface AdminUserPage { users: AdminUser[]; total: number; pendingCount: number; page: number; limit: number }
 
+export interface AccountProfile {
+  id: string; email: string; name: string; role: 'member' | 'admin'; createdAt: string;
+  hasPassword: boolean; hasGoogle: boolean; googleEmail: string | null;
+}
+export interface AccountSession { id: string; device: string; createdAt: string; lastUsedAt: string; current: boolean }
+
 export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected' | 'partial' | 'reconciliation_required' | 'stopped' | 'failed';
 
 export interface ExecutionSnapshot {

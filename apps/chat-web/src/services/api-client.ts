@@ -8,6 +8,7 @@ import type {
   ExecutionSnapshot,
   AdminUser, AdminUserPage,
   AuthMessageResponse,
+  AccountProfile, AccountSession,
 } from '../types';
 
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
@@ -289,6 +290,31 @@ export class ApiClient {
 
   async changeAdminUser(id: string, action: 'approve' | 'disable' | 'enable' | 'role', role?: 'member' | 'admin'): Promise<{ user: AdminUser }> {
     return this.request(`/api/admin/users/${encodeURIComponent(id)}/${action}`, { method: 'POST', ...(action === 'role' ? { body: JSON.stringify({ role }) } : {}) });
+  }
+
+  // --- Own account (AUTH-05) ---
+  async getAccount(): Promise<{ account: AccountProfile }> {
+    return this.request('/api/account');
+  }
+
+  async updateAccountName(name: string): Promise<{ user: User }> {
+    return this.request('/api/account/profile', { method: 'PATCH', body: JSON.stringify({ name }) });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.request('/api/account/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+  }
+
+  async getAccountSessions(): Promise<{ sessions: AccountSession[] }> {
+    return this.request('/api/account/sessions');
+  }
+
+  async revokeAccountSession(id: string): Promise<{ success: true }> {
+    return this.request(`/api/account/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST' });
+  }
+
+  async revokeOtherAccountSessions(): Promise<{ revoked: number }> {
+    return this.request('/api/account/sessions/revoke-others', { method: 'POST' });
   }
 
   // --- Conversations ---

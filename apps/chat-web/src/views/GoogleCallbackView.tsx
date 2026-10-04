@@ -6,6 +6,7 @@ import { AuthFeedback, AuthFormFrame, type AuthViewProps } from './AuthFormFrame
 
 export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps & { googleCallback?: GoogleCallbackInput }) {
   const [busy, setBusy] = useState(true), [message, setMessage] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
+  const [linked, setLinked] = useState(false);
   const completion = useRef<ReturnType<typeof apiClient.completeGoogleAuth> | null>(null);
   const input = useRef(googleCallback), invalidated = useRef(false);
   const initialSession = useRef(authStorage.getStoredTokens());
@@ -39,7 +40,7 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
     completion.current.then(data => {
       if (!canComplete()) return;
       if ('success' in data && data.success === true) {
-        setMessage('Đã liên kết tài khoản Google.'); return;
+        setMessage('Đã liên kết tài khoản Google.'); setLinked(true); return;
       }
       if (!('accessToken' in data) || !data.accessToken || !data.refreshToken || !data.user?.id) {
         setError('Không thể hoàn tất đăng nhập Google. Hãy đăng nhập lại.'); return;
@@ -60,5 +61,6 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
   return <AuthFormFrame title="Đăng nhập Google" description="Xác thực tài khoản Google để sử dụng hệ thống." navigate={navigate}>
     {busy && <p role="status" className="text-sm text-zinc-600">Đang xử lý đăng nhập Google...</p>}
     <AuthFeedback error={error} message={message} />
+    {linked && <button type="button" onClick={() => navigate('/account')} className="mt-4 rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-100">Về trang tài khoản</button>}
   </AuthFormFrame>;
 }

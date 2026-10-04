@@ -3,8 +3,8 @@ import { createAuthMiddleware, generateAccessToken, generateTokens, verifyRefres
 import { hashPassword, toAuthUser, verifyPassword } from '../../db/repositories/user-repo.js';
 import type { AuthRoutesOptions } from './index.js';
 import { InvalidSessionUserError } from '../../db/repositories/session-repo.js';
+import { LoginFailures } from '../../auth/login-failures.js';
 
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const DUMMY_PASSWORD = hashPassword('dummy-login-password-for-missing-users');
 
 export function createSessionRoutes(options: AuthRoutesOptions): Router {
@@ -12,8 +12,7 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
   const clock = options.clock ?? Date.now;
   const sessions = options.sessionRepo ?? options.userRepo?.sessions;
   const auth = createAuthMiddleware(options.jwtSecret, { sessionRepo: sessions, clock });
-  const failures = new Map<string, { count: number; expiresAt: number }>();
-  const pendingLogins = new Map<string, Promise<void>>();
+  const failures = options.loginFailures ?? new LoginFailures(clock);
 
   router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const body = req.body ?? {};
@@ -22,16 +21,14 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
       return;
     }
     const email = body.email.trim().toLowerCase();
-    const key = JSON.stringify([req.ip, email]);
+    const key = LoginFailures.key(req.ip, email);
     // Serialize password verification per IP/email so concurrent requests cannot
     // all pass the failure limit before PostgreSQL returns their account lookup.
-    const preceding = pendingLogins.get(key) ?? Promise.resolve();
-    const verification = preceding.catch(() => {}).then(async () => {
+    await failures.serialize(key, async () => {
       const now = clock();
-      let bucket = failures.get(key);
-      if (bucket && bucket.expiresAt <= now) { failures.delete(key); bucket = undefined; }
-      if (bucket && bucket.count >= 5) {
-        res.setHeader('Retry-After', String(Math.ceil((bucket.expiresAt - now) / 1000)));
+      const retryAfter = failures.retryAfter(key);
+      if (retryAfter !== null) {
+        res.setHeader('Retry-After', String(retryAfter));
         res.status(429).json({ error: 'Too many login attempts. Try again later.' });
         return;
       }
@@ -46,16 +43,11 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
         user = await options.validateCredentials(email, body.password);
       }
       if (!user) {
-        const finishedAt = clock();
-        for (const [oldKey, failure] of failures) if (failure.expiresAt <= finishedAt) failures.delete(oldKey);
-        // The lookup awaits PostgreSQL: count against the current bucket, including
-        // failures that other requests completed during that await.
-        const current = failures.get(key);
-        failures.set(key, { count: (current?.count ?? 0) + 1, expiresAt: current?.expiresAt ?? finishedAt + LOGIN_WINDOW_MS });
+        failures.record(key);
         res.status(401).json({ error: 'Invalid email or password' });
         return;
       }
-      failures.delete(key);
+      failures.clear(key);
       if (options.userRepo && user.status !== 'active') {
         const code = user.status === 'disabled' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_PENDING';
         res.status(403).json({ error: 'Account is not active', code });
@@ -77,9 +69,6 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
       }
       res.json({ user, ...generateTokens(user, options.jwtSecret) });
     });
-    pendingLogins.set(key, verification);
-    try { await verification; }
-    finally { if (pendingLogins.get(key) === verification) pendingLogins.delete(key); }
   });
 
   router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
