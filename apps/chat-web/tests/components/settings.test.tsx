@@ -129,7 +129,7 @@ describe('SettingsModal Component', () => {
 
   it('posts credentials and scope to the API and reports the save result', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [], credentialFields: [{ key: 'apiKey', label: 'API Key / Client ID' }, { key: 'token', label: 'OAuth / API Token' }], scopeKey: 'boards' }] }) };
+      if (url === '/api/services') return { ok: true, json: async () => ({ services: [{ id: 'trello', name: 'Trello', connected: false, allowedScope: [], credentialFields: [{ key: 'apiKey', label: 'API Key / Client ID' }, { key: 'token', label: 'OAuth / API Token' }], scopeKey: 'boards', scopeLabel: 'Board ID' }] }) };
       if (url === '/api/services/trello/credentials') return { ok: true, json: async () => ({ success: true, message: 'Saved' }) };
       throw new Error('Unexpected endpoint');
     });
@@ -137,7 +137,7 @@ describe('SettingsModal Component', () => {
     render(<SettingsModal isOpen onClose={vi.fn()} authToken="jwt" />);
     fireEvent.change(await screen.findByLabelText(/API Key/), { target: { value: 'key-123' } });
     fireEvent.change(screen.getByLabelText(/OAuth/), { target: { value: 'token-456' } });
-    fireEvent.change(screen.getByPlaceholderText(/Thêm board/), { target: { value: 'board-789' } });
+    fireEvent.change(screen.getByPlaceholderText(/Thêm Board ID/), { target: { value: 'board-789' } });
     fireEvent.click(screen.getByRole('button', { name: /Thêm/i }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu cấu hình/i }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/services/trello/credentials', expect.objectContaining({

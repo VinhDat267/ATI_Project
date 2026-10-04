@@ -413,7 +413,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             {/* Live Execution Progress Card */}
             {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
             {executionSnapshot && needsReconciliation && <ReconciliationNotice
-              snapshot={executionSnapshot} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
+              snapshot={executionSnapshot} services={services} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
             {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
             {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
             {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}

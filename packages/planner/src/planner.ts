@@ -1,7 +1,7 @@
 import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage } from './types.js';
 import { WorkingMemory } from './working-memory.js';
-import { classifyIntent } from './router.js';
+import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
@@ -85,6 +85,13 @@ function asCandidates(value: unknown, nameField?: string): GatherCandidate[] {
     }
     return { ...item, name } as GatherCandidate;
   });
+}
+
+// A request that names an unconfigured service is refused, never rerouted to another service.
+function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
+  return { kind: 'refusal',
+    reason: unavailable.length > 0 ? unavailableServiceReason(unavailable) : 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
+    suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
 }
 
 export class AIPlanner {
@@ -300,12 +307,9 @@ export class AIPlanner {
     const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
 
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
-    const targetServices = classifyIntent(userTexts.join('\n'), this.toolCatalog, this.serviceRegistry);
-    const activeTools = this.toolCatalog.filter((tool) => targetServices.includes(tool.service));
-    if (activeTools.length === 0) {
-      return { kind: 'refusal', reason: 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
-        suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
-    }
+    const route = routeIntent(userTexts.join('\n'), this.toolCatalog, this.serviceRegistry);
+    const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
+    if (activeTools.length === 0) return unroutable(route.unavailable);
 
     if (this.prefetchDirectory && this.gatherSearch) await this.listDirectory(activeTools, input);
     if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
@@ -380,14 +384,9 @@ export class AIPlanner {
       : userMessage;
 
     // 1. Hierarchical Routing: filter tool catalog by intent
-    const targetServices = classifyIntent(originalIntent ?? userMessage, this.toolCatalog, this.serviceRegistry);
-    const activeTools = this.toolCatalog.filter((tool) =>
-      targetServices.includes(tool.service)
-    );
-    if (activeTools.length === 0) {
-      return { kind: 'refusal', reason: 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
-        suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
-    }
+    const route = routeIntent(originalIntent ?? userMessage, this.toolCatalog, this.serviceRegistry);
+    const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
+    if (activeTools.length === 0) return unroutable(route.unavailable);
 
     // 2. Prepare System Prompt & Conversation
     const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone });

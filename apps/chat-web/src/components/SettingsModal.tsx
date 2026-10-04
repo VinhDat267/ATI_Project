@@ -183,12 +183,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 connected={Boolean(svc.configured)}
                 allowedScope={svc.allowedScope || []}
                 credentialFields={svc.credentialFields || []}
-                scopeLabel={
-                  svc.scopeLabel ||
-                  ({ boards: 'board', channels: 'channel', repos: 'Repository' }[
-                    svc.scopeKey || ''
-                  ] ?? 'tài nguyên')
-                }
+                scopeLabel={svc.scopeLabel || 'tài nguyên'}
                 onTestConnection={() => handleTestConnection(svc.id)}
                 onSave={(input) => handleSave(svc.id, input)}
               />
