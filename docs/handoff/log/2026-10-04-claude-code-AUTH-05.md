@@ -1,0 +1,28 @@
+# 2026-10-04 · Claude Code · AUTH-05
+
+- **Đã làm:**
+  - **API `/api/account`:** hồ sơ, đổi tên, đổi mật khẩu, danh sách phiên, đăng xuất một phiên khác hoặc mọi thiết bị khác.
+  - **Đổi mật khẩu:**
+    - sai mật khẩu hiện tại trả 400 và được tính vào giới hạn đăng nhập sai (`LoginFailures` dùng chung với route đăng nhập);
+    - đổi xong thì thu hồi mọi phiên khác và vô hiệu link reset chưa dùng.
+  - **Migration 0008:** thêm `users.google_email`.
+  - **Giao diện:** trang "Tài khoản" ở `/account`, mục "Tài khoản" trong menu, nút "Về trang tài khoản" sau khi liên kết Google.
+- **PR / commit:** nhánh `feat/auth-05-account-page`.
+  - `5d768d3`, `c0df781`: test RED;
+  - `f52f8a9`: backend;
+  - `3d2e1e9`: frontend;
+  - `87cbf2d`: browser;
+  - `7d6d129`, `2f6d512`: test link reset.
+- **Kiểm tra đã chạy (lệnh và kết quả):**
+  - **RED:** backend 21/21; frontend 8/8 + 1; browser `AUTH-05:` timeout trên code chỉ có backend.
+  - **GREEN:** `tests/auth` 130/130; `account-view` 9/9; browser `AUTH-05:` 3/3.
+  - **Mutation:** 20/20.
+  - `npm run check`: exit 0; v3 1.219 = 47 schema + 340 adapters + 180 planner + 25 executor + 331 API + 296 web; eval 165; typecheck, build, quét bản build đạt.
+  - `npm run test:browser:v3`: exit 0, 28/28 ca qua 11 scenario (default 16, gồm AUTH-05).
+- **Chưa làm / vấn đề phát hiện:**
+  - Test link reset lúc đầu fail ngay trên code thật: route reset trả 503 vì app trong test không có email sender. Lỗi ở test, đã sửa; mutation B3 chạy lại sau khi sửa.
+  - "Lần dùng cuối" của phiên là lần refresh gần nhất.
+  - Luồng Google ở trang tài khoản chưa chạy trong browser, vì sandbox không bật Google.
+- **Việc tiếp theo đề xuất:**
+  - Review độc lập AUTH-05.
+  - AUTH-06 (Google và SMTP thật), W3-00b.
