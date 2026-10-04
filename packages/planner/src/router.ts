@@ -24,11 +24,25 @@ function routingText(message: string, services: ServiceDefinition[]): string {
   }).join('\n');
 }
 
+export interface RoutedIntent {
+  services: TargetService[];
+  /** Registered services the request needs that this session has not configured. */
+  unavailable: Array<{ id: string; name: string }>;
+}
+
 export function classifyIntent(
   message: string,
   toolCatalog: ToolDefinition[] = ALL_TOOLS,
   services: ServiceDefinition[] = SERVICE_REGISTRY,
 ): TargetService[] {
+  return routeIntent(message, toolCatalog, services).services;
+}
+
+export function routeIntent(
+  message: string,
+  toolCatalog: ToolDefinition[] = ALL_TOOLS,
+  services: ServiceDefinition[] = SERVICE_REGISTRY,
+): RoutedIntent {
   const intent = routingText(message, services);
   const available = new Set(toolCatalog.map((tool) => tool.service));
   const explicitlyNamed = services.filter((service) =>
@@ -45,8 +59,15 @@ export function classifyIntent(
   // Explicit intent for a registered but unavailable service must not silently
   // fall back to another service's write tools.
   if (fallback.length > 0) {
-    if (fallback.some((service) => !available.has(service.id))) return [];
-    return fallback.map((service) => service.id);
+    const unavailable = fallback.filter((service) => !available.has(service.id)).map(({ id, name }) => ({ id, name }));
+    return unavailable.length > 0 ? { services: [], unavailable } : { services: fallback.map((service) => service.id), unavailable: [] };
   }
-  return services.filter((service) => available.has(service.id)).map((service) => service.id);
+  return { services: services.filter((service) => available.has(service.id)).map((service) => service.id), unavailable: [] };
+}
+
+/** "A", "A và B", "A, B và C": the refusal names every service the request still needs. */
+export function unavailableServiceReason(unavailable: RoutedIntent['unavailable']): string {
+  const names = unavailable.map((service) => service.name);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} và ${names[names.length - 1]}` : names[0];
+  return `${list} chưa được kết nối hoặc chưa có tài nguyên được phép.`;
 }

@@ -14,7 +14,8 @@ it('asks in Vietnamese before a child lookup without its parent board', async ()
 it('refuses unavailable services in Vietnamese before calling the provider', async () => {
   const planner = new AIPlanner({ provider: new MockLLMProvider(), toolCatalog: TRELLO_TOOLS });
   const result = await planner.processMessage({ userMessage: 'Gửi tin qua Telegram', memory: new WorkingMemory() });
-  expect(result).toMatchObject({ kind: 'refusal', reason: expect.stringContaining('Dịch vụ được yêu cầu') });
+  // W3-00b: the refusal names the missing service.
+  expect(result).toMatchObject({ kind: 'refusal', reason: 'Telegram chưa được kết nối hoặc chưa có tài nguyên được phép.' });
 });
 it('registry parent questions and planner fixed outward question/reason/context literals contain no English phrases', async () => {
   const { readFile } = await import('node:fs/promises');
