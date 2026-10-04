@@ -134,11 +134,13 @@ it.each([['W3-07', 'W3\\-07'], ['Kiểm tra W3-07 Jira', 'Kiểm tra W3\\-07 Jir
 });
 it('looks an issue key up directly in the searched project, then adds text matches without duplicates', async () => {
   const other = { ...issue, key: 'ATI-7', id: '10007', fields: { ...issue.fields, summary: 'Mentions ATI-42' } };
-  const f = scripted(url => url.includes('search/jql') ? json({ issues: [other, issue] }) : undefined);
-  const output = await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'ati-42', limit: 2 });
+  const f = scripted((url, init) => url.includes('search/jql') ? json({ issues: [other, issue].slice(0, JSON.parse(init.body).maxResults) }) : undefined);
+  const output = await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'ati-42', limit: 3 });
   expect(output.issues.map((row: any) => row.key)).toEqual(['ATI-42', 'ATI-7']);
   expect(f.mock.calls[0]![0]).toBe(credentials.siteUrl + '/rest/api/3/issue/ATI-42?fields=summary,status,project');
   expect(f.mock.calls[0]![1].method).toBe('GET'); expect(searchOperand(f)).toBe('ati\\-42'); expect(f).toHaveBeenCalledTimes(2);
+  const capped = await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'ATI-42', limit: 1 });
+  expect(capped.issues.map((row: any) => row.key)).toEqual(['ATI-42']);
 });
 it('keeps text results when the key does not exist, and never returns an issue moved out of the project', async () => {
   const missing = scripted(url => url.includes('/issue/ATI-99') ? json({ errorMessages: ['Issue does not exist'] }, 404) : undefined);
