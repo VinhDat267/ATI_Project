@@ -1,6 +1,6 @@
 # AUTH-05 · Trang quản lý tài khoản
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/auth-05-account-page` · **Phụ thuộc:** AUTH-01 đã merge; phần liên kết Google cần AUTH-04 · **Làm song song với:** AUTH-02 → AUTH-04
+**Trạng thái:** xong · **PR:** #68 và bản sửa sau review #73 (`198fe6d`) · **Review:** delta/runner đạt độc lập; Google/SMTP thật chờ AUTH-06 · **Phụ thuộc:** AUTH-01 và AUTH-04 đã merge
 
 Đọc trước: [yêu cầu chung của mảng tài khoản](AUTH-common.md).
 
@@ -32,23 +32,23 @@ Mọi route chỉ thao tác trên phiên và dữ liệu của chính người d
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test đổi mật khẩu:
+- [x] Test đổi mật khẩu:
   - sai mật khẩu hiện tại bị từ chối và tính vào giới hạn đăng nhập sai;
   - đổi xong, các phiên khác bị thu hồi, phiên hiện tại vẫn dùng được;
   - mật khẩu mới < 12 ký tự bị từ chối.
-- [ ] Test phiên: người dùng A không xem được hay thu hồi phiên của người dùng B (403/404); phiên đã thu hồi biến mất khỏi danh sách và refresh của nó trả 401.
-- [ ] Test sửa tên: tên rỗng hoặc quá dài bị từ chối; tên mới hiện trong `GET /api/auth/me` và access token phát hành sau đó.
-- [ ] Test giao diện:
+- [x] Test phiên: người dùng A không xem được hay thu hồi phiên của người dùng B (403/404); phiên đã thu hồi biến mất khỏi danh sách và refresh của nó trả 401.
+- [x] Test sửa tên: tên rỗng hoặc quá dài bị từ chối; tên mới hiện trong `GET /api/auth/me` và access token phát hành sau đó.
+- [x] Test giao diện:
   - tài khoản chỉ có Google không thấy ô "mật khẩu hiện tại" mà thấy hướng dẫn;
   - nút "Gỡ liên kết" bị khóa khi không có mật khẩu.
-- [ ] Browser E2E:
+- [x] Browser E2E:
   - đăng nhập ở hai context trình duyệt, ở context 1 bấm "Đăng xuất khỏi mọi thiết bị khác", context 2 bị đưa về màn hình đăng nhập ở thao tác tiếp theo;
   - đổi tên thì tên mới hiện trên `UserNavMenu`.
-- [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
 
 ## Kết quả (agent thi công điền)
 
-- PR: nhánh `feat/auth-05-account-page` (Claude Code thi công theo yêu cầu của người dùng).
+- PR: [#68](https://github.com/VinhDat267/ATI_Project/pull/68), nhánh `feat/auth-05-account-page` (Claude Code thi công); bản sửa sau review độc lập [#73](https://github.com/VinhDat267/ATI_Project/pull/73), nhánh `vinhdat/fix-auth05-account-actions` (Codex).
 - Commit:
   - test RED backend `5d768d3`;
   - backend `f52f8a9`;
@@ -108,3 +108,9 @@ Mọi route chỉ thao tác trên phiên và dữ liệu của chính người d
 - **Gate CI và hoàn thiện runner:** [run đầu của PR #73](https://github.com/VinhDat267/ATI_Project/actions/runs/37212230875) đạt check nhưng fail ca JWT hết hạn: CI không đặt `JWT_SECRET`, API tự sinh khóa riêng trong khi test worker chưa có khóa. Tái hiện local khi bỏ biến này: **1 fail**, exit 1 đúng `createHmac` nhận undefined. Runner auth04 nay sinh khóa ngẫu nhiên 32 byte nếu chưa cấu hình, truyền chung cho API và worker, giữ khóa đã cấu hình. Không đổi API/config production/test expectation. Chạy lại khi cả `JWT_SECRET` và `ENCRYPTION_KEY` đều không đặt từ ngoài: `npm run check` **exit 0, 1.245 v3 + 165 eval**; browser **exit 0, 32/32 qua 11 scenario**, auth04 **5/5**. Logs `ci-env-red.log`, `check-ci-env.log`, `browser-ci-env.log` được giữ ngoài repo. Container test tái tạo riêng đã dọn sau khi kiểm 0 client; DB dev vẫn healthy.
 - **Review runner bổ sung:** reviewer kiểm syntax, **2/2** environment guard và **9/9** kiểm runner offline, exit 0; xác nhận khóa tự sinh được truyền chung, khóa đã cấu hình giữ nguyên, guard target DB/live vẫn chặn và teardown fixture giữ nguyên. Không có finding cần sửa; reviewer không chạy browser/PG/provider, còn gate CI trên HEAD mới. Báo cáo `reviewer/AUTH05-RUNNER-FOLLOWUP-REVIEW.md` giữ ngoài repo.
 - Không sửa backend hoặc chính sách hủy mutation in-flight. Google thật/SMTP thật/model/service thật **NOT_RUN**; nghiệm thu Google consent/config thật vẫn thuộc AUTH-06.
+
+### Sau merge #73 (reviewer, 04/10/2026)
+
+- Merge `198fe6d91e27e084aef44d37974064994d2f3c99`, 22:38:04 Việt Nam. [CI cuối](https://github.com/VinhDat267/ATI_Project/actions/runs/37213086389) SUCCESS trên head `4e469a12482e487a3a25ebe7c1747c77a0502780`; `git diff --exit-code` giữa head và cây merge đạt. Bản sửa đã vào main.
+- Số liệu hiện hành: check **1.245 v3 + 165 eval**, browser **32/32 qua 11 scenario**; review độc lập delta và runner đạt với giới hạn đã ghi trên. Các số liệu #68/#71 ở phần lịch sử không được coi là số hiện tại.
+- Đóng task trong phạm vi card dựa trên test sản phẩm và các lần chạy đã ghi. Browser Google account dùng OIDC giả; nghiệm thu Google/SMTP thật còn AUTH-06. Không nâng quan sát revoke/password in-flight thành yêu cầu mới.
