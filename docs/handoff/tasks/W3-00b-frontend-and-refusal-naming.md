@@ -29,7 +29,7 @@ Hoàn tất phần W3-00 tách ra: frontend không còn viết cố định theo
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#71](https://github.com/VinhDat267/ATI_Project/pull/71), nhánh `feat/w3-00b-frontend-and-refusal-naming`, base `main` `54215a3`; chưa merge, chờ CI head bàn giao và review độc lập.
+- Commit: planner test `ad9c3b7` → code `3a2a29b`; frontend test `4e6d6eb` → code `8acf3483b45b129d383fc9ccdefa0ead4cc6e1f1`. Hai test cũ đã đổi expectation nằm trong các commit code: `vietnamese-responses.test.ts` mong câu Telegram cụ thể; `settings.test.tsx` bổ sung `scopeLabel: 'Board ID'` và placeholder tương ứng.
+- Test đã chạy và kết quả: log thi công ngày 04/10/2026 đã được root đối chiếu: `npm run check` exit 0, **1.232 v3 = 47 schema + 340 adapters + 188 planner + 25 executor + 331 API + 301 web**, **165 eval**, typecheck/build/credential scan/launcher và 8 fixture/env guard tests đạt. `npm run test:browser:v3` exit 0, **28/28 ca qua 11 scenario**, không có ca fail. Root chạy lại focused: **12/12 planner + 16/16 frontend**, exit 0; bao gồm hai test cũ ở trên. Bộ hồi quy routing không sửa; static guard bỏ ngoại lệ bảng tên service trong ReconciliationNotice. Bằng chứng và giới hạn xem [log bàn giao](../log/2026-10-04-codex-W3-00b-handoff.md).
+- Điều chưa làm hoặc khác với task card: chưa có review độc lập/CI head bàn giao; output RED gốc chưa thu hồi, chỉ xác minh thứ tự test commit trước implementation. Model/golden/service thật **NOT_RUN**; không coi browser sandbox là nghiệm thu live. Giữ các blueprint có sẵn và LandingPage ngoài phạm vi. Secret multiline được xóa khỏi ô nhập sau lưu thành công, không hiển thị lại giá trị đã lưu; lưu lỗi giữ bản nhập. PostgreSQL tạm `w300b-pg` đã dọn sau khi lưu log, DB dev15433 giữ nguyên. CURRENT-STATE/ROADMAP để reviewer cập nhật sau merge.
