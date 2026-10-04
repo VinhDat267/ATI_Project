@@ -32,17 +32,17 @@ Admin duyệt tài khoản mới, khóa/mở khóa tài khoản, cấp hoặc b�
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test quyền: member gọi mọi route admin nhận 403; admin xác định theo DB. Một người vừa bị bỏ quyền admin mà còn access token cũ vẫn bị 403.
-- [ ] Test duyệt: chỉ duyệt được `pending` đã xác minh email; duyệt xong thì đăng nhập được; email thông báo nằm trong outbox (nếu AUTH-02 đã có).
-- [ ] Test khóa: người bị khóa bị từ chối **ngay** ở request tiếp theo (nhờ middleware của AUTH-01), refresh trả 401; mở khóa xong thì đăng nhập lại được.
-- [ ] Test ràng buộc: không tự khóa, không tự bỏ quyền; hai admin cùng bỏ quyền của nhau đồng thời thì vẫn còn ít nhất một admin (PostgreSQL thật, transaction có khóa dòng).
-- [ ] Test response không chứa hash mật khẩu.
-- [ ] Browser E2E: admin thấy tài khoản chờ duyệt → duyệt → tài khoản đó đăng nhập được; admin khóa → phiên của người đó bị đẩy về màn hình đăng nhập ở thao tác tiếp theo; member không thấy mục "Quản lý người dùng".
-- [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] Test quyền: member gọi mọi route admin nhận 403; admin xác định theo DB. Một người vừa bị bỏ quyền admin mà còn access token cũ vẫn bị 403.
+- [x] Test duyệt: chỉ duyệt được `pending` đã xác minh email; duyệt xong thì đăng nhập được; email thông báo nằm trong outbox (nếu AUTH-02 đã có).
+- [x] Test khóa: người bị khóa bị từ chối **ngay** ở request tiếp theo (nhờ middleware của AUTH-01), refresh trả 401; mở khóa xong thì đăng nhập lại được.
+- [x] Test ràng buộc: không tự khóa, không tự bỏ quyền; hai admin cùng bỏ quyền của nhau đồng thời thì vẫn còn ít nhất một admin (PostgreSQL thật, transaction có khóa dòng).
+- [x] Test response không chứa hash mật khẩu.
+- [x] Browser E2E: admin thấy tài khoản chờ duyệt → duyệt → tài khoản đó đăng nhập được; admin khóa → phiên của người đó bị đẩy về màn hình đăng nhập ở thao tác tiếp theo; member không thấy mục "Quản lý người dùng".
+- [x] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
 
 ## Kết quả (agent thi công điền)
 
-- PR: root chuẩn bị PR xếp trên AUTH-02; chưa push hoặc mở PR trong phiên thi công này.
+- PR: https://github.com/VinhDat267/ATI_Project/pull/53; xếp trên AUTH-02 #52; review/local checks đạt, chờ CI cuối.
 - Commit sản phẩm: `377d872` (API/UI), `df68137` (email duyệt và regression phiên cạnh tranh), `2c7e685` (bật signup sau ghép UI đầy đủ). AUTH-02 cuối `7d7dd66` đã ghép tại `ce8c122`; task/test bổ sung `502ef34`. Xem [nhật ký](../log/2026-10-04-codex-AUTH-03-admin-users.md).
 - Test đã chạy và kết quả:
   - RED: 8 ca HTTP/PostgreSQL và 4 ca UI thất bại do thiếu API/view; lỗi mất phiên trở về landing, UUID hoa, email duyệt trống và thiếu sender đều có RED riêng trước sửa.
@@ -56,3 +56,12 @@ Admin duyệt tài khoản mới, khóa/mở khóa tài khoản, cấp hoặc b�
   - Đã ghép toàn bộ AUTH-02 và đổi mặc định `AUTH_SIGNUP_ENABLED` thành `true`; env `false` vẫn đóng đăng ký. Config có RED → GREEN cho mốc này. Browser AUTH-03 đã được thêm vào default selector của script canonical; root ghép thêm selector FE-03 và chạy đủ gate cuối trước PR.
   - Không sửa v2, `CURRENT-STATE.md`, `ROADMAP.md`, private env hoặc DB của người dùng. Không gọi model/provider/cloud DB/service thật. Chưa tự mở PR, push hoặc merge vào main.
   - Review độc lập phát hiện P2: verified pending → disable → enable từng cấp active mà không approve/email. Sửa tại `8f96c86`: chỉ active được khóa; pending disable trả 409 và UI không hiện Khóa/Mở khóa. RED thật: HTTP 200 thay vì 409, UI có nút Khóa; GREEN 16/16 PostgreSQL + 11/11 UI/nav và typecheck exit 0. Account vẫn pending, enable/login bị chặn, không tạo session/outbox/audit. Browser scenario đã thêm assertions cho P2; root chạy lại canonical/review trên head sửa. AUTH-02 base cuối `adbc0a7` đã ghép.
+## Xác minh cuối của root/reviewer (04/10/2026)
+
+- PR: https://github.com/VinhDat267/ATI_Project/pull/53; base AUTH-02 #52 `adbc0a7`, nhánh `vinhdat/feat-auth-03-admin-users`. Chưa merge; CI trên head cuối chờ kết quả.
+- `npm run check` tại `5bf87c6`: exit 0, **1.014 v3 + 165 evaluation offline**; typecheck/build/credential scan/launcher 1/env guards 3 đạt.
+- `npm run test:browser:v3`: exit 0, **23/23** qua 10 scenario. Pending không có Khóa/Mở khóa, disable API409; Duyệt → outbox → member login; active khóa → request/refresh bị từ chối/về login. AUTH-02 signup/reset đi qua approve API thật khi cả hai cùng có mặt.
+- P2 bypass pending-disable-enable đã được reviewer xác nhận đóng ở `8f96c86`: chỉ active được khóa; pending giữ luồng Duyệt/email. Rerun độc lập **16/16 PostgreSQL + 11/11 UI**, probe HTTP pending disable/enable409, login403; approve đúng1email; active disable→enable200. Review **Đạt**, không còn P1/P2 được xác nhận.
+- Code cuối giữ signup default **true** vì AUTH-02 đầy đủ đã ghép; explicit env **false** vẫn đóng đăng ký.
+- Bằng chứng local ngoài repo: `auth03-final-check-p2.log`, `auth03-final-browser-p2.log`, `auth03-p2-independent-pg.log`, `auth03-p2-independent-ui.log`, `auth03-p2-independent-probe.log` trong `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/`.
+- SMTP/model/provider/SaaS thật **NOT_RUN**. Các container PostgreSQL riêng của agent đã xóa và xác minh; DB người dùng 15433 không bị dùng/sửa. Không sửa CURRENT-STATE/ROADMAP trước merge.

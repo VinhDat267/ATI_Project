@@ -46,3 +46,12 @@ Lần full API chạy trước khi public schema được migrate từng lỗi 1
 - Browser AUTH-03 đã thêm assertions: pending không có Khóa/Mở khóa và gọi HTTP disable trực tiếp trả 409 trước Duyệt. **Chưa chạy browser bản sửa** ở agent thi công; root chạy canonical/review tuần tự trên head cuối.
 - AUTH-02 docs/base PR cuối `adbc0a7` đã merge; signup default true giữ nguyên. Không sửa task card mới hoặc tạo log mới; cập nhật ngay task/log AUTH-03 này.
 - DB P2 riêng: `ati-auth03-review-p2`, ID `4d32956f5b5a84ef406abf7e1d0920cd1e19a6dbb10a43897b93d3881c97d47b`, labels task AUTH-03/owner codex, tmpfs PostgreSQL, loopback **56728**. Sau kiểm tra đã xóa container này và xác minh ID không còn trong `docker ps -a`; không dùng DB/cổng canonical hoặc của người dùng.
+## Xác minh cuối của root/reviewer (04/10/2026)
+
+- PR: https://github.com/VinhDat267/ATI_Project/pull/53; base AUTH-02 #52 `adbc0a7`, nhánh `vinhdat/feat-auth-03-admin-users`. Chưa merge; CI trên head cuối chờ kết quả.
+- `npm run check` tại `5bf87c6`: exit 0, **1.014 v3 + 165 evaluation offline**; typecheck/build/credential scan/launcher 1/env guards 3 đạt.
+- `npm run test:browser:v3`: exit 0, **23/23** qua 10 scenario. Pending không có Khóa/Mở khóa, disable API409; Duyệt → outbox → member login; active khóa → request/refresh bị từ chối/về login. AUTH-02 signup/reset đi qua approve API thật khi cả hai cùng có mặt.
+- P2 bypass pending-disable-enable đã được reviewer xác nhận đóng ở `8f96c86`: chỉ active được khóa; pending giữ luồng Duyệt/email. Rerun độc lập **16/16 PostgreSQL + 11/11 UI**, probe HTTP pending disable/enable409, login403; approve đúng1email; active disable→enable200. Review **Đạt**, không còn P1/P2 được xác nhận.
+- Code cuối giữ signup default **true** vì AUTH-02 đầy đủ đã ghép; explicit env **false** vẫn đóng đăng ký.
+- Bằng chứng local ngoài repo: `auth03-final-check-p2.log`, `auth03-final-browser-p2.log`, `auth03-p2-independent-pg.log`, `auth03-p2-independent-ui.log`, `auth03-p2-independent-probe.log` trong `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/`.
+- SMTP/model/provider/SaaS thật **NOT_RUN**. Các container PostgreSQL riêng của agent đã xóa và xác minh; DB người dùng 15433 không bị dùng/sửa. Không sửa CURRENT-STATE/ROADMAP trước merge.
