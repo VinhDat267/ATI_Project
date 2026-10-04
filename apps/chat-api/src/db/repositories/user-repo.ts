@@ -16,6 +16,12 @@ export interface UserRow {
   status: 'pending' | 'active' | 'disabled';
   role: 'member' | 'admin';
   google_sub: string | null;
+  google_email?: string | null;
+}
+
+export interface AccountProfile {
+  id: string; email: string; name: string; role: 'member' | 'admin'; createdAt: string;
+  hasPassword: boolean; hasGoogle: boolean; googleEmail: string | null;
 }
 
 export function toAuthUser(user: UserRow): AuthUser {
@@ -110,6 +116,43 @@ export class UserRepo {
       [hashedPassword, email.toLowerCase().trim()]
     );
     return (res.rowCount ?? 0) > 0;
+  }
+
+  async accountProfile(id: string): Promise<AccountProfile | null> {
+    const user = await this.findById(id);
+    return user && { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.created_at.toISOString(),
+      hasPassword: user.password !== null, hasGoogle: user.google_sub !== null, googleEmail: user.google_sub ? user.google_email ?? null : null };
+  }
+
+  async updateName(id: string, name: string, now = Date.now()): Promise<UserRow | null> {
+    return (await this.pool.query<UserRow>("UPDATE users SET name=$2,updated_at=$3 WHERE id=$1 AND status='active' RETURNING *", [id, name, new Date(now)])).rows[0] ?? null;
+  }
+
+  /**
+   * Replaces a password the caller has just proven. Ends every other session and any
+   * unused reset link; false when the password changed meanwhile or the session closed.
+   */
+  async changePassword(id: string, sessionId: string, expectedHash: string, newPassword: string, now = Date.now()): Promise<boolean> {
+    const replacement = hashPassword(newPassword);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // The same user-row lock as reset, admin actions and session creation.
+      const user = (await client.query<UserRow>('SELECT * FROM users WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      const session = (await client.query('SELECT id FROM auth_sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>$3',
+        [sessionId, id, new Date(now)])).rows[0];
+      if (!user || user.status !== 'active' || user.password !== expectedHash || !session) { await client.query('ROLLBACK'); return false; }
+      await client.query('UPDATE users SET password=$2,updated_at=$3 WHERE id=$1', [id, replacement, new Date(now)]);
+      await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,$3) WHERE user_id=$1 AND id<>$2', [id, sessionId, new Date(now)]);
+      await client.query("UPDATE auth_tokens SET used_at=COALESCE(used_at,$2) WHERE user_id=$1 AND purpose='reset_password'", [id, new Date(now)]);
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async provisionAdmin(data: { email: string; password: string; name: string }): Promise<UserRow> {
