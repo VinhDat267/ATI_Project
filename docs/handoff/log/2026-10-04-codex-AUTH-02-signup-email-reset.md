@@ -30,3 +30,11 @@ Bằng chứng chỉ lưu cục bộ: `C:/Users/VinhDat/.codex/visualizations/20
 - Browser AUTH-02 **NOT_RUN** tại worktree này theo lịch cổng root. Đã thêm `auth-02-signup-reset.spec.ts` (2 ca), scenario `auth02` mở cờ riêng. Luồng chính đọc outbox thật, xác minh/pending, ưu tiên approve qua AUTH-03; standalone cho phép DB approval chỉ khi route chưa có (404). Kiểm reset/revoke hai phiên, mật khẩu cũ bị từ chối, token dùng lại bị từ chối và header referrer không tồn tại. Ca cờ đóng chỉ kiểm UI theo response config được chặn trong browser; API403 cờ đóng đã có test HTTP thật riêng.
 - Canonical check trên head cuối, browser toàn bộ, review độc lập, CI, PR và merge **OPEN** do root thực hiện. Không gọi SMTP hoặc provider/service thật; không tuyên bố production readiness.
 - Container focused chưa dọn tại bàn giao để reviewer có thể lặp lại probe; root được cung cấp chính xác identity/port để dọn sau verification nếu không còn cần.
+## Xác minh cuối của root/reviewer (04/10/2026)
+
+- PR: https://github.com/VinhDat267/ATI_Project/pull/52; base main, nhánh `vinhdat/feat-auth-02-signup-email`. Chưa merge; CI trên head cuối còn chờ.
+- `npm run check` trên code hoàn chỉnh `7d7dd66`: exit 0, **989 v3 + 165 evaluation offline**, typecheck/build/credential scan/launcher 1/env guards 3 đạt. Các timeout do tải đồng thời không còn trong phép chạy canonical tuần tự.
+- `npm run test:browser:v3` sau delta test-only `4f50970`: exit 0, **22/22** qua 10 scenario. Header Chromium no-referrer thiếu hoặc rỗng đều không chứa URL; test vẫn từ chối URL. Signup/outbox/verification/pending/reset/revocation/mật khẩu cũ đã kiểm bằng browser + PostgreSQL thật.
+- Review độc lập: **Đạt**, không có P1/P2 được xác nhận; reviewer chạy lại **21/21 API/email PostgreSQL + 5/5 frontend**. Delta `7d7dd66..4f50970` chỉ assertion browser, không đổi runtime.
+- Bằng chứng canonical và review: thư mục local `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/`, các log `auth02-final-check.log`, `auth02-final-browser-rerun.log`, `auth02-independent-focused-verified.log`, `auth02-independent-web.log`. Không commit raw artifacts.
+- SMTP/model/provider/SaaS thật vẫn **NOT_RUN**; không tuyên bố production readiness. AUTH-03 xếp trên PR này để bật mặc định đăng ký khi cả đăng ký và duyệt cùng có mặt.
