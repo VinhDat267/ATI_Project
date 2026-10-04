@@ -73,7 +73,14 @@ W4-03 đo "tỉ lệ plan dùng được" với người dùng thật. Nếu pla
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: root sẽ tạo sau khi ghép AUTH-02/AUTH-03 và review độc lập; chưa push/merge.
+- Commit code: `60d8219`, `56af477`, `75c0e17`, `c3e4ae7` trên `vinhdat/feat-fe-03-readable-workflows`; base `3212181`.
+- Đã làm: metadata `resourceLabels` lấy từ grounding thực sự và chỉ tham số `x-resource`, có parent board khi đã tra cứu; migration `0006_fe03_resource_labels.sql` lưu riêng ngoài plan JSON/text/hash. Preview/SSE, history message và execution snapshot phục hồi cùng nhãn. ID chưa biết hoặc tên xung đột giữ ID thô; hiển thị Đọc/Ghi và rủi ro từ catalog.
+- Kết quả theo trường có link HTTP/HTTPS an toàn, thời gian, JSON đầy đủ trong Chi tiết, tóm tắt số bước succeeded/skipped và plan đã duyệt thu gọn. Text stream kết thúc được giữ thành message có timestamp.
+- SSE: mở khi tab ẩn; mỗi kết nối đọc token mới; HTTP 401 refresh một lần, giữ giới hạn qua render lại AuthGate. Lỗi xác thực chắc chắn xóa phiên; lỗi mạng/503 giữ token. Sau 5 giây mất kết nối hiện thông báo, mở lại thành công thì xóa thông báo.
+- Tiếng Việt: câu cố định planner/registry, lỗi API dịch ở biên phản hồi giữ status/code; không sửa chuỗi do model sinh ra. Textarea Enter/Shift+Enter, chặn gửi trùng khi planning, một cơ chế prefill; landmark/log, một h1, nhãn nút icon, h-dvh, giờ sidebar vi-VN 24h, sửa tiêu đề blueprint và chỉ báo dịch vụ/runtime ban đầu.
+- TDD thật: RED 7 ca nhãn/result/textarea; RED 4 HTTP SSE 401; RED 7 câu tiếng Việt; RED xung đột/prototype ID; RED AuthGate subscriber 2 refresh thay vì 1; RED giờ sidebar 06:24 PM thay vì 18:24. Sau sửa các ca tương ứng GREEN.
+- Test đã chạy và kết quả (exit 0): `npm run test -w @wap/chat-web -- --maxWorkers=2` **196/196** trước test giờ sidebar cuối; `npm run test -w @wap/chat-api -- --maxWorkers=2` **210/210**; `npm run test -w @wap/planner` **180/180**; sau sửa giờ/selector, `npm run test -w @wap/chat-web -- tests/services/conversation-time.test.ts tests/components/sidebar-history.test.tsx tests/sse-auth-reconnect.test.tsx` **10/10**; `npm run typecheck:v3`; `git diff --check`.
+- Bằng chứng PostgreSQL: planner thật với provider offline + lookup fixtures → SSE → SQL metadata → repository mới/HTTP reload pending và completed, hash/text giữ nguyên, migration chạy lại không mất nhãn. DB tmpfs riêng `ati-fe03-labels-20261004`, ID `8161a052698cb1d91fc8b7ec2eb99e2722ddf97b2d7962b8e10869262978b12e`, cổng động `51855`; đã xóa đúng container và xác minh không còn. Không dùng DB người dùng `15433` hay canonical `55533`.
+- Browser: thêm 2 ca `FE-03:` và đăng ký canonical selector. Root checkpoint: ca tên/ID, reload, approve, link/landmarks đạt; ca Shift+Enter/busy gặp selector tên nút đã sửa ở `c3e4ae7`. `npm run check` và toàn bộ `npm run test:browser:v3` đang do root chạy trên worktree này; còn chờ kết quả cuối/reviewer/CI, chưa tuyên bố task nghiệm thu hoàn tất.
+- Giới hạn: các suite chạy đồng thời dưới tải CPU đã có 1 lỗi Back/Forward chờ 20 ms và 2 timeout child process cũ; chạy serial với 2 worker đạt lại, không sửa implementation để che lỗi. Browser tên dùng grounding fixture sandbox được nêu rõ trong test; test backend chứng minh planner/lookup thật trong phạm vi offline. Model/golden/live service **NOT_RUN**; cần golden mới khi được cấp quyền vì wording planner/registry đã đổi. Không dùng `.env` riêng, provider, service thật hoặc cloud DB; không sửa v2/CURRENT-STATE/ROADMAP hay thiết kế thị giác.
