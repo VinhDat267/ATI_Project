@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { assertBrowserV3Environment } from './v3-local-env.mjs';
 import { startGoogleFixture } from './google-oidc-fixture.mjs';
@@ -35,6 +36,8 @@ for (const scenario of scenarios) {
       const fixture = await startGoogleFixture();
       stopFixture = fixture.stop;
       Object.assign(env, {
+        // Expired-token probes and the API must use the same per-run signing key.
+        JWT_SECRET: env.JWT_SECRET || randomBytes(32).toString('hex'),
         AUTH_SIGNUP_ENABLED: 'true', GOOGLE_OAUTH_CLIENT_ID: 'auth04-test.apps.googleusercontent.com',
         GOOGLE_OAUTH_CLIENT_SECRET: 'fake-oidc-secret',
         GOOGLE_OAUTH_REDIRECT_URI: 'http://127.0.0.1:5174/auth/google/callback',
