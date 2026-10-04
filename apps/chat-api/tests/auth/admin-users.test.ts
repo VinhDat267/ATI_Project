@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../../src/app.js';
 import { UserRepo, hashPassword } from '../../src/db/repositories/user-repo.js';
 import { AdminUserRepo } from '../../src/db/repositories/admin-user-repo.js';
+import { OutboxEmailSender } from '../../src/services/email/index.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
@@ -26,19 +27,20 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     admin = new pg.Pool({ connectionString: databaseUrl });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href, max: 12 });
-    for (const file of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0003_auth_sessions.sql']) {
+    for (const file of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0003_auth_sessions.sql', '0005_auth_tokens_outbox.sql']) {
       await pool.query(await readFile(`${root}/db/v3/${file}`, 'utf8'));
     }
     users = new UserRepo(pool);
   });
   beforeEach(async () => {
     await pool.query('TRUNCATE users CASCADE');
+    await pool.query('TRUNCATE email_outbox');
     actor = randomUUID(); target = randomUUID(); otherAdmin = randomUUID();
     for (const [id, role, status, name] of [[actor, 'admin', 'active', 'Admin'], [target, 'member', 'pending', 'Candidate'], [otherAdmin, 'admin', 'active', 'Second Admin']]) {
       await pool.query('INSERT INTO users(id,email,password,name,role,status,email_verified) VALUES($1,$2,$3,$4,$5,$6,true)', [id, `${id}@example.test`, storedPassword, name, role, status]);
     }
     audit.info.mockClear();
-    app = createApp({ jwtSecret: secret, userRepo: users, adminUserRepo: new AdminUserRepo(pool), adminAuditLogger: audit });
+    app = createApp({ jwtSecret: secret, userRepo: users, adminUserRepo: new AdminUserRepo(pool), adminAuditLogger: audit, emailSender: new OutboxEmailSender(pool) });
   });
   afterAll(async () => {
     await pool?.end(); await admin?.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); await admin?.end();
@@ -82,6 +84,10 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     expect((await request(app).post('/api/auth/login').send({ email: `${target}@example.test`, password })).status).toBe(200);
     expect((await mutate(tokens.accessToken, target, 'approve')).status).toBe(409);
     expect((await pool.query('SELECT status FROM users WHERE id=$1', [target])).rows[0].status).toBe('active');
+    const mail = (await pool.query('SELECT to_address,subject,body_text,body_html FROM email_outbox')).rows;
+    expect(mail).toHaveLength(1);
+    expect(mail[0]).toMatchObject({ to_address: `${target}@example.test`, subject: 'Tài khoản ATI đã được duyệt' });
+    expect(mail[0].body_text).toContain('đã được quản trị viên duyệt');
   });
 
   it('disables and revokes every session immediately; enabling requires a fresh login', async () => {
@@ -168,6 +174,32 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
   it('normalizes valid uppercase UUIDs before matching the target account', async () => {
     const tokens = await login(actor);
     expect((await mutate(tokens.accessToken, target.toUpperCase(), 'approve')).status).toBe(200);
+  });
+
+  it('requires an approval email sender before committing account access', async () => {
+    const tokens = await login(actor);
+    app = createApp({ jwtSecret: secret, userRepo: users, adminUserRepo: new AdminUserRepo(pool), adminAuditLogger: audit });
+    expect((await mutate(tokens.accessToken, target, 'approve')).status).toBe(503);
+    expect((await pool.query('SELECT status FROM users WHERE id=$1', [target])).rows[0].status).toBe('pending');
+    expect(audit.info).not.toHaveBeenCalled();
+  });
+
+  it('sends one outbox notification when two requests race to approve the same pending account', async () => {
+    const tokens = await login(actor);
+    const responses = await Promise.all([mutate(tokens.accessToken, target, 'approve'), mutate(tokens.accessToken, target, 'approve')]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [`${target}@example.test`])).rows[0].n).toBe(1);
+    expect(audit.info).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one active admin when two admins disable one another concurrently', async () => {
+    const first = await login(actor), second = await login(otherAdmin);
+    const responses = await Promise.all([mutate(first.accessToken, otherAdmin, 'disable'), mutate(second.accessToken, actor, 'disable')]);
+    expect(responses.filter(response => response.status === 200)).toHaveLength(1);
+    expect(responses.filter(response => [401, 403].includes(response.status))).toHaveLength(1);
+    expect((await pool.query("SELECT count(*)::int AS n FROM users WHERE role='admin' AND status='active'")).rows[0].n).toBe(1);
+    const disabled = (await pool.query("SELECT id FROM users WHERE role='admin' AND status='disabled'")).rows[0].id;
+    expect((await pool.query('SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL', [disabled])).rows[0].n).toBe(0);
   });
 });
 
