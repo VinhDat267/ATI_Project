@@ -59,6 +59,13 @@ export interface User {
   hasGoogle?: boolean;
 }
 
+export interface AdminUser extends User {
+  role: 'member' | 'admin'; status: 'pending' | 'active' | 'disabled';
+  emailVerified: boolean; hasPassword: boolean; hasGoogle: boolean;
+  createdAt: string; openSessions: number;
+}
+export interface AdminUserPage { users: AdminUser[]; total: number; pendingCount: number; page: number; limit: number }
+
 export type PlanStatus = 'idle' | 'preview' | 'approving' | 'executing' | 'completed' | 'rejected' | 'partial' | 'reconciliation_required' | 'stopped' | 'failed';
 
 export interface ExecutionSnapshot {

@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth/index.js';
+import { createAdminUsersRoutes, type AdminUsersOptions } from './routes/auth/admin-users.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
@@ -16,7 +17,7 @@ import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
 
-export interface AppOptions {
+export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
   userRepo?: UserRepo;
@@ -66,6 +67,12 @@ export function createApp(options: AppOptions): Express {
   );
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
+
+  // Memory storage cannot manage persistent accounts, even with a legacy JWT.
+  app.use('/api/admin/users', (req, res, next) => {
+    if (!options.adminUserRepo) { res.status(503).json({ error: 'Quản trị người dùng cần PostgreSQL.' }); return; }
+    authMiddleware(req, res, next);
+  }, createAdminUsersRoutes(options));
 
   // Services routes (protected via Bearer header)
   app.use(

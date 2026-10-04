@@ -9,6 +9,7 @@ export const routes = [
   { kind: 'home', pattern: /^\/$/, publicView: (props: PublicViewProps) => createElement(LandingView, { onGoToLogin: () => props.navigate('/login') }) },
   { kind: 'login', pattern: /^\/login\/?$/, publicView: (props: PublicViewProps) => createElement(LoginPage, props) },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
+  { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
 ] as const;
 export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found' } | { kind: 'conversation'; conversationId: string };
 
