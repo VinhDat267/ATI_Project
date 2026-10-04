@@ -73,3 +73,6 @@ CLAUDE.md
 .gitnexus/
 .playwright-mcp/
 .artifacts/
+
+# Live-service evidence stays on the team lead machine (W3-07)
+docs/ai-evidence/V3-LIVE-EXECUTION/
