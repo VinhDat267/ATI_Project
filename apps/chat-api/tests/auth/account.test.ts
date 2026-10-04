@@ -64,6 +64,14 @@ describe('AUTH-05 account management with real PostgreSQL and HTTP', () => {
     expect((await login(CHROME, email, password)).status).toBe(401);
   });
 
+  it('invalidates an unused password-reset link when the password is changed', async () => {
+    const current = (await login()).body;
+    const resetToken = await users.authTokens.issue(userId, 'reset_password', now);
+    expect((await as(current.accessToken).post('/api/account/change-password', { currentPassword: password, newPassword: changed })).status).toBe(200);
+    expect((await request(app).post('/api/auth/reset-password').send({ token: resetToken, password: 'Auth05Reset!password' })).status).toBe(400);
+    expect((await login(CHROME, email, changed)).status).toBe(200);
+  });
+
   it('rejects a wrong current password without logging out and counts it toward the login limit', async () => {
     const current = (await login()).body;
     for (let i = 0; i < 5; i++) {
