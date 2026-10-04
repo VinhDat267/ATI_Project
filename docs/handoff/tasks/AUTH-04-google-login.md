@@ -1,6 +1,6 @@
 # AUTH-04 · Đăng nhập và đăng ký bằng Google
 
-**Trạng thái:** thi công và review đạt, chờ merge #66 · **Nhánh:** `vinhdat/feat-auth-04-google-login` · **Phụ thuộc:** AUTH-01 đã merge · **Làm song song với:** AUTH-02, AUTH-03
+**Trạng thái:** xong, đã merge #66 tại `5cc07ca` ngày 04/10/2026; review độc lập đạt, CI xanh · **Nhánh thi công:** `vinhdat/feat-auth-04-google-login` · **Phụ thuộc:** AUTH-01 đã merge · **Làm song song với:** AUTH-02, AUTH-03
 
 Đọc trước: [yêu cầu chung của mảng tài khoản](AUTH-common.md). Đọc tài liệu OpenID Connect hiện hành của Google trước khi code; ghi đường dẫn và ngày đọc trong log.
 
@@ -72,9 +72,9 @@
 
 ## Kết quả (agent thi công điền)
 
-- PR: [#66](https://github.com/VinhDat267/ATI_Project/pull/66), base `main` `02b21e6`; chờ CI đúng head và merge.
+- PR: [#66](https://github.com/VinhDat267/ATI_Project/pull/66), base `main` `02b21e6`; merge `5cc07ca8c31eccbb06a26bb471196e2f74b4c718` lúc 18:35:28 Việt Nam ngày 04/10/2026. [CI](https://github.com/VinhDat267/ATI_Project/actions/runs/37198604541) SUCCESS trên head cuối `b4029e9e6408045ddb08cc3f5ea5650953f2b779`; tree merge bằng head.
 - Commit code: `9c7641e4b5e2559028ab8056b17cf0ae9af0f5b5`.
 - Tài liệu Google đã đọc ngày **04/10/2026**: [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect), [OAuth 2.0 web server](https://developers.google.com/identity/protocols/oauth2/web-server). Google cho phép query theo giới hạn redirect URI; triển khai chọn đường dẫn cố định `/auth/google/callback`, không query/fragment.
 - Test và review: `npm run check` exit 0, **1.188 v3 + 165 eval**, typecheck/build/credential scan/launcher/local guards/fake OIDC đạt; canonical browser **27/27**, 11 scenario; Google repeat **3/3**, exit 0. Reviewer tổng thể độc lập chạy lại **51 API + 4 fixture + 49 frontend + 3 probe HTTP**, đều exit 0; không còn P1/P2 được xác nhận. RED/GREEN và các lần sửa sau review xem [log bàn giao](../log/2026-10-04-codex-AUTH-04-google-login.md).
 - Khác với task card: migration **0007** vì 0005/0006 đã dùng. Thêm binding cookie trình duyệt và session gốc cho link; nhận lại email chưa xác minh còn vô hiệu token reset/verify cũ. Google signup tuân thủ cờ đăng ký độc lập với SMTP, chia sẻ quota 10/IP/giờ với email. Callback và request bảo toàn phiên mới qua đổi tab, xoay token, logout và JSON trả chậm.
-- **NOT_RUN:** Google/GCP thật, SMTP thật (AUTH-06), model/service thật và deploy. Bằng chứng local/sandbox không thay thế nghiệm thu live. CURRENT-STATE/ROADMAP chưa sửa trước merge.
+- **NOT_RUN:** Google/GCP thật, SMTP thật (AUTH-06), model/service thật và deploy. Bằng chứng local/sandbox không thay thế nghiệm thu live. CURRENT-STATE/ROADMAP được reviewer cập nhật sau merge trong PR bàn giao riêng.
