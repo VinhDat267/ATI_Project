@@ -1,6 +1,6 @@
 # W3-07 · Chạy thật năm service mới
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
+**Trạng thái:** đang làm (Telegram xong; Google, Notion, Jira chờ tài khoản) · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
 
 Có thể làm từng service ngay khi task của service đó merge, không cần chờ đủ năm.
 
@@ -50,7 +50,20 @@ Sau khi đủ các service còn trong phạm vi:
 
 ## Kết quả (agent thi công điền)
 
-- PR:
+- PR: nhánh `test/w3-07-telegram-live` (phần Telegram).
 - Service đã chạy thật / chưa chạy (và lý do):
-- Workflow nhiều service:
+  - **Telegram: xong (04/10/2026).** Nhóm thử nghiệm "ATI Test" (`-5405985621`, loại `group`), bot riêng cho dự án.
+    1. `check` chỉ đọc (`getMe` + `getChat`): `telegram: OK - 1 allowlisted resources`.
+    2. Ghi thật Telegram + Slack, người dùng duyệt đúng plan hash `dcc54de450356f23e3602f56214e1ae93dfb28171100e7266bbcbe71fc6ba801`:
+       - plan do model thật lập trong 7,3 s, hai search đọc (`slack.search_channels`, `telegram.list_chats`);
+       - `telegram.send_message` thành công, `messageId: 5`;
+       - `slack.send_message` vào `#ati-test` thành công (`ts 1791074394.559019`), nội dung lấy `messageId` từ bước trước qua `$template`;
+       - người dùng đối chiếu bằng mắt, vì bot không đọc lại được tin của chính nó.
+    3. Ca lỗi thật không ghi: token giả đúng định dạng được gửi tới Telegram, server trả HTTP 401, hệ thống báo `AUTH_ERROR: Telegram request failed: AUTH_ERROR`; output không chứa token giả hay `api.telegram.org/bot`.
+    4. Bằng chứng `plan.json`/`execution.json` ở `docs/ai-evidence/V3-LIVE-EXECUTION/2026-10-04T00-39-28-834Z/` (không commit).
+  - **Google Sheets, Google Calendar, Notion, Jira: chưa chạy**, chờ người dùng tạo tài khoản và tài nguyên thử nghiệm.
+- Workflow nhiều service: chưa chạy (cần ít nhất 2 service mới đã sẵn sàng).
 - Điều chưa làm hoặc khác với task card:
+  - Ca lỗi dùng token sai thay cho thu hồi token thật, để không phải tạo lại bot.
+  - Thêm `docs/ai-evidence/V3-LIVE-EXECUTION/` vào `.gitignore`, vì trước đó thư mục này chỉ được bỏ qua bằng `.git/info/exclude` ở máy nhóm trưởng.
+  - Chưa cập nhật `evaluations/README.md` và `docs/MULTI-SERVICE-SCOPE.md`; làm khi đủ các service.
