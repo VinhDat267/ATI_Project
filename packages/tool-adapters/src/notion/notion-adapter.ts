@@ -94,9 +94,11 @@ function retryDelay(header: string | null): number {
   const delay = Number.isFinite(seconds) ? seconds : Date.parse(value) - Date.now();
   return Number.isFinite(delay) ? Math.max(0, delay) : 1000;
 }
+const NOTION_HOSTS = ['app.notion.com', 'www.notion.so', 'notion.so'];
 function link(value: any, writing = false): string {
   if (typeof value?.url !== 'string') badResponse(writing);
-  try { const url = new URL(value.url); if (url.protocol !== 'https:' || !['www.notion.so', 'notion.so'].includes(url.hostname) || url.username || url.password) badResponse(writing); }
+  // app.notion.com observed from the live API on 04/10/2026 (W3-07); notion.so kept for older links.
+  try { const url = new URL(value.url); if (url.protocol !== 'https:' || !NOTION_HOSTS.includes(url.hostname) || url.username || url.password) badResponse(writing); }
   catch { badResponse(writing); }
   return value.url;
 }

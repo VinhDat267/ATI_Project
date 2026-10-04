@@ -234,3 +234,13 @@ it('uses shared limiter slots for database/data-source/page requests', async () 
   await adapter.execute('notion.create_page', { databaseId: DB, title: 'First' });
   const pending = adapter.execute('notion.search_databases', { query: '' }); await vi.advanceTimersByTimeAsync(999); expect(calls).toHaveLength(3); await vi.advanceTimersByTimeAsync(1); await pending; expect(calls).toHaveLength(4);
 });
+
+// W3-07 live run (04/10/2026): Notion now returns https://app.notion.com/... URLs.
+it.each(['https://app.notion.com/', 'https://www.notion.so/', 'https://notion.so/'])('accepts Notion resource URLs on %s', async base => {
+  const { adapter } = setup(call => ok(call.url.includes('/databases/') ? { ...database(), url: base + DB.replaceAll('-', '') } : source()));
+  expect(await adapter.execute('notion.search_databases', { query: '' })).toEqual([{ id: DB, title: 'ATI Notes', url: base + DB.replaceAll('-', '') }]);
+});
+it.each(['https://app.notion.com.evil.test/', 'https://evil.test/app.notion.com/', 'http://app.notion.com/', 'https://user:pass@app.notion.com/', 'https://notion.site/'])('rejects a non-Notion or unsafe resource URL %s', async base => {
+  const { adapter } = setup(call => ok(call.url.includes('/databases/') ? { ...database(), url: base + DB.replaceAll('-', '') } : source()));
+  await expect(adapter.execute('notion.search_databases', { query: '' })).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+});
