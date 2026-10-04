@@ -168,6 +168,31 @@ describe('AUTH-02 signup and password recovery with PostgreSQL and HTTP', () => 
     expect((await pool.query('SELECT id FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL', [user.id])).rows).toHaveLength(0);
   });
 
+  it('rejects an actual HTTP login whose real SQL password snapshot became obsolete during password reset', async () => {
+    const user = (await pool.query("INSERT INTO users(email,password,name,status,email_verified) VALUES($1,$2,'Delayed HTTP','active',true) RETURNING *", [email, storedPassword])).rows[0];
+    let release!: () => void, found!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const queried = new Promise<void>(resolve => { found = resolve; });
+    class DelayedUserRepo extends UserRepo {
+      override async findByEmail(value: string) {
+        const row = await super.findByEmail(value);
+        found(); await hold; return row;
+      }
+    }
+    const delayedApp = createApp({ jwtSecret: secret, userRepo: new DelayedUserRepo(pool), authClock: () => now });
+    const login = request(delayedApp).post('/api/auth/login').send({ email, password }).then(response => response);
+    await queried;
+    try {
+      const token = await users.authTokens.issue(user.id, 'reset_password', now);
+      expect((await post('reset-password', { token, password: 'ChangedHttp02!password' })).status).toBe(200);
+    } finally { release(); }
+    const response = await login;
+    expect(response.status).toBe(401);
+    expect(response.body).not.toHaveProperty('accessToken'); expect(response.body).not.toHaveProperty('refreshToken');
+    expect(JSON.stringify(response.body)).not.toContain(storedPassword);
+    expect((await pool.query('SELECT id FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL', [user.id])).rows).toHaveLength(0);
+  });
+
   it('enforces signup IP and forgot/resend email limits and Retry-After using an injected clock', async () => {
     for (let i = 0; i < 10; i++) expect((await post('signup', { email: `limit-${i}-${email}`, name: 'Test', password })).status).toBe(200);
     const blocked = await signup(); expect(blocked.status).toBe(429); expect(blocked.headers['retry-after']).toBe('3600');
