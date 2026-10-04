@@ -1,6 +1,6 @@
 # W3-07 · Chạy thật năm service mới
 
-**Trạng thái:** đang làm (Telegram, Notion xong; Google, Jira chờ tài khoản) · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
+**Trạng thái:** đang làm (Telegram, Notion và workflow 4 service xong; Google, Jira chờ tài khoản) · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
 
 Có thể làm từng service ngay khi task của service đó merge, không cần chờ đủ năm.
 
@@ -50,7 +50,7 @@ Sau khi đủ các service còn trong phạm vi:
 
 ## Kết quả (agent thi công điền)
 
-- PR: #48 (Telegram), #49 (sửa host Notion), nhánh `test/w3-07-notion-live` (Notion).
+- PR: #48 (Telegram), #49 (sửa host Notion), #50 (Notion), nhánh `test/w3-07-four-service-live` (workflow 4 service).
 - Service đã chạy thật / chưa chạy (và lý do):
   - **Telegram: xong (04/10/2026).** Nhóm thử nghiệm "ATI Test" (`-5405985621`, loại `group`), bot riêng cho dự án.
     1. `check` chỉ đọc (`getMe` + `getChat`): `telegram: OK - 1 allowlisted resources`.
@@ -71,7 +71,16 @@ Sau khi đủ các service còn trong phạm vi:
     4. Ca lỗi thật không ghi: token giả, Notion trả HTTP 401, hệ thống báo `AUTH_ERROR: Notion request failed with HTTP 401`; output không chứa token.
     5. Bằng chứng ở `docs/ai-evidence/V3-LIVE-EXECUTION/2026-10-04T01-58-31-111Z/` (không commit).
   - **Google Sheets, Google Calendar, Jira: chưa chạy**, chờ người dùng tạo tài khoản và tài nguyên thử nghiệm.
-- Workflow nhiều service: chưa chạy. Đã có 2 service mới (Telegram, Notion); có thể chạy workflow ≥ 4 service, ví dụ GitHub → Notion → Telegram → Slack.
+- Workflow nhiều service: **xong (04/10/2026), GitHub → Notion → Telegram → Slack** (2 service mới).
+  - Model thật lập plan trong 8,4 s, 4 search đọc (repo, database, chat, channel) chạy song song.
+  - Người dùng duyệt plan hash `057c0ab9826543b4035555d6915c032416763278b86b31cab54366d439173f16`. Cả 4 step `succeeded`:
+    - `github.create_issue`: issue #3 `https://github.com/VinhDat267/ati-test/issues/3`;
+    - `notion.create_page`: page `3eff24d5-a6d3-8192-a24e-cd326c8447fb`, `Trạng thái: Mới`, `Link` = URL issue qua `$template`;
+    - `telegram.send_message`: `messageId 6`, nội dung có link issue và link page;
+    - `slack.send_message`: `ts 1791079497.557269`, cùng nội dung.
+  - Đối chiếu bằng tool đọc: `github.get_issue` trả issue #3 đúng tiêu đề; `notion.query_database` trả page có `Link` trùng URL issue (`linkMatchesIssue: true`).
+  - Hai tin nhắn đối chiếu bằng mắt, vì bot Telegram không đọc lại được tin của chính nó.
+  - Bằng chứng ở `docs/ai-evidence/V3-LIVE-EXECUTION/2026-10-04T02-04-30-538Z/` (không commit).
 - Điều chưa làm hoặc khác với task card:
   - Ca lỗi dùng token sai thay cho thu hồi token thật, để không phải tạo lại bot.
   - Thêm `docs/ai-evidence/V3-LIVE-EXECUTION/` vào `.gitignore`, vì trước đó thư mục này chỉ được bỏ qua bằng `.git/info/exclude` ở máy nhóm trưởng.
