@@ -8,7 +8,7 @@
 
 - Mọi route dùng tài khoản đọc từ PostgreSQL; không dùng claim role hoặc allowlist cấu hình dịch vụ để cấp quyền quản trị người dùng.
 - Mỗi mutation có transaction, advisory lock dùng chung cho mọi API process trong cùng schema, khóa actor/target theo thứ tự UUID, rồi đọc lại role/status và phiên của actor sau khi chờ. Hai admin bỏ quyền hoặc khóa nhau vẫn giữ một admin active; actor mất quyền trong lúc chờ bị 403.
-- Không tự khóa hoặc tự bỏ quyền admin. Chỉ duyệt pending đã xác minh email. `enable` chỉ áp dụng tài khoản disabled đã xác minh; không dùng enable để bỏ qua pending.
+- Không tự khóa hoặc tự bỏ quyền admin. Chỉ duyệt pending đã xác minh email. Sau sửa review P2, `disable` chỉ áp dụng active; pending không thể chuyển disabled để dùng `enable` bỏ qua Duyệt. `enable` chỉ áp dụng tài khoản disabled đã xác minh.
 - Disable thu hồi mọi phiên trong transaction. Session creation của AUTH-02 khóa và đọc lại user; regression AUTH-03 chứng minh phiên tạo từ snapshot active cũ không sống lại sau enable.
 - GET có status/search/page/limit, tìm kiếm wildcard theo nghĩa đen, truy vấn tham số, giới hạn phân trang và chỉ chọn metadata an toàn. Không trả password hash hoặc Google subject; số phiên chỉ gồm phiên chưa thu hồi/chưa hết hạn.
 - Audit JSON chỉ chứa event, actorId, targetId, action và thời điểm DB; không email/name/token/password/nội dung thư. Chỉ ghi sau mutation thành công.
@@ -36,3 +36,13 @@ Lần full API chạy trước khi public schema được migrate từng lỗi 1
 - Browser `AUTH-03:` đã thêm vào grep default của `scripts/test-v3-browser.mjs`; selector AUTH-02 từ merge phụ thuộc được giữ nguyên. Root giữ thêm selector FE-03 khi ghép nhánh.
 - **Chờ root:** canonical check/browser tuần tự trên head cuối, review độc lập và CI đúng head, mở PR xếp trên AUTH-02. Không push/mở PR/merge main trong phiên này.
 - **NOT_RUN:** SMTP/live provider/cloud DB/service thật. Không thay env riêng hoặc read/write credentials người dùng.
+
+## Sửa P2 sau review độc lập
+
+- **Phát hiện:** verified pending có thể `disable` 200 rồi `enable` 200 thành active mà chưa từng approve; không có approval email. Bản kiểm trước sửa của root đạt 1012 v3 + 165 eval và 23 browser nhưng chưa bảo vệ chuỗi chuyển trạng thái này.
+- **Sửa sản phẩm `8f96c86`:** giữ kiểm tra trong transaction sau khóa dòng; `disable` pending trả `409 ACCOUNT_NOT_DISABLEABLE` trước UPDATE/audit. UI chỉ hiện Khóa cho active, Mở khóa cho disabled; pending giữ nhãn Chờ duyệt và nút Duyệt cùng xác nhận quyền dùng dịch vụ. Không thêm migration hoặc sửa luồng approve.
+- **RED trên PostgreSQL/HTTP thật:** test `rejects disabling a verified pending account so enable cannot bypass approval` nhận 200 thay vì 409. UI test `keeps pending accounts in the approval flow without lock or unlock actions` tìm thấy Khóa thay vì không có. Cả hai lệnh exit 1 trước sửa.
+- **GREEN:** `npm test -w @wap/chat-api -- tests/auth/admin-users.test.ts tests/auth/admin-users-session-race.test.ts` **16/16**, exit 0; UI/admin-nav **11/11**, exit 0; `npm run typecheck:v3` exit 0. Regression kiểm pending không đổi, enable 409, login 403 ACCOUNT_PENDING, zero session/outbox/audit; test active disable → enable cũ vẫn đạt.
+- Browser AUTH-03 đã thêm assertions: pending không có Khóa/Mở khóa và gọi HTTP disable trực tiếp trả 409 trước Duyệt. **Chưa chạy browser bản sửa** ở agent thi công; root chạy canonical/review tuần tự trên head cuối.
+- AUTH-02 docs/base PR cuối `adbc0a7` đã merge; signup default true giữ nguyên. Không sửa task card mới hoặc tạo log mới; cập nhật ngay task/log AUTH-03 này.
+- DB P2 riêng: `ati-auth03-review-p2`, ID `4d32956f5b5a84ef406abf7e1d0920cd1e19a6dbb10a43897b93d3881c97d47b`, labels task AUTH-03/owner codex, tmpfs PostgreSQL, loopback **56728**. Sau kiểm tra đã xóa container này và xác minh ID không còn trong `docker ps -a`; không dùng DB/cổng canonical hoặc của người dùng.
