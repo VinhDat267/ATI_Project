@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import { apiClient } from '../services/api-client';
 import { userErrorMessage } from '../services/user-error';
@@ -23,16 +23,23 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
+  const hadSession = useRef(Boolean(authStorage.getStoredTokens().accessToken));
   useEffect(() => {
     let current = true;
     apiClient.getAuthConfig().then(data => { if (current) setAuthConfig(data); }).catch(() => {});
     return () => { current = false; };
   }, []);
   useEffect(() => subscribeAuthTokens(tokens => {
+    const lostSession = hadSession.current && !tokens.accessToken;
+    hadSession.current = Boolean(tokens.accessToken);
     setAuthToken(tokens.accessToken);
     if (tokens.user) setUser(tokens.user);
     else if (!tokens.accessToken) setUser(null);
-  }), []);
+    if (lostSession) {
+      useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
+      navigate('/login', true);
+    }
+  }), [navigate]);
   useEffect(() => {
     let current = true;
     const { accessToken, user: storedUser } = authStorage.getStoredTokens();
@@ -66,10 +73,13 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
       navigate('/');
     }
   };
-  if (authToken) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
+  const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password'].includes(route.kind);
+  if (authToken && !isAccountFlow) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
   if (route.kind === 'not-found') return <NotFoundView onGoHome={() => navigate('/')} />;
   const definition = routes.find(entry => entry.kind === route.kind);
   const PublicView = definition && 'publicView' in definition ? definition.publicView : routes[1].publicView;
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}
-    isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')} />;
+    isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')}
+    onSignup={() => navigate('/signup')} onForgotPassword={() => navigate('/forgot-password')} onResendVerification={() => navigate('/resend-verification')}
+    token={'token' in route ? route.token : undefined} />;
 }

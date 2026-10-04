@@ -27,6 +27,8 @@ import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createSandboxAdapter } from './sandbox/index.js';
 import { createSandboxProvider, createBackupSandboxProvider } from './sandbox/scenarios.js';
 import { createApp } from './app.js';
+import { AdminUserRepo } from './db/repositories/admin-user-repo.js';
+import { createEmailSender } from './services/email/index.js';
 
 async function bootstrap() {
   const env = validateEnv();
@@ -274,6 +276,10 @@ async function bootstrap() {
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
+    adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
+    signupEnabled: env.AUTH_SIGNUP_ENABLED,
+    appBaseUrl: env.APP_BASE_URL,
+    emailSender: pool && userRepo ? createEmailSender(env, pool) : undefined,
     validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD
       ? (email, password) => email === process.env.SANDBOX_USER_EMAIL && password === process.env.SANDBOX_USER_PASSWORD
         ? { id: DEMO_ADMIN_ID, email, name: 'Sandbox User' } : null

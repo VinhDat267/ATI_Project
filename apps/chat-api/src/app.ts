@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth/index.js';
+import { createAdminUsersRoutes, type AdminUsersOptions } from './routes/auth/admin-users.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
@@ -16,13 +17,17 @@ import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
+import type { EmailSender } from './services/email/index.js';
 
-export interface AppOptions {
+export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
   userRepo?: UserRepo;
   sessionRepo?: SessionRepo;
   authClock?: () => number;
+  signupEnabled?: boolean;
+  appBaseUrl?: string;
+  emailSender?: EmailSender;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
@@ -74,10 +79,17 @@ export function createApp(options: AppOptions): Express {
   app.use(
     '/api/auth',
     createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, sessionRepo: options.sessionRepo,
-      clock: options.authClock, validateCredentials: options.validateCredentials })
+      clock: options.authClock, validateCredentials: options.validateCredentials,
+      signupEnabled: options.signupEnabled, appBaseUrl: options.appBaseUrl, emailSender: options.emailSender })
   );
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
+
+  // Memory storage cannot manage persistent accounts, even with a legacy JWT.
+  app.use('/api/admin/users', (req, res, next) => {
+    if (!options.adminUserRepo) { res.status(503).json({ error: 'Quản trị người dùng cần PostgreSQL.' }); return; }
+    authMiddleware(req, res, next);
+  }, createAdminUsersRoutes(options));
 
   // Services routes (protected via Bearer header)
   app.use(

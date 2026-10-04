@@ -5,3 +5,4 @@ export * from './step-repo.js';
 export * from './credential-repo.js';
 export * from './user-repo.js';
 export * from './session-repo.js';
+export * from './auth-token-repo.js';

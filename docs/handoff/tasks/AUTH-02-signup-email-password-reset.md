@@ -57,30 +57,47 @@
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test migration chạy hai lần (PostgreSQL thật).
-- [ ] Test đăng ký:
+- [x] Test migration chạy hai lần (PostgreSQL thật).
+- [x] Test đăng ký:
   - tạo `pending` + chưa xác minh + một email trong outbox;
   - email đã tồn tại: cùng phản hồi HTTP, không tạo tài khoản, outbox có thư "có người thử đăng ký";
   - mật khẩu < 12 ký tự bị từ chối.
-- [ ] Test token:
+- [x] Test token:
   - DB chỉ có hash;
   - token hết hạn, đã dùng, sai mục đích đều bị từ chối;
   - tạo token mới làm token cũ hết hiệu lực;
   - hai request dùng cùng token đồng thời chỉ một thành công (PostgreSQL thật).
-- [ ] Test quên mật khẩu:
+- [x] Test quên mật khẩu:
   - email lạ và email có thật trả phản hồi giống hệt;
   - đặt lại xong thì mọi phiên cũ bị thu hồi (refresh cũ trả 401);
   - tài khoản chỉ có Google đặt được mật khẩu;
   - `email_verified` thành `true`.
-- [ ] Test giới hạn tần suất (đồng hồ giả) cho signup, forgot, resend.
-- [ ] Test `live` thiếu biến SMTP thì không khởi động; `SmtpEmailSender` dựng đúng transport (inject transport giả, không gửi thật trong test).
-- [ ] Test không có token/link trong log (bắt log trong test).
-- [ ] Browser E2E (sandbox, PostgreSQL thật): đăng ký → đọc link trong `email_outbox` → xác minh → màn hình "chờ duyệt" → admin duyệt (qua AUTH-03 nếu đã có, nếu chưa thì đổi trạng thái trực tiếp trong DB) → đăng nhập. Quên mật khẩu → link trong outbox → đặt mật khẩu → đăng nhập bằng mật khẩu mới; mật khẩu cũ bị từ chối.
-- [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] Test giới hạn tần suất (đồng hồ giả) cho signup, forgot, resend.
+- [x] Test `live` thiếu biến SMTP thì không khởi động; `SmtpEmailSender` dựng đúng transport (inject transport giả, không gửi thật trong test).
+- [x] Test không có token/link trong log (bắt log trong test).
+- [x] Browser E2E (sandbox, PostgreSQL thật): đăng ký → đọc link trong `email_outbox` → xác minh → màn hình "chờ duyệt" → admin duyệt (qua AUTH-03 nếu đã có, nếu chưa thì đổi trạng thái trực tiếp trong DB) → đăng nhập. Quên mật khẩu → link trong outbox → đặt mật khẩu → đăng nhập bằng mật khẩu mới; mật khẩu cũ bị từ chối.
+- [x] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
+- PR: https://github.com/VinhDat267/ATI_Project/pull/52; review/local checks đạt, chờ CI cuối; chưa merge.
+- Commit: backend `99b539c5315c4ea4aead14a280cec87d3ed947cd`; frontend/browser và regression HTTP `9cefe3ecd249d721640309c660f9e5c8ae5c0115`; nhật ký đi kèm commit tài liệu kế tiếp.
 - Test đã chạy và kết quả:
+  - RED PostgreSQL/HTTP: 13/13 fail vì endpoint chưa có (404) hoặc hai bảng chưa có; RED email/config được chạy lại với fixture khóa mã hóa đúng, 3 cấu hình fail như dự kiến; RED giao diện 5/5 fail; RED stale-login ở repo tạo phiên bằng snapshot cũ, và RED HTTP với caller trước sửa trả 200 thay vì 401.
+  - GREEN: 20/20 backend/email mới; 69/69 auth + config hiện có tại checkpoint backend; thêm regression HTTP snapshot mật khẩu cũ 1/1 pass trên code cuối; toàn bộ web workspace 189/189 pass. Typecheck API và web, `git diff --check` exit 0.
+  - Root chạy `npm run check` trên checkpoint `99b539c`: exit 0, 983 v3 + 165 evaluation offline, typecheck/build/credential scan/launcher/env guards đạt. Đây là bằng chứng checkpoint backend, chưa phải check canonical của head frontend cuối.
+  - Suite API rộng trên DB riêng đã migrate: 218/223 pass, năm timeout ở các ca cũ (CLI provision; hai memory snapshot; hai startup reconciliation) khi các worker chạy đồng thời. Không tăng timeout hoặc sửa các test đó. Root chịu trách nhiệm chạy canonical tuần tự trên head tích hợp cuối.
+  - Bằng chứng cục bộ: `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/AUTH02/`; browser spec mới đã đăng ký scenario `auth02`, chưa chạy ở worktree thi công theo lịch cổng của root.
 - Điều chưa làm hoặc khác với task card:
+  - Migration dùng `0005_auth_tokens_outbox.sql` vì `0004_conversation_titles.sql` đã có. Migration được thực thi hai lần trên PostgreSQL thật và giữ nguyên token đã dùng/outbox.
+  - Thêm `SessionRepo.create(..., expectedPasswordHash?)` khóa hàng user và kiểm lại password/status để chặn login đang chạy trước reset hoặc disable; token consumption và reset/password/session revocation cùng transaction.
+  - Cờ đăng ký vẫn mặc định `false`; AUTH-03/root đổi mặc định chỉ khi cả hai tính năng cùng có mặt. Email sandbox/CI dùng outbox, SMTP transport chỉ được kiểm qua injection, không gọi SMTP/email/provider/service thật.
+  - Browser AUTH-02, canonical check trên head cuối, review độc lập, CI và PR: **NOT_RUN/OPEN tại thời điểm bàn giao**. Không tuyên bố nghiệm thu sản phẩm thật hoặc production readiness.
+## Xác minh cuối của root/reviewer (04/10/2026)
+
+- PR: https://github.com/VinhDat267/ATI_Project/pull/52; base main, nhánh `vinhdat/feat-auth-02-signup-email`. Chưa merge; CI trên head cuối còn chờ.
+- `npm run check` trên code hoàn chỉnh `7d7dd66`: exit 0, **989 v3 + 165 evaluation offline**, typecheck/build/credential scan/launcher 1/env guards 3 đạt. Các timeout do tải đồng thời không còn trong phép chạy canonical tuần tự.
+- `npm run test:browser:v3` sau delta test-only `4f50970`: exit 0, **22/22** qua 10 scenario. Header Chromium no-referrer thiếu hoặc rỗng đều không chứa URL; test vẫn từ chối URL. Signup/outbox/verification/pending/reset/revocation/mật khẩu cũ đã kiểm bằng browser + PostgreSQL thật.
+- Review độc lập: **Đạt**, không có P1/P2 được xác nhận; reviewer chạy lại **21/21 API/email PostgreSQL + 5/5 frontend**. Delta `7d7dd66..4f50970` chỉ assertion browser, không đổi runtime.
+- Bằng chứng canonical và review: thư mục local `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/`, các log `auth02-final-check.log`, `auth02-final-browser-rerun.log`, `auth02-independent-focused-verified.log`, `auth02-independent-web.log`. Không commit raw artifacts.
+- SMTP/model/provider/SaaS thật vẫn **NOT_RUN**; không tuyên bố production readiness. AUTH-03 xếp trên PR này để bật mặc định đăng ký khi cả đăng ký và duyệt cùng có mặt.
