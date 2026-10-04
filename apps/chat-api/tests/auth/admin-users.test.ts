@@ -115,6 +115,21 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     expect((await pool.query('SELECT role,status FROM users WHERE id=$1', [actor])).rows[0]).toEqual({ role: 'admin', status: 'active' });
   });
 
+  it('rejects disabling a verified pending account so enable cannot bypass approval', async () => {
+    const tokens = await login(actor);
+    const disabled = await mutate(tokens.accessToken, target, 'disable');
+    expect(disabled.status).toBe(409);
+    expect(disabled.body.code).toBe('ACCOUNT_NOT_DISABLEABLE');
+    expect((await pool.query('SELECT status,email_verified FROM users WHERE id=$1', [target])).rows[0]).toEqual({ status: 'pending', email_verified: true });
+    expect((await mutate(tokens.accessToken, target, 'enable')).status).toBe(409);
+    const attemptedLogin = await request(app).post('/api/auth/login').send({ email: `${target}@example.test`, password });
+    expect(attemptedLogin.status).toBe(403);
+    expect(attemptedLogin.body.code).toBe('ACCOUNT_PENDING');
+    expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [`${target}@example.test`])).rows[0].n).toBe(0);
+    expect((await pool.query('SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1', [target])).rows[0].n).toBe(0);
+    expect(audit.info).not.toHaveBeenCalled();
+  });
+
   it('keeps one active admin when two admins demote one another concurrently', async () => {
     const first = await login(actor), second = await login(otherAdmin);
     const responses = await Promise.all([mutate(first.accessToken, otherAdmin, 'role', { role: 'member' }), mutate(second.accessToken, actor, 'role', { role: 'member' })]);

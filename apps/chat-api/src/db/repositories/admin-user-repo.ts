@@ -78,6 +78,9 @@ export class AdminUserRepo {
       if (action === 'disable' && target.status === 'disabled') {
         throw new AdminUserError(409, 'ACCOUNT_ALREADY_DISABLED', 'Tài khoản đã bị khóa.');
       }
+      if (action === 'disable' && target.status !== 'active') {
+        throw new AdminUserError(409, 'ACCOUNT_NOT_DISABLEABLE', 'Chỉ khóa được tài khoản đang hoạt động. Tài khoản chờ duyệt phải được duyệt trước.');
+      }
       if (action === 'role' && (!role || target.role === role)) {
         throw new AdminUserError(409, 'ROLE_UNCHANGED', 'Vai trò tài khoản chưa thay đổi.');
       }

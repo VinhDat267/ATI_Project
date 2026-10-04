@@ -28,6 +28,10 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await admin.getByRole('searchbox', { name: 'Tìm theo email hoặc tên' }).fill(email);
     await admin.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
     const row = admin.getByRole('row').filter({ hasText: email });
+    await expect(row.getByRole('button', { name: 'Khóa', exact: true })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: 'Mở khóa', exact: true })).toHaveCount(0);
+    const adminAccess = await admin.evaluate(() => localStorage.getItem('wap_access_token')!);
+    expect((await admin.request.post(`/api/admin/users/${id}/disable`, { headers: { Authorization: `Bearer ${adminAccess}` } })).status()).toBe(409);
     await row.getByRole('button', { name: 'Duyệt', exact: true }).click();
     await expect(admin.getByRole('dialog')).toContainText('Người này sẽ dùng được các service đã kết nối của nhóm');
     expect((await db.query('SELECT status FROM users WHERE id=$1', [id])).rows[0].status).toBe('pending');

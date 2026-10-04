@@ -90,7 +90,8 @@ export function AdminUsersView({ user, navigate, onLogout }: Props) {
             <td className="p-4 whitespace-nowrap"><p>{[account.hasPassword && 'Mật khẩu', account.hasGoogle && 'Google'].filter(Boolean).join(', ') || 'Chưa thiết lập'}</p><p className="mt-1 text-xs text-zinc-500">{account.openSessions} phiên đang mở</p></td>
             <td className="p-4"><div className="flex flex-wrap gap-2">
               {account.status === 'pending' && <button className={buttonStyle} disabled={busy || !account.emailVerified} title={!account.emailVerified ? 'Cần xác minh email trước khi duyệt' : undefined} onClick={() => setConfirmation({ user: account, action: 'approve' })}>Duyệt</button>}
-              {account.status !== 'disabled' ? <button className={buttonStyle} disabled={busy || account.id === user.id} onClick={() => setConfirmation({ user: account, action: 'disable' })}>Khóa</button> : <button className={buttonStyle} disabled={busy || !account.emailVerified} onClick={() => setConfirmation({ user: account, action: 'enable' })}>Mở khóa</button>}
+              {account.status === 'active' && <button className={buttonStyle} disabled={busy || account.id === user.id} onClick={() => setConfirmation({ user: account, action: 'disable' })}>Khóa</button>}
+              {account.status === 'disabled' && <button className={buttonStyle} disabled={busy || !account.emailVerified} onClick={() => setConfirmation({ user: account, action: 'enable' })}>Mở khóa</button>}
               <button className={buttonStyle} disabled={busy || (account.id === user.id && account.role === 'admin')} onClick={() => setConfirmation({ user: account, action: 'role', role: account.role === 'admin' ? 'member' : 'admin' })}>Đổi vai trò</button>
             </div></td>
           </tr>)}</tbody>

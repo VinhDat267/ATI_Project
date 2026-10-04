@@ -48,6 +48,17 @@ it('shows the admin navigation entry only with the current admin role', () => {
   expect(screen.getByRole('button', { name: 'Quản lý người dùng' })).toBeInTheDocument();
 });
 
+it('keeps pending accounts in the approval flow without lock or unlock actions', async () => {
+  render(<App />);
+  await screen.findByText('candidate@example.test');
+  expect(screen.getByText('Chờ duyệt')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Khóa' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Mở khóa' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Duyệt' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('Người này sẽ dùng được các service đã kết nối của nhóm');
+  expect(vi.mocked(apiClient.request).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
+});
+
 it('searches within the pending tab and keeps server rejection visible without optimistic approval', async () => {
   render(<App />);
   await screen.findByText('candidate@example.test');
