@@ -76,3 +76,6 @@ CLAUDE.md
 
 # Live-service evidence stays on the team lead machine (W3-07)
 docs/ai-evidence/V3-LIVE-EXECUTION/
+
+# Real authentication evidence contains private email addresses and one-use links (AUTH-06)
+docs/ai-evidence/AUTH-LIVE/

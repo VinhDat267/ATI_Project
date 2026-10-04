@@ -378,6 +378,86 @@ read the text that would be sent, and that a sent message stayed marked
 that stopped at the preview and cancelled (8.6 s to the preview, nothing
 executed).
 
+### AUTH-06: real email and Google authentication
+
+Keep credentials in the ignored root `.env`. Set `RUNTIME_MODE=live`,
+`AUTH_SIGNUP_ENABLED=true`, `APP_BASE_URL=http://localhost:5174` and
+`V3_WEB_PORT=5174`. Live startup also needs the existing `DATABASE_URL`,
+private `JWT_SECRET` and `ENCRYPTION_KEY`, and LLM provider configuration;
+authentication acceptance does not need a model call.
+
+- Gmail: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER`,
+  `SMTP_PASSWORD` (an App Password for that same Gmail), and `MAIL_FROM`.
+  The account owner enables two-step verification and creates the App
+  Password; agents never retrieve or print it. See
+  [Google's App Password instructions](https://support.google.com/accounts/answer/185833).
+- Google: create a **Web application** OAuth client and set
+  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and
+  `GOOGLE_OAUTH_REDIRECT_URI=http://localhost:5174/auth/google/callback`.
+  Register that exact redirect URI on the same client in Google Cloud.
+  Use only `openid email profile`. External/Testing has a basic-identity
+  scope exception: these scopes do not restrict login to the test-user
+  allowlist. ATI still requires administrator approval. See
+  [Google's publishing-status rules](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
+
+On PowerShell, put `RUNTIME_MODE=live` in `.env`, then run:
+
+```powershell
+npm ci --no-audit --no-fund
+npm run db:migrate:v3
+# If there is no active administrator, the owner sets CHAT_ADMIN_EMAIL,
+# CHAT_ADMIN_PASSWORD and CHAT_ADMIN_NAME before provisioning:
+npm run admin:provision:v3
+npm run up
+```
+
+Provisioning an existing administrator replaces its password and revokes
+its sessions; run it only when that change is intended. Use the project's
+existing PostgreSQL endpoint. On the team lead's Windows machine this is
+port `15433`; do not reset its volume to fix a port conflict. Open
+`http://localhost:5174` consistently for signup, received links and OAuth.
+
+Use a consenting recipient and record these separate checks:
+
+1. Signup → actual verification email → click received link → pending
+   approval → administrator approves → actual approval email → login.
+2. Forgot password → actual reset email → the owner sets a new password →
+   login with it. Reuse each consumed verification/reset link and confirm
+   it fails. Check the received links' origin and Vietnamese subject/body.
+3. A fresh Google identity → pending → administrator approves → Google
+   login. From an existing verified password account, link Google on
+   `/account`, then sign out and log in through Google.
+   If Google reuses the current identity, first add the second owned Gmail
+   to the browser's Google session, sign out of ATI and choose that second
+   account in Google's account chooser.
+4. With a deliberately incorrect SMTP password in an isolated process,
+   signup still returns the generic message and the server logs only
+   `[auth-email] Không gửi được email.`. Separately test an unregistered
+   redirect URI against Google; restore the correct configuration afterwards.
+   Google rejects an invalid redirect on its own error page; it does not
+   redirect to the application's callback in that case. Record the provider
+   error separately from callback errors handled by ATI.
+
+`535 / EAUTH` means Gmail refused SMTP authentication. The account owner
+checks `SMTP_USER` and replaces `SMTP_PASSWORD` with a current App Password,
+without spaces between its displayed groups. Restart the app after editing
+`.env`. If the first signup could not send email, use **Gửi lại email xác
+minh** once sending works: the pending account already exists.
+
+Google `401 invalid_client` / “The OAuth client was not found” is distinct
+from `redirect_uri_mismatch`: check the Web client ID and its matching
+secret first, then the exact registered redirect URI. A locally valid
+configuration or a visible Google button does not prove provider acceptance.
+Replace template values such as `CLIENT_ID.apps.googleusercontent.com`
+with the client ID copied from Google Cloud.
+
+Before storing private evidence, verify
+`git check-ignore docs/ai-evidence/AUTH-LIVE/probe.json`. Keep received
+links, emails and captures in that ignored directory, redact email/token
+from screenshots, and commit only aggregate results. SMTP accepting a send
+does not prove inbox receipt; record `PASS`, `FAIL`, `NOT_RUN` or `UNKNOWN`
+for each step without treating fixture browser tests as real-provider proof.
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline
