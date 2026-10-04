@@ -40,8 +40,9 @@ it('constructs new endpoint POST JQL, escaping injection and Lucene punctuation;
   expect(await a.execute('jira.search_issues', { projectKey: 'ATI', query, limit: 20 })).toEqual({ issues: [{ id: '10042', key: 'ATI-42', title: 'Login bug', status: 'Open', url: credentials.siteUrl + '/browse/ATI-42' }] });
   const [url, init] = f.mock.calls[0]!; expect(url).toBe(credentials.siteUrl + '/rest/api/3/search/jql'); expect(init.method).toBe('POST');
   const body = JSON.parse(init.body); expect(body.jql).toMatch(/^project = "ATI" AND text ~ "/); expect(body.jql).toContain('x' + '\\'.repeat(3) + '" OR project'); expect(body.jql).toContain('\\'.repeat(3) + '"y'); expect(body.jql).not.toContain('~ "x" OR'); expect(body.fields).toEqual(['summary', 'status', 'project']); expect(body.maxResults).toBe(20);
-  // Every double quote in the text operand is escaped; symbols are removed as permitted by the card.
-  const operand = body.jql.slice(body.jql.indexOf('text ~ "') + 8, -'" ORDER BY updated DESC'.length); expect(operand).not.toMatch(/[+&|!(){}\[\]^~*?:]/);
+  // Every double quote in the text operand is escaped; Lucene operators are escaped, never left active (W3-09).
+  const operand = JSON.parse(body.jql.slice(body.jql.indexOf('text ~ ') + 7, -' ORDER BY updated DESC'.length)) as string;
+  expect(operand.replace(/\\./g, '')).not.toMatch(/[+\-&|!(){}\[\]^~*?:"\\]/);
   f.mockClear(); await a.execute('jira.search_issues', { projectKey: 'ATI', query: '' }); expect(JSON.parse(f.mock.calls[0]![1].body).jql).toBe('project = "ATI" ORDER BY updated DESC');
 });
 it('escapes quote and backslash at both Lucene and JQL layers, including unpaired quote', async () => {
@@ -118,4 +119,59 @@ it('shared limiter throttles two instances and aborts actual wait before dispatc
 it('checkConnection reads myself and refuses anonymous/malformed identities', async () => {
   const f = scripted(); expect(await make(f).checkConnection()).toBe(true); expect(f.mock.calls[0]![0]).toBe(credentials.siteUrl + '/rest/api/3/myself');
   await expect(make(vi.fn(async () => json({}))).checkConnection()).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+});
+
+// W3-09: live Jira Cloud missed "Kiểm tra W3-07 Jira" because '-' was replaced by a space.
+const searchOperand = (f: any) => {
+  const jql = JSON.parse(f.mock.calls.find((call: any) => String(call[0]).endsWith('/search/jql'))![1].body).jql as string;
+  return JSON.parse(jql.slice(jql.indexOf('text ~ ') + 7, -' ORDER BY updated DESC'.length)) as string;
+};
+it.each([['W3-07', 'W3\\-07'], ['Kiểm tra W3-07 Jira', 'Kiểm tra W3\\-07 Jira'], ['v2-beta', 'v2\\-beta'],
+  ['+ - & | ! ( ) { } [ ] ^ ~ * ? : / \\ "', '\\+ \\- \\& \\| \\! \\( \\) \\{ \\} \\[ \\] \\^ \\~ \\* \\? \\: \\/ \\\\ \\"']])('escapes Lucene operators in %j instead of removing them', async (query, lucene) => {
+  const f = scripted(); await make(f).execute('jira.search_issues', { projectKey: 'ATI', query });
+  expect(searchOperand(f)).toBe(lucene);
+  expect(JSON.parse(f.mock.calls.at(-1)![1].body).jql).toMatch(/^project = "ATI" AND text ~ "[^]*" ORDER BY updated DESC$/);
+});
+it('looks an issue key up directly in the searched project, then adds text matches without duplicates', async () => {
+  const other = { ...issue, key: 'ATI-7', id: '10007', fields: { ...issue.fields, summary: 'Mentions ATI-42' } };
+  const f = scripted((url, init) => url.includes('search/jql') ? json({ issues: [other, issue].slice(0, JSON.parse(init.body).maxResults) }) : undefined);
+  const output = await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'ati-42', limit: 3 });
+  expect(output.issues.map((row: any) => row.key)).toEqual(['ATI-42', 'ATI-7']);
+  expect(f.mock.calls[0]![0]).toBe(credentials.siteUrl + '/rest/api/3/issue/ATI-42?fields=summary,status,project');
+  expect(f.mock.calls[0]![1].method).toBe('GET'); expect(searchOperand(f)).toBe('ati\\-42'); expect(f).toHaveBeenCalledTimes(2);
+  const capped = await make(f).execute('jira.search_issues', { projectKey: 'ATI', query: 'ATI-42', limit: 1 });
+  expect(capped.issues.map((row: any) => row.key)).toEqual(['ATI-42']);
+});
+it('keeps text results when the key does not exist, and never returns an issue moved out of the project', async () => {
+  const missing = scripted(url => url.includes('/issue/ATI-99') ? json({ errorMessages: ['Issue does not exist'] }, 404) : undefined);
+  expect((await make(missing).execute('jira.search_issues', { projectKey: 'ATI', query: 'ATI-99' })).issues.map((row: any) => row.key)).toEqual(['ATI-42']);
+  expect(missing.mock.calls.map(call => String(call[0]).replace(credentials.siteUrl, ''))).toEqual(['/rest/api/3/issue/ATI-99?fields=summary,status,project', '/rest/api/3/myself', '/rest/api/3/search/jql']);
+  const moved = scripted(url => url.includes('/issue/ATI-5') ? json({ ...issue, key: 'OTHER-5', fields: { ...issue.fields, project: { key: 'OTHER' } } })
+    : url.includes('search/jql') ? json({ issues: [] }) : undefined);
+  expect(await make(moved).execute('jira.search_issues', { projectKey: 'ATI', query: 'ATI-5' })).toEqual({ issues: [] });
+});
+it('does not look up keys of another project or text that only contains a key', async () => {
+  for (const query of ['OTHER-1', 'see ATI-42', 'ATI-0']) {
+    const f = scripted(); await make(f).execute('jira.search_issues', { projectKey: 'ATI', query });
+    expect(f).toHaveBeenCalledTimes(1); expect(String(f.mock.calls[0]![0])).toBe(credentials.siteUrl + '/rest/api/3/search/jql');
+  }
+});
+// W3-09: with a wrong Basic token Jira Cloud answers /myself 401 but hides /project/ATIT as 404.
+const hidden = (myself: Response | Error) => scripted(url => url.endsWith('/myself') ? (myself instanceof Error ? (() => { throw myself; })() : myself)
+  : url.includes('/project/') || url.includes('/issue/') ? json({ errorMessages: ['No project could be found with key ATI.'] }, 404) : undefined);
+it.each([[401, 'AUTH_ERROR'], [403, 'AUTH_ERROR'], [200, 'NOT_FOUND'], [500, 'NOT_FOUND']])('a read 404 asks /myself once: myself %i gives %s', async (status, category) => {
+  for (const run of [(a: any) => a.execute('jira.search_projects', { query: '' }), (a: any) => a.execute('jira.add_comment', { issueKey: 'ATI-42', body: 'x' }),
+    (a: any) => a.execute('jira.search_issues', { projectKey: 'ATI', query: 'ATI-42' })]) {
+    const f = hidden(json(status === 200 ? { accountId: 'fixture' } : { errorMessages: ['Unauthorized ' + credentials.apiToken] }, status));
+    const error = await run(make(f)).then(() => null, (e: any) => e);
+    if (category === 'NOT_FOUND' && f.mock.calls.some(call => String(call[0]).endsWith('/search/jql'))) { expect(error).toBeNull(); continue; }
+    expect(error).toMatchObject({ category }); expect(JSON.stringify(error) + error.message).not.toContain(credentials.apiToken);
+    expect(f.mock.calls.filter(call => String(call[0]).endsWith('/myself'))).toHaveLength(1);
+    expect(f.mock.calls.some(call => call[1].method === 'POST')).toBe(false);
+  }
+});
+it('keeps NOT_FOUND with exactly one extra request when the /myself check itself fails', async () => {
+  const f = hidden(new TypeError('network down'));
+  await expect(make(f).execute('jira.search_projects', { query: '' })).rejects.toMatchObject({ category: 'NOT_FOUND' });
+  expect(f).toHaveBeenCalledTimes(2);
 });
