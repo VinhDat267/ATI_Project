@@ -80,7 +80,16 @@
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
+- PR: chờ root tích hợp AUTH-03 + FE-03, review độc lập và CI; chưa push hoặc mở PR trong phiên thi công này.
+- Commit: backend `99b539c5315c4ea4aead14a280cec87d3ed947cd`; frontend/browser và regression HTTP `9cefe3ecd249d721640309c660f9e5c8ae5c0115`; nhật ký đi kèm commit tài liệu kế tiếp.
 - Test đã chạy và kết quả:
+  - RED PostgreSQL/HTTP: 13/13 fail vì endpoint chưa có (404) hoặc hai bảng chưa có; RED email/config được chạy lại với fixture khóa mã hóa đúng, 3 cấu hình fail như dự kiến; RED giao diện 5/5 fail; RED stale-login ở repo tạo phiên bằng snapshot cũ, và RED HTTP với caller trước sửa trả 200 thay vì 401.
+  - GREEN: 20/20 backend/email mới; 69/69 auth + config hiện có tại checkpoint backend; thêm regression HTTP snapshot mật khẩu cũ 1/1 pass trên code cuối; toàn bộ web workspace 189/189 pass. Typecheck API và web, `git diff --check` exit 0.
+  - Root chạy `npm run check` trên checkpoint `99b539c`: exit 0, 983 v3 + 165 evaluation offline, typecheck/build/credential scan/launcher/env guards đạt. Đây là bằng chứng checkpoint backend, chưa phải check canonical của head frontend cuối.
+  - Suite API rộng trên DB riêng đã migrate: 218/223 pass, năm timeout ở các ca cũ (CLI provision; hai memory snapshot; hai startup reconciliation) khi các worker chạy đồng thời. Không tăng timeout hoặc sửa các test đó. Root chịu trách nhiệm chạy canonical tuần tự trên head tích hợp cuối.
+  - Bằng chứng cục bộ: `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/AUTH02/`; browser spec mới đã đăng ký scenario `auth02`, chưa chạy ở worktree thi công theo lịch cổng của root.
 - Điều chưa làm hoặc khác với task card:
+  - Migration dùng `0005_auth_tokens_outbox.sql` vì `0004_conversation_titles.sql` đã có. Migration được thực thi hai lần trên PostgreSQL thật và giữ nguyên token đã dùng/outbox.
+  - Thêm `SessionRepo.create(..., expectedPasswordHash?)` khóa hàng user và kiểm lại password/status để chặn login đang chạy trước reset hoặc disable; token consumption và reset/password/session revocation cùng transaction.
+  - Cờ đăng ký vẫn mặc định `false`; AUTH-03/root đổi mặc định chỉ khi cả hai tính năng cùng có mặt. Email sandbox/CI dùng outbox, SMTP transport chỉ được kiểm qua injection, không gọi SMTP/email/provider/service thật.
+  - Browser AUTH-02, canonical check trên head cuối, review độc lập, CI và PR: **NOT_RUN/OPEN tại thời điểm bàn giao**. Không tuyên bố nghiệm thu sản phẩm thật hoặc production readiness.
