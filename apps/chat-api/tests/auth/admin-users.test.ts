@@ -55,6 +55,9 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ total: 2, pendingCount: 1, page: 1, limit: 1 });
     expect(response.body.users).toHaveLength(1);
+    const secondPage = await request(app).get('/api/admin/users?limit=1&page=2&status=active&search=Admin').set('Authorization', `Bearer ${tokens.accessToken}`);
+    expect(secondPage.body.users).toHaveLength(1);
+    expect(secondPage.body.users[0].id).not.toBe(response.body.users[0].id);
     const all = await request(app).get('/api/admin/users').set('Authorization', `Bearer ${tokens.accessToken}`);
     expect(all.body.users.find((user: any) => user.id === actor)).toMatchObject({ emailVerified: true, hasPassword: true, hasGoogle: false, openSessions: 2 });
     expect(JSON.stringify(all.body)).not.toContain(storedPassword);

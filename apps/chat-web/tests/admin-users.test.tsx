@@ -75,3 +75,18 @@ it('shows the login page when a subsequent API request revokes the authenticated
   expect(await screen.findByLabelText('Email')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/login');
 });
+
+it.each([
+  { action: 'disable', button: 'Khóa', confirm: 'Xác nhận khóa', status: 'active', explanation: 'Mọi phiên đăng nhập' },
+  { action: 'enable', button: 'Mở khóa', confirm: 'Xác nhận mở khóa', status: 'disabled', explanation: 'có thể đăng nhập lại' },
+  { action: 'role', button: 'Đổi vai trò', confirm: 'Xác nhận đổi vai trò', status: 'active', explanation: 'quản lý cấu hình dịch vụ chung' },
+])('requires confirmation before $action and sends only the confirmed change', async ({ action, button, confirm, status, explanation }) => {
+  vi.mocked(apiClient.request).mockResolvedValue({ users: [{ ...candidate, status }], total: 1, pendingCount: 0, page: 1, limit: 20 });
+  render(<App />);
+  await screen.findByText('candidate@example.test');
+  fireEvent.click(screen.getByRole('button', { name: button }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(explanation);
+  expect(vi.mocked(apiClient.request).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', { name: confirm }));
+  await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(`/api/admin/users/u1/${action}`, expect.objectContaining({ method: 'POST', ...(action === 'role' ? { body: '{"role":"admin"}' } : {}) })));
+});
