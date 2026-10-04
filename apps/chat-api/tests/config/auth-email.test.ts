@@ -20,8 +20,8 @@ describe('AUTH-02 email startup configuration', () => {
     expect(() => validateEnv({ ...live, SMTP_PORT: 'no' })).toThrow(/SMTP_PORT/);
     expect(() => validateEnv({ AUTH_SIGNUP_ENABLED: 'invalid' })).toThrow(/AUTH_SIGNUP_ENABLED/);
   });
-  it('keeps signup default closed, supports explicit flags and permits sandbox without SMTP', () => {
-    expect(validateEnv({}) as any).toMatchObject({ AUTH_SIGNUP_ENABLED: false, APP_BASE_URL: 'http://127.0.0.1:5174' });
+  it('opens signup after AUTH-02/AUTH-03 integration, supports explicit closure, and permits sandbox without SMTP', () => {
+    expect(validateEnv({}) as any).toMatchObject({ AUTH_SIGNUP_ENABLED: true, APP_BASE_URL: 'http://127.0.0.1:5174' });
     expect((validateEnv({ AUTH_SIGNUP_ENABLED: 'true' }) as any).AUTH_SIGNUP_ENABLED).toBe(true);
     expect((validateEnv({ AUTH_SIGNUP_ENABLED: 'false' }) as any).AUTH_SIGNUP_ENABLED).toBe(false);
     expect(validateEnv(live)).toMatchObject({ SMTP_PORT: 465, APP_BASE_URL: 'https://workflow.example.test' });

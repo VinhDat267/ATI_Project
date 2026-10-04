@@ -83,7 +83,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.AUTH_SIGNUP_ENABLED && !['true', 'false'].includes(env.AUTH_SIGNUP_ENABLED)) {
     throw new Error('AUTH_SIGNUP_ENABLED must be true or false');
   }
-  const AUTH_SIGNUP_ENABLED = env.AUTH_SIGNUP_ENABLED === 'true';
+  const AUTH_SIGNUP_ENABLED = env.AUTH_SIGNUP_ENABLED !== 'false';
   if (isLive) {
     for (const field of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'MAIL_FROM', 'APP_BASE_URL']) {
       if (!env[field]?.trim()) throw new Error(`${field} is required in live mode`);
