@@ -1,6 +1,6 @@
 # W3-09 · Jira: tìm kiếm với dấu gạch ngang và báo đúng lỗi token khi đọc
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `fix/w3-09-jira-live-findings` · **Phụ thuộc:** không
+**Trạng thái:** xong, #63 tại `f284b12`; review độc lập và nghiệm thu chỉ đọc sau merge đạt · **Nhánh thi công:** `fix/w3-09-jira-live-findings` · **Phụ thuộc:** không
 
 Nguồn: chạy thật Jira trong W3-07 ngày 04/10/2026 (site Jira Cloud Free, project `ATIT`).
 
@@ -30,8 +30,8 @@ Nguồn: chạy thật Jira trong W3-07 ngày 04/10/2026 (site Jira Cloud Free, 
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
-- [ ] Sau khi merge: chạy lại `run.ts check` với token giả (phải ra `AUTH_ERROR`) và đọc lại `ATIT-4` bằng query `W3-07` (phải tìm thấy). Chỉ đọc, không ghi.
+- [x] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] Sau khi merge: chạy lại `run.ts check` với token giả (phải ra `AUTH_ERROR`) và đọc lại `ATIT-4` bằng query `W3-07` (phải tìm thấy). Chỉ đọc, không ghi.
 
 ## Kết quả (agent thi công điền)
 
@@ -67,5 +67,13 @@ Nguồn: chạy thật Jira trong W3-07 ngày 04/10/2026 (site Jira Cloud Free, 
   - **`npm run test:browser:v3`:** exit 0, 26/26 ca qua 10 scenario (jira_slack 1/1).
 - Điều chưa làm hoặc khác với task card:
   - **Không dùng `key = "…"` trong JQL** như task card gợi ý. JQL báo lỗi 400 khi key không tồn tại, làm hỏng cả lần tìm; đọc thẳng `/issue/{key}` thì key thiếu chỉ là 404. Đổi lại tốn thêm 1 request (thêm 2 nếu key không tồn tại, vì có lần gọi `/myself`).
-  - **Chưa kiểm với Jira thật.** Hành vi tìm `W3-07` và báo `AUTH_ERROR` với token sai cần chạy lại bằng `run.ts` sau khi merge (chỉ đọc, như tiêu chí nghiệm thu).
+  - **Ở mốc thi công chưa kiểm với Jira thật.** Nghiệm thu sau merge đã đạt, ghi ở phần reviewer bên dưới.
   - Mô tả tool trong catalog **không đổi**, nên không cần đo lại model vì W3-09.
+
+### Review độc lập và nghiệm thu sau merge (Codex, 04/10/2026)
+
+- Review độc lập snapshot `917b2eb`: **58/58** focused tests, **29/29** native HTTP probes (112 escaping inputs), **6/6** base/head controls, exit0; không có P1/P2 được xác nhận. Không sửa source khi review.
+- Sau #64, cập nhật branch theo main: head `971c3b25966d4b334b0f4db1d4b746088716278b`, [CI v3](https://github.com/VinhDat267/ATI_Project/actions/runs/37191633127) SUCCESS. Tree bằng snapshot kết hợp được root chạy lại; merge `f284b1215c6b858a34aebf994b5f0b08a4236aed` giữ cùng tree (`git diff --exit-code` đạt).
+- Canonical root: check **1.096 v3** = 47 schema + 340 adapters + 180 planner + 25 executor + 258 API + 246 web; **165 offline eval**, typecheck/build/security scan/launcher/guards đạt, exit0. Browser **26/26**, 10 scenario, PostgreSQL tạm55533.
+- **Jira thật sau merge:** helper ngoài repo gọi đúng `run.ts check` trong child process, env chỉ bật Jira/project thử ATIT và token giả: **exit1, AUTH_ERROR** đúng kỳ vọng. `checkLiveService` với token giả cũng AUTH_ERROR. Token hiện có: `jira.search_issues(query='W3-07')` trả issue `ATIT-4`; query key `ATIT-4` cũng trả đúng issue. Helper toàn bộ **PASS, exit0**; chỉ GET và POST read-only `/search/jql`, guard chặn ghi. Không in token/site/email hoặc response đầy đủ, không sao chép `.env`.
+- Không gọi model, live SMTP, service write hoặc deploy. Log/probe raw giữ ngoài repo; reviewer cập nhật CURRENT-STATE/ROADMAP trong PR tài liệu sau merge.
