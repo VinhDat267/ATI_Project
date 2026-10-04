@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AuthRoutesOptions } from './index.js';
-import { duplicateSignupEmail, sendEmailSafely, verificationEmail } from '../../services/email/index.js';
+import { duplicateSignupEmail, sendEmailInBackground, sendEmailSafely, verificationEmail } from '../../services/email/index.js';
 import { emailResponse, normalizedEmail, notifyAdmins, rateLimit, requirePostgres, signupResponse, validPassword, validToken } from './public-helpers.js';
 
 export function createSignupRoutes(options: AuthRoutesOptions): Router {
@@ -39,7 +39,7 @@ export function createSignupRoutes(options: AuthRoutesOptions): Router {
     const user = await options.userRepo!.findByEmail(email);
     if (user && !user.email_verified && user.status === 'pending') {
       const token = await options.userRepo!.authTokens.issue(user.id, 'verify_email', clock());
-      await sendEmailSafely(options.emailSender, verificationEmail(email, user.name, options.appBaseUrl ?? 'http://127.0.0.1:5174', token));
+      sendEmailInBackground(options.emailSender, verificationEmail(email, user.name, options.appBaseUrl ?? 'http://127.0.0.1:5174', token));
     }
     res.json(emailResponse);
   });

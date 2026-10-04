@@ -271,6 +271,8 @@ async function bootstrap() {
     sseManager,
   });
 
+  if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');
+
   // 7. Express App
   const app = createApp({
     jwtSecret: env.JWT_SECRET,
@@ -279,7 +281,7 @@ async function bootstrap() {
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     appBaseUrl: env.APP_BASE_URL,
-    emailSender: pool && userRepo ? createEmailSender(env, pool) : undefined,
+    emailSender: pool && userRepo && env.EMAIL_ENABLED ? createEmailSender(env, pool) : undefined,
     validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD
       ? (email, password) => email === process.env.SANDBOX_USER_EMAIL && password === process.env.SANDBOX_USER_PASSWORD
         ? { id: DEMO_ADMIN_ID, email, name: 'Sandbox User' } : null

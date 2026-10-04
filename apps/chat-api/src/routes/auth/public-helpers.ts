@@ -14,7 +14,7 @@ export const validPassword = (value: unknown): value is string => typeof value =
 export const validToken = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
 export function requirePostgres(options: AuthRoutesOptions, res: Response): boolean {
   if (options.userRepo && options.emailSender) return true;
-  res.status(503).json({ error: 'Tính năng này cần PostgreSQL và dịch vụ email.' }); return false;
+  res.status(503).json({ error: options.userRepo ? 'Chưa cấu hình gửi email.' : 'Tính năng này cần PostgreSQL và dịch vụ email.' }); return false;
 }
 export function rateLimit(limit: number, clock: () => number) {
   const buckets = new Map<string, { count: number; expiresAt: number }>();

@@ -34,6 +34,11 @@ export async function sendEmailSafely(sender: EmailSender | undefined, message: 
   catch { logger.warn('[auth-email] Không gửi được email.'); }
 }
 
+/** Starts delivery without awaiting it, so the response time does not reveal whether an account exists (AUTH-02b). */
+export function sendEmailInBackground(sender: EmailSender | undefined, message: EmailMessage, logger: Pick<Console, 'warn'> = console): void {
+  void sendEmailSafely(sender, message, logger);
+}
+
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 function email(to: string, subject: string, text: string): EmailMessage {
   return { to, subject, text, html: `<div lang="vi">${text.split('\n').map(line => `<p>${/^https?:\/\//.test(line) ? `<a href="${escapeHtml(line)}">${escapeHtml(line)}</a>` : escapeHtml(line)}</p>`).join('')}</div>` };

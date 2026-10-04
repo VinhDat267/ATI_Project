@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AuthRoutesOptions } from './index.js';
 import { hashPassword } from '../../db/repositories/user-repo.js';
-import { resetPasswordEmail, sendEmailSafely } from '../../services/email/index.js';
+import { resetPasswordEmail, sendEmailInBackground } from '../../services/email/index.js';
 import { emailResponse, normalizedEmail, rateLimit, requirePostgres, validPassword, validToken } from './public-helpers.js';
 
 export function createPasswordRoutes(options: AuthRoutesOptions): Router {
@@ -16,7 +16,7 @@ export function createPasswordRoutes(options: AuthRoutesOptions): Router {
     const user = await options.userRepo!.findByEmail(email);
     if (user) {
       const token = await options.userRepo!.authTokens.issue(user.id, 'reset_password', clock());
-      await sendEmailSafely(options.emailSender, resetPasswordEmail(email, user.name, options.appBaseUrl ?? 'http://127.0.0.1:5174', token));
+      sendEmailInBackground(options.emailSender, resetPasswordEmail(email, user.name, options.appBaseUrl ?? 'http://127.0.0.1:5174', token));
     }
     res.json(emailResponse);
   });
