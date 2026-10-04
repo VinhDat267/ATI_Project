@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import { apiClient } from '../services/api-client';
 import { userErrorMessage } from '../services/user-error';
@@ -23,16 +23,23 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
+  const hadSession = useRef(Boolean(authStorage.getStoredTokens().accessToken));
   useEffect(() => {
     let current = true;
     apiClient.getAuthConfig().then(data => { if (current) setAuthConfig(data); }).catch(() => {});
     return () => { current = false; };
   }, []);
   useEffect(() => subscribeAuthTokens(tokens => {
+    const lostSession = hadSession.current && !tokens.accessToken;
+    hadSession.current = Boolean(tokens.accessToken);
     setAuthToken(tokens.accessToken);
     if (tokens.user) setUser(tokens.user);
     else if (!tokens.accessToken) setUser(null);
-  }), []);
+    if (lostSession) {
+      useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
+      navigate('/login', true);
+    }
+  }), [navigate]);
   useEffect(() => {
     let current = true;
     const { accessToken, user: storedUser } = authStorage.getStoredTokens();

@@ -6,6 +6,7 @@ import type {
   ServiceInfo,
   User,
   ExecutionSnapshot,
+  AdminUser, AdminUserPage,
   AuthMessageResponse,
 } from '../types';
 
@@ -201,6 +202,19 @@ export class ApiClient {
 
   async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live' }> {
     return this.request('/api/health');
+  }
+
+  async getAdminUsers(options: { status?: 'pending' | 'active' | 'disabled'; search?: string; page?: number; limit?: number } = {}): Promise<AdminUserPage> {
+    const query = new URLSearchParams();
+    if (options.page !== undefined) query.set('page', String(options.page));
+    if (options.limit !== undefined) query.set('limit', String(options.limit));
+    if (options.status) query.set('status', options.status);
+    if (options.search) query.set('search', options.search);
+    return this.request(`/api/admin/users${query.size ? `?${query}` : ''}`);
+  }
+
+  async changeAdminUser(id: string, action: 'approve' | 'disable' | 'enable' | 'role', role?: 'member' | 'admin'): Promise<{ user: AdminUser }> {
+    return this.request(`/api/admin/users/${encodeURIComponent(id)}/${action}`, { method: 'POST', ...(action === 'role' ? { body: JSON.stringify({ role }) } : {}) });
   }
 
   // --- Conversations ---

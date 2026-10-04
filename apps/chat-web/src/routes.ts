@@ -18,6 +18,7 @@ export const routes = [
   { kind: 'forgot-password', pattern: /^\/forgot-password\/?$/, publicView: (props: PublicViewProps) => createElement(ForgotPasswordView, props) },
   { kind: 'reset-password', pattern: /^\/reset-password\/?$/, publicView: (props: PublicViewProps) => createElement(ResetPasswordView, props) },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
+  { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
 ] as const;
 export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found'; token?: string } | { kind: 'conversation'; conversationId: string };
 

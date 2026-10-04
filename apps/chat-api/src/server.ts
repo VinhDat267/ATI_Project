@@ -27,6 +27,7 @@ import { ALL_TOOLS } from '@wap/tool-schemas';
 import { createSandboxAdapter } from './sandbox/index.js';
 import { createSandboxProvider, createBackupSandboxProvider } from './sandbox/scenarios.js';
 import { createApp } from './app.js';
+import { AdminUserRepo } from './db/repositories/admin-user-repo.js';
 import { createEmailSender } from './services/email/index.js';
 
 async function bootstrap() {
@@ -275,6 +276,7 @@ async function bootstrap() {
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
+    adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     appBaseUrl: env.APP_BASE_URL,
     emailSender: pool && userRepo ? createEmailSender(env, pool) : undefined,
