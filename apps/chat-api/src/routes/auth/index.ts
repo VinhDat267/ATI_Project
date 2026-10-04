@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { createSessionRoutes } from './session.js';
+import { createSignupRoutes } from './signup.js';
+import { createPasswordRoutes } from './password.js';
+import type { EmailSender } from '../../services/email/index.js';
 import type { AuthUser } from '../../auth/jwt.js';
 import type { UserRepo } from '../../db/repositories/user-repo.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
@@ -11,12 +14,17 @@ export interface AuthRoutesOptions {
   userRepo?: UserRepo;
   sessionRepo?: SessionRepo;
   clock?: () => number;
+  signupEnabled?: boolean;
+  appBaseUrl?: string;
+  emailSender?: EmailSender;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
 }
 
 export function createAuthRoutes(options: AuthRoutesOptions): Router {
   const router = Router();
-  router.get('/config', (_req, res) => res.json({ signupEnabled: false, googleEnabled: false }));
+  router.get('/config', (_req, res) => res.json({ signupEnabled: options.signupEnabled ?? false, googleEnabled: false }));
   router.use(createSessionRoutes(options));
+  router.use(createSignupRoutes(options));
+  router.use(createPasswordRoutes(options));
   return router;
 }

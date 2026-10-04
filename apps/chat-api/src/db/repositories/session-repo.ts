@@ -13,20 +13,35 @@ export type RefreshResult =
   | { kind: 'conflict' }
   | { kind: 'invalid' };
 
+export class InvalidSessionUserError extends Error {
+  constructor() { super('Không thể xác thực tài khoản.'); }
+}
+
 export class SessionRepo {
   constructor(private pool: pg.Pool) {}
 
-  async create(userId: string, userAgent: string | undefined, now = Date.now()): Promise<{ sessionId: string; refreshToken: string }> {
+  async create(userId: string, userAgent: string | undefined, now = Date.now(), expectedPasswordHash?: string | null): Promise<{ sessionId: string; refreshToken: string }> {
     const refreshToken = newToken();
-    // Lazy expiry cleanup also cascades the retired hash history.
+    // Expiry cleanup uses no user lock and cannot fail after the new session
+    // has committed. It also cascades the retired refresh hash history.
     await this.pool.query('DELETE FROM auth_sessions WHERE expires_at <= $1', [new Date(now)]);
-    const result = await this.pool.query(
-      `INSERT INTO auth_sessions(user_id,refresh_token_hash,created_at,last_used_at,expires_at,user_agent)
-       SELECT id,$2,$3,$3,$4,$5 FROM users WHERE id=$1 AND status='active' RETURNING id`,
-      [userId, tokenHash(refreshToken), new Date(now), new Date(now + SESSION_TTL_MS), userAgent?.slice(0, 1024) ?? null],
-    );
-    if (!result.rows[0]) throw new Error('Account is not active');
-    return { sessionId: result.rows[0].id, refreshToken };
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Reset/disable also lock this user. Recheck the password snapshot after
+      // that lock so a previously authenticated old password cannot create a
+      // fresh session after password reset has revoked the existing sessions.
+      const account = (await client.query<{ status: string; password: string | null }>('SELECT status,password FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
+      if (!account || account.status !== 'active' || (expectedPasswordHash !== undefined && account.password !== expectedPasswordHash)) throw new InvalidSessionUserError();
+      const result = await client.query(
+        `INSERT INTO auth_sessions(user_id,refresh_token_hash,created_at,last_used_at,expires_at,user_agent)
+         VALUES($1,$2,$3,$3,$4,$5) RETURNING id`,
+        [userId, tokenHash(refreshToken), new Date(now), new Date(now + SESSION_TTL_MS), userAgent?.slice(0, 1024) ?? null],
+      );
+      await client.query('COMMIT');
+      return { sessionId: result.rows[0].id, refreshToken };
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   }
 
   async findActiveUser(sessionId: string, userId: string, now = Date.now()): Promise<AuthUser | null> {

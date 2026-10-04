@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { createAuthMiddleware, generateAccessToken, generateTokens, verifyRefreshToken, type AuthUser } from '../../auth/jwt.js';
 import { hashPassword, toAuthUser, verifyPassword } from '../../db/repositories/user-repo.js';
 import type { AuthRoutesOptions } from './index.js';
+import { InvalidSessionUserError } from '../../db/repositories/session-repo.js';
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const DUMMY_PASSWORD = hashPassword('dummy-login-password-for-missing-users');
@@ -36,10 +37,11 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
       }
 
       let user: AuthUser | null = null;
+      let expectedPasswordHash: string | null | undefined;
       if (options.userRepo) {
         const found = await options.userRepo.findByEmail(email);
         const valid = verifyPassword(body.password, found?.password ?? DUMMY_PASSWORD);
-        if (found && found.password && valid) user = toAuthUser(found);
+        if (found && found.password && valid) { user = toAuthUser(found); expectedPasswordHash = found.password; }
       } else if (options.validateCredentials) {
         user = await options.validateCredentials(email, body.password);
       }
@@ -64,7 +66,12 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
         return;
       }
       if (sessions) {
-        const session = await sessions.create(user.id, req.get('User-Agent'), now);
+        let session;
+        try { session = await sessions.create(user.id, req.get('User-Agent'), now, expectedPasswordHash); }
+        catch (error) {
+          if (!(error instanceof InvalidSessionUserError)) throw error;
+          res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác' }); return;
+        }
         res.json({ user, ...generateAccessToken(user, options.jwtSecret, session.sessionId, now), refreshToken: session.refreshToken });
         return;
       }
