@@ -2,6 +2,7 @@ import type pg from 'pg';
 import crypto from 'node:crypto';
 import { SessionRepo } from './session-repo.js';
 import { AuthTokenRepo } from './auth-token-repo.js';
+import { GoogleAuthRepo } from './google-auth-repo.js';
 import type { AuthUser } from '../../auth/jwt.js';
 
 export interface UserRow {
@@ -52,9 +53,11 @@ export function verifyPassword(password: string, storedHash?: string | null): bo
 export class UserRepo {
   readonly sessions: SessionRepo;
   readonly authTokens: AuthTokenRepo;
+  readonly googleAuth: GoogleAuthRepo;
   constructor(private pool: pg.Pool) {
     this.sessions = new SessionRepo(pool);
     this.authTokens = new AuthTokenRepo(pool);
+    this.googleAuth = new GoogleAuthRepo(pool);
   }
 
   async createPendingUser(data: { email: string; password: string; name: string }): Promise<UserRow | null> {

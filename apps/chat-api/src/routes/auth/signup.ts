@@ -2,11 +2,12 @@ import { Router } from 'express';
 import type { AuthRoutesOptions } from './index.js';
 import { duplicateSignupEmail, sendEmailInBackground, sendEmailSafely, verificationEmail } from '../../services/email/index.js';
 import { emailResponse, normalizedEmail, notifyAdmins, rateLimit, requirePostgres, signupResponse, validPassword, validToken } from './public-helpers.js';
+import { SignupQuota, SignupRateLimitError } from '../../auth/signup-quota.js';
 
 export function createSignupRoutes(options: AuthRoutesOptions): Router {
   const router = Router();
   const clock = options.clock ?? Date.now;
-  const signupLimit = rateLimit(10, clock), resendLimit = rateLimit(3, clock);
+  const signupQuota = options.signupQuota ?? new SignupQuota(clock), resendLimit = rateLimit(3, clock);
   router.post('/signup', async (req, res) => {
     if (!requirePostgres(options, res)) return;
     if (!options.signupEnabled) { res.status(403).json({ error: 'Đăng ký tài khoản hiện đang đóng.' }); return; }
@@ -15,7 +16,12 @@ export function createSignupRoutes(options: AuthRoutesOptions): Router {
     if (!email || !validPassword(password) || !name || name.length > 100) {
       res.status(400).json({ error: 'Nhập tên (tối đa 100 ký tự), email hợp lệ và mật khẩu từ 12 đến 128 ký tự.' }); return;
     }
-    if (!signupLimit(req.ip ?? 'unknown', res)) return;
+    try { signupQuota.take(req.ip ?? 'unknown'); }
+    catch (error) {
+      if (!(error instanceof SignupRateLimitError)) throw error;
+      res.setHeader('Retry-After', String(error.retryAfter));
+      res.status(429).json({ error: error.message }); return;
+    }
     const user = await options.userRepo!.createPendingUser({ email, password, name });
     if (user) {
       const token = await options.userRepo!.authTokens.issue(user.id, 'verify_email', clock());

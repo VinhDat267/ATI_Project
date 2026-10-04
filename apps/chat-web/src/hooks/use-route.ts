@@ -5,6 +5,12 @@ export function useRoute(initialView?: 'landing' | 'login') {
   const [route, setRoute] = useState<AppRoute>(() => initialView
     ? { kind: initialView === 'login' ? 'login' : 'home' } : readRoute());
   useLayoutEffect(() => {
+    if (route.kind === 'google-callback') {
+      const url = new URL(window.location.href);
+      for (const key of ['code', 'state', 'error', 'error_description', 'error_uri']) url.searchParams.delete(key);
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
     if (route.kind !== 'verify-email' && route.kind !== 'reset-password') return;
     const url = new URL(window.location.href);
     if (!url.searchParams.has('token')) return;

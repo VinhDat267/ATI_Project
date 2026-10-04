@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { apiClient } from '../services/api-client';
 import { userErrorMessage } from '../services/user-error';
+import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { AuthFeedback, AuthFormFrame, authButtonClass, authInputClass, type AuthViewProps } from './AuthFormFrame';
 
 export function SignupView({ navigate, authConfig }: AuthViewProps) {
@@ -15,7 +16,7 @@ export function SignupView({ navigate, authConfig }: AuthViewProps) {
   };
   return <AuthFormFrame title="Tạo tài khoản" description="Xác minh email và chờ quản trị viên duyệt để sử dụng hệ thống." navigate={navigate}>
     <AuthFeedback error={error} message={message} />
-    {!authConfig?.signupEnabled ? <p role="status" className="text-sm text-zinc-600">Đăng ký tài khoản hiện đang đóng.</p>
+    {!authConfig?.signupEnabled ? <p role="status" className="text-sm text-zinc-600">Đăng ký bằng email hiện đang đóng.</p>
       : !message && <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="text-sm text-zinc-700">Họ tên<input className={authInputClass} value={name} onChange={event => setName(event.target.value)} autoComplete="name" required maxLength={100} /></label>
         <label className="text-sm text-zinc-700">Email<input type="email" className={authInputClass} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required maxLength={254} /></label>
@@ -23,5 +24,6 @@ export function SignupView({ navigate, authConfig }: AuthViewProps) {
         <p className="text-xs text-zinc-500">Mật khẩu từ 12 đến 128 ký tự.</p>
         <button className={authButtonClass} disabled={busy}>{busy ? 'Đang gửi...' : 'Tạo tài khoản'}</button>
       </form>}
+    {authConfig?.googleEnabled && !message && <GoogleAuthButton disabled={busy} />}
   </AuthFormFrame>;
 }

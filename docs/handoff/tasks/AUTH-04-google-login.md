@@ -1,6 +1,6 @@
 # AUTH-04 · Đăng nhập và đăng ký bằng Google
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/auth-04-google-login` · **Phụ thuộc:** AUTH-01 đã merge · **Làm song song với:** AUTH-02, AUTH-03
+**Trạng thái:** thi công và review đạt, chờ merge #66 · **Nhánh:** `vinhdat/feat-auth-04-google-login` · **Phụ thuộc:** AUTH-01 đã merge · **Làm song song với:** AUTH-02, AUTH-03
 
 Đọc trước: [yêu cầu chung của mảng tài khoản](AUTH-common.md). Đọc tài liệu OpenID Connect hiện hành của Google trước khi code; ghi đường dẫn và ngày đọc trong log.
 
@@ -53,27 +53,28 @@
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test kiểm ID token: từ chối khi:
+- [x] Test kiểm ID token: từ chối khi:
   - sai chữ ký, `kid` lạ không có trong JWKS mới;
   - `iss` sai, `aud` sai, hết hạn, `nonce` sai;
   - `email_verified` false, thuật toán khác RS256 (kể cả `none`).
-- [ ] Test `state`: dùng lại, hết hạn, không tồn tại đều bị từ chối; hai callback đồng thời cùng `state` chỉ một thành công (PostgreSQL thật).
-- [ ] Test PKCE: `code_verifier` gửi tới token endpoint khớp `code_challenge` đã gửi Google.
-- [ ] Test đủ năm trường hợp của bảng ghép tài khoản, đặc biệt: tài khoản email chưa xác minh bị Google "nhận lại" thì mật khẩu cũ không còn đăng nhập được và phiên cũ bị thu hồi.
-- [ ] Test `mode: 'link'` không thể gắn vào user khác bằng cách sửa dữ liệu phía trình duyệt; `google_sub` trùng bị từ chối.
-- [ ] Test `unlink` bị từ chối khi tài khoản không có mật khẩu.
-- [ ] Test `live` bỏ qua env URL giả; thiếu env Google thì `googleEnabled: false`.
-- [ ] Test không có `code`, token, `client_secret` trong log.
-- [ ] Browser E2E với máy chủ OIDC giả:
+- [x] Test `state`: dùng lại, hết hạn, không tồn tại đều bị từ chối; hai callback đồng thời cùng `state` chỉ một thành công (PostgreSQL thật).
+- [x] Test PKCE: `code_verifier` gửi tới token endpoint khớp `code_challenge` đã gửi Google.
+- [x] Test đủ năm trường hợp của bảng ghép tài khoản, đặc biệt: tài khoản email chưa xác minh bị Google "nhận lại" thì mật khẩu cũ không còn đăng nhập được và phiên cũ bị thu hồi.
+- [x] Test `mode: 'link'` không thể gắn vào user khác bằng cách sửa dữ liệu phía trình duyệt; `google_sub` trùng bị từ chối.
+- [x] Test `unlink` bị từ chối khi tài khoản không có mật khẩu.
+- [x] Test `live` bỏ qua env URL giả; thiếu env Google thì `googleEnabled: false`.
+- [x] Test không có `code`, token, `client_secret` trong log.
+- [x] Browser E2E với máy chủ OIDC giả:
   - người mới đăng nhập Google → màn hình "chờ duyệt";
   - admin duyệt (DB hoặc AUTH-03) → đăng nhập Google vào được chat;
   - URL sau callback không còn `code`/`state`.
-- [ ] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] Test mới fail trước khi sửa; `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Tài liệu Google đã đọc (đường dẫn, ngày):
-- Test đã chạy và kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#66](https://github.com/VinhDat267/ATI_Project/pull/66), base `main` `02b21e6`; chờ CI đúng head và merge.
+- Commit code: `9c7641e4b5e2559028ab8056b17cf0ae9af0f5b5`.
+- Tài liệu Google đã đọc ngày **04/10/2026**: [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect), [OAuth 2.0 web server](https://developers.google.com/identity/protocols/oauth2/web-server). Google cho phép query theo giới hạn redirect URI; triển khai chọn đường dẫn cố định `/auth/google/callback`, không query/fragment.
+- Test và review: `npm run check` exit 0, **1.188 v3 + 165 eval**, typecheck/build/credential scan/launcher/local guards/fake OIDC đạt; canonical browser **27/27**, 11 scenario; Google repeat **3/3**, exit 0. Reviewer tổng thể độc lập chạy lại **51 API + 4 fixture + 49 frontend + 3 probe HTTP**, đều exit 0; không còn P1/P2 được xác nhận. RED/GREEN và các lần sửa sau review xem [log bàn giao](../log/2026-10-04-codex-AUTH-04-google-login.md).
+- Khác với task card: migration **0007** vì 0005/0006 đã dùng. Thêm binding cookie trình duyệt và session gốc cho link; nhận lại email chưa xác minh còn vô hiệu token reset/verify cũ. Google signup tuân thủ cờ đăng ký độc lập với SMTP, chia sẻ quota 10/IP/giờ với email. Callback và request bảo toàn phiên mới qua đổi tab, xoay token, logout và JSON trả chậm.
+- **NOT_RUN:** Google/GCP thật, SMTP thật (AUTH-06), model/service thật và deploy. Bằng chứng local/sandbox không thay thế nghiệm thu live. CURRENT-STATE/ROADMAP chưa sửa trước merge.

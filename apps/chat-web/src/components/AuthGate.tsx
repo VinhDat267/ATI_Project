@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
-import { apiClient } from '../services/api-client';
+import { apiClient, sharesAuthSession } from '../services/api-client';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore } from '../store/chat-store';
 import { NotFoundView } from '../views/NotFoundView';
@@ -42,14 +42,26 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   }), [navigate]);
   useEffect(() => {
     let current = true;
-    const { accessToken, user: storedUser } = authStorage.getStoredTokens();
+    const { accessToken, refreshToken, user: storedUser } = authStorage.getStoredTokens();
+    const ownsHydration = () => {
+      const latest = authStorage.getStoredTokens();
+      return current && Boolean(latest.accessToken) &&
+        (latest.accessToken === accessToken || sharesAuthSession(accessToken, latest.accessToken));
+    };
     if (accessToken) {
       setAuthToken(accessToken); if (storedUser) setUser(storedUser);
       apiClient.getMe().then(data => {
-        if (current && data?.user) { setUser(data.user); authStorage.setStoredTokens({ user: data.user }); }
+        if (ownsHydration() && data?.user) { setUser(data.user); authStorage.setStoredTokens({ user: data.user }); }
       }).catch(reason => {
-        if (!current) return;
-        if (reason?.status === 401) { authStorage.clearStoredTokens(); setAuthToken(null); setUser(null); }
+        if (!ownsHydration()) return;
+        if (reason?.status === 401) {
+          // An obsolete response can still belong to the same rotating session.
+          // Only invalidate the exact pair that this hydration began with.
+          const latest = authStorage.getStoredTokens();
+          if (latest.accessToken === accessToken && latest.refreshToken === refreshToken) {
+            authStorage.clearStoredTokens(); setAuthToken(null); setUser(null);
+          }
+        }
         else setAuthError(userErrorMessage(reason));
       });
     }
@@ -73,7 +85,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
       navigate('/');
     }
   };
-  const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password'].includes(route.kind);
+  const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password', 'google-callback'].includes(route.kind);
   if (authToken && !isAccountFlow) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
   if (route.kind === 'not-found') return <NotFoundView onGoHome={() => navigate('/')} />;
   const definition = routes.find(entry => entry.kind === route.kind);
@@ -81,5 +93,5 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}
     isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')}
     onSignup={() => navigate('/signup')} onForgotPassword={() => navigate('/forgot-password')} onResendVerification={() => navigate('/resend-verification')}
-    token={'token' in route ? route.token : undefined} />;
+    token={'token' in route ? route.token : undefined} googleCallback={'googleCallback' in route ? route.googleCallback : undefined} />;
 }

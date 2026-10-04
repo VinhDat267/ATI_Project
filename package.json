@@ -23,7 +23,7 @@
     "typecheck:v2": "tsc -p tsconfig.json && npm run typecheck -w @wap/web",
     "schema:json": "npm run schema:json -w @wap/dsl",
     "api:generate": "tsx packages/dsl/scripts/emit-openapi.ts && openapi-typescript docs/openapi.yaml -o packages/dsl/generated/api.d.ts",
-    "check": "npm run typecheck:v3 && npm run test:v3 && npm run test:eval:v3 && npm run build:v3 && node scripts/test-v3-web-build-security.mjs && npm run test:launcher:v3 && node --test scripts/v3-local-env.test.mjs",
+    "check": "npm run typecheck:v3 && npm run test:v3 && npm run test:eval:v3 && npm run build:v3 && node scripts/test-v3-web-build-security.mjs && npm run test:launcher:v3 && node --test scripts/v3-local-env.test.mjs scripts/fake-oidc.test.mjs",
     "check:local:v3": "node --env-file-if-exists=.env scripts/run-v3-local.mjs check",
     "test:browser:v3": "node --env-file-if-exists=.env scripts/test-v3-browser.mjs",
     "test:launcher:v3": "node --test scripts/start-v3.test.mjs",

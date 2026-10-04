@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
 
 export interface EnvConfig {
   DATABASE_URL: string;
@@ -13,6 +14,9 @@ export interface EnvConfig {
   PORT: number;
   RUNTIME_MODE: 'live' | 'sandbox';
   AUTH_SIGNUP_ENABLED: boolean;
+  /** Google registration uses the raw account policy independently of SMTP availability. */
+  GOOGLE_SIGNUP_ENABLED: boolean;
+  GOOGLE_OAUTH?: GoogleOAuthConfig;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
   EMAIL_ENABLED: boolean;
   APP_BASE_URL: string;
@@ -107,6 +111,30 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     APP_BASE_URL = url.origin;
   } catch { throw new Error('APP_BASE_URL must be a web origin (HTTPS in live, or loopback HTTP)'); }
 
+  let GOOGLE_OAUTH: GoogleOAuthConfig | undefined;
+  if (env.GOOGLE_OAUTH_CLIENT_ID?.trim() && env.GOOGLE_OAUTH_CLIENT_SECRET?.trim() && env.GOOGLE_OAUTH_REDIRECT_URI?.trim()) {
+    let redirectUri: string;
+    try {
+      const url = new URL(env.GOOGLE_OAUTH_REDIRECT_URI.trim());
+      const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+      if (!['http:', 'https:'].includes(url.protocol) || (isLive && url.protocol !== 'https:' && !loopback)
+        || url.username || url.password || url.pathname !== '/auth/google/callback' || url.search || url.hash) throw new Error();
+      redirectUri = url.href;
+    } catch { throw new Error('GOOGLE_OAUTH_REDIRECT_URI must be the web /auth/google/callback URL without query, fragment or credentials'); }
+    const endpoints = { ...GOOGLE_ENDPOINTS };
+    if (!isLive) {
+      for (const [key, field] of Object.entries({ authorizationUrl: 'GOOGLE_OAUTH_AUTH_URL', tokenUrl: 'GOOGLE_OAUTH_TOKEN_URL', jwksUrl: 'GOOGLE_OAUTH_JWKS_URL' })) {
+        if (!env[field]?.trim()) continue;
+        try {
+          const url = new URL(env[field]!.trim());
+          if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+          endpoints[key as keyof typeof endpoints] = url.href;
+        } catch { throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`); }
+      }
+    }
+    GOOGLE_OAUTH = { clientId: env.GOOGLE_OAUTH_CLIENT_ID.trim(), clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET.trim(), redirectUri, ...endpoints };
+  }
+
   return {
     DATABASE_URL,
     JWT_SECRET,
@@ -118,6 +146,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     PORT,
     RUNTIME_MODE,
     AUTH_SIGNUP_ENABLED,
+    GOOGLE_SIGNUP_ENABLED: env.AUTH_SIGNUP_ENABLED !== 'false',
+    GOOGLE_OAUTH,
     EMAIL_ENABLED,
     APP_BASE_URL,
     SMTP_HOST: env.SMTP_HOST || '',
