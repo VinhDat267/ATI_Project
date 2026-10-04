@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 let server: Server;
 let base: string;
 let refreshStatus = 200;
+let streamStatus = 200;
 let rejectFresh = false;
 let streamHeaders: string[] = [];
 let refreshCount = 0;
@@ -23,13 +24,14 @@ function SubscribedClient() {
   return token ? <p>Đã đăng nhập</p> : <p>Đăng nhập</p>;
 }
 beforeEach(async () => {
-  refreshStatus = 200; rejectFresh = false; streamHeaders = []; refreshCount = 0;
+  refreshStatus = 200; streamStatus = 200; rejectFresh = false; streamHeaders = []; refreshCount = 0;
   useChatStore.getState().reset(); useChatStore.getState().setConversationId('c1');
   authStorage.setStoredTokens({ accessToken: 'expired', refreshToken: 'refresh-test' });
   server = createServer((req, res) => {
     if (req.url === '/api/auth/refresh') { refreshCount++; res.writeHead(refreshStatus, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(refreshStatus === 200 ? { accessToken: 'fresh', refreshToken: 'rotated' } : { error: 'Thử lại sau' })); return; }
     if (req.url?.endsWith('/stream')) {
       streamHeaders.push(String(req.headers.authorization));
+      if (streamStatus !== 200) { res.writeHead(streamStatus, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Bạn không có quyền thực hiện thao tác này.' })); return; }
       if (req.headers.authorization !== 'Bearer fresh' || rejectFresh) { res.writeHead(401); res.end(); return; }
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });
       res.write('event: clarification\ndata: {"question":"Kết nối đã khôi phục"}\n\n'); return;
@@ -62,6 +64,13 @@ it('keeps the one-refresh budget when new tokens re-render the authentication su
   await screen.findByText('Đăng nhập');
   expect(refreshCount).toBe(1);
 });
+it('a real ownership 403 stops the stream without clearing a valid authenticated session', async () => {
+  streamStatus = 403; render(<Client />);
+  await screen.findByText('Mất kết nối, đang thử lại…', {}, { timeout: 6500 });
+  expect(authStorage.getStoredTokens().accessToken).toBe('expired');
+  expect(refreshCount).toBe(0);
+  expect(streamHeaders).toEqual(['Bearer expired']);
+}, 8000);
 it('refresh server failure retains authentication and shows a delayed disconnection notice', async () => {
   refreshStatus = 503; render(<Client />);
   await waitFor(() => expect(streamHeaders.length).toBeGreaterThan(0));

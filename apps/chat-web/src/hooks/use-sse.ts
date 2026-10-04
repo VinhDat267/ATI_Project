@@ -321,7 +321,10 @@ export function useSSE(conversationId: string | null, token: string | null) {
         return response;
       },
       async onopen(response) {
-        if (response.status === 401 || response.status === 403) {
+        // A stream 403 means conversation ownership was denied, not that the
+        // authenticated session expired. Only the refresh endpoint's 403 above
+        // is an authentication failure; keep credentials for other conversations.
+        if (response.status === 401) {
           authStorage.clearStoredTokens();
           throw new StreamAuthError('Phiên đăng nhập đã hết hạn.');
         }
