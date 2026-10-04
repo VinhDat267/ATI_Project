@@ -35,7 +35,37 @@ Nguồn: chạy thật Jira trong W3-07 ngày 04/10/2026 (site Jira Cloud Free, 
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
+- PR: nhánh `fix/w3-09-jira-live-findings` (Claude Code thi công theo yêu cầu của người dùng).
+- Commit: `48dbe69` (test RED), `74ed79a` (sửa), `58d705d` (thêm test cho mutation lọt), kèm commit tài liệu.
+- Tài liệu đã đọc (04/10/2026), Atlassian Support, Jira Cloud:
+  - "Search for work items using the text field":
+    - `-` là toán tử loại trừ, `+` bắt buộc, `!`/`&&`/`||`/`( )` là toán tử;
+    - cụm từ chính xác viết `text ~ "\"…\""`.
+  - "What is advanced search in Jira Cloud?", mục "Restricted words and characters":
+    - ký tự không phải chữ/số phần lớn không được index;
+    - một số ký tự cần hai dấu backslash trong JQL, ví dụ `field ~ "\\(text"`.
+- Cách sửa:
+  - **Mục 1:**
+    - escape bằng backslash các ký tự `+ - & | ! ( ) { } [ ] ^ ~ * ? : \ / "`, không xóa nữa; sau đó escape lớp JQL như cũ.
+      - `W3-07` cho ra `text ~ "W3\\-07"`: một term giống như lúc Jira index.
+      - Cả câu vẫn nằm trong một chuỗi `text ~ "…"`.
+    - Query có dạng issue key (không phân biệt hoa thường) thuộc **đúng project đang tìm** thì đọc thẳng `GET /issue/{key}?fields=summary,status,project` trước text search.
+      - Kết quả đọc thẳng đứng đầu, bỏ trùng, vẫn giới hạn bởi `limit`.
+      - Key không tồn tại (404) hoặc issue đã chuyển sang project khác thì không tính, text search vẫn chạy.
+  - **Mục 2:**
+    - đọc nhận 404 (trừ chính `/myself`) thì gọi `/myself` **một lần, không retry**;
+    - 401/403 thì `AUTH_ERROR`, mọi kết quả khác (200, 5xx, lỗi mạng) giữ `NOT_FOUND`;
+    - lệnh ghi không đổi.
+- Test đã chạy và kết quả (04/10/2026):
+  - **RED trên `main` `87411bc`:** 11/11 fail đúng lý do:
+    - `expected 'W3 07' to be 'W3\-07'`;
+    - chưa đọc thẳng issue key;
+    - read 404 ra `NOT_FOUND` mà không gọi `/myself`.
+  - **GREEN:** `jira-adapter.test.ts` 58/58. Các test chống chèn JQL cũ vẫn đạt; assertion "ký tự bị xóa" đổi thành "ký tự được escape".
+  - **Mutation:** 11/11 bị bắt. Lần đầu bỏ khử trùng lặp lọt vì `slice` che mất phần tử trùng; đã thêm test, chạy lại thì bị bắt.
+  - **`npm run check`:** exit 0; v3 1.086 = 47 schema + 340 adapters + 180 planner + 25 executor + 258 API + 236 web; eval 165; typecheck, build, quét bản build đạt.
+  - **`npm run test:browser:v3`:** exit 0, 26/26 ca qua 10 scenario (jira_slack 1/1).
 - Điều chưa làm hoặc khác với task card:
+  - **Không dùng `key = "…"` trong JQL** như task card gợi ý. JQL báo lỗi 400 khi key không tồn tại, làm hỏng cả lần tìm; đọc thẳng `/issue/{key}` thì key thiếu chỉ là 404. Đổi lại tốn thêm 1 request (thêm 2 nếu key không tồn tại, vì có lần gọi `/myself`).
+  - **Chưa kiểm với Jira thật.** Hành vi tìm `W3-07` và báo `AUTH_ERROR` với token sai cần chạy lại bằng `run.ts` sau khi merge (chỉ đọc, như tiêu chí nghiệm thu).
+  - Mô tả tool trong catalog **không đổi**, nên không cần đo lại model vì W3-09.
