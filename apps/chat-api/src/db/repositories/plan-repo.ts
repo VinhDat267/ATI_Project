@@ -11,6 +11,7 @@ export interface PlanRow {
   decided_at: Date | null;
   created_at: Date;
   revision?: string;
+  resource_labels?: Record<string, string>;
 }
 
 export class PlanRepo {
@@ -22,6 +23,7 @@ export class PlanRepo {
     planText?: string;
     planHash: string;
     expiresAt: Date;
+    resourceLabels?: Record<string, string>;
   }): Promise<PlanRow> {
     const client = await this.pool.connect();
     try {
@@ -34,10 +36,10 @@ export class PlanRepo {
         [data.convId]
       );
       const res = await client.query(
-        `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at, resource_labels)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [data.convId, JSON.stringify(data.planJson), data.planText || null, data.planHash, data.expiresAt]
+        [data.convId, JSON.stringify(data.planJson), data.planText || null, data.planHash, data.expiresAt, JSON.stringify(data.resourceLabels ?? {})]
       );
       await client.query('COMMIT');
       return res.rows[0];

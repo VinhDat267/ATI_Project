@@ -46,9 +46,9 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
     if (id === currentConversationId) return;
     if (onSelectConversation) { onSelectConversation(id); return; }
     const selected = ++selection.current;
-    const store = useChatStore.getState(); store.reset(); store.setConversationId(id);
+    const store = useChatStore.getState(); store.reset({ preservePlanning: true }); store.setConversationId(id);
     try { await loadConversationHistory(id, () => selection.current === selected && useChatStore.getState().conversationId === id); }
-    catch (reason) { if (selection.current === selected) { store.reset(); setError(userErrorMessage(reason)); } }
+    catch (reason) { if (selection.current === selected) { store.reset({ preservePlanning: true }); setError(userErrorMessage(reason)); } }
   };
   const rename = async (id: string) => {
     if (saving) return;

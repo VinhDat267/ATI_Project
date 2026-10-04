@@ -4,7 +4,7 @@ import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn() }));
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = {id:'u1', name:'Tester', email:'test@example.test'};
 beforeEach(() => {
   useChatStore.getState().reset();

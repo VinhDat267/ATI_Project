@@ -410,7 +410,7 @@ export class ExecutionService {
       } catch { /* Invalid or unstarted progress can still be stopped. */ }
     }
     return {
-      plan: { ...parsed, id: plan.id, convId: plan.conv_id, status: plan.status },
+      plan: { ...parsed, id: plan.id, convId: plan.conv_id, status: plan.status, resourceLabels: plan.resource_labels ?? {} },
       execution,
       steps: rows.map(row => ({ stepId: row.step_id, tool: row.tool, status: row.status, output: row.output_json,
         error: row.error_json, startedAt: row.started_at, completedAt: row.completed_at, durationMs: row.duration_ms })),

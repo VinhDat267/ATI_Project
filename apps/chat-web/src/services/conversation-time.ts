@@ -8,7 +8,7 @@ export function formatConversationTime(dateStr?: string): string {
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear();
   if (isToday) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
   }
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);

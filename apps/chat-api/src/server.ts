@@ -93,7 +93,7 @@ async function bootstrap() {
         for (const previous of planMap.values()) {
           if (previous.conv_id === data.convId && previous.status === 'pending') setMemoryPlanStatus(previous, 'superseded');
         }
-        const row = { id, conv_id: data.convId, plan_json: data.planJson, plan_text: data.planText || JSON.stringify(data.planJson), plan_hash: data.planHash, status: 'pending', expires_at: data.expiresAt, decided_at: null, created_at: new Date(), revision: '1' };
+        const row = { id, conv_id: data.convId, plan_json: data.planJson, resource_labels: data.resourceLabels ?? {}, plan_text: data.planText || JSON.stringify(data.planJson), plan_hash: data.planHash, status: 'pending', expires_at: data.expiresAt, decided_at: null, created_at: new Date(), revision: '1' };
         planMap.set(id, row);
         return { ...row };
       },

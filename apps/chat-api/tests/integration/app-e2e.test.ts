@@ -96,7 +96,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     const res = await fetch(`${baseUrl}/api/conversations`);
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toMatch(/authorization/i);
+    expect(body.error).toMatch(/đăng nhập/i);
   });
 
   it('rejects login with invalid credentials with 401', async () => {
@@ -107,7 +107,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     });
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toMatch(/invalid email or password/i);
+    expect(body.error).toMatch(/Email hoặc mật khẩu không chính xác/i);
   });
 
   it('rejects login for arbitrary unknown email with 401', async () => {
@@ -118,7 +118,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     });
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toMatch(/invalid email or password/i);
+    expect(body.error).toMatch(/Email hoặc mật khẩu không chính xác/i);
   });
 
   let validToken = '';

@@ -4,11 +4,13 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import { WorkingMemory, type AIPlanner, type ChatMessage } from '@wap/planner';
 import type { PlannerResponse } from '@wap/tool-schemas';
+import { resourceLabels } from './resource-labels.js';
 
 export interface HandleUserMessageInput {
   conversationId: string;
   userId: string;
   content: string;
+  requestId?: string;
 }
 
 export interface IngestionResult {
@@ -42,22 +44,22 @@ export class ChatService {
   }
 
   async handleUserMessage(input: HandleUserMessageInput): Promise<IngestionResult> {
-    const { conversationId, userId, content } = input;
+    const { conversationId, userId, content, requestId } = input;
 
     // 1. Save user message immediately to DB
-    const message = await this.msgRepo.createMessage(
-      conversationId,
-      'user',
-      content
-    );
+    const message = requestId
+      ? await this.msgRepo.createMessage(conversationId, 'user', content, { requestId })
+      : await this.msgRepo.createMessage(conversationId, 'user', content);
+    const correlation = { replyToMessageId: message.id, ...(requestId ? { requestId } : {}) };
 
     // 2. Schedule async planner pipeline execution
     setImmediate(() => {
-      this.executePlannerPipeline(conversationId, userId, content, message.id).catch((err) => {
-        this.eventEmitter.emit('error', {
-          conversationId,
-          message: err?.message || 'Unexpected error in planning pipeline',
-        });
+      this.executePlannerPipeline(conversationId, userId, content, message.id, requestId).catch(async () => {
+        const text = 'Không thể lập kế hoạch lúc này. Hãy thử lại.';
+        try {
+          await this.msgRepo.createMessage(conversationId, 'system', `Lỗi: ${text}`, { type: 'planning_error', ...correlation });
+        } catch { /* SSE must still report the failure if saving its history fails. */ }
+        this.eventEmitter.emit('error', { conversationId, message: text, ...correlation });
       });
     });
 
@@ -71,12 +73,15 @@ export class ChatService {
     conversationId: string,
     _userId: string,
     content: string,
-    currentMessageId: string
+    currentMessageId: string,
+    requestId?: string
   ): Promise<void> {
+    const correlation = { replyToMessageId: currentMessageId, ...(requestId ? { requestId } : {}) };
     // Emit agent_state: planning
     this.eventEmitter.emit('agent_state', {
       conversationId,
       state: 'planning',
+      ...correlation,
     });
 
     // Retrieve previous messages for conversation context
@@ -106,6 +111,7 @@ export class ChatService {
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
 
     if (plannerResponse.kind === 'plan') {
+      const labels = resourceLabels(plannerResponse, memory);
       const planHash = createHash('sha256')
         .update(JSON.stringify(plannerResponse))
         .digest('hex');
@@ -119,49 +125,58 @@ export class ChatService {
           planText: JSON.stringify(plannerResponse),
           planHash,
           expiresAt,
+          resourceLabels: labels,
         });
         planId = createdPlan.id;
       }
 
       await this.msgRepo.createMessage(conversationId, 'assistant', `Kế hoạch: ${plannerResponse.summary}`, {
-        type: 'plan', planId, plan: plannerResponse,
+        type: 'plan', planId, plan: plannerResponse, resourceLabels: labels, ...correlation,
       });
 
       this.eventEmitter.emit('plan_preview', {
         conversationId,
         planId,
         plan: plannerResponse,
+        resourceLabels: labels,
+        ...correlation,
       });
 
       this.eventEmitter.emit('agent_state', {
         conversationId,
         state: 'waiting_for_approval',
+        ...correlation,
       });
     } else if (plannerResponse.kind === 'clarification') {
       await this.msgRepo.createMessage(conversationId, 'assistant', plannerResponse.question, {
-        type: 'clarification', options: plannerResponse.options ?? [], context: plannerResponse.context,
+        type: 'clarification', options: plannerResponse.options ?? [], context: plannerResponse.context, ...correlation,
       });
       this.eventEmitter.emit('clarification', {
         conversationId,
         question: plannerResponse.question,
         options: plannerResponse.options ?? [],
         context: plannerResponse.context,
+        ...correlation,
       });
 
       this.eventEmitter.emit('agent_state', {
         conversationId,
         state: 'idle',
+        ...correlation,
       });
     } else if (plannerResponse.kind === 'refusal') {
+      await this.msgRepo.createMessage(conversationId, 'assistant', `Từ chối yêu cầu: ${plannerResponse.reason}${plannerResponse.suggestion ? `\nGợi ý: ${plannerResponse.suggestion}` : ''}`, { type: 'refusal', ...correlation });
       this.eventEmitter.emit('refusal', {
         conversationId,
         reason: plannerResponse.reason,
         suggestion: plannerResponse.suggestion,
+        ...correlation,
       });
 
       this.eventEmitter.emit('agent_state', {
         conversationId,
         state: 'idle',
+        ...correlation,
       });
     }
   }

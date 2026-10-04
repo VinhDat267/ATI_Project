@@ -1,5 +1,6 @@
 import React from 'react';
-import type { StepState } from '../types';
+import type { StepState, PlanStatus } from '../types';
+import { getToolDefinition, type JSONSchema } from '@wap/tool-schemas';
 
 export interface ExecutionStepInfo {
   id: string;
@@ -7,18 +8,58 @@ export interface ExecutionStepInfo {
   description: string;
   status: StepState;
   duration?: string;
-  output?: string;
+  output?: unknown;
+  completedAt?: string | null;
   error?: string;
 }
 
 export interface ExecutionProgressProps {
   steps: ExecutionStepInfo[];
   title?: string;
+  status?: PlanStatus;
+}
+
+const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
+const timeFields = new Set(['createdAt', 'updatedAt', 'start', 'end']);
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+const safeURL = (text: string) => { try { const url = new URL(text); return ['http:', 'https:'].includes(url.protocol); } catch { return false; } };
+
+function FieldList({ value }: { value: Record<string, unknown> }) {
+  return <dl>{Object.entries(value).filter(([key, field]) => Object.hasOwn(resultNames, key) && (typeof field === 'string' || typeof field === 'number')).map(([key, field]) =>
+    <div key={key} className="flex gap-2"><dt>{resultNames[key]}:</dt><dd>{typeof field === 'string' && safeURL(field)
+      ? <a href={field} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{field}</a>
+      : typeof field === 'string' && timeFields.has(key) && Number.isFinite(Date.parse(field))
+        ? <time dateTime={field}>{new Date(field).toLocaleString('vi-VN', { hour12: false })}</time> : String(field)}</dd></div>)}</dl>;
+}
+
+/** Read collections are taken only from the tool's declared output shape. */
+function collectionRows(value: unknown, tool: string): unknown[] | undefined {
+  const definition = getToolDefinition(tool);
+  if (definition?.sideEffect !== 'read') return;
+  const schema = definition.outputSchema;
+  if (schema.type === 'array' && schema.items?.type === 'object') return Array.isArray(value) ? value : undefined;
+  if (schema.type !== 'object' || !isRecord(value)) return;
+  const collections = Object.entries(schema.properties ?? {}).filter(([, field]) =>
+    (field as JSONSchema).type === 'array' && (field as JSONSchema).items?.type === 'object');
+  if (collections.length) return collections.flatMap(([key]) => Array.isArray(value[key]) ? value[key] : []);
+}
+
+function ResultFields({ output, tool }: { output: unknown; tool: string }) {
+  let value = output;
+  if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
+  const rows = collectionRows(value, tool);
+  return <div className="mt-2 text-xs text-zinc-700 break-words">
+    {isRecord(value) && <FieldList value={value} />}
+    {rows ? <><p>{rows.length} kết quả</p><ol aria-label="Kết quả đọc" className="space-y-2 mt-1">{rows.filter(isRecord).map((row, index) => <li key={index}><FieldList value={row} /></li>)}</ol></>
+      : !isRecord(value) && <p>{typeof value === 'object' ? `${Array.isArray(value) ? value.length : 0} kết quả` : String(value)}</p>}
+    <details className="mt-2"><summary className="cursor-pointer">Chi tiết</summary><pre className="whitespace-pre-wrap break-all mt-1">{JSON.stringify(value, null, 2)}</pre></details>
+  </div>;
 }
 
 export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
   steps,
   title = '⚡ Tiến trình thực thi liên dịch vụ',
+  status,
 }) => {
   const getStatusIcon = (status: StepState) => {
     switch (status) {
@@ -107,11 +148,8 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
                   )}
                 </div>
 
-                {step.output && (
-                  <div className="mt-1 text-xs text-[#0066cc] font-mono break-all whitespace-pre-wrap">
-                    {step.output}
-                  </div>
-                )}
+                {step.completedAt && <time className="text-xs text-zinc-500" dateTime={step.completedAt}>{new Date(step.completedAt).toLocaleString('vi-VN', { hour12: false })}</time>}
+                {step.output != null && <ResultFields output={step.output} tool={step.tool} />}
 
                 {step.error && (
                   <div className="mt-1 text-xs text-red-600 font-medium">
@@ -123,6 +161,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
           );
         })}
       </div>
+      {status === 'completed' && <p role="status" className="text-sm text-green-700">Đã hoàn thành {steps.filter(step => step.status === 'succeeded').length}/{steps.length} bước{steps.some(step => step.status === 'skipped') ? `; ${steps.filter(step => step.status === 'skipped').length} bước đã bỏ qua` : ''}.</p>}
     </div>
   );
 };

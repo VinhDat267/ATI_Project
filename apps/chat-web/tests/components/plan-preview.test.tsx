@@ -57,7 +57,7 @@ describe('PlanPreview Component', () => {
     expect(onApprove).toHaveBeenCalled();
   });
 
-  it('triggers onEdit and onCancel handlers and pre-fills input on Sửa qua Chat', () => {
+  it('delegates edit and cancel without mutating the input or dispatching duplicate prefill', () => {
     const onEdit = vi.fn();
     const onCancel = vi.fn();
     const chatInput = document.createElement('input');
@@ -84,8 +84,8 @@ describe('PlanPreview Component', () => {
     const editBtn = screen.getByRole('button', { name: /sửa/i });
     fireEvent.click(editBtn);
     expect(onEdit).toHaveBeenCalled();
-    expect(chatInput.value).toBe('Điều chỉnh kế hoạch: ');
-    expect(focusSpy).toHaveBeenCalled();
+    expect(chatInput.value).toBe('');
+    expect(focusSpy).not.toHaveBeenCalled();
 
     const cancelBtn = screen.getByRole('button', { name: /hủy/i });
     fireEvent.click(cancelBtn);

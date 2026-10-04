@@ -8,6 +8,14 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   const store = useChatStore.getState();
   const data = await apiClient.getConversation(id);
   if (!isCurrent()) return;
+  const pending = useChatStore.getState().planningByConversation[id];
+  if (pending) {
+    const acceptedId = pending.messageId ?? data.messages?.find(message => message.role === 'user' &&
+      pending.requestId && message.metadata?.requestId === pending.requestId)?.id;
+    if (acceptedId && data.messages?.some(message =>
+      ['plan', 'clarification', 'refusal', 'planning_error'].includes(message.metadata?.type ?? '') &&
+      message.metadata?.replyToMessageId === acceptedId)) store.setIsPlanning(false, id, pending.requestId);
+  }
   for (const message of data.messages || []) {
     if (message.metadata?.type === 'working_memory' && !message.content) continue;
     store.addMessage({ ...message, role: message.role || 'user', content: message.content || '', timestamp: message.created_at || message.timestamp });
@@ -41,7 +49,7 @@ export function useConversationHistory(id: string | null) {
     setError(null);
     const store = useChatStore.getState();
     if (!id) {
-      if (previousRoute.current) store.reset();
+      if (previousRoute.current) store.reset({ preservePlanning: true });
       previousRoute.current = null; setLoading(false);
       return;
     }
@@ -49,12 +57,12 @@ export function useConversationHistory(id: string | null) {
     // Conversations created in this session are already initialized, including optimistic messages.
     if (store.conversationId === id && loadingId.current !== id) { setLoading(false); return; }
     loadingId.current = id;
-    if (store.conversationId !== id) { store.reset(); store.setConversationId(id); }
+    if (store.conversationId !== id) { store.reset({ preservePlanning: true }); store.setConversationId(id); }
     setLoading(true);
     const isCurrent = () => current && useChatStore.getState().conversationId === id;
     void loadConversationHistory(id, isCurrent).catch(reason => {
       if (!isCurrent()) return;
-      store.reset();
+      store.reset({ preservePlanning: true });
       setError(reason?.status === 404 ? 'Không tìm thấy hội thoại.' : userErrorMessage(reason));
     }).finally(() => { if (current) { loadingId.current = null; setLoading(false); } });
     return () => { current = false; };

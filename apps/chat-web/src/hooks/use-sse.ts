@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
 import type { GatherStep, StepState, PlanStatus } from '../types';
+import { authStorage } from '../services/auth-storage';
+import { apiClient } from '../services/api-client';
 import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 
 const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
@@ -18,9 +20,6 @@ export function handleSSEEvent(
   conversationId?: string
 ): void {
   const store = useChatStore.getState();
-  if (conversationId && store.conversationId !== conversationId) {
-    return;
-  }
   const key = conversationId || store.conversationId || fallbackConversationKey;
 
   if (eventId !== undefined) {
@@ -41,6 +40,18 @@ export function handleSSEEvent(
     data = { raw: dataStr };
   }
 
+  const source = conversationId ?? store.conversationId;
+  const pending = source ? store.planningByConversation[source] : undefined;
+  if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
+  if (['plan', 'plan_preview', 'clarification', 'refusal', 'error'].includes(event)) store.setIsPlanning(false, source, data.requestId);
+  if (event === 'agent_state' && data.state === 'planning') {
+    store.setIsPlanning(true, source, data.requestId);
+    if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
+  }
+  // A late terminal event still settles its own request, but cannot populate
+  // messages/plan state for the conversation the user is now reading.
+  if (conversationId && store.conversationId !== conversationId) return;
+
   if (['exec_start', 'exec_step', 'step_status', 'exec_done'].includes(event) &&
       data.planId && (store.activePlan?.id || store.executionSnapshot?.plan.id) &&
       data.planId !== store.activePlan?.id && data.planId !== store.executionSnapshot?.plan.id) return;
@@ -48,6 +59,9 @@ export function handleSSEEvent(
     ? store.executionSnapshot : null;
 
   switch (event) {
+    case 'agent_state':
+      break;
+
     case 'text_start':
       store.setIsStreaming(true);
       store.setStreamingText('');
@@ -61,6 +75,7 @@ export function handleSSEEvent(
 
     case 'text_end':
     case 'text_done':
+      if (store.streamingText) { store.addMessage({ id: `text_${Date.now()}`, role: 'assistant', content: store.streamingText }); store.setStreamingText(''); }
       store.setIsStreaming(false);
       break;
 
@@ -75,6 +90,7 @@ export function handleSSEEvent(
         thinking: planObj.thinking,
         steps: Array.isArray(planObj.steps) ? planObj.steps : [],
         warnings: planObj.warnings,
+        resourceLabels: data.resourceLabels ?? planObj.resourceLabels,
       });
       store.setPlanStatus('preview');
       store.setClarification(null);
@@ -262,82 +278,85 @@ export function handleSSEEvent(
   }
 }
 
+class StreamAuthError extends Error {}
+class StreamClientError extends Error {}
+
 export function useSSE(conversationId: string | null, token: string | null) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
+  const [disconnected, setDisconnected] = useState(false);
+  const authRetry = useRef({ conversationId, refreshed: false });
   useEffect(() => {
-    if (!conversationId || !token) {
-      return;
-    }
-
+    setDisconnected(false);
+    if (!conversationId || !token) { authRetry.current = { conversationId, refreshed: false }; return; }
+    if (authRetry.current.conversationId !== conversationId) authRetry.current = { conversationId, refreshed: false };
+    // Token storage notifies AuthGate and restarts this effect during refresh.
+    // Keep the budget across that restart until a stream has actually opened.
+    const budget = authRetry.current;
     const ctrl = new AbortController();
-    abortControllerRef.current = ctrl;
-
-    const url = `/api/conversations/${conversationId}/stream`;
-
-    fetchEventSource(url, {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const markDisconnected = () => { if (!timer) timer = setTimeout(() => { if (!ctrl.signal.aborted) setDisconnected(true); }, 5000); };
+    const connected = () => { if (timer) clearTimeout(timer); timer = undefined; setDisconnected(false); };
+    const cursor = lastEventSeq.get(conversationId);
+    const lastId = !cursor ? '0' : cursor.epoch === 'legacy' ? String(cursor.seq) : `${cursor.epoch}:${cursor.seq}`;
+    fetchEventSource(`/api/conversations/${conversationId}/stream`, {
       signal: ctrl.signal,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Last-Event-ID': (() => {
-          const cursor = lastEventSeq.get(conversationId);
-          if (!cursor) return '0';
-          return cursor.epoch === 'legacy'
-            ? String(cursor.seq)
-            : `${cursor.epoch}:${cursor.seq}`;
-        })(),
-      },
-      async onopen(res) {
-        if (res.status === 401 || res.status === 403) {
-          ctrl.abort();
-          throw new Error(`SSE auth failed (${res.status})`);
+      openWhenHidden: true,
+      headers: { Authorization: `Bearer ${token}`, 'Last-Event-ID': lastId },
+      // fetch-event-source copies headers once. Read current storage for every open
+      // and replace the header on the single authenticated retry.
+      fetch: async (input, init) => {
+        const headers = new Headers(init?.headers);
+        headers.set('Authorization', `Bearer ${authStorage.getStoredTokens().accessToken || token}`);
+        let response = await fetch(input, { ...init, headers });
+        if (response.status === 401 && !budget.refreshed) {
+          try {
+            budget.refreshed = true;
+            const tokens = await apiClient.refreshToken();
+            if (ctrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+            headers.set('Authorization', `Bearer ${tokens.accessToken}`);
+            response = await fetch(input, { ...init, headers });
+          } catch (error) {
+            if (ctrl.signal.aborted) throw error;
+            if ((error as any)?.status === 401 || (error as any)?.status === 403) {
+              authStorage.clearStoredTokens();
+              throw new StreamAuthError('Phiên đăng nhập đã hết hạn.');
+            }
+            budget.refreshed = false;
+            throw error;
+          }
         }
-        const contentType =
-          res.headers?.get?.('content-type') ||
-          (res.headers as any)?.['content-type'];
-        if (res.ok && contentType?.includes('text/event-stream')) {
-          // Reconnect after an API restart has no guarantee of a replayable cursor.
+        return response;
+      },
+      async onopen(response) {
+        // A stream 403 means conversation ownership was denied, not that the
+        // authenticated session expired. Only the refresh endpoint's 403 above
+        // is an authentication failure; keep credentials for other conversations.
+        if (response.status === 401) {
+          authStorage.clearStoredTokens();
+          throw new StreamAuthError('Phiên đăng nhập đã hết hạn.');
+        }
+        const contentType = response.headers?.get?.('content-type') || (response.headers as any)?.['content-type'];
+        if (response.ok && contentType?.includes('text/event-stream')) {
+          budget.refreshed = false;
+          connected();
           void refreshExecutionSnapshot(conversationId).catch(() => {});
           return;
         }
-        if (res.status >= 400 && res.status < 500) {
-          ctrl.abort();
-          throw new Error(`SSE client error (${res.status})`);
-        }
-        throw new Error(
-          `Expected text/event-stream, got ${contentType || 'none'} (${res.status})`
-        );
+        if (response.status >= 400 && response.status < 500) throw new StreamClientError('Không mở được kết nối hội thoại.');
+        throw new Error('Kết nối hội thoại tạm thời gián đoạn.');
       },
-      onmessage(ev) {
-        handleSSEEvent(
-          ev.event || 'message',
-          ev.data,
-          ev.id || undefined,
-          conversationId
-        );
-        if (ev.event === 'exec_done') {
-          void refreshExecutionSnapshot(conversationId).catch(() => {});
-        }
+      onmessage(event) {
+        handleSSEEvent(event.event || 'message', event.data, event.id || undefined, conversationId);
+        if (event.event === 'exec_done') void refreshExecutionSnapshot(conversationId).catch(() => {});
       },
-      onerror(err) {
-        if (
-          ctrl.signal.aborted ||
-          String(err).includes('SSE auth failed') ||
-          String(err).includes('SSE client error') ||
-          String(err).includes('getReader') ||
-          String(err).includes('Expected text/event-stream')
-        ) {
-          throw err;
-        }
-        console.warn('SSE connection error, auto-retrying:', err);
+      onclose() { throw new Error('Kết nối hội thoại đã đóng.'); },
+      onerror(error) {
+        if (ctrl.signal.aborted || error instanceof StreamAuthError) throw error;
+        markDisconnected();
+        if (error instanceof StreamClientError) throw error;
+        return 1000;
       },
-    }).catch((err) => {
-      if (ctrl.signal.aborted) return;
-      console.warn('SSE stream closed:', err?.message || err);
-    });
-
-    return () => {
-      ctrl.abort();
-    };
+    }).catch(() => { if (!ctrl.signal.aborted) markDisconnected(); });
+    return () => { ctrl.abort(); if (timer) clearTimeout(timer); };
   }, [conversationId, token]);
+  return { disconnected };
 }

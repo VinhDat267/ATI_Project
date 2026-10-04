@@ -88,6 +88,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         convId: planRow.conv_id,
         status: planRow.status,
         ...parsed,
+        resourceLabels: planRow.resource_labels ?? {},
       });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch active plan' });
@@ -180,7 +181,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
-      const { content } = req.body || {};
+      const { content, tempId } = req.body || {};
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content string is required' });
@@ -191,6 +192,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         conversationId,
         userId,
         content,
+        ...(typeof tempId === 'string' && tempId.length <= 128 ? { requestId: tempId } : {}),
       });
 
       res.status(202).json(result);

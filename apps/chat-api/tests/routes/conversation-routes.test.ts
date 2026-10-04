@@ -2,6 +2,18 @@ import { describe, it, expect, vi } from 'vitest';
 import { ChatService } from '../../src/services/chat-service.js';
 
 describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', () => {
+  it('persists refusal with the exact accepted message and client request correlation', async () => {
+    const rows: any[] = [], events: any[] = [];
+    const service = new ChatService({
+      msgRepo: { createMessage: async (_convId: string, role: string, content: string, metadata?: any) => { const row = { id: `m${rows.length}`, role, content, metadata }; rows.push(row); return row; }, listMessages: async () => rows } as any,
+      planner: { processMessage: async () => ({ kind: 'refusal', reason: 'Dịch vụ chưa khả dụng.', suggestion: 'Hãy kết nối dịch vụ.' }) } as any,
+      eventEmitter: { emit: (name, payload) => { events.push({ name, payload }); } },
+    });
+    const accepted = await service.handleUserMessage({ conversationId: 'c1', userId: 'u1', content: 'Yêu cầu', requestId: 'client-request' });
+    await vi.waitFor(() => expect(events.some(event => event.name === 'refusal')).toBe(true));
+    expect(rows.find(row => row.metadata?.type === 'refusal')).toMatchObject({ content: 'Từ chối yêu cầu: Dịch vụ chưa khả dụng.\nGợi ý: Hãy kết nối dịch vụ.', metadata: { replyToMessageId: accepted.messageId, requestId: 'client-request' } });
+    expect(events.find(event => event.name === 'refusal').payload).toMatchObject({ replyToMessageId: accepted.messageId, requestId: 'client-request' });
+  });
   it('persists working memory and assistant clarification across user turns', async () => {
     const rows: any[] = [];
     const msgRepo = {
@@ -205,8 +217,9 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
       'error',
       expect.objectContaining({
         conversationId: 'conv-3',
-        message: 'LLM rate limit',
+        message: 'Không thể lập kế hoạch lúc này. Hãy thử lại.',
       })
     );
+    expect(mockMsgRepo.createMessage).toHaveBeenCalledWith('conv-3', 'system', 'Lỗi: Không thể lập kế hoạch lúc này. Hãy thử lại.', { type: 'planning_error', replyToMessageId: 'msg-125' });
   });
 });
