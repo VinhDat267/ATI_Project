@@ -67,8 +67,13 @@ describe('AUTH-05 account management with real PostgreSQL and HTTP', () => {
   it('invalidates an unused password-reset link when the password is changed', async () => {
     const current = (await login()).body;
     const resetToken = await users.authTokens.issue(userId, 'reset_password', now);
+    const unused = "SELECT count(*)::int AS n FROM auth_tokens WHERE user_id=$1 AND purpose='reset_password' AND used_at IS NULL";
+    expect((await pool.query(unused, [userId])).rows[0].n).toBe(1);
     expect((await as(current.accessToken).post('/api/account/change-password', { currentPassword: password, newPassword: changed })).status).toBe(200);
-    expect((await request(app).post('/api/auth/reset-password').send({ token: resetToken, password: 'Auth05Reset!password' })).status).toBe(400);
+    expect((await pool.query(unused, [userId])).rows[0].n).toBe(0);
+    // Password reset needs an email sender to be enabled at all.
+    const withEmail = createApp({ jwtSecret: secret, userRepo: users, authClock: () => now, emailSender: { send: async () => {} } } as any);
+    expect((await request(withEmail).post('/api/auth/reset-password').send({ token: resetToken, password: 'Auth05Reset!password' })).status).toBe(400);
     expect((await login(CHROME, email, changed)).status).toBe(200);
   });
 
