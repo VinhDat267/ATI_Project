@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../../src/app.js';
 import { UserRepo, verifyPassword } from '../../src/db/repositories/user-repo.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
-import { OutboxEmailSender } from '../../src/services/email/index.js';
+import { OutboxEmailSender, type EmailMessage } from '../../src/services/email/index.js';
 const directory = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 const secret = 'google_auth_test_secret_at_least_32_characters';
 const config = { clientId: 'test-client', clientSecret: 'private-test-secret', redirectUri: 'http://localhost:5174/auth/google/callback',
@@ -97,9 +97,25 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
   });
   it('creates a verified pending Google-only account and notifies active admins; respects closed signup', async () => {
     const adminUser = await users.provisionAdmin({ email: `${randomUUID()}@example.test`, name: 'Admin', password: 'Admin!password123' });
-    const r = await login(); expect(r.status).toBe(403); expect(r.body.code).toBe('ACCOUNT_PENDING');
-    const u = await users.findByEmail(email); expect(u).toMatchObject({ password: null, email_verified: true, status: 'pending', google_sub: subject });
-    expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBeGreaterThan(0);
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const deliveries: Promise<void>[] = [];
+    const sender = new OutboxEmailSender(pool);
+    app = build({ emailSender: { send: (message: EmailMessage) => {
+      const delivery = gate.then(() => sender.send(message)); deliveries.push(delivery); return delivery;
+    } } });
+    try {
+      const r = await login(); expect(r.status).toBe(403); expect(r.body.code).toBe('ACCOUNT_PENDING');
+      const u = await users.findByEmail(email); expect(u).toMatchObject({ password: null, email_verified: true, status: 'pending', google_sub: subject });
+      expect(deliveries.length).toBeGreaterThan(0);
+      // The response intentionally precedes background delivery. Hold a real
+      // outbox INSERT to prove that boundary, then observe persisted delivery.
+      expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBe(0);
+      release();
+      await vi.waitFor(async () => {
+        expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBeGreaterThan(0);
+      }, { timeout: 3000 });
+    } finally { release(); await Promise.allSettled(deliveries); }
     email = `${randomUUID()}@example.test`; subject = randomUUID(); app = build({ googleSignupEnabled: false });
     expect((await login()).body.code).toBe('SIGNUP_DISABLED'); expect(await users.findByEmail(email)).toBeNull();
   });
@@ -107,7 +123,9 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     const u = await user(); const r = await login(); expect(r.status).toBe(200); expect(r.body.user.id).toBe(u.id);
     expect(r.body.refreshToken).toBeTruthy(); expect((await users.findById(u.id))!.password).toBe(u.password);
     email = `${randomUUID()}@example.test`; expect((await login()).body.user.id).toBe(u.id); expect(await users.findByEmail(email)).toBeNull();
-    expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [u.email])).rows[0].n).toBe(1);
+    await vi.waitFor(async () => {
+      expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [u.email])).rows[0].n).toBe(1);
+    }, { timeout: 3000 });
   });
   it('reclaims unverified email by clearing password and revoking sessions and outstanding auth tokens, preserving status', async () => {
     const u = await user(false); const old = await users.sessions.create(u.id, 'old', now); const authToken = await users.authTokens.issue(u.id, 'reset_password', now);
