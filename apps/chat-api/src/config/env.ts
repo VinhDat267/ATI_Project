@@ -13,6 +13,8 @@ export interface EnvConfig {
   PORT: number;
   RUNTIME_MODE: 'live' | 'sandbox';
   AUTH_SIGNUP_ENABLED: boolean;
+  /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
+  EMAIL_ENABLED: boolean;
   APP_BASE_URL: string;
   SMTP_HOST: string;
   SMTP_PORT: number;
@@ -83,12 +85,15 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.AUTH_SIGNUP_ENABLED && !['true', 'false'].includes(env.AUTH_SIGNUP_ENABLED)) {
     throw new Error('AUTH_SIGNUP_ENABLED must be true or false');
   }
-  const AUTH_SIGNUP_ENABLED = env.AUTH_SIGNUP_ENABLED !== 'false';
-  if (isLive) {
-    for (const field of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'MAIL_FROM', 'APP_BASE_URL']) {
+  const smtpFields = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'MAIL_FROM'];
+  const EMAIL_ENABLED = !isLive || smtpFields.some(field => env[field]?.trim());
+  // Live may start without any SMTP setting; a partial configuration is still a startup error.
+  if (isLive && EMAIL_ENABLED) {
+    for (const field of [...smtpFields, 'APP_BASE_URL']) {
       if (!env[field]?.trim()) throw new Error(`${field} is required in live mode`);
     }
   }
+  const AUTH_SIGNUP_ENABLED = EMAIL_ENABLED && env.AUTH_SIGNUP_ENABLED !== 'false';
   const SMTP_PORT = env.SMTP_PORT ? Number(env.SMTP_PORT) : 465;
   if (!Number.isInteger(SMTP_PORT) || SMTP_PORT < 1 || SMTP_PORT > 65535) throw new Error('SMTP_PORT must be a valid TCP port');
   const MAIL_FROM = env.MAIL_FROM || '';
@@ -113,6 +118,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     PORT,
     RUNTIME_MODE,
     AUTH_SIGNUP_ENABLED,
+    EMAIL_ENABLED,
     APP_BASE_URL,
     SMTP_HOST: env.SMTP_HOST || '',
     SMTP_PORT,

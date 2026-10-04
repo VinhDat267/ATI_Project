@@ -5,8 +5,9 @@ import pg from 'pg';
 const password = 'Auth02Browser!original';
 const newPassword = 'Auth02Browser!changed';
 async function mailLink(db: pg.Pool, email: string, view: string) {
-  const mail = (await db.query('SELECT * FROM email_outbox WHERE to_address=$1 AND body_text LIKE $2 ORDER BY created_at DESC LIMIT 1', [email, `%view=${view}%`])).rows[0];
-  expect(mail).toBeDefined();
+  // Reset and resend emails are delivered after the response (AUTH-02b), so wait for the outbox row.
+  let mail: any;
+  await expect.poll(async () => (mail = (await db.query('SELECT * FROM email_outbox WHERE to_address=$1 AND body_text LIKE $2 ORDER BY created_at DESC LIMIT 1', [email, `%view=${view}%`])).rows[0])).toBeDefined();
   const link = new URL(mail.body_text.match(/http[^\s]+/)[0]);
   expect(link.searchParams.get('view')).toBe(view);
   return `${link.pathname}${link.search}`;

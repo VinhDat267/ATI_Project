@@ -66,3 +66,19 @@ describe('AUTH-02 email delivery boundary', () => {
     expect(approved.text).toContain('duyệt'); expect(approved.html).not.toContain('<script>');
   });
 });
+
+describe('AUTH-02b live startup without SMTP', () => {
+  const smtpFields = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'MAIL_FROM'] as const;
+  const withoutEmail: Record<string, string> = Object.fromEntries(Object.entries(live).filter(([key]) => !(smtpFields as readonly string[]).includes(key) && key !== 'APP_BASE_URL'));
+  it('starts live without any SMTP setting, with email off and signup off even when requested', () => {
+    expect(validateEnv(withoutEmail)).toMatchObject({ EMAIL_ENABLED: false, AUTH_SIGNUP_ENABLED: false });
+    expect(validateEnv({ ...withoutEmail, AUTH_SIGNUP_ENABLED: 'true' })).toMatchObject({ EMAIL_ENABLED: false, AUTH_SIGNUP_ENABLED: false });
+    expect(validateEnv(live)).toMatchObject({ EMAIL_ENABLED: true, AUTH_SIGNUP_ENABLED: true });
+    expect(validateEnv({ RUNTIME_MODE: 'sandbox' })).toMatchObject({ EMAIL_ENABLED: true, AUTH_SIGNUP_ENABLED: true });
+  });
+  it('still refuses a partial SMTP configuration in live', () => {
+    for (const field of smtpFields) {
+      expect(() => validateEnv({ ...withoutEmail, [field]: live[field] })).toThrow(/is required in live mode/);
+    }
+  });
+});

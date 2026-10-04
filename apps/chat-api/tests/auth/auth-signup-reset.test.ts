@@ -19,14 +19,20 @@ describe('AUTH-02 signup and password recovery with PostgreSQL and HTTP', () => 
   let admin: pg.Pool, pool: pg.Pool, users: UserRepo;
   let app: ReturnType<typeof createApp>, now: number;
   let email: string;
-  const send = async (message: { to: string; subject: string; text: string; html: string }) => {
-    await pool.query('INSERT INTO email_outbox(to_address,subject,body_text,body_html) VALUES($1,$2,$3,$4)', [message.to, message.subject, message.text, message.html]);
+  // forgot-password and resend-verification deliver in the background (AUTH-02b); wait for started deliveries before reading.
+  const deliveries = new Set<Promise<unknown>>();
+  const send = (message: { to: string; subject: string; text: string; html: string }) => {
+    const delivery = pool.query('INSERT INTO email_outbox(to_address,subject,body_text,body_html) VALUES($1,$2,$3,$4)', [message.to, message.subject, message.text, message.html]);
+    deliveries.add(delivery); void delivery.then(() => deliveries.delete(delivery), () => deliveries.delete(delivery));
+    return delivery.then(() => undefined);
   };
+  const delivered = () => Promise.allSettled([...deliveries]);
   const buildApp = (extra: Record<string, unknown> = {}) => createApp({ jwtSecret: secret, userRepo: users, authClock: () => now,
     signupEnabled: true, appBaseUrl: 'http://localhost:5174', emailSender: { send }, ...extra } as any);
   const post = (path: string, data: object) => request(app).post(`/api/auth/${path}`).send(data);
   const signup = () => post('signup', { name: 'Người dùng', email, password });
   const tokenFromMail = async (recipient = email, view = 'verify-email') => {
+    await delivered();
     const mail = (await pool.query('SELECT * FROM email_outbox WHERE to_address=$1 ORDER BY created_at DESC,id DESC LIMIT 1', [recipient])).rows[0];
     expect(mail).toBeDefined();
     const link = mail.body_text.match(/http[^\s]+/)![0];
