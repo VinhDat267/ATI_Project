@@ -24,7 +24,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | xong, #33 tại `4a4553b`; Telegram thật chưa nghiệm thu |
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | xong, #34 tại `dc80de4`; Jira thật chưa nghiệm thu |
 | 3 | Đánh giá planner với các service mới, đo lại bộ cũ, test định tuyến tất định | [W3-06](tasks/W3-06-new-services-eval.md) | đo xong, #35 tại `a75ac35`; numeric gate cả năm đạt, parity ff15 và latency chưa đạt; product acceptance incomplete |
-| 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | chờ (từng service sau khi merge; người dùng chuẩn bị tài khoản) |
+| 3 | Chạy thật từng service mới và một workflow ≥ 4 service | [W3-07](tasks/W3-07-new-services-live.md) | xong 04/10: #48 Telegram, #49/#50 Notion, #51 workflow 4 service, #55 Jira, #57 Google; phát hiện → W3-09 |
 | 3 | Giới hạn kích thước kết quả đọc (Sheets, Notion, Calendar, giới hạn chung trong planner), test 403 Calendar, phân loại lỗi token Google (từ audit W3 03/10) | [W3-08](tasks/W3-08-bounded-read-results.md) | xong: #39 và bản sửa #45 tại `81225de`; hai P2 đã sửa, review độc lập đạt, CI955+165/browser20 xanh; xem [bằng chứng](log/2026-10-03-codex-W3-08-review-fixes.md) |
 | 3 | Jira: tìm kiếm với dấu gạch ngang, báo đúng lỗi token khi đọc (phát hiện khi chạy thật W3-07) | [W3-09](tasks/W3-09-jira-live-findings.md) | chờ |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | xong, #41 tại `fbd993f`; review độc lập đạt, CI xanh |
@@ -57,6 +57,6 @@ Thứ tự và song song: W3-00 đã merge qua #29 tại `c7a38c0`; W3-01 Sheets
 
 **Mảng frontend** (review 02/10/2026): FE-01 và FE-02 đã merge. Phần giao diện của AUTH-02 → AUTH-05, W3-00b và FE-03 đã gỡ chặn. FE-03 xong trước buổi thử W4-03; chưa thay đổi ưu tiên hay triển khai các task tiếp theo trong phiên merge này.
 
-Phần việc của con người nên bắt đầu ngay: tạo tài khoản và tài nguyên thử nghiệm cho năm service (W3-07); tạo Gmail gửi thư và App Password, OAuth client của Google (AUTH-06); các thành viên viết câu hỏi (W4-01); hẹn người tham gia buổi thử (W4-03).
+Phần việc của con người nên bắt đầu ngay: tạo Gmail gửi thư và App Password, OAuth client của Google (AUTH-06); các thành viên viết câu hỏi (W4-01); hẹn người tham gia buổi thử (W4-03).
 
 Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04. Mảng frontend: không bỏ FE-01 (lỗi an toàn và nội dung sai sự thật). FE-02 và FE-03 có thể bỏ các phần nhỏ (phân trang, Shift+Enter, `h-dvh`), không bỏ: mở lại hội thoại khi tải lại, tên tài nguyên trong plan, SSE tự refresh.
