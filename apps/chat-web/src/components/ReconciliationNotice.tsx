@@ -1,4 +1,4 @@
-import type { ExecutionSnapshot } from '../types';
+import type { ExecutionSnapshot, ServiceInfo } from '../types';
 
 function savedArguments(value: unknown, snapshot: ExecutionSnapshot): unknown {
   const resolve = (ref: string): unknown => {
@@ -31,16 +31,17 @@ function savedArguments(value: unknown, snapshot: ExecutionSnapshot): unknown {
   return value;
 }
 
-export function ReconciliationNotice({ snapshot, busy, error, onSkip, onStop, onContinue }: {
-  snapshot: ExecutionSnapshot; busy: boolean; error: string | null;
+export function ReconciliationNotice({ snapshot, services: catalog = [], busy, error, onSkip, onStop, onContinue }: {
+  snapshot: ExecutionSnapshot; services?: ServiceInfo[]; busy: boolean; error: string | null;
   onSkip: (stepId: string) => void; onStop: () => void; onContinue: () => void;
 }) {
   const unknown = snapshot.steps.filter(step => step.status === 'unknown');
   const canContinue = snapshot.recoveryActions.includes('continue') && unknown.length === 0;
   const paused = unknown.find(step => step.stepId === snapshot.execution.pausedStepId);
+  // Display names come from GET /api/services, looked up by the tool's service prefix.
   const services = [...new Set(unknown.map(step => {
     const service = step.tool.split('.')[0];
-    return ({ trello: 'Trello', slack: 'Slack', github: 'GitHub' } as Record<string, string>)[service] || service;
+    return catalog.find(entry => entry.id === service)?.name || service;
   }))].join(', ') || 'dịch vụ liên quan';
   return (
     <section aria-label="Cần đối soát trước khi tiếp tục" aria-busy={busy}

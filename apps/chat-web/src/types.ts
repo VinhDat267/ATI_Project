@@ -119,7 +119,7 @@ export interface ServiceInfo {
   connectionStatus?: 'healthy' | 'unhealthy' | 'unconfigured' | 'unchecked';
   lastCheckedAt?: string | null;
   allowedScope?: string[];
-  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' }>;
+  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' | 'multiline' }>;
   scopeKey?: string;
   scopeLabel?: string;
 }

@@ -5,7 +5,7 @@ export interface ServiceCardProps {
   title: string;
   connected?: boolean;
   allowedScope?: string[];
-  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' }>;
+  credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' | 'multiline' }>;
   scopeLabel?: string;
   onSave?: (input: { credentials: Record<string, string>; allowedScope: string[] }) => Promise<ServiceActionResult> | void;
   onTestConnection?: () => Promise<ServiceActionResult> | void;
@@ -69,6 +69,8 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
       const selected = Object.fromEntries(credentialFields.map(({ key }) => [key, credentials[key] ?? '']));
       const result = await onSave({ credentials: selected, allowedScope: scopes });
       if (result) setFeedback(result);
+      // Saved secrets are never shown again; a textarea cannot mask them like a password input.
+      if (result?.success) setCredentials({});
     } catch (error) {
       setFeedback({ success: false, message: error instanceof Error ? error.message : 'Không thể lưu cấu hình' });
     } finally {
@@ -101,11 +103,17 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
       <div className="mt-4 flex flex-col gap-3">
         {credentialFields.map((field) => <div key={field.key}>
           <label htmlFor={`${service}-${field.key}`} className="block text-xs font-semibold text-zinc-700 mb-1">{field.label}</label>
-          <input id={`${service}-${field.key}`} type={field.type ?? 'password'}
-            value={credentials[field.key] ?? ''}
-            onChange={(e) => setCredentials({ ...credentials, [field.key]: e.target.value })}
-            placeholder="••••••••••••••••"
-            className="w-full bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          {field.type === 'multiline'
+            ? <textarea id={`${service}-${field.key}`} rows={4} spellCheck={false} autoComplete="off"
+              value={credentials[field.key] ?? ''}
+              onChange={(e) => setCredentials({ ...credentials, [field.key]: e.target.value })}
+              placeholder="••••••••••••••••"
+              className="w-full bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs font-mono text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            : <input id={`${service}-${field.key}`} type={field.type ?? 'password'}
+              value={credentials[field.key] ?? ''}
+              onChange={(e) => setCredentials({ ...credentials, [field.key]: e.target.value })}
+              placeholder="••••••••••••••••"
+              className="w-full bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500" />}
         </div>)}
       </div>
 

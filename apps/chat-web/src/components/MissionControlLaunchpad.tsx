@@ -95,6 +95,9 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
   const missingServices = (bp: BlueprintCard) => services.filter(service =>
     bp.requiredTools.some(tool => tool.startsWith(`${service.id}.`)) && !service.configured).map(service => service.name);
 
+  const configured = services.filter(service => service.configured).map(service => `@${service.name}`);
+  const commandPlaceholder = `Gõ lệnh điều phối${configured.length ? ` (${configured.join(', ')})` : ''} hoặc chọn quy trình mẫu bên dưới...`;
+
   const [commandInput, setCommandInput] = useState('');
 
   const handleCommandSubmit = (e: React.FormEvent) => {
@@ -182,7 +185,7 @@ export const MissionControlLaunchpad: React.FC<MissionControlLaunchpadProps> = (
             <input
               type="text"
               aria-label="Khung lệnh điều phối quy trình"
-              placeholder="Gõ lệnh điều phối (@trello, @slack, @github) hoặc chọn quy trình mẫu bên dưới..."
+              placeholder={commandPlaceholder}
               value={commandInput}
               onChange={(e) => setCommandInput(e.target.value)}
               className="w-full bg-transparent text-xs sm:text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none"
