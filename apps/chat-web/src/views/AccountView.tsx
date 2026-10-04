@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { apiClient } from '../services/api-client';
+import { apiClient, sharesAuthSession } from '../services/api-client';
 import { authStorage } from '../services/auth-storage';
 import { userErrorMessage } from '../services/user-error';
 import type { AccountProfile, AccountSession, User } from '../types';
@@ -52,7 +52,7 @@ export function AccountView({ user, navigate, onLogout }: Props) {
       const { user: updated } = await apiClient.updateAccountName(trimmed);
       // The navigation menu reads the signed-in user from token storage.
       authStorage.setStoredTokens({ user: { ...user, ...updated } });
-      setName(updated.name); await load();
+      setName(current => current === name ? updated.name : current); await load();
       return 'Đã lưu tên mới.';
     });
   };
@@ -66,6 +66,15 @@ export function AccountView({ user, navigate, onLogout }: Props) {
       return 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.';
     });
   };
+  const linkGoogle = () => void run('link', async () => {
+    const initial = authStorage.getStoredTokens();
+    const { url } = await apiClient.startGoogleAuth('link');
+    const latest = authStorage.getStoredTokens();
+    const sameSession = (latest.accessToken === initial.accessToken && latest.refreshToken === initial.refreshToken)
+      || sharesAuthSession(initial.accessToken, latest.accessToken);
+    if (!mounted.current || !latest.accessToken || !latest.refreshToken || latest.user?.id !== initial.user?.id || !sameSession) return;
+    window.location.assign(url);
+  });
   const others = sessions.filter(session => !session.current);
   if (!user) return <p role="status" className="p-6">Đang tải tài khoản...</p>;
   return <main className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
@@ -123,7 +132,7 @@ export function AccountView({ user, navigate, onLogout }: Props) {
                 ? <button type="button" disabled={busy !== null || !account.hasPassword} aria-describedby={account.hasPassword ? undefined : 'account-unlink-rule'} className={buttonStyle}
                     onClick={() => void run('unlink', async () => { await apiClient.unlinkGoogle(); await load(); return 'Đã gỡ liên kết Google.'; })}>Gỡ liên kết</button>
                 : <button type="button" disabled={busy !== null} className={buttonStyle}
-                    onClick={() => void run('link', async () => { const { url } = await apiClient.startGoogleAuth('link'); window.location.assign(url); })}>Liên kết Google</button>}
+                    onClick={linkGoogle}>Liên kết Google</button>}
             </li>
             {account.hasGoogle && !account.hasPassword && <li id="account-unlink-rule" className="text-xs text-zinc-500">Cần đặt mật khẩu trước khi gỡ liên kết Google, nếu không bạn sẽ không còn cách đăng nhập.</li>}
           </ul>

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { assertBrowserV3Environment } from './v3-local-env.mjs';
 import { startGoogleFixture } from './google-oidc-fixture.mjs';
@@ -12,7 +13,7 @@ const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
   { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|AUTH-05:' },
   { name: 'auth02', grep: 'AUTH-02:' },
-  { name: 'auth04', grep: 'AUTH-04:' },
+  { name: 'auth04', grep: 'AUTH-04:|AUTH-05 Google:' },
   { name: 'clarification', grep: 'clarification before plan' },
   { name: 'partial_failure', grep: 'partial failure and skip' },
   { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },
@@ -35,6 +36,8 @@ for (const scenario of scenarios) {
       const fixture = await startGoogleFixture();
       stopFixture = fixture.stop;
       Object.assign(env, {
+        // Expired-token probes and the API must use the same per-run signing key.
+        JWT_SECRET: env.JWT_SECRET || randomBytes(32).toString('hex'),
         AUTH_SIGNUP_ENABLED: 'true', GOOGLE_OAUTH_CLIENT_ID: 'auth04-test.apps.googleusercontent.com',
         GOOGLE_OAUTH_CLIENT_SECRET: 'fake-oidc-secret',
         GOOGLE_OAUTH_REDIRECT_URI: 'http://127.0.0.1:5174/auth/google/callback',
