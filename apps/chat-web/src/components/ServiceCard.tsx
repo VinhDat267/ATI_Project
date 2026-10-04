@@ -69,8 +69,10 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
       const selected = Object.fromEntries(credentialFields.map(({ key }) => [key, credentials[key] ?? '']));
       const result = await onSave({ credentials: selected, allowedScope: scopes });
       if (result) setFeedback(result);
-      // Saved secrets are never shown again; a textarea cannot mask them like a password input.
-      if (result?.success) setCredentials({});
+      // Clear saved values, preserving fields edited while this submission was pending.
+      if (result?.success) setCredentials((current) => Object.fromEntries(
+        Object.entries(current).filter(([key, value]) => value !== selected[key]),
+      ));
     } catch (error) {
       setFeedback({ success: false, message: error instanceof Error ? error.message : 'Không thể lưu cấu hình' });
     } finally {
