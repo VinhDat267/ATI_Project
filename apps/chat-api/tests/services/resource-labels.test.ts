@@ -4,6 +4,23 @@ import { expect, it } from 'vitest';
 import { ChatService } from '../../src/services/chat-service.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { WorkingMemory } from '@wap/planner';
+it.each([true, false])('scopes duplicate issue numbers to the actual parent, with a known repo=%s', knownRepo => {
+  const memory = new WorkingMemory();
+  memory.setEntity('__observed', { issue: [
+    { id: 'a42', number: 42, title: 'Issue A', repo: 'a/repo' },
+    { id: 'b42', number: 42, title: 'Issue B', repo: 'b/repo' },
+  ] });
+  const plan = { kind: 'plan', summary: 'Đọc issue', warnings: [], steps: [{ id: 's1', tool: 'github.get_issue', args: { repo: knownRepo ? 'b/repo' : { $ref: 'prior.output.fullName' }, issueNumber: 42 } }] } as any;
+  const labels = resourceLabels(plan, memory);
+  if (knownRepo) expect(labels['42']).toBe('Issue B');
+  else expect(Object.hasOwn(labels, '42')).toBe(false);
+});
+it('omits duplicate issue numbers when the lookup did not retain their parent scope', () => {
+  const memory = new WorkingMemory();
+  memory.setEntity('issue', [{ id: 'a42', number: 42, title: 'Issue A' }, { id: 'b42', number: 42, title: 'Issue B' }]);
+  const plan = { kind: 'plan', summary: 'Đọc issue', warnings: [], steps: [{ id: 's1', tool: 'github.get_issue', args: { repo: 'b/repo', issueNumber: 42 } }] } as any;
+  expect(Object.hasOwn(resourceLabels(plan, memory), '42')).toBe(false);
+});
 it('keeps a conflicting raw identifier unlabeled rather than choosing another resource name', () => {
   const memory = new WorkingMemory();
   memory.setEntity('list', { id: 'same', name: 'Cần làm' }); memory.setEntity('member', { id: 'same', name: 'Minh' });
