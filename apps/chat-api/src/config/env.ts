@@ -12,6 +12,13 @@ export interface EnvConfig {
   APP_TIME_ZONE: string;
   PORT: number;
   RUNTIME_MODE: 'live' | 'sandbox';
+  AUTH_SIGNUP_ENABLED: boolean;
+  APP_BASE_URL: string;
+  SMTP_HOST: string;
+  SMTP_PORT: number;
+  SMTP_USER: string;
+  SMTP_PASSWORD: string;
+  MAIL_FROM: string;
 }
 
 export function validateEnv(env: Record<string, string | undefined> = process.env): EnvConfig {
@@ -73,6 +80,28 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const PORT = Number(env.PORT) || 3000;
   const RUNTIME_MODE = (env.RUNTIME_MODE === 'live' ? 'live' : 'sandbox') as 'live' | 'sandbox';
 
+  if (env.AUTH_SIGNUP_ENABLED && !['true', 'false'].includes(env.AUTH_SIGNUP_ENABLED)) {
+    throw new Error('AUTH_SIGNUP_ENABLED must be true or false');
+  }
+  const AUTH_SIGNUP_ENABLED = env.AUTH_SIGNUP_ENABLED === 'true';
+  if (isLive) {
+    for (const field of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'MAIL_FROM', 'APP_BASE_URL']) {
+      if (!env[field]?.trim()) throw new Error(`${field} is required in live mode`);
+    }
+  }
+  const SMTP_PORT = env.SMTP_PORT ? Number(env.SMTP_PORT) : 465;
+  if (!Number.isInteger(SMTP_PORT) || SMTP_PORT < 1 || SMTP_PORT > 65535) throw new Error('SMTP_PORT must be a valid TCP port');
+  const MAIL_FROM = env.MAIL_FROM || '';
+  if (/[\r\n]/.test(MAIL_FROM)) throw new Error('MAIL_FROM must not contain line breaks');
+  let APP_BASE_URL: string;
+  try {
+    const url = new URL(env.APP_BASE_URL || 'http://127.0.0.1:5174');
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (!['https:', 'http:'].includes(url.protocol) || (isLive && url.protocol !== 'https:' && !loopback)
+      || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error();
+    APP_BASE_URL = url.origin;
+  } catch { throw new Error('APP_BASE_URL must be a web origin (HTTPS in live, or loopback HTTP)'); }
+
   return {
     DATABASE_URL,
     JWT_SECRET,
@@ -83,5 +112,12 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     APP_TIME_ZONE,
     PORT,
     RUNTIME_MODE,
+    AUTH_SIGNUP_ENABLED,
+    APP_BASE_URL,
+    SMTP_HOST: env.SMTP_HOST || '',
+    SMTP_PORT,
+    SMTP_USER: env.SMTP_USER || '',
+    SMTP_PASSWORD: env.SMTP_PASSWORD || '',
+    MAIL_FROM,
   };
 }

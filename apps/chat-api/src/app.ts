@@ -16,6 +16,7 @@ import type { CredentialRepo } from './db/repositories/credential-repo.js';
 import type { ChatService } from './services/chat-service.js';
 import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
+import type { EmailSender } from './services/email/index.js';
 
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
@@ -23,6 +24,9 @@ export interface AppOptions extends AdminUsersOptions {
   userRepo?: UserRepo;
   sessionRepo?: SessionRepo;
   authClock?: () => number;
+  signupEnabled?: boolean;
+  appBaseUrl?: string;
+  emailSender?: EmailSender;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
@@ -63,7 +67,8 @@ export function createApp(options: AppOptions): Express {
   app.use(
     '/api/auth',
     createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, sessionRepo: options.sessionRepo,
-      clock: options.authClock, validateCredentials: options.validateCredentials })
+      clock: options.authClock, validateCredentials: options.validateCredentials,
+      signupEnabled: options.signupEnabled, appBaseUrl: options.appBaseUrl, emailSender: options.emailSender })
   );
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
