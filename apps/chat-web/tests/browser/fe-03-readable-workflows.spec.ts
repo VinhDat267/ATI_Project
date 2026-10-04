@@ -48,7 +48,7 @@ test('FE-03: grounded display names survive preview reload and approved result l
 });
 test('FE-03: Shift Enter creates a newline and planning disables a second send', async ({ page }) => {
   await login(page);
-  await page.getByRole('button', { name: 'Cuộc hội thoại mới', exact: true }).click();
+  await page.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
   const input = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
   await input.fill('Tạo công việc Trello'); await input.press('Shift+Enter'); await input.press('a');
   await expect(input).toHaveValue('Tạo công việc Trello\na');

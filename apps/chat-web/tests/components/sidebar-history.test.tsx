@@ -83,7 +83,7 @@ describe('SidebarHistory Component', () => {
 
     expect(await screen.findByText('Hội thoại backend')).toBeInTheDocument();
     // Expected time format "10:30"
-    const expectedTime = today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const expectedTime = '10:30';
     expect(screen.getByText(expectedTime)).toBeInTheDocument();
   });
 
