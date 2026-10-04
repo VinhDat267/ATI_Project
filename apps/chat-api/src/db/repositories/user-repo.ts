@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import crypto from 'node:crypto';
 import { SessionRepo } from './session-repo.js';
+import { AuthTokenRepo } from './auth-token-repo.js';
 import type { AuthUser } from '../../auth/jwt.js';
 
 export interface UserRow {
@@ -50,8 +51,23 @@ export function verifyPassword(password: string, storedHash?: string | null): bo
 
 export class UserRepo {
   readonly sessions: SessionRepo;
+  readonly authTokens: AuthTokenRepo;
   constructor(private pool: pg.Pool) {
     this.sessions = new SessionRepo(pool);
+    this.authTokens = new AuthTokenRepo(pool);
+  }
+
+  async createPendingUser(data: { email: string; password: string; name: string }): Promise<UserRow | null> {
+    const result = await this.pool.query<UserRow>(
+      `INSERT INTO users(email,password,name,status,email_verified,role) VALUES($1,$2,$3,'pending',false,'member')
+       ON CONFLICT(email) DO NOTHING RETURNING *`,
+      [data.email.trim().toLowerCase(), hashPassword(data.password), data.name],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async listActiveAdmins(): Promise<UserRow[]> {
+    return (await this.pool.query<UserRow>("SELECT * FROM users WHERE role='admin' AND status='active'")).rows;
   }
 
   async findByEmail(email: string): Promise<UserRow | null> {

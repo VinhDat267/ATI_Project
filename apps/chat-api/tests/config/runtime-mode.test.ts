@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { validateEnv } from '../../src/config/env.js';
 
+const smtp = { SMTP_HOST: 'smtp.gmail.com', SMTP_PORT: '465', SMTP_USER: 'fixture@example.test', SMTP_PASSWORD: 'test-only', MAIL_FROM: 'fixture@example.test', APP_BASE_URL: 'https://example.test' };
+
 describe('runtime mode fail-closed boundaries', () => {
   it('creates a fresh private JWT secret for each sandbox process', () => {
     const first = validateEnv({ RUNTIME_MODE: 'sandbox' });
@@ -19,7 +21,7 @@ describe('runtime mode fail-closed boundaries', () => {
 
   it('requires the settings of the selected LLM provider in live', () => {
     const live = {
-      RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://user:pass@localhost/db',
+      ...smtp, RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://user:pass@localhost/db',
       JWT_SECRET: 'secure-jwt-secret-for-test-at-least-32-chars', ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef',
     };
     expect(() => validateEnv(live)).toThrow(/GEMINI_API_KEY/);
@@ -32,7 +34,7 @@ describe('runtime mode fail-closed boundaries', () => {
 
   it('searches with the model in live and with regex rules in sandbox unless overridden', () => {
     const live = {
-      RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://user:pass@localhost/db', GEMINI_API_KEY: 'k',
+      ...smtp, RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://user:pass@localhost/db', GEMINI_API_KEY: 'k',
       JWT_SECRET: 'secure-jwt-secret-for-test-at-least-32-chars', ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef',
     };
     expect(validateEnv(live).PLANNER_SEARCH_MODE).toBe('llm');
