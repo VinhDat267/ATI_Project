@@ -217,8 +217,8 @@ test('real browser and PostgreSQL: clarification before plan', async ({ page }) 
     const prompt = `Tạo task trên board Frontend, gán Minh và thông báo Slack E2E ambiguous ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();
-    await expect(page.getByText('Which member do you mean?')).toBeVisible();
-    const clarification = await pool.query("SELECT m.id FROM messages m WHERE m.content = $1 AND m.metadata->>'type' = 'clarification' AND m.conv_id IN (SELECT conv_id FROM messages WHERE content = $2)", ['Which member do you mean?', prompt]);
+    await expect(page.getByText('Bạn muốn chọn member nào?')).toBeVisible();
+    const clarification = await pool.query("SELECT m.id FROM messages m WHERE m.content = $1 AND m.metadata->>'type' = 'clarification' AND m.conv_id IN (SELECT conv_id FROM messages WHERE content = $2)", ['Bạn muốn chọn member nào?', prompt]);
     expect(clarification.rowCount).toBeGreaterThan(0);
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill('Minh Nguyễn');
     await composerSend(page).click();
