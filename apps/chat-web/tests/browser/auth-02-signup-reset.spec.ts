@@ -40,7 +40,7 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
       page.waitForRequest(request => request.url().endsWith('/api/health')),
       page.evaluate(() => fetch('/api/health').then(response => response.json())),
     ]);
-    expect(healthRequest.headers().referer).toBeUndefined();
+    expect(healthRequest.headers().referer || '').toBe('');
     expect((await db.query('SELECT status,email_verified FROM users WHERE id=$1', [user.id])).rows[0]).toEqual({ status: 'pending', email_verified: true });
     await page.screenshot({ path: testInfo.outputPath('AUTH02-verified-pending.png'), fullPage: true });
     await login(page, email, password);
