@@ -66,7 +66,33 @@ Kết quả: màn hình ở hội thoại A trống, không có dòng "Đang l�
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
+- PR: nhánh `fix/fe-03b-new-conversation-race` (Claude Code thi công theo yêu cầu của người dùng).
+- Commit: `f4390ce` (test RED), `e1a43ef` (sửa).
+- Cách sửa: chọn **(a)**. `Workspace` giữ promise của lần bấm "Cuộc hội thoại mới" đang chạy:
+  - tin gửi trong lúc đó chờ promise này rồi vào đúng hội thoại mới, không tự tạo hội thoại thứ hai;
+  - cả khi người dùng bấm từ một hội thoại cũ X: tin vào hội thoại mới, không vào X.
+
+  Lý do: người dùng gửi được ngay, không phải bấm Enter lần hai như cách (b). Không thêm trạng thái giao diện, không đổi store hay API.
+- Test đã chạy và kết quả (04/10/2026, PostgreSQL tạm ở 55533):
+  - **RED trên `main` `a478537`:**
+    - unit: 3/3 fail đúng lý do:
+      - tin bị kẹt chờ hội thoại thứ hai (`expected [] to deeply equal [['c-new', …]]`);
+      - tin rơi vào `c1`;
+      - bấm hai lần tạo 2 hội thoại;
+    - browser `FE-03b:`: fail ở `getByText('Đang lập kế hoạch…')`, giống lỗi trên CI của #57.
+  - **GREEN:**
+    - `planning-navigation.test.tsx` 18/18 (5 test mới; 2 test thêm sau cho ca bấm lần nữa sau khi lần đầu xong và ca tạo hội thoại lỗi);
+    - browser `FE-03b:` và `FE-03: Shift Enter…` với `--repeat-each=20`: 40/40.
+  - **Mutation trên bản sửa:** 5/5 bị bắt:
+    - bỏ chặn bấm hai lần;
+    - tin gửi bỏ qua promise đang chờ;
+    - không ghi promise;
+    - không xóa promise sau khi xong;
+    - giữ route cũ khi đang tạo.
+  - **`npm run check`:** exit 0. v3 1.068 = 47 schema + 328 adapters + 180 planner + 25 executor + 252 API + 236 web; eval 165.
+  - **`npm run test:browser:v3`:** exit 0, 26/26 ca qua 10 scenario (default 15 ca, gồm test FE-03b mới).
 - Điều chưa làm hoặc khác với task card:
+  - Bấm "Cuộc hội thoại mới" hai lần liên tiếp giờ chỉ tạo **một** hội thoại (có test).
+  - Gửi từ trang chủ (luồng tự tạo hội thoại), rồi bấm "Cuộc hội thoại mới" trước khi xong: không đổi. Lần bấm sau tạo hội thoại mới và màn hình chuyển sang đó; tin nằm ở hội thoại đã gửi, thấy trong lịch sử.
+  - Tạo hội thoại lỗi khi đã gửi tin: giải phóng trạng thái lập kế hoạch, báo lỗi như cũ. Nội dung đã gõ không giữ lại, giống luồng tạo hội thoại lỗi hiện có.
+  - Không đổi API hay schema database.
