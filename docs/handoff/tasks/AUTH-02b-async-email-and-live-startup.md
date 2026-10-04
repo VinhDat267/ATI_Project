@@ -43,7 +43,45 @@ Nguồn: review của Claude Code cho #52/#53/#54 ngày 04/10/2026 (xem `log/202
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit:
-- Test đã chạy và kết quả:
+- PR: nhánh `fix/auth-02b-async-email` (Claude Code thi công theo yêu cầu của người dùng).
+- Commit: `4730c76` (test RED), `ecfe7ab` (sửa), kèm commit tài liệu.
+- Cách sửa mục 1: chọn **(b)**.
+  - `forgot-password` và `resend-verification` tạo token xong thì gọi `sendEmailInBackground`, không chờ SMTP. Lỗi gửi vẫn đi qua `sendEmailSafely`, chỉ ghi log đã làm sạch.
+  - Không chọn (a): outbox ở live sẽ lưu link reset có token dạng rõ trong database, ngược thiết kế chỉ lưu hash token.
+  - `signup` giữ nguyên, vì hai nhánh của nó vẫn cùng chờ một lần gửi thư.
+- Cách sửa mục 2:
+  - `validateEnv` thêm `EMAIL_ENABLED`. Live không có biến SMTP nào thì `EMAIL_ENABLED=false` và `AUTH_SIGNUP_ENABLED` bị buộc về `false`. Có một vài biến là lỗi khởi động như cũ.
+  - Server không tạo email sender khi `EMAIL_ENABLED=false`, và ghi một dòng cảnh báo khi khởi động (không có giá trị nào).
+  - Năm route email trả 503 "Chưa cấu hình gửi email.". Không có PostgreSQL thì vẫn trả thông báo cũ.
+- Test đã chạy và kết quả (04/10/2026, PostgreSQL tạm ở 55533):
+  - **RED trên `main` `7d2b292`:**
+    - SMTP giả lập chậm 500 ms, mỗi route 5 cặp email có/không có tài khoản: chênh lệch trung vị **519 ms** (`forgot-password`) và **514 ms** (`resend-verification`), vượt ngưỡng 100 ms;
+    - `validateEnv` live không SMTP: lỗi `SMTP_HOST is required in live mode`;
+    - spawn `server.ts` thật ở live không SMTP: thoát khi khởi động với cùng lỗi.
+  - **Hai test giữ hành vi cũ (đạt cả trước khi sửa):**
+    - cấu hình SMTP thiếu một phần vẫn là lỗi khởi động;
+    - duyệt tài khoản trả 503 `APPROVAL_EMAIL_UNAVAILABLE` khi không có sender, tài khoản vẫn `pending`.
+  - **GREEN:**
+    - test auth, config và live-startup: 93/93, chạy 3 lần liên tiếp;
+    - mỗi email có tài khoản nhận đúng một thư, email lạ không nhận thư.
+  - **Probe của reviewer chạy lại** (SMTP chậm 800 ms): email có tài khoản **28 ms**, email không có **5 ms**. Trước khi sửa là 832 ms và 6 ms.
+  - **Mutation:** 9/9 bị bắt:
+    - hai route chờ SMTP trở lại;
+    - helper gửi nền bỏ thư;
+    - live không SMTP vẫn lỗi;
+    - chấp nhận cấu hình thiếu một phần;
+    - không buộc tắt đăng ký;
+    - server vẫn tạo sender;
+    - mất dòng cảnh báo;
+    - thông báo 503 chung chung.
+  - **`npm run check`:** exit 0; v3 1.074 = 47 schema + 328 adapters + 180 planner + 25 executor + 258 API + 236 web; eval 165; typecheck, build, quét bản build đạt.
+  - **`npm run test:browser:v3`:** exit 0, 26/26 ca qua 10 scenario (auth02 2/2).
 - Điều chưa làm hoặc khác với task card:
+  - Nhánh email lạ **không** làm thêm việc giả để cân thời gian.
+    - Chênh lệch còn lại là transaction tạo token, khoảng 20 ms ở máy (probe 28 vs 5 ms), dưới ngưỡng 100 ms.
+    - Mỗi email chỉ được gửi 3 yêu cầu mỗi giờ, nên khó đo chênh lệch nhỏ như vậy giữa nhiễu mạng.
+  - Thư gửi nền chưa có hàng đợi bền: nếu API dừng ngay sau khi trả lời, thư đang gửi có thể mất. Người dùng chỉ cần gửi lại yêu cầu.
+  - Hai chỗ test đọc thư ngay sau response được sửa để chờ:
+    - helper `tokenFromMail` chờ các lần `send` đã bắt đầu;
+    - `mailLink` của browser test AUTH-02 poll outbox.
+  - `.env.example` ghi rõ live chạy được khi không có SMTP.
