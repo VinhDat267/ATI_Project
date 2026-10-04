@@ -1,6 +1,6 @@
 # W3-07 · Chạy thật năm service mới
 
-**Trạng thái:** đang làm (Telegram, Notion và workflow 4 service xong; Google, Jira chờ tài khoản) · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
+**Trạng thái:** đang làm (Telegram, Notion, Jira và workflow 4 service xong; Google chờ tài khoản) · **Nhánh gợi ý:** `test/w3-07-new-services-live` · **Phụ thuộc:** task service tương ứng đã merge; người dùng đã làm phần chuẩn bị của service đó · **Có phần việc của con người**
 
 Có thể làm từng service ngay khi task của service đó merge, không cần chờ đủ năm.
 
@@ -50,7 +50,7 @@ Sau khi đủ các service còn trong phạm vi:
 
 ## Kết quả (agent thi công điền)
 
-- PR: #48 (Telegram), #49 (sửa host Notion), #50 (Notion), nhánh `test/w3-07-four-service-live` (workflow 4 service).
+- PR: #48 (Telegram), #49 (sửa host Notion), #50 (Notion), #51 (workflow 4 service), nhánh `test/w3-07-jira-live` (Jira).
 - Service đã chạy thật / chưa chạy (và lý do):
   - **Telegram: xong (04/10/2026).** Nhóm thử nghiệm "ATI Test" (`-5405985621`, loại `group`), bot riêng cho dự án.
     1. `check` chỉ đọc (`getMe` + `getChat`): `telegram: OK - 1 allowlisted resources`.
@@ -70,7 +70,16 @@ Sau khi đủ các service còn trong phạm vi:
     3. Đọc lại bằng `notion.query_database`: đúng ID, tiêu đề `Kiểm tra W3-07 Notion`, `Trạng thái: Mới`.
     4. Ca lỗi thật không ghi: token giả, Notion trả HTTP 401, hệ thống báo `AUTH_ERROR: Notion request failed with HTTP 401`; output không chứa token.
     5. Bằng chứng ở `docs/ai-evidence/V3-LIVE-EXECUTION/2026-10-04T01-58-31-111Z/` (không commit).
-  - **Google Sheets, Google Calendar, Jira: chưa chạy**, chờ người dùng tạo tài khoản và tài nguyên thử nghiệm.
+  - **Jira: xong (04/10/2026), có 2 phát hiện → [W3-09](W3-09-jira-live-findings.md).** Site Jira Cloud Free, project `ATIT` (team-managed), API token không scope.
+    1. `check`: `jira: OK - 1 allowlisted resources`.
+    2. Ghi thật Jira + Slack, người dùng duyệt plan hash `d328ee1ad816aad7d1dc1a8b756999528c9701060d9dc53ebe42d747dfad9d7c`:
+       - model thật lập plan trong 7,8 s;
+       - `jira.create_issue` thành công, `ATIT-4`;
+       - `slack.send_message` thành công (`ts 1791094534.504529`), kèm key và link ticket.
+    3. Đọc lại bằng `jira.search_issues`: query rỗng và query `Jira` thấy `ATIT-4 | Kiểm tra W3-07 Jira | To Do`. Query `W3` và nguyên tiêu đề lại trả rỗng, vì adapter thay `-` bằng khoảng trắng (phát hiện 1).
+    4. Ca lỗi token sai: `jira: FAILED - NOT_FOUND`, không phải `AUTH_ERROR`. Probe trực tiếp cùng token giả: `/myself` trả 401, `/project/ATIT` trả 404, vì Jira coi Basic auth sai là ẩn danh và giấu project (phát hiện 2). Output không chứa token.
+    5. Bằng chứng ở `docs/ai-evidence/V3-LIVE-EXECUTION/2026-10-04T02-17-44-125Z/` (không commit).
+  - **Google Sheets, Google Calendar: chưa chạy**, chờ người dùng tạo service account.
 - Workflow nhiều service: **xong (04/10/2026), GitHub → Notion → Telegram → Slack** (2 service mới).
   - Model thật lập plan trong 8,4 s, 4 search đọc (repo, database, chat, channel) chạy song song.
   - Người dùng duyệt plan hash `057c0ab9826543b4035555d6915c032416763278b86b31cab54366d439173f16`. Cả 4 step `succeeded`:
