@@ -7,7 +7,7 @@ export function userFacingError(value: unknown): string {
     [/Successfully connected/i, 'Kiểm tra kết nối thành công.'],
     [/Provider rejected|verification failed/i, 'Kiểm tra kết nối thất bại. Hãy kiểm tra thông tin kết nối dịch vụ.'],
     [/Email and password are required/i, 'Vui lòng nhập email và mật khẩu.'],
-    [/Invalid email or password/i, 'Email hoặc mật khẩu không đúng.'],
+    [/Invalid email or password/i, 'Email hoặc mật khẩu không chính xác.'],
     [/Too many login attempts/i, 'Bạn đã thử đăng nhập quá nhiều lần. Hãy thử lại sau.'],
     [/Account is not active/i, 'Tài khoản chưa được kích hoạt.'],
     [/refreshToken is required/i, 'Thiếu thông tin để gia hạn phiên đăng nhập.'],
