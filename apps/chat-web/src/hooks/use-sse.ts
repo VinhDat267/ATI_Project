@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
 import type { GatherStep, StepState, PlanStatus } from '../types';
@@ -277,14 +277,18 @@ class StreamClientError extends Error {}
 
 export function useSSE(conversationId: string | null, token: string | null) {
   const [disconnected, setDisconnected] = useState(false);
+  const authRetry = useRef({ conversationId, refreshed: false });
   useEffect(() => {
     setDisconnected(false);
-    if (!conversationId || !token) return;
+    if (!conversationId || !token) { authRetry.current = { conversationId, refreshed: false }; return; }
+    if (authRetry.current.conversationId !== conversationId) authRetry.current = { conversationId, refreshed: false };
+    // Token storage notifies AuthGate and restarts this effect during refresh.
+    // Keep the budget across that restart until a stream has actually opened.
+    const budget = authRetry.current;
     const ctrl = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const markDisconnected = () => { if (!timer) timer = setTimeout(() => { if (!ctrl.signal.aborted) setDisconnected(true); }, 5000); };
     const connected = () => { if (timer) clearTimeout(timer); timer = undefined; setDisconnected(false); };
-    let refreshed = false;
     const cursor = lastEventSeq.get(conversationId);
     const lastId = !cursor ? '0' : cursor.epoch === 'legacy' ? String(cursor.seq) : `${cursor.epoch}:${cursor.seq}`;
     fetchEventSource(`/api/conversations/${conversationId}/stream`, {
@@ -297,18 +301,20 @@ export function useSSE(conversationId: string | null, token: string | null) {
         const headers = new Headers(init?.headers);
         headers.set('Authorization', `Bearer ${authStorage.getStoredTokens().accessToken || token}`);
         let response = await fetch(input, { ...init, headers });
-        if (response.status === 401 && !refreshed) {
+        if (response.status === 401 && !budget.refreshed) {
           try {
+            budget.refreshed = true;
             const tokens = await apiClient.refreshToken();
             if (ctrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-            refreshed = true;
             headers.set('Authorization', `Bearer ${tokens.accessToken}`);
             response = await fetch(input, { ...init, headers });
           } catch (error) {
+            if (ctrl.signal.aborted) throw error;
             if ((error as any)?.status === 401 || (error as any)?.status === 403) {
               authStorage.clearStoredTokens();
               throw new StreamAuthError('Phiên đăng nhập đã hết hạn.');
             }
+            budget.refreshed = false;
             throw error;
           }
         }
@@ -321,7 +327,7 @@ export function useSSE(conversationId: string | null, token: string | null) {
         }
         const contentType = response.headers?.get?.('content-type') || (response.headers as any)?.['content-type'];
         if (response.ok && contentType?.includes('text/event-stream')) {
-          refreshed = false;
+          budget.refreshed = false;
           connected();
           void refreshExecutionSnapshot(conversationId).catch(() => {});
           return;
