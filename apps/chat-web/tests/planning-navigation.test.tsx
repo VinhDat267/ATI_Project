@@ -176,3 +176,58 @@ it('clears every conversation planning record when the authenticated session is 
   expect(useChatStore.getState().planningByConversation).toEqual({});
   expect(useChatStore.getState().conversationId).toBeNull();
 });
+const newConversationButton = () => screen.getByRole('button', { name: /Cuộc hội thoại mới/ });
+it('sends a message typed while New conversation is pending into that conversation', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  send('Plan in the new conversation');
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(sends.map(row => [row.convId, row.content])).toEqual([['c-new', 'Plan in the new conversation']]));
+  expect(creations).toHaveLength(1);
+  expect(window.location.pathname).toBe('/c/c-new');
+  expect(screen.getByText('Plan in the new conversation')).toBeInTheDocument();
+  expect(screen.getByText('Đang lập kế hoạch…')).toBeInTheDocument();
+});
+it('sends into the pending new conversation instead of the conversation being left', async () => {
+  render(<App />); await screen.findByText('Saved c1');
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  send('Plan after leaving c1');
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(sends).toHaveLength(1));
+  expect(sends[0]).toMatchObject({ convId: 'c-new', content: 'Plan after leaving c1' });
+  expect(window.location.pathname).toBe('/c/c-new');
+  expect(screen.getByText('Đang lập kế hoạch…')).toBeInTheDocument();
+});
+it('creates one conversation when New conversation is clicked twice before the first reply', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); fireEvent.click(newConversationButton());
+  await waitFor(() => expect(creations).toHaveLength(1));
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
+  expect(creations).toHaveLength(1);
+});
+it('creates another conversation when New conversation is clicked again after the first one opened', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(2));
+  await act(async () => reply(creations[1]!, { conversation: { id: 'c-next' } }, 201));
+  await waitFor(() => expect(window.location.pathname).toBe('/c/c-next'));
+  send('Plan in the second new conversation');
+  await waitFor(() => expect(sends.map(row => row.convId)).toEqual(['c-next']));
+});
+it('releases a message sent while New conversation fails and reports the failure', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await screen.findByRole('button', { name: 'Conversation one' });
+  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  send('Plan without a conversation');
+  await act(async () => reply(creations[0]!, { error: 'Máy chủ lỗi' }, 500));
+  expect(await screen.findByText(/Không thể tạo phiên hội thoại mới/)).toBeInTheDocument();
+  expect(sends).toHaveLength(0); expect(creations).toHaveLength(1);
+  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Try again' } });
+  expect(sendButton()).toBeEnabled();
+});
