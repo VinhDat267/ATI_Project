@@ -43,15 +43,15 @@ Admin duyệt tài khoản mới, khóa/mở khóa tài khoản, cấp hoặc b�
 ## Kết quả (agent thi công điền)
 
 - PR: root chuẩn bị PR xếp trên AUTH-02; chưa push hoặc mở PR trong phiên thi công này.
-- Commit sản phẩm: `377d872` (API/UI), merge backend AUTH-02 `99b539c` tại `e8daa2d`, `df68137` (email duyệt và regression phiên cạnh tranh). Các test bổ sung và metadata được commit sau; xem [nhật ký](../log/2026-10-04-codex-AUTH-03-admin-users.md).
+- Commit sản phẩm: `377d872` (API/UI), `df68137` (email duyệt và regression phiên cạnh tranh), `2c7e685` (bật signup sau ghép UI đầy đủ). AUTH-02 cuối `7d7dd66` đã ghép tại `ce8c122`; task/test bổ sung `502ef34`. Xem [nhật ký](../log/2026-10-04-codex-AUTH-03-admin-users.md).
 - Test đã chạy và kết quả:
   - RED: 8 ca HTTP/PostgreSQL và 4 ca UI thất bại do thiếu API/view; lỗi mất phiên trở về landing, UUID hoa, email duyệt trống và thiếu sender đều có RED riêng trước sửa.
   - PostgreSQL thật: 15/15 ca AUTH-03, gồm hai admin bỏ quyền/khóa nhau, chờ advisory lock rồi kiểm lại quyền actor, duyệt đồng thời chỉ một email, khóa thu hồi mọi phiên và phân trang/tìm kiếm không lộ hash.
   - Ca tạo phiên trong lúc khóa: RED thực tế trên AUTH-01, phiên tạo muộn hoạt động lại khi mở khóa; GREEN sau khi dùng khóa dòng của AUTH-02. AUTH-03 thêm regression, không sửa lại implementation phiên của AUTH-02.
-  - UI trọng tâm 10/10; toàn bộ web 192/192; `npm run typecheck:v3` exit 0.
+  - UI trọng tâm 10/10; toàn bộ web trước stack UI AUTH-02 192/192. Sau stack đầy đủ và đổi signup default, trọng tâm tích hợp API/config/AUTH-02/AUTH-03 36/36 và UI/signup/session/routing 24/24; `npm run typecheck:v3` exit 0.
   - Toàn bộ API lần đầu sau migrate đạt 235/235. Sau thêm ba ca: 236/238, hai fixture khởi động child process có timeout 10 giây; chạy riêng hai file với `--maxWorkers=1` đạt 18/18. Root chạy canonical tuần tự trên head tích hợp cuối; không coi phép chạy từng phần là full-suite PASS.
   - Root chạy browser AUTH-03 trên nhánh ghép AUTH-02 backend + AUTH-03 + FE-03: 1/1, exit 0; duyệt → email outbox → member đăng nhập → khóa → request kế tiếp về màn hình đăng nhập. CI và đủ canonical browser scenario chờ root chạy trên head cuối.
 - Điều chưa làm hoặc khác với task card:
   - Duyệt gửi `approvalEmail` qua `EmailSender` của AUTH-02 sau transaction thành công; thiếu sender trả 503 trước cấp quyền. Sandbox dùng outbox; không gọi SMTP thật.
-  - `AUTH_SIGNUP_ENABLED` vẫn mặc định `false` tại checkpoint này vì mới ghép backend AUTH-02. Root ghép toàn bộ AUTH-02 rồi đổi mặc định thành `true`, kiểm tra lại và cập nhật bằng chứng cuối trước PR.
+  - Đã ghép toàn bộ AUTH-02 và đổi mặc định `AUTH_SIGNUP_ENABLED` thành `true`; env `false` vẫn đóng đăng ký. Config có RED → GREEN cho mốc này. Browser AUTH-03 đã được thêm vào default selector của script canonical; root ghép thêm selector FE-03 và chạy đủ gate cuối trước PR.
   - Không sửa v2, `CURRENT-STATE.md`, `ROADMAP.md`, private env hoặc DB của người dùng. Không gọi model/provider/cloud DB/service thật. Chưa tự mở PR, push hoặc merge vào main.
