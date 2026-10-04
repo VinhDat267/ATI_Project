@@ -24,10 +24,10 @@ it('changes public views on browser Back and Forward', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập vào hệ thống' }));
   expect(window.location.pathname).toBe('/login');
   expect(screen.getByLabelText('Email')).toBeInTheDocument();
-  await act(async () => { window.history.back(); await new Promise(resolve => setTimeout(resolve, 20)); });
-  expect(screen.getByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeInTheDocument();
-  await act(async () => { window.history.forward(); await new Promise(resolve => setTimeout(resolve, 20)); });
-  expect(screen.getByLabelText('Email')).toBeInTheDocument();
+  act(() => window.history.back());
+  expect(await screen.findByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeInTheDocument();
+  act(() => window.history.forward());
+  expect(await screen.findByLabelText('Email')).toBeInTheDocument();
 });
 it('leaves the login URL after successful login', async () => {
   window.history.replaceState({}, '', '/login');
