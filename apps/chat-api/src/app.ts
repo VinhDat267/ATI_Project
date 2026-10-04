@@ -18,6 +18,7 @@ import type { SSEManager } from './sse/sse-manager.js';
 import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
+import type { GoogleOAuthConfig } from './auth/google-oidc.js';
 
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
@@ -28,6 +29,9 @@ export interface AppOptions extends AdminUsersOptions {
   signupEnabled?: boolean;
   appBaseUrl?: string;
   emailSender?: EmailSender;
+  googleOAuth?: GoogleOAuthConfig;
+  googleFetchFn?: typeof fetch;
+  googleSignupEnabled?: boolean;
   validateCredentials?: (email: string, password: string) => Promise<AuthUser | null> | AuthUser | null;
   convRepo?: ConversationRepo;
   msgRepo?: MessageRepo;
@@ -60,7 +64,15 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.path.startsWith('/api/auth/google/')) {
+      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+      const origin = req.get('Origin');
+      res.vary('Origin');
+      if (origin && origins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+    } else res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
     if (req.method === 'OPTIONS') {
@@ -80,7 +92,9 @@ export function createApp(options: AppOptions): Express {
     '/api/auth',
     createAuthRoutes({ jwtSecret: options.jwtSecret, userRepo: options.userRepo, sessionRepo: options.sessionRepo,
       clock: options.authClock, validateCredentials: options.validateCredentials,
-      signupEnabled: options.signupEnabled, appBaseUrl: options.appBaseUrl, emailSender: options.emailSender })
+      signupEnabled: options.signupEnabled, appBaseUrl: options.appBaseUrl, emailSender: options.emailSender,
+      runtimeMode: options.runtimeMode, googleOAuth: options.googleOAuth, googleFetchFn: options.googleFetchFn,
+      googleSignupEnabled: options.googleSignupEnabled })
   );
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });

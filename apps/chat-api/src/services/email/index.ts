@@ -61,3 +61,6 @@ export function pendingApprovalEmail(to: string, name: string, userEmail: string
 export function approvalEmail(to: string, name: string): EmailMessage {
   return email(to, 'Tài khoản ATI đã được duyệt', `Chào ${name},\nTài khoản của bạn đã được quản trị viên duyệt. Bạn có thể đăng nhập và sử dụng ATI.`);
 }
+export function googleLinkedEmail(to: string): EmailMessage {
+  return email(to, 'Tài khoản ATI đã liên kết Google', 'Tài khoản ATI của bạn vừa được liên kết với Google. Nếu bạn không yêu cầu việc này, hãy liên hệ quản trị viên.');
+}

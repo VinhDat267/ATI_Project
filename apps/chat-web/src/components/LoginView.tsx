@@ -1,4 +1,5 @@
 import React from 'react';
+import { GoogleAuthButton } from './GoogleAuthButton';
 
 export interface LoginViewProps {
   email: string;
@@ -14,7 +15,6 @@ export interface LoginViewProps {
   onSignup?: () => void;
   onForgotPassword?: () => void;
   onResendVerification?: () => void;
-  onGoogleLogin?: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
@@ -31,7 +31,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onSignup,
   onForgotPassword,
   onResendVerification,
-  onGoogleLogin,
 }) => {
   const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
   const demoPassword = import.meta.env.VITE_DEMO_PASSWORD;
@@ -196,7 +195,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             {onResendVerification && <button type="button" className="hover:underline" onClick={onResendVerification}>Gửi lại email xác minh</button>}
           </div>
           {authConfig?.signupEnabled && onSignup && <button type="button" className="text-sm text-[#0071e3] hover:underline" onClick={onSignup}>Tạo tài khoản</button>}
-          {authConfig?.googleEnabled && onGoogleLogin && <button type="button" onClick={onGoogleLogin}>Đăng nhập bằng Google</button>}
+          {authConfig?.googleEnabled && <GoogleAuthButton disabled={isLoggingIn} />}
 
           {/* Quick-Fill Admin Helper for Local Testing (Only in sandbox/dev mode) */}
           {showDemo && (

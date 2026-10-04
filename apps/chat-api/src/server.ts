@@ -280,6 +280,8 @@ async function bootstrap() {
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
+    googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
+    googleOAuth: env.GOOGLE_OAUTH,
     appBaseUrl: env.APP_BASE_URL,
     emailSender: pool && userRepo && env.EMAIL_ENABLED ? createEmailSender(env, pool) : undefined,
     validateCredentials: !userRepo && env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_USER_EMAIL && process.env.SANDBOX_USER_PASSWORD

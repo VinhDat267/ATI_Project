@@ -2,34 +2,39 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient } from '../../src/services/api-client';
 import { authStorage } from '../../src/services/auth-storage';
 import { userErrorMessage } from '../../src/services/user-error';
+import { generateAccessToken } from '../../../chat-api/src/auth/jwt';
+
+const owner = { id: 'owner', email: 'owner@example.test', name: 'Owner' };
+const expired = generateAccessToken(owner, 'fixture-secret', 'shared-session', 1000).accessToken;
+const otherTabAccess = generateAccessToken(owner, 'fixture-secret', 'shared-session', 2000).accessToken;
 
 const client = new ApiClient();
 beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 afterEach(() => vi.unstubAllGlobals());
 describe('AUTH-01 browser session client', () => {
   it('adopts another tab token pair on REFRESH_ROTATED and retries with that access token', async () => {
-    authStorage.setStoredTokens({ accessToken: 'expired', refreshToken: 'old' });
+    authStorage.setStoredTokens({ accessToken: expired, refreshToken: 'old', user: owner });
     const requests: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       if (url === '/api/auth/refresh') {
-        localStorage.setItem('wap_access_token', 'other-tab-access');
+        localStorage.setItem('wap_access_token', otherTabAccess);
         localStorage.setItem('wap_refresh_token', 'other-tab-refresh');
         return new Response(JSON.stringify({ code: 'REFRESH_ROTATED' }), { status: 409 });
       }
       const token = new Headers(init?.headers).get('Authorization')!; requests.push(token);
-      return new Response(JSON.stringify({ user: { id: 'owner' } }), { status: token === 'Bearer expired' ? 401 : 200 });
+      return new Response(JSON.stringify({ user: { id: 'owner' } }), { status: token === `Bearer ${expired}` ? 401 : 200 });
     }));
     await expect(client.getMe()).resolves.toMatchObject({ user: { id: 'owner' } });
-    expect(requests).toEqual(['Bearer expired', 'Bearer other-tab-access']);
+    expect(requests).toEqual([`Bearer ${expired}`, `Bearer ${otherTabAccess}`]);
     expect(authStorage.getStoredTokens().refreshToken).toBe('other-tab-refresh');
   });
   it('requires a changed refresh token, even if access JWT is identical within one second', async () => {
-    authStorage.setStoredTokens({ accessToken: 'same-access', refreshToken: 'old' });
+    authStorage.setStoredTokens({ accessToken: expired, refreshToken: 'old' });
     vi.stubGlobal('fetch', vi.fn(async () => {
       localStorage.setItem('wap_refresh_token', 'new');
       return new Response(JSON.stringify({ code: 'REFRESH_ROTATED' }), { status: 409 });
     }));
-    await expect(client.refreshToken()).resolves.toMatchObject({ accessToken: 'same-access', refreshToken: 'new' });
+    await expect(client.refreshToken()).resolves.toMatchObject({ accessToken: expired, refreshToken: 'new' });
   });
   it('clears the local session on REFRESH_ROTATED with no replacement pair', async () => {
     authStorage.setStoredTokens({ accessToken: 'expired', refreshToken: 'old' });

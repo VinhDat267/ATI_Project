@@ -20,7 +20,7 @@ export class InvalidSessionUserError extends Error {
 export class SessionRepo {
   constructor(private pool: pg.Pool) {}
 
-  async create(userId: string, userAgent: string | undefined, now = Date.now(), expectedPasswordHash?: string | null): Promise<{ sessionId: string; refreshToken: string }> {
+  async create(userId: string, userAgent: string | undefined, now = Date.now(), expectedPasswordHash?: string | null, expectedGoogleSub?: string): Promise<{ sessionId: string; refreshToken: string }> {
     const refreshToken = newToken();
     // Expiry cleanup uses no user lock and cannot fail after the new session
     // has committed. It also cascades the retired refresh hash history.
@@ -31,8 +31,9 @@ export class SessionRepo {
       // Reset/disable also lock this user. Recheck the password snapshot after
       // that lock so a previously authenticated old password cannot create a
       // fresh session after password reset has revoked the existing sessions.
-      const account = (await client.query<{ status: string; password: string | null }>('SELECT status,password FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
-      if (!account || account.status !== 'active' || (expectedPasswordHash !== undefined && account.password !== expectedPasswordHash)) throw new InvalidSessionUserError();
+      const account = (await client.query<{ status: string; password: string | null; google_sub: string | null }>('SELECT status,password,google_sub FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
+      if (!account || account.status !== 'active' || (expectedPasswordHash !== undefined && account.password !== expectedPasswordHash)
+        || (expectedGoogleSub !== undefined && account.google_sub !== expectedGoogleSub)) throw new InvalidSessionUserError();
       const result = await client.query(
         `INSERT INTO auth_sessions(user_id,refresh_token_hash,created_at,last_used_at,expires_at,user_agent)
          VALUES($1,$2,$3,$3,$4,$5) RETURNING id`,
