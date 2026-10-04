@@ -57,26 +57,26 @@ W4-03 đo "tỉ lệ plan dùng được" với người dùng thật. Nếu pla
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test backend: `plan_preview` và metadata plan có `resourceLabels` đúng cho tham số `x-resource`, không có nhãn cho tham số thường.
-- [ ] Test frontend:
+- [x] Test backend: `plan_preview` và metadata plan có `resourceLabels` đúng cho tham số `x-resource`, không có nhãn cho tham số thường.
+- [x] Test frontend:
   - plan hiện tên kèm ID, nhãn Đọc/Ghi;
   - kết quả có link bấm được;
   - link `javascript:` hay scheme khác không được render thành link.
-- [ ] Test SSE: `onopen` 401 → refresh → kết nối lại thành công; refresh lỗi → về đăng nhập; mất kết nối thì hiện dải thông báo. Dùng access token TTL ngắn hoặc đồng hồ giả, không chờ 15 phút thật.
-- [ ] Test không còn chuỗi tiếng Anh cố định trong các câu hỏi, câu từ chối và lỗi trả cho người dùng.
-- [ ] Browser E2E:
+- [x] Test SSE: `onopen` 401 → refresh → kết nối lại thành công; refresh lỗi → về đăng nhập; mất kết nối thì hiện dải thông báo. Dùng access token TTL ngắn hoặc đồng hồ giả, không chờ 15 phút thật.
+- [x] Test không còn chuỗi tiếng Anh cố định trong các câu hỏi, câu từ chối và lỗi trả cho người dùng.
+- [x] Browser E2E:
   - plan preview có tên tài nguyên;
   - sau khi chạy, link kết quả bấm được;
   - Shift+Enter xuống dòng;
   - không gửi được tin thứ hai khi đang chờ plan.
-- [ ] `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
+- [x] `npm run check` exit 0; `npm run test:browser:v3` đạt hết.
 
 ## Kết quả (agent thi công điền)
 
 - Review P2 nhãn trùng scope: bỏ chọn entity đầu tiên theo issueNumber; lọc parent repo từ argument `x-resource` thực tế khi lookup giữ scope, còn nhiều entity thì giữ ID. RED3 ca (b/repo#42 nhận Issue A, scope chưa rõ vẫn có nhãn) → GREEN resource-labels6/6; không đổi payload/hash/migration.
 - Review P2 kết quả đọc: hiển thị collection theo output schema đã đăng ký (Trello/GitHub array, Jira issues, Notion pages, Calendar events), tên/title, link HTTP/HTTPS an toàn và giờ vi-VN; giữ JSON đầy đủ trong Chi tiết. RED6 ca collection → GREEN readable-workflow13/13 gồm unsafe URL; không đổi kết quả thực thi.
 - Review P2 planning: giữ requestId/messageId theo hội thoại qua navigation reset, chuyển draft lock sang ID mới khi tạo async; xác thực mất thì xóa toàn bộ. Terminal SSE/HTTP chỉ xử lý đúng request, phản hồi cũ không mở khóa/lập lại lock của lần gửi mới. History mở khóa chỉ khi replyToMessageId trỏ đúng user message đã nhận; plan/clarification/refusal/error đều lưu metadata terminal để phục hồi khi hoàn tất trong lúc stream đã đóng. RED3 native HTTP navigation/creation/late-failure + RED thiếu persistence error → GREEN navigation/correlation13/13, related navigation/store/history/SSE59/59; sau chỉnh cuối store/SSE/workflow51/51, API15/15, typecheck/diff check exit0. SQL integration đã thêm assertion correlation, chưa chạy lại riêng: root canonical gate sẽ xác minh. Không đổi executable plan/text/hash hay thêm migration.
-- PR: root sẽ tạo sau khi ghép AUTH-02/AUTH-03 và review độc lập; chưa push/merge.
+- PR: https://github.com/VinhDat267/ATI_Project/pull/54; xếp trên AUTH-03 #53; review/local checks đạt, chờ CI cuối.
 - Commit code: `60d8219`, `56af477`, `75c0e17`, `c3e4ae7`, `029d0f5` trên `vinhdat/feat-fe-03-readable-workflows`; base `3212181`.
 - Đã làm: metadata `resourceLabels` lấy từ grounding thực sự và chỉ tham số `x-resource`, có parent board khi đã tra cứu; migration `0006_fe03_resource_labels.sql` lưu riêng ngoài plan JSON/text/hash. Preview/SSE, history message và execution snapshot phục hồi cùng nhãn. ID chưa biết hoặc tên xung đột giữ ID thô; hiển thị Đọc/Ghi và rủi ro từ catalog.
 - Kết quả theo trường có link HTTP/HTTPS an toàn, thời gian, JSON đầy đủ trong Chi tiết, tóm tắt số bước succeeded/skipped và plan đã duyệt thu gọn. Text stream kết thúc được giữ thành message có timestamp.
@@ -88,3 +88,12 @@ W4-03 đo "tỉ lệ plan dùng được" với người dùng thật. Nếu pla
 - Bằng chứng PostgreSQL: planner thật với provider offline + lookup fixtures → SSE → SQL metadata → repository mới/HTTP reload pending và completed, hash/text giữ nguyên, migration chạy lại không mất nhãn. DB tmpfs riêng `ati-fe03-labels-20261004`, ID `8161a052698cb1d91fc8b7ec2eb99e2722ddf97b2d7962b8e10869262978b12e`, cổng động `51855`; đã xóa đúng container và xác minh không còn. Không dùng DB người dùng `15433` hay canonical `55533`.
 - Canonical của root trên `c3e4ae7`: `npm run check` exit0, **987 v3 + 165 evaluation**. Browser default **11 đạt/2 lỗi**: FE-02 mở hội thoại khác bị SSE403 xóa phiên; FE-03 busy gửi yêu cầu Trello-only không khớp fixture hai dịch vụ. Cả hai nguyên nhân đã sửa ở `029d0f5`; focused sau sửa: native SSE **6/6**, AIPlanner multiline **1/1**, typecheck/diff check exit0. Root chạy lại browser trên head mới; còn chờ toàn bộ browser/reviewer/CI, chưa tuyên bố task nghiệm thu hoàn tất. Có 2 ca `FE-03:` đã đăng ký canonical selector.
 - Giới hạn: các suite chạy đồng thời dưới tải CPU đã có 1 lỗi Back/Forward chờ 20 ms và 2 timeout child process cũ; chạy serial với 2 worker đạt lại, không sửa implementation để che lỗi. Browser tên dùng grounding fixture sandbox được nêu rõ trong test; test backend chứng minh planner/lookup thật trong phạm vi offline. Model/golden/live service **NOT_RUN**; cần golden mới khi được cấp quyền vì wording planner/registry đã đổi. Không dùng `.env` riêng, provider, service thật hoặc cloud DB; không sửa v2/CURRENT-STATE/ROADMAP hay thiết kế thị giác.
+## Xác minh cuối của root/reviewer (04/10/2026)
+
+- PR: https://github.com/VinhDat267/ATI_Project/pull/54; base AUTH-03 #53 `39640ab`, sau AUTH-02 #52. Nhánh `vinhdat/feat-fe-03-readable-workflows`; chưa merge, CI trên head tài liệu cuối còn chờ.
+- Root ghép tại `e2bbde9`, giữ EmailSender + userFacingError và toàn bộ browser selectors. `npm run check`: exit0, **1.063 v3 + 165 evaluation offline**, typecheck/build/credentialscan/launcher1/envguards3 đạt. API252/web231 gồm SQL persistence/correlation và regression cả3task.
+- Delta `82fcd24` chỉ thống nhất câu lỗi login tiếng Việt và2assertion API; API integration **11/11** exit0. `npm run test:browser:v3` trên code cuối: exit0, **25/25** qua10scenario. Cả signup/outbox/approve/reset/khóa phiên, grounded preview/reload/results và multiline/busy đều đạt trên Chromium/PostgreSQL sandbox.
+- Review độc lập **Đạt**: cả3P2 đóng, không có P1/P2 mới được xác nhận. Rerun **32 frontend** (13nativeHTTPplanning,13workflow,6nativeHTTPSSE) + **15API**, exit0; negative probes đúngrepo issue, collectionHTTPS link, navigation vẫn sends1. Metadata nằm ngoài executableJSON/text/hash.
+- Các fixP2: `c61fefc` nhãn theo phạm vi repo/ambiguousomit; `4b81017` collections theo registered outputschema; `50d028e` planning theo conversation/request, exact reply correlation và durable refusal/error. Body.tempId được kiểm kiểu/độ dài; authloss xóa toàn bộ record, navigation preserve. Không đổi migration/approval semantics.
+- Bằng chứng local ngoài repo trong `C:/Users/VinhDat/.codex/visualizations/2026/10/04/auth02-auth03-fe03/`: `combined-final-check.log`, `combined-login-wording.log`, `combined-final-browser-rerun.log` và các log review/negative probes. Raw artifacts không commit.
+- Golden/model/liveSMTP/provider/service thật **NOT_RUN**. CI/offline/browser không thay nghiệm thu live service; wording planner/registry cần golden mới khi được cấp quyền. Không sửa CURRENT-STATE/ROADMAP trước merge; giữ3PRworktrees đểreview, root dọn worktree tích hợp/container tạm khi gate hoàn tất.
