@@ -6,9 +6,10 @@ const fakeOidc = resolve(fileURLToPath(new URL('.', import.meta.url)), 'fake-oid
 
 // Starts the local OIDC provider used by the AUTH-04 browser scenario and resolves
 // with its origin once the child reports readiness on its first stdout line.
+// Port 0 lets the OS pick a free port: a fixed one can be taken by any outgoing socket.
 export async function startGoogleFixture() {
   const child = spawn(process.execPath, [fakeOidc], {
-    env: { ...process.env, FAKE_OIDC_PORT: '55534' }, stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, FAKE_OIDC_PORT: '0' }, stdio: ['ignore', 'pipe', 'inherit'],
   });
   const stopped = new Promise(resolve => child.once('close', resolve));
   let port;
@@ -26,7 +27,7 @@ export async function startGoogleFixture() {
         if (newline < 0) return;
         try {
           const ready = JSON.parse(output.slice(0, newline));
-          if (ready.status !== 'ready' || ready.port !== 55534) throw new Error('Invalid local OIDC readiness');
+          if (ready.status !== 'ready' || !Number.isInteger(ready.port) || ready.port < 1 || ready.port > 65535) throw new Error('Invalid local OIDC readiness');
           clearTimeout(timer);
           child.removeListener('error', fail);
           child.removeListener('exit', fail);
