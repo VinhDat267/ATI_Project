@@ -319,6 +319,30 @@ repository. External writes cannot be rolled back. Evidence is written to
 node --env-file=.env --import tsx evaluations/live-execution/run.ts check
 ```
 
+### W3-07 live runs (04/10/2026)
+
+Each new service ran against a real test resource. Every write followed a plan
+whose hash the project owner approved:
+
+- **Telegram:** message to a test group.
+- **Notion:** page in a test database.
+- **Jira:** issue `ATIT-4`.
+- **Google Calendar:** event on a dedicated calendar.
+- **Google Sheets:** appended row.
+- **Four services:** GitHub issue → Notion page (Link = issue URL) → Telegram → Slack.
+
+Results were read back with the read tools. Each service also had a real
+authentication failure, and every one was classified `AUTH_ERROR`, except Jira
+project reads (see W3-09). The live runs found three product issues that
+fixture tests missed:
+
+- Notion URLs on `app.notion.com` (fixed in #49);
+- Jira text search misses hyphenated terms (W3-09);
+- an invalid Jira token yields `NOT_FOUND` on project reads (W3-09).
+
+Evidence stays in `docs/ai-evidence/V3-LIVE-EXECUTION/` (not committed);
+hashes and IDs are in `docs/handoff/tasks/W3-07-new-services-live.md`.
+
 ### Through the app
 
 `live-app/` takes one request through the product itself: web UI, chat-api in

@@ -2,6 +2,16 @@
 
 **Cập nhật:** 29/09/2026. **Trạng thái:** đã triển khai GitHub làm dịch vụ thứ ba và kiểm chứng workflow ba dịch vụ trong sandbox + PostgreSQL; gate live và phục hồi vẫn mở.
 
+> **Cập nhật 04/10/2026 (W3-07):** catalog có 8 service (Trello, Slack, GitHub, Google Sheets, Google Calendar, Notion, Telegram, Jira). Cả năm service mới đã chạy thật có kiểm soát qua `evaluations/live-execution/run.ts`, mỗi lệnh ghi theo plan người dùng đã duyệt đúng hash:
+> - **Telegram:** gửi tin vào nhóm thử nghiệm.
+> - **Notion:** tạo page; lần chạy thật phát hiện host `app.notion.com`, sửa qua #49.
+> - **Jira:** tạo `ATIT-4`; hai phát hiện → W3-09.
+> - **Google Calendar:** tạo sự kiện.
+> - **Google Sheets:** thêm dòng có link sự kiện.
+> - **Workflow 4 service:** GitHub → Notion → Telegram → Slack, 4/4 step thành công, đối chiếu bằng tool đọc.
+>
+> Mỗi service có một ca lỗi xác thực thật (Telegram 401, Notion 401, Jira 401/404, Google 400 `invalid_grant`). Chi tiết và hash ở [W3-07](handoff/tasks/W3-07-new-services-live.md); bảng gate bên dưới giữ nguyên lịch sử ngày 29/09, trừ dòng Live.
+
 Tài liệu này ghi nhận khoảng cách mã nguồn và backlog. Nguồn chuẩn tắc về hành vi và nghiệm thu vẫn là [đặc tả v3, mục 1.4](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md#14-phạm-vi-đa-dịch-vụ-và-điều-kiện-hoàn-thành).
 
 ## Mục tiêu sản phẩm
@@ -45,7 +55,7 @@ Các gói việc MS-01 → MS-06 nằm ở đầu [kế hoạch v3](superpowers/
 | Adapter thứ ba | Schema, credentials, repo scope, transport và lỗi được kiểm thử | CONFIRMED qua injected fetch; live NOT_RUN |
 | Workflow ba dịch vụ | Kết quả bước trước được dùng ở bước sau; preview/approval/result và DB khớp nhau | CONFIRMED sandbox + PostgreSQL, 1 browser E2E |
 | Giới hạn và lỗi | Thiếu cấu hình, ngoài scope, token hết hiệu lực, 429, timeout, `UNKNOWN`, dependency khi bỏ qua bước | PARTIAL; unit/integration fixture, live NOT_RUN |
-| Live | Có kết quả API thật và đối chiếu tài nguyên cùng trạng thái DB; lưu evidence riêng với sandbox | NOT_RUN |
+| Live | Có kết quả API thật và đối chiếu tài nguyên cùng trạng thái DB; lưu evidence riêng với sandbox | CONFIRMED qua `run.ts` cho cả 8 service (04/10/2026, W3-07); đối chiếu bằng tool đọc, chưa đối chiếu DB của app vì không chạy qua frontend |
 
 Giữ regression Trello/Slack. Test giả lập có giá trị kiểm tra hợp đồng, nhưng không đóng gate live hoặc chất lượng AI. Đạt một workflow ba dịch vụ là bằng chứng tối thiểu cho scope mở rộng, không phải cam kết hỗ trợ mọi dịch vụ.
 
