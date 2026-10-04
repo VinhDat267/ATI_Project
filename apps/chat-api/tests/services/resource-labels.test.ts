@@ -2,6 +2,28 @@ import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { expect, it } from 'vitest';
 import { ChatService } from '../../src/services/chat-service.js';
+import { resourceLabels } from '../../src/services/resource-labels.js';
+import { WorkingMemory } from '@wap/planner';
+it('keeps a conflicting raw identifier unlabeled rather than choosing another resource name', () => {
+  const memory = new WorkingMemory();
+  memory.setEntity('list', { id: 'same', name: 'Cần làm' }); memory.setEntity('member', { id: 'same', name: 'Minh' });
+  const plan = { kind: 'plan', thinking: 'Đã tra cứu', summary: 'Tạo và gán', warnings: [], steps: [
+    { id: 's1', tool: 'trello.create_card', description: 'Tạo', dependsOn: [], args: { listId: 'same', title: 'Task' } },
+    { id: 's2', tool: 'trello.add_member', description: 'Gán', dependsOn: [], args: { cardId: { $ref: 's1.output.id' }, memberId: 'same' } },
+  ] } as any;
+  expect(resourceLabels(plan, memory)).toEqual({});
+});
+it('uses schema resource fields and omits unknown names and unresolved parents', () => {
+  const memory = new WorkingMemory();
+  memory.setEntity('repository', { id: 'opaque', fullName: 'owner/repo' });
+  memory.setEntity('issue', { id: 'issue-id', number: 42, title: 'Sửa lỗi' });
+  memory.setEntity('list', { id: 'L1', name: 'Cần làm', boardId: 'unknown-parent' });
+  const plan = { kind: 'plan', thinking: 'Đã tra cứu', summary: 'Đọc', warnings: [], steps: [
+    { id: 's1', tool: 'github.get_issue', description: 'Đọc', dependsOn: [], args: { repo: 'owner/repo', issueNumber: 42 } },
+    { id: 's2', tool: 'trello.create_card', description: 'Tạo', dependsOn: [], args: { listId: 'L1', title: 'issue-id' } },
+  ] } as any;
+  expect(resourceLabels(plan, memory)).toEqual({ 'owner/repo': 'owner/repo', 42: 'Sửa lỗi', L1: 'Cần làm' });
+});
 it('emits and saves only grounded x-resource labels outside the executable JSON and hash', async () => {
   const events = new EventEmitter();
   const stored: any[] = [];

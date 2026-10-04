@@ -60,6 +60,6 @@ test('FE-03: Shift Enter creates a newline and planning disables a second send',
   await expect(composer(page).getByRole('button', { name: 'Gửi', exact: true })).toBeDisabled();
   await expect(page.getByText('Đang lập kế hoạch…')).toBeVisible();
   await input.fill('Tin nhắn trùng'); await input.press('Enter');
-  expect(sent).toBe(1); release();
+  await expect.poll(() => sent).toBe(1); release();
   await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
 });

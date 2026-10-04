@@ -6,6 +6,10 @@ import { PlanPreview } from '../../src/components/PlanPreview';
 import { ExecutionProgress } from '../../src/components/ExecutionProgress';
 import { ChatContainer } from '../../src/components/ChatContainer';
 afterEach(cleanup);
+it('keeps an unlabelled resource whose ID is an object prototype property readable', () => {
+  render(<PlanPreview plan={{ summary: 'Tạo thẻ', resourceLabels: {}, steps: [{ id: 's1', tool: 'trello.create_card', description: 'Tạo thẻ', args: { listId: '__proto__', title: 'Task' } }] }} />);
+  expect(screen.getByTestId('arg-listId')).toHaveTextContent('__proto__');
+});
 it('shows resource labels with the raw ID and catalog read/write risk', () => {
   render(<PlanPreview plan={{ summary: 'Tạo thẻ', resourceLabels: { L1: 'Cần làm (board Frontend)' }, steps: [{ id: 's1', tool: 'trello.create_card', description: 'Tạo thẻ', args: { listId: 'L1', title: 'L1' } }] }} />);
   expect(screen.getByText('Cần làm (board Frontend)')).toBeDefined();

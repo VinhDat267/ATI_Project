@@ -67,7 +67,7 @@ export const PlanStepItem: React.FC<PlanStepItemProps> = ({
             {Object.entries(step.args).map(([k, v]) => {
               const { text: valStr, isRef } = formatArgValue(v);
               const isResource = Boolean(tool?.inputSchema.properties?.[k]?.['x-resource']);
-              const label = isResource && (typeof v === 'string' || typeof v === 'number') ? resourceLabels[String(v)] : undefined;
+              const label = isResource && (typeof v === 'string' || typeof v === 'number') && Object.hasOwn(resourceLabels, String(v)) ? resourceLabels[String(v)] : undefined;
               return (
                 <span key={k} className="inline-flex items-start gap-1">
                   <span className="text-zinc-400">{k}:</span>

@@ -10,6 +10,7 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory): Recor
   };
   const name = (entity: Record<string, any>) => [entity.name, entity.fullName, entity.title].find(value => typeof value === 'string' && value.trim());
   const labels: Record<string, string> = Object.create(null);
+  const ambiguous = new Set<string>();
   for (const step of plan.steps) {
     const properties = getToolDefinition(step.tool)?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries(properties)) {
@@ -22,7 +23,11 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory): Recor
         const entity = entries(key).find(item => String(item[annotation['x-resource-field'] ?? 'id']) === String(value));
         if (!entity || !name(entity)) continue;
         const board = typeof entity.boardId === 'string' ? entries('board').find(item => item.id === entity.boardId) : undefined;
-        labels[String(value)] = `${name(entity)}${board && name(board) ? ` (board ${name(board)})` : ''}`;
+        const id = String(value);
+        const label = `${name(entity)}${board && name(board) ? ` (board ${name(board)})` : ''}`;
+        if (ambiguous.has(id)) continue;
+        if (Object.hasOwn(labels, id) && labels[id] !== label) { delete labels[id]; ambiguous.add(id); }
+        else labels[id] = label;
       }
     }
   }
