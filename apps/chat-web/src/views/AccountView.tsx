@@ -139,7 +139,7 @@ export function AccountView({ user, navigate, onLogout }: Props) {
               })}>Đăng xuất khỏi mọi thiết bị khác</button>
           </div>
           <ul className="mt-3 divide-y divide-zinc-100 text-sm">
-            {sessions.map(session => <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+            {[...sessions].sort((a, b) => Number(b.current) - Number(a.current)).map(session => <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <div>
                 <p className="font-medium">{session.device}{session.current && <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-normal text-blue-700">Phiên này</span>}</p>
                 <p className="mt-1 text-xs text-zinc-500">Đăng nhập: {when(session.createdAt)} · Dùng lần cuối: {when(session.lastUsedAt)}</p>
