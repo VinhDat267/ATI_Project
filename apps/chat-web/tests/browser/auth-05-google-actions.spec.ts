@@ -59,14 +59,14 @@ test('AUTH-05 Google: a revoked account session goes to login instead of repeate
 });
 for (const leave of ['logout', 'workspace'] as const) {
   test(`AUTH-05 Google: ignores a successful pending start after ${leave}`, async ({ page }) => {
-    // Observe completion of the real JSON read; do not replace its result or timing.
+    // Observe delivery of the real body even when the client discards it after
+    // logout. The clone leaves the application's response and JSON read intact.
     await page.addInitScript(() => {
       const native = window.fetch;
       window.fetch = async (...args) => {
         const response = await native(...args);
         if (String(args[0]) === '/api/auth/google/start') {
-          const json = response.json.bind(response);
-          response.json = async () => { try { return await json(); } finally { sessionStorage.setItem('auth05-test-start-read', 'true'); } };
+          void response.clone().arrayBuffer().then(() => sessionStorage.setItem('auth05-test-start-read', 'true'));
         }
         return response;
       };

@@ -166,12 +166,21 @@ export class ApiClient {
     return data;
   }
   startGoogleAuth(mode: 'login' | 'link' = 'login') {
+    // A rejected authenticated start has not issued OAuth state yet. Recover
+    // its owned session once, while keeping the one-use callback below separate.
+    if (mode === 'link') return this.request<{ url: string }>('/api/auth/google/start', {
+      method: 'POST', credentials: 'include', body: JSON.stringify({ mode }),
+    });
     return this.googleAuthAction<{ url: string }>('start', { mode });
   }
   completeGoogleAuth(code: string, state: string) {
     return this.googleAuthAction<{ accessToken: string; refreshToken: string; user: User } | { success: true }>('callback', { code, state });
   }
-  unlinkGoogle() { return this.googleAuthAction<{ success: true }>('unlink', {}); }
+  unlinkGoogle() {
+    return this.request<{ success: true }>('/api/auth/google/unlink', {
+      method: 'POST', credentials: 'include', body: JSON.stringify({}),
+    });
+  }
 
   async login(
     email: string,
