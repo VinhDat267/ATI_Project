@@ -22,6 +22,7 @@ export const routes = [
   { kind: 'google-callback', pattern: /^\/auth\/google\/callback\/?$/, publicView: (props: PublicViewProps) => createElement(GoogleCallbackView, props) },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
   { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
+  { kind: 'account', pattern: /^\/account\/?$/ },
 ] as const;
 export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found'; token?: string; googleCallback?: GoogleCallbackInput } | { kind: 'conversation'; conversationId: string };
 

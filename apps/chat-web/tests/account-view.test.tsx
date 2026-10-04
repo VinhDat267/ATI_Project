@@ -132,3 +132,15 @@ it('logs out one other session or every other device', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất khỏi mọi thiết bị khác' }));
   await waitFor(() => expect(posts().map(([url]) => url)).toEqual(['/api/account/sessions/s2/revoke', '/api/account/sessions/revoke-others']));
 });
+
+it('returns to the account page after linking Google', async () => {
+  const state = 'S'.repeat(43);
+  window.history.replaceState({}, '', `/auth/google/callback?code=fixture-code&state=${state}`);
+  vi.spyOn(apiClient, 'completeGoogleAuth').mockResolvedValue({ success: true });
+  serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
+  render(<App />);
+  expect(await screen.findByText('Đã liên kết tài khoản Google.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Về trang tài khoản' }));
+  await waitFor(() => expect(window.location.pathname).toBe('/account'));
+  expect(await screen.findByText(/personal@gmail\.test/)).toBeInTheDocument();
+});
