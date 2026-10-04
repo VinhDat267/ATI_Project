@@ -53,6 +53,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [servicesError, setServicesError] = useState<string | null>(null);
   const [servicesLoading, setServicesLoading] = useState(false);
+  const currentRoute = useRef(route);
+  currentRoute.current = route;
   const serviceRequest = useRef(0);
   const loadServices = useCallback(async () => {
     const request = ++serviceRequest.current;
@@ -101,7 +103,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
       const data = await apiClient.createConversation();
       const newConv = data.conversation;
       if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
-      reset();
+      reset({ preservePlanning: true });
       setConversationId(newConv.id);
       navigate(conversationPath(newConv.id));
       useChatStore.getState().setConversations([
@@ -111,33 +113,35 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   };
 
   const handleSendMessage = async (content: string) => {
-    if (useChatStore.getState().isPlanning) return;
-    useChatStore.getState().setIsPlanning(true);
-    let currentConvId = conversationId;
+    const tempId = `temp-${crypto.randomUUID()}`;
+    let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
+    if (!useChatStore.getState().beginPlanning(currentConvId, tempId)) return;
     if (!currentConvId) {
       try {
         const data = await apiClient.createConversation();
         currentConvId = data.conversation?.id;
         if (currentConvId) {
-          setConversationId(currentConvId);
-          navigate(conversationPath(currentConvId));
+          useChatStore.getState().transferPlanning(null, currentConvId, tempId);
+          if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
+            setConversationId(currentConvId);
+            navigate(conversationPath(currentConvId));
+          }
         }
       } catch (err) {
         console.warn('Could not create conversation via API:', err);
       }
       if (!currentConvId) {
-        useChatStore.getState().addMessage({
+        if (currentRoute.current.kind === 'home') useChatStore.getState().addMessage({
           id: `err-${Date.now()}`,
           role: 'system',
           content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',
         });
-        useChatStore.getState().setIsPlanning(false);
+        useChatStore.getState().setIsPlanning(false, null, tempId);
         return;
       }
     }
 
-    const tempId = `temp-${Date.now()}`;
-    addOptimisticMessage({ id: tempId, content });
+    if (useChatStore.getState().conversationId === currentConvId) addOptimisticMessage({ id: tempId, content });
 
     try {
       const result = await apiClient.sendMessage(
@@ -145,13 +149,16 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
         content,
         tempId
       );
-      useChatStore
-        .getState()
-        .confirmMessage(tempId, result?.messageId || tempId);
+      const store = useChatStore.getState();
+      store.confirmPlanningRequest(currentConvId, tempId, result?.messageId || tempId);
+      if (store.conversationId === currentConvId) store.confirmMessage(tempId, result?.messageId || tempId);
     } catch (err: any) {
-      useChatStore.getState().setIsPlanning(false);
-      useChatStore.getState().markMessageFailed(tempId);
-      useChatStore.getState().addMessage({
+      const store = useChatStore.getState();
+      const ownsAttempt = store.planningByConversation[currentConvId]?.requestId === tempId;
+      store.setIsPlanning(false, currentConvId, tempId);
+      if (store.conversationId !== currentConvId || !ownsAttempt) return;
+      store.markMessageFailed(tempId);
+      store.addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
         content: `[Lỗi gửi tin nhắn]: ${userErrorMessage(err, 'Máy chủ từ chối yêu cầu')}`,

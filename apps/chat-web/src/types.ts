@@ -8,7 +8,7 @@ export interface ChatMessage {
   status?: MessageStatus;
   timestamp?: string;
   created_at?: string;
-  metadata?: { type?: string; planId?: string; plan?: ActivePlan; resourceLabels?: Record<string, string> };
+  metadata?: { type?: string; planId?: string; plan?: ActivePlan; resourceLabels?: Record<string, string>; requestId?: string; replyToMessageId?: string };
 }
 
 export type StepState = 'pending' | 'running' | 'succeeded' | 'failed' | 'paused' | 'skipped' | 'unknown';

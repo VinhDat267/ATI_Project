@@ -20,9 +20,6 @@ export function handleSSEEvent(
   conversationId?: string
 ): void {
   const store = useChatStore.getState();
-  if (conversationId && store.conversationId !== conversationId) {
-    return;
-  }
   const key = conversationId || store.conversationId || fallbackConversationKey;
 
   if (eventId !== undefined) {
@@ -43,17 +40,26 @@ export function handleSSEEvent(
     data = { raw: dataStr };
   }
 
+  const source = conversationId ?? store.conversationId;
+  const pending = source ? store.planningByConversation[source] : undefined;
+  if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
+  if (['plan', 'plan_preview', 'clarification', 'refusal', 'error'].includes(event)) store.setIsPlanning(false, source, data.requestId);
+  if (event === 'agent_state' && data.state === 'planning') {
+    store.setIsPlanning(true, source, data.requestId);
+    if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
+  }
+  // A late terminal event still settles its own request, but cannot populate
+  // messages/plan state for the conversation the user is now reading.
+  if (conversationId && store.conversationId !== conversationId) return;
+
   if (['exec_start', 'exec_step', 'step_status', 'exec_done'].includes(event) &&
       data.planId && (store.activePlan?.id || store.executionSnapshot?.plan.id) &&
       data.planId !== store.activePlan?.id && data.planId !== store.executionSnapshot?.plan.id) return;
   const savedExecution = data.planId && data.planId === store.executionSnapshot?.plan.id
     ? store.executionSnapshot : null;
 
-  if (['plan', 'plan_preview', 'clarification', 'refusal', 'error'].includes(event)) store.setIsPlanning(false);
-
   switch (event) {
     case 'agent_state':
-      store.setIsPlanning(data.state === 'planning');
       break;
 
     case 'text_start':

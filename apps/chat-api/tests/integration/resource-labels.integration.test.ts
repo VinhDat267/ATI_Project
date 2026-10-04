@@ -34,9 +34,10 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   const events = new EventEmitter(); events.on('error', () => {});
   const chat = new ChatService({ convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) } });
   const preview = new Promise<any>((resolve, reject) => { events.once('plan_preview', resolve); events.once('error', reject); events.once('clarification', reject); });
-  await chat.handleUserMessage({ conversationId: conv.id, userId: owner, content: 'Tạo thẻ trên board Frontend list Cần làm' });
+  const accepted = await chat.handleUserMessage({ conversationId: conv.id, userId: owner, content: 'Tạo thẻ trên board Frontend list Cần làm', requestId: 'fe03-sql-request' });
   const event = await preview;
   expect(event.resourceLabels).toEqual({ L1: 'Cần làm (board Frontend)' });
+  expect(event).toMatchObject({ replyToMessageId: accepted.messageId, requestId: 'fe03-sql-request' });
   const saved = await new PlanRepo(pool).getPlan(event.planId);
   expect(saved?.resource_labels).toEqual(event.resourceLabels);
   expect(saved?.plan_text).toBe(JSON.stringify(plan));
@@ -47,7 +48,9 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   const app = createApp({ jwtSecret: secret, convRepo: new ConversationRepo(pool), msgRepo: new MessageRepo(pool), planRepo: new PlanRepo(pool), chatService: chat, executionService: execution });
   const pending = await request(app).get(`/api/conversations/${conv.id}/plans/active`).set(headers);
   expect(pending.status).toBe(200); expect(pending.body.resourceLabels).toEqual(event.resourceLabels);
-  expect((await request(app).get(`/api/conversations/${conv.id}`).set(headers)).body.messages.find((row: any) => row.metadata?.type === 'plan').metadata.resourceLabels).toEqual(event.resourceLabels);
+  const history = (await request(app).get(`/api/conversations/${conv.id}`).set(headers)).body.messages;
+  expect(history.find((row: any) => row.metadata?.type === 'plan').metadata).toMatchObject({ resourceLabels: event.resourceLabels, replyToMessageId: accepted.messageId, requestId: 'fe03-sql-request' });
+  expect(history.find((row: any) => row.id === accepted.messageId).metadata).toEqual({ requestId: 'fe03-sql-request' });
   await plans.updatePlanStatus(event.planId, 'completed');
   const restored = await request(app).get(`/api/conversations/${conv.id}/executions/latest`).set(headers);
   expect(restored.status).toBe(200); expect(restored.body.plan.resourceLabels).toEqual(event.resourceLabels);

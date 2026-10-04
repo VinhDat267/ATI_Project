@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeAuthTokens } from '../services/auth-storage';
 import type {
   ChatMessage,
   ActivePlan,
@@ -17,7 +18,11 @@ export interface ChatStoreState {
   streamingText: string;
   isStreaming: boolean;
   isPlanning: boolean;
-  setIsPlanning: (value: boolean) => void;
+  planningByConversation: Record<string, { requestId?: string; messageId?: string; startedAt: string }>;
+  setIsPlanning: (value: boolean, conversationId?: string | null, requestId?: string) => void;
+  beginPlanning: (conversationId: string | null, requestId: string) => boolean;
+  transferPlanning: (conversationId: string | null, targetId: string, requestId: string) => void;
+  confirmPlanningRequest: (conversationId: string, requestId: string | undefined, messageId: string) => void;
   activePlan: ActivePlan | null;
   planStatus: PlanStatus;
   activeClarification: ClarificationState | null;
@@ -51,7 +56,7 @@ export interface ChatStoreState {
       | ((prev: GatherState | null) => GatherState | null)
   ) => void;
   updateStepStatus: (stepId: string, status: StepState, error?: string) => void;
-  reset: () => void;
+  reset: (options?: { preservePlanning?: boolean }) => void;
 }
 
 const initialState = {
@@ -61,6 +66,7 @@ const initialState = {
   streamingText: '',
   isStreaming: false,
   isPlanning: false,
+  planningByConversation: {},
   activePlan: null,
   planStatus: 'idle' as PlanStatus,
   activeClarification: null,
@@ -73,10 +79,11 @@ const initialState = {
   executionLoadError: null,
 };
 
-export const useChatStore = create<ChatStoreState>((set) => ({
+const planningKey = (id: string | null) => id ?? '__draft__';
+export const useChatStore = create<ChatStoreState>((set, get) => ({
   ...initialState,
 
-  setConversationId: (id) => set({ conversationId: id }),
+  setConversationId: (id) => set(state => ({ conversationId: id, isPlanning: !!state.planningByConversation[planningKey(id)] })),
   setConversations: (conversations) => set({ conversations }),
 
   addMessage: (message) =>
@@ -116,7 +123,31 @@ export const useChatStore = create<ChatStoreState>((set) => ({
     set((state) => ({ streamingText: state.streamingText + delta })),
 
   setIsStreaming: (isStreaming) => set({ isStreaming }),
-  setIsPlanning: (isPlanning) => set({ isPlanning }),
+  setIsPlanning: (value, conversationId, requestId) => set(state => {
+    const id = conversationId === undefined ? state.conversationId : conversationId;
+    const key = planningKey(id), previous = state.planningByConversation[key];
+    if (requestId && previous?.requestId && previous.requestId !== requestId) return {};
+    const records = { ...state.planningByConversation };
+    if (value) records[key] = previous ?? { requestId, startedAt: new Date().toISOString() };
+    else delete records[key];
+    return { planningByConversation: records, isPlanning: !!records[planningKey(state.conversationId)] };
+  }),
+  beginPlanning: (id, requestId) => {
+    if (get().planningByConversation[planningKey(id)]) return false;
+    get().setIsPlanning(true, id, requestId); return true;
+  },
+  transferPlanning: (id, targetId, requestId) => set(state => {
+    const record = state.planningByConversation[planningKey(id)];
+    if (!record || record.requestId !== requestId) return {};
+    const records = { ...state.planningByConversation, [targetId]: record };
+    delete records[planningKey(id)];
+    return { planningByConversation: records, isPlanning: !!records[planningKey(state.conversationId)] };
+  }),
+  confirmPlanningRequest: (id, requestId, messageId) => set(state => {
+    const record = state.planningByConversation[id];
+    if (!record || record.requestId !== requestId) return {};
+    return { planningByConversation: { ...state.planningByConversation, [id]: { ...record, messageId } } };
+  }),
 
   // A read-only execution snapshot may hydrate activePlan, but cannot supersede a pending-plan read.
   setActivePlan: (plan) => set(state => ({ activePlan: plan, planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
@@ -163,13 +194,14 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       return { stepStatuses: { ...state.stepStatuses, [stepId]: status }, stepErrors, executionRevision: state.executionRevision + 1 };
     }),
 
-  reset: () =>
+  reset: (options) =>
     set((state) => ({
       conversationId: null,
       messages: [],
       streamingText: '',
       isStreaming: false,
-      isPlanning: false,
+      planningByConversation: options?.preservePlanning ? state.planningByConversation : {},
+      isPlanning: options?.preservePlanning ? !!state.planningByConversation[planningKey(null)] : false,
       activePlan: null,
       planStatus: 'idle',
       activeClarification: null,
@@ -183,3 +215,6 @@ export const useChatStore = create<ChatStoreState>((set) => ({
       conversations: state.conversations,
     })),
 }));
+
+// Session loss must release every request; navigation resets preserve them.
+subscribeAuthTokens(tokens => { if (!tokens.accessToken) useChatStore.getState().reset(); });

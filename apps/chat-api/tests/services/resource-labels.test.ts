@@ -53,11 +53,14 @@ it('emits and saves only grounded x-resource labels outside the executable JSON 
     eventEmitter: { emit: (event, payload) => events.emit(event, payload) },
   });
   const preview = new Promise<any>(resolve => events.once('plan_preview', resolve));
-  await service.handleUserMessage({ conversationId: 'c1', userId: 'u1', content: 'Tạo thẻ' });
+  await service.handleUserMessage({ conversationId: 'c1', userId: 'u1', content: 'Tạo thẻ', requestId: 'request-fe03' });
   const event = await preview;
   expect(event.resourceLabels).toEqual({ L1: 'Cần làm (board Frontend)' });
   expect(plans[0].resourceLabels).toEqual(event.resourceLabels);
   expect(stored.find(row => row.metadata?.type === 'plan').metadata.resourceLabels).toEqual(event.resourceLabels);
+  expect(stored[0].metadata).toEqual({ requestId: 'request-fe03' });
+  expect(stored.find(row => row.metadata?.type === 'plan').metadata).toMatchObject({ replyToMessageId: stored[0].id, requestId: 'request-fe03' });
+  expect(event).toMatchObject({ replyToMessageId: stored[0].id, requestId: 'request-fe03' });
   expect(plans[0].planJson).toEqual(plan);
   expect(plans[0].planText).toBe(JSON.stringify(plan));
   expect(plans[0].planHash).toBe(createHash('sha256').update(JSON.stringify(plan)).digest('hex'));
