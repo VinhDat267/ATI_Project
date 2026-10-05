@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 05/10/2026, sau merge kế hoạch #77 tại `badccb3` (task card W3-10, W3-11, W4-00) và #78 (quy tắc phiên trong `PROMPTS.md`); cả hai chỉ sửa tài liệu, mốc mã sản phẩm vẫn là `198fe6d`. Agent cập nhật: Claude Code (reviewer). Mục trước đó do Codex ghi sau merge AUTH-06 #75 tại `bfd824f`.
+**Cập nhật lần cuối:** 05/10/2026, sau merge #80 tại `7060a37`: xoá mã và tài liệu v1/v2 khỏi `main`. Mã nguồn v3 không đổi; chỉ đổi manifest/lock. Trước đó: kế hoạch #77 (`badccb3`), quy tắc phiên #78, đồng bộ #79 (`b7ced04`). Agent cập nhật: Claude Code (reviewer).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -57,15 +57,15 @@
 | `db/v3` | 11 bảng nghiệp vụ PostgreSQL, gồm phiên đăng nhập, lịch sử hash refresh token, auth token, outbox và oauth_states; migrations 0001–0008 |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do + 44 câu services), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
 
-Các thư mục v2 (`apps/api`, `apps/web`, `packages/dsl`, `packages/engine`, `db/migrations`) là lưu trữ, **không sửa**.
+Mã và tài liệu v1/v2 (`apps/api`, `apps/web`, `apps/mcp-task-hub`, `packages/dsl`, `packages/engine`, `packages/db`, `db/migrations` và báo cáo/bằng chứng đi kèm) đã xoá khỏi `main` ngày 05/10 qua #80. Ảnh chụp trước khi xoá là tag `archive/v2-final` (`badccb3`); đọc lại bằng `git show archive/v2-final:<đường dẫn>`.
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Số liệu phần mềm hiện tại từ [CI PR #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347), SUCCESS trên head `df3b7e8`, ngày 05/10/2026 giờ Việt Nam; implementer và reviewer độc lập chạy `npm run check` trên PostgreSQL tmpfs riêng trong AUTH-06. Tree merge `bfd824f` bằng head CI (`git diff --exit-code` đạt); PR chỉ đổi tài liệu/ignore, mã sản phẩm vẫn ở `198fe6d`. Browser32/32 chạy trên CI với OIDC giả, chưa chạy lại local trong AUTH-06. Bằng chứng Gmail/Google thật có native UI, DB/API và các bước người dùng trực tiếp xác nhận, ghi riêng ở đoạn AUTH-06/task card. Ba phép đo model thật W3-06 vẫn dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; chưa đo lại sau các thay đổi sản phẩm tiếp theo, gồm wording refusal W3-00b. Không gọi model hoặc ghi workflow dịch vụ trong AUTH-06. Các bằng chứng live cũ giữ ngày và giới hạn; nghiệm thu auth không xác lập chính sách hủy request backend đang chạy hay độ bền gửi thư qua restart.
+Mỗi số liệu ghi kèm ngày đo và commit. Số liệu phần mềm mới nhất từ [CI PR #80](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959), SUCCESS trên head `dc3dba8` ngày 05/10/2026, sau khi xoá v1/v2. Claude Code cũng chạy lại `npm ci`, `npm run check` và browser trên PostgreSQL tmpfs riêng; cả hai cho đúng số của CI #75 bên dưới. Trước đó: [CI PR #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347), SUCCESS trên head `df3b7e8`, ngày 05/10/2026 giờ Việt Nam; implementer và reviewer độc lập chạy `npm run check` trên PostgreSQL tmpfs riêng trong AUTH-06. Tree merge `bfd824f` bằng head CI (`git diff --exit-code` đạt); PR chỉ đổi tài liệu/ignore, mã sản phẩm vẫn ở `198fe6d`. Browser32/32 chạy trên CI với OIDC giả, chưa chạy lại local trong AUTH-06. Bằng chứng Gmail/Google thật có native UI, DB/API và các bước người dùng trực tiếp xác nhận, ghi riêng ở đoạn AUTH-06/task card. Ba phép đo model thật W3-06 vẫn dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; chưa đo lại sau các thay đổi sản phẩm tiếp theo, gồm wording refusal W3-00b. Không gọi model hoặc ghi workflow dịch vụ trong AUTH-06. Các bằng chứng live cũ giữ ngày và giới hạn; nghiệm thu auth không xác lập chính sách hủy request backend đang chạy hay độ bền gửi thư qua restart.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 1.245/1.245 = 47 schema + 340 adapters + 188 planner + 25 executor + 331 API + 314 web | 04–05/10, [CI #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347) head `df3b7e8`; implementer/reviewer check trên PostgreSQL tmpfs riêng, không đổi nguồn sản phẩm | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 1.245/1.245 = 47 schema + 340 adapters + 188 planner + 25 executor + 331 API + 314 web | 05/10, [CI #80](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959) head `dc3dba8` và chạy local trên PostgreSQL tmpfs; trước đó 04–05/10, [CI #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347) head `df3b7e8` | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
 | Browser E2E (sandbox, PostgreSQL thật) | 32/32 ca, 11 scenario | như trên; auth04 gồm Google login và bốn ca AUTH-05 Google, dùng OIDC giả | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
@@ -94,6 +94,13 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- #80 dọn repo (`7060a37`), merge 05/10 lúc 08:38:32 Việt Nam; **tự review, người dùng cho merge khi chưa có review độc lập**.
+  - Xoá 899 file v1/v2 (1.511 → 612 file được theo dõi) theo thiết kế người dùng duyệt; giữ tài liệu đề tài ban đầu (mô tả dự án, yêu cầu chức năng, wireframe, ADR).
+  - Khai báo lại ba package v3 trước đây chỉ có nhờ workspace v2: `tsx`, `@playwright/test`, `ajv`. Lock bỏ 145 gói, không đổi phiên bản gói nào.
+  - AGENTS.md mục 1.3, README, `docs/README.md`, `.env.example`, `.gitignore` cập nhật.
+  - CI [37251935959](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959) SUCCESS trên head `dc3dba8`; check 1.245+165 và browser 32/32 qua 11 scenario, cả CI lẫn local. Worktree xoá trước merge; nhánh local/remote đã xoá; local main fast-forward, chạy `npm ci`.
+  - File v2 chưa từng commit còn trên máy nhóm trưởng (output build/test, 388 file bằng chứng) được chuyển vào Thùng rác Windows theo yêu cầu người dùng, không xoá vĩnh viễn.
+  - Xem [log](log/2026-10-05-claude-code-remove-v2.md).
 - #77 kế hoạch (`badccb3`), merge 05/10 lúc 07:38:41 Việt Nam; chỉ sửa tài liệu, tự review. Ba task card mới:
   - **W3-10:** yêu cầu chỉ đọc hỏi lại ngay, plan phải có bước ghi; ghi thời gian, số lần thử, token từng lời gọi model; đo lại golden một lần;
   - **W3-11:** chạy thật năm service mới qua frontend;
@@ -155,6 +162,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Thư gửi ở nền chưa có hàng đợi bền (API dừng ngay sau khi trả lời thì có thể mất thư); chi phí DB hai nhánh known/unknown chưa tương đương (giới hạn 3 yêu cầu/giờ/email); giới hạn đoán mật khẩu theo một API instance và chưa có giới hạn chung theo IP cho login | `apps/chat-api/src/routes/auth/`, `services/email/` | AUTH-05 đã merge #68 và bản sửa sau review #73; "lần dùng cuối" của phiên là lần refresh gần nhất. Google login đã merge AUTH-04, quota signup chung email/Google 10/IP/giờ đã có. Review AUTH-02b không thấy chênh lệch 800 ms còn lại; chưa coi là bảo đảm timing tuyệt đối. Review delta #73 không chứng nhận hủy mutation backend in-flight. Google/SMTP thật đã nghiệm thu ở AUTH-06 |
 | Golden set chưa đo lại sau FE-03 (câu chữ planner/registry đổi), W3-08 (mô tả tool đổi) và W3-00b (refusal nêu tên service); thiếu test cho `openWhenHidden` của SSE | evaluations, `apps/chat-web/src/hooks/use-sse.ts` | Đo lại khi có quyền gọi model |
 | Tin nhắn Slack chưa đọc lại tự động sau khi gửi | live-execution | |
+| Test chat-api mặc định `DATABASE_URL` tới cổng 55532 (cổng của compose v2 đã xoá) khi không đặt biến | `apps/chat-api/tests/auth/*`, `tests/integration/*` | CI đặt `DATABASE_URL` nên không bị ảnh hưởng. `scripts/test-v3.mjs` không tự đặt biến này: chạy local mà quên đặt thì test PostgreSQL lỗi kết nối tới 55532. Nên đổi mặc định sang 55533 trong một task nhỏ. Phát hiện khi dọn v2 (#80) |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
 
@@ -181,7 +189,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - **Chốt 05/10/2026:**
   - yêu cầu chỉ đọc được hỏi lại ngay ở lời gọi model đầu tiên, không tra cứu; plan phải có ít nhất một bước ghi; không thêm kiểu trả lời đọc dữ liệu (W3-10);
   - LLM dự phòng là model Codex `cx/` trong cùng 9router, chuyển thủ công, không tự chuyển model khi lỗi (W4-00);
-  - phép đo trước/sau của W3-10 phải dùng đúng `ag/gemini-3.8-flash`.
+  - phép đo trước/sau của W3-10 phải dùng đúng `ag/gemini-3.8-flash`;
+  - xoá mã và tài liệu v1/v2 khỏi `main` (#80). Cần đối chứng thì đọc từ tag `archive/v2-final`; không khôi phục vào `main` khi chưa có yêu cầu của chủ dự án.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
