@@ -63,16 +63,24 @@ export function Cockpit(props: Props) {
     <div className="flex items-center justify-between gap-3"><span className="text-sm text-text-secondary">Enter gửi · Shift+Enter xuống dòng</span><button type="submit" disabled={!draft.trim() || state.isPlanning} className="rounded-full bg-primary text-white px-5 py-2 font-semibold">Gửi</button></div>
     {state.isPlanning && <p role="status" className="text-sm text-text-secondary mt-2">Đang lập kế hoạch…</p>}
   </form>;
-  const plan = state.executionSnapshot?.plan ?? state.activePlan;
-  const executionSteps = (plan?.steps ?? state.executionSnapshot?.steps.map(step => ({ id: step.stepId, tool: step.tool, description: step.stepId, args: {} })) ?? []).map(step => {
-    const saved = state.executionSnapshot?.steps.find(row => row.stepId === step.id);
+  // Recovery owns its durable execution. Ordinary progress belongs to the current active plan.
+  const snapshot = [7, 8, 9].includes(moment as number) || state.activePlan?.id === state.executionSnapshot?.plan.id ||
+    (!state.activePlan && !state.isPlanning && state.planStatus === state.executionSnapshot?.execution.status)
+    ? state.executionSnapshot : null;
+  const plan = snapshot?.plan ?? state.activePlan;
+  const executionSteps = (plan?.steps ?? snapshot?.steps.map(step => ({ id: step.stepId, tool: step.tool, description: step.stepId, args: {} })) ?? []).map(step => {
+    const saved = snapshot?.steps.find(row => row.stepId === step.id);
     const elapsed = saved?.durationMs ?? (saved?.startedAt ? Math.max(0, (saved.completedAt ? Date.parse(saved.completedAt) : now) - Date.parse(saved.startedAt)) : null);
-    return { id: step.id, tool: step.tool, description: step.description, status: saved?.status ?? state.stepStatuses[step.id] ?? 'pending', output: saved?.output, completedAt: saved?.completedAt, error: state.stepErrors[step.id], duration: elapsed != null && Number.isFinite(elapsed) ? `${elapsed / 1000}s` : undefined };
+    const liveStatus = state.executionSnapshot && !snapshot ? undefined : state.stepStatuses[step.id];
+    return { id: step.id, tool: step.tool, description: step.description, status: saved?.status ?? liveStatus ?? 'pending', output: saved?.output, completedAt: saved?.completedAt, error: liveStatus ? state.stepErrors[step.id] : undefined, duration: elapsed != null && Number.isFinite(elapsed) ? `${elapsed / 1000}s` : undefined };
   });
-  const started = state.executionSnapshot?.steps.flatMap(row => row.startedAt && Number.isFinite(Date.parse(row.startedAt)) ? [Date.parse(row.startedAt)] : []) ?? [];
-  const ended = state.executionSnapshot?.steps.flatMap(row => row.completedAt && Number.isFinite(Date.parse(row.completedAt)) ? [Date.parse(row.completedAt)] : []) ?? [];
+  const started = snapshot?.steps.flatMap(row => row.startedAt && Number.isFinite(Date.parse(row.startedAt)) ? [Date.parse(row.startedAt)] : []) ?? [];
+  const ended = snapshot?.steps.flatMap(row => row.completedAt && Number.isFinite(Date.parse(row.completedAt)) ? [Date.parse(row.completedAt)] : []) ?? [];
   const total = started.length && ended.length ? Math.max(0, Math.max(...ended) - Math.min(...started)) / 1000 : null;
   const request = [...state.messages].reverse().find(message => message.role === 'user')?.content;
+  const latestMessage = state.messages.at(-1);
+  const terminalError = latestMessage?.metadata?.type === 'planning_error' ||
+    (latestMessage?.role === 'system' && /^(\[Lỗi|Lỗi:)/.test(latestMessage.content)) ? latestMessage : null;
   const title = moment === 1 ? 'Bạn muốn nhờ ATI việc gì?' : moment === 2 ? 'Đang tìm đúng chỗ' : moment === 3 ? 'ATI cần bạn chọn thêm' : moment === 4 ? 'Kiểm tra trước khi làm' : moment === 5 ? 'ATI đang làm' : moment === 6 ? 'Việc đã xong' : moment === 'refusal' ? 'Chưa thể làm yêu cầu này' : moment === 'unsuccessful' ? 'Yêu cầu đã kết thúc' : 'Cần xử lý trước khi tiếp tục';
   return <>
     <div data-cockpit-background className="flex h-full flex-col min-w-0">
@@ -85,6 +93,7 @@ export function Cockpit(props: Props) {
         {props.contentOverride ?? <section aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
           <p className="text-sm uppercase tracking-widest text-text-secondary mb-3">ATI · Điều phối công việc</p>
           <h1 className="text-3xl sm:text-4xl mb-6">{title}</h1>
+          {terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>}
           {moment === 1 && <>
             <p className="text-text-secondary mb-6">Mô tả công việc bằng một câu. Bạn kiểm tra kế hoạch trước khi ATI ghi lên dịch vụ.</p>
             {!drawer && composer}
@@ -107,7 +116,7 @@ export function Cockpit(props: Props) {
             <div className="flex flex-wrap gap-3 border-t border-border mt-6 pt-4"><button type="button" onClick={props.onApprove} disabled={!state.activePlan.id} className="rounded-full bg-primary text-white px-5 py-3">Duyệt kế hoạch</button><button type="button" onClick={() => { setDraft('Điều chỉnh kế hoạch: '); input.current?.focus(); }} className="rounded-full border border-border px-4 py-3">Sửa qua chat</button><button type="button" onClick={props.onCancel} className="rounded-full px-4 py-3 text-danger-text">Hủy</button></div>
           </div>}
           {[5, 6, 7, 8, 9, 'unsuccessful'].includes(moment) && <>
-            {executionSteps.length > 0 && (moment === 6 ? <ExecutionReceipt steps={executionSteps} services={props.services} /> : <ExecutionProgress steps={executionSteps} status={state.executionSnapshot?.execution.status ?? state.planStatus} title="Tiến trình công việc" />)}
+            {executionSteps.length > 0 && (moment === 6 ? <ExecutionReceipt steps={executionSteps} services={props.services} /> : <ExecutionProgress steps={executionSteps} status={snapshot?.execution.status ?? state.planStatus} title="Tiến trình công việc" />)}
             {moment === 5 && !executionSteps.length && <p role="status">Đang kích hoạt kế hoạch…</p>}
             {moment === 6 && <p role="status" className="text-success-text">Quy trình đã hoàn thành.</p>}
             {moment === 'unsuccessful' && <p role="status">{state.planStatus === 'stopped' ? 'Quy trình đã dừng.' : state.planStatus === 'rejected' ? 'Kế hoạch đã hủy; chưa thực thi.' : 'Quy trình không hoàn thành.'}</p>}
@@ -121,7 +130,6 @@ export function Cockpit(props: Props) {
           {state.executionSnapshot?.execution.status === 'stopped' && moment !== 'unsuccessful' && <p role="status">Quy trình đã dừng.</p>}
           {moment !== 4 && state.activePlan && <details className="mt-5"><summary>Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span></summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify(state.activePlan, null, 2)}</pre></details>}
           {state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
-          {state.messages.at(-1)?.role === 'system' && state.messages.at(-1)?.content.startsWith('[Lỗi') && <p role="alert" className="text-danger-text mt-4">{state.messages.at(-1)?.content}</p>}
         </section>}
       </div>
       {!props.contentOverride && moment !== 1 && !drawer && <div className="shrink-0 border-t border-border bg-bg-page px-4 sm:px-8 py-3"><div className="max-w-3xl mx-auto">{composer}</div></div>}

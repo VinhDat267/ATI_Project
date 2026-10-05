@@ -27,7 +27,7 @@ const safeURL = (text: string) => { try { const url = new URL(text); return ['ht
 
 function FieldList({ value }: { value: Record<string, unknown> }) {
   return <dl>{Object.entries(value).filter(([key, field]) => Object.hasOwn(resultNames, key) && (typeof field === 'string' || typeof field === 'number')).map(([key, field]) =>
-    <div key={key} className="flex gap-2"><dt>{resultNames[key]}:</dt><dd>{typeof field === 'string' && safeURL(field)
+    <div key={key} className="flex gap-2 min-w-0"><dt className="shrink-0">{resultNames[key]}:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{typeof field === 'string' && safeURL(field)
       ? <a href={field} target="_blank" rel="noopener noreferrer" className="text-primary-text underline">{field}</a>
       : typeof field === 'string' && timeFields.has(key) && Number.isFinite(Date.parse(field))
         ? <time dateTime={field}>{new Date(field).toLocaleString('vi-VN', { hour12: false })}</time> : String(field)}</dd></div>)}</dl>;

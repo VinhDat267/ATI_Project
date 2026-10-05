@@ -122,3 +122,50 @@ it.each(['executing','completed'] as const)('late approval success preserves aut
   fireEvent.click(screen.getByRole('button',{name:'Duyệt kế hoạch'})); act(()=>useChatStore.getState().setPlanStatus(phase));
   await act(async()=>finish()); expect(useChatStore.getState().planStatus).toBe(phase); expect(screen.queryByRole('button',{name:'Duyệt kế hoạch'})).toBeNull();
 });
+
+it.each(['preview','completed'] as const)('beginPlanning retires the previous %s owner but retains completed history', status => {
+  useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:status});
+  expect(useChatStore.getState().beginPlanning('A','new-request')).toBe(true);
+  renderCockpit();
+  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','2');
+  expect(useChatStore.getState().activePlan).toBeNull();
+});
+it('a read-only old completed snapshot cannot reacquire the stage while a new request is planning',()=>{
+  const store=useChatStore.getState(); store.setConversationId('A');
+  store.beginPlanning('A','new-request');
+  store.setExecutionSnapshot({plan:{...plan,convId:'A',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded'}]});
+  renderCockpit(); expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','2');
+  expect(useChatStore.getState().executionSnapshot?.plan.id).toBe('p1');
+});
+it.each(['unknown','failed'] as const)('a new planning request preserves unsafe %s evidence',status=>{
+  useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'partial',stepStatuses:{s1:status}});
+  useChatStore.getState().beginPlanning('A','new-request'); renderCockpit();
+  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment',status==='unknown'?'8':'7');
+  expect(useChatStore.getState().activePlan?.id).toBe('p1');
+});
+it('current progress rejects old snapshot output even when the plans reuse a step ID, then follows actual SSE',async()=>{
+  const store=useChatStore.getState(); store.setConversationId('A');
+  store.setExecutionSnapshot({plan:{...plan,convId:'A',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded',durationMs:3000,output:{url:'https://github.com/ati/test/issues/42',number:42}}]});
+  store.setActivePlan({...plan,id:'new-plan',summary:'New plan',steps:[{id:'s1',tool:'slack.send_message',description:'NEW operation',args:{channel:'#general',text:'New content'}}]});
+  store.setPlanStatus('approving'); renderCockpit();
+  expect(screen.getByText('NEW operation',{exact:true})).toBeInTheDocument();
+  expect(screen.queryByRole('link',{name:'https://github.com/ati/test/issues/42'})).toBeNull();
+  expect(screen.queryByText('Đã hoàn thành 1/1 bước.',{exact:true})).toBeNull();
+  const {handleSSEEvent}=await import('../src/hooks/use-sse');
+  act(()=>handleSSEEvent('exec_start',JSON.stringify({planId:'new-plan'}),undefined,'A'));
+  act(()=>handleSSEEvent('exec_step',JSON.stringify({planId:'new-plan',stepId:'s1',status:'running'}),undefined,'A'));
+  expect(useChatStore.getState().planStatus).toBe('executing');
+  expect(screen.getByText('NEW operation',{exact:true})).toBeInTheDocument();
+  act(()=>handleSSEEvent('exec_step',JSON.stringify({planId:'new-plan',stepId:'s1',status:'succeeded'}),undefined,'A'));
+  act(()=>handleSSEEvent('exec_done',JSON.stringify({planId:'new-plan',status:'completed'}),undefined,'A'));
+  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','6');
+  expect(screen.queryByRole('link',{name:'https://github.com/ati/test/issues/42'})).toBeNull();
+});
+it.each([
+  {content:'Stored planning failure',metadata:{type:'planning_error'}},
+  {content:'Lỗi: Legacy planning failure'},
+  {content:'[Lỗi gửi tin nhắn]: Transport failure'},
+])('terminal error feedback remains visible outside the conversation drawer: $content',message=>{
+  useChatStore.setState({messages:[{id:'error',role:'system',...message}]}); renderCockpit();
+  expect(screen.getByRole('alert')).toHaveTextContent(message.content);
+});

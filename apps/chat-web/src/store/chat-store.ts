@@ -134,6 +134,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   }),
   beginPlanning: (id, requestId) => {
     if (get().planningByConversation[planningKey(id)]) return false;
+    set(state => {
+      if (state.conversationId !== id) return {};
+      const unsafe = state.planStatus === 'reconciliation_required' ||
+        state.executionSnapshot?.execution.status === 'reconciliation_required' ||
+        [...Object.values(state.stepStatuses), ...(state.executionSnapshot?.steps.map(step => step.status) ?? [])]
+          .some(status => status === 'unknown' || status === 'failed');
+      if (unsafe || !['idle', 'preview', 'completed', 'stopped', 'rejected'].includes(state.planStatus)) return {};
+      // The new request owns planning. Keep the saved receipt as history, not its active plan.
+      return { activePlan: null, planStatus: 'idle', activeClarification: null, gatherState: null,
+        stepStatuses: {}, stepErrors: {}, planRevision: state.planRevision + 1,
+        executionRevision: state.executionRevision + 1 };
+    });
     get().setIsPlanning(true, id, requestId); return true;
   },
   transferPlanning: (id, targetId, requestId) => set(state => {
@@ -158,6 +170,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   setExecutionSnapshot: (snapshot) => set(state => {
     if (!snapshot) return { executionSnapshot: null, stepStatuses: {}, stepErrors: {}, executionRevision: state.executionRevision + 1 };
     const hasNewPreview = state.activePlan?.id !== snapshot.plan.id && ['preview', 'approving'].includes(state.planStatus);
+    const hasNewRequest = state.isPlanning && ['completed', 'stopped'].includes(snapshot.execution.status) &&
+      !snapshot.steps.some(step => step.status === 'unknown' || step.status === 'failed');
     const plan: ActivePlan = {
       id: snapshot.plan.id,
       summary: snapshot.plan.summary || 'Quy trình đã lưu',
@@ -168,7 +182,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       executionSnapshot: snapshot,
       executionRevision: state.executionRevision + 1,
       executionLoadError: null,
-      ...(hasNewPreview ? {} : { activePlan: plan, planStatus: snapshot.execution.status }),
+      ...(hasNewPreview || hasNewRequest ? {} : { activePlan: plan, planStatus: snapshot.execution.status }),
       stepStatuses: Object.fromEntries(snapshot.steps.map(row => [row.stepId, row.status])),
       stepErrors: Object.fromEntries(snapshot.steps.flatMap(row => {
         const error = typeof row.error === 'string' ? row.error : row.error?.message;

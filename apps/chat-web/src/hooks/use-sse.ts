@@ -247,6 +247,7 @@ export function handleSSEEvent(
       store.addMessage({
         id: `err_${Date.now()}`,
         role: 'system',
+        metadata: { type: 'planning_error' },
         content: `Lỗi: ${data.message || data.error || 'Có lỗi xảy ra trong quá trình xử lý'}`,
       });
       break;
