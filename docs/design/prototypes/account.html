@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tài khoản của bạn — ATI</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              bg: '#F8F8F6',
+              text: '#111827',
+              border: '#E7E7E2',
+              muted: '#6B7280',
+              surface: '#FFFFFF',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05)',
+            'drawer': '-8px 0 32px rgba(0, 0, 0, 0.08)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --muted: #6B7280;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --success: #16A34A;
+      --warn: #D97706;
+      --danger: #DC2626;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Focus Visible Ring */
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #FF5701;
+      outline-offset: 2px;
+    }
+
+    /* Tối ưu màn hình hẹp dưới 420px */
+    @media (max-width: 419px) {
+      #role-pill-badge {
+        display: none !important;
+      }
+    }
+
+    /* prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]">
+
+  <!-- Toast Thông báo nổi -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2" role="status" aria-live="polite"></div>
+
+  <!-- THANH TRÊN (COCKPIT HEADER) -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Điều hướng quay lại -->
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5 flex-shrink-0" title="Quay lại không gian làm việc" aria-label="Quay lại không gian làm việc">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="history.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Nhật ký</span>
+        </a>
+
+        <a href="settings.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>Kết nối dịch vụ</span>
+        </a>
+      </div>
+
+      <!-- Cụm Trạng thái Vai trò & Điều khiển Demo -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        <!-- Nhãn vai trò hiện tại -->
+        <div id="role-pill-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-[#E7E7E2] text-[#4B5563] shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-[#16A34A]" id="role-indicator-dot"></span>
+          <span id="header-role-display">Quản trị viên</span>
+        </div>
+
+        <!-- Avatar người dùng nhanh -->
+        <div class="w-8 h-8 rounded-full bg-[#FF5701] text-white text-xs font-bold flex items-center justify-center shadow-sm flex-shrink-0" id="header-avatar-badge" title="Tài khoản Lan Nguyễn">
+          LN
+        </div>
+
+        <!-- Nút Kịch bản demo -->
+        <div class="relative inline-block text-left">
+          <button id="btn-toggle-demo-menu" type="button" class="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-medium text-[#111827] bg-white hover:bg-neutral-100 rounded-lg border border-[#E7E7E2] shadow-sm transition-colors flex-shrink-0" aria-haspopup="true" aria-expanded="false" onclick="toggleDemoDropdown()">
+            <svg class="w-3.5 h-3.5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span class="hidden sm:inline">Kịch bản demo</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FF5701]/10 text-[#FF5701]">DEMO</span>
+          </button>
+
+          <!-- Menu chọn Kịch bản Demo -->
+          <div id="demo-menu-dropdown" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-[#E7E7E2] p-3 z-40 space-y-3" role="menu">
+            <div>
+              <p class="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider mb-1.5">Xem giao diện như</p>
+              <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F8F8F6] rounded-lg border border-[#E7E7E2]">
+                <button type="button" id="demo-role-admin" class="px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#FF5701] shadow-sm transition-all" onclick="setRole('admin')">Quản trị viên</button>
+                <button type="button" id="demo-role-member" class="px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all" onclick="setRole('member')">Thành viên</button>
+              </div>
+            </div>
+
+            <div class="border-t border-[#E7E7E2] pt-2.5">
+              <p class="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider mb-1.5">Tài khoản Google & Mật khẩu</p>
+              <div class="flex flex-col gap-1 p-1 bg-[#F8F8F6] rounded-lg border border-[#E7E7E2]">
+                <button type="button" id="demo-auth-standard" class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-semibold text-white bg-[#FF5701] shadow-sm transition-all" onclick="setAuthScenario('standard')">
+                  Đã liên kết (Có mật khẩu)
+                </button>
+                <button type="button" id="demo-auth-google-only" class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F0F0EB] transition-all" onclick="setAuthScenario('google_only')">
+                  Chỉ Google (Chưa có mật khẩu)
+                </button>
+                <button type="button" id="demo-auth-unlinked" class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F0F0EB] transition-all" onclick="setAuthScenario('unlinked')">
+                  Chưa liên kết Google
+                </button>
+              </div>
+            </div>
+
+            <div class="border-t border-[#E7E7E2] pt-2 flex items-center justify-between">
+              <span class="text-[11px] text-[#6B7280]">Khôi phục mặc định:</span>
+              <button type="button" onclick="resetAccountDemoData()" class="text-[11px] text-[#FF5701] hover:underline font-medium">Đặt lại dữ liệu</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- NỘI DUNG CHÍNH -->
+  <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
+    
+    <!-- Tiêu đề trang -->
+    <div class="mb-8">
+      <div class="flex items-center gap-2 text-xs text-[#6B7280] mb-2 font-medium">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <span>/</span>
+        <span class="text-[#111827]">Tài khoản của bạn</span>
+      </div>
+      <h1 class="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
+        Cài đặt tài khoản
+      </h1>
+      <p class="text-sm sm:text-base text-[#4B5563] mt-2">
+        Quản lý thông tin hồ sơ, bảo mật mật khẩu, các phiên thiết bị đang truy cập và liên kết tài khoản Google.
+      </p>
+    </div>
+
+    <!-- KHỐI TỔNG QUAN TÀI KHOẢN (PROFILE CARD) -->
+    <div class="bg-white rounded-2xl p-5 sm:p-6 border border-[#E7E7E2] shadow-sm mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+      <div class="flex items-center gap-4">
+        <!-- Avatar tròn lớn -->
+        <div id="profile-card-avatar" class="w-16 h-16 rounded-2xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-2xl shadow-sm flex-shrink-0">
+          LN
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <h2 id="profile-card-name" class="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+              Lan Nguyễn
+            </h2>
+            <span id="profile-card-role-badge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701] border border-[#FF5701]/20">
+              Quản trị viên
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 mt-1 text-xs sm:text-sm text-[#4B5563]">
+            <span class="font-mono text-[#111827]">lan.nguyen@congty.vn</span>
+            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-full">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Đã xác minh
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tóm tắt số thiết bị hoạt động -->
+      <div class="w-full sm:w-auto bg-[#F8F8F6] rounded-xl px-4 py-3 border border-[#E7E7E2] flex items-center gap-2 text-xs text-[#4B5563] self-start sm:self-center">
+        <span class="w-2 h-2 rounded-full bg-[#16A34A]"></span>
+        <span id="summary-sessions-text">3 thiết bị đang hoạt động</span>
+      </div>
+    </div>
+
+    <!-- LƯỚI 4 PHẦN TÍNH NĂNG -->
+    <div class="space-y-8">
+      
+      <!-- PHẦN 1: THÔNG TIN CÁ NHÂN & ĐỔI TÊN -->
+      <section id="section-profile" class="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-profile">
+        <div class="border-b border-[#E7E7E2] pb-4 mb-6">
+          <h2 id="heading-profile" class="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+            1. Thông tin cá nhân
+          </h2>
+          <p class="text-xs sm:text-sm text-[#6B7280] mt-1">
+            Cập nhật họ và tên hiển thị trên không gian làm việc và trong các kế hoạch phối hợp của nhóm.
+          </p>
+        </div>
+
+        <form id="form-update-profile" onsubmit="handleUpdateProfile(event)" class="space-y-5 max-w-xl">
+          <!-- Trường Họ và tên -->
+          <div>
+            <label for="input-full-name" class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+              Họ và tên <span class="text-[#FF5701]">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="input-full-name" 
+              name="fullName" 
+              value="Lan Nguyễn" 
+              required 
+              class="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all"
+              placeholder="Nhập họ và tên đầy đủ"
+            >
+            <p class="text-xs text-[#6B7280] mt-1.5">
+              Tên này sẽ hiển thị ở góc thanh điều khiển và đại diện cho bạn khi duyệt các kế hoạch của ATI.
+            </p>
+          </div>
+
+          <!-- Trường Email (Khóa, chỉ hiển thị) -->
+          <div>
+            <label for="input-email-readonly" class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+              Địa chỉ email đăng nhập
+            </label>
+            <div class="relative">
+              <input 
+                type="email" 
+                id="input-email-readonly" 
+                value="lan.nguyen@congty.vn" 
+                readonly 
+                class="w-full text-sm sm:text-base px-3.5 py-2.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#6B7280] font-mono cursor-not-allowed pr-28"
+              >
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-medium text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-md">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                Xác minh
+              </div>
+            </div>
+            <p class="text-xs text-[#6B7280] mt-1.5">
+              Email dùng để đăng nhập và nhận thông báo phê duyệt từ quản trị viên. Để đổi email, vui lòng liên hệ quản trị viên nhóm.
+            </p>
+          </div>
+
+          <!-- Trường Vai trò tài khoản -->
+          <div>
+            <label class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+              Vai trò trong nhóm
+            </label>
+            <div class="p-3.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div class="text-xs sm:text-sm">
+                <div class="font-semibold text-[#111827]" id="profile-role-title">Quản trị viên (Admin)</div>
+                <div class="text-[#4B5563] mt-0.5 leading-relaxed" id="profile-role-description">
+                  Bạn có toàn quyền kết nối các dịch vụ mới của nhóm, chỉnh sửa nơi được phép dùng và phê duyệt thành viên mới.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nút Lưu họ tên -->
+          <div class="pt-2">
+            <button 
+              type="submit" 
+              id="btn-save-profile" 
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] bg-[#FF5701] hover:bg-[#e04d00] text-white text-sm font-semibold rounded-xl shadow-sm transition-all focus:outline-none"
+            >
+              <span>Lưu thay đổi họ tên</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- PHẦN 2: ĐỔI MẬT KHẨU -->
+      <section id="section-password" class="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-password">
+        <div class="border-b border-[#E7E7E2] pb-4 mb-6">
+          <h2 id="heading-password" class="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+            2. Đổi mật khẩu
+          </h2>
+          <p class="text-xs sm:text-sm text-[#6B7280] mt-1">
+            Đặt mật khẩu an toàn ít nhất 12 ký tự để bảo vệ tài khoản điều phối của bạn.
+          </p>
+        </div>
+
+        <form id="form-change-password" onsubmit="handleChangePassword(event)" class="space-y-5 max-w-xl">
+          <!-- Mật khẩu hiện tại -->
+          <div>
+            <label for="input-current-pass" class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+              Mật khẩu hiện tại <span class="text-[#FF5701]">*</span>
+            </label>
+            <div class="relative">
+              <input 
+                type="password" 
+                id="input-current-pass" 
+                required 
+                class="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10"
+                placeholder="Nhập mật khẩu đang dùng"
+              >
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility('input-current-pass', this)" 
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg"
+                aria-label="Ẩn hoặc hiện mật khẩu hiện tại"
+              >
+                <svg class="w-4 h-4 eye-icon-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <svg class="w-4 h-4 eye-icon-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Mật khẩu mới -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="input-new-pass" class="block text-xs sm:text-sm font-semibold text-[#111827]">
+                Mật khẩu mới <span class="text-[#FF5701]">*</span>
+              </label>
+              <span id="pass-strength-indicator" class="text-xs font-medium text-[#6B7280]">Ít nhất 12 ký tự</span>
+            </div>
+            <div class="relative">
+              <input 
+                type="password" 
+                id="input-new-pass" 
+                minlength="12" 
+                required 
+                oninput="checkPasswordStrength(this.value)"
+                class="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10"
+                placeholder="Ít nhất 12 ký tự"
+              >
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility('input-new-pass', this)" 
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg"
+                aria-label="Ẩn hoặc hiện mật khẩu mới"
+              >
+                <svg class="w-4 h-4 eye-icon-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <svg class="w-4 h-4 eye-icon-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+              </button>
+            </div>
+            
+            <!-- Thanh độ mạnh mật khẩu -->
+            <div class="w-full bg-[#E7E7E2] h-1.5 rounded-full overflow-hidden mt-2">
+              <div id="pass-strength-bar" class="h-full bg-neutral-400 w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+
+          <!-- Xác nhận mật khẩu mới -->
+          <div>
+            <label for="input-confirm-pass" class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+              Xác nhận mật khẩu mới <span class="text-[#FF5701]">*</span>
+            </label>
+            <div class="relative">
+              <input 
+                type="password" 
+                id="input-confirm-pass" 
+                minlength="12" 
+                required 
+                class="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10"
+                placeholder="Nhập lại đúng mật khẩu mới"
+              >
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility('input-confirm-pass', this)" 
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg"
+                aria-label="Ẩn hoặc hiện mật khẩu xác nhận"
+              >
+                <svg class="w-4 h-4 eye-icon-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <svg class="w-4 h-4 eye-icon-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Thông báo lưu ý khi đổi mật khẩu -->
+          <div class="p-3 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-xs text-[#4B5563] leading-relaxed">
+            <strong class="text-[#111827] font-semibold">Lưu ý an toàn:</strong> Sau khi đổi mật khẩu, các thiết bị khác sẽ bị đăng xuất và các link đặt lại mật khẩu cũ hết hiệu lực. Thiết bị này vẫn giữ đăng nhập.
+          </div>
+
+          <!-- Nút Đổi mật khẩu -->
+          <div class="pt-2">
+            <button 
+              type="submit" 
+              id="btn-submit-change-pass" 
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] bg-[#111827] hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition-all focus:outline-none"
+            >
+              <span>Cập nhật mật khẩu mới</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Hướng dẫn khi tài khoản chỉ đăng nhập bằng Google (chưa có mật khẩu) -->
+        <div id="password-google-only-guide" class="hidden max-w-xl p-5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl space-y-4">
+          <div class="flex items-start gap-3.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div class="space-y-1">
+              <h3 class="font-bold text-sm text-[#111827]">Tài khoản này chưa có mật khẩu</h3>
+              <p class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+                Tài khoản này chưa có mật khẩu. Để gỡ Google, hãy đặt mật khẩu trước bằng 'Quên mật khẩu': hệ thống gửi link đặt mật khẩu tới email của bạn.
+              </p>
+            </div>
+          </div>
+          <div class="pt-2 border-t border-[#E7E7E2] flex flex-wrap items-center gap-3">
+            <a href="index.html" class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-[#111827] bg-white border border-[#E7E7E2] hover:bg-neutral-50 rounded-xl shadow-sm transition-colors">
+              <svg class="w-4 h-4 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+              <span>Đến trang đăng nhập để dùng "Quên mật khẩu"</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- PHẦN 3: DANH SÁCH PHIÊN & THU HỒI -->
+      <section id="section-sessions" class="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-sessions">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E7E7E2] pb-4 mb-6">
+          <div>
+            <h2 id="heading-sessions" class="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+              3. Các phiên đang đăng nhập
+            </h2>
+            <p class="text-xs sm:text-sm text-[#6B7280] mt-1">
+              Danh sách các thiết bị và trình duyệt đang truy cập tài khoản ATI của bạn.
+            </p>
+          </div>
+
+          <!-- Nút Thu hồi tất cả các phiên khác -->
+          <button 
+            type="button" 
+            id="btn-revoke-all-others" 
+            onclick="promptRevokeAllOtherSessions()" 
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs sm:text-sm font-semibold rounded-xl border border-red-200 transition-colors flex-shrink-0"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            <span>Đăng xuất khỏi tất cả phiên khác</span>
+          </button>
+        </div>
+
+        <!-- Danh sách thẻ phiên -->
+        <div id="sessions-list-container" class="space-y-3">
+          
+          <!-- Phiên 1: Phiên hiện tại -->
+          <div id="session-card-current" class="p-4 rounded-xl border border-[#16A34A]/30 bg-[#16A34A]/5 flex items-start justify-between gap-3 transition-all">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-white border border-[#E7E7E2] text-[#111827] flex items-center justify-center flex-shrink-0 shadow-sm">
+                <!-- Icon Laptop -->
+                <svg class="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="text-sm font-bold text-[#111827]">Chrome trên Windows 11</h3>
+                  <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+                    Phiên hiện tại
+                  </span>
+                </div>
+                <p class="text-xs text-[#4B5563] mt-1">
+                  Trình duyệt này · <span class="font-medium text-[#16A34A]">Đang hoạt động</span>
+                </p>
+              </div>
+            </div>
+            <div class="text-xs text-[#6B7280] italic flex-shrink-0 pt-1">
+              Đang dùng
+            </div>
+          </div>
+
+          <!-- Phiên 2: Safari trên iPhone -->
+          <div id="session-card-mobile" class="p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-[#D1D5DB] flex items-start justify-between gap-3 transition-all shadow-sm">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] flex items-center justify-center flex-shrink-0">
+                <!-- Icon Phone -->
+                <svg class="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#111827]">Safari trên iPhone 15 Pro</h3>
+                <p class="text-xs text-[#4B5563] mt-1">
+                  <span class="text-[#6B7280]">Hoạt động lần cuối: 2 giờ trước</span>
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              onclick="revokeSingleSession('session-card-mobile', 'Safari trên iPhone 15 Pro')" 
+              class="px-3 py-1.5 text-xs font-medium text-[#4B5563] hover:text-red-600 bg-[#F8F8F6] hover:bg-red-50 rounded-lg border border-[#E7E7E2] hover:border-red-200 transition-colors flex-shrink-0"
+              title="Đăng xuất thiết bị này"
+            >
+              Thu hồi
+            </button>
+          </div>
+
+          <!-- Phiên 3: Firefox trên macOS -->
+          <div id="session-card-macos" class="p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-[#D1D5DB] flex items-start justify-between gap-3 transition-all shadow-sm">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] flex items-center justify-center flex-shrink-0">
+                <!-- Icon Laptop -->
+                <svg class="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#111827]">Firefox trên macOS Sonoma</h3>
+                <p class="text-xs text-[#4B5563] mt-1">
+                  <span class="text-[#6B7280]">Hoạt động lần cuối: 3 ngày trước</span>
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              onclick="revokeSingleSession('session-card-macos', 'Firefox trên macOS Sonoma')" 
+              class="px-3 py-1.5 text-xs font-medium text-[#4B5563] hover:text-red-600 bg-[#F8F8F6] hover:bg-red-50 rounded-lg border border-[#E7E7E2] hover:border-red-200 transition-colors flex-shrink-0"
+              title="Đăng xuất thiết bị này"
+            >
+              Thu hồi
+            </button>
+          </div>
+
+          <!-- Khung khi đã thu hồi hết các phiên khác -->
+          <div id="sessions-empty-state" class="hidden p-6 rounded-xl border border-dashed border-[#E7E7E2] bg-[#F8F8F6] text-center">
+            <svg class="w-8 h-8 text-[#16A34A] mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <p class="text-xs sm:text-sm font-semibold text-[#111827]">Chỉ còn phiên hiện tại đang hoạt động</p>
+            <p class="text-xs text-[#6B7280] mt-0.5">Không còn phiên đăng nhập nào khác trên các thiết bị khác.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- PHẦN 4: LIÊN KẾT / GỠ GOOGLE -->
+      <section id="section-google" class="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-google">
+        <div class="border-b border-[#E7E7E2] pb-4 mb-6">
+          <h2 id="heading-google" class="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+            4. Liên kết tài khoản Google
+          </h2>
+          <p class="text-xs sm:text-sm text-[#6B7280] mt-1">
+            Dùng tài khoản Google để đăng nhập một chạm vào ATI nhanh chóng và an toàn mà không cần nhớ mật khẩu.
+          </p>
+        </div>
+
+        <!-- Trạng thái 1: ĐÃ LIÊN KẾT (Mặc định) -->
+        <div id="google-linked-state" class="p-4 sm:p-5 rounded-xl border border-[#E7E7E2] bg-[#F8F8F6] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start gap-4">
+            <!-- Google Logo chuẩn SVG -->
+            <div class="w-10 h-10 rounded-xl bg-white border border-[#E7E7E2] flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-bold text-[#111827]">Tài khoản Google</span>
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-full">
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                  Đã liên kết
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-[#4B5563] font-mono mt-0.5" id="google-linked-email-display">
+                lan.nguyen@congty.vn
+              </p>
+              <p class="text-xs text-[#6B7280] mt-1">
+                Bạn có thể bấm nút "Tiếp tục với Google" trên trang đăng nhập để vào thẳng ATI.
+              </p>
+            </div>
+          </div>
+
+          <!-- Nút Gỡ liên kết Google -->
+          <button 
+            type="button" 
+            id="btn-unlink-google" 
+            onclick="promptUnlinkGoogleModal()" 
+            class="px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-red-200 rounded-xl transition-colors flex-shrink-0 self-start sm:self-center"
+          >
+            Gỡ liên kết Google
+          </button>
+        </div>
+
+        <!-- Thông báo giải thích khi tài khoản chưa có mật khẩu -->
+        <div id="google-no-password-notice" class="hidden mt-3 p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-800 leading-relaxed flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <p>
+            Tài khoản này chưa có mật khẩu. Để gỡ Google, hãy đặt mật khẩu trước bằng 'Quên mật khẩu': hệ thống gửi link đặt mật khẩu tới email của bạn.
+          </p>
+        </div>
+
+        <!-- Trạng thái 2: CHƯA LIÊN KẾT (Ẩn mặc định) -->
+        <div id="google-unlinked-state" class="hidden p-4 sm:p-5 rounded-xl border border-[#E7E7E2] bg-[#F8F8F6] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-white border border-[#E7E7E2] flex items-center justify-center flex-shrink-0 shadow-sm text-[#9CA3AF]">
+              <svg class="w-5 h-5 flex-shrink-0 opacity-40" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-bold text-[#111827]">Tài khoản Google</span>
+                <span class="inline-flex items-center text-[11px] font-medium text-[#6B7280] bg-neutral-200 px-2 py-0.5 rounded-full">
+                  Chưa liên kết
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-[#6B7280] mt-1">
+                Hiện bạn chưa liên kết tài khoản Google với tài khoản ATI này.
+              </p>
+            </div>
+          </div>
+
+          <!-- Nút Liên kết Google -->
+          <button 
+            type="button" 
+            id="btn-link-google" 
+            onclick="triggerLinkGoogleFlow()" 
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-[#111827] bg-white hover:bg-neutral-50 border border-[#E7E7E2] rounded-xl shadow-sm transition-colors flex-shrink-0 self-start sm:self-center"
+          >
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span id="btn-link-google-text">Liên kết với Google</span>
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- CHÂN TRANG NHẸ -->
+  <footer class="mt-auto border-t border-[#E7E7E2] bg-white py-6 px-4 sm:px-6">
+    <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+      <div class="text-center sm:text-left">
+        <span class="font-display font-bold text-[#111827]">ATI</span> — AI Workflow Automation Platform · 2026
+      </div>
+      <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 sm:gap-4">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <span>·</span>
+        <a href="history.html" class="hover:text-[#111827] transition-colors">Nhật ký điều phối</a>
+        <span>·</span>
+        <a href="settings.html" class="hover:text-[#111827] transition-colors">Kết nối dịch vụ</a>
+        <span>·</span>
+        <a href="responses.html" class="hover:text-[#111827] transition-colors">Tình huống xử lý</a>
+        <span>·</span>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL XÁC NHẬN THU HỒI TẤT CẢ PHIÊN KHÁC -->
+  <div id="modal-revoke-all" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-revoke-all-title">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E7E7E2] animate-in fade-in zoom-in-95 duration-200">
+      <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <h3 id="modal-revoke-all-title" class="font-display text-lg font-bold text-[#111827]">
+        Đăng xuất khỏi tất cả phiên khác?
+      </h3>
+      <p class="text-xs sm:text-sm text-[#4B5563] mt-2 leading-relaxed">
+        Hành động này sẽ thu hồi quyền truy cập của toàn bộ các thiết bị và trình duyệt khác (iPhone, máy tính khác). Riêng phiên hiện tại trên trình duyệt này vẫn được duy trì.
+      </p>
+      <div class="flex items-center justify-end gap-3 mt-6">
+        <button 
+          type="button" 
+          onclick="closeModal('modal-revoke-all')" 
+          class="px-4 py-2 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] bg-[#F8F8F6] hover:bg-neutral-200 rounded-xl transition-colors"
+        >
+          Hủy bỏ
+        </button>
+        <button 
+          type="button" 
+          onclick="confirmRevokeAllOtherSessions()" 
+          class="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
+        >
+          Xác nhận thu hồi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL XÁC NHẬN GỠ LIÊN KẾT GOOGLE -->
+  <div id="modal-unlink-google" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-unlink-google-title">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E7E7E2] animate-in fade-in zoom-in-95 duration-200">
+      <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+      </div>
+      <h3 id="modal-unlink-google-title" class="font-display text-lg font-bold text-[#111827]">
+        Gỡ liên kết tài khoản Google?
+      </h3>
+      <p class="text-xs sm:text-sm text-[#4B5563] mt-2 leading-relaxed">
+        Sau khi gỡ liên kết, bạn sẽ không thể dùng nút "Tiếp tục với Google" để đăng nhập nữa. Bạn sẽ cần nhập địa chỉ email và mật khẩu của ATI để truy cập vào hệ thống.
+      </p>
+
+      <!-- Trường Mật khẩu hiện tại (Bắt buộc) -->
+      <div class="mt-4 text-left">
+        <label for="input-unlink-current-pass" class="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
+          Mật khẩu hiện tại <span class="text-[#FF5701]">*</span>
+        </label>
+        <div class="relative">
+          <input 
+            type="password" 
+            id="input-unlink-current-pass" 
+            placeholder="Nhập mật khẩu hiện tại để xác nhận"
+            onkeydown="if(event.key==='Enter'){confirmUnlinkGoogle();}"
+            class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10"
+            required
+            autocomplete="current-password"
+          >
+          <button 
+            type="button" 
+            onclick="togglePasswordVisibility('input-unlink-current-pass', this)" 
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg"
+            aria-label="Ẩn hoặc hiện mật khẩu"
+          >
+            <svg class="w-4 h-4 eye-icon-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <svg class="w-4 h-4 eye-icon-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+          </button>
+        </div>
+        <p class="text-[11px] text-[#6B7280] mt-1.5">
+          Hệ thống yêu cầu mật khẩu hiện tại để xác thực trước khi huỷ phương thức đăng nhập bằng Google.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-6">
+        <button 
+          type="button" 
+          onclick="closeModal('modal-unlink-google')" 
+          class="px-4 py-2 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] bg-[#F8F8F6] hover:bg-neutral-200 rounded-xl transition-colors"
+        >
+          Giữ liên kết
+        </button>
+        <button 
+          type="button" 
+          onclick="confirmUnlinkGoogle()" 
+          class="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
+        >
+          Xác nhận gỡ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC ĐIỀU KHIỂN TRANG TÀI KHOẢN -->
+  <script>
+    // Trạng thái tài khoản người dùng
+    const accountState = {
+      fullName: 'Lan Nguyễn',
+      email: 'lan.nguyen@congty.vn',
+      role: 'admin', // 'admin' | 'member'
+      googleLinked: true,
+      hasPassword: true, // false: Chỉ đăng nhập bằng Google (chưa có mật khẩu)
+      googleEmail: 'lan.nguyen@congty.vn',
+      otherSessionsCount: 2
+    };
+
+    // Khởi tạo giao diện khi tải trang
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAccountState();
+      
+      // Bắt phím Esc để đóng modal
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeModal('modal-revoke-all');
+          closeModal('modal-unlink-google');
+          const demoMenu = document.getElementById('demo-menu-dropdown');
+          if (demoMenu && !demoMenu.classList.contains('hidden')) {
+            demoMenu.classList.add('hidden');
+            document.getElementById('btn-toggle-demo-menu').setAttribute('aria-expanded', 'false');
+          }
+        }
+      });
+
+      // Bấm ra ngoài để đóng menu demo
+      document.addEventListener('click', (e) => {
+        const demoDropdown = document.getElementById('demo-menu-dropdown');
+        const demoBtn = document.getElementById('btn-toggle-demo-menu');
+        if (demoDropdown && demoBtn && !demoDropdown.contains(e.target) && !demoBtn.contains(e.target)) {
+          demoDropdown.classList.add('hidden');
+          demoBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    // Cập nhật giao diện theo accountState
+    function renderAccountState() {
+      // 1. Họ và tên
+      const initials = getInitials(accountState.fullName);
+      document.getElementById('header-avatar-badge').textContent = initials;
+      document.getElementById('profile-card-avatar').textContent = initials;
+      document.getElementById('profile-card-name').textContent = accountState.fullName;
+      document.getElementById('input-full-name').value = accountState.fullName;
+
+      // 2. Vai trò
+      const isAdmin = accountState.role === 'admin';
+      const roleName = isAdmin ? 'Quản trị viên' : 'Thành viên';
+      
+      document.getElementById('header-role-display').textContent = roleName;
+      document.getElementById('profile-card-role-badge').textContent = roleName;
+      document.getElementById('profile-role-title').textContent = isAdmin ? 'Quản trị viên (Admin)' : 'Thành viên (Member)';
+      document.getElementById('profile-role-description').textContent = isAdmin
+        ? 'Bạn có toàn quyền kết nối các dịch vụ mới của nhóm, chỉnh sửa nơi được phép dùng và phê duyệt thành viên mới.'
+        : 'Bạn có quyền sử dụng các công cụ đã được kết nối và kiểm tra tình trạng kết nối. Chỉ quản trị viên mới có quyền đổi khoá chung.';
+
+      // Cập nhật nút vai trò trong Demo
+      const btnAdmin = document.getElementById('demo-role-admin');
+      const btnMember = document.getElementById('demo-role-member');
+      if (btnAdmin && btnMember) {
+        if (isAdmin) {
+          btnAdmin.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#FF5701] shadow-sm transition-all';
+          btnMember.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all';
+        } else {
+          btnAdmin.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all';
+          btnMember.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#FF5701] shadow-sm transition-all';
+        }
+      }
+
+      // 3. Google Linked State & Trạng thái có mật khẩu
+      const googleLinkedBlock = document.getElementById('google-linked-state');
+      const googleUnlinkedBlock = document.getElementById('google-unlinked-state');
+      const btnUnlinkGoogle = document.getElementById('btn-unlink-google');
+      const googleNoPassNotice = document.getElementById('google-no-password-notice');
+      const formChangePass = document.getElementById('form-change-password');
+      const passGoogleOnlyGuide = document.getElementById('password-google-only-guide');
+
+      if (accountState.googleLinked) {
+        googleLinkedBlock.classList.remove('hidden');
+        googleUnlinkedBlock.classList.add('hidden');
+        document.getElementById('google-linked-email-display').textContent = accountState.googleEmail;
+
+        if (!accountState.hasPassword) {
+          // Trạng thái: Chỉ đăng nhập bằng Google (chưa có mật khẩu)
+          if (btnUnlinkGoogle) {
+            btnUnlinkGoogle.disabled = true;
+            btnUnlinkGoogle.className = 'px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-neutral-400 bg-neutral-100 border border-[#E7E7E2] rounded-xl cursor-not-allowed flex-shrink-0 self-start sm:self-center';
+            btnUnlinkGoogle.setAttribute('title', 'Tài khoản chưa có mật khẩu');
+          }
+          if (googleNoPassNotice) googleNoPassNotice.classList.remove('hidden');
+
+          // Mục Đổi mật khẩu đổi thành hướng dẫn
+          if (formChangePass) formChangePass.classList.add('hidden');
+          if (passGoogleOnlyGuide) passGoogleOnlyGuide.classList.remove('hidden');
+        } else {
+          // Bình thường: đã liên kết và có mật khẩu
+          if (btnUnlinkGoogle) {
+            btnUnlinkGoogle.disabled = false;
+            btnUnlinkGoogle.className = 'px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-red-200 rounded-xl transition-colors flex-shrink-0 self-start sm:self-center';
+            btnUnlinkGoogle.removeAttribute('title');
+          }
+          if (googleNoPassNotice) googleNoPassNotice.classList.add('hidden');
+
+          // Mục Đổi mật khẩu hiển thị form bình thường
+          if (formChangePass) formChangePass.classList.remove('hidden');
+          if (passGoogleOnlyGuide) passGoogleOnlyGuide.classList.add('hidden');
+        }
+      } else {
+        googleLinkedBlock.classList.add('hidden');
+        googleUnlinkedBlock.classList.remove('hidden');
+        if (googleNoPassNotice) googleNoPassNotice.classList.add('hidden');
+
+        // Khi chưa liên kết Google thì tài khoản luôn có mật khẩu
+        if (formChangePass) formChangePass.classList.remove('hidden');
+        if (passGoogleOnlyGuide) passGoogleOnlyGuide.classList.add('hidden');
+      }
+
+      // Cập nhật các nút kịch bản Demo trong Dropdown
+      const demoAuthStandard = document.getElementById('demo-auth-standard');
+      const demoAuthGoogleOnly = document.getElementById('demo-auth-google-only');
+      const demoAuthUnlinked = document.getElementById('demo-auth-unlinked');
+      const activeClass = 'w-full text-left px-2.5 py-1.5 rounded-md text-xs font-semibold text-white bg-[#FF5701] shadow-sm transition-all';
+      const inactiveClass = 'w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F0F0EB] transition-all';
+
+      if (demoAuthStandard && demoAuthGoogleOnly && demoAuthUnlinked) {
+        if (!accountState.googleLinked) {
+          demoAuthStandard.className = inactiveClass;
+          demoAuthGoogleOnly.className = inactiveClass;
+          demoAuthUnlinked.className = activeClass;
+        } else if (!accountState.hasPassword) {
+          demoAuthStandard.className = inactiveClass;
+          demoAuthGoogleOnly.className = activeClass;
+          demoAuthUnlinked.className = inactiveClass;
+        } else {
+          demoAuthStandard.className = activeClass;
+          demoAuthGoogleOnly.className = inactiveClass;
+          demoAuthUnlinked.className = inactiveClass;
+        }
+      }
+
+      // 4. Số lượng phiên
+      updateSessionsSummary();
+    }
+
+    // Lấy ký tự viết tắt đại diện
+    function getInitials(name) {
+      if (!name) return 'ATI';
+      const parts = name.trim().split(/\s+/);
+      if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    // Cập nhật số phiên đăng nhập
+    function updateSessionsSummary() {
+      const total = accountState.otherSessionsCount + 1;
+      const text = `${total} thiết bị đang hoạt động`;
+      const summaryElem = document.getElementById('summary-sessions-text');
+      if (summaryElem) summaryElem.textContent = text;
+
+      const emptyState = document.getElementById('sessions-empty-state');
+      const revokeAllBtn = document.getElementById('btn-revoke-all-others');
+
+      if (accountState.otherSessionsCount <= 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (revokeAllBtn) revokeAllBtn.classList.add('hidden');
+      } else {
+        if (emptyState) emptyState.classList.add('hidden');
+        if (revokeAllBtn) revokeAllBtn.classList.remove('hidden');
+      }
+    }
+
+    // PHẦN 1: XỬ LÝ ĐỔI HỌ TÊN
+    function handleUpdateProfile(event) {
+      event.preventDefault();
+      const input = document.getElementById('input-full-name');
+      const newName = input.value.trim();
+
+      if (!newName) {
+        showToast('Vui lòng nhập họ và tên hợp lệ.', 'error');
+        return;
+      }
+
+      accountState.fullName = newName;
+      renderAccountState();
+      showToast('Đã lưu thay đổi họ và tên thành công!');
+    }
+
+    // PHẦN 2: XỬ LÝ ĐỔI MẬT KHẨU
+    function handleChangePassword(event) {
+      event.preventDefault();
+      const currentPass = document.getElementById('input-current-pass').value;
+      const newPass = document.getElementById('input-new-pass').value;
+      const confirmPass = document.getElementById('input-confirm-pass').value;
+
+      if (!currentPass) {
+        showToast('Vui lòng nhập mật khẩu hiện tại.', 'error');
+        return;
+      }
+
+      if (newPass.length < 12) {
+        showToast('Mật khẩu mới phải có ít nhất 12 ký tự.', 'error');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showToast('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.', 'error');
+        return;
+      }
+
+      if (newPass === currentPass) {
+        showToast('Mật khẩu mới không được trùng với mật khẩu hiện tại.', 'warn');
+        return;
+      }
+
+      // Mô phỏng thành công: các phiên khác bị đăng xuất, thiết bị này giữ đăng nhập
+      const s2 = document.getElementById('session-card-mobile');
+      const s3 = document.getElementById('session-card-macos');
+      if (s2) s2.remove();
+      if (s3) s3.remove();
+      accountState.otherSessionsCount = 0;
+      updateSessionsSummary();
+
+      document.getElementById('input-current-pass').value = '';
+      document.getElementById('input-new-pass').value = '';
+      document.getElementById('input-confirm-pass').value = '';
+      document.getElementById('pass-strength-bar').style.width = '0%';
+      document.getElementById('pass-strength-indicator').textContent = 'Ít nhất 12 ký tự';
+
+      showToast('Đổi mật khẩu thành công! Sau khi đổi mật khẩu, các thiết bị khác sẽ bị đăng xuất và các link đặt lại mật khẩu cũ hết hiệu lực. Thiết bị này vẫn giữ đăng nhập.');
+    }
+
+    // Kiểm tra độ mạnh mật khẩu trực quan
+    function checkPasswordStrength(val) {
+      const bar = document.getElementById('pass-strength-bar');
+      const label = document.getElementById('pass-strength-indicator');
+
+      if (!val) {
+        bar.style.width = '0%';
+        bar.className = 'h-full bg-neutral-400 w-0 transition-all duration-300';
+        label.textContent = 'Ít nhất 12 ký tự';
+        label.className = 'text-xs font-medium text-[#6B7280]';
+        return;
+      }
+
+      let score = 0;
+      if (val.length >= 12) score += 2;
+      if (/[A-Z]/.test(val)) score += 1;
+      if (/[0-9]/.test(val)) score += 1;
+      if (/[^A-Za-z0-9]/.test(val)) score += 1;
+
+      if (val.length < 12) {
+        bar.style.width = '30%';
+        bar.className = 'h-full bg-red-500 transition-all duration-300';
+        label.textContent = `Chưa đủ 12 ký tự (${val.length}/12)`;
+        label.className = 'text-xs font-medium text-red-600';
+      } else if (score <= 3) {
+        bar.style.width = '65%';
+        bar.className = 'h-full bg-amber-500 transition-all duration-300';
+        label.textContent = 'Độ mạnh: Khá tốt (12+ ký tự)';
+        label.className = 'text-xs font-medium text-amber-600';
+      } else {
+        bar.style.width = '100%';
+        bar.className = 'h-full bg-emerald-600 transition-all duration-300';
+        label.textContent = 'Độ mạnh: Rất an toàn';
+        label.className = 'text-xs font-medium text-emerald-600';
+      }
+    }
+
+    // Bật/tắt ẩn hiện mật khẩu
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+
+      const showIcon = btn.querySelector('.eye-icon-show');
+      const hideIcon = btn.querySelector('.eye-icon-hide');
+
+      if (showIcon && hideIcon) {
+        if (isPassword) {
+          showIcon.classList.add('hidden');
+          hideIcon.classList.remove('hidden');
+        } else {
+          showIcon.classList.remove('hidden');
+          hideIcon.classList.add('hidden');
+        }
+      }
+    }
+
+    // PHẦN 3: XỬ LÝ THU HỒI PHIÊN
+    function revokeSingleSession(cardId, deviceName) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        card.remove();
+        accountState.otherSessionsCount = Math.max(0, accountState.otherSessionsCount - 1);
+        updateSessionsSummary();
+        showToast(`Đã thu hồi phiên trên ${deviceName}`);
+      }, 200);
+    }
+
+    function promptRevokeAllOtherSessions() {
+      const modal = document.getElementById('modal-revoke-all');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function confirmRevokeAllOtherSessions() {
+      closeModal('modal-revoke-all');
+      
+      const s2 = document.getElementById('session-card-mobile');
+      const s3 = document.getElementById('session-card-macos');
+      if (s2) s2.remove();
+      if (s3) s3.remove();
+
+      accountState.otherSessionsCount = 0;
+      updateSessionsSummary();
+      showToast('Đã đăng xuất khỏi tất cả các phiên thiết bị khác!');
+    }
+
+    // PHẦN 4: XỬ LÝ LIÊN KẾT / GỠ GOOGLE
+    function promptUnlinkGoogleModal() {
+      if (!accountState.hasPassword) {
+        showToast('Tài khoản này chưa có mật khẩu. Để gỡ Google, hãy đặt mật khẩu trước bằng Quên mật khẩu.', 'warn');
+        return;
+      }
+      const modal = document.getElementById('modal-unlink-google');
+      const passInput = document.getElementById('input-unlink-current-pass');
+      if (passInput) passInput.value = '';
+      if (modal) modal.classList.remove('hidden');
+      if (passInput) setTimeout(() => passInput.focus(), 100);
+    }
+
+    function confirmUnlinkGoogle() {
+      const passInput = document.getElementById('input-unlink-current-pass');
+      if (!passInput || !passInput.value.trim()) {
+        showToast('Vui lòng nhập mật khẩu hiện tại để xác nhận gỡ liên kết.', 'error');
+        if (passInput) passInput.focus();
+        return;
+      }
+
+      passInput.value = '';
+      closeModal('modal-unlink-google');
+      accountState.googleLinked = false;
+      accountState.hasPassword = true;
+      renderAccountState();
+      showToast('Đã gỡ liên kết với tài khoản Google.');
+    }
+
+    function triggerLinkGoogleFlow() {
+      const btn = document.getElementById('btn-link-google');
+      const btnText = document.getElementById('btn-link-google-text');
+      if (!btn || !btnText) return;
+
+      btn.disabled = true;
+      btnText.textContent = 'Đang kết nối Google…';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btnText.textContent = 'Liên kết với Google';
+        accountState.googleLinked = true;
+        accountState.hasPassword = true;
+        renderAccountState();
+        showToast('Đã liên kết thành công tài khoản Google (lan.nguyen@congty.vn)!');
+      }, 700);
+    }
+
+    // MODAL HELPERS
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // KỊCH BẢN DEMO
+    function toggleDemoDropdown() {
+      const dropdown = document.getElementById('demo-menu-dropdown');
+      const btn = document.getElementById('btn-toggle-demo-menu');
+      if (!dropdown || !btn) return;
+
+      const isHidden = dropdown.classList.contains('hidden');
+      if (isHidden) {
+        dropdown.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        dropdown.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function setRole(role) {
+      accountState.role = role;
+      renderAccountState();
+      showToast(`Đã chuyển vai trò xem sang: ${role === 'admin' ? 'Quản trị viên' : 'Thành viên'}`);
+    }
+
+    function setAuthScenario(scenario) {
+      if (scenario === 'google_only') {
+        accountState.googleLinked = true;
+        accountState.hasPassword = false;
+        showToast('Demo: Tài khoản chỉ đăng nhập bằng Google (chưa có mật khẩu)');
+      } else if (scenario === 'unlinked') {
+        accountState.googleLinked = false;
+        accountState.hasPassword = true;
+        showToast('Demo: Đã chuyển sang Chưa liên kết Google');
+      } else {
+        accountState.googleLinked = true;
+        accountState.hasPassword = true;
+        showToast('Demo: Tài khoản đã liên kết Google và có mật khẩu');
+      }
+      renderAccountState();
+    }
+
+    function setGoogleLinkedState(isLinked) {
+      if (isLinked) {
+        setAuthScenario('standard');
+      } else {
+        setAuthScenario('unlinked');
+      }
+    }
+
+    function resetAccountDemoData() {
+      accountState.fullName = 'Lan Nguyễn';
+      accountState.role = 'admin';
+      accountState.googleLinked = true;
+      accountState.hasPassword = true;
+      accountState.otherSessionsCount = 2;
+
+      // Vẽ lại thẻ phiên nếu đã bị xoá
+      const container = document.getElementById('sessions-list-container');
+      const current = document.getElementById('session-card-current');
+      
+      if (container && current) {
+        // Đảm bảo có lại card mobile & macos nếu thiếu
+        if (!document.getElementById('session-card-mobile')) {
+          const div2 = document.createElement('div');
+          div2.id = 'session-card-mobile';
+          div2.className = 'p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-[#D1D5DB] flex items-start justify-between gap-3 transition-all shadow-sm';
+          div2.innerHTML = `
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#111827]">Safari trên iPhone 15 Pro</h3>
+                <p class="text-xs text-[#4B5563] mt-1"><span class="text-[#6B7280]">Hoạt động lần cuối: 2 giờ trước</span></p>
+              </div>
+            </div>
+            <button type="button" onclick="revokeSingleSession('session-card-mobile', 'Safari trên iPhone 15 Pro')" class="px-3 py-1.5 text-xs font-medium text-[#4B5563] hover:text-red-600 bg-[#F8F8F6] hover:bg-red-50 rounded-lg border border-[#E7E7E2] hover:border-red-200 transition-colors flex-shrink-0">Thu hồi</button>
+          `;
+          container.insertBefore(div2, document.getElementById('sessions-empty-state'));
+        }
+
+        if (!document.getElementById('session-card-macos')) {
+          const div3 = document.createElement('div');
+          div3.id = 'session-card-macos';
+          div3.className = 'p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-[#D1D5DB] flex items-start justify-between gap-3 transition-all shadow-sm';
+          div3.innerHTML = `
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#111827]">Firefox trên macOS Sonoma</h3>
+                <p class="text-xs text-[#4B5563] mt-1"><span class="text-[#6B7280]">Hoạt động lần cuối: 3 ngày trước</span></p>
+              </div>
+            </div>
+            <button type="button" onclick="revokeSingleSession('session-card-macos', 'Firefox trên macOS Sonoma')" class="px-3 py-1.5 text-xs font-medium text-[#4B5563] hover:text-red-600 bg-[#F8F8F6] hover:bg-red-50 rounded-lg border border-[#E7E7E2] hover:border-red-200 transition-colors flex-shrink-0">Thu hồi</button>
+          `;
+          container.insertBefore(div3, document.getElementById('sessions-empty-state'));
+        }
+      }
+
+      renderAccountState();
+      showToast('Đã đặt lại dữ liệu tài khoản về mặc định.');
+    }
+
+    // TOAST NOTIFICATION
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'px-4 py-2.5 rounded-xl bg-[#111827] text-white text-xs sm:text-sm font-medium shadow-xl border border-neutral-700 flex items-center gap-2 pointer-events-auto transition-all duration-200 transform translate-y-2 opacity-0';
+      
+      let icon = '<span class="w-2 h-2 rounded-full bg-[#16A34A] flex-shrink-0"></span>';
+      if (type === 'error') {
+        icon = '<span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>';
+      } else if (type === 'warn') {
+        icon = '<span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>';
+      }
+
+      toast.innerHTML = `${icon}<span>${message}</span>`;
+      container.appendChild(toast);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      // Remove after 3.5s
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-1');
+        setTimeout(() => {
+          toast.remove();
+        }, 200);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

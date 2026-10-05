@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 — Không tìm thấy trang · ATI</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              bg: '#F8F8F6',
+              text: '#111827',
+              border: '#E7E7E2',
+              muted: '#6B7280',
+              surface: '#FFFFFF',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --muted: #6B7280;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-display {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]">
+
+  <!-- 1. Thanh điều hướng chuẩn cockpit -->
+  <header class="sticky top-0 z-40 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Quay lại -->
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+          <span class="sm:hidden">Quay lại</span>
+        </a>
+
+        <span class="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-200/70 text-[#4B5563]">
+          Mã sự cố: 404
+        </span>
+      </div>
+
+      <!-- Mã sự cố -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-200/70 text-[#4B5563]">
+          Mã lỗi: 404
+        </span>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- 2. Nội dung chính 404 -->
+  <main class="flex-1 flex flex-col items-center justify-center max-w-xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    
+    <!-- Hero 404 Section -->
+    <section class="text-center space-y-5 max-w-xl mx-auto">
+      
+      <div class="relative inline-block select-none">
+        <span class="font-display font-bold text-8xl sm:text-9xl text-neutral-200 tracking-tight block">404</span>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <h1 class="font-display font-bold text-2xl sm:text-3xl text-[#111827] px-4 py-1 bg-[#F8F8F6]/80 backdrop-blur-sm rounded-lg">
+            Không tìm thấy trang
+          </h1>
+        </div>
+      </div>
+
+      <!-- Hiển thị đường dẫn không tồn tại -->
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-200/60 border border-[#E7E7E2] text-xs font-mono text-[#4B5563] max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+        <span class="text-neutral-500 font-sans">Đường dẫn:</span>
+        <span id="current-bad-path" class="text-[#DC2626] font-semibold">/trang-khong-ton-tai</span>
+      </div>
+
+      <p class="text-sm text-[#4B5563] leading-relaxed">
+        Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống ATI, đã được đổi tên hoặc chuyển sang vị trí khác. Dữ liệu công việc của bạn tại các dịch vụ vẫn an toàn tuyệt đối.
+      </p>
+
+      <!-- Hành động điều hướng chính -->
+      <div class="flex flex-wrap items-center justify-center gap-3 pt-3">
+        <a href="app-stage.html" class="px-5 py-2.5 min-h-[44px] rounded-xl bg-[#FF5701] hover:bg-[#e04d00] text-white text-xs font-semibold shadow-sm transition-colors inline-flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span>Về không gian làm việc chính</span>
+        </a>
+
+        <button type="button" onclick="historyBackFallback()" class="px-4 py-2.5 min-h-[44px] rounded-xl bg-white hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] text-xs font-medium border border-[#E7E7E2] transition-colors inline-flex items-center justify-center">
+          ← Quay lại trang trước
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 4. Chân trang đơn giản -->
+  <footer class="mt-auto border-t border-[#E7E7E2] py-4 px-4 text-center text-xs text-[#6B7280]">
+    <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>ATI · 2026 — Hệ thống điều phối tác vụ an toàn & minh bạch</span>
+      <div class="flex items-center gap-3">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <span>·</span>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Hiển thị đường dẫn đang truy cập (nếu có)
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        const pathEl = document.getElementById('current-bad-path');
+        const pathname = window.location.pathname;
+        if (pathEl && pathname && pathname !== '/' && !pathname.endsWith('404.html')) {
+          pathEl.textContent = pathname + window.location.search;
+        } else if (pathEl) {
+          pathEl.textContent = window.location.search ? window.location.search : '/duong-dan-khong-ton-tai';
+        }
+      } catch (err) {
+        // bỏ qua nếu lỗi trình duyệt bảo mật
+      }
+    });
+
+    function historyBackFallback() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'app-stage.html';
+      }
+    }
+  </script>
+</body>
+</html>

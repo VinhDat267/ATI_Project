@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kết nối dịch vụ — ATI</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              bg: '#F8F8F6',
+              text: '#111827',
+              border: '#E7E7E2',
+              muted: '#6B7280',
+              surface: '#FFFFFF',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05)',
+            'drawer': '-8px 0 32px rgba(0, 0, 0, 0.08)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --muted: #6B7280;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --success: #16A34A;
+      --warn: #D97706;
+      --danger: #DC2626;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Focus Visible Ring */
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #FF5701;
+      outline-offset: 2px;
+    }
+
+    /* Custom Transitions */
+    .drawer-backdrop {
+      transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer-panel {
+      transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Tối ưu màn hình hẹp dưới 420px */
+    @media (max-width: 419px) {
+      #role-pill-badge {
+        display: none !important;
+      }
+    }
+
+    /* prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .drawer-backdrop, .drawer-panel {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]">
+
+  <!-- Toast Thông báo nổi -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2" role="status" aria-live="polite"></div>
+
+  <!-- THANH TRÊN (COCKPIT HEADER) -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Điều hướng quay lại -->
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+          <span class="sm:hidden">Quay lại</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="history.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Nhật ký</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="guide.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Cẩm nang kết nối & Mẫu câu lệnh">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          <span>Cẩm nang</span>
+        </a>
+      </div>
+
+      <!-- Cụm Trạng thái Vai trò & Điều khiển Demo -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        <!-- Nhãn vai trò hiện tại -->
+        <div id="role-pill-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-[#E7E7E2] text-[#4B5563] shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-[#16A34A]" id="role-indicator-dot"></span>
+          <span id="role-name-display">Quản trị viên</span>
+        </div>
+
+        <!-- Nút Kịch bản demo -->
+        <div class="relative inline-block text-left">
+          <button id="btn-toggle-demo-menu" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#111827] bg-white hover:bg-neutral-100 rounded-lg border border-[#E7E7E2] shadow-sm transition-colors" aria-haspopup="true" aria-expanded="false">
+            <svg class="w-3.5 h-3.5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>Kịch bản demo</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FF5701]/10 text-[#FF5701]">DEMO</span>
+          </button>
+
+          <!-- Menu chọn Kịch bản Demo -->
+          <div id="demo-menu-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-[#E7E7E2] p-3 z-40 space-y-3" role="menu">
+            <div>
+              <p class="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider mb-1.5">Xem giao diện như</p>
+              <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F8F8F6] rounded-lg border border-[#E7E7E2]">
+                <button type="button" id="demo-role-admin" class="px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#FF5701] shadow-sm transition-all" onclick="setRole('admin')">Quản trị viên</button>
+                <button type="button" id="demo-role-member" class="px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all" onclick="setRole('member')">Thành viên</button>
+              </div>
+              <p class="text-[11px] text-[#6B7280] mt-1">Thành viên chỉ được kiểm tra kết nối, không sửa khoá.</p>
+            </div>
+
+            <div class="border-t border-[#E7E7E2] pt-2.5">
+              <label for="demo-test-result" class="block text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider mb-1.5">Kết quả kiểm tra tiếp theo</label>
+              <select id="demo-test-result" class="w-full text-xs bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg px-2.5 py-1.5 text-[#111827] focus:outline-none focus:border-[#FF5701]">
+                <option value="success">Thành công (320 ms)</option>
+                <option value="rejected">Bị từ chối (Sai khoá / Thiếu quyền)</option>
+                <option value="timeout">Quá thời gian (10 giây không phản hồi)</option>
+              </select>
+            </div>
+
+            <div class="border-t border-[#E7E7E2] pt-2 flex items-center justify-between">
+              <span class="text-[11px] text-[#6B7280]">Khôi phục mặc định:</span>
+              <button type="button" onclick="resetDemoData()" class="text-[11px] text-[#FF5701] hover:underline font-medium">Đặt lại dữ liệu</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- NỘI DUNG CHÍNH -->
+  <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
+    
+    <!-- Tiêu đề trang & Nguyên tắc -->
+    <div class="mb-8 sm:mb-10">
+      <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
+        <h1 class="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
+          Kết nối dịch vụ
+        </h1>
+        <div class="inline-flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#16A34A]"></span>
+          <span id="summary-connected-count" class="text-sm sm:text-base font-semibold text-[#111827]">4 / 8 dịch vụ đã thiết lập · 4 kết nối tốt</span>
+        </div>
+      </div>
+
+      <!-- Khung nguyên tắc an toàn dữ liệu -->
+      <div class="bg-white rounded-xl p-4 sm:p-5 border border-[#E7E7E2] shadow-sm flex items-start gap-3">
+        <div class="w-6 h-6 rounded-full bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <div class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+          <strong class="text-[#111827] font-semibold">Nguyên tắc an toàn của nhóm:</strong> ATI chỉ đọc và ghi ở những nơi bạn chọn bên dưới. Khoá được mã hoá khi lưu và không hiển thị lại.
+        </div>
+      </div>
+    </div>
+
+    <!-- DANH SÁCH 2 NHÓM DỊCH VỤ -->
+    <div class="space-y-8 sm:space-y-10">
+      
+      <!-- Nhóm 1: Đã thiết lập -->
+      <section aria-labelledby="heading-connected-services">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
+          <h2 id="heading-connected-services" class="text-xs font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-2 whitespace-nowrap">
+            <span>Đã thiết lập</span>
+            <span id="badge-count-connected" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#16A34A]/10 text-[#16A34A]">4</span>
+          </h2>
+          <span class="text-xs text-[#6B7280]">Bấm vào hàng để xem hoặc đổi nơi được dùng</span>
+        </div>
+
+        <div id="list-connected-services" class="space-y-3" role="list">
+          <!-- Render tự động bằng JavaScript -->
+        </div>
+      </section>
+
+      <!-- Nhóm 2: Chưa thiết lập -->
+      <section aria-labelledby="heading-unconnected-services">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
+          <h2 id="heading-unconnected-services" class="text-xs font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-2 whitespace-nowrap">
+            <span>Chưa thiết lập</span>
+            <span id="badge-count-unconnected" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-200 text-[#4B5563]">4</span>
+          </h2>
+          <span class="text-xs text-[#6B7280]">Bấm để thêm khoá truy cập và kích hoạt</span>
+        </div>
+
+        <div id="list-unconnected-services" class="space-y-3" role="list">
+          <!-- Render tự động bằng JavaScript -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Chú thích chân trang -->
+    <div class="mt-12 pt-6 border-t border-[#E7E7E2] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+      <div>
+        <p>ATI — Nền tảng điều phối công việc liên dịch vụ · 2026</p>
+        <p class="text-[11px] text-[#9CA3AF] mt-0.5">Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 text-xs">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <a href="guide.html" class="hover:text-[#111827] transition-colors">Cẩm nang</a>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn & Dữ liệu</a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- NGĂN CHI TIẾT DỊCH VỤ (DRAWER DIALOG / FULLSCREEN MOBILE)     -->
+  <!-- ============================================================= -->
+  <div id="service-drawer-container" class="hidden fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="drawer-service-title">
+    
+    <!-- Lớp nền mờ (Backdrop) -->
+    <div id="drawer-backdrop" class="drawer-backdrop fixed inset-0 bg-black/40 opacity-0 transition-opacity" onclick="closeServiceDrawer()"></div>
+
+    <div class="fixed inset-y-0 right-0 max-w-full flex">
+      <!-- Panel ngăn chi tiết -->
+      <div id="drawer-panel" class="drawer-panel w-screen sm:max-w-xl bg-white shadow-2xl flex flex-col translate-x-full border-l border-[#E7E7E2] transition-transform">
+        
+        <!-- Header của ngăn chi tiết -->
+        <div class="px-5 sm:px-6 py-4 border-b border-[#E7E7E2] flex items-center justify-between gap-3 bg-[#F8F8F6]">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="drawer-icon-container" class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+              <!-- Service SVG inserted dynamically -->
+            </div>
+            <div class="min-w-0">
+              <h2 id="drawer-service-title" class="font-display text-xl font-bold text-[#111827] truncate">
+                Trello
+              </h2>
+              <div id="drawer-header-status-badge" class="mt-0.5">
+                <!-- Status badge inserted dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="btn-close-drawer" onclick="closeServiceDrawer()" class="p-2 text-[#6B7280] hover:text-[#111827] rounded-lg hover:bg-neutral-200 transition-colors" aria-label="Đóng ngăn chi tiết">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Cảnh báo thành viên thường (nếu role == 'member') -->
+        <div id="drawer-member-warning" class="hidden px-5 sm:px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+          <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span>Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm. Bạn vẫn có thể bấm <strong>Kiểm tra kết nối</strong> ở mục 3.</span>
+        </div>
+
+        <!-- Thân ngăn chi tiết (Cuộn dọc) -->
+        <div class="flex-1 overflow-y-auto px-5 sm:px-6 py-6 space-y-8" id="drawer-body">
+          
+          <!-- PHẦN 1: KHOÁ TRUY CẬP -->
+          <section aria-labelledby="section-keys-title" class="space-y-4">
+            <div class="flex items-center justify-between gap-2 border-b border-[#E7E7E2] pb-2">
+              <h3 id="section-keys-title" class="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">1</span>
+                <span>Khoá truy cập</span>
+              </h3>
+              <!-- Nút toggle Lấy khoá ở đâu? -->
+              <button type="button" id="btn-toggle-key-help" onclick="toggleKeyHelp()" class="text-xs text-[#FF5701] hover:underline font-medium inline-flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Lấy khoá ở đâu?</span>
+              </button>
+            </div>
+
+            <!-- Hộp hướng dẫn Lấy khoá ở đâu (Ẩn mặc định) -->
+            <div id="key-help-box" class="hidden bg-[#F8F8F6] p-3.5 rounded-xl border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">
+              <p id="key-help-text">Hướng dẫn lấy khoá...</p>
+              <div class="mt-2.5 pt-2 border-t border-[#E7E7E2]">
+                <a id="key-help-guide-link" href="guide.html" target="_blank" class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FF5701] hover:underline">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                  <span>Xem cẩm nang hướng dẫn từng bước kèm hình ảnh &rarr;</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Gợi ý riêng của dịch vụ (nếu có) -->
+            <div id="service-specific-hint" class="hidden text-xs text-[#6B7280] italic bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 flex items-center gap-2 text-blue-900">
+              <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span id="service-specific-hint-text">Gợi ý...</span>
+            </div>
+
+            <!-- Các ô nhập khoá (Dynamic) -->
+            <div id="drawer-key-fields" class="space-y-3.5">
+              <!-- Sinh tự động theo dịch vụ -->
+            </div>
+          </section>
+
+          <!-- PHẦN 2: NƠI ATI ĐƯỢC PHÉP DÙNG -->
+          <section aria-labelledby="section-scope-title" class="space-y-4">
+            <div class="border-b border-[#E7E7E2] pb-2">
+              <h3 id="section-scope-title" class="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">2</span>
+                <span>Nơi ATI được phép dùng</span>
+              </h3>
+              <p class="text-xs text-[#6B7280] mt-1" id="scope-description-text">
+                ATI chỉ đọc và ghi ở những nơi trong danh sách này.
+              </p>
+            </div>
+
+            <!-- Danh sách Chip các nơi được phép dùng -->
+            <div>
+              <div id="scope-chips-container" class="flex flex-wrap gap-2 mb-3 min-h-[32px]">
+                <!-- Chips sinh tự động -->
+              </div>
+              <p id="scope-empty-error" class="hidden text-xs text-[#DC2626] font-medium mb-2">
+                Cần ít nhất một mục được phép dùng.
+              </p>
+            </div>
+
+            <!-- Ô thêm mới nơi được phép dùng -->
+            <div id="scope-add-form" class="space-y-1.5">
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <label id="scope-input-label" for="new-scope-input" class="sr-only">Thêm mục mới</label>
+                  <input type="text" id="new-scope-input" oninput="onScopeInputChanged()" placeholder="Nhập ID mới..." class="w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:outline-none focus:border-[#FF5701] transition-all">
+                </div>
+                <button type="button" id="btn-add-scope" onclick="addNewScopeItem()" class="px-3.5 py-2 text-xs sm:text-sm font-medium text-[#111827] bg-[#F8F8F6] hover:bg-neutral-200 border border-[#E7E7E2] rounded-lg transition-colors flex-shrink-0">
+                  + Thêm
+                </button>
+              </div>
+              <p id="new-scope-format-hint" class="hidden text-[11px] text-[#DC2626] font-medium">Định dạng hợp lệ: chủ-kho/tên-kho (ví dụ: VinhDat267/ati-test)</p>
+            </div>
+          </section>
+
+          <!-- KHỐI LƯU THAY ĐỔI (Trước khi kiểm tra) -->
+          <div class="bg-[#F8F8F6] p-4 rounded-xl border border-[#E7E7E2] space-y-3">
+            <p class="text-xs text-[#4B5563] leading-relaxed">
+              <strong class="text-[#111827]">Lưu ý khi cập nhật:</strong> Muốn lưu bất kỳ thay đổi nào (kể cả chỉ thêm/bớt nơi được dùng), bạn cần nhập lại đủ các ô khoá bên trên.
+            </p>
+            <div id="save-validation-error" class="hidden text-xs text-[#DC2626] font-medium"></div>
+            <button type="button" id="btn-save-service-changes" onclick="saveServiceChanges()" class="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-[#FF5701] hover:bg-[#e04d01] rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Lưu thay đổi</span>
+            </button>
+          </div>
+
+          <!-- PHẦN 3: KIỂM TRA KẾT NỐI -->
+          <section aria-labelledby="section-test-title" class="space-y-4 pt-2 border-t border-[#E7E7E2]">
+            <div class="border-b border-[#E7E7E2] pb-2">
+              <h3 id="section-test-title" class="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">3</span>
+                <span>Kiểm tra kết nối</span>
+              </h3>
+              <p class="text-xs text-[#6B7280] mt-1">
+                Gửi một tín hiệu kiểm tra tới máy chủ dịch vụ để xác nhận khoá và quyền hạn vẫn hợp lệ.
+              </p>
+            </div>
+
+            <!-- Nút bấm kiểm tra -->
+            <div>
+              <button type="button" id="btn-run-test-connection" onclick="runTestConnection()" class="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-[#111827] bg-white hover:bg-neutral-50 border border-[#E7E7E2] rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                <!-- Icon hoặc Spinner -->
+                <svg id="test-btn-icon" class="w-4 h-4 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <svg id="test-btn-spinner" class="hidden w-4 h-4 animate-spin text-[#FF5701]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span id="test-btn-text">Kiểm tra kết nối</span>
+              </button>
+              <p id="test-unconfigured-note" class="hidden text-xs text-[#6B7280] mt-1.5 leading-relaxed">Lưu khoá và ít nhất một nơi được dùng trước, rồi mới kiểm tra được.</p>
+            </div>
+
+            <!-- Kết quả kiểm tra (aria-live="polite") -->
+            <div id="test-result-box" class="hidden p-3.5 rounded-xl border text-xs leading-relaxed" aria-live="polite">
+              <div class="flex items-start gap-2.5">
+                <span id="test-result-icon" class="mt-0.5 flex-shrink-0"></span>
+                <div class="flex-1">
+                  <p id="test-result-message" class="font-medium"></p>
+                  <p id="test-result-time" class="text-[11px] text-[#6B7280] mt-0.5"></p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC VÀ DỮ LIỆU -->
+  <script>
+    /* =======================================================
+       1. ĐỊNH NGHĨA DỮ LIỆU 8 DỊCH VỤ VÀ SVG INLINE
+       ======================================================= */
+    const SERVICE_SVGS = {
+      trello: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#0079BF"/><rect x="4" y="4" width="6.5" height="13" rx="1.5" fill="white"/><rect x="13.5" y="4" width="6.5" height="8.5" rx="1.5" fill="white"/></svg>`,
+      slack: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.528 2.528 0 0 1 2.521-2.52 2.528 2.528 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.528 2.528 0 0 1-2.52-2.523 2.528 2.528 0 0 1 2.52-2.52h6.313A2.528 2.528 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>`,
+      github: `<svg class="w-6 h-6 text-[#24292E]" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>`,
+      sheets: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#0F9D58"/><path d="M14 2v6h6l-6-6z" fill="#87CEAB"/><rect x="7" y="11" width="10" height="7" rx="0.5" fill="white" fill-opacity="0.3"/><line x1="7" y1="14" x2="17" y2="14" stroke="white" stroke-width="1"/><line x1="11" y1="11" x2="11" y2="18" stroke="white" stroke-width="1"/></svg>`,
+      calendar: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" fill="#4285F4"/><rect x="3" y="4" width="18" height="5" fill="#1967D2"/><circle cx="7" cy="2.5" r="1.5" fill="#1967D2"/><circle cx="17" cy="2.5" r="1.5" fill="#1967D2"/><text x="12" y="17" fill="white" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">31</text></svg>`,
+      notion: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.222 3.125l13.774-1.12c1.38-.112 1.954.267 2.502.933l2.808 3.444c.433.533.693 1.155.693 1.777v12.22c0 1.2-.544 1.866-1.843 1.977l-14.88 1.111c-1.378.111-2.04-.333-2.589-1l-2.016-2.555c-.443-.555-.67-1.222-.67-1.778V4.88c0-1.111.66-1.666 2.22-1.755zm14.153 1.867L7.332 5.88c-.328.026-.453.18-.453.373v11.758c0 .24.125.4.375.373l11.043-.88c.328-.027.422-.24.422-.453V5.419c0-.24-.125-.4-.344-.427zM9.47 7.915l3.593-.24 3.03 5.467V7.435l2.25-.16v8.425l-3.375.24-3.25-5.653v5.626l-2.25.16V7.915z" fill="#111827"/></svg>`,
+      telegram: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#229ED9"/><path d="M17.5 7.5L5.5 12.1L9.5 13.6L14.7 10.3C14.9 10.2 15.1 10.4 15 10.6L10.8 14.4V17.5L12.9 15.5L16.2 17.9C16.8 18.2 17.2 17.9 17.4 17.2L19.4 8.2C19.6 7.3 18.9 6.8 17.5 7.5Z" fill="white"/></svg>`,
+      jira: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none"><path d="M11.53 2C11.53 7.26 7.26 11.53 2 11.53C7.26 11.53 11.53 15.8 11.53 21.06C11.53 15.8 15.8 11.53 21.06 11.53C15.8 11.53 11.53 7.26 11.53 2Z" fill="#0052CC"/><path d="M11.53 2C11.53 4.63 9.4 6.76 6.77 6.76C9.4 6.76 11.53 8.89 11.53 11.52C11.53 8.89 13.66 6.76 16.29 6.76C13.66 6.76 11.53 4.63 11.53 2Z" fill="#2684FF"/></svg>`
+    };
+
+    const INITIAL_SERVICES_DATA = [
+      {
+        id: 'trello',
+        name: 'Trello',
+        configured: true,
+        statusType: 'ok', // 'untested' | 'ok' | 'failed'
+        lastCheckTime: '14:05',
+        capabilities: 'Tìm bảng, danh sách, thành viên, card; tạo/cập nhật card, gán thành viên, thêm checklist.',
+        keyHelp: 'Đăng nhập Trello, truy cập trello.com/power-ups/admin để tạo Power-Up và lấy API key, sau đó tạo API token kèm theo.',
+        hint: null,
+        scopeLabel: 'Board ID',
+        scopeItems: ['board_todo_demo_8f'],
+        keyInputs: [
+          { id: 'key_1', label: 'API key', type: 'text', placeholder: 'Đã lưu · nhập lại nếu muốn thay' },
+          { id: 'key_2', label: 'API token', type: 'password', placeholder: 'Đã lưu · nhập lại nếu muốn thay' }
+        ]
+      },
+      {
+        id: 'slack',
+        name: 'Slack',
+        configured: true,
+        statusType: 'ok',
+        lastCheckTime: '14:05',
+        capabilities: 'Tìm kênh; gửi tin nhắn.',
+        keyHelp: 'Truy cập api.slack.com/apps, tạo App trong Workspace, vào OAuth & Permissions để cấp quyền và sao chép Bot User OAuth Token (xoxb-).',
+        hint: 'Gợi ý: Mời bot vào kênh Slack trước khi thực hiện gửi tin.',
+        scopeLabel: 'Channel ID',
+        scopeItems: ['C07DEMO9X1'],
+        keyInputs: [
+          { id: 'key_1', label: 'Bot token', type: 'password', placeholder: 'Đã lưu · nhập lại nếu muốn thay' }
+        ]
+      },
+      {
+        id: 'github',
+        name: 'GitHub',
+        configured: true,
+        statusType: 'ok',
+        lastCheckTime: '14:05',
+        capabilities: 'Tìm kho, xem/tìm issue; tạo issue, gắn nhãn.',
+        keyHelp: 'Vào github.com/settings/tokens (Personal access tokens), chọn Tokens (classic) hoặc Fine-grained, cấp quyền "repo" để tạo token.',
+        hint: null,
+        scopeLabel: 'Repository (chủ/tên-kho)',
+        scopeItems: ['VinhDat267/ati-test'],
+        keyInputs: [
+          { id: 'key_1', label: 'Personal access token', type: 'password', placeholder: 'Đã lưu · nhập lại nếu muốn thay' }
+        ]
+      },
+      {
+        id: 'sheets',
+        name: 'Google Sheets',
+        configured: true,
+        statusType: 'ok',
+        lastCheckTime: '14:05',
+        capabilities: 'Xem bảng tính, tab, đọc vùng ô; thêm dòng.',
+        keyHelp: 'Truy cập Google Cloud Console, tạo Service Account trong IAM & Admin, tạo khoá định dạng JSON rồi sao chép Email và Private key (PEM).',
+        hint: 'Gợi ý: Nhớ chia sẻ bảng tính cho Email Service Account với quyền Chỉnh sửa (Editor).',
+        scopeLabel: 'Spreadsheet ID',
+        scopeItems: ['1BxiMVs0XRA5nFMdKvBIIl_demo'],
+        keyInputs: [
+          { id: 'key_1', label: 'Email service account', type: 'email', placeholder: 'Đã lưu · nhập lại nếu muốn thay' },
+          { id: 'key_2', label: 'Private key (PEM)', type: 'textarea', placeholder: 'Đã lưu · nhập lại nếu muốn thay' }
+        ]
+      },
+      {
+        id: 'calendar',
+        name: 'Google Calendar',
+        configured: false,
+        statusType: 'untested',
+        lastCheckTime: null,
+        capabilities: 'Xem lịch và sự kiện; tạo sự kiện (không mời người khác).',
+        keyHelp: 'Dùng chung Service Account với Google Sheets trong Google Cloud Console, bật Google Calendar API và chia sẻ lịch cho Email Service Account.',
+        hint: 'Gợi ý: Chia sẻ lịch Google cho Email Service Account với quyền Make changes to events.',
+        scopeLabel: 'Calendar ID',
+        scopeItems: [],
+        keyInputs: [
+          { id: 'key_1', label: 'Email service account', type: 'email', placeholder: 'service-account@project.iam.gserviceaccount.com' },
+          { id: 'key_2', label: 'Private key (PEM)', type: 'textarea', placeholder: '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----' }
+        ]
+      },
+      {
+        id: 'notion',
+        name: 'Notion',
+        configured: false,
+        statusType: 'untested',
+        lastCheckTime: null,
+        capabilities: 'Tìm database, đọc page; tạo page, nối văn bản.',
+        keyHelp: 'Truy cập notion.so/my-integrations, tạo Internal integration để lấy token bí mật, sau đó mở database trong Notion và thêm connection này.',
+        hint: 'Gợi ý: Mở trang hoặc database trong Notion > chọn nút ⋯ > Connections > Thêm integration bạn vừa tạo.',
+        scopeLabel: 'Database ID',
+        scopeItems: [],
+        keyInputs: [
+          { id: 'key_1', label: 'Internal integration token', type: 'password', placeholder: 'secret_...' }
+        ]
+      },
+      {
+        id: 'telegram',
+        name: 'Telegram',
+        configured: false,
+        statusType: 'untested',
+        lastCheckTime: null,
+        capabilities: 'Đọc thông tin chat; gửi tin nhắn văn bản.',
+        keyHelp: 'Mở ứng dụng Telegram, nhắn tin cho tài khoản @BotFather bằng lệnh /newbot để tạo bot và nhận Bot token dạng số:chuỗi.',
+        hint: 'Gợi ý: Thêm bot vào nhóm chat Telegram của bạn và gán quyền gửi tin nhắn.',
+        scopeLabel: 'Chat ID',
+        scopeItems: [],
+        keyInputs: [
+          { id: 'key_1', label: 'Bot token (BotFather)', type: 'password', placeholder: '123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ' }
+        ]
+      },
+      {
+        id: 'jira',
+        name: 'Jira',
+        configured: false,
+        statusType: 'untested',
+        lastCheckTime: null,
+        capabilities: 'Tìm project, issue; tạo issue, thêm bình luận.',
+        keyHelp: 'Đăng nhập id.atlassian.com/manage-profile/security/api-tokens để tạo API token, dùng cùng email Atlassian và đường dẫn trang Jira dạng https://ten-site.atlassian.net.',
+        hint: null,
+        scopeLabel: 'Project key',
+        scopeItems: [],
+        keyInputs: [
+          { id: 'key_1', label: 'Site URL (https://ten-site.atlassian.net)', type: 'url', placeholder: 'https://cong-ty.atlassian.net' },
+          { id: 'key_2', label: 'Email Atlassian', type: 'email', placeholder: 'user@company.com' },
+          { id: 'key_3', label: 'API token', type: 'password', placeholder: 'ATATT3xFfGF0...' }
+        ]
+      }
+    ];
+
+    // State ứng dụng
+    let services = JSON.parse(JSON.stringify(INITIAL_SERVICES_DATA));
+    let currentRole = 'admin'; // 'admin' | 'member'
+    let currentActiveServiceId = null;
+    let lastFocusedElementBeforeDrawer = null;
+    let testTimeoutTimer = null;
+
+    /* =======================================================
+       2. QUẢN LÝ VAI TRÒ & KỊCH BẢN DEMO
+       ======================================================= */
+    function setRole(role) {
+      currentRole = role;
+      const adminBtn = document.getElementById('demo-role-admin');
+      const memberBtn = document.getElementById('demo-role-member');
+      const roleDisplay = document.getElementById('role-name-display');
+      const roleDot = document.getElementById('role-indicator-dot');
+
+      if (role === 'admin') {
+        adminBtn.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#FF5701] shadow-sm transition-all';
+        memberBtn.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all';
+        roleDisplay.textContent = 'Quản trị viên';
+        roleDot.className = 'w-2 h-2 rounded-full bg-[#16A34A]';
+      } else {
+        memberBtn.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#111827] shadow-sm transition-all';
+        adminBtn.className = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all';
+        roleDisplay.textContent = 'Thành viên';
+        roleDot.className = 'w-2 h-2 rounded-full bg-[#6B7280]';
+      }
+
+      // Đóng menu demo
+      document.getElementById('demo-menu-dropdown').classList.add('hidden');
+      document.getElementById('btn-toggle-demo-menu').setAttribute('aria-expanded', 'false');
+
+      // Cập nhật lại giao diện ngăn chi tiết nếu đang mở
+      if (currentActiveServiceId) {
+        applyRoleToDrawer();
+      }
+
+      showToast(`Đã chuyển vai trò sang: ${role === 'admin' ? 'Quản trị viên' : 'Thành viên'}`);
+    }
+
+    function resetDemoData() {
+      services = JSON.parse(JSON.stringify(INITIAL_SERVICES_DATA));
+      renderServiceLists();
+      if (currentActiveServiceId) {
+        openServiceDrawer(currentActiveServiceId);
+      }
+      document.getElementById('demo-menu-dropdown').classList.add('hidden');
+      document.getElementById('btn-toggle-demo-menu').setAttribute('aria-expanded', 'false');
+      showToast('Đã khôi phục dữ liệu mẫu ban đầu.');
+    }
+
+    // Toggle menu demo
+    document.getElementById('btn-toggle-demo-menu').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('demo-menu-dropdown');
+      const isExpanded = menu.classList.contains('hidden');
+      menu.classList.toggle('hidden');
+      document.getElementById('btn-toggle-demo-menu').setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('demo-menu-dropdown');
+      const btn = document.getElementById('btn-toggle-demo-menu');
+      if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    /* =======================================================
+       3. HIỂN THỊ DANH SÁCH DỊCH VỤ
+       ======================================================= */
+    function getStatusBadgeHtml(service) {
+      if (!service.configured) {
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-[#6B7280] border border-[#E7E7E2]">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]"></span>
+          <span>Chưa kết nối</span>
+        </span>`;
+      }
+      if (service.statusType === 'untested') {
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          <span>Chưa kiểm tra</span>
+        </span>`;
+      }
+      if (service.statusType === 'ok') {
+        const timeStr = service.lastCheckTime ? ` · kiểm tra lúc ${service.lastCheckTime}` : '';
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+          <span>Kết nối tốt${timeStr}</span>
+        </span>`;
+      }
+      if (service.statusType === 'failed') {
+        const timeStr = service.lastCheckTime ? ` · kiểm tra lúc ${service.lastCheckTime}` : '';
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#DC2626]"></span>
+          <span>Không kết nối được${timeStr}</span>
+        </span>`;
+      }
+      return '';
+    }
+
+    function renderServiceLists() {
+      const configuredList = document.getElementById('list-connected-services');
+      const unconfiguredList = document.getElementById('list-unconnected-services');
+      
+      const configuredItems = services.filter(s => s.configured);
+      const unconfiguredItems = services.filter(s => !s.configured);
+      const okCount = services.filter(s => s.statusType === 'ok').length;
+
+      // Cập nhật tóm tắt số lượng: "4 / 8 dịch vụ đã thiết lập · 4 kết nối tốt"
+      document.getElementById('summary-connected-count').textContent = `${configuredItems.length} / ${services.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`;
+      document.getElementById('badge-count-connected').textContent = configuredItems.length;
+      document.getElementById('badge-count-unconnected').textContent = unconfiguredItems.length;
+
+      // Render danh sách Đã thiết lập
+      if (configuredItems.length === 0) {
+        configuredList.innerHTML = `<div class="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Chưa có dịch vụ nào được thiết lập.</div>`;
+      } else {
+        configuredList.innerHTML = configuredItems.map(s => renderServiceRowHtml(s)).join('');
+      }
+
+      // Render danh sách Chưa thiết lập
+      if (unconfiguredItems.length === 0) {
+        unconfiguredList.innerHTML = `<div class="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Tất cả 8 dịch vụ đều đã được thiết lập.</div>`;
+      } else {
+        unconfiguredList.innerHTML = unconfiguredItems.map(s => renderServiceRowHtml(s)).join('');
+      }
+    }
+
+    function renderServiceRowHtml(service) {
+      const svg = SERVICE_SVGS[service.id] || '';
+      const badge = getStatusBadgeHtml(service);
+
+      return `
+        <div 
+          role="button" 
+          tabindex="0"
+          id="service-row-${service.id}"
+          onclick="openServiceDrawer('${service.id}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openServiceDrawer('${service.id}');}"
+          class="group bg-white hover:bg-[#FDFDFD] border border-[#E7E7E2] hover:border-[#FF5701]/40 rounded-xl p-4 sm:p-5 transition-all shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:outline-none"
+          aria-haspopup="dialog"
+          aria-label="${service.name} — bấm để xem chi tiết kết nối"
+        >
+          <div class="flex items-start sm:items-center gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+              ${svg}
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-display font-semibold text-base text-[#111827] group-hover:text-[#FF5701] transition-colors">
+                  ${service.name}
+                </h3>
+              </div>
+              <p class="text-xs text-[#4B5563] mt-0.5 line-clamp-1 sm:line-clamp-2">
+                ${service.capabilities}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E7E7E2]/60">
+            <div>${badge}</div>
+            <div class="text-[#6B7280] group-hover:text-[#FF5701] transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /* =======================================================
+       4. NGĂN CHI TIẾT (DRAWER) VÀ FORM ĐIỀU KHIỂN
+       ======================================================= */
+    function openServiceDrawer(serviceId) {
+      const service = services.find(s => s.id === serviceId);
+      if (!service) return;
+
+      currentActiveServiceId = serviceId;
+      lastFocusedElementBeforeDrawer = document.getElementById(`service-row-${serviceId}`);
+
+      // Cập nhật Header drawer
+      document.getElementById('drawer-service-title').textContent = service.name;
+      document.getElementById('drawer-icon-container').innerHTML = SERVICE_SVGS[service.id] || '';
+      document.getElementById('drawer-header-status-badge').innerHTML = getStatusBadgeHtml(service);
+
+      // Cập nhật hướng dẫn Lấy khoá ở đâu
+      document.getElementById('key-help-text').textContent = service.keyHelp;
+      const keyGuideLink = document.getElementById('key-help-guide-link');
+      if (keyGuideLink) {
+        keyGuideLink.href = `guide.html?service=${service.id}`;
+      }
+      document.getElementById('key-help-box').classList.add('hidden');
+
+      // Gợi ý riêng
+      const hintBox = document.getElementById('service-specific-hint');
+      if (service.hint) {
+        document.getElementById('service-specific-hint-text').textContent = service.hint;
+        hintBox.classList.remove('hidden');
+      } else {
+        hintBox.classList.add('hidden');
+      }
+
+      // Render các ô nhập khoá
+      renderDrawerKeyInputs(service);
+
+      // Render phần nơi được phép dùng
+      document.getElementById('scope-description-text').textContent = `ATI chỉ đọc và ghi ở những ${service.scopeLabel} trong danh sách này.`;
+      document.getElementById('new-scope-input').placeholder = `Nhập ${service.scopeLabel} mới (ví dụ)...`;
+      document.getElementById('scope-input-label').textContent = `Thêm ${service.scopeLabel}`;
+      renderScopeChips(service);
+
+      // Reset kết quả kiểm tra cũ
+      document.getElementById('test-result-box').classList.add('hidden');
+      document.getElementById('save-validation-error').classList.add('hidden');
+
+      // Áp dụng vai trò (Admin vs Member)
+      applyRoleToDrawer();
+
+      // Cập nhật trạng thái nút Kiểm tra kết nối theo configured
+      updateTestConnectionButtonState(service);
+
+      // Mở modal drawer
+      const container = document.getElementById('service-drawer-container');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const panel = document.getElementById('drawer-panel');
+
+      container.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      // Kích hoạt animation
+      requestAnimationFrame(() => {
+        backdrop.classList.remove('opacity-0');
+        backdrop.classList.add('opacity-100');
+        panel.classList.remove('translate-x-full');
+        panel.classList.add('translate-x-0');
+        
+        // Focus vào nút đóng hoặc ô đầu tiên
+        document.getElementById('btn-close-drawer').focus();
+      });
+    }
+
+    function closeServiceDrawer() {
+      const container = document.getElementById('service-drawer-container');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const panel = document.getElementById('drawer-panel');
+
+      if (testTimeoutTimer) {
+        clearTimeout(testTimeoutTimer);
+        testTimeoutTimer = null;
+      }
+      resetTestButton();
+
+      const closingServiceId = currentActiveServiceId;
+
+      backdrop.classList.remove('opacity-100');
+      backdrop.classList.add('opacity-0');
+      panel.classList.remove('translate-x-0');
+      panel.classList.add('translate-x-full');
+
+      setTimeout(() => {
+        container.classList.add('hidden');
+        document.body.style.overflow = '';
+        currentActiveServiceId = null;
+
+        // Trả lại focus: sau khi lưu hoặc đổi nhóm, DOM của hàng có thể đã được render lại
+        const targetRow = closingServiceId ? document.getElementById(`service-row-${closingServiceId}`) : null;
+        if (targetRow) {
+          targetRow.focus();
+        } else if (lastFocusedElementBeforeDrawer && typeof lastFocusedElementBeforeDrawer.focus === 'function') {
+          lastFocusedElementBeforeDrawer.focus();
+        }
+      }, 260);
+    }
+
+    function toggleKeyHelp() {
+      const box = document.getElementById('key-help-box');
+      box.classList.toggle('hidden');
+    }
+
+    function renderDrawerKeyInputs(service) {
+      const container = document.getElementById('drawer-key-fields');
+      container.innerHTML = service.keyInputs.map(input => {
+        const isJiraUrl = service.id === 'jira' && input.id === 'key_1';
+        if (input.type === 'textarea') {
+          return `
+            <div>
+              <label for="${input.id}" class="block text-xs font-semibold text-[#111827] mb-1.5">
+                ${input.label} <span class="text-[#FF5701]">*</span>
+              </label>
+              <textarea 
+                id="${input.id}" 
+                rows="3"
+                oninput="onKeyInputChanged('${input.id}')"
+                placeholder="${input.placeholder}" 
+                class="key-input-field w-full text-xs font-mono px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:outline-none focus:border-[#FF5701] transition-all resize-y"
+              ></textarea>
+            </div>
+          `;
+        }
+        return `
+          <div>
+            <label for="${input.id}" class="block text-xs font-semibold text-[#111827] mb-1.5">
+              ${input.label} <span class="text-[#FF5701]">*</span>
+            </label>
+            <input 
+              type="${input.type}" 
+              id="${input.id}" 
+              oninput="onKeyInputChanged('${input.id}')"
+              placeholder="${input.placeholder}" 
+              class="key-input-field w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:outline-none focus:border-[#FF5701] transition-all"
+            >
+            ${isJiraUrl ? `<p id="${input.id}-format-hint" class="hidden text-[11px] text-[#DC2626] font-medium mt-1">Định dạng hợp lệ: https://ten-site.atlassian.net</p>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function onKeyInputChanged(inputId) {
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service) return;
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const val = input.value.trim();
+
+      if (service.id === 'jira' && inputId === 'key_1') {
+        const hint = document.getElementById(inputId + '-format-hint');
+        if (hint) {
+          if (val && !/^https:\/\/[a-zA-Z0-9-]+\.atlassian\.net\/?$/.test(val)) {
+            hint.classList.remove('hidden');
+            input.classList.add('border-rose-400');
+          } else {
+            hint.classList.add('hidden');
+            input.classList.remove('border-rose-400');
+          }
+        }
+      }
+    }
+
+    function onScopeInputChanged() {
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service) return;
+      const input = document.getElementById('new-scope-input');
+      const hint = document.getElementById('new-scope-format-hint');
+      if (!input || !hint) return;
+      const val = input.value.trim();
+
+      if (service.id === 'github') {
+        if (val && !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(val)) {
+          hint.classList.remove('hidden');
+          input.classList.add('border-rose-400');
+        } else {
+          hint.classList.add('hidden');
+          input.classList.remove('border-rose-400');
+        }
+      } else {
+        hint.classList.add('hidden');
+        input.classList.remove('border-rose-400');
+      }
+    }
+
+    function renderScopeChips(service) {
+      const container = document.getElementById('scope-chips-container');
+      const emptyError = document.getElementById('scope-empty-error');
+
+      if (!service.scopeItems || service.scopeItems.length === 0) {
+        container.innerHTML = `<span class="text-xs text-[#6B7280] italic py-1">Chưa có ${service.scopeLabel} nào được cấp quyền.</span>`;
+        emptyError.textContent = `Cần ít nhất một ${service.scopeLabel}.`;
+        emptyError.classList.remove('hidden');
+        return;
+      }
+
+      emptyError.classList.add('hidden');
+      const isMember = currentRole === 'member';
+
+      container.innerHTML = service.scopeItems.map((item, idx) => {
+        return `
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] shadow-sm">
+            <span class="font-mono text-[11px] truncate max-w-[200px] sm:max-w-[260px]">${escapeHtml(item)}</span>
+            ${!isMember ? `
+              <button 
+                type="button" 
+                onclick="removeScopeItem(${idx})" 
+                class="text-[#6B7280] hover:text-[#DC2626] transition-colors p-0.5 rounded-full hover:bg-neutral-200"
+                aria-label="Xoá mục ${escapeHtml(item)}"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addNewScopeItem() {
+      if (currentRole === 'member') return;
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service) return;
+
+      const input = document.getElementById('new-scope-input');
+      const val = input.value.trim();
+      if (!val) {
+        input.focus();
+        return;
+      }
+
+      // Kiểm tra định dạng nếu là GitHub (phải dạng chủ/tên-kho)
+      if (service.id === 'github' && !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(val)) {
+        showToast('Repository GitHub phải có định dạng: chủ-kho/tên-kho (ví dụ: VinhDat267/ati-test)', 'error');
+        input.focus();
+        return;
+      }
+
+      if (!service.scopeItems) service.scopeItems = [];
+      if (!service.scopeItems.includes(val)) {
+        service.scopeItems.push(val);
+      }
+      input.value = '';
+      const hint = document.getElementById('new-scope-format-hint');
+      if (hint) hint.classList.add('hidden');
+      input.classList.remove('border-rose-400');
+      renderScopeChips(service);
+    }
+
+    function removeScopeItem(index) {
+      if (currentRole === 'member') return;
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service || !service.scopeItems) return;
+
+      service.scopeItems.splice(index, 1);
+      renderScopeChips(service);
+    }
+
+    function updateTestConnectionButtonState(service) {
+      const btn = document.getElementById('btn-run-test-connection');
+      const note = document.getElementById('test-unconfigured-note');
+      if (!btn) return;
+
+      if (!service || !service.configured) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        btn.classList.remove('hover:bg-neutral-50');
+        if (note) note.classList.remove('hidden');
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.classList.add('hover:bg-neutral-50');
+        if (note) note.classList.add('hidden');
+      }
+    }
+
+    function applyRoleToDrawer() {
+      const isMember = currentRole === 'member';
+      const warning = document.getElementById('drawer-member-warning');
+      const saveBtn = document.getElementById('btn-save-service-changes');
+      const addScopeForm = document.getElementById('scope-add-form');
+      const keyFields = document.querySelectorAll('.key-input-field');
+
+      if (isMember) {
+        warning.classList.remove('hidden');
+        saveBtn.disabled = true;
+        saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        addScopeForm.classList.add('hidden');
+        keyFields.forEach(f => {
+          f.disabled = true;
+          f.classList.add('bg-neutral-100', 'cursor-not-allowed');
+        });
+      } else {
+        warning.classList.add('hidden');
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        addScopeForm.classList.remove('hidden');
+        keyFields.forEach(f => {
+          f.disabled = false;
+          f.classList.remove('bg-neutral-100', 'cursor-not-allowed');
+        });
+      }
+
+      // Re-render chips to add/remove delete buttons và cập nhật nút kiểm tra
+      if (currentActiveServiceId) {
+        const service = services.find(s => s.id === currentActiveServiceId);
+        if (service) {
+          renderScopeChips(service);
+          updateTestConnectionButtonState(service);
+        }
+      }
+    }
+
+    /* =======================================================
+       5. LƯU THAY ĐỔI & KIỂM TRA ĐỊNH DẠNG
+       ======================================================= */
+    function saveServiceChanges() {
+      if (currentRole === 'member') return;
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service) return;
+
+      const errorBox = document.getElementById('save-validation-error');
+      errorBox.classList.add('hidden');
+
+      // 1. Kiểm tra Nơi được phép dùng ít nhất 1 mục
+      if (!service.scopeItems || service.scopeItems.length === 0) {
+        errorBox.textContent = `Cần ít nhất một ${service.scopeLabel}. Hãy thêm vào danh sách trước khi lưu.`;
+        errorBox.classList.remove('hidden');
+        return;
+      }
+
+      // 2. Kiểm tra các ô khoá bắt buộc không được để trống khi lưu mới hoặc cập nhật
+      const keyInputs = document.querySelectorAll('.key-input-field');
+      let allFilled = true;
+      for (const input of keyInputs) {
+        if (!input.value.trim()) {
+          allFilled = false;
+          break;
+        }
+      }
+
+      if (!allFilled) {
+        errorBox.textContent = 'Vui lòng nhập lại đủ các ô khoá để lưu thay đổi.';
+        errorBox.classList.remove('hidden');
+        return;
+      }
+
+      // 3. Kiểm tra định dạng đặc thù của từng dịch vụ
+      if (service.id === 'jira') {
+        const siteUrlInput = document.getElementById('key_1');
+        if (siteUrlInput && !/^https:\/\/[a-zA-Z0-9-]+\.atlassian\.net\/?$/.test(siteUrlInput.value.trim())) {
+          errorBox.textContent = 'Jira Site URL phải có định dạng https://ten-site.atlassian.net';
+          errorBox.classList.remove('hidden');
+          siteUrlInput.focus();
+          return;
+        }
+      }
+
+      // Đã hợp lệ -> Lưu thay đổi
+      // Đặt configured = true, statusType = 'untested'
+      // Hàng chuyển sang nhóm "Đã thiết lập" ngay khi lưu
+      service.configured = true;
+      service.statusType = 'untested';
+      service.lastCheckTime = null;
+
+      // Xoá nội dung ô nhập khoá (nguyên tắc: khoá lưu xong không bao giờ hiển thị lại)
+      keyInputs.forEach(input => {
+        input.value = '';
+        input.placeholder = 'Đã lưu · nhập lại nếu muốn thay';
+      });
+
+      // Mở khoá nút kiểm tra kết nối nếu trước đó chưa cấu hình
+      updateTestConnectionButtonState(service);
+
+      // Cập nhật lại UI
+      renderServiceLists();
+      document.getElementById('drawer-header-status-badge').innerHTML = getStatusBadgeHtml(service);
+      showToast('Đã lưu. Bấm Kiểm tra kết nối để chắc chắn khoá dùng được.');
+
+      // Hiển thị thông báo hướng dẫn tại khối kết quả
+      const resultBox = document.getElementById('test-result-box');
+      resultBox.className = 'p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-xs leading-relaxed';
+      document.getElementById('test-result-icon').innerHTML = `<svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+      document.getElementById('test-result-message').textContent = 'Đã lưu khoá mới. Trạng thái hiện tại: Chưa kiểm tra. Hãy bấm nút Kiểm tra kết nối bên trên.';
+      document.getElementById('test-result-time').textContent = '';
+      resultBox.classList.remove('hidden');
+    }
+
+    /* =======================================================
+       6. KIỂM TRA KẾT NỐI (TEST CONNECTION)
+       ======================================================= */
+    function resetTestButton() {
+      const btn = document.getElementById('btn-run-test-connection');
+      const icon = document.getElementById('test-btn-icon');
+      const spinner = document.getElementById('test-btn-spinner');
+      const text = document.getElementById('test-btn-text');
+
+      icon.classList.remove('hidden');
+      spinner.classList.add('hidden');
+      text.textContent = 'Kiểm tra kết nối';
+
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (service) {
+        updateTestConnectionButtonState(service);
+      } else {
+        btn.disabled = false;
+      }
+    }
+
+    function runTestConnection() {
+      const service = services.find(s => s.id === currentActiveServiceId);
+      if (!service || !service.configured) return;
+
+      const btn = document.getElementById('btn-run-test-connection');
+      const icon = document.getElementById('test-btn-icon');
+      const spinner = document.getElementById('test-btn-spinner');
+      const text = document.getElementById('test-btn-text');
+      const resultBox = document.getElementById('test-result-box');
+      const resultIcon = document.getElementById('test-result-icon');
+      const resultMsg = document.getElementById('test-result-message');
+      const resultTime = document.getElementById('test-result-time');
+
+      btn.disabled = true;
+      icon.classList.add('hidden');
+      spinner.classList.remove('hidden');
+      text.textContent = 'Đang kiểm tra kết nối...';
+      resultBox.classList.add('hidden');
+
+      // Lấy kết quả mô phỏng từ cấu hình Demo
+      const simulatedResult = document.getElementById('demo-test-result').value; // 'success' | 'rejected' | 'timeout'
+
+      if (simulatedResult === 'timeout') {
+        // Chờ 10 giây rồi báo lỗi timeout
+        testTimeoutTimer = setTimeout(() => {
+          resetTestButton();
+          service.statusType = 'failed';
+          service.lastCheckTime = getCurrentTimeStr();
+
+          resultBox.className = 'p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs leading-relaxed';
+          resultIcon.innerHTML = `<svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+          resultMsg.textContent = 'Không nhận được phản hồi sau 10 giây. Thử lại sau.';
+          resultTime.textContent = `Thời gian ghi nhận: ${service.lastCheckTime}`;
+          resultBox.classList.remove('hidden');
+
+          renderServiceLists();
+          document.getElementById('drawer-header-status-badge').innerHTML = getStatusBadgeHtml(service);
+        }, 10000);
+        return;
+      }
+
+      // Đối với success và rejected: chờ 600ms mô phỏng mạng
+      testTimeoutTimer = setTimeout(() => {
+        resetTestButton();
+        const nowStr = getCurrentTimeStr();
+        service.lastCheckTime = nowStr;
+
+        if (simulatedResult === 'success') {
+          service.statusType = 'ok';
+
+          resultBox.className = 'p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-xs leading-relaxed';
+          resultIcon.innerHTML = `<svg class="w-4 h-4 text-[#16A34A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+          resultMsg.textContent = 'Kết nối tốt (320 ms)';
+          resultTime.textContent = `Đã kiểm tra thành công lúc ${nowStr}`;
+          resultBox.classList.remove('hidden');
+
+          showToast(`${service.name}: Kết nối tốt (320 ms)`, 'success');
+        } else {
+          // Bị từ chối
+          service.statusType = 'failed';
+
+          resultBox.className = 'p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs leading-relaxed';
+          resultIcon.innerHTML = `<svg class="w-4 h-4 text-[#DC2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+          resultMsg.textContent = 'Khoá truy cập bị từ chối (HTTP 401). Vui lòng kiểm tra lại quyền.';
+          resultTime.textContent = `Thời gian ghi nhận: ${nowStr}`;
+          resultBox.classList.remove('hidden');
+
+          showToast(`${service.name}: Lỗi xác thực (HTTP 401)`, 'error');
+        }
+
+        renderServiceLists();
+        document.getElementById('drawer-header-status-badge').innerHTML = getStatusBadgeHtml(service);
+      }, 600);
+    }
+
+    /* =======================================================
+       7. CÁC HÀM TIỆN ÍCH & TRỢ NĂNG
+       ======================================================= */
+    function getCurrentTimeStr() {
+      const d = new Date();
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let bgStyle = 'bg-[#111827] text-white';
+      if (type === 'success') bgStyle = 'bg-[#16A34A] text-white';
+      if (type === 'error') bgStyle = 'bg-[#DC2626] text-white';
+
+      toast.className = `px-4 py-2.5 rounded-xl shadow-lg text-xs sm:text-sm font-medium transition-all transform translate-y-2 opacity-0 duration-200 pointer-events-auto flex items-center gap-2 ${bgStyle}`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // Keyboard support: Esc để đóng drawer, Focus trap
+    document.addEventListener('keydown', (e) => {
+      const container = document.getElementById('service-drawer-container');
+      if (container.classList.contains('hidden')) return;
+
+      if (e.key === 'Escape') {
+        closeServiceDrawer();
+        return;
+      }
+
+      // Focus trap
+      if (e.key === 'Tab') {
+        const focusable = container.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    });
+
+    // Khởi tạo trang
+    document.addEventListener('DOMContentLoaded', () => {
+      renderServiceLists();
+      // settings.html#notion mở thẳng ngăn của dịch vụ đó (link từ màn từ chối / hỏi lại)
+      const linkedId = decodeURIComponent(location.hash.slice(1));
+      if (services.some(s => s.id === linkedId)) openServiceDrawer(linkedId);
+    });
+  </script>
+</body>
+</html>

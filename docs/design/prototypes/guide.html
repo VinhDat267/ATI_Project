@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cẩm nang kết nối & Mẫu câu lệnh — ATI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              'primary-hover': '#E04D00',
+              bg: '#F8F8F6',
+              surface: '#FFFFFF',
+              border: '#E7E7E2',
+              text: '#111827',
+              muted: '#6B7280',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            sans: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --border: #E7E7E2;
+      --text: #111827;
+      --accent: #FF5701;
+    }
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: "Be Vietnam Pro", system-ui, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #F1F1EE;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #D1D5DB;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #9CA3AF;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col antialiased selection:bg-[#FF5701]/10 selection:text-[#FF5701]">
+
+  <!-- ==================== HEADER (COCKPIT NAVIGATION) ==================== -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Điều hướng -->
+      <div class="flex items-center gap-2.5 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+          <span class="sm:hidden">Quay lại</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <!-- Liên kết chéo -->
+        <a href="settings.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>Kết nối dịch vụ</span>
+        </a>
+
+        <a href="history.html" class="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Nhật ký</span>
+        </a>
+
+        <a href="users.html" class="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Quản lý người dùng">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span>Người dùng</span>
+        </a>
+      </div>
+
+      <!-- Cụm Phải: Vai trò + Kịch bản Demo + Avatar -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        
+        <!-- Nhãn vai trò -->
+        <span id="role-pill-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-200/80 text-[#374151] border border-neutral-300/60" title="Vai trò hiện tại của bạn">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+          <span id="current-role-label">Quản trị viên</span>
+        </span>
+
+        <!-- Nút Kịch bản demo -->
+        <div class="relative">
+          <button type="button" id="btn-demo-menu" onclick="toggleDemoDropdown()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-[#4B5563] bg-white border border-[#E7E7E2] rounded-lg hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm" aria-haspopup="true" aria-expanded="false">
+            <svg class="w-3.5 h-3.5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            <span class="hidden sm:inline">Kịch bản</span>
+            <svg class="w-3 h-3 text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <!-- Dropdown menu kịch bản demo -->
+          <div id="demo-dropdown" class="hidden absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white border border-[#E7E7E2] rounded-xl shadow-lg p-2.5 text-xs z-50 space-y-2">
+            <div class="font-semibold text-[#111827] px-1 pb-1 border-b border-[#E7E7E2]">Kịch bản kiểm thử</div>
+            
+            <div class="space-y-1">
+              <div class="text-[11px] text-[#6B7280] font-medium px-1">Xem như:</div>
+              <div class="grid grid-cols-2 gap-1">
+                <button type="button" onclick="setRole('admin')" id="demo-role-admin-btn" class="px-2 py-1 text-center font-medium rounded bg-[#FF5701] text-white">Quản trị viên</button>
+                <button type="button" onclick="setRole('member')" id="demo-role-member-btn" class="px-2 py-1 text-center font-medium rounded bg-neutral-100 text-[#4B5563] hover:bg-neutral-200">Thành viên</button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-[#E7E7E2] text-[11px] text-[#6B7280] px-1">
+              Chuyển nhanh sang các màn hình liên quan:
+              <div class="mt-1 space-y-1">
+                <a href="settings.html" class="block text-[#FF5701] hover:underline font-medium">→ Đến Cài đặt dịch vụ</a>
+                <a href="history.html" class="block text-[#4B5563] hover:underline">→ Đến Nhật ký điều phối</a>
+                <a href="responses.html" class="block text-[#4B5563] hover:underline">→ Đến Màn phản hồi khi lỗi</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avatar Người dùng -->
+        <a href="account.html" class="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-[#111827] text-white flex items-center justify-center font-medium text-xs shadow-sm hover:ring-2 hover:ring-[#FF5701] hover:ring-offset-2 transition-all flex-shrink-0" title="Tài khoản Lan Nguyễn">
+          LN
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+    <!-- HERO / TIÊU ĐỀ TRANG -->
+    <section class="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div class="space-y-2 max-w-2xl">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701]">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            <span>CẨM NANG & THƯ VIỆN LỆNH</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-[#111827] tracking-tight">
+            Cẩm nang kết nối & Mẫu câu lệnh ATI
+          </h1>
+          <p class="text-sm sm:text-base text-[#4B5563] leading-relaxed">
+            Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Hướng dẫn trực quan từng bước lấy khoá cho 8 công cụ, thư viện mẫu câu lệnh tiếng Việt hiệu quả cao, và danh sách rõ ràng những việc ATI làm được và chưa làm được.
+          </p>
+        </div>
+
+        <!-- Thẻ số liệu tóm tắt nhanh -->
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 flex-shrink-0">
+          <div class="bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl p-2 sm:p-3 text-center">
+            <div class="text-lg sm:text-2xl font-bold text-[#FF5701]">8/8</div>
+            <div class="text-[10px] sm:text-[11px] text-[#6B7280] font-medium mt-0.5 leading-tight">Dịch vụ có hướng dẫn</div>
+          </div>
+          <div class="bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl p-2 sm:p-3 text-center">
+            <div class="text-lg sm:text-2xl font-bold text-[#111827]">12+</div>
+            <div class="text-[10px] sm:text-[11px] text-[#6B7280] font-medium mt-0.5 leading-tight">Mẫu câu lệnh sẵn</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 Tabs Điều hướng Phân khu chính -->
+      <div class="mt-8 pt-4 border-t border-[#E7E7E2]">
+        <nav class="flex flex-wrap gap-2" aria-label="Các phân khu cẩm nang">
+          <button type="button" onclick="switchMainTab('keys')" id="tab-btn-keys" class="main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#FF5701] text-white shadow-sm" aria-selected="true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            <span>1. Hướng dẫn lấy khoá (8 dịch vụ)</span>
+          </button>
+
+          <button type="button" onclick="switchMainTab('prompts')" id="tab-btn-prompts" class="main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all inline-flex items-center gap-2 bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]" aria-selected="false">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+            <span>2. Thư viện mẫu câu lệnh</span>
+          </button>
+
+          <button type="button" onclick="switchMainTab('capabilities')" id="tab-btn-capabilities" class="main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all inline-flex items-center gap-2 bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]" aria-selected="false">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>3. Việc làm được & Chưa làm được</span>
+          </button>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         PHÂN KHU 1: HƯỚNG DẪN TỪNG BƯỚC LẤY KHOÁ 8 DỊCH VỤ
+         ======================================================== -->
+    <section id="section-keys" class="space-y-6">
+
+      <!-- Thanh chọn 8 dịch vụ -->
+      <div class="bg-white rounded-2xl border border-[#E7E7E2] p-4 shadow-sm">
+        <div class="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3 px-1">
+          Chọn công cụ bạn muốn kết nối:
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" id="service-pills-container">
+          <!-- Sẽ được điền bằng JS để giữ nguyên SVG inline -->
+        </div>
+      </div>
+
+      <!-- Khung chi tiết hướng dẫn của dịch vụ được chọn -->
+      <div id="service-guide-detail" class="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm space-y-6">
+        <!-- Render động qua JavaScript -->
+      </div>
+    </section>
+
+    <!-- ========================================================
+         PHÂN KHU 2: THƯ VIỆN CÂU LỆNH MẪU TIẾNG VIỆT HIỆU QUẢ CAO
+         ======================================================== -->
+    <section id="section-prompts" class="hidden space-y-6">
+
+      <!-- Bộ lọc và tìm kiếm câu lệnh -->
+      <div class="bg-white rounded-2xl border border-[#E7E7E2] p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <!-- Ô tìm kiếm -->
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9CA3AF]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <input type="text" id="prompt-search-input" oninput="filterPrompts()" placeholder="Tìm kiếm mẫu lệnh theo từ khoá (Trello, lỗi, sheets, slack, họp...)" class="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl focus:outline-none focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all">
+          </div>
+
+          <!-- Các nút lọc nhóm nghiệp vụ -->
+          <div class="flex flex-wrap gap-1.5 sm:gap-2" id="prompt-category-filter">
+            <button type="button" onclick="setPromptCategory('all')" id="btn-cat-all" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#111827] text-white">Tất cả (12)</button>
+            <button type="button" onclick="setPromptCategory('sprint-bug')" id="btn-cat-sprint-bug" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]">Lỗi Sprint (4)</button>
+            <button type="button" onclick="setPromptCategory('sheet-sync')" id="btn-cat-sheet-sync" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]">Đồng bộ bảng tính (4)</button>
+            <button type="button" onclick="setPromptCategory('reporting')" id="btn-cat-reporting" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]">Báo cáo & Giao tiếp (4)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danh sách thẻ câu lệnh mẫu -->
+      <div id="prompts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Render động qua JavaScript -->
+      </div>
+
+      <!-- 4 Nguyên tắc vàng viết câu lệnh cho ATI -->
+      <div class="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 rounded-2xl border border-amber-200/80 p-6 shadow-sm space-y-3">
+        <div class="flex items-center gap-2 text-amber-900 font-semibold text-sm">
+          <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>4 kinh nghiệm thực tế để câu lệnh tiếng Việt chạy chính xác nhất</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-amber-950">
+          <div class="p-3 bg-white/80 rounded-xl border border-amber-200/60 space-y-1">
+            <div class="font-bold text-amber-800">1. Dùng động từ hành động rõ</div>
+            <p class="text-neutral-600">Bắt đầu bằng: <em>"Tạo card..."</em>, <em>"Ghi vào bảng tính..."</em>, <em>"Gửi tin vào kênh..."</em>, <em>"Gán nhãn..."</em></p>
+          </div>
+          <div class="p-3 bg-white/80 rounded-xl border border-amber-200/60 space-y-1">
+            <div class="font-bold text-amber-800">2. Nêu rõ tên nơi cần làm</div>
+            <p class="text-neutral-600">Chỉ rõ: <em>bảng To Do</em>, <em>kênh #ati-test</em>, <em>kho mã ati-test</em>, <em>tab Tasks</em> để ATI tìm đúng chỗ.</p>
+          </div>
+          <div class="p-3 bg-white/80 rounded-xl border border-amber-200/60 space-y-1">
+            <div class="font-bold text-amber-800">3. Ghép nhiều việc trong 1 câu</div>
+            <p class="text-neutral-600">Dùng từ nối: <em>"đồng thời"</em>, <em>"sau đó"</em>, <em>"và báo kênh..."</em> để ATI tự động móc nối các liên kết.</p>
+          </div>
+          <div class="p-3 bg-white/80 rounded-xl border border-amber-200/60 space-y-1">
+            <div class="font-bold text-amber-800">4. Luôn an tâm khi bấm duyệt</div>
+            <p class="text-neutral-600">ATI luôn cho bạn xem trước nguyên văn nội dung sẽ gửi đi. Không có gì bị ghi khi bạn chưa bấm Duyệt.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         PHÂN KHU 3: VIỆC LÀM ĐƯỢC VÀ CHƯA LÀM ĐƯỢC
+         ======================================================== -->
+    <section id="section-capabilities" class="hidden space-y-6">
+
+      <!-- Giới thiệu nguyên tắc an toàn -->
+      <div class="bg-white rounded-2xl border border-[#E7E7E2] p-5 shadow-sm flex items-start sm:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <h2 class="text-base sm:text-lg font-bold text-[#111827]">
+            Bảng minh bạch năng lực của ATI trên 8 công cụ
+          </h2>
+          <p class="text-xs sm:text-sm text-[#4B5563]">
+            ATI tuân thủ nguyên tắc an toàn tối đa: <span class="font-medium text-[#111827]">không bao giờ tự ý xoá vĩnh viễn dữ liệu cũ</span> và chỉ hoạt động trong đúng phạm vi bảng, kênh, kho mã được quản trị viên cấp phép.
+          </p>
+        </div>
+        <a href="settings.html" class="flex-shrink-0 px-3.5 py-2 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-semibold text-[#111827] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors inline-flex items-center gap-1.5">
+          <span>Xem nơi được phép</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+
+      <!-- Lưới 8 công cụ so sánh Làm được vs Chưa làm được -->
+      <div id="capabilities-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Render động qua JavaScript -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== TOAST NOTIFICATION CONTAINER ==================== -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="mt-auto border-t border-[#E7E7E2] bg-white py-6 px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+      <div class="flex items-center gap-2">
+        <div class="w-5 h-5 rounded bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">A</div>
+        <span class="font-semibold text-[#111827]">ATI</span>
+        <span>— AI Workflow Automation Platform · 2026</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <a href="settings.html" class="hover:text-[#111827] transition-colors">Kết nối dịch vụ</a>
+        <a href="history.html" class="hover:text-[#111827] transition-colors">Nhật ký điều phối</a>
+        <a href="responses.html" class="hover:text-[#111827] transition-colors">Màn phản hồi</a>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+  <script>
+    /* =======================================================
+       1. SVG INLINE NGUYÊN BẢN CỦA 8 DỊCH VỤ
+       ======================================================= */
+    const SERVICE_SVGS = {
+      trello: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#0079BF"/><rect x="4" y="4" width="6.5" height="13" rx="1.5" fill="white"/><rect x="13.5" y="4" width="6.5" height="8.5" rx="1.5" fill="white"/></svg>`,
+      slack: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.528 2.528 0 0 1 2.521-2.52 2.528 2.528 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.528 2.528 0 0 1-2.52-2.523 2.528 2.528 0 0 1 2.52-2.52h6.313A2.528 2.528 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>`,
+      github: `<svg class="w-5 h-5 text-[#24292E]" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>`,
+      sheets: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#0F9D58"/><path d="M14 2v6h6l-6-6z" fill="#87CEAB"/><rect x="7" y="11" width="10" height="7" rx="0.5" fill="white" fill-opacity="0.3"/><line x1="7" y1="14" x2="17" y2="14" stroke="white" stroke-width="1"/><line x1="11" y1="11" x2="11" y2="18" stroke="white" stroke-width="1"/></svg>`,
+      calendar: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" fill="#4285F4"/><rect x="3" y="4" width="18" height="5" fill="#1967D2"/><circle cx="7" cy="2.5" r="1.5" fill="#1967D2"/><circle cx="17" cy="2.5" r="1.5" fill="#1967D2"/><text x="12" y="17" fill="white" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">31</text></svg>`,
+      notion: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.222 3.125l13.774-1.12c1.38-.112 1.954.267 2.502.933l2.808 3.444c.433.533.693 1.155.693 1.777v12.22c0 1.2-.544 1.866-1.843 1.977l-14.88 1.111c-1.378.111-2.04-.333-2.589-1l-2.016-2.555c-.443-.555-.67-1.222-.67-1.778V4.88c0-1.111.66-1.666 2.22-1.755zm14.153 1.867L7.332 5.88c-.328.026-.453.18-.453.373v11.758c0 .24.125.4.375.373l11.043-.88c.328-.027.422-.24.422-.453V5.419c0-.24-.125-.4-.344-.427zM9.47 7.915l3.593-.24 3.03 5.467V7.435l2.25-.16v8.425l-3.375.24-3.25-5.653v5.626l-2.25.16V7.915z" fill="#111827"/></svg>`,
+      telegram: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#229ED9"/><path d="M17.5 7.5L5.5 12.1L9.5 13.6L14.7 10.3C14.9 10.2 15.1 10.4 15 10.6L10.8 14.4V17.5L12.9 15.5L16.2 17.9C16.8 18.2 17.2 17.9 17.4 17.2L19.4 8.2C19.6 7.3 18.9 6.8 17.5 7.5Z" fill="white"/></svg>`,
+      jira: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M11.53 2C11.53 7.26 7.26 11.53 2 11.53C7.26 11.53 11.53 15.8 11.53 21.06C11.53 15.8 15.8 11.53 21.06 11.53C15.8 11.53 11.53 7.26 11.53 2Z" fill="#0052CC"/><path d="M11.53 2C11.53 4.63 9.4 6.76 6.77 6.76C9.4 6.76 11.53 8.89 11.53 11.52C11.53 8.89 13.66 6.76 16.29 6.76C13.66 6.76 11.53 4.63 11.53 2Z" fill="#2684FF"/></svg>`
+    };
+
+    /* =======================================================
+       2. DỮ LIỆU CHI TIẾT 8 DỊCH VỤ & HƯỚNG DẪN TỪNG BƯỚC
+       ======================================================= */
+    const SERVICE_GUIDES = {
+      trello: {
+        id: 'trello',
+        name: 'Trello',
+        category: 'Quản lý công việc dạng bảng',
+        keys: ['API key', 'API token'],
+        scopeLabel: 'Board ID',
+        sampleScope: '5f1a2b3c4d5e6f7a8b9c0d1e',
+        timeEstimate: 'Khoảng 2 phút',
+        summary: 'Tạo và cập nhật card, gán thành viên, thêm checklist trên bảng công việc của nhóm.',
+        importantNotice: 'ATI chỉ đọc và ghi trên đúng Board ID bạn cấp. Card đã xong được lưu trữ chứ không bao giờ bị xoá mất.',
+        steps: [
+          {
+            num: 1,
+            title: 'Truy cập cổng quản lý Trello Power-Up',
+            desc: 'Đăng nhập vào Trello, sau đó mở trang quản lý tích hợp tại <a href="https://trello.com/power-ups/admin" target="_blank" class="text-[#0079BF] font-medium underline">trello.com/power-ups/admin</a> (hoặc trello.com/app-key).',
+            callout: 'Nếu bạn chưa có Power-Up nào, bấm "New" và đặt tên là "ATI Automation".'
+          },
+          {
+            num: 2,
+            title: 'Sao chép API Key',
+            desc: 'Tại mục "API Key", bạn sẽ thấy một chuỗi ký tự 32 chữ số. Bấm nút sao chép và dán vào ô "API key" trong Cài đặt của ATI.',
+            callout: 'Khoá này dùng để nhận diện ứng dụng của bạn với máy chủ Trello.'
+          },
+          {
+            num: 3,
+            title: 'Tạo và lấy API Token',
+            desc: 'Ngay cạnh ô API Key, bấm vào liên kết có chữ "Token" (hoặc Generate a Token). Một màn hình xin quyền mở ra, cuộn xuống và bấm nút "Allow".',
+            callout: 'Sao chép chuỗi mã Token dài hiển thị trên màn hình và dán vào ô "API token" của ATI.'
+          },
+          {
+            num: 4,
+            title: 'Lấy Board ID (Nơi được phép dùng)',
+            desc: 'Mở bảng Trello, thêm .json vào cuối địa chỉ (ví dụ https://trello.com/b/AbCd1234/to-do.json), tìm trường "id" đầu tiên (24 ký tự chữ và số) và dán vào danh sách Board ID.',
+            callout: 'Ví dụ ID mẫu: 5f1a2b3c4d5e6f7a8b9c0d1e'
+          }
+        ]
+      },
+      slack: {
+        id: 'slack',
+        name: 'Slack',
+        category: 'Giao tiếp & Kênh thông báo nhóm',
+        keys: ['Bot token'],
+        scopeLabel: 'Channel ID',
+        sampleScope: 'C07DEMO9X1 (#ati-test)',
+        timeEstimate: 'Khoảng 3 phút',
+        summary: 'Gửi tin nhắn thông báo vào các kênh công khai hoặc riêng tư khi việc trên các công cụ khác hoàn thành.',
+        importantNotice: 'Bắt buộc mời bot vào kênh trước! Sau khi tạo, hãy gõ lệnh /invite @ATI trong kênh bạn muốn gửi tin.',
+        steps: [
+          {
+            num: 1,
+            title: 'Tạo ứng dụng Slack mới',
+            desc: 'Truy cập trang nhà phát triển Slack tại <a href="https://api.slack.com/apps" target="_blank" class="text-[#36C5F0] font-medium underline">api.slack.com/apps</a>. Bấm nút "Create New App" > chọn "From scratch". Đặt tên "ATI Bot" và chọn Workspace nhóm.',
+            callout: 'Chọn đúng không gian làm việc của công ty bạn.'
+          },
+          {
+            num: 2,
+            title: 'Cấp quyền hạn tối thiểu (Bot Scopes)',
+            desc: 'Ở menu bên trái, bấm vào "OAuth & Permissions". Cuộn xuống mục "Scopes" > "Bot Token Scopes" và bấm "Add an OAuth Scope". Thêm các quyền:',
+            tags: ['chat:write (gửi tin)', 'channels:read (xem kênh chung)', 'groups:read (xem kênh riêng)'],
+            callout: 'Chỉ cần quyền chat:write là đủ để bot gửi tin. Không cấp thêm quyền quản trị.'
+          },
+          {
+            num: 3,
+            title: 'Cài đặt vào Workspace & lấy Bot Token',
+            desc: 'Cuộn lên đầu trang "OAuth & Permissions", bấm nút "Install to Workspace" và bấm "Allow". Sau đó sao chép chuỗi "Bot User OAuth Token" bắt đầu bằng chữ "xoxb-".',
+            callout: 'Dán chuỗi bắt đầu bằng xoxb- vào ô "Bot token" trong ATI.'
+          },
+          {
+            num: 4,
+            title: 'Lấy Channel ID & Mời bot vào kênh',
+            desc: 'Mở ứng dụng Slack trên máy tính, chuột phải vào tên kênh (ví dụ #ati-test) > chọn "View channel details" (Xem chi tiết kênh). Cuộn xuống đáy cùng để thấy "Channel ID" (bắt đầu bằng chữ C, ví dụ C07DEMO9X1).',
+            callout: 'Đừng quên: Gõ lệnh /invite @ATI Bot trong kênh đó để bot có quyền gửi tin!'
+          }
+        ]
+      },
+      github: {
+        id: 'github',
+        name: 'GitHub',
+        category: 'Kho mã nguồn & Quản lý Issue lỗi',
+        keys: ['Personal access token'],
+        scopeLabel: 'Repository (chủ/tên-kho)',
+        sampleScope: 'VinhDat267/ati-test',
+        timeEstimate: 'Khoảng 2 phút',
+        summary: 'Tìm kho mã, đọc và tạo issue lỗi, gắn nhãn (bug, defect), liên kết chéo với card Trello.',
+        importantNotice: 'ATI không bao giờ xoá repository, không merge code, và chỉ thao tác trên issue thuộc kho bạn cho phép.',
+        steps: [
+          {
+            num: 1,
+            title: 'Vào cài đặt mã truy cập cá nhân',
+            desc: 'Đăng nhập GitHub, bấm vào ảnh đại diện góc trên cùng bên phải > chọn "Settings". Ở menu bên trái, cuộn xuống dưới cùng chọn "Developer settings" > "Personal access tokens" > "Tokens (classic)".',
+            callout: 'Đường dẫn trực tiếp: github.com/settings/tokens'
+          },
+          {
+            num: 2,
+            title: 'Tạo mã truy cập mới (Token)',
+            desc: 'Bấm nút "Generate new token" (chọn Generate new token classic). Đặt tên ghi chú (Note) là "ATI Automation". Chọn thời hạn (Expiration) theo nhu cầu.',
+            callout: 'Tích chọn đúng phạm vi quyền duy nhất: "repo" (toàn quyền quản lý issue và đọc kho mã).'
+          },
+          {
+            num: 3,
+            title: 'Sao chép mã ghp_...',
+            desc: 'Cuộn xuống cuối trang bấm "Generate token". GitHub sẽ hiển thị chuỗi mã bắt đầu bằng "ghp_". Hãy sao chép ngay lập tức.',
+            callout: 'GitHub chỉ hiển thị mã này MỘT LẦN duy nhất. Dán ngay vào ô "Personal access token" trên ATI.'
+          },
+          {
+            num: 4,
+            title: 'Điền tên Repository được phép',
+            desc: 'Nhập tên kho mã dưới định dạng "tên_chủ_sở_hữu/tên_kho_mã". Ví dụ tài khoản là VinhDat267 và kho là ati-test thì điền:',
+            urlSample: 'VinhDat267/ati-test',
+            callout: 'Bạn có thể thêm nhiều kho mã bằng cách bấm "Thêm nơi được dùng".'
+          }
+        ]
+      },
+      sheets: {
+        id: 'sheets',
+        name: 'Google Sheets',
+        category: 'Bảng tính trực tuyến & Lưu trữ công việc',
+        keys: ['Email service account', 'Private key (PEM)'],
+        scopeLabel: 'Spreadsheet ID',
+        sampleScope: '1BxiMVs0XRA5nFMdKvBIIl_demo',
+        timeEstimate: 'Khoảng 4 phút',
+        summary: 'Xem danh sách tab, đọc dữ liệu các vùng ô và thêm dòng mới vào bảng tính nhiệm vụ.',
+        importantNotice: 'Bắt buộc chia sẻ bảng tính cho Email Service Account và cấp quyền "Người chỉnh sửa" (Editor)!',
+        steps: [
+          {
+            num: 1,
+            title: 'Tạo tài khoản dịch vụ trên Google Cloud',
+            desc: 'Mở Google Cloud Console tại <a href="https://console.cloud.google.com" target="_blank" class="text-[#0F9D58] font-medium underline">console.cloud.google.com</a>. Bật thư viện "Google Sheets API" trong mục "APIs & Services".',
+            callout: 'Vào "IAM & Admin" > "Service Accounts", bấm "Create Service Account", đặt tên "ati-sheets-bot" và bấm Done.'
+          },
+          {
+            num: 2,
+            title: 'Tạo file khoá JSON và lấy Private Key',
+            desc: 'Bấm vào tài khoản dịch vụ vừa tạo > chọn tab "Keys" > "Add Key" > "Create new key" > chọn định dạng JSON và tải về máy.',
+            callout: 'Mở file JSON bằng Notepad: sao chép giá trị "client_email" vào ô Email, và toàn bộ khối "private_key" (kể cả -----BEGIN PRIVATE KEY-----) vào ô Private key.'
+          },
+          {
+            num: 3,
+            title: 'Lấy Spreadsheet ID từ đường link',
+            desc: 'Mở bảng tính Google Sheets bạn muốn dùng trên trình duyệt (ví dụ ATI Test Tracker). Nhìn lên thanh địa chỉ:',
+            urlSample: 'https://docs.google.com/spreadsheets/d/[MÃ_SPREADSHEET_ID]/edit',
+            callout: 'Sao chép đoạn ký tự dài giữa "/d/" và "/edit" dán vào ô "Spreadsheet ID" trên ATI.'
+          },
+          {
+            num: 4,
+            title: 'Chia sẻ bảng tính cho Email Service Account',
+            desc: 'Bấm nút "Chia sẻ" (Share) màu xanh góc phải bảng tính Google Sheets. Dán địa chỉ email dạng "...@...iam.gserviceaccount.com" vào và cấp quyền "Người chỉnh sửa" (Editor).',
+            callout: 'Nếu không chia sẻ, Google sẽ từ chối và báo lỗi không có quyền ghi.'
+          }
+        ]
+      },
+      calendar: {
+        id: 'calendar',
+        name: 'Google Calendar',
+        category: 'Lịch họp & Sự kiện nhóm',
+        keys: ['Email service account', 'Private key (PEM)'],
+        scopeLabel: 'Calendar ID',
+        sampleScope: 'team-calendar@group.calendar.google.com',
+        timeEstimate: 'Khoảng 2 phút (dùng chung khoá Sheets)',
+        summary: 'Xem lịch, kiểm tra thời gian trống và tạo sự kiện lịch họp cho các mốc sprint.',
+        importantNotice: 'Dùng chung Email Service Account và Private Key của Google Sheets. Chỉ cần chia sẻ thêm Lịch của bạn.',
+        steps: [
+          {
+            num: 1,
+            title: 'Bật Google Calendar API trên Google Cloud',
+            desc: 'Trong cùng dự án Google Cloud Console đã tạo ở bước Google Sheets, vào thư viện API và bật thêm "Google Calendar API".',
+            callout: 'Bạn dùng lại đúng Email Service Account và Private Key (PEM) đã có từ Google Sheets.'
+          },
+          {
+            num: 2,
+            title: 'Lấy Calendar ID từ Google Calendar',
+            desc: 'Mở Google Calendar trên máy tính (<a href="https://calendar.google.com" target="_blank" class="text-[#4285F4] font-medium underline">calendar.google.com</a>). Ở cột trái, rê chuột vào Lịch của bạn > bấm dấu ba chấm > "Cài đặt và chia sẻ" (Settings and sharing).',
+            callout: 'Cuộn xuống mục "Tích hợp lịch" (Integrate calendar) để sao chép "Mã lịch" (Calendar ID).'
+          },
+          {
+            num: 3,
+            title: 'Chia sẻ Lịch cho Email Service Account',
+            desc: 'Tại trang Cài đặt lịch đó, cuộn lên mục "Chia sẻ với những người hoặc nhóm cụ thể", bấm "Thêm người", dán Email Service Account vào và chọn quyền "Thực hiện thay đổi cho các sự kiện".',
+            callout: 'Điều này cho phép ATI tạo sự kiện mới vào lịch của bạn mà không cần hỏi lại mật khẩu.'
+          }
+        ]
+      },
+      notion: {
+        id: 'notion',
+        name: 'Notion',
+        category: 'Tài liệu, Wiki & Biên bản cuộc họp',
+        keys: ['Internal integration token'],
+        scopeLabel: 'Database ID',
+        sampleScope: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d',
+        timeEstimate: 'Khoảng 3 phút',
+        summary: 'Tìm database, đọc page, tạo page biên bản họp mới và nối nội dung tóm tắt.',
+        importantNotice: 'Sau khi tạo Integration, bắt buộc phải vào Database Notion bấm dấu ba chấm > "Connect to" > chọn ATI!',
+        steps: [
+          {
+            num: 1,
+            title: 'Tạo Integration mới trên Notion',
+            desc: 'Đăng nhập tài khoản Notion, mở trang quản lý tích hợp tại <a href="https://www.notion.so/profile/integrations" target="_blank" class="text-neutral-900 font-medium underline">notion.so/profile/integrations</a>. Bấm "New integration", đặt tên là "ATI Notion", chọn đúng Workspace của nhóm và bấm Save.',
+            callout: 'Chọn quyền mặc định: Read content, Update content, Insert content.'
+          },
+          {
+            num: 2,
+            title: 'Sao chép Internal Integration Secret',
+            desc: 'Sau khi lưu, Notion hiển thị chuỗi "Internal Integration Secret" bắt đầu bằng "secret_" hoặc "ntn_". Bấm nút Show rồi Copy chuỗi này.',
+            callout: 'Dán chuỗi này vào ô "Internal integration token" trong Cài đặt của ATI.'
+          },
+          {
+            num: 3,
+            title: 'Lấy Database ID từ URL',
+            desc: 'Mở Database bạn muốn dùng trên Notion dưới dạng trang đầy đủ (Full page). Nhìn lên thanh địa chỉ trình duyệt:',
+            urlSample: 'https://notion.so/workspace/[MÃ_DATABASE_ID_32_KÝ_TỰ]?v=...',
+            callout: 'Sao chép chuỗi 32 ký tự nằm giữa tên workspace và dấu hỏi chấm "?".'
+          },
+          {
+            num: 4,
+            title: 'Kết nối Integration vào Database',
+            desc: 'Tại trang Database đó trên Notion, bấm vào dấu ba chấm (...) ở góc trên cùng bên phải > cuộn xuống mục "Connections" (hoặc "Connect to") > tìm và bấm chọn "ATI Notion".',
+            callout: 'Nếu không làm bước này, Notion sẽ chặn và báo lỗi "Object not found" vì lý do bảo mật.'
+          }
+        ]
+      },
+      telegram: {
+        id: 'telegram',
+        name: 'Telegram',
+        category: 'Thông báo tin nhắn nhanh & Nhóm chat',
+        keys: ['Bot token (BotFather)'],
+        scopeLabel: 'Chat ID',
+        sampleScope: '-1002489102931',
+        timeEstimate: 'Khoảng 2 phút',
+        summary: 'Gửi tin nhắn văn bản thông báo tiến độ vào nhóm chat hoặc kênh Telegram của nhóm.',
+        importantNotice: 'Bot phải được thêm vào nhóm chat trước thì mới gửi tin vào nhóm đó được.',
+        steps: [
+          {
+            num: 1,
+            title: 'Nói chuyện với BotFather trên Telegram',
+            desc: 'Mở Telegram và tìm kiếm tài khoản chính thức <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@BotFather</code> (có tích xanh). Bấm Start và gửi lệnh <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">/newbot</code>.',
+            callout: 'Làm theo hướng dẫn: Đặt tên cho bot (ví dụ: ATI Alert) và username kết thúc bằng _bot (ví dụ: ati_alert_bot).'
+          },
+          {
+            num: 2,
+            title: 'Sao chép Bot Token từ tin nhắn phản hồi',
+            desc: 'BotFather sẽ gửi lại một tin nhắn chúc mừng kèm chuỗi mã HTTP API Token (dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">123456789:ABCdef...</code>). Sao chép chuỗi này dán vào ô "Bot token" của ATI.',
+            callout: 'Không chia sẻ token này cho người lạ.'
+          },
+          {
+            num: 3,
+            title: 'Thêm bot vào nhóm chat của bạn',
+            desc: 'Mở nhóm chat Telegram của bạn, bấm vào tên nhóm > "Add Members" > tìm username của bot vừa tạo và thêm bot vào nhóm.',
+            callout: 'Bot cần có quyền gửi tin nhắn văn bản cơ bản trong nhóm.'
+          },
+          {
+            num: 4,
+            title: 'Lấy Chat ID của nhóm',
+            desc: 'Thêm bot <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@getmyid_bot</code> hoặc <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@userinfobot</code> vào nhóm, bot đó sẽ gửi tin nhắn báo mã Chat ID (thường là số âm có dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">-100...</code>).',
+            callout: 'Dán mã số âm đó vào danh sách "Chat ID" trên ATI, sau đó bạn có thể xoá bot lấy ID ra khỏi nhóm.'
+          }
+        ]
+      },
+      jira: {
+        id: 'jira',
+        name: 'Jira',
+        category: 'Quản lý dự án phát triển phần mềm',
+        keys: ['Site URL', 'Email Atlassian', 'API token'],
+        scopeLabel: 'Project key',
+        sampleScope: 'ATI',
+        timeEstimate: 'Khoảng 3 phút',
+        summary: 'Tìm project, tạo issue task/bug mới và thêm bình luận vào issue của nhóm.',
+        importantNotice: 'Site URL bắt buộc phải có dạng https://ten-site.atlassian.net. Không điền link phụ.',
+        steps: [
+          {
+            num: 1,
+            title: 'Tạo Atlassian API Token',
+            desc: 'Đăng nhập tài khoản Atlassian của bạn tại <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" class="text-[#0052CC] font-medium underline">id.atlassian.com/manage-profile/security/api-tokens</a>. Bấm "Create API token", đặt nhãn "ATI Automation" và bấm Create.',
+            callout: 'Sao chép chuỗi token được sinh ra và dán vào ô "API token" trên ATI.'
+          },
+          {
+            num: 2,
+            title: 'Điền Site URL & Email tài khoản',
+            desc: 'Điền địa chỉ website Jira của công ty bạn (dạng: <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">https://ten-cong-ty.atlassian.net</code>) vào ô "Site URL", và email đăng nhập Atlassian vào ô "Email Atlassian".',
+            callout: 'Hệ thống tự động kiểm tra định dạng .atlassian.net hợp lệ.'
+          },
+          {
+            num: 3,
+            title: 'Lấy Project Key của dự án',
+            desc: 'Mở dự án của bạn trên Jira. Project key chính là mã chữ in hoa viết tắt đứng trước các số issue (ví dụ issue có mã là <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">ATI-42</code> thì Project key là <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">ATI</code>).',
+            callout: 'Thêm mã Project key này vào danh sách nơi được phép trên ATI.'
+          }
+        ]
+      }
+    };
+
+    /* =======================================================
+       3. THƯ VIỆN CÂU LỆNH MẪU TIẾNG VIỆT (12 MẪU THỰC TẾ)
+       ======================================================= */
+    const SAMPLE_PROMPTS = [
+      // Nhóm 1: Quản lý lỗi Sprint
+      {
+        id: 'p1',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Tạo thẻ lỗi, issue GitHub, ghi Sheets và báo Slack',
+        prompt: 'Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub trong ati-test, ghi vào Google Sheets Tasks và báo kênh Slack #ati-test',
+        services: ['trello', 'github', 'sheets', 'slack'],
+        workflow: [
+          'Trello: Tạo card "Sửa lỗi đăng nhập Google" trong danh sách Doing',
+          'GitHub: Tạo issue mới trong kho ati-test và gắn link card Trello',
+          'Google Sheets: Thêm 1 dòng mới vào tab Tasks của bảng tính ATI Test Tracker',
+          'Slack: Soạn và gửi tin thông báo kèm đầy đủ đường dẫn tới #ati-test'
+        ],
+        badge: 'Được dùng nhiều nhất'
+      },
+      {
+        id: 'p2',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Gán người phụ trách card Trello và gắn nhãn issue GitHub',
+        prompt: 'Gán người phụ trách @tuan cho card lỗi giỏ hàng trên Trello và đặt nhãn bug cho issue tương ứng trên GitHub',
+        services: ['trello', 'github'],
+        workflow: [
+          'Trello: Tìm card lỗi giỏ hàng trên bảng To Do và gán thành viên Tuấn Đặng',
+          'GitHub: Tìm issue liên quan trong kho mã và gán nhãn "bug"'
+        ]
+      },
+      {
+        id: 'p3',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Tạo issue GitHub cho lỗi giao diện và báo Slack',
+        prompt: 'Tạo issue GitHub cho lỗi hiển thị nút bấm trên Safari màn hình nhỏ và gửi tin báo vào kênh #ati-test',
+        services: ['github', 'slack'],
+        workflow: [
+          'GitHub: Tạo issue "Lỗi hiển thị nút bấm trên Safari 375px" có nhãn defect',
+          'Slack: Gửi tin nhắn thông báo issue vừa mở kèm liên kết mở nhanh'
+        ]
+      },
+      {
+        id: 'p4',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Lưu trữ card cũ trên bảng Trello',
+        prompt: 'Lưu trữ các card cũ trong danh sách Done trên bảng Trello',
+        services: ['trello'],
+        workflow: [
+          'Trello: Quét danh sách Done trên bảng To Do và chuyển trạng thái lưu trữ an toàn (không xoá mất card)'
+        ]
+      },
+
+      // Nhóm 2: Đồng bộ bảng tính & Vận hành
+      {
+        id: 'p5',
+        category: 'sheet-sync',
+        categoryLabel: 'Đồng bộ bảng tính',
+        title: 'Đọc issue đang mở trên GitHub và bổ sung vào Google Sheets',
+        prompt: 'Đọc các issue đang mở trên GitHub ati-test và ghi thêm các dòng mới vào bảng tính ATI Test Tracker tab Tasks',
+        services: ['github', 'sheets'],
+        workflow: [
+          'GitHub: Quét danh sách các issue đang mở trong kho ati-test',
+          'Google Sheets: So sánh và ghi thêm từng dòng vào cuối bảng tính Tasks (tiêu đề, người tạo, ngày tạo)'
+        ],
+        badge: 'Tự động hoá vận hành'
+      },
+      {
+        id: 'p6',
+        category: 'sheet-sync',
+        categoryLabel: 'Đồng bộ bảng tính',
+        title: 'Ghi nhiệm vụ mới vào Google Sheets với người phụ trách',
+        prompt: 'Ghi vào Google Sheets một dòng công việc mới: Kiểm thử tính năng xuất báo cáo tuần, người phụ trách Lan Nguyễn, hạn chót thứ 6',
+        services: ['sheets'],
+        workflow: [
+          'Google Sheets: Tìm bảng tính ATI Test Tracker tab Tasks và chèn dòng mới với đầy đủ các cột dữ liệu'
+        ]
+      },
+      {
+        id: 'p7',
+        category: 'sheet-sync',
+        categoryLabel: 'Đồng bộ bảng tính',
+        title: 'Tạo card Trello từ các dòng mới trong Google Sheets',
+        prompt: 'Tạo card Trello trên bảng To Do cho các mục công việc vừa được thêm vào Google Sheets ngày hôm nay',
+        services: ['sheets', 'trello'],
+        workflow: [
+          'Google Sheets: Đọc các dòng mới thêm có ngày hôm nay',
+          'Trello: Tạo các card tương ứng trong danh sách To Do kèm mô tả tóm tắt'
+        ]
+      },
+      {
+        id: 'p8',
+        category: 'sheet-sync',
+        categoryLabel: 'Đồng bộ bảng tính',
+        title: 'Tạo Issue Jira từ dòng lỗi trong bảng tính Google Sheets',
+        prompt: 'Tạo một issue Jira trong project ATI cho lỗi tải chậm được ghi nhận tại dòng mới nhất trên Google Sheets',
+        services: ['sheets', 'jira'],
+        workflow: [
+          'Google Sheets: Đọc nội dung mô tả lỗi ở dòng cuối',
+          'Jira: Tạo issue loại Bug với tiêu đề và mô tả tương ứng'
+        ]
+      },
+
+      // Nhóm 3: Báo cáo tiến độ & Giao tiếp
+      {
+        id: 'p9',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Tạo page Notion biên bản họp và gửi link lên Slack',
+        prompt: 'Tạo page Notion ghi biên bản họp sprint ngày hôm nay và gửi thông báo kèm link page vào kênh Slack #ati-test',
+        services: ['notion', 'slack'],
+        workflow: [
+          'Notion: Tạo một trang mới trong Database với tiêu đề "Biên bản họp Sprint" và khung nội dung',
+          'Slack: Gửi tin nhắn vào kênh #ati-test kèm đường dẫn trực tiếp tới trang Notion vừa tạo'
+        ],
+        badge: 'Phổ biến cho PM'
+      },
+      {
+        id: 'p10',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Thông báo xử lý xong issue từ GitHub sang Slack',
+        prompt: 'Gửi tin vào kênh #ati-test báo issue #42 trên ati-test đã xử lý xong, kèm link issue',
+        services: ['github', 'slack'],
+        workflow: [
+          'GitHub: Lấy thông tin issue #42 từ kho ati-test',
+          'Slack: Gửi thông báo kèm link issue vào kênh #ati-test'
+        ]
+      },
+      {
+        id: 'p11',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Tạo sự kiện họp Google Calendar và báo kênh Slack',
+        prompt: 'Tạo sự kiện Google Calendar Họp review Sprint vào 15:00 thứ 6 này và báo vào kênh Slack #ati-test',
+        services: ['calendar', 'slack'],
+        workflow: [
+          'Google Calendar: Đặt lịch sự kiện vào 15:00 thứ 6',
+          'Slack: Đăng thông báo lịch họp để mọi người chuẩn bị'
+        ]
+      },
+      {
+        id: 'p12',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Gửi thông báo tiến độ vào nhóm Telegram',
+        prompt: 'Gửi tin nhắn Telegram vào nhóm Vận hành thông báo hệ thống đã cập nhật xong các báo cáo tuần',
+        services: ['telegram'],
+        workflow: [
+          'Telegram: Gửi tin nhắn văn bản thuần vào đúng Chat ID nhóm vận hành'
+        ]
+      }
+    ];
+
+    /* =======================================================
+       4. DANH SÁCH VIỆC LÀM ĐƯỢC VÀ CHƯA LÀM ĐƯỢC (8 CÔNG CỤ)
+       ======================================================= */
+    const CAPABILITIES_DATA = [
+      {
+        id: 'trello',
+        name: 'Trello',
+        role: 'Quản lý bảng Kanban & Thẻ công việc',
+        canDo: [
+          'Tìm bảng, danh sách (list), thành viên và card',
+          'Tạo card mới trong danh sách mong muốn',
+          'Cập nhật card: đổi tên, mô tả, chuyển cột danh sách',
+          'Lưu trữ card cũ an toàn (archive)',
+          'Gán thành viên vào card',
+          'Thêm checklist và các mục con cần làm'
+        ],
+        cannotDo: [
+          'Xoá card',
+          'Bình luận trên card'
+        ]
+      },
+      {
+        id: 'slack',
+        name: 'Slack',
+        role: 'Kênh giao tiếp & Thông báo tức thời',
+        canDo: [
+          'Tìm kênh công khai hoặc riêng tư (đã mời bot)',
+          'Gửi tin nhắn văn bản',
+          'Chèn liên kết trực tiếp tới các công cụ khác'
+        ],
+        cannotDo: [
+          'Đọc lại tin đã gửi',
+          'Gửi vào luồng thảo luận'
+        ]
+      },
+      {
+        id: 'github',
+        name: 'GitHub',
+        role: 'Quản lý kho mã & Theo dõi Issue lỗi',
+        canDo: [
+          'Tìm kiếm kho mã trong danh sách cho phép',
+          'Xem và tìm kiếm các issue đang mở hoặc đã đóng',
+          'Tạo issue mới với tiêu đề và mô tả chi tiết',
+          'Gắn nhãn đã có sẵn trong kho',
+          'Dẫn liên kết chéo tới card Trello và bảng tính'
+        ],
+        cannotDo: [
+          'Đọc lịch sử thay đổi mã / pull request',
+          'Đóng issue',
+          'Gán người phụ trách'
+        ]
+      },
+      {
+        id: 'sheets',
+        name: 'Google Sheets',
+        role: 'Bảng tính trực tuyến & Lưu trữ bảng biểu',
+        canDo: [
+          'Xem danh sách các trang tính (tabs)',
+          'Đọc dữ liệu trong các vùng ô xác định',
+          'Thêm dòng mới vào cuối bảng tính (append row)',
+          'Điền dữ liệu đúng theo thứ tự các cột sẵn có'
+        ],
+        cannotDo: [
+          'Sửa hoặc xoá dòng đã có',
+          'Mỗi lần thêm tối đa 20 dòng'
+        ]
+      },
+      {
+        id: 'calendar',
+        name: 'Google Calendar',
+        role: 'Lịch họp & Quản lý thời gian',
+        canDo: [
+          'Xem lịch và các sự kiện đã lên lịch',
+          'Tạo sự kiện mới: đặt tiêu đề, thời gian bắt đầu, kết thúc',
+          'Thêm mô tả và liên kết cuộc họp vào sự kiện'
+        ],
+        cannotDo: [
+          'Mời người khác',
+          'Sự kiện dài quá 24 giờ',
+          'Sửa hoặc xoá sự kiện'
+        ]
+      },
+      {
+        id: 'notion',
+        name: 'Notion',
+        role: 'Không gian tài liệu & Biên bản làm việc',
+        canDo: [
+          'Tìm database trong danh sách đã cấp quyền kết nối',
+          'Đọc các page trong database (thuộc tính dạng chữ)',
+          'Tạo trang mới trong database (ví dụ: Biên bản họp)',
+          'Thêm các đoạn văn bản tóm tắt nội dung'
+        ],
+        cannotDo: [
+          'Database có nhiều nguồn dữ liệu',
+          'Sửa page ngoài việc nối thêm văn bản'
+        ]
+      },
+      {
+        id: 'telegram',
+        name: 'Telegram',
+        role: 'Nhóm chat & Thông báo tin tức nhanh',
+        canDo: [
+          'Đọc thông tin nhóm chat đã thêm bot',
+          'Gửi tin nhắn văn bản thông báo tiến độ vào nhóm'
+        ],
+        cannotDo: [
+          'Định dạng chữ (đậm, nghiêng, link xem trước)'
+        ]
+      },
+      {
+        id: 'jira',
+        name: 'Jira',
+        role: 'Quản lý dự án & Quy trình phát triển',
+        canDo: [
+          'Tìm project và issue trong phạm vi cấp phép',
+          'Tạo issue mới (loại Task, Bug, Story)',
+          'Thêm bình luận (comment) cập nhật tiến độ vào issue'
+        ],
+        cannotDo: [
+          'Chuyển trạng thái issue',
+          'Xoá issue'
+        ]
+      }
+    ];
+
+    /* =======================================================
+       5. TRẠNG THÁI & KHỞI TẠO ỨNG DỤNG
+       ======================================================= */
+    let currentMainTab = 'keys';
+    let selectedServiceId = 'trello';
+    let currentPromptCategory = 'all';
+    let currentRole = 'admin'; // 'admin' | 'member'
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Kiểm tra tham số URL query nếu có (ví dụ: ?tab=prompts hoặc ?service=slack)
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      const serviceParam = urlParams.get('service');
+
+      if (tabParam && ['keys', 'prompts', 'capabilities'].includes(tabParam)) {
+        switchMainTab(tabParam);
+      }
+
+      if (serviceParam && SERVICE_GUIDES[serviceParam]) {
+        selectedServiceId = serviceParam;
+      }
+
+      // 2. Render các thành phần
+      renderServicePills();
+      renderServiceGuideDetail(selectedServiceId);
+      renderPromptsList();
+      renderCapabilitiesGrid();
+
+      // 3. Đóng dropdown demo khi bấm ngoài
+      document.addEventListener('click', (e) => {
+        const demoDropdown = document.getElementById('demo-dropdown');
+        const btnDemoMenu = document.getElementById('btn-demo-menu');
+        if (demoDropdown && !demoDropdown.contains(e.target) && !btnDemoMenu.contains(e.target)) {
+          demoDropdown.classList.add('hidden');
+          btnDemoMenu.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    /* =======================================================
+       6. HÀM CHUYỂN TAB CHÍNH
+       ======================================================= */
+    function switchMainTab(tabKey) {
+      currentMainTab = tabKey;
+
+      // Cập nhật giao diện nút tab
+      ['keys', 'prompts', 'capabilities'].forEach(key => {
+        const btn = document.getElementById(`tab-btn-${key}`);
+        const sec = document.getElementById(`section-${key}`);
+        if (key === tabKey) {
+          btn.className = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#FF5701] text-white shadow-sm';
+          btn.setAttribute('aria-selected', 'true');
+          sec.classList.remove('hidden');
+        } else {
+          btn.className = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all inline-flex items-center gap-2 bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]';
+          btn.setAttribute('aria-selected', 'false');
+          sec.classList.add('hidden');
+        }
+      });
+    }
+
+    /* =======================================================
+       7. HÀM RENDER PHÂN KHU 1: HƯỚNG DẪN LẤY KHOÁ
+       ======================================================= */
+    function renderServicePills() {
+      const container = document.getElementById('service-pills-container');
+      if (!container) return;
+
+      const services = Object.keys(SERVICE_GUIDES);
+      container.innerHTML = services.map(id => {
+        const s = SERVICE_GUIDES[id];
+        const isSelected = id === selectedServiceId;
+        return `
+          <button type="button" onclick="selectServiceGuide('${id}')" id="service-pill-${id}" class="flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group ${isSelected ? 'bg-orange-50/80 border-[#FF5701] ring-1 ring-[#FF5701]' : 'bg-[#F8F8F6] border-[#E7E7E2] hover:bg-white hover:border-neutral-300'}">
+            <div class="w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-110">
+              ${SERVICE_SVGS[id] || ''}
+            </div>
+            <span class="text-xs font-semibold mt-1.5 ${isSelected ? 'text-[#FF5701]' : 'text-[#374151]'}">${s.name}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectServiceGuide(serviceId) {
+      if (!SERVICE_GUIDES[serviceId]) return;
+      selectedServiceId = serviceId;
+      renderServicePills();
+      renderServiceGuideDetail(serviceId);
+    }
+
+    function renderServiceGuideDetail(serviceId) {
+      const s = SERVICE_GUIDES[serviceId];
+      const container = document.getElementById('service-guide-detail');
+      if (!s || !container) return;
+
+      container.innerHTML = `
+        <!-- Tiêu đề dịch vụ & Thẻ tóm tắt -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E7E7E2]">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-2.5 shadow-sm">
+              ${SERVICE_SVGS[serviceId] || ''}
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-xl sm:text-2xl font-bold text-[#111827]">${s.name}</h3>
+                <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">${s.category}</span>
+              </div>
+              <p class="text-xs sm:text-sm text-[#4B5563] mt-0.5">${s.summary}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <a href="settings.html#${s.id}" class="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title="Mở trang cài đặt để dán khoá">
+              <span>Đi tới Cài đặt khoá →</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Hộp thông tin khoá cần chuẩn bị & nơi được phép dùng -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+            <div class="text-[11px] text-[#6B7280] font-medium">Khoá cần lấy:</div>
+            <div class="font-semibold text-xs text-[#111827] mt-1 flex flex-wrap gap-1">
+              ${s.keys.map(k => `<span class="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">${k}</span>`).join('')}
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+            <div class="text-[11px] text-[#6B7280] font-medium">Nơi ATI được phép dùng:</div>
+            <div class="font-semibold text-xs text-[#111827] mt-1 flex items-center gap-1">
+              <span class="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">${s.scopeLabel}</span>
+              <span class="text-[11px] text-[#6B7280] font-normal truncate">(${s.sampleScope})</span>
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+            <div class="text-[11px] text-[#6B7280] font-medium">Thời gian hoàn thành:</div>
+            <div class="font-semibold text-xs text-emerald-700 mt-1 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>${s.timeEstimate}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cảnh báo lưu ý quan trọng -->
+        <div class="p-4 rounded-xl bg-amber-50/80 border border-amber-200/70 text-xs text-amber-900 flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <div>
+            <span class="font-bold">Lưu ý quan trọng cho người dùng:</span> ${s.importantNotice}
+          </div>
+        </div>
+
+        <!-- Các bước thực hiện đánh số -->
+        <div class="space-y-4 pt-2">
+          <h4 class="text-sm font-bold text-[#111827] uppercase tracking-wider">
+            Các bước lấy khoá chi tiết từng thao tác:
+          </h4>
+
+          <div class="space-y-3">
+            ${s.steps.map(st => `
+              <div class="p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-neutral-300 transition-colors flex items-start gap-3.5">
+                <div class="w-7 h-7 rounded-full bg-[#111827] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                  ${st.num}
+                </div>
+                <div class="space-y-1.5 flex-1 min-w-0">
+                  <div class="font-bold text-sm text-[#111827]">${st.title}</div>
+                  <div class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">${st.desc}</div>
+                  
+                  ${st.tags ? `
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                      ${st.tags.map(t => `<span class="px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-mono text-[11px] border border-neutral-200">${t}</span>`).join('')}
+                    </div>
+                  ` : ''}
+
+                  ${st.urlSample ? `
+                    <div class="p-2 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-mono text-[#111827] select-all break-all">
+                      ${st.urlSample}
+                    </div>
+                  ` : ''}
+
+                  ${st.callout ? `
+                    <div class="text-[11px] text-neutral-500 italic flex items-center gap-1 pt-0.5">
+                      <svg class="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      <span>${st.callout}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    /* =======================================================
+       8. HÀM RENDER PHÂN KHU 2: THƯ VIỆN CÂU LỆNH MẪU
+       ======================================================= */
+    function setPromptCategory(catKey) {
+      currentPromptCategory = catKey;
+
+      ['all', 'sprint-bug', 'sheet-sync', 'reporting'].forEach(k => {
+        const btn = document.getElementById(`btn-cat-${k}`);
+        if (!btn) return;
+        if (k === catKey) {
+          btn.className = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#111827] text-white';
+        } else {
+          btn.className = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E7E7E2]';
+        }
+      });
+
+      renderPromptsList();
+    }
+
+    function filterPrompts() {
+      renderPromptsList();
+    }
+
+    function renderPromptsList() {
+      const container = document.getElementById('prompts-grid');
+      const searchInput = document.getElementById('prompt-search-input');
+      const query = (searchInput ? searchInput.value.toLowerCase().trim() : '');
+
+      if (!container) return;
+
+      const filtered = SAMPLE_PROMPTS.filter(p => {
+        const matchesCategory = (currentPromptCategory === 'all' || p.category === currentPromptCategory);
+        const matchesQuery = !query || 
+          p.title.toLowerCase().includes(query) || 
+          p.prompt.toLowerCase().includes(query) || 
+          p.categoryLabel.toLowerCase().includes(query) ||
+          p.services.some(s => s.toLowerCase().includes(query));
+        return matchesCategory && matchesQuery;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full p-8 text-center bg-white rounded-2xl border border-[#E7E7E2] text-sm text-[#6B7280]">
+            Không tìm thấy mẫu câu lệnh phù hợp với từ khoá <span class="font-bold text-[#111827]">"${query}"</span>. Hãy thử tìm từ khoá khác như "Trello", "Slack", "lỗi", "báo cáo".
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => `
+        <div class="bg-white rounded-2xl border border-[#E7E7E2] p-5 shadow-sm hover:border-[#FF5701]/60 transition-all flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <!-- Header của thẻ prompt -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 border border-neutral-200">
+                ${p.categoryLabel}
+              </span>
+              ${p.badge ? `
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-[#FF5701]">
+                  ★ ${p.badge}
+                </span>
+              ` : ''}
+            </div>
+
+            <!-- Tiêu đề câu lệnh -->
+            <h4 class="font-bold text-sm sm:text-base text-[#111827] leading-snug">
+              ${p.title}
+            </h4>
+
+            <!-- Nội dung câu lệnh trong khung nổi bật -->
+            <div class="p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm font-medium text-[#111827] leading-relaxed relative group">
+              "${p.prompt}"
+            </div>
+
+            <!-- Các công cụ tham gia -->
+            <div class="space-y-1.5 pt-1">
+              <div class="text-[11px] text-[#6B7280] font-medium">Công cụ tham gia:</div>
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${p.services.map(sid => `
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E7E7E2] text-[11px] font-medium text-neutral-700">
+                    <span class="w-3.5 h-3.5 flex items-center justify-center">${SERVICE_SVGS[sid] || ''}</span>
+                    <span>${SERVICE_GUIDES[sid]?.name || sid}</span>
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Quy trình từng bước khi chạy -->
+            <div class="space-y-1 pt-1 border-t border-[#E7E7E2]">
+              <div class="text-[11px] text-[#6B7280] font-semibold uppercase tracking-wider">ATI sẽ làm lần lượt sau khi bạn duyệt:</div>
+              <ul class="text-xs text-neutral-600 space-y-1 list-disc list-inside">
+                ${p.workflow.map(w => `<li class="truncate">${w}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+
+          <!-- Nút hành động: Sao chép & Thử trên sân khấu -->
+          <div class="pt-3 border-t border-[#E7E7E2] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+            <button type="button" onclick="copyPromptText('${p.id}')" id="copy-btn-${p.id}" class="px-3 py-2 sm:py-1.5 rounded-lg bg-[#F8F8F6] hover:bg-neutral-200/80 text-xs font-semibold text-[#111827] border border-[#E7E7E2] transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
+              <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+              <span>Sao chép câu lệnh</span>
+            </button>
+
+            <a href="app-stage.html" class="text-xs font-semibold text-[#FF5701] hover:underline inline-flex items-center gap-1 py-1 min-h-[36px]">
+              <span>Thử trên sân khấu →</span>
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function copyPromptText(promptId) {
+      const p = SAMPLE_PROMPTS.find(item => item.id === promptId);
+      if (!p) return;
+
+      navigator.clipboard.writeText(p.prompt).then(() => {
+        showToast('Đã sao chép câu lệnh vào bộ nhớ tạm! Dán vào ô nhập của ATI để bắt đầu.');
+        const btn = document.getElementById(`copy-btn-${promptId}`);
+        if (btn) {
+          btn.innerHTML = `
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span class="text-emerald-700">Đã sao chép!</span>
+          `;
+          setTimeout(() => {
+            btn.innerHTML = `
+              <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+              <span>Sao chép câu lệnh</span>
+            `;
+          }, 2000);
+        }
+      }).catch(() => {
+        showToast('Không thể sao chép tự động. Bạn hãy bôi đen câu lệnh để chép tay nhé.');
+      });
+    }
+
+    /* =======================================================
+       9. HÀM RENDER PHÂN KHU 3: LÀM ĐƯỢC VÀ CHƯA LÀM ĐƯỢC
+       ======================================================= */
+    function renderCapabilitiesGrid() {
+      const container = document.getElementById('capabilities-grid');
+      if (!container) return;
+
+      container.innerHTML = CAPABILITIES_DATA.map(c => `
+        <div class="bg-white rounded-2xl border border-[#E7E7E2] p-6 shadow-sm space-y-4">
+          <!-- Header công cụ -->
+          <div class="flex items-center justify-between gap-3 pb-3 border-b border-[#E7E7E2]">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-1.5">
+                ${SERVICE_SVGS[c.id] || ''}
+              </div>
+              <div>
+                <h4 class="font-bold text-base text-[#111827]">${c.name}</h4>
+                <div class="text-xs text-[#6B7280]">${c.role}</div>
+              </div>
+            </div>
+            <a href="settings.html#${c.id}" class="text-xs text-[#FF5701] font-medium hover:underline">
+              Cài đặt khoá
+            </a>
+          </div>
+
+          <!-- Lưới 2 cột: Làm được vs Chưa làm được -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <!-- Cột xanh: Việc làm được -->
+            <div class="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/60 space-y-2">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>Việc ATI LÀM ĐƯỢC:</span>
+              </div>
+              <ul class="text-xs text-emerald-950 space-y-1.5">
+                ${c.canDo.map(item => `
+                  <li class="flex items-start gap-1.5">
+                    <span class="text-emerald-500 font-bold mt-0.5">•</span>
+                    <span>${item}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+
+            <!-- Cột xám/đỏ: Việc chưa làm được -->
+            <div class="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-neutral-700">
+                <svg class="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <span>Việc ATI CHƯA LÀM ĐƯỢC:</span>
+              </div>
+              <ul class="text-xs text-neutral-600 space-y-1.5">
+                ${c.cannotDo.map(item => `
+                  <li class="flex items-start gap-1.5">
+                    <span class="text-neutral-400 font-bold mt-0.5">•</span>
+                    <span>${item}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    /* =======================================================
+       10. CƠ CHẾ TOAST & KỊCH BẢN DEMO
+       ======================================================= */
+    function toggleDemoDropdown() {
+      const demoDropdown = document.getElementById('demo-dropdown');
+      const btn = document.getElementById('btn-demo-menu');
+      if (!demoDropdown || !btn) return;
+      const isHidden = demoDropdown.classList.contains('hidden');
+      if (isHidden) {
+        demoDropdown.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        demoDropdown.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function setRole(role) {
+      currentRole = role;
+      const roleLabel = document.getElementById('current-role-label');
+      const btnAdmin = document.getElementById('demo-role-admin-btn');
+      const btnMember = document.getElementById('demo-role-member-btn');
+
+      if (role === 'admin') {
+        if (roleLabel) roleLabel.textContent = 'Quản trị viên';
+        if (btnAdmin) btnAdmin.className = 'px-2 py-1 text-center font-medium rounded bg-[#FF5701] text-white';
+        if (btnMember) btnMember.className = 'px-2 py-1 text-center font-medium rounded bg-neutral-100 text-[#4B5563] hover:bg-neutral-200';
+        showToast('Đã chuyển xem như Quản trị viên (toàn quyền thêm khoá và cấu hình).');
+      } else {
+        if (roleLabel) roleLabel.textContent = 'Thành viên';
+        if (btnAdmin) btnAdmin.className = 'px-2 py-1 text-center font-medium rounded bg-neutral-100 text-[#4B5563] hover:bg-neutral-200';
+        if (btnMember) btnMember.className = 'px-2 py-1 text-center font-medium rounded bg-[#FF5701] text-white';
+        showToast('Đã chuyển xem như Thành viên (chỉ xem hướng dẫn và sao chép mẫu lệnh).');
+      }
+
+      toggleDemoDropdown();
+    }
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto bg-[#111827] text-white text-xs px-4 py-3 rounded-xl shadow-lg border border-neutral-700 flex items-center gap-2 max-w-sm transition-all transform duration-200';
+      toast.innerHTML = `
+        <svg class="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="flex-1">${message}</span>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
