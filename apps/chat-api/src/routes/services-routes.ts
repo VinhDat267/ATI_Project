@@ -134,5 +134,43 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     }
   });
 
+  // PUT /api/services/:service/scope
+  router.put('/:service/scope', async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!isAdmin((req as any).user, options.adminUserIds)) {
+        res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
+        return;
+      }
+      const service = String(req.params.service);
+      const registration = getRegisteredService(service);
+      if (!registration) {
+        res.status(400).json({ error: 'Unsupported service' });
+        return;
+      }
+      if (!credentialRepo) {
+        res.status(500).json({ error: 'Credential repository not configured' });
+        return;
+      }
+      const scope = normalizeAllowedScope(registration.definition, req.body?.allowedScope);
+      if (!scope || !encryptionKey) {
+        res.status(400).json({ error: 'A non-empty allowed scope and encryption key are required' });
+        return;
+      }
+      const saved = await credentialRepo.updateCredentials(service, config => encryptCredentials({
+        ...decryptCredentials(config, encryptionKey), allowedScope: scope,
+      }, encryptionKey));
+      if (!saved) {
+        res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
+        return;
+      }
+      generations.set(service, (generations.get(service) ?? 0) + 1);
+      checks.delete(service);
+      options.onCredentialsChanged?.(service);
+      res.status(200).json({ success: true, message: `Allowed scope saved for ${service}` });
+    } catch {
+      res.status(500).json({ error: 'Không thể lưu phạm vi tài nguyên. Hãy thử lại.' });
+    }
+  });
+
   return router;
 }

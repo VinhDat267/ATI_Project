@@ -437,6 +437,16 @@ export class ApiClient {
     return this.request<{ services: ServiceInfo[] }>('/api/services');
   }
 
+  async saveServiceScope(
+    service: string,
+    allowedScope: string[] | Record<string, string[]>
+  ): Promise<{ success: true; message: string }> {
+    return this.request<{ success: true; message: string }>(`/api/services/${encodeURIComponent(service)}/scope`, {
+      method: 'PUT',
+      body: JSON.stringify({ allowedScope }),
+    });
+  }
+
   async testConnection(service: string): Promise<any> {
     const res = await this.requestRaw(`/api/services/${service}/test`, {
       method: 'POST',

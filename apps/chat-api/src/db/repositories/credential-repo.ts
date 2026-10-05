@@ -61,6 +61,37 @@ export class CredentialRepo {
     return sharedRes.rows[0] || null;
   }
 
+  /** Read and transform shared config under the same lock as key replacement. */
+  async updateCredentials(
+    service: string,
+    transformConfig: (config: string) => string,
+  ): Promise<ServiceCredentialRow | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [service, 'team-shared']);
+      const current = await client.query<ServiceCredentialRow>(
+        'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL', [service],
+      );
+      const record = current.rows[0];
+      if (!record) {
+        await client.query('COMMIT');
+        return null;
+      }
+      const updated = await client.query<ServiceCredentialRow>(
+        'UPDATE service_credentials SET config = $2 WHERE id = $1 RETURNING *',
+        [record.id, transformConfig(record.config)],
+      );
+      await client.query('COMMIT');
+      return updated.rows[0] ?? null;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async deleteCredentials(service: string, userId?: string | null): Promise<void> {
     if (userId) {
       await this.pool.query(

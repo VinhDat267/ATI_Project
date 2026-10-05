@@ -249,6 +249,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         error: 'RefusalResponse requires a non-empty string reason',
       };
     }
+    // Only routing can identify unavailable services; model-supplied names are untrusted.
+    delete parsed.unavailableServices;
     return { valid: true, parsed: parsed as PlannerResponse };
   }
 

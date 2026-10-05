@@ -96,6 +96,7 @@ export interface RefusalResponse {
   kind: 'refusal';
   reason: string;
   suggestion?: string;
+  unavailableServices?: Array<{ id: string; name: string }>;
 }
 
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse;
