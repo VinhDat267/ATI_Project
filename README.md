@@ -3,7 +3,7 @@
 > **Đề tài #26:** Nền tảng tự động hóa quy trình làm việc bằng Trí tuệ Nhân tạo  
 > **Kiến trúc v3:** Chat Agent + Tool Orchestration (Plan-then-Execute)  
 > **Ngôn ngữ & Nền tảng:** TypeScript Monorepo (Node.js 22+, React 19, PostgreSQL, Docker)  
-> **Trạng thái kiểm chứng (29/09/2026):** 227/227 tests v3 cục bộ, typecheck, build, launcher và 5/5 browser E2E với PostgreSQL đã qua trên nhánh hiện tại. Kịch bản ba dịch vụ chạy trong sandbox; chưa kiểm thử live Gemini/GitHub/Trello/Slack hoặc phục hồi sau crash. Production readiness chưa được xác nhận.
+> **Trạng thái kiểm chứng:** số liệu mới nhất, ngày đo và giới hạn nằm ở [`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md). Production readiness chưa được xác nhận.
 
 ---
 
@@ -11,7 +11,7 @@
 
 **Phạm vi sản phẩm:** nền tảng lập kế hoạch và thực thi workflow trên nhiều dịch vụ bên ngoài đã được tích hợp và cấp quyền. Một workflow có thể phối hợp quản lý công việc, nhắn tin, mã nguồn, bảng tính và các dịch vụ khác qua catalog công cụ chung. Trello và Slack là hai tích hợp đầu tiên, không phải giới hạn của đề tài.
 
-**Hiện trạng mở rộng:** v3 đã có registry metadata, planner dùng catalog dịch vụ khả dụng, API/UI cấu hình theo metadata và adapter GitHub bên cạnh Trello/Slack. Workflow GitHub issue → Trello card → Slack message đã qua browser E2E sandbox với tham chiếu dữ liệu giữa các bước và PostgreSQL. Kết nối/ghi thật trên GitHub cùng hai dịch vụ còn lại chưa được nghiệm thu; vì vậy Phase 7 vẫn mở ở gate live. Google Sheets, Gmail, Calendar và Notion thuộc các đợt sau. Chi tiết tại [phạm vi đa dịch vụ và bằng chứng](docs/MULTI-SERVICE-SCOPE.md).
+**Hiện trạng mở rộng:** catalog có 33 tool trên 8 dịch vụ (Trello, Slack, GitHub, Google Sheets, Google Calendar, Notion, Telegram, Jira), dùng chung registry, adapter, allowlist tài nguyên và API/UI cấu hình theo metadata. Mức nghiệm thu của từng dịch vụ (sandbox, chạy thật qua script, chạy thật qua giao diện) ghi ở [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) và [phạm vi đa dịch vụ](docs/MULTI-SERVICE-SCOPE.md).
 
 Khác với các hệ thống cứng nhắc yêu cầu người dùng phải tự cấu trúc hóa dữ liệu vào bảng tính hoặc kéo thả luồng thủ công, **AI Workflow Platform v3** cho phép người dùng mô tả công việc hoàn toàn bằng **ngôn ngữ tự nhiên** (tiếng Việt/Anh) qua giao diện Chat:
 
@@ -43,23 +43,18 @@ Repository sử dụng mô hình Monorepo với ranh giới phân tách trách n
 ```text
 ATI_Project/
 ├── packages/
-│   ├── tool-schemas/       ← [MỚI v3] Schema & types chuẩn cho tools (shared contract)
-│   ├── tool-adapters/      ← [MỚI v3] SDK adapters (Trello, Slack, GitHub), mã hóa AES-256-GCM, rate limiter
-│   ├── planner/            ← [MỚI v3] AI Planner core: Router, Working Memory, 4-layer validator
-│   ├── executor/           ← [MỚI v3] Sequential executor: $ref resolver, ACID transactions, UNKNOWN safety
-│   ├── dsl/                ← [Legacy v2] DSL cũ (giữ nguyên làm tài liệu tham khảo)
-│   └── engine/             ← [Legacy v2] Engine cũ (giữ nguyên làm tài liệu tham khảo)
+│   ├── tool-schemas/       ← Schema & types chuẩn cho tools (shared contract), service registry
+│   ├── tool-adapters/      ← Adapter 8 dịch vụ, mã hóa AES-256-GCM, allowlist, rate limiter
+│   ├── planner/            ← AI Planner: router, working memory, prompt (src/prompts), validator
+│   └── executor/           ← Sequential executor: $ref/$template resolver, timeout, UNKNOWN safety
 ├── apps/
-│   ├── chat-api/           ← [MỚI v3] Backend Express: Auth JWT, Ingestion 202, SSE stream sequence
-│   ├── chat-web/           ← [MỚI v3] Frontend React 19 + Tailwind + fetch-event-source
-│   ├── api/                ← [Legacy v2] Backend cũ (lưu trữ)
-│   └── web/                ← [Legacy v2] Frontend cũ (lưu trữ)
-├── db/
-│   ├── v3/                 ← [MỚI v3] Schema PostgreSQL v3 (6 tables, 4 FK indexes)
-│   └── migrations/         ← [Legacy v2] Migrations 0001-0014
-├── prompts/                ← [MỚI v3] System prompts có đánh phiên bản (v001, v002...)
-├── evaluations/            ← [MỚI v3] Bộ 50 Golden Prompts đo lường chất lượng AI
-├── docs/                   ← Specs, plans, evidence, và hướng dẫn vận hành
+│   ├── chat-api/           ← Backend Express: auth/phiên, hội thoại, approval, thực thi, SSE
+│   └── chat-web/           ← Frontend React 19 + Tailwind + fetch-event-source
+├── db/v3/                  ← Migrations PostgreSQL v3
+├── evaluations/            ← Golden set, chạy thật có kiểm soát (live-execution, live-app)
+├── scripts/                ← Launcher, runner test/browser, OIDC giả cho test
+├── docs/                   ← Đặc tả, kế hoạch, handoff giữa các agent, bằng chứng v3
+├── compose.v3.yaml         ← PostgreSQL 16 cho phát triển cục bộ
 └── vitest.workspace.ts     ← Cấu hình test đa package cho toàn monorepo
 ```
 
@@ -85,7 +80,7 @@ Copy-Item .env.example .env
 
 Để **đăng nhập và dùng giao diện sandbox**, điền cả `SANDBOX_USER_EMAIL` (một email bạn chọn) và `SANDBOX_USER_PASSWORD` (mật khẩu cục bộ bạn chọn) trong `.env`; không commit file này. Sandbox chỉ lắng nghe trên `127.0.0.1` và tạo JWT secret riêng cho mỗi lần chạy nếu bạn để trống biến đó. Để chạy `RUNTIME_MODE=live`, thay URL sandbox bằng PostgreSQL thật, đặt `JWT_SECRET` (ít nhất 32 byte), `ENCRYPTION_KEY` (32 byte hoặc 64 ký tự hex), `GEMINI_API_KEY` thật và `CHAT_ADMIN_EMAIL`/`CHAT_ADMIN_PASSWORD` (ít nhất 12 ký tự); sau đó chạy `npm run db:migrate:v3` và `npm run admin:provision:v3` trước khi khởi động. Live sẽ từ chối khởi động nếu thiếu cấu hình hoặc không kết nối được DB; việc kiểm thử nhà cung cấp thật vẫn chưa được nghiệm thu.
 
-Để chạy **sandbox có PostgreSQL thật** (khuyến nghị khi kiểm thử v3), làm theo [hướng dẫn môi trường v3](docs/V3-LOCAL-SETUP.md): dùng container/cổng riêng `55533`, migrate và tạo tài khoản cục bộ. Không dùng compose v2 ở cổng `55532` cho quy trình này.
+Để chạy **sandbox có PostgreSQL thật** (khuyến nghị khi kiểm thử v3), làm theo [hướng dẫn môi trường v3](docs/V3-LOCAL-SETUP.md): dùng container/cổng riêng `55533`, migrate và tạo tài khoản cục bộ.
 
 Trong Settings, GitHub nhận personal access token và allowlist repository dạng `owner/repo`. Lệnh đọc/ghi issue chỉ được gửi tới repository đã cấu hình. Kết nối được kiểm tra qua lệnh đọc `/user`; điều đó chưa xác nhận token có quyền ghi issue. Theo [GitHub REST API](https://docs.github.com/en/rest/issues/issues), tạo issue cần quyền Issues write trên repository đích.
 
@@ -101,11 +96,11 @@ npm run check
 ```
 `check` chạy typecheck, 6 workspace test suites, build web và smoke test khởi động API/web sandbox; không chứng minh triển khai production hoặc chất lượng AI live.
 
-Sau khi tạo tài khoản PostgreSQL sandbox theo hướng dẫn setup v3, chạy `npm run test:browser:v3` để kiểm tra năm luồng bằng Chromium, API/web thật và trạng thái DB, gồm workflow GitHub → Trello → Slack. Bằng chứng và giới hạn được ghi tại [phạm vi đa dịch vụ](docs/MULTI-SERVICE-SCOPE.md) và [Phase 6 sandbox browser evidence](docs/audits/2026-09-29-v3-review/PHASE6-SANDBOX-BROWSER.md).
+Sau khi tạo tài khoản PostgreSQL sandbox theo hướng dẫn setup v3, chạy `npm run test:browser:v3` để kiểm tra các luồng chính bằng Chromium, API/web thật và trạng thái DB. Bằng chứng và giới hạn được ghi tại [phạm vi đa dịch vụ](docs/MULTI-SERVICE-SCOPE.md) và [Phase 6 sandbox browser evidence](docs/audits/2026-09-29-v3-review/PHASE6-SANDBOX-BROWSER.md).
 
 CI v3 chạy `npm ci`, migration, `npm run check` và browser E2E trên PostgreSQL 16 riêng cho mỗi job tại [v3-check.yml](.github/workflows/v3-check.yml). Chạy CI từ GitHub vẫn cần xác nhận sau khi push.
 
-Các lệnh gốc `build`, `test`, `typecheck`, `check`, `up`, `api:dev`, `api:start`, `web:dev` nay trỏ vào v3. Lệnh v2 lịch sử tương ứng có hậu tố `:v2` (ví dụ `npm run check:v2`, `npm run up:v2`); các gate `check:backend`, `check:engine`, `check:web`, `check:g1` vẫn thuộc v2. Xem [chỉ mục tài liệu](docs/README.md) trước khi dùng hướng dẫn cũ.
+Mã và tài liệu v1/v2 đã được xoá khỏi `main` ngày 05/10/2026; ảnh chụp trước khi xoá là tag `archive/v2-final`. Xem [chỉ mục tài liệu](docs/README.md).
 
 ---
 

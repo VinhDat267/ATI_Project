@@ -1,6 +1,6 @@
 # Môi trường v3 cục bộ (PostgreSQL thật, sandbox)
 
-Hướng dẫn này dành cho một checkout mới. Container v3 dùng project Docker `ati-v3`, volume `v3_pgdata` và cổng loopback `55533`; stack v2/G1 ở `55532` không bị dùng chung. Chế độ `sandbox` không gọi Gemini, Trello hoặc Slack thật.
+Hướng dẫn này dành cho một checkout mới. Container v3 dùng project Docker `ati-v3`, volume `v3_pgdata` và cổng loopback `55533`. Chế độ `sandbox` không gọi Gemini, Trello hoặc Slack thật.
 
 ## 1. Chuẩn bị
 

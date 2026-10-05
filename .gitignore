@@ -7,8 +7,6 @@ generated/
 *.tsbuildinfo
 .cache/
 .turbo/
-apps/web/test-results/
-apps/web/playwright-report/
 
 # Local environment and credentials; only blank/synthetic templates are shared
 .env
@@ -59,14 +57,6 @@ Desktop.ini
 .superpowers/
 .pi/
 CLAUDE.md
-
-# New evidence captures are ignored by default. After content review, add only
-# the exact approved checkpoint files with git add -f -- <path>; never
-# force-add a whole directory. See docs/GIT-POLICY.md. Ignore rules do not
-# protect already tracked files.
-/docs/api-evidence/**/
-/docs/task-hub-evidence/**/
-/docs/web-evidence/**/
 
 # Codegraph
 .codegraph/

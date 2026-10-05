@@ -32,7 +32,7 @@ ADR-001 đo lock entries và gzip của một renderer tối thiểu. Các số 
 
 ## Căn cứ được đo
 
-Nguồn: [measurement.json](web-evidence/ADR-002/measurement.json), tái chạy bằng `node docs/web-evidence/ADR-002/measure.mjs` từ root. Script tạo thư mục tạm, copy package manifests/lock hiện tại và ba file DSL thuần; `npm install --package-lock-only`, `npm ci --ignore-scripts`, `npm audit --json`, rồi `vite build` một mẫu. Lockfile workspace được kiểm hash không đổi.
+Nguồn: measurement.json (`web-evidence/ADR-002/measurement.json`, đã xoá khỏi main, xem tag `archive/v2-final`), tái chạy bằng `node docs/web-evidence/ADR-002/measure.mjs` từ root. Script tạo thư mục tạm, copy package manifests/lock hiện tại và ba file DSL thuần; `npm install --package-lock-only`, `npm ci --ignore-scripts`, `npm audit --json`, rồi `vite build` một mẫu. Lockfile workspace được kiểm hash không đổi.
 
 | Biến thể | Lock entries | Tăng so 248 | JS mẫu, bytes | JS gzip | CSS gzip | `npm audit` |
 |---|---:|---:|---:|---:|---:|---|
@@ -79,7 +79,7 @@ Nguồn: [measurement.json](web-evidence/ADR-002/measurement.json), tái chạy 
 ## Tài liệu liên quan
 
 - [ADR-001](ADR-001-FRONTEND-STACK.md): renderer, proxy, bảo mật; phần styling/data layer được thay bởi ADR này.
-- [System design](superpowers/specs/2026-09-15-platform-system-design.md) mục 8: module map frontend.
-- [Kế hoạch WEB-01–03](superpowers/plans/2026-09-15-frontend-platform.md).
+- System design (`superpowers/specs/2026-09-15-platform-system-design.md`, đã xoá khỏi main, xem tag `archive/v2-final`) mục 8: module map frontend.
+- Kế hoạch WEB-01–03 (`superpowers/plans/2026-09-15-frontend-platform.md`, đã xoá khỏi main, xem tag `archive/v2-final`).
 - [DESIGN.md](../DESIGN.md): nguồn token cho `@theme`.
 - Tài liệu tham khảo: [Tailwind CSS v4 theme variables](https://tailwindcss.com/docs/theme), [shadcn/ui Vite](https://ui.shadcn.com/docs/installation/vite), [TanStack Query important defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults), [Radix Primitives accessibility](https://www.radix-ui.com/primitives/docs/overview/accessibility).

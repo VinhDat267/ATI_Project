@@ -1,0 +1,30 @@
+# 05/10/2026 · Claude Code · Xoá mã và tài liệu v1/v2 khỏi main
+
+- **Yêu cầu và quyết định:** người dùng muốn dọn repo trước các task tiếp theo, xoá v2 vì không dùng lại và không liên quan tới v3.
+  - Thiết kế được duyệt trong chat: xoá nhóm A (mã v1/v2), B (cấu hình, script, compose, testdata đi kèm), C (tài liệu và bằng chứng v1/v2).
+  - Giữ nhóm D (tài liệu đề tài ban đầu: mô tả dự án, yêu cầu chức năng, màn hình, wireframe, ADR-001/002, `specs/patches`).
+  - Không xoá nhánh. Không viết lại lịch sử git.
+- **Bảo toàn:** tag có chú thích `archive/v2-final` tại `badccb3` (main trước khi dọn), đã push lên origin. Đọc lại một file bằng `git show archive/v2-final:<đường dẫn>`.
+- **Kiểm trước khi xoá:**
+  - mã v3 không import package hay đường dẫn v2; không package v3 nào khai báo phụ thuộc v2; CI chỉ chạy v3;
+  - ba phụ thuộc v3 chỉ có nhờ workspace v2 khai báo: `tsx` (dùng trong `api:dev`, `admin:provision:v3`; CI chạy lệnh sau), `@playwright/test` (browser test, `live-app`), `ajv` (test của `tool-schemas`). Đã khai báo lại đúng phiên bản đang dùng.
+- **Kết quả:** 1.511 → 612 file được theo dõi, xoá 899 file trong ba commit:
+  - mã và cấu hình (506 file): `apps/api`, `apps/web`, `apps/mcp-task-hub`, `packages/dsl`, `packages/engine`, `packages/db`, `db/migrations`, `db/DATABASE.md`, `testdata`, `config`, `tests`, `.superpowers`, 29 script v2, Dockerfile, `.dockerignore`, ba file compose v2, `docs/openapi.yaml`;
+  - tài liệu và bằng chứng (393 file);
+  - `package.json` bỏ các lệnh v2 và `openapi-typescript`, `prettier`, `yaml`. `package-lock.json` bỏ 145 gói, không thêm và không đổi phiên bản gói nào;
+  - `tsconfig.json` gốc chỉ còn `paths`/`include` v3; `.gitignore` bỏ dòng v2; `.env.example` chỉ giữ biến v3 mà mã đọc (biến năm service mới chuyển khỏi mục "LEGACY V2");
+  - AGENTS.md mục 1.3, README, `docs/README.md`, `V3-LOCAL-SETUP.md`, `team-workflow.md` cập nhật; 11 link của nhóm D trỏ tới tài liệu đã xoá đổi thành chữ thường kèm tên tag; 4 link sai đường dẫn có từ trước trong `PROJECT-REPORT.md` được sửa.
+- **Kiểm thử (worktree riêng, PostgreSQL 16 tạm trên tmpfs ở cổng 55533, `RUNTIME_MODE=sandbox`, tài khoản admin test giống CI, không có `.env`):**
+  - `npm ci` từ lock mới: exit 0; `npm run typecheck:v3` và typecheck `evaluations/golden-v2`: exit 0;
+  - `npm run db:migrate:v3`: áp 0001–0008;
+  - `npm run check`: exit 0. v3 **1.245** = 47 schema + 340 adapters + 188 planner + 25 executor + 331 API + 314 web; eval **165**; quét bản build PASS; launcher 1/1; guard 8/8. Bằng đúng số của CURRENT-STATE trước khi dọn;
+  - `npm run admin:provision:v3` rồi `npm run test:browser:v3`: exit 0, **32/32 qua 11 scenario**, không có ca fail;
+  - kiểm link tương đối trong 165 file md/html còn lại: chỉ còn 2 link hỏng trong `PRODUCT.md` (xem dưới).
+  - Không chạy lại suite trước khi dọn trên cùng máy; mốc so sánh là CI của `main` và số trong CURRENT-STATE.
+- **Không sửa, còn tham chiếu tới phần đã xoá:**
+  - `DESIGN.md`, `PRODUCT.md` (file riêng của người dùng, đang có thay đổi chưa commit); `PRODUCT.md` có 2 link tới tài liệu v2 đã xoá;
+  - CURRENT-STATE mục 2 (reviewer sửa sau merge);
+  - đặc tả v3 và `specs/patches` nhắc `docker-compose.yml` trong sơ đồ thiết kế;
+  - log và task card trong `docs/handoff` (lịch sử);
+  - test của chat-api mặc định `DATABASE_URL` cổng 55532 khi không đặt biến; mã v3 không đổi trong PR này.
+- **Sau merge:** chạy lại `npm ci` ở thư mục chính, vì `node_modules` hiện còn liên kết các workspace v2.

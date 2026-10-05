@@ -25,9 +25,10 @@ Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repos
 - [`docs/MULTI-SERVICE-SCOPE.md`](docs/MULTI-SERVICE-SCOPE.md) ghi khoảng cách mã nguồn và backlog; tài liệu này không thay thế quyền lực chuẩn tắc của đặc tả v3.
 - Khi thêm dịch vụ, phải xét catalog, routing/gather, adapter, xác thực, phạm vi tài nguyên, API/UI cấu hình và kiểm thử liên dịch vụ; không giả định chỉ cần thêm một file adapter.
 
-### 1.3. Ranh giới với mã nguồn cũ (Legacy v2)
-- Các thư mục cũ: `apps/api/`, `apps/web/`, `packages/dsl/`, `packages/engine/`, `db/migrations/` là **mã nguồn lưu trữ lịch sử (Read-only)**.
-- **Tuyệt đối không sửa đổi** các file v2 trừ khi có yêu cầu trích xuất dữ liệu đối chứng. Mọi tính năng v3 được xây dựng độc lập tại:
+### 1.3. Mã nguồn cũ (v1/v2) đã xoá
+- Ngày 05/10/2026, chủ dự án quyết định xoá mã và tài liệu v1/v2 khỏi `main`: `apps/api/`, `apps/web/`, `apps/mcp-task-hub/`, `packages/dsl/`, `packages/engine/`, `packages/db/`, `db/migrations/` cùng các báo cáo, kế hoạch và bằng chứng đi kèm.
+- Ảnh chụp trước khi xoá là tag `archive/v2-final`. Cần đối chứng thì đọc từ tag (`git show archive/v2-final:<đường dẫn>`); không khôi phục vào `main` khi chưa có yêu cầu của chủ dự án.
+- Mọi mã nguồn hiện nằm tại:
   - `packages/tool-schemas/`
   - `packages/tool-adapters/`
   - `packages/planner/`

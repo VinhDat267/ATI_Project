@@ -33,7 +33,7 @@ của mình, gần như không đụng vào code người khác.
 Shared — phải PR + review trước khi merge:
 ├── packages/tool-schemas/   ← AI Engineer sở hữu, Backend dùng
 ├── db/v3/migration.sql      ← Backend sở hữu, cả team dùng
-├── docker-compose.yml       ← Backend sở hữu
+├── compose.v3.yaml          ← Backend sở hữu
 ├── package.json (root)      ← thỏa thuận
 └── docs/                    ← ai cũng sửa được
 ```

@@ -687,10 +687,10 @@ Demo Trello/Slack dưới đây chưa đủ để nghiệm thu scope nền tản
 
 | Document | Đường dẫn | Mô tả |
 |---|---|---|
-| Design Spec v3 | [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Đặc tả thiết kế chi tiết (1029 dòng, 12 sections) |
-| Implementation Plan | [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) | Kế hoạch triển khai 28 tasks TDD |
-| Team Workflow | [`docs/team-workflow.md`](docs/team-workflow.md) | Module ownership, Git strategy, commit conventions |
-| AGENTS.md | [`AGENTS.md`](AGENTS.md) | Multi-agent engineering protocol cho repo |
+| Design Spec v3 | [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Đặc tả thiết kế chi tiết (1029 dòng, 12 sections) |
+| Implementation Plan | [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) | Kế hoạch triển khai 28 tasks TDD |
+| Team Workflow | [`docs/team-workflow.md`](team-workflow.md) | Module ownership, Git strategy, commit conventions |
+| AGENTS.md | [`AGENTS.md`](../AGENTS.md) | Multi-agent engineering protocol cho repo |
 
 ---
 
