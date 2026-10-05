@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 05/10/2026, sau merge AUTH-06 #75 tại `bfd824f`; PR này chỉ cập nhật hướng dẫn/bằng chứng, mốc mã sản phẩm vẫn là `198fe6d`. Agent cập nhật: Codex (reviewer). Các mục trước đó do Codex và Claude Code ghi.
+**Cập nhật lần cuối:** 05/10/2026, sau merge kế hoạch #77 tại `badccb3` (task card W3-10, W3-11, W4-00) và #78 (quy tắc phiên trong `PROMPTS.md`); cả hai chỉ sửa tài liệu, mốc mã sản phẩm vẫn là `198fe6d`. Agent cập nhật: Claude Code (reviewer). Mục trước đó do Codex ghi sau merge AUTH-06 #75 tại `bfd824f`.
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -8,7 +8,7 @@
 > **Trạng thái merge:** Tuần 2: W2-01 vào `main` qua PR #15 (thi công ở #16); W2-02 và W2-04 qua #18 (W2-04 ở #20); task card W2-05 qua #22; W2-05 qua #23 tại `1029e55`. W2-03 chưa làm. Không còn PR mở của tuần 2.
 >
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
-> - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Parity/latency và policy chỉ đọc cần follow-up riêng, chưa có task card sửa sản phẩm;
+> - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
 > - **frontend:** FE-01 → FE-03 và FE-03b đã merge;
 > - **đánh giá:** W4-01 → W4-04.
@@ -94,6 +94,13 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- #77 kế hoạch (`badccb3`), merge 05/10 lúc 07:38:41 Việt Nam; chỉ sửa tài liệu, tự review. Ba task card mới:
+  - **W3-10:** yêu cầu chỉ đọc hỏi lại ngay, plan phải có bước ghi; ghi thời gian, số lần thử, token từng lời gọi model; đo lại golden một lần;
+  - **W3-11:** chạy thật năm service mới qua frontend;
+  - **W4-00:** dự phòng bằng model Codex `cx/` trong 9router.
+
+  Người dùng chốt hai quyết định ngày 05/10 (xem mục 6 và 7). CI [37248029172](https://github.com/VinhDat267/ATI_Project/actions/runs/37248029172) SUCCESS trên head `fdf073e`; worktree xoá trước merge, nhánh local/remote đã xoá, local main fast-forward. Xem [log kế hoạch](log/2026-10-05-claude-code-plan-week4-risks.md).
+- #78 (`2fb15df`), 05/10: thêm "Quy tắc cho một phiên Claude Code" vào `docs/handoff/PROMPTS.md`.
 - #75 AUTH-06 (`bfd824f`), merge 05/10 lúc01:02:48 Việt Nam: nghiệm thu Gmail/Google thật và hướng dẫn setup/troubleshooting; không đổi mã sản phẩm. Review độc lập đạt, CI head `df3b7e8` xanh, tree merge bằng head; check1.245+165/browser32 qua11scenario. Local main fast-forward, bằng chứng28file sao chép vào AUTH-LIVE ignored và SHA256 khớp; runtime lỗi/container tạm đã dọn. Kiểm cuối bàn giao: API3000/web5174 đã dừng, DB dev15433 vẫn healthy. Xem [log merge](log/2026-10-05-codex-AUTH-06-merge.md).
 - #73 sửa AUTH-05 (`198fe6d`), merge 04/10 lúc 22:38:04 Việt Nam: đóng 2 P2 và 1 P3 sau review #68, bổ sung 9 test native HTTP và 4 browser Google account; runner dùng chung khóa JWT test khi chưa cấu hình. Review độc lập delta và runner đạt, CI head `4e469a1` xanh, cây merge bằng head. Check1.245+165/browser32 qua11scenario; Google/SMTP thật NOT_RUN. Local main fast-forward, năm file riêng giữ nguyên; xem [log merge](log/2026-10-04-codex-AUTH-05-merge.md).
 - #71 W3-00b (`1200a3f`), merge 04/10 lúc 20:47:23 Việt Nam: frontend và refusal naming theo registry/API, không đổi routing policy; P2 mất draft sau phản hồi lưu cũ đã sửa. Review độc lập planner/frontend và re-review delta đạt; CI head `e60e4b3` xanh, cây merge bằng head. Check1.236+165/browser28 đạt; log thi công và sửa review trong task card, [log merge](log/2026-10-04-codex-W3-00b-merge.md). Model/golden/service thật chưa đo lại.
@@ -136,8 +143,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 | Vấn đề | Ở đâu | Ghi chú |
 |---|---|---|
-| Pure-read response kind và write-only prompt chưa được validator enforce | planner / W3-06 evidence | 18attempts:15refusal/3plan/0clarification; sh07 lượt1/3 và ca01 lượt1 có read plan hợp lệ theo validator. Sáu case0/3kind, ca04 invitation0/3; policy/enforcement cần task riêng, không fit label sau quan sát |
-| Parity freeform và latency services chưa đạt | evaluations / W3-06 | ff15=0/3 vì Slack/Telegram cùng frontend; giữ label cũ. Services p95=31,097s vượt15s, max53,021s; usable-plan null, không nghiệm thu sản phẩm từ numeric PASS |
+| Pure-read response kind và write-only prompt chưa được validator enforce | planner / W3-06 evidence | 18attempts:15refusal/3plan/0clarification; sh07 lượt1/3 và ca01 lượt1 có read plan hợp lệ theo validator. Sáu case0/3kind, ca04 invitation0/3; policy đã chốt 05/10 (hỏi lại ngay, plan phải có bước ghi), sửa ở [W3-10](tasks/W3-10-read-only-and-latency.md) |
+| Parity freeform và latency services chưa đạt | evaluations / W3-06 | ff15=0/3 vì Slack/Telegram cùng frontend; giữ label cũ. Services p95=31,097s vượt15s, max53,021s; 18/25 lượt quá15s là câu chỉ đọc → [W3-10](tasks/W3-10-read-only-and-latency.md). Usable-plan null, không nghiệm thu sản phẩm từ numeric PASS |
 | Legacy Trello member fixture sai output schema | evaluations/golden-v2/fixtures.ts | 531trace thiếu fullName nhưng có name, đã tồn tại ở base; service mới zero schema mismatch. Sửa fixture cần documented rerun, không sửa ngầm context |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
 | Các ca lỗi của service thật: 429, timeout, ngoài scope và token hết hạn mới test bằng dữ liệu giả | adapters | W3-07 đã chạy ca token/key sai thật cho năm service mới (Telegram 401, Notion 401, Jira 401/404, Google `invalid_grant`). W2-03 (ba service cũ) vẫn chờ người dùng duyệt plan ghi |
@@ -155,7 +162,10 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 - Database: `npm run db:up:v3` (PostgreSQL 16 tại `127.0.0.1:55533`, user/db `ati_v3`); máy Windows nhóm trưởng đang dùng override ignored `.codex/` tại port15433 và giữ volume dev. Migration: `npm run db:migrate:v3`.
 - `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LIVE_SHEETS_SPREADSHEET_IDS`, `LIVE_CALENDAR_IDS`, `NOTION_TOKEN`, `LIVE_NOTION_DATABASE_IDS`, `TELEGRAM_BOT_TOKEN`, `LIVE_TELEGRAM_CHAT_IDS`, `JIRA_SITE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `LIVE_JIRA_PROJECT_KEYS`, `AUTH_SIGNUP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_BASE_URL`, `V3_WEB_PORT`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`.
-- LLM: model `ag/gemini-3.8-flash` qua một cổng tương thích OpenAI chạy ở máy (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`). Cổng này có thể ngừng hoạt động bất cứ lúc nào; trước buổi bảo vệ cần có đường dự phòng qua Gemini API chính thức (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`).
+- LLM: model `ag/gemini-3.8-flash` qua 9router chạy ở máy nhóm trưởng (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL=http://localhost:20128/v1`). 9router gom nhiều tài khoản Gemini chạy song song.
+  - **Dự phòng (chốt 05/10):** đổi `LLM_MODEL` sang một model Codex `cx/` trong cùng 9router, chuyển thủ công rồi khởi động lại; chưa kiểm với sản phẩm, xem [W4-00](tasks/W4-00-llm-fallback-provider.md).
+  - Không dùng Gemini API chính thức: quota miễn phí 20 request/ngày và 503 liên tục khi thử ngày 29–30/09.
+  - Rủi ro còn lại: sự cố của chính 9router hoặc máy nhóm trưởng (ngày 03/10 một campaign dừng ở 79/132 lượt khi tiến trình cổng đổi).
 - Chạy app: `npm run up` (API cổng 3000, web cổng 5174). Chế độ live: `RUNTIME_MODE=live npm run up`, xem mục "Through the app" trong `evaluations/README.md`. Live không có biến SMTP nào vẫn chạy, nhưng đăng ký bằng email và các chức năng gửi email tắt (503); cấu hình SMTP thiếu một phần là lỗi khởi động.
 - Google login cần đủ `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` và PostgreSQL; thiếu thì ẩn nút và route Google trả 503. Google signup theo `AUTH_SIGNUP_ENABLED`, không phụ thuộc việc SMTP đã bật; Callback web `/auth/google/callback`; Google OAuth và Gmail SMTP thật đã cấu hình/kiểm ở AUTH-06 ngày04–05/10; xem hướng dẫn AUTH-06 trong `evaluations/README.md`.
 - Tài nguyên thử nghiệm thật: Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`. Chỉ ghi ra service thật khi người dùng đã duyệt đúng plan đó.
@@ -167,6 +177,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - đăng ký mở nhưng admin duyệt, vì credentials service dùng chung cả nhóm;
   - gửi email bằng Gmail SMTP (`nodemailer` là thư viện mới duy nhất được phép cho mảng tài khoản);
   - đăng nhập Google bằng OIDC.
+
+- **Chốt 05/10/2026:**
+  - yêu cầu chỉ đọc được hỏi lại ngay ở lời gọi model đầu tiên, không tra cứu; plan phải có ít nhất một bước ghi; không thêm kiểu trả lời đọc dữ liệu (W3-10);
+  - LLM dự phòng là model Codex `cx/` trong cùng 9router, chuyển thủ công, không tự chuyển model khi lỗi (W4-00);
+  - phép đo trước/sau của W3-10 phải dùng đúng `ag/gemini-3.8-flash`.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
