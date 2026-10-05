@@ -48,4 +48,9 @@ Nội dung cockpit (FE-05/06), trang Kết nối dịch vụ (FE-07), các trang
 
 ## Kết quả
 
-_(agent thi công điền)_
+- Đã triển khai trên `vinhdat/feat-fe-04-shell`, từ `0d279a9`; code được nghiệm thu tại `189417e48053815078b6468548db2f86b83fcb83`. Token/font sáng-tối, theme bootstrap và đồng bộ tab, AppShell/menu/banner, bốn route và Settings page dùng lại logic hiện có; cấu trúc cockpit và các màn hình thuộc FE-05→FE-10 giữ phạm vi riêng.
+- RED trước tính năng và regression được ghi nhận thật. Review độc lập đầu phát hiện bốn P2: locator AUTH-05, weight nút cam, tương phản chữ dark, kích thước vùng chạm. Đã sửa đủ bốn; reviewer kiểm lại delta và các gate, kết luận Đạt.
+- Reviewer chạy `npm run check`: exit 0, **1.270 v3** (47 schema + 340 adapter + 188 planner + 25 executor + 331 API + 339 web), **165 evaluation offline**, typecheck/build/scan bundle/launcher/guards đạt.
+- Reviewer chạy nguyên lệnh `npm run test:browser:v3`: exit 0, **39/39**, đủ **11 scenario**. Giữ các assertion logout/DB rename/Google link-unlink/refresh; bổ sung bảy test FE-04, gồm năm ca CSS thực tế cho weight, contrast và vùng chạm. Kết quả browser cũ 32 pass/2 fail là bằng chứng lỗi trước sửa, không tính là đạt.
+- Ảnh desktop 1440/mobile 375 sáng-tối và menu/Settings đã được xem trực tiếp. Weight nút 600, vùng chạm ≥40×40, đoạn cảnh báo dark đạt 9,5665:1; Settings đúng một main/một h1, không thấy overflow ở các trạng thái kiểm. Bằng chứng chi tiết lưu riêng.
+- PR/CI remote và merge còn chờ tại thời điểm bàn giao này. Model/dịch vụ thật và screen reader **NOT_RUN**; browser dùng sandbox/OIDC fixture, không đụng DB dev 15433. Xem [nhật ký FE-04](../log/2026-10-05-codex-FE-04.md).
