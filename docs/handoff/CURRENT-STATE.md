@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 05/10/2026, sau merge #80 tại `7060a37`: xoá mã và tài liệu v1/v2 khỏi `main`. Mã nguồn v3 không đổi; chỉ đổi manifest/lock. Trước đó: kế hoạch #77 (`badccb3`), quy tắc phiên #78, đồng bộ #79 (`b7ced04`). Agent cập nhật: Claude Code (reviewer).
+**Cập nhật lần cuối:** 05/10/2026, sau merge #82 (DOC-01) tại `841d9da`: sửa năm link HTML tới tag `archive/v2-final`; mã/CSS v3 không đổi. Trước đó: xoá mã và tài liệu v1/v2 qua #80 (`7060a37`), bàn giao #81 (`0ecaa18`), kế hoạch #77 (`badccb3`), quy tắc phiên #78, đồng bộ #79 (`b7ced04`). Agent cập nhật: Codex (reviewer độc lập DOC-01).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -94,6 +94,10 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **DOC-01 xong #82** (`841d9da`), merge 05/10 lúc 09:32:41 Việt Nam: đóng finding P3 của review độc lập #80; sửa năm href trong `docs/screens.html` và `docs/wireframes.html` tới tag `archive/v2-final`, có nhãn "lưu trữ"; bốn href local còn tồn tại giữ nguyên.
+  - Review độc lập `0ecaa18..36cef3b` đạt: base có năm đích thiếu; head có năm link archive (BASELINE 2/API 2/EXECUTION-CONTRACT 1), bốn link local và `missing=[]`. GitHub Contents API trả ba `html_url` đúng href; tag peel về `badccb3`; `git diff --check` exit 0.
+  - [CI PR #82](https://github.com/VinhDat267/ATI_Project/actions/runs/37255434085) SUCCESS trên head `36cef3b`; cây merge bằng head đã kiểm. [CI main](https://github.com/VinhDat267/ATI_Project/actions/runs/37255822408) SUCCESS đúng merge `841d9da`.
+  - Chỉ sửa liên kết tài liệu; không chạy lại suite ứng dụng local, model hoặc service workflow. Các giới hạn live và backlog giữ nguyên. Xem [task DOC-01](tasks/DOC-01-pr80-archive-links.md) và [log reviewer](log/2026-10-05-codex-DOC-01-merge.md).
 - #80 dọn repo (`7060a37`), merge 05/10 lúc 08:38:32 Việt Nam; **tự review, người dùng cho merge khi chưa có review độc lập**.
   - Xoá 899 file v1/v2 (1.511 → 612 file được theo dõi) theo thiết kế người dùng duyệt; giữ tài liệu đề tài ban đầu (mô tả dự án, yêu cầu chức năng, wireframe, ADR).
   - Khai báo lại ba package v3 trước đây chỉ có nhờ workspace v2: `tsx`, `@playwright/test`, `ajv`. Lock bỏ 145 gói, không đổi phiên bản gói nào.
