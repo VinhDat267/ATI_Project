@@ -91,7 +91,8 @@ function asCandidates(value: unknown, nameField?: string): GatherCandidate[] {
 function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
   return { kind: 'refusal',
     reason: unavailable.length > 0 ? unavailableServiceReason(unavailable) : 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
-    suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.' };
+    suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.',
+    ...(unavailable.length > 0 ? { unavailableServices: unavailable } : {}) };
 }
 
 export class AIPlanner {
