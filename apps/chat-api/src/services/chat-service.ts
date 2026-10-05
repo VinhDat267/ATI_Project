@@ -165,11 +165,15 @@ export class ChatService {
         ...correlation,
       });
     } else if (plannerResponse.kind === 'refusal') {
-      await this.msgRepo.createMessage(conversationId, 'assistant', `Từ chối yêu cầu: ${plannerResponse.reason}${plannerResponse.suggestion ? `\nGợi ý: ${plannerResponse.suggestion}` : ''}`, { type: 'refusal', ...correlation });
-      this.eventEmitter.emit('refusal', {
-        conversationId,
+      const refusal = {
         reason: plannerResponse.reason,
         suggestion: plannerResponse.suggestion,
+        ...(plannerResponse.unavailableServices ? { unavailableServices: plannerResponse.unavailableServices } : {}),
+      };
+      await this.msgRepo.createMessage(conversationId, 'assistant', `Từ chối yêu cầu: ${plannerResponse.reason}${plannerResponse.suggestion ? `\nGợi ý: ${plannerResponse.suggestion}` : ''}`, { type: 'refusal', ...refusal, ...correlation });
+      this.eventEmitter.emit('refusal', {
+        conversationId,
+        ...refusal,
         ...correlation,
       });
 
