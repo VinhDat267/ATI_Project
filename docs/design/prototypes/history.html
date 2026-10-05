@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nhật ký điều phối & Lịch sử yêu cầu — ATI</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              bg: '#F8F8F6',
+              text: '#111827',
+              border: '#E7E7E2',
+              muted: '#6B7280',
+              surface: '#FFFFFF',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05)',
+            'drawer': '-8px 0 32px rgba(0, 0, 0, 0.08)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --muted: #6B7280;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --success: #16A34A;
+      --warn: #D97706;
+      --danger: #DC2626;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Focus Visible Ring */
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #FF5701;
+      outline-offset: 2px;
+    }
+
+    /* Tối ưu màn hình hẹp dưới 420px */
+    @media (max-width: 419px) {
+      #role-pill-badge {
+        display: none !important;
+      }
+    }
+
+    /* prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]">
+
+  <!-- Toast Thông báo nổi -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2" role="status" aria-live="polite"></div>
+
+  <!-- THANH TRÊN (COCKPIT HEADER) -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Điều hướng quay lại -->
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+          <span class="sm:hidden">Quay lại</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <!-- Liên kết chéo -->
+        <a href="settings.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>Kết nối dịch vụ</span>
+        </a>
+
+        <a href="guide.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Cẩm nang kết nối & Mẫu câu lệnh">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          <span>Cẩm nang</span>
+        </a>
+
+        <a href="users.html" id="nav-link-users" class="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Quản lý người dùng">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span>Người dùng</span>
+        </a>
+      </div>
+
+      <!-- Cụm Phải: Vai trò + Kịch bản Demo + Avatar -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        
+        <!-- Nhãn vai trò hiện tại -->
+        <span id="role-pill-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-200/80 text-[#374151] border border-neutral-300/60" title="Vai trò hiện tại của bạn">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+          <span id="current-role-label">Quản trị viên</span>
+        </span>
+
+        <!-- Nút Kịch bản demo -->
+        <div class="relative">
+          <button type="button" id="btn-demo-menu" onclick="toggleDemoDropdown()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#4B5563] bg-white border border-[#E7E7E2] rounded-lg hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm" aria-haspopup="true" aria-expanded="false">
+            <svg class="w-3.5 h-3.5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            <span class="hidden sm:inline">Kịch bản</span>
+            <svg class="w-3 h-3 text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <!-- Dropdown menu kịch bản demo -->
+          <div id="demo-dropdown" class="hidden absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-[#E7E7E2] py-2 z-50 text-xs">
+            <div class="px-3 py-1.5 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider border-b border-[#E7E7E2]">
+              Kịch bản kiểm thử demo
+            </div>
+            
+            <!-- Đổi vai trò xem -->
+            <div class="p-2 border-b border-[#E7E7E2]">
+              <span class="block text-[11px] text-[#6B7280] mb-1.5 font-medium">Xem trang với vai trò:</span>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button type="button" onclick="setRole('admin')" id="demo-role-admin-btn" class="px-2 py-1.5 rounded-lg text-center font-medium bg-[#FF5701] text-white transition-colors">
+                  Quản trị viên
+                </button>
+                <button type="button" onclick="setRole('member')" id="demo-role-member-btn" class="px-2 py-1.5 rounded-lg text-center font-medium bg-neutral-100 text-[#4B5563] hover:bg-neutral-200 transition-colors">
+                  Thành viên
+                </button>
+              </div>
+            </div>
+
+            <!-- Thao tác dữ liệu mẫu -->
+            <div class="py-1">
+              <button type="button" onclick="addSampleRequest()" class="w-full text-left px-3 py-2 text-[#374151] hover:bg-neutral-50 flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-[#16A34A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span>Thêm yêu cầu mẫu mới (vừa xong)</span>
+              </button>
+              <button type="button" onclick="resetToDefaultData()" class="w-full text-left px-3 py-2 text-[#DC2626] hover:bg-red-50 flex items-center gap-2">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.038 8.038 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Khôi phục dữ liệu ban đầu</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avatar người dùng liên kết về account.html -->
+        <a href="account.html" class="w-8 h-8 rounded-full bg-[#FF5701] text-white flex items-center justify-center font-semibold text-xs tracking-wider shadow-sm hover:ring-2 hover:ring-[#FF5701]/30 transition-all" title="Tài khoản của Lan Nguyễn">
+          LN
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- NỘI DUNG CHÍNH -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+    <!-- KHỐI TIÊU ĐỀ & NGUYÊN TẮC AN TOÀN -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E7E7E2] pb-6">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-200/80 text-[#374151]">
+            <svg class="w-3 h-3 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Nhật ký điều phối
+          </span>
+          <span id="requests-count-badge" class="text-xs text-[#6B7280]">28 yêu cầu</span>
+        </div>
+        <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#111827]">
+          Nhật ký điều phối & Lịch sử yêu cầu
+        </h1>
+        <p class="text-sm text-[#4B5563] mt-1.5 max-w-2xl leading-relaxed">
+          Theo dõi toàn bộ các phiên điều phối liên dịch vụ do ATI thực hiện. Mỗi yêu cầu đều có đầy đủ bước duyệt, biên nhận và liên kết tới từng kết quả.
+        </p>
+      </div>
+
+      <!-- Nút hành động nhanh -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a href="app-stage.html" class="inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-[#FF5701] text-white hover:bg-[#E04D00] shadow-sm hover:shadow transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span>Gõ yêu cầu mới</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- NGUYÊN TẮC AN TOÀN -->
+    <div class="p-4 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft flex items-start gap-3.5">
+      <div class="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-[#FF5701] mt-0.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      </div>
+      <div class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+        <strong class="text-[#111827] font-semibold">Minh bạch & An toàn dữ liệu:</strong> 
+        ATI không bao giờ tự ý ghi gì khi bạn chưa bấm duyệt. Mọi hành động đều được lưu vết thời gian thực, có đường dẫn kiểm tra trực tiếp trên từng công cụ và tuyệt đối dừng lại hỏi người dùng nếu mạng gián đoạn giữa chừng.
+      </div>
+    </div>
+
+    <!-- 4 THẺ THỐNG KÊ NHANH -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div class="p-4 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft">
+        <div class="text-xs font-medium text-[#6B7280]">Tổng yêu cầu</div>
+        <div id="stat-total" class="font-display text-2xl font-bold text-[#111827] mt-1">28</div>
+        <div class="text-[11px] text-[#6B7280] mt-0.5" id="stat-scope-desc">Lịch sử cá nhân</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft">
+        <div class="text-xs font-medium text-[#16A34A] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+          <span>Hoàn tất trọn vẹn</span>
+        </div>
+        <div id="stat-completed" class="font-display text-2xl font-bold text-[#16A34A] mt-1">26</div>
+        <div class="text-[11px] text-[#6B7280] mt-0.5">Đã duyệt & xuất kết quả</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft">
+        <div class="text-xs font-medium text-[#D97706] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#D97706]"></span>
+          <span>Đã dừng / Chờ hỏi</span>
+        </div>
+        <div id="stat-paused" class="font-display text-2xl font-bold text-[#D97706] mt-1">1</div>
+        <div class="text-[11px] text-[#6B7280] mt-0.5">Mạng ngắt khi đang ghi</div>
+      </div>
+      <div class="p-4 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft">
+        <div class="text-xs font-medium text-[#6B7280] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#6B7280]"></span>
+          <span>Từ chối / Đã hủy</span>
+        </div>
+        <div id="stat-cancelled" class="font-display text-2xl font-bold text-[#4B5563] mt-1">1</div>
+        <div class="text-[11px] text-[#6B7280] mt-0.5">Chưa hỗ trợ hoặc hủy duyệt</div>
+      </div>
+    </div>
+
+    <!-- THANH TÌM KIẾM VÀ BỘ LỌC ĐA NĂNG -->
+    <div class="bg-white p-4 rounded-2xl border border-[#E7E7E2] shadow-soft space-y-3.5">
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        
+        <!-- Ô tìm kiếm -->
+        <div class="relative flex-1">
+          <label for="search-input" class="sr-only">Tìm kiếm yêu cầu trong nhật ký</label>
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#9CA3AF]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input type="text" id="search-input" oninput="handleFilterChange()" placeholder="Tìm theo tiêu đề hội thoại…" class="w-full text-xs sm:text-sm pl-10 pr-4 py-2.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#111827] focus:bg-white focus:outline-none focus:border-[#FF5701] transition-all">
+        </div>
+
+        <!-- Bộ lọc kết hợp -->
+        <div class="flex flex-wrap items-center gap-2.5 flex-shrink-0">
+          
+          <!-- Lọc theo Trạng thái -->
+          <div class="flex items-center gap-1.5">
+            <div class="relative">
+              <select id="filter-status" onchange="handleFilterChange()" class="text-xs sm:text-sm font-medium py-2.5 pl-3 pr-8 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#374151] focus:bg-white focus:outline-none focus:border-[#FF5701] cursor-pointer transition-colors appearance-none">
+                <option value="all">Tất cả trạng thái</option>
+                <option value="completed">✓ Hoàn tất trọn vẹn</option>
+                <option value="paused">⚠ Đã dừng (mất mạng)</option>
+                <option value="cancelled">✕ Từ chối / Đã hủy</option>
+              </select>
+              <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-[#9CA3AF]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </div>
+            <span class="text-[11px] text-[#9CA3AF] font-medium whitespace-nowrap">(bản mẫu)</span>
+          </div>
+
+          <!-- Lọc theo Dịch vụ -->
+          <div class="flex items-center gap-1.5">
+            <div class="relative">
+              <select id="filter-service" onchange="handleFilterChange()" class="text-xs sm:text-sm font-medium py-2.5 pl-3 pr-8 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#374151] focus:bg-white focus:outline-none focus:border-[#FF5701] cursor-pointer transition-colors appearance-none">
+                <option value="all">Tất cả công cụ</option>
+                <option value="trello">Trello</option>
+                <option value="slack">Slack</option>
+                <option value="github">GitHub</option>
+                <option value="sheets">Google Sheets</option>
+                <option value="notion">Notion</option>
+                <option value="calendar">Google Calendar</option>
+                <option value="jira">Jira</option>
+              </select>
+              <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-[#9CA3AF]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </div>
+            <span class="text-[11px] text-[#9CA3AF] font-medium whitespace-nowrap">(bản mẫu)</span>
+          </div>
+
+          <!-- Nút đặt lại bộ lọc -->
+          <button type="button" onclick="resetFilters()" class="p-2.5 text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 rounded-xl transition-colors" title="Đặt lại bộ lọc">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.038 8.038 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Quick chips filters -->
+      <div class="flex items-center gap-2 overflow-x-auto pt-2 border-t border-[#E7E7E2] text-xs">
+        <span class="text-[#6B7280] font-medium whitespace-nowrap">Lọc nhanh:</span>
+        <button type="button" onclick="setQuickFilter('all')" class="quick-chip px-2.5 py-1 rounded-lg border font-medium bg-[#111827] text-white border-[#111827] transition-colors" data-chip="all">Tất cả</button>
+        <button type="button" onclick="setQuickFilter('today')" class="quick-chip px-2.5 py-1 rounded-lg border font-medium bg-neutral-100 text-[#4B5563] border-transparent hover:bg-neutral-200 transition-colors" data-chip="today">Hôm nay</button>
+        <button type="button" onclick="setQuickFilter('has_github')" class="quick-chip px-2.5 py-1 rounded-lg border font-medium bg-neutral-100 text-[#4B5563] border-transparent hover:bg-neutral-200 transition-colors" data-chip="has_github">Có GitHub</button>
+        <button type="button" onclick="setQuickFilter('needs_attention')" class="quick-chip px-2.5 py-1 rounded-lg border font-medium bg-neutral-100 text-[#4B5563] border-transparent hover:bg-neutral-200 transition-colors" data-chip="needs_attention">Cần xem lại (1)</button>
+      </div>
+    </div>
+
+    <!-- DANH SÁCH NHẬT KÝ THEO DÒNG THỜI GIAN -->
+    <div id="requests-list-container" class="space-y-6">
+      <!-- Sinh động qua JavaScript -->
+    </div>
+
+    <!-- NÚT TẢI THÊM CUỐI DANH SÁCH -->
+    <div id="load-more-container" class="pt-2 flex flex-col items-center justify-center gap-2">
+      <button type="button" id="btn-load-more" onclick="loadMoreRequests()" class="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-white border border-[#E7E7E2] hover:border-[#FF5701] text-[#374151] hover:text-[#FF5701] shadow-soft transition-all">
+        <span>Tải thêm</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div id="load-more-all-loaded" class="hidden text-xs text-[#9CA3AF]">Đã hiển thị toàn bộ lịch sử hội thoại</div>
+    </div>
+
+    <!-- TRẠNG THÁI RỖNG (EMPTY STATE KHI TÌM KHÔNG THẤY) -->
+    <div id="empty-state" class="hidden p-12 text-center bg-white rounded-2xl border border-[#E7E7E2] shadow-soft space-y-3">
+      <div class="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-[#6B7280]">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      </div>
+      <h3 class="font-display text-lg font-bold text-[#111827]">Không tìm thấy yêu cầu phù hợp</h3>
+      <p class="text-xs sm:text-sm text-[#6B7280] max-w-sm mx-auto">
+        Thử thay đổi từ khóa tìm kiếm hoặc bỏ bớt các điều kiện lọc trạng thái, dịch vụ.
+      </p>
+      <button type="button" onclick="resetFilters()" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#111827] transition-colors mt-2">
+        <span>Xoá toàn bộ bộ lọc</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- CHÂN TRANG -->
+  <footer class="mt-auto border-t border-[#E7E7E2] bg-[#F8F8F6] py-6 px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
+      <div class="flex items-center gap-2">
+        <span class="font-display font-bold text-[#111827]">ATI</span>
+        <span>· 2026</span>
+        <span>· AI Workflow Automation Platform</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+        <a href="settings.html" class="hover:text-[#111827] transition-colors">Kết nối dịch vụ</a>
+        <a href="guide.html" class="hover:text-[#111827] transition-colors">Cẩm nang & Mẫu lệnh</a>
+        <a href="users.html" class="hover:text-[#111827] transition-colors">Quản lý người dùng</a>
+        <a href="account.html" class="hover:text-[#111827] transition-colors">Tài khoản</a>
+        <a href="responses.html" class="hover:text-[#111827] transition-colors">Màn từ chối & hỏi lại</a>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- =========================================================
+       NGĂN CHI TIẾT YÊU CẦU & BIÊN NHẬN (DETAIL DRAWER)
+       ========================================================= -->
+  <div id="request-detail-drawer" class="fixed inset-0 z-50 overflow-hidden hidden" role="dialog" aria-modal="true" aria-labelledby="drawer-request-title">
+    <!-- Backdrop mờ -->
+    <div id="drawer-backdrop" onclick="closeDetailDrawer()" class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity opacity-0"></div>
+
+    <div class="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-16">
+      <div id="drawer-panel" class="w-screen max-w-2xl bg-white shadow-drawer border-l border-[#E7E7E2] flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out">
+        
+        <!-- Header Drawer -->
+        <div class="px-5 sm:px-6 py-4 border-b border-[#E7E7E2] flex items-center justify-between gap-3 bg-[#F8F8F6]">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span id="drawer-req-id" class="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-neutral-200 text-[#374151]">
+                ATI-CV-042
+              </span>
+              <span id="drawer-status-badge">
+                <!-- Status Badge -->
+              </span>
+            </div>
+            <h2 id="drawer-request-title" class="font-display text-lg sm:text-xl font-bold text-[#111827] mt-1 line-clamp-2">
+              Chi tiết yêu cầu điều phối
+            </h2>
+          </div>
+
+          <button type="button" onclick="closeDetailDrawer()" class="p-2 text-[#6B7280] hover:text-[#111827] rounded-lg hover:bg-neutral-200 transition-colors flex-shrink-0" aria-label="Đóng ngăn chi tiết">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Thân Drawer cuộn dọc -->
+        <div class="flex-1 overflow-y-auto px-5 sm:px-6 py-6 space-y-6" id="drawer-body">
+          
+          <!-- HỘP CÂU LỆNH GỐC TIẾNG VIỆT -->
+          <div class="p-4 rounded-xl bg-neutral-50 border border-[#E7E7E2] space-y-2">
+            <div class="flex items-center justify-between text-xs text-[#6B7280]">
+              <span class="font-medium">Câu lệnh tiếng Việt gốc:</span>
+              <button type="button" onclick="copyDrawerPrompt()" class="text-[#FF5701] hover:underline inline-flex items-center gap-1 font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span>Sao chép câu lệnh</span>
+              </button>
+            </div>
+            <p id="drawer-prompt-text" class="text-sm sm:text-base font-semibold text-[#111827] leading-relaxed">
+              "Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack"
+            </p>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 border-t border-neutral-200 text-xs text-[#6B7280]">
+              <span id="drawer-author-info">Người yêu cầu: <strong>Lan Nguyễn</strong></span>
+              <span id="drawer-time-info">Thời gian: <strong>14:02 · Hôm nay</strong></span>
+              <span id="drawer-duration-info">Xong trong: <strong>3,8 giây</strong></span>
+            </div>
+          </div>
+
+          <!-- THÔNG ĐIỆP AN TOÀN / CẢNH BÁO NẾU CÓ -->
+          <div id="drawer-safety-notice" class="p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5">
+            <!-- Dynamic notice -->
+          </div>
+
+          <!-- KẾ HOẠCH HÀNH ĐỘNG VÀ BIÊN NHẬN KẾT QUẢ -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-[11px] flex items-center justify-center font-bold">1</span>
+                <span>Hành trình thực hiện & Biên nhận</span>
+              </h3>
+              <span id="drawer-steps-count" class="text-xs text-[#6B7280] font-medium">4 / 4 việc hoàn thành</span>
+            </div>
+
+            <!-- Danh sách từng bước biên nhận -->
+            <div id="drawer-steps-list" class="space-y-3">
+              <!-- Sinh động -->
+            </div>
+          </div>
+
+          <!-- SƠ ĐỒ TRUYỀN DỮ LIỆU LIÊN CÔNG CỤ -->
+          <div id="drawer-data-flow-section" class="space-y-3">
+            <div class="flex items-center justify-between border-t border-[#E7E7E2] pt-4">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-[11px] flex items-center justify-center font-bold">2</span>
+                <span>Dòng dữ liệu kết nối</span>
+              </h3>
+              <span class="text-[11px] text-[#6B7280]">Khớp nối tự động giữa các bước</span>
+            </div>
+            
+            <div id="drawer-data-flow-content" class="p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs space-y-2">
+              <!-- Dynamic Flow Content -->
+            </div>
+          </div>
+
+          <!-- NHẬT KÝ SỰ KIỆN CHI TIẾT (AUDIT LOG) -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between border-t border-[#E7E7E2] pt-4">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#111827] text-white text-[11px] flex items-center justify-center font-bold">3</span>
+                <span>Nhật ký sự kiện điều phối</span>
+              </h3>
+              <span class="text-[11px] text-[#6B7280]">Lưu vết từng mốc</span>
+            </div>
+
+            <div id="drawer-timeline-logs" class="space-y-2 font-mono text-xs">
+              <!-- Dynamic Timeline events -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer Drawer -->
+        <div class="px-5 sm:px-6 py-3.5 border-t border-[#E7E7E2] bg-[#F8F8F6] flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5">
+          <button type="button" onclick="closeDetailDrawer()" class="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] rounded-xl hover:bg-neutral-200 transition-colors text-center">
+            Đóng
+          </button>
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <button type="button" onclick="copyDrawerReport()" class="justify-center px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[#374151] bg-white border border-[#E7E7E2] hover:bg-neutral-50 rounded-xl transition-colors shadow-sm inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+              <span>Sao chép biên nhận</span>
+            </button>
+            <button type="button" id="btn-replay-stage" onclick="replayInStage()" class="justify-center px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#FF5701] hover:bg-[#E04D00] rounded-xl transition-all shadow-sm inline-flex items-center gap-1.5">
+              <span>Mở lại trên sân khấu →</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT LOGIC QUẢN LÝ DỮ LIỆU & TƯƠNG TÁC
+       ========================================================= -->
+  <script>
+    /* =======================================================
+       1. SVG INLINE CỦA 8 DỊCH VỤ (CHÍNH XÁC NHƯ TOÀN BỘ DỰ ÁN)
+       ======================================================= */
+    const SERVICE_SVGS = {
+      trello: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#0079BF"/><rect x="4" y="4" width="6.5" height="13" rx="1.5" fill="white"/><rect x="13.5" y="4" width="6.5" height="8.5" rx="1.5" fill="white"/></svg>`,
+      slack: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.528 2.528 0 0 1 2.521-2.52 2.528 2.528 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.528 2.528 0 0 1-2.52-2.523 2.528 2.528 0 0 1 2.52-2.52h6.313A2.528 2.528 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>`,
+      github: `<svg class="w-5 h-5 text-[#24292E]" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>`,
+      sheets: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#0F9D58"/><path d="M14 2v6h6l-6-6z" fill="#87CEAB"/><rect x="7" y="11" width="10" height="7" rx="0.5" fill="white" fill-opacity="0.3"/><line x1="7" y1="14" x2="17" y2="14" stroke="white" stroke-width="1"/><line x1="11" y1="11" x2="11" y2="18" stroke="white" stroke-width="1"/></svg>`,
+      calendar: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" fill="#4285F4"/><rect x="3" y="4" width="18" height="5" fill="#1967D2"/><circle cx="7" cy="2.5" r="1.5" fill="#1967D2"/><circle cx="17" cy="2.5" r="1.5" fill="#1967D2"/><text x="12" y="17" fill="white" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">31</text></svg>`,
+      notion: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.222 3.125l13.774-1.12c1.38-.112 1.954.267 2.502.933l2.808 3.444c.433.533.693 1.155.693 1.777v12.22c0 1.2-.544 1.866-1.843 1.977l-14.88 1.111c-1.378.111-2.04-.333-2.589-1l-2.016-2.555c-.443-.555-.67-1.222-.67-1.778V4.88c0-1.111.66-1.666 2.22-1.755zm14.153 1.867L7.332 5.88c-.328.026-.453.18-.453.373v11.758c0 .24.125.4.375.373l11.043-.88c.328-.027.422-.24.422-.453V5.419c0-.24-.125-.4-.344-.427zM9.47 7.915l3.593-.24 3.03 5.467V7.435l2.25-.16v8.425l-3.375.24-3.25-5.653v5.626l-2.25.16V7.915z" fill="#111827"/></svg>`,
+      telegram: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#229ED9"/><path d="M17.5 7.5L5.5 12.1L9.5 13.6L14.7 10.3C14.9 10.2 15.1 10.4 15 10.6L10.8 14.4V17.5L12.9 15.5L16.2 17.9C16.8 18.2 17.2 17.9 17.4 17.2L19.4 8.2C19.6 7.3 18.9 6.8 17.5 7.5Z" fill="white"/></svg>`,
+      jira: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M11.53 2C11.53 7.26 7.26 11.53 2 11.53C7.26 11.53 11.53 15.8 11.53 21.06C11.53 15.8 15.8 11.53 21.06 11.53C15.8 11.53 11.53 7.26 11.53 2Z" fill="#0052CC"/><path d="M11.53 2C11.53 4.63 9.4 6.76 6.77 6.76C9.4 6.76 11.53 8.89 11.53 11.52C11.53 8.89 13.66 6.76 16.29 6.76C13.66 6.76 11.53 4.63 11.53 2Z" fill="#2684FF"/></svg>`
+    };
+
+    /* =======================================================
+       2. DỮ LIỆU LỊCH SỬ CÁC PHIÊN YÊU CẦU MẪU
+       ======================================================= */
+    const INITIAL_REQUESTS = [
+      {
+        id: 'CV-042',
+        title: 'Tạo card Trello, issue GitHub, cập nhật Sheets và Slack',
+        prompt: 'Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack',
+        status: 'completed', // 'completed' | 'paused' | 'cancelled'
+        statusLabel: '✓ Hoàn tất',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '14:02 · Hôm nay',
+        dateGroup: 'today',
+        durationStr: '3,8 giây',
+        services: ['trello', 'github', 'sheets', 'slack'],
+        summaryResult: 'Đã tạo card Doing · Issue #42 · Dòng 104 · Đã gửi kênh #ati-test',
+        safetyNotice: {
+          type: 'success',
+          text: '✓ Kế hoạch được duyệt lúc 14:02 bởi Lan Nguyễn. Không ghi dữ liệu gì trước khi duyệt. Toàn bộ 4 đường dẫn biên nhận đã được xác nhận trực tiếp.'
+        },
+        steps: [
+          {
+            service: 'trello',
+            serviceName: 'Trello',
+            actionTitle: 'Tạo card "Sửa lỗi đăng nhập Google" trong danh sách Doing',
+            targetLoc: 'Bảng To Do · Danh sách Doing',
+            badge: '✓ Đã tạo card',
+            linkText: 'Mở card ↗',
+            linkUrl: '#trello-card'
+          },
+          {
+            service: 'github',
+            serviceName: 'GitHub',
+            actionTitle: 'Tạo issue #42: Sửa lỗi đăng nhập Google (kèm link card Trello)',
+            targetLoc: 'Kho VinhDat267/ati-test · Nhãn bug',
+            badge: '✓ Đã tạo issue',
+            linkText: 'Mở issue #42 ↗',
+            linkUrl: '#github-issue-42'
+          },
+          {
+            service: 'sheets',
+            serviceName: 'Google Sheets',
+            actionTitle: 'Thêm Dòng 104 vào trang Tasks với mã issue #42 và card Trello',
+            targetLoc: 'Bảng tính ATI Test Tracker · Trang Tasks',
+            badge: '✓ Đã ghi dòng',
+            linkText: 'Mở trang tính ↗',
+            linkUrl: '#google-sheets-104'
+          },
+          {
+            service: 'slack',
+            serviceName: 'Slack',
+            actionTitle: 'Gửi tin nhắn thông báo vào kênh #ati-test có link card và issue',
+            targetLoc: 'Kênh #ati-test (Slack Workspace)',
+            badge: '✓ Đã gửi tin',
+            linkText: 'Xem tin ↗',
+            linkUrl: '#slack-msg'
+          }
+        ],
+        dataFlow: 'Link card Trello được tạo trước → tự động truyền vào mô tả Issue GitHub #42 → cả hai đường dẫn được ghi vào Dòng 104 Google Sheets và gửi nguyên văn vào kênh Slack #ati-test.',
+        timelineLogs: [
+          '14:01:45 — Lan Nguyễn gửi câu yêu cầu tiếng Việt qua ô nhập.',
+          '14:01:48 — ATI tìm đúng 4 công cụ (Bảng To Do, kho ati-test, bảng tính ATI Test Tracker, kênh #ati-test).',
+          '14:02:10 — Lan Nguyễn bấm nút "Duyệt kế hoạch ✓".',
+          '14:02:11 — Bước 1 hoàn thành trên Trello (đã tạo card Doing).',
+          '14:02:12 — Bước 2 hoàn thành trên GitHub (đã tạo Issue #42).',
+          '14:02:13 — Bước 3 hoàn thành trên Google Sheets (đã thêm Dòng 104).',
+          '14:02:14 — Bước 4 hoàn thành trên Slack (đã gửi tin nhắn #ati-test).',
+          '14:02:14 — Hoàn tất trọn vẹn trong 3,8 giây. Lưu trữ 4 biên nhận.'
+        ]
+      },
+      {
+        id: 'CV-041',
+        title: 'Ghi biên bản họp sprint tuần 40 vào Notion và thông báo Slack',
+        prompt: 'Ghi biên bản họp sprint tuần 40 vào Notion và thông báo kênh #ati-test',
+        status: 'completed',
+        statusLabel: '✓ Hoàn tất',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '10:15 · Hôm nay',
+        dateGroup: 'today',
+        durationStr: '2,4 giây',
+        services: ['notion', 'slack'],
+        summaryResult: 'Đã tạo trang Sprint 40 trong Database Meetings · Đã gửi tin Slack #ati-test',
+        safetyNotice: {
+          type: 'success',
+          text: '✓ Kế hoạch được duyệt lúc 10:15 bởi Lan Nguyễn. Không có thay đổi nào diễn ra trước lúc duyệt.'
+        },
+        steps: [
+          {
+            service: 'notion',
+            serviceName: 'Notion',
+            actionTitle: 'Tạo trang mới "Biên bản họp Sprint 40" trong database Sprint Notes',
+            targetLoc: 'Database Sprint Notes (ID: db_sprint_notes)',
+            badge: '✓ Đã tạo trang',
+            linkText: 'Mở trang Notion ↗',
+            linkUrl: '#notion-page'
+          },
+          {
+            service: 'slack',
+            serviceName: 'Slack',
+            actionTitle: 'Gửi tin nhắn kèm đường dẫn trang Notion vào kênh #ati-test',
+            targetLoc: 'Kênh #ati-test',
+            badge: '✓ Đã gửi tin',
+            linkText: 'Xem tin ↗',
+            linkUrl: '#slack-msg-sprint'
+          }
+        ],
+        dataFlow: 'Trang Notion tạo xong trả về đường dẫn URL → ATI đính kèm đường dẫn này vào tin nhắn gửi tới kênh Slack #ati-test.',
+        timelineLogs: [
+          '10:14:50 — Lan Nguyễn gửi yêu cầu tạo trang Notion và báo Slack.',
+          '10:14:52 — ATI tìm đúng database Sprint Notes và kênh #ati-test.',
+          '10:15:05 — Lan Nguyễn duyệt kế hoạch.',
+          '10:15:06 — Tạo trang Notion thành công.',
+          '10:15:07 — Gửi tin nhắn Slack thành công.',
+          '10:15:07 — Kế hoạch hoàn tất.'
+        ]
+      },
+      {
+        id: 'CV-040',
+        title: 'Tạo issue GitHub cho tính năng xuất PDF và cập nhật Sheets',
+        prompt: 'Tạo issue GitHub cho tính năng xuất báo cáo PDF và cập nhật dòng 98 trên Sheets',
+        status: 'paused',
+        statusLabel: '⚠ Đã dừng khi đang ghi',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '16:40 · Hôm qua',
+        dateGroup: 'yesterday',
+        durationStr: 'Đang tạm dừng',
+        services: ['github', 'sheets'],
+        summaryResult: 'Bước 1 GitHub #41 đã tạo xong · Bước 2 Sheets bị gián đoạn mạng, ATI dừng lại hỏi',
+        safetyNotice: {
+          type: 'warn',
+          text: '⚠ Đường truyền mạng bị ngắt đúng lúc đang ghi lên Google Sheets. ATI đã dừng lại để hỏi Lan Nguyễn, tuyệt đối không tự làm lại để tránh ghi trùng lặp dữ liệu.'
+        },
+        steps: [
+          {
+            service: 'github',
+            serviceName: 'GitHub',
+            actionTitle: 'Tạo issue #41: Tính năng xuất báo cáo PDF',
+            targetLoc: 'Kho VinhDat267/ati-test',
+            badge: '✓ Đã tạo issue #41',
+            linkText: 'Mở issue #41 ↗',
+            linkUrl: '#github-issue-41'
+          },
+          {
+            service: 'sheets',
+            serviceName: 'Google Sheets',
+            actionTitle: 'Cập nhật trạng thái tại Dòng 98 bảng tính Tasks',
+            targetLoc: 'Bảng tính ATI Test Tracker',
+            badge: '⚠ Đang dừng hỏi người dùng',
+            linkText: 'Kiểm tra trên Sheets ↗',
+            linkUrl: '#sheets-verify'
+          }
+        ],
+        dataFlow: 'Issue GitHub #41 đã tạo an toàn. Dữ liệu sang Sheets bị ngắt kết nối giữa chừng và đang đợi người dùng kiểm tra xác nhận.',
+        timelineLogs: [
+          '16:39:50 — Lan Nguyễn duyệt kế hoạch gồm 2 bước.',
+          '16:40:02 — Bước 1 hoàn thành: tạo issue #41 trên GitHub.',
+          '16:40:12 — Bước 2 Google Sheets: mất kết nối đường truyền với máy chủ Sheets.',
+          '16:40:13 — ATI kích hoạt cơ chế bảo vệ an toàn: dừng kế hoạch và gửi thông báo hỏi người dùng.'
+        ]
+      },
+      {
+        id: 'CV-039',
+        title: 'Xoá hết các card cũ trong bảng To Do',
+        prompt: 'Xoá hết các card cũ trong bảng To Do',
+        status: 'cancelled',
+        statusLabel: '✕ Đã từ chối',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '11:20 · Hôm qua',
+        dateGroup: 'yesterday',
+        durationStr: 'Không ghi',
+        services: ['trello'],
+        summaryResult: 'Từ chối: ATI chưa có thao tác xoá card trên Trello. Đã gợi ý lưu trữ thay vì xoá.',
+        safetyNotice: {
+          type: 'neutral',
+          text: '✕ Yêu cầu bị từ chối trước khi lập kế hoạch do thao tác chưa hỗ trợ. Chưa có bất kỳ dữ liệu nào bị thay đổi trên Trello.'
+        },
+        steps: [
+          {
+            service: 'trello',
+            serviceName: 'Trello',
+            actionTitle: 'Thao tác xoá card',
+            targetLoc: 'Bảng To Do',
+            badge: '✕ Chưa hỗ trợ thao tác xoá',
+            linkText: 'Xem trợ giúp Trello ↗',
+            linkUrl: 'responses.html'
+          }
+        ],
+        dataFlow: 'Không có dữ liệu nào được gửi đi hoặc thay đổi.',
+        timelineLogs: [
+          '11:20:10 — Lan Nguyễn gửi yêu cầu "Xoá hết các card cũ trong bảng To Do".',
+          '11:20:11 — Hệ thống kiểm tra danh mục quyền cho phép: Trello không hỗ trợ lệnh xoá hủy vĩnh viễn.',
+          '11:20:11 — Trả lời từ chối và gợi ý lệnh thay thế: "Lưu trữ các card cũ trong bảng To Do".'
+        ]
+      },
+      {
+        id: 'CV-038',
+        title: 'Ghi nhận phản hồi kiểm thử vào Sheets và tạo lịch review',
+        prompt: 'Ghi nhận phản hồi kiểm thử vào Google Sheets và tạo sự kiện lịch review sprint',
+        status: 'completed',
+        statusLabel: '✓ Hoàn tất',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '09:30 · 3 ngày trước',
+        dateGroup: 'earlier',
+        durationStr: '3,1 giây',
+        services: ['sheets', 'calendar'],
+        summaryResult: 'Đã thêm Dòng 103 trên Sheets · Đã tạo sự kiện "Review Sprint" vào Google Calendar',
+        safetyNotice: {
+          type: 'success',
+          text: '✓ Kế hoạch được duyệt lúc 09:30 bởi Lan Nguyễn. Chỉ tác động vào bảng tính Tasks và Lịch nhóm được cấp phép.'
+        },
+        steps: [
+          {
+            service: 'sheets',
+            serviceName: 'Google Sheets',
+            actionTitle: 'Thêm Dòng 103 ghi nhận phản hồi kiểm thử hệ thống',
+            targetLoc: 'Bảng tính ATI Test Tracker · Trang Tasks',
+            badge: '✓ Đã ghi dòng',
+            linkText: 'Mở trang tính ↗',
+            linkUrl: '#sheets-103'
+          },
+          {
+            service: 'calendar',
+            serviceName: 'Google Calendar',
+            actionTitle: 'Tạo sự kiện "Review Sprint 40" lúc 15:00 thứ Sáu',
+            targetLoc: 'Lịch công việc ATI Team',
+            badge: '✓ Đã tạo sự kiện',
+            linkText: 'Mở lịch Google ↗',
+            linkUrl: '#calendar-event'
+          }
+        ],
+        dataFlow: 'Nội dung phản hồi được ghi vào Sheets trước → lấy tiêu đề nhiệm vụ để tạo sự kiện họp đánh giá trên Google Calendar.',
+        timelineLogs: [
+          '09:29:40 — Lan Nguyễn gửi câu yêu cầu.',
+          '09:30:05 — Lan Nguyễn bấm duyệt kế hoạch.',
+          '09:30:06 — Ghi dòng Google Sheets thành công.',
+          '09:30:08 — Tạo sự kiện Google Calendar thành công.',
+          '09:30:08 — Kế hoạch hoàn tất.'
+        ]
+      },
+      {
+        id: 'CV-037',
+        title: 'Gửi tin nhắn thông báo bản build phát hành v2.4 lên Slack',
+        prompt: 'Gửi tin nhắn thông báo bản build phát hành v2.4 lên kênh Slack #ati-test',
+        status: 'completed',
+        statusLabel: '✓ Hoàn tất',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: '17:15 · 4 ngày trước',
+        dateGroup: 'earlier',
+        durationStr: '1,2 giây',
+        services: ['slack'],
+        summaryResult: 'Đã gửi tin nhắn thông báo vào kênh #ati-test kèm ghi chú phát hành',
+        safetyNotice: {
+          type: 'success',
+          text: '✓ Đã xem trước nguyên văn tin nhắn trước khi gửi. Đã gửi thành công vào kênh được cấp phép.'
+        },
+        steps: [
+          {
+            service: 'slack',
+            serviceName: 'Slack',
+            actionTitle: 'Gửi tin nhắn phát hành bản build v2.4',
+            targetLoc: 'Kênh #ati-test',
+            badge: '✓ Đã gửi tin',
+            linkText: 'Xem tin ↗',
+            linkUrl: '#slack-build-msg'
+          }
+        ],
+        dataFlow: 'Tin nhắn gửi trực tiếp đến kênh Slack đã cấp phép.',
+        timelineLogs: [
+          '17:14:50 — Lan Nguyễn gửi yêu cầu thông báo bản build.',
+          '17:15:02 — Lan Nguyễn xem trước nguyên văn tin nhắn và duyệt.',
+          '17:15:03 — Tin nhắn xuất hiện trong kênh #ati-test.'
+        ]
+      }
+    ];
+
+    /* =======================================================
+       3. TRẠNG THÁI ỨNG DỤNG & QUẢN TRỊ
+       ====================================================== */
+    let currentRole = 'admin'; // 'admin' | 'member'
+    let requestsData = JSON.parse(JSON.stringify(INITIAL_REQUESTS));
+    let activeQuickFilter = 'all';
+    let selectedRequestId = null;
+    let visibleCount = 4;
+    let editingRequestId = null;
+
+    /* =======================================================
+       4. KHỞI TẠO & RENDER DANH SÁCH
+       ====================================================== */
+    document.addEventListener('DOMContentLoaded', () => {
+      // Đọc role từ localStorage nếu có
+      const savedRole = localStorage.getItem('ati_demo_role');
+      if (savedRole && (savedRole === 'admin' || savedRole === 'member')) {
+        currentRole = savedRole;
+      }
+      updateRoleUI();
+      renderRequestsList();
+      updateStatistics();
+    });
+
+    function setRole(role) {
+      currentRole = role;
+      localStorage.setItem('ati_demo_role', role);
+      updateRoleUI();
+      renderRequestsList();
+      updateStatistics();
+      toggleDemoDropdown(false);
+      showToast(role === 'admin' ? 'Đã chuyển sang vai trò: Quản trị viên' : 'Đã chuyển sang vai trò: Thành viên', 'info');
+    }
+
+    function updateRoleUI() {
+      const roleLabel = document.getElementById('current-role-label');
+      const adminBtn = document.getElementById('demo-role-admin-btn');
+      const memberBtn = document.getElementById('demo-role-member-btn');
+      const navLinkUsers = document.getElementById('nav-link-users');
+
+      if (currentRole === 'admin') {
+        if (roleLabel) roleLabel.textContent = 'Quản trị viên';
+        if (adminBtn && memberBtn) {
+          adminBtn.className = 'px-2 py-1.5 rounded-lg text-center font-medium bg-[#FF5701] text-white transition-colors';
+          memberBtn.className = 'px-2 py-1.5 rounded-lg text-center font-medium bg-neutral-100 text-[#4B5563] hover:bg-neutral-200 transition-colors';
+        }
+        if (navLinkUsers) navLinkUsers.style.display = 'inline-flex';
+      } else {
+        if (roleLabel) roleLabel.textContent = 'Thành viên';
+        if (memberBtn && adminBtn) {
+          memberBtn.className = 'px-2 py-1.5 rounded-lg text-center font-medium bg-[#FF5701] text-white transition-colors';
+          adminBtn.className = 'px-2 py-1.5 rounded-lg text-center font-medium bg-neutral-100 text-[#4B5563] hover:bg-neutral-200 transition-colors';
+        }
+        if (navLinkUsers) navLinkUsers.style.display = 'none';
+      }
+    }
+
+    function updateStatistics() {
+      const totalCount = requestsData.length;
+      const completedCount = requestsData.filter(r => r.status === 'completed').length;
+      const pausedCount = requestsData.filter(r => r.status === 'paused').length;
+      const cancelledCount = requestsData.filter(r => r.status === 'cancelled').length;
+
+      document.getElementById('stat-total').textContent = totalCount;
+      document.getElementById('stat-completed').textContent = completedCount;
+      document.getElementById('stat-paused').textContent = pausedCount;
+      document.getElementById('stat-cancelled').textContent = cancelledCount;
+
+      const badge = document.getElementById('requests-count-badge');
+      if (badge) badge.textContent = `${totalCount} hội thoại`;
+      const scopeDesc = document.getElementById('stat-scope-desc');
+      if (scopeDesc) scopeDesc.textContent = 'Lịch sử cá nhân';
+    }
+
+    /* =======================================================
+       5. LỌC & TÌM KIẾM YÊU CẦU
+       ====================================================== */
+    function handleFilterChange() {
+      visibleCount = 4;
+      renderRequestsList();
+    }
+
+    function setQuickFilter(type) {
+      activeQuickFilter = type;
+      visibleCount = 4;
+      // Cập nhật trạng thái nút chip
+      document.querySelectorAll('.quick-chip').forEach(btn => {
+        if (btn.getAttribute('data-chip') === type) {
+          btn.className = 'quick-chip px-2.5 py-1 rounded-lg border font-medium bg-[#111827] text-white border-[#111827] transition-colors';
+        } else {
+          btn.className = 'quick-chip px-2.5 py-1 rounded-lg border font-medium bg-neutral-100 text-[#4B5563] border-transparent hover:bg-neutral-200 transition-colors';
+        }
+      });
+      renderRequestsList();
+    }
+
+    function resetFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('filter-status').value = 'all';
+      document.getElementById('filter-service').value = 'all';
+      setQuickFilter('all');
+      visibleCount = 4;
+      showToast('Đã đặt lại toàn bộ điều kiện lọc', 'info');
+    }
+
+    function getFilteredRequests() {
+      const keyword = (document.getElementById('search-input').value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('filter-status').value;
+      const serviceFilter = document.getElementById('filter-service').value;
+
+      return requestsData.filter(req => {
+        // Lọc trạng thái
+        if (statusFilter !== 'all' && req.status !== statusFilter) {
+          return false;
+        }
+
+        // Lọc dịch vụ
+        if (serviceFilter !== 'all' && !req.services.includes(serviceFilter)) {
+          return false;
+        }
+
+        // Quick chips filter
+        if (activeQuickFilter === 'today' && req.dateGroup !== 'today') {
+          return false;
+        }
+        if (activeQuickFilter === 'has_github' && !req.services.includes('github')) {
+          return false;
+        }
+        if (activeQuickFilter === 'needs_attention' && req.status !== 'paused') {
+          return false;
+        }
+
+        // Lọc từ khóa theo tiêu đề hội thoại, câu lệnh hoặc kết quả
+        if (keyword) {
+          const matchTitle = (req.title || '').toLowerCase().includes(keyword);
+          const matchPrompt = (req.prompt || '').toLowerCase().includes(keyword);
+          const matchResult = (req.summaryResult || '').toLowerCase().includes(keyword);
+          if (!matchTitle && !matchPrompt && !matchResult) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    function loadMoreRequests() {
+      visibleCount += 4;
+      renderRequestsList();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* =======================================================
+       6. ĐỔI TÊN HỘI THOẠI INLINE (ENTER LƯU, ESC HUỶ)
+       ====================================================== */
+    function startInlineRename(reqId, event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      editingRequestId = reqId;
+      renderRequestsList();
+      setTimeout(() => {
+        const inp = document.getElementById(`rename-input-${reqId}`);
+        if (inp) {
+          inp.focus();
+          inp.select();
+        }
+      }, 50);
+    }
+
+    function cancelInlineRename() {
+      editingRequestId = null;
+      renderRequestsList();
+    }
+
+    function handleRenameKey(event, reqId) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveInlineRename(reqId);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelInlineRename();
+      }
+    }
+
+    function saveInlineRename(reqId) {
+      const inp = document.getElementById(`rename-input-${reqId}`);
+      if (!inp) return;
+      const newTitle = inp.value.trim();
+      if (!newTitle) {
+        showToast('Tiêu đề hội thoại không được để trống', 'error');
+        return;
+      }
+      const target = requestsData.find(r => r.id === reqId);
+      if (target) {
+        target.title = newTitle.slice(0, 60);
+        showToast('Đã đổi tên hội thoại thành công', 'success');
+      }
+      editingRequestId = null;
+      renderRequestsList();
+    }
+
+    /* =======================================================
+       7. RENDER DANH SÁCH YÊU CẦU THEO NHÓM THỜI GIAN
+       ====================================================== */
+    function renderRequestsList() {
+      const container = document.getElementById('requests-list-container');
+      const emptyState = document.getElementById('empty-state');
+      const loadMoreContainer = document.getElementById('load-more-container');
+      const filtered = getFilteredRequests();
+      const totalFiltered = filtered.length;
+
+      if (totalFiltered === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      const displayed = filtered.slice(0, visibleCount);
+
+      if (loadMoreContainer) {
+        if (visibleCount < totalFiltered) {
+          loadMoreContainer.classList.remove('hidden');
+          const remaining = totalFiltered - visibleCount;
+          const btn = document.getElementById('btn-load-more');
+          if (btn) {
+            btn.innerHTML = `<span>Tải thêm (${remaining} hội thoại)</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>`;
+          }
+        } else {
+          loadMoreContainer.classList.add('hidden');
+        }
+      }
+
+      // Nhóm theo ngày: Hôm nay, Hôm qua, Trước đó
+      const groups = [
+        { key: 'today', title: 'Hôm nay', items: displayed.filter(r => r.dateGroup === 'today') },
+        { key: 'yesterday', title: 'Hôm qua', items: displayed.filter(r => r.dateGroup === 'yesterday') },
+        { key: 'earlier', title: 'Tuần này & Trước đó', items: displayed.filter(r => r.dateGroup === 'earlier') }
+      ];
+
+      let html = '';
+
+      groups.forEach(group => {
+        if (group.items.length === 0) return;
+
+        html += `
+          <section class="space-y-3">
+            <div class="flex items-center gap-2 px-1">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-[#6B7280]">${group.title}</h2>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#E7E7E2]"></span>
+              <span class="text-xs text-[#9CA3AF]">${group.items.length} hội thoại</span>
+            </div>
+            <div class="space-y-3">
+              ${group.items.map(req => renderRequestCardHtml(req)).join('')}
+            </div>
+          </section>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderRequestCardHtml(req) {
+      const isEditing = editingRequestId === req.id;
+      const rawTitle = req.title || req.prompt || '';
+      const displayTitle = rawTitle.length > 60 ? rawTitle.slice(0, 60) + '…' : rawTitle;
+
+      // Huy hiệu trạng thái
+      let badgeClass = '';
+      if (req.status === 'completed') {
+        badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+      } else if (req.status === 'paused') {
+        badgeClass = 'bg-amber-50 text-amber-900 border-amber-200';
+      } else {
+        badgeClass = 'bg-neutral-100 text-neutral-800 border-neutral-200';
+      }
+
+      // Biểu tượng các dịch vụ tác động
+      const serviceIconsHtml = req.services.map(srv => {
+        const svg = SERVICE_SVGS[srv] || '';
+        return `
+          <div class="w-7 h-7 rounded-lg bg-neutral-100 border border-[#E7E7E2] flex items-center justify-center p-1 shadow-sm hover:scale-105 transition-transform" title="${srv}">
+            ${svg}
+          </div>
+        `;
+      }).join('');
+
+      // Tiêu đề & input inline
+      let titleHtml = '';
+      if (isEditing) {
+        titleHtml = `
+          <div class="space-y-1.5 py-0.5" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-2">
+              <input
+                id="rename-input-${req.id}"
+                type="text"
+                maxlength="60"
+                value="${escapeHtml(rawTitle.slice(0, 60))}"
+                onkeydown="handleRenameKey(event, '${req.id}')"
+                class="flex-1 min-w-[200px] text-sm sm:text-base font-semibold text-[#111827] px-3 py-1.5 border-2 border-[#FF5701] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5701]/20 bg-white shadow-sm"
+                placeholder="Nhập tiêu đề hội thoại (tối đa 60 ký tự)"
+              />
+              <button
+                type="button"
+                onclick="saveInlineRename('${req.id}')"
+                class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white transition-colors shadow-sm flex-shrink-0"
+              >
+                Lưu
+              </button>
+              <button
+                type="button"
+                onclick="cancelInlineRename()"
+                class="px-2.5 py-1.5 text-xs font-medium rounded-xl text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 transition-colors flex-shrink-0"
+              >
+                Huỷ
+              </button>
+            </div>
+            <div class="text-[11px] text-[#6B7280] flex items-center gap-2">
+              <span>Nhấn <kbd class="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[10px] font-mono">Enter</kbd> để lưu, <kbd class="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[10px] font-mono">Esc</kbd> để huỷ</span>
+              <span class="text-[#9CA3AF]">·</span>
+              <span>Tối đa 60 ký tự</span>
+            </div>
+          </div>
+        `;
+      } else {
+        titleHtml = `
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-sm sm:text-base font-semibold text-[#111827] group-hover:text-[#FF5701] transition-colors leading-snug">
+              ${escapeHtml(displayTitle)}
+            </h3>
+            <button
+              type="button"
+              onclick="startInlineRename('${req.id}', event)"
+              class="inline-flex items-center gap-1 px-2 py-1 text-xs text-[#6B7280] hover:text-[#FF5701] hover:bg-neutral-100 rounded-lg transition-colors"
+              title="Đổi tên hội thoại"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              <span class="text-[11px] font-medium">Đổi tên</span>
+            </button>
+          </div>
+        `;
+      }
+
+      return `
+        <article class="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft hover:border-[#FF5701]/60 transition-all group">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            
+            <!-- Cụm trái: Trạng thái, Thời gian, Tiêu đề hội thoại, Kết quả -->
+            <div class="space-y-2 flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold border ${badgeClass}">
+                  ${req.statusLabel}
+                </span>
+                <span class="text-[#9CA3AF]">·</span>
+                <span class="text-[#6B7280] font-medium">${req.timeStr}</span>
+              </div>
+
+              <!-- Tiêu đề hội thoại (hoặc ô nhập đổi tên inline) -->
+              ${titleHtml}
+
+              <!-- Tóm tắt kết quả ngắn gọn -->
+              <p class="text-xs text-[#4B5563] flex items-start gap-1.5 pt-0.5">
+                <svg class="w-3.5 h-3.5 text-[#16A34A] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span class="line-clamp-1">${req.summaryResult}</span>
+              </p>
+            </div>
+
+            <!-- Cụm phải: Dải dịch vụ + Nút xem chi tiết -->
+            <div class="flex sm:flex-col items-center sm:items-end justify-between gap-3 flex-shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-neutral-100">
+              <div class="flex items-center gap-1.5">
+                ${serviceIconsHtml}
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="quickCopyPrompt('${req.id}')" class="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 rounded-lg transition-colors" title="Sao chép câu lệnh này">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                </button>
+                <button type="button" onclick="openDetailDrawer('${req.id}')" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#F8F8F6] group-hover:bg-[#FF5701] text-[#111827] group-hover:text-white border border-[#E7E7E2] group-hover:border-transparent transition-all shadow-sm">
+                  <span>Xem biên nhận</span>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </article>
+      `;
+    }
+
+    /* =======================================================
+       7. MỞ VÀ ĐÓNG NGĂN CHI TIẾT (DETAIL DRAWER)
+       ====================================================== */
+    function openDetailDrawer(reqId) {
+      selectedRequestId = reqId;
+      const req = requestsData.find(r => r.id === reqId);
+      if (!req) return;
+
+      // Điền thông tin vào Drawer
+      document.getElementById('drawer-req-id').textContent = req.id;
+      document.getElementById('drawer-prompt-text').textContent = `"${req.prompt}"`;
+      document.getElementById('drawer-author-info').innerHTML = `Người yêu cầu: <strong>${req.author}</strong> (${req.authorEmail})`;
+      document.getElementById('drawer-time-info').innerHTML = `Thời gian: <strong>${req.timeStr}</strong>`;
+      document.getElementById('drawer-duration-info').innerHTML = `Thời gian chạy: <strong>${req.durationStr}</strong>`;
+
+      // Huy hiệu trạng thái Drawer
+      const statusBadgeContainer = document.getElementById('drawer-status-badge');
+      let badgeClass = '';
+      if (req.status === 'completed') badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+      else if (req.status === 'paused') badgeClass = 'bg-amber-50 text-amber-900 border-amber-200';
+      else badgeClass = 'bg-neutral-100 text-neutral-800 border-neutral-200';
+      statusBadgeContainer.innerHTML = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold border ${badgeClass}">${req.statusLabel}</span>`;
+
+      // Safety Notice
+      const noticeBox = document.getElementById('drawer-safety-notice');
+      if (req.safetyNotice.type === 'success') {
+        noticeBox.className = 'p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 bg-emerald-50/70 border-emerald-200 text-emerald-900';
+        noticeBox.innerHTML = `
+          <svg class="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          <div>${req.safetyNotice.text}</div>
+        `;
+      } else if (req.safetyNotice.type === 'warn') {
+        noticeBox.className = 'p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 bg-amber-50 border-amber-200 text-amber-900';
+        noticeBox.innerHTML = `
+          <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <div>${req.safetyNotice.text}</div>
+        `;
+      } else {
+        noticeBox.className = 'p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 bg-neutral-100 border-neutral-200 text-neutral-800';
+        noticeBox.innerHTML = `
+          <svg class="w-4 h-4 text-neutral-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>${req.safetyNotice.text}</div>
+        `;
+      }
+
+      // Danh sách các bước biên nhận
+      document.getElementById('drawer-steps-count').textContent = `${req.steps.filter(s => s.badge.includes('✓')).length} / ${req.steps.length} việc hoàn thành`;
+      
+      const stepsContainer = document.getElementById('drawer-steps-list');
+      stepsContainer.innerHTML = req.steps.map((st, idx) => {
+        const svg = SERVICE_SVGS[st.service] || '';
+        const isSuccess = st.badge.includes('✓');
+        const badgeStyle = isSuccess 
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+          : (st.badge.includes('⚠') ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200');
+
+        return `
+          <div class="p-3.5 rounded-xl bg-white border border-[#E7E7E2] shadow-sm space-y-2">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-start gap-2.5 min-w-0">
+                <div class="w-7 h-7 rounded-lg bg-neutral-100 border border-neutral-200 flex items-center justify-center p-1 flex-shrink-0 mt-0.5">
+                  ${svg}
+                </div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                    <span>Bước ${idx + 1}: ${st.serviceName}</span>
+                    <span class="text-[#9CA3AF]">·</span>
+                    <span class="text-[11px] font-normal text-[#6B7280] truncate">${st.targetLoc}</span>
+                  </div>
+                  <p class="text-xs text-[#374151] mt-0.5 font-medium leading-snug">
+                    ${st.actionTitle}
+                  </p>
+                </div>
+              </div>
+
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badgeStyle} flex-shrink-0">
+                ${st.badge}
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-neutral-100 text-xs">
+              <span class="text-[11px] text-[#6B7280]">Đã đối chiếu phạm vi cấp phép</span>
+              <a href="${st.linkUrl}" onclick="event.preventDefault(); showToast('Mở kết quả trên ${st.serviceName} (mô phỏng liên kết ngoại)', 'info')" class="text-[#FF5701] font-semibold hover:underline inline-flex items-center gap-1">
+                <span>${st.linkText}</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Dòng dữ liệu kết nối
+      const flowBox = document.getElementById('drawer-data-flow-content');
+      flowBox.innerHTML = `
+        <p class="text-[#374151] leading-relaxed">${req.dataFlow}</p>
+      `;
+
+      // Timeline logs
+      const logsBox = document.getElementById('drawer-timeline-logs');
+      logsBox.innerHTML = req.timelineLogs.map(log => `
+        <div class="flex items-start gap-2 text-[#4B5563] py-1 border-b border-neutral-100 last:border-b-0">
+          <span class="text-[#FF5701] flex-shrink-0 font-bold">›</span>
+          <span>${log}</span>
+        </div>
+      `).join('');
+
+      // Hiển thị Drawer
+      const drawer = document.getElementById('request-detail-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const panel = document.getElementById('drawer-panel');
+
+      drawer.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      // Animation trượt vào
+      requestAnimationFrame(() => {
+        backdrop.classList.remove('opacity-0');
+        backdrop.classList.add('opacity-100');
+        panel.classList.remove('translate-x-full');
+        panel.classList.add('translate-x-0');
+      });
+    }
+
+    function closeDetailDrawer() {
+      const drawer = document.getElementById('request-detail-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const panel = document.getElementById('drawer-panel');
+
+      backdrop.classList.remove('opacity-100');
+      backdrop.classList.add('opacity-0');
+      panel.classList.remove('translate-x-0');
+      panel.classList.add('translate-x-full');
+
+      setTimeout(() => {
+        drawer.classList.add('hidden');
+        document.body.style.overflow = '';
+      }, 250);
+    }
+
+    // Đóng bằng phím Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const drawer = document.getElementById('request-detail-drawer');
+        if (drawer && !drawer.classList.contains('hidden')) {
+          closeDetailDrawer();
+        }
+        toggleDemoDropdown(false);
+      }
+    });
+
+    /* =======================================================
+       8. CÁC TIỆN ÍCH SAO CHÉP & ĐIỀU HƯỚNG SÂN KHẤU
+       ====================================================== */
+    function quickCopyPrompt(reqId) {
+      const req = requestsData.find(r => r.id === reqId);
+      if (!req) return;
+      navigator.clipboard.writeText(req.prompt).then(() => {
+        showToast(`Đã sao chép câu lệnh: "${req.prompt}"`, 'success');
+      }).catch(() => {
+        showToast('Không thể sao chép vào bộ nhớ tạm', 'error');
+      });
+    }
+
+    function copyDrawerPrompt() {
+      if (!selectedRequestId) return;
+      quickCopyPrompt(selectedRequestId);
+    }
+
+    function copyDrawerReport() {
+      const req = requestsData.find(r => r.id === selectedRequestId);
+      if (!req) return;
+
+      const reportText = `[ATI - BÁO CÁO KẾT QUẢ ĐIỀU PHỐI]
+Mã yêu cầu: ${req.id}
+Thời gian: ${req.timeStr}
+Người yêu cầu: ${req.author}
+Câu lệnh gốc: "${req.prompt}"
+Trạng thái: ${req.statusLabel}
+Kết quả tóm tắt: ${req.summaryResult}
+Số dịch vụ tác động: ${req.services.join(', ')}
+Cam kết an toàn: Chưa ghi bất kỳ dữ liệu nào khi chưa được duyệt.`;
+
+      navigator.clipboard.writeText(reportText).then(() => {
+        showToast('✓ Đã sao chép toàn bộ biên nhận vào bộ nhớ tạm', 'success');
+      }).catch(() => {
+        showToast('Không thể sao chép báo cáo', 'error');
+      });
+    }
+
+    function replayInStage() {
+      const req = requestsData.find(r => r.id === selectedRequestId);
+      if (!req) return;
+      closeDetailDrawer();
+      showToast('Đang chuyển sang không gian làm việc...', 'info');
+      setTimeout(() => {
+        window.location.href = 'app-stage.html';
+      }, 500);
+    }
+
+    /* =======================================================
+       9. THÊM YÊU CẦU MẪU & KHÔI PHỤC DỮ LIỆU
+       ====================================================== */
+    function addSampleRequest() {
+      const newReq = {
+        id: `CV-${Math.floor(100 + Math.random() * 900)}`,
+        title: 'Tạo thẻ Trello và gửi thông báo hoàn tất Slack',
+        prompt: 'Tạo thẻ Trello trong danh sách Doing và gửi thông báo hoàn tất vào Slack #ati-test',
+        status: 'completed',
+        statusLabel: '✓ Hoàn tất',
+        author: 'Lan Nguyễn',
+        authorEmail: 'lan.nguyen@congty.vn',
+        authorKey: 'lan_nguyen',
+        timeStr: 'Vừa xong · Hôm nay',
+        dateGroup: 'today',
+        durationStr: '1,8 giây',
+        services: ['trello', 'slack'],
+        summaryResult: 'Đã tạo card Trello · Đã gửi tin nhắn xác nhận kênh #ati-test',
+        safetyNotice: {
+          type: 'success',
+          text: '✓ Kế hoạch vừa hoàn thành an toàn. Toàn bộ các bước đều tuân thủ nguyên tắc chỉ làm sau khi duyệt.'
+        },
+        steps: [
+          {
+            service: 'trello',
+            serviceName: 'Trello',
+            actionTitle: 'Tạo card "Cập nhật tài liệu kỹ thuật"',
+            targetLoc: 'Bảng To Do · Danh sách Doing',
+            badge: '✓ Đã tạo card',
+            linkText: 'Mở card ↗',
+            linkUrl: '#trello-new'
+          },
+          {
+            service: 'slack',
+            serviceName: 'Slack',
+            actionTitle: 'Gửi tin nhắn vào kênh #ati-test',
+            targetLoc: 'Kênh #ati-test',
+            badge: '✓ Đã gửi tin',
+            linkText: 'Xem tin ↗',
+            linkUrl: '#slack-new'
+          }
+        ],
+        dataFlow: 'Tạo card Trello thành công rồi chuyển đường dẫn sang gửi kênh Slack #ati-test.',
+        timelineLogs: [
+          'Vừa xong — Lan Nguyễn gửi câu yêu cầu.',
+          'Vừa xong — Lan Nguyễn duyệt kế hoạch hành động.',
+          'Vừa xong — Hoàn tất 2/2 việc liên dịch vụ.'
+        ]
+      };
+
+      requestsData.unshift(newReq);
+      visibleCount = 4;
+      renderRequestsList();
+      updateStatistics();
+      toggleDemoDropdown(false);
+      showToast('Đã thêm 1 hội thoại mẫu vào lịch sử!', 'success');
+    }
+
+    function resetToDefaultData() {
+      requestsData = JSON.parse(JSON.stringify(INITIAL_REQUESTS));
+      resetFilters();
+      renderRequestsList();
+      updateStatistics();
+      toggleDemoDropdown(false);
+      showToast('Đã khôi phục dữ liệu nhật ký ban đầu', 'info');
+    }
+
+    /* =======================================================
+       10. MENU KỊCH BẢN DEMO & TOAST NỔI
+       ====================================================== */
+    function toggleDemoDropdown(force) {
+      const dropdown = document.getElementById('demo-dropdown');
+      const btn = document.getElementById('btn-demo-menu');
+      if (!dropdown || !btn) return;
+
+      const isHidden = dropdown.classList.contains('hidden');
+      const shouldOpen = (force !== undefined) ? force : isHidden;
+
+      if (shouldOpen) {
+        dropdown.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        dropdown.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    // Đóng dropdown khi click bên ngoài
+    document.addEventListener('click', (e) => {
+      const btn = document.getElementById('btn-demo-menu');
+      const dropdown = document.getElementById('demo-dropdown');
+      if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+        toggleDemoDropdown(false);
+      }
+    });
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `px-4 py-2.5 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all transform duration-200 pointer-events-auto flex items-center gap-2 max-w-md ${
+        type === 'success' ? 'bg-[#111827] text-white border-neutral-700' :
+        type === 'error' ? 'bg-[#DC2626] text-white border-red-700' :
+        'bg-[#111827] text-white border-neutral-700'
+      }`;
+
+      let icon = '';
+      if (type === 'success') {
+        icon = `<svg class="w-4 h-4 text-[#16A34A] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+      } else if (type === 'error') {
+        icon = `<svg class="w-4 h-4 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+      } else {
+        icon = `<svg class="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+      }
+
+      toast.innerHTML = `${icon}<span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+  </script>
+
+</body>
+</html>
