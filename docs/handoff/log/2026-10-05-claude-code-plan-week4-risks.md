@@ -11,11 +11,13 @@
 - **Frontend live:** `evaluations/live-app/` sửa lần cuối 01/10, trước AUTH-01 → AUTH-06, FE-02, FE-03 và W3-00b. Bước 2 của task card W3-07 (ghi thật qua frontend) chưa làm.
 - **Quyết định của người dùng (05/10):**
   - yêu cầu chỉ đọc được hỏi lại ngay, plan phải có bước ghi;
-  - dự phòng là một provider khác qua `OpenAICompatibleProvider`, chuyển thủ công.
+  - đường chính giữ `ag/gemini-3.8-flash` qua 9router, có nhiều tài khoản Gemini chạy song song;
+  - dự phòng là model Codex (`cx/`) trong cùng 9router (danh sách model theo ảnh người dùng gửi), chỉ đổi `LLM_MODEL`, chuyển thủ công. Ban đầu task card W4-00 được viết cho một provider ngoài 9router; đã sửa sau khi người dùng làm rõ.
+  - Đã kiểm trên Node v24: biến đặt sẵn trong môi trường thắng giá trị trong file `--env-file-if-exists`, nên đổi `LLM_MODEL` không cần sửa `.env`.
 - **Kết quả:**
   - task card [W3-10](../tasks/W3-10-read-only-and-latency.md), [W3-11](../tasks/W3-11-new-services-through-frontend.md), [W4-00](../tasks/W4-00-llm-fallback-provider.md);
   - ROADMAP thêm ba dòng; sửa dòng tuần 5 (LLM dự phòng theo W4-00 thay cho Gemini API chính thức); thêm đoạn lập kế hoạch 05/10 và thứ tự bỏ khi thiếu thời gian.
   - Không sửa mã nguồn, CURRENT-STATE hay đặc tả. CURRENT-STATE mục 6 vẫn ghi dự phòng qua Gemini API chính thức; reviewer cập nhật sau merge.
 - **Kiểm tra:** PR chỉ sửa tài liệu nên không chạy `npm run check`. Số liệu trong task card tính lại bằng script đọc `report.json`, chạy ngoài repo.
 - **Chưa quyết, cần người dùng:** W2-03 (ca 1–2 không ghi làm được ngay; ca 4 ghi thật cần duyệt plan); PR #47 bản nháp (triển khai Planora, base `Frontend_UXUI`, không có trong ROADMAP).
-- **Việc tiếp theo đề xuất:** giao W4-00, W3-10, W3-11 cùng phần khung W4-01/W4-03 cho các agent; người dùng chuẩn bị tài khoản provider dự phòng (W4-00).
+- **Việc tiếp theo đề xuất:** giao W4-00, W3-10, W3-11 cùng phần khung W4-01/W4-03 cho các agent; người dùng xác nhận nguồn `cx/` trong 9router gọi được (W4-00).

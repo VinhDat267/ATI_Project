@@ -1,6 +1,6 @@
 # W3-11 · Chạy thật năm service mới qua frontend
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w3-11-new-services-frontend` · **Phụ thuộc:** W3-07 (đã xong), tài nguyên thử nghiệm của W3-07 còn dùng được, cổng LLM hoạt động (hoặc provider dự phòng [W4-00](W4-00-llm-fallback-provider.md)); nên xong trước buổi thử W4-03 · **Có phần việc của con người:** duyệt từng plan ghi, tự nhập credentials trên giao diện
+**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w3-11-new-services-frontend` · **Phụ thuộc:** W3-07 (đã xong), tài nguyên thử nghiệm của W3-07 còn dùng được, 9router hoạt động (model chính, hoặc model dự phòng `cx/` của [W4-00](W4-00-llm-fallback-provider.md); ghi model đã dùng); nên xong trước buổi thử W4-03 · **Có phần việc của con người:** duyệt từng plan ghi, tự nhập credentials trên giao diện
 
 ## Vấn đề
 
@@ -22,7 +22,7 @@ Harness `evaluations/live-app/` sửa lần cuối ngày 01/10. `live-app.e2e.ts
   - Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`;
   - Sheets "ATI Test Tracker", Calendar "ATI Test", Notion "ATI Test Notes";
   - nhóm Telegram thử, Jira project `ATIT`.
-- Cổng LLM đang chạy.
+- 9router đang chạy.
 - Ở mục 3, người dùng tự gõ hoặc dán credentials vào giao diện; agent không đọc, không in.
 
 ## Việc cần làm

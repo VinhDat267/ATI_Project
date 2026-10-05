@@ -40,7 +40,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Frontend: điều hướng bằng URL, nút Back, mở lại hội thoại khi tải lại, tách `App.tsx`, tiêu đề và phân trang lịch sử | [FE-02](tasks/FE-02-routing-and-history.md) | xong, #42 tại `8b6c8e6`; review độc lập đạt, CI xanh sau retarget main |
 | 3–4 | Frontend: plan hiện tên tài nguyên và nhãn Đọc/Ghi, kết quả dễ đọc có link, SSE tự refresh token, chuỗi tiếng Việt, hỗ trợ trình đọc màn hình | [FE-03](tasks/FE-03-readable-plan-and-results.md) | xong, #54 tại `9709a2d`; golden cần đo lại |
 | 3–4 | Frontend: gửi tin ngay sau "Cuộc hội thoại mới" làm tin rơi vào hội thoại khác; test FE-03 lúc đạt lúc không trên CI | [FE-03b](tasks/FE-03b-new-conversation-send-race.md) | xong, #60 và sửa sau review #64 tại `965c8bc`; hai P2 đã sửa, review độc lập đạt, browser26/repeat40/CI xanh; P3 history nhánh lỗi còn mở |
-| 4 (làm sớm, trước các phép đo) | Đường LLM dự phòng qua một provider OpenAI-compatible khác, chuyển thủ công; probe thật và bộ đo tối thiểu trên model dự phòng | [W4-00](tasks/W4-00-llm-fallback-provider.md) | chờ; có phần việc của con người (tài khoản, khóa, ngân sách) |
+| 4 (làm sớm, trước các phép đo) | Đường LLM dự phòng: chuyển thủ công sang một model Codex (`cx/`) trong 9router; probe chọn model, bộ đo tối thiểu, một lượt qua app, runbook | [W4-00](tasks/W4-00-llm-fallback-provider.md) | chờ; người dùng xác nhận nguồn `cx/` gọi được và quota |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
@@ -65,11 +65,11 @@ AUTH-06: người dùng đã cấu hình Gmail SMTP/Google client và hoàn thà
 **Lập kế hoạch 05/10/2026** (sau AUTH-06; Claude Code). Ba task mới cho các rủi ro trước tuần 4:
 - **W3-10:** 18/25 lượt services quá 15 s là yêu cầu chỉ đọc (3 lời gọi model rồi phần lớn từ chối). Đuôi chậm còn lại chưa phân biệt được model hay cổng, vì báo cáo không ghi lần thử lại bên trong và token.
 - **W3-11:** năm service mới chưa từng chạy qua giao diện ở chế độ live; harness `live-app` có từ trước AUTH/FE-02/FE-03.
-- **W4-00:** mọi phép đo và demo phụ thuộc một cổng LLM ở máy. Gemini API chính thức không đủ quota (thử 29–30/09).
+- **W4-00:** mọi phép đo và demo dùng `ag/gemini-3.8-flash` qua 9router ở máy nhóm trưởng. Nhiều tài khoản Gemini song song tránh được lỗi của từng tài khoản, nhưng không tránh được sự cố của chính 9router (03/10) hay sự cố chung của nguồn Gemini. Chưa có đường thay thế nào được kiểm với sản phẩm; Gemini API chính thức không đủ quota (thử 29–30/09).
 
 Người dùng chốt ngày 05/10:
 - yêu cầu chỉ đọc được hỏi lại ngay, plan phải có bước ghi, không thêm kiểu trả lời đọc dữ liệu;
-- đường dự phòng là một provider khác qua `OpenAICompatibleProvider`, chuyển thủ công, không dùng Gemini API chính thức.
+- đường chính giữ Gemini qua 9router với nhiều tài khoản; dự phòng là model Codex (`cx/`) trong cùng 9router, chỉ đổi `LLM_MODEL`, chuyển thủ công; không dùng Gemini API chính thức.
 
 Ba task làm song song được với nhau và với khung W4-01/W4-03, W4-02, công cụ W4-04. Thứ tự cần giữ:
 - W3-10 merge trước 20/10, vì đổi prompt và cần đo lại golden;
@@ -78,4 +78,4 @@ Ba task làm song song được với nhau và với khung W4-01/W4-03, W4-02, c
 
 Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, không đổi sang provider khác giữa chừng một campaign.
 
-Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04. Mảng frontend: không bỏ FE-01 (lỗi an toàn và nội dung sai sự thật). FE-02 và FE-03 có thể bỏ các phần nhỏ (phân trang, Shift+Enter, `h-dvh`), không bỏ: mở lại hội thoại khi tải lại, tên tài nguyên trong plan, SSE tự refresh. Task lập 05/10: không bỏ W4-00 (cổng ngừng thì mất số liệu tuần 4 và demo) và W3-11 (demo đi qua giao diện); W3-10 có thể bỏ mục 8 (xử lý đuôi chậm), không bỏ phần A (đo), phần B (chỉ đọc) và lần đo lại.
+Thứ tự ưu tiên khi thiếu thời gian: không bỏ W3-00 (là bằng chứng cho tiêu chí mở rộng của đặc tả) và không bỏ phục hồi, an toàn ghi (tuần 2). Bỏ service theo thứ tự: Telegram, Jira (trùng nhóm với Slack, Trello), rồi Notion, Calendar, Sheets. Mảng tài khoản: không bỏ AUTH-01 (đặc tả §8.1 yêu cầu thu hồi được token). AUTH-02 và AUTH-03 đi cùng nhau; thiếu một trong hai thì giữ đăng ký tắt. Bỏ theo thứ tự: phần phiên đăng nhập của AUTH-05, rồi AUTH-04. Mảng frontend: không bỏ FE-01 (lỗi an toàn và nội dung sai sự thật). FE-02 và FE-03 có thể bỏ các phần nhỏ (phân trang, Shift+Enter, `h-dvh`), không bỏ: mở lại hội thoại khi tải lại, tên tài nguyên trong plan, SSE tự refresh. Task lập 05/10: không bỏ W4-00 (việc nhỏ; nếu nguồn Gemini hỏng mà chưa có đường thay thế đã kiểm thì mất số liệu tuần 4 và demo) và W3-11 (demo đi qua giao diện); W3-10 có thể bỏ mục 8 (xử lý đuôi chậm), không bỏ phần A (đo), phần B (chỉ đọc) và lần đo lại.

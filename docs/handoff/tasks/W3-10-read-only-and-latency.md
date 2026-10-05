@@ -1,6 +1,6 @@
 # W3-10 · Yêu cầu chỉ đọc hỏi lại ngay; giảm thời gian tới plan preview
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `fix/w3-10-read-only-latency` · **Phụ thuộc:** không; nên merge trước 20/10 để W4-04 đo trên planner cuối cùng · **Cần gọi model thật** (cổng hiện tại, hoặc provider dự phòng của [W4-00](W4-00-llm-fallback-provider.md) nếu cổng ngừng)
+**Trạng thái:** chờ · **Nhánh gợi ý:** `fix/w3-10-read-only-latency` · **Phụ thuộc:** không; nên merge trước 20/10 để W4-04 đo trên planner cuối cùng · **Cần gọi model thật:** `ag/gemini-3.8-flash` qua 9router, cùng model với W3-06 để so trước/sau. Không dùng model dự phòng `cx/` của [W4-00](W4-00-llm-fallback-provider.md) cho phép đo này.
 
 Nguồn: phân tích `report.json` của W3-06 ([services](../../ai-evidence/V3-GOLDEN-V2/services-llm-2026-10-03T11-10-25-012Z/summary.md), source `7ba60ef`, 03/10/2026), Claude Code thực hiện ngày 05/10/2026.
 
@@ -74,7 +74,8 @@ Yêu cầu chỉ đọc được **hỏi lại ngay** ở lời gọi model đ�
    - Hướng có thể cân nhắc:
      - thời hạn mỗi lần thử ngắn hơn, nếu số liệu cho thấy lần thử sau thường nhanh;
      - giảm suy luận dài, như đã làm với cs11;
-     - chạy thêm một lượt `EVAL_CONCURRENCY=1` để kiểm có phải tranh chấp ở cổng.
+     - chạy thêm một lượt `EVAL_CONCURRENCY=1` để kiểm có phải tranh chấp ở cổng;
+     - đối chiếu với log hoặc bảng điều khiển của 9router (nếu có): 9router chia request cho nhiều tài khoản Gemini, nên đuôi chậm có thể do 429 hay chuyển tài khoản ở phía 9router, không thấy được từ phía planner.
    - README ghi đã thử và không có lợi: request hedging, biến thể thinking của model.
    - Không đổi catalog tool.
 9. Đo lại đủ ba bộ (core 50, freeform 18, services 44), mỗi bộ 3 lần, cùng model, cùng `PLANNER_SEARCH_MODE=llm` và `EVAL_CONCURRENCY=2` như W3-06.
