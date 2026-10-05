@@ -8,5 +8,8 @@
   },
   "scripts": {
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
   }
 }
