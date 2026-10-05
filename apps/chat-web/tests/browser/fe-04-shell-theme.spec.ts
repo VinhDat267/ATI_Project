@@ -90,7 +90,7 @@ test('FE-04: mobile drawer and scope-removal controls have real 40 by 40 touch t
     expect(box!.width).toBeGreaterThanOrEqual(40); expect(box!.height).toBeGreaterThanOrEqual(40);
   };
   await assertTarget(open); await open.click();
-  const close = page.getByRole('button', { name: 'Đóng danh sách hội thoại' });
+  const close = page.getByRole('button', { name: 'Đóng Lịch sử yêu cầu' });
   await assertTarget(close); await assertTarget(page.getByRole('button', { name: /^Đổi tên / }).first());
   await page.screenshot({ path: info.outputPath('FE04-mobile-drawer-targets.png'), animations: 'disabled' });
   await close.click();

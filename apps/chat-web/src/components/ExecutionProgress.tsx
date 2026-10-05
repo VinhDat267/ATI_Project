@@ -1,6 +1,7 @@
 import React from 'react';
 import type { StepState, PlanStatus } from '../types';
 import { getToolDefinition, type JSONSchema } from '@wap/tool-schemas';
+import { ServiceLogo } from './ServiceLogo';
 
 export interface ExecutionStepInfo {
   id: string;
@@ -44,7 +45,7 @@ function collectionRows(value: unknown, tool: string): unknown[] | undefined {
   if (collections.length) return collections.flatMap(([key]) => Array.isArray(value[key]) ? value[key] : []);
 }
 
-function ResultFields({ output, tool }: { output: unknown; tool: string }) {
+export function ResultFields({ output, tool }: { output: unknown; tool: string }) {
   let value = output;
   if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
   const rows = collectionRows(value, tool);
@@ -134,12 +135,11 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
               <div className="flex-1 pb-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="bg-primary-tint text-primary-text border border-border font-mono text-sm font-semibold px-2 py-0.5 rounded">
-                      {step.tool}
-                    </span>
+                    <ServiceLogo service={getToolDefinition(step.tool)?.service ?? step.tool.split('.')[0]} />
                     <span className="text-sm font-semibold text-text">
                       {step.description}
                     </span>
+                    <span className="text-sm text-text-secondary">{({ pending:'Chờ chạy', running:'Đang chạy', succeeded:'Hoàn thành', failed:'Lỗi đã biết', paused:'Tạm dừng', skipped:'Đã bỏ qua', unknown:'Chưa rõ kết quả' })[step.status]}</span>
                   </div>
                   {step.duration && (
                     <span className="text-xs text-text-muted font-mono">
@@ -150,6 +150,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
 
                 {step.completedAt && <time className="text-xs text-text-muted" dateTime={step.completedAt}>{new Date(step.completedAt).toLocaleString('vi-VN', { hour12: false })}</time>}
                 {step.output != null && <ResultFields output={step.output} tool={step.tool} />}
+                <details className="text-sm"><summary>Thông tin bước</summary><code>{step.tool}</code></details>
 
                 {step.error && (
                   <div className="mt-1 text-xs text-danger-text font-medium">

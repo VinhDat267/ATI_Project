@@ -75,13 +75,13 @@ describe('App message sending', () => {
 
     // Verify empty state text and prompt chips
     expect(
-      await screen.findByText(/phê duyệt các lệnh ghi trước khi chạy/i)
+      await screen.findByText(/kiểm tra kế hoạch trước khi ATI ghi/i)
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(/✨ Tạo công việc trên Trello, phân công nhân sự và thông báo qua Slack/i)
+      await screen.findByText(/Tạo công việc mới trên Trello/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/🔍 Kiểm tra danh sách bảng việc Trello và kênh Slack liên kết/i)
+      screen.getByText(/Gửi thông báo tiến độ qua Slack/i)
     ).toBeInTheDocument();
 
     // Verify placebo dark mode toggle is removed
@@ -92,17 +92,17 @@ describe('App message sending', () => {
     fireEvent.click(hamburger);
 
     // Backdrop overlay should be present
-    const backdrop = document.querySelector('.bg-black\\/30');
+    const backdrop = screen.getByRole('dialog').parentElement;
     expect(backdrop).not.toBeNull();
 
     // Clicking backdrop closes the sidebar
-    fireEvent.click(backdrop!);
-    expect(document.querySelector('.bg-black\\/30')).toBeNull();
+    fireEvent.mouseDown(backdrop!);
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     // Re-open mobile sidebar and test closing via Escape key
     fireEvent.click(hamburger);
-    expect(document.querySelector('.bg-black\\/30')).not.toBeNull();
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(document.querySelector('.bg-black\\/30')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

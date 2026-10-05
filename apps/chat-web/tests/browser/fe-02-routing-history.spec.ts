@@ -33,7 +33,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     }
     await page.goto(`/c/${id}`); await page.reload();
     await expect(page.getByText('FE02 saved request')).toBeVisible();
-    await expect(page.getByText('FE02 pending preview')).toBeVisible();
+    await expect(page.getByText('FE02 pending preview', {exact:true})).toBeVisible();
     await expect(page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('FE02-direct-reload.png'), fullPage: true });
     await page.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
@@ -56,7 +56,7 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
     await login(page); const userId = await owner(db); const prefix = `FE02-${Date.now()}`;
     const oldest = (await db.query("INSERT INTO conversations(user_id,title,updated_at) VALUES($1,$2,now()-interval '60 days') RETURNING id", [userId, `${prefix} oldest %_`])).rows[0].id;
     for (let index = 0; index < 55; index++) await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2)', [userId, `${prefix} history ${index}`]);
-    await page.reload(); const history = page.getByRole('region', { name: 'Danh sách hội thoại' });
+    await page.reload(); await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click(); const history = page.getByRole('region', { name: 'Danh sách hội thoại' });
     await expect(history.getByText(`${prefix} history 54`)).toBeVisible();
     await expect(history.getByText(`${prefix} oldest %_`)).toHaveCount(0);
     // Search is sent to the server; literal SQL wildcard characters must not match other titles.
@@ -77,7 +77,8 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
 
 test('FE-02: empty chat starts at top', async ({ page }, testInfo) => {
   await login(page);
-  const empty = page.locator('.overflow-y-auto.max-w-4xl');
+  await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click();
+  const empty = page.getByRole('log',{name:'Hội thoại'});
   await expect(empty).toBeVisible();
   await expect.poll(() => empty.evaluate(area => area.scrollTop)).toBe(0);
   await page.screenshot({ path: testInfo.outputPath('FE02-empty-scroll-top.png'), fullPage: true });
@@ -89,7 +90,7 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
     await login(page);
     const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [await owner(db), 'FE02 scrolling'])).rows[0].id;
     for (let index = 0; index < 25; index++) await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [id, `Saved message ${index}: ${'Long scroll content. '.repeat(50)}`]);
-    await page.goto(`/c/${id}`); const area = page.locator('.overflow-y-auto.max-w-3xl');
+    await page.goto(`/c/${id}`); await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
     await expect(page.getByText(/Saved message 24:/)).toBeAttached();
     await area.evaluate(element => { element.scrollTop = element.scrollHeight; });
     const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');

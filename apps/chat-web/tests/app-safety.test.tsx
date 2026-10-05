@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { transcriptText } from './cockpit-test-helpers';
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
@@ -17,7 +18,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens();});
-async function openApp() { render(<App />); await screen.findByRole('heading',{name:'AI Workflow Platform'}); }
+async function openApp() { render(<App />); await screen.findByRole('heading',{level:1}); }
 it('preserves the current conversation and messages when creating a conversation fails', async () => {
   useChatStore.setState({conversationId:'valid-c1',messages:[{id:'m1',role:'user',content:'Keep this conversation'}]});
   vi.spyOn(apiClient,'createConversation').mockRejectedValue(new TypeError('Failed to fetch'));
@@ -25,7 +26,7 @@ it('preserves the current conversation and messages when creating a conversation
   fireEvent.click(screen.getAllByRole('button',{name:/Cuộc hội thoại mới/})[0]);
   await screen.findByText(/Không thể kết nối máy chủ/);
   expect(useChatStore.getState().conversationId).toBe('valid-c1');
-  expect(screen.getByText('Keep this conversation')).toBeInTheDocument();
+  expect(await transcriptText('Keep this conversation')).toBeInTheDocument();
 });
 it('disables approval without a real plan id', async () => {
   useChatStore.setState({conversationId:'c1',activePlan:{summary:'Invalid plan',steps:[]} as any,planStatus:'preview'});

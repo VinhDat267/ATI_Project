@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
+import { openHistory } from './cockpit-test-helpers';
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
@@ -82,7 +83,7 @@ it('shows an owner-scoped not-found view and clears prior data for a foreign lin
 });
 it('puts selected history in the URL and clears it when browser Back returns home', async () => {
   authStorage.setStoredTokens({ accessToken: 'access', user }); render(<App />);
-  fireEvent.click(await screen.findByText('Saved history'));
+  await openHistory(); fireEvent.click(await screen.findByText('Saved history'));
   expect(window.location.pathname).toBe('/c/saved'); await screen.findByText('Saved request');
   await act(async () => { window.history.back(); await new Promise(resolve => setTimeout(resolve, 20)); });
   await waitFor(() => expect(useChatStore.getState().conversationId).toBeNull());

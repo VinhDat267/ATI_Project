@@ -1,0 +1,124 @@
+/** @vitest-environment jsdom */
+import { afterEach, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { Workspace } from '../src/components/Workspace';
+import { useChatStore } from '../src/store/chat-store';
+import { Cockpit } from '../src/components/Cockpit';
+import { resourceDestination } from '../src/components/Cockpit';
+import { CockpitDialog } from '../src/components/CockpitDialog';
+import { apiClient } from '../src/services/api-client';
+import type { ChatStoreState } from '../src/store/chat-store';
+vi.mock('../src/hooks/use-sse', async importOriginal => ({ ...await importOriginal<typeof import('../src/hooks/use-sse')>(), useSSE: () => ({ disconnected: false }) }));
+vi.mock('../src/hooks/use-conversation-history', () => ({ useConversationHistory: () => ({ loading: false, error: null }) }));
+vi.mock('../src/services/api-client', () => ({ apiClient: { getRuntime: async () => ({ runtimeMode: 'sandbox' }), getServices: async () => ({ services: [] }), getConversations: async () => ({ conversations: [] }), rejectPlan:vi.fn(), approvePlan:vi.fn() } }));
+afterEach(() => { cleanup(); useChatStore.getState().reset(); });
+it('FE-05 exposes exactly one chat composer on the empty cockpit', () => {
+  useChatStore.getState().reset();
+  render(<Workspace authToken="test" user={null} authError={null} onClearAuthError={() => {}} onLogout={() => {}} route={{kind:'home'}} navigate={() => {}} />);
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  expect(screen.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeInTheDocument();
+});
+const plan = { id:'p1',summary:'Tạo issue và gửi báo cáo',resourceLabels:{ repo:'ati-test' },steps:[{id:'s1',tool:'github.create_issue',description:'Tạo issue trong kho ati-test',args:{repo:'repo',title:'Kiểm tra cockpit',body:'Nội dung cần ghi'}}] };
+function renderCockpit() { return render(<Cockpit services={[{id:'github',name:'GitHub',configured:true,connected:false,connectionStatus:'unchecked'},{id:'slack',name:'Slack',configured:false,connected:false,connectionStatus:'unconfigured'}]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />); }
+it.each(['idle','preview','approving','executing','completed','stopped','rejected','failed'] as const)('one draft survives conversation drawer at %s', status => {
+  useChatStore.setState({activePlan:plan,planStatus:status}); renderCockpit();
+  fireEvent.change(screen.getByRole('textbox'), {target:{value:'Draft stays'}});
+  const opener=screen.getByRole('button',{name:'Nhật ký hội thoại'}); opener.focus(); fireEvent.click(opener);
+  const dialog=screen.getByRole('dialog',{name:'Nhật ký hội thoại'});
+  expect(screen.getAllByRole('textbox')).toHaveLength(1); expect(within(dialog).getByRole('textbox')).toHaveValue('Draft stays');
+  fireEvent.keyDown(document,{key:'Escape'});
+  expect(screen.getAllByRole('textbox')).toHaveLength(1); expect(screen.getByRole('textbox')).toHaveValue('Draft stays'); expect(opener).toHaveFocus();
+});
+it.each([
+  ['planning',{isPlanning:true}],
+  ['clarification',{activeClarification:{question:'Chọn nơi ghi',options:['A']}}],
+  ['known failure',{planStatus:'partial',stepStatuses:{s1:'failed'}}],
+  ['unknown',{planStatus:'executing',stepStatuses:{s1:'unknown'}}],
+  ['restart',{planStatus:'reconciliation_required'}],
+  ['refusal',{messages:[{id:'r',role:'assistant',content:'Từ chối yêu cầu: Chưa kết nối',metadata:{type:'refusal'}}]}],
+] as const)('one composer through drawer transitions at %s',(_name,patch)=>{
+  useChatStore.setState(patch as Partial<ChatStoreState>); renderCockpit();
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button',{name:'Nhật ký hội thoại'}));
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  fireEvent.keyDown(document,{key:'Escape'}); expect(screen.getAllByRole('textbox')).toHaveLength(1);
+});
+it('configured suggestions prefill the single textarea; unconfigured services have no suggestion', () => {
+  renderCockpit(); fireEvent.click(screen.getByRole('button',{name:'Tạo issue mới trên GitHub'}));
+  expect(screen.getByRole('textbox')).toHaveValue('Tạo issue mới trên GitHub');
+  expect(screen.queryByRole('button',{name:'Gửi thông báo tiến độ qua Slack'})).toBeNull();
+  expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
+  expect(screen.getByRole('link',{name:'Kết nối thêm'})).toHaveAttribute('href','/settings');
+});
+it('future services use the API name, generic SVG and a configured suggestion without adding core branches',()=>{
+  render(<Cockpit services={[{id:'future-tool',name:'Công cụ nhóm',configured:true,connected:false,connectionStatus:'unchecked'}]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />);
+  expect(screen.getByText('Công cụ nhóm')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Mô tả công việc với Công cụ nhóm'}));
+  expect(screen.getByRole('textbox')).toHaveValue('Mô tả công việc với Công cụ nhóm');
+});
+it('uses generic resource types and prior step number when the server has no grounded names',()=>{
+  expect(resourceDestination({id:'s',tool:'trello.create_card',description:'Create',args:{listId:'opaque-list-id'}})).toBe('Danh sách · chưa có tên trong dữ liệu');
+  expect(resourceDestination({id:'s2',tool:'trello.add_member',description:'Assign',args:{cardId:{$ref:'step_1.output.id'},memberId:'opaque-member-id'}})).toBe('Kết quả của bước 1 · Thành viên · chưa có tên trong dữ liệu');
+});
+it('preview contains actual intended text and grounded destination without invented issue number', () => {
+  useChatStore.setState({activePlan:plan,planStatus:'preview'}); renderCockpit();
+  expect(screen.queryByText(/#42/)).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Xem trước'}));
+  const dialog=screen.getByRole('dialog',{name:'Xem trước nội dung'});
+  expect(within(dialog).getByText('Kiểm tra cockpit')).toBeInTheDocument(); expect(within(dialog).getByText('Nội dung cần ghi')).toBeInTheDocument();
+  expect(within(dialog).getByText(/Đích:/)).toHaveTextContent('ati-test');
+  expect(within(dialog).queryByText('repo',{exact:true})).toBeNull();
+  const close=within(dialog).getByRole('button',{name:'Đóng Xem trước nội dung'}); close.focus(); fireEvent.keyDown(document,{key:'Tab'}); expect(close).toHaveFocus();
+  fireEvent.keyDown(document,{key:'Escape'}); expect(screen.getByRole('button',{name:'Xem trước'})).toHaveFocus();
+});
+it('clarification uses its single main textarea with no second free-text form', () => {
+  useChatStore.setState({activeClarification:{question:'Chọn kho nào?',options:['Kho A','Kho B']}}); renderCockpit();
+  expect(screen.getAllByRole('textbox')).toHaveLength(1); expect(screen.getByRole('textbox',{name:'Nhập câu trả lời làm rõ yêu cầu'})).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Kho A'})).toBeInTheDocument();
+});
+it('receipt uses actual elapsed timestamps and only http(s) outcome links', () => {
+  useChatStore.setState({planStatus:'completed',executionSnapshot:{plan:{...plan,convId:'c1',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded',startedAt:'2026-10-05T10:00:00.000Z',completedAt:'2026-10-05T10:00:02.500Z',durationMs:2500,output:{url:'https://github.com/ati/test/issues/42',html_url:'javascript:alert(1)',number:42}}]}}); renderCockpit();
+  const link=screen.getByRole('link',{name:'https://github.com/ati/test/issues/42'}); expect(link).toHaveAttribute('rel','noopener noreferrer'); expect(link).toHaveAttribute('target','_blank');
+  expect(screen.queryByRole('link',{name:'javascript:alert(1)'})).toBeNull(); expect(screen.getByText('Thời gian thực thi: 2.5 giây')).toBeInTheDocument(); expect(screen.queryByText(/đã xác nhận/i)).toBeNull();
+});
+it('offers two honest follow-up suggestions even when no service is configured',()=>{
+  useChatStore.setState({planStatus:'completed'});
+  render(<Cockpit services={[]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />);
+  expect(within(screen.getByRole('group',{name:'Gợi ý tiếp theo'})).getAllByRole('button')).toHaveLength(2);
+});
+it('returns focus to a rerendered opener using its stable identity', () => {
+  const view=render(<><button key="a" id="stable-opener">Open</button></>); screen.getByRole('button',{name:'Open'}).focus();
+  view.rerender(<><button key="a" id="stable-opener">Open</button><CockpitDialog title="Example" returnFocusId="stable-opener" onClose={()=>{}}><button>Action</button></CockpitDialog></>);
+  view.rerender(<><button key="b" id="stable-opener">Open</button><CockpitDialog title="Example" returnFocusId="stable-opener" onClose={()=>{}}><button>Action</button></CockpitDialog></>);
+  view.rerender(<><button key="b" id="stable-opener">Open</button></>); expect(screen.getByRole('button',{name:'Open'})).toHaveFocus();
+});
+it('late plan for A cannot change B cockpit moment', async () => {
+  useChatStore.setState({conversationId:'B'}); renderCockpit();
+  const {handleSSEEvent}=await import('../src/hooks/use-sse');
+  act(()=>handleSSEEvent('plan_preview',JSON.stringify({planId:'plan-A',summary:'Late A',steps:plan.steps}),undefined,'A'));
+  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','1'); expect(screen.queryByText('Late A')).toBeNull();
+});
+it('late cancellation for A cannot clear the selected B plan', async () => {
+  let finish!:()=>void; vi.mocked(apiClient.rejectPlan).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve(undefined); }));
+  useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'preview'});
+  render(<Workspace authToken="test" user={null} authError={null} onClearAuthError={() => {}} onLogout={() => {}} route={{kind:'conversation',conversationId:'A'}} navigate={() => {}} />);
+  fireEvent.click(screen.getByRole('button',{name:'Hủy'}));
+  act(()=>useChatStore.setState({conversationId:'B',activePlan:{...plan,id:'plan-B'},planStatus:'preview'}));
+  await act(async()=>finish()); expect(useChatStore.getState().activePlan?.id).toBe('plan-B'); expect(useChatStore.getState().planStatus).toBe('preview');
+});
+it.each(['executing','completed'] as const)('a late approval error cannot restore preview after authoritative SSE %s',async phase=>{
+  let fail!:(error:Error)=>void; vi.mocked(apiClient.approvePlan).mockImplementation(()=>new Promise((_resolve,reject)=>{fail=reject;}));
+  useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'preview'});
+  render(<Workspace authToken="test" user={null} authError={null} onClearAuthError={() => {}} onLogout={() => {}} route={{kind:'conversation',conversationId:'A'}} navigate={() => {}} />);
+  fireEvent.click(screen.getByRole('button',{name:'Duyệt kế hoạch'}));
+  act(()=>useChatStore.getState().setPlanStatus(phase));
+  await act(async()=>fail(new Error('Late transport error')));
+  expect(useChatStore.getState().planStatus).toBe(phase); expect(screen.queryByRole('button',{name:'Duyệt kế hoạch'})).toBeNull();
+});
+it.each(['executing','completed'] as const)('late approval success preserves authoritative SSE %s',async phase=>{
+  let finish!:()=>void; vi.mocked(apiClient.approvePlan).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve(undefined);}));
+  useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'preview'});
+  render(<Workspace authToken="test" user={null} authError={null} onClearAuthError={() => {}} onLogout={() => {}} route={{kind:'conversation',conversationId:'A'}} navigate={() => {}} />);
+  fireEvent.click(screen.getByRole('button',{name:'Duyệt kế hoạch'})); act(()=>useChatStore.getState().setPlanStatus(phase));
+  await act(async()=>finish()); expect(useChatStore.getState().planStatus).toBe(phase); expect(screen.queryByRole('button',{name:'Duyệt kế hoạch'})).toBeNull();
+});

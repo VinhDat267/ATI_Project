@@ -46,6 +46,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const access = await page.evaluate(() => localStorage.getItem('wap_access_token'));
     const listed = await page.request.get('/api/conversations', { headers: { Authorization: `Bearer ${access}` } });
     expect((await listed.json()).conversations[0].id).toBe(convId);
+    await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice).toBeVisible();
@@ -78,7 +79,7 @@ async function login(page: import('@playwright/test').Page) {
   await page.getByRole('textbox', { name: 'Email' }).fill(email!);
   await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI Workflow Platform' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
 }
 
 test('real browser and PostgreSQL: login, chat, approval and execution Continue safe pending after reload', async ({ page }, testInfo) => {
@@ -105,6 +106,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     const writes: string[] = [];
     page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });
     await page.reload();
+    await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
     const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
@@ -192,7 +194,7 @@ test('real browser and PostgreSQL: edit a pending plan through chat', async ({ p
     const first = (await pool.query("SELECT id FROM plans WHERE conv_id = $1 AND status = 'pending'", [convId])).rows[0]?.id;
     expect(first).toBeTruthy();
 
-    await page.getByRole('button', { name: 'Sửa qua Chat' }).click();
+    await page.getByRole('button', { name: 'Sửa qua chat' }).click();
     await expect(composer).toHaveValue(/^Điều chỉnh kế hoạch: /);
     await composer.pressSequentially('đổi tiêu đề thành Sửa CSS trang chủ');
     await composerSend(page).click();
@@ -235,8 +237,7 @@ for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQ
   try {
     await login(page);
     const disabledSample = page.getByRole('button', { name: /Cần kết nối/ }).first();
-    await expect(disabledSample).toBeDisabled();
-    expect(await disabledSample.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
+    await expect(disabledSample).toHaveCount(0); // Suggestions only use configured services.
     const prompt = `Tạo task Trello rồi báo Slack E2E partial failure ${Date.now()}`;
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
     await composerSend(page).click();
