@@ -115,6 +115,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onCl
           activeClarification: previous.activeClarification, gatherState: previous.gatherState,
           stepStatuses: previous.stepStatuses, stepErrors: previous.stepErrors,
           executionSnapshot: previous.executionSnapshot, executionLoadError: previous.executionLoadError,
+          retiredExecutionPlanId: previous.retiredExecutionPlanId,
         });
         setConversationId(previous.conversationId);
         if (previousRoute.kind === 'conversation') navigate(conversationPath(previousRoute.conversationId));

@@ -99,3 +99,52 @@ test('FE-05: native terminal SSE planner error remains visible in the cockpit',a
     await expect.poll(()=>sends).toBe(2);
   } finally {release();}
 });
+for (const event of ['clarification','error']) for (const readPhase of ['during planning','after terminal']) test(`FE-05: late snapshot: new ${event} owns the stage after delayed old receipt HTTP begun ${readPhase}`,async({page},info)=>{
+  await login(page);
+  let releaseTerminal!:()=>void, releaseSnapshot!:()=>void, noteSnapshot!:()=>void;
+  const terminalGate=new Promise<void>(resolve=>releaseTerminal=resolve);
+  const snapshotGate=new Promise<void>(resolve=>releaseSnapshot=resolve);
+  const snapshotStarted=new Promise<void>(resolve=>noteSnapshot=resolve);
+  let streamOpens=0, armed=false, terminalStreamOpened=false, requestId:string|undefined;
+  let snapshot:any;
+  await page.route('**/api/conversations/*/stream',async route=>{
+    streamOpens++;
+    if (streamOpens===1) { await route.fulfill({status:200,contentType:'text/event-stream',body:': initial connection\n\n'}); return; }
+    await terminalGate; terminalStreamOpened=true;
+    await route.fulfill({status:200,contentType:'text/event-stream',body:`event: ${event}\ndata: ${JSON.stringify({requestId,question:'NEW request needs a destination',options:['NEW destination A'],message:'NEW request failed before planning finished'})}\n\n`});
+  });
+  await page.route('**/api/conversations/*/executions/latest',async route=>{
+    if (!armed || !terminalStreamOpened || (readPhase==='after terminal' && streamOpens<3)) { await route.continue(); return; }
+    const response=await route.fetch(); snapshot=await response.json(); noteSnapshot();
+    await snapshotGate; await route.fulfill({response});
+  });
+  const ids=await seed(page);
+  await page.route('**/api/conversations/*/messages',async route=>{
+    requestId=route.request().postDataJSON().tempId;
+    await route.fulfill({status:202,json:{messageId:'reviewer-new-message'}}); releaseTerminal();
+  });
+  try {
+    armed=true;
+    const input=page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    await input.fill(`NEW request ending in ${event}`); await input.press('Enter');
+    const cockpit=page.getByRole('region',{name:'Cockpit'}), expected=event==='clarification'?'3':'1';
+    await expect(cockpit).toHaveAttribute('data-moment',expected); await snapshotStarted;
+    const before={moment:await cockpit.getAttribute('data-moment'),body:await cockpit.innerText()};
+    await page.screenshot({path:info.outputPath(`late-snapshot-${event}-before.png`),animations:'disabled'});
+    const readResponse=page.waitForResponse(response=>response.url().endsWith(`/api/conversations/${ids.convId}/executions/latest`));
+    releaseSnapshot(); await readResponse;
+    await readResponse.then(response=>response.finished());
+    await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    const after={moment:await cockpit.getAttribute('data-moment'),body:await cockpit.innerText()};
+    await save(info,page,`late-snapshot-${event}`,{...ids,readPhase,requestId,streamOpens,expected,before,after,snapshotPlanId:snapshot.plan.id,snapshotStatus:snapshot.execution.status,boundary:'Real fixture DB/HTTP + controlled native SSE; frontend ownership only'});
+    expect(after.moment).toBe(expected);
+    await expect(page.getByRole('link',{name:'https://github.com/ati/test/issues/42',exact:true})).toHaveCount(0);
+    if(event==='clarification') {
+      await expect(cockpit.getByText('NEW request needs a destination',{exact:true})).toBeVisible();
+      await expect(cockpit.getByRole('button',{name:'NEW destination A',exact:true})).toBeEnabled();
+    } else {
+      await expect(cockpit.getByRole('alert')).toHaveText('Lỗi: NEW request failed before planning finished');
+      await expect(cockpit.getByRole('alert')).toBeInViewport();
+    }
+  } finally {releaseTerminal();releaseSnapshot();}
+});
