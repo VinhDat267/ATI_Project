@@ -1,6 +1,11 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 05/10/2026, sau merge #80 tại `7060a37`: xoá mã và tài liệu v1/v2 khỏi `main`. Mã nguồn v3 không đổi; chỉ đổi manifest/lock. Trước đó: kế hoạch #77 (`badccb3`), quy tắc phiên #78, đồng bộ #79 (`b7ced04`). Agent cập nhật: Claude Code (reviewer).
+**Cập nhật lần cuối:** 05/10/2026, sau merge #84 tại `ab0817e`: kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01). Chỉ tài liệu, mã nguồn không đổi. Trước đó:
+- #82 DOC-01 (`841d9da`): sửa năm link lưu trữ mà review độc lập #80 phát hiện;
+- #80 xoá v1/v2 (`7060a37`);
+- #77 kế hoạch tuần 4 (`badccb3`).
+
+Agent cập nhật: Claude Code (reviewer).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -10,7 +15,7 @@
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03 và FE-03b đã merge;
+> - **frontend:** FE-01 → FE-03 và FE-03b đã merge. Giao diện mới theo design system Agentic có kế hoạch qua #84 (FE-04 → FE-10, UI-API-01), chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -94,7 +99,19 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
-- #80 dọn repo (`7060a37`), merge 05/10 lúc 08:38:32 Việt Nam; **tự review, người dùng cho merge khi chưa có review độc lập**.
+- #84 kế hoạch giao diện mới (`ab0817e`), merge 05/10 lúc 19:22:29 Việt Nam. Chỉ tài liệu; **tự review, người dùng cho merge khi chưa có review độc lập**. CI `v3` xanh trên head `c245170`.
+  - `docs/design/prototypes/`: 12 trang HTML làm bằng OpenDesign, review với mã thật nhiều vòng trong ngày. Đã gỡ khỏi bản mẫu các tính năng không có trong API (mời thành viên, từ chối tài khoản, gỡ khoá, lịch sử cả nhóm, lưu bản nháp…) và các câu sai về hệ thống.
+  - Đặc tả `docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`:
+    - token Agentic và các điểm lệch đã chốt;
+    - route mới `/settings`, `/history`, `/guide`, `/privacy`;
+    - bảng trạng thái thật → khoảnh khắc của cockpit;
+    - quy tắc trung thực, trợ năng, chế độ tối;
+    - thay đổi backend (UI-API-01), mốc thời gian, phương án cắt.
+  - Task card FE-04 → FE-10 và UI-API-01; ROADMAP thêm 8 dòng. Phần tối thiểu để demo: FE-04 → FE-07.
+  - Thứ tự cần giữ: FE-05 merge trước 16/10 để buổi thử W4-03 chạy trên giao diện mới. Nếu không kịp thì W4-03 dùng giao diện hiện tại và báo cáo ghi rõ.
+  - Xem [log](log/2026-10-05-claude-code-plan-ui-redesign.md).
+- #82 DOC-01 (`841d9da`), merge 05/10 lúc 09:32:41 Việt Nam (Codex): review độc lập #80 phát hiện một lỗi P3. Năm link trong `docs/screens.html` và `docs/wireframes.html` trỏ tới tài liệu v2 đã xoá; nay trỏ sang bản tại tag `archive/v2-final` trên GitHub. Xem [log](log/2026-10-05-codex-DOC-01-pr80-archive-links.md).
+- #80 dọn repo (`7060a37`), merge 05/10 lúc 08:38:32 Việt Nam; tự review, người dùng cho merge khi chưa có review độc lập. Review độc lập sau merge chỉ phát hiện lỗi P3 link lưu trữ, đã sửa ở #82.
   - Xoá 899 file v1/v2 (1.511 → 612 file được theo dõi) theo thiết kế người dùng duyệt; giữ tài liệu đề tài ban đầu (mô tả dự án, yêu cầu chức năng, wireframe, ADR).
   - Khai báo lại ba package v3 trước đây chỉ có nhờ workspace v2: `tsx`, `@playwright/test`, `ajv`. Lock bỏ 145 gói, không đổi phiên bản gói nào.
   - AGENTS.md mục 1.3, README, `docs/README.md`, `.env.example`, `.gitignore` cập nhật.
@@ -165,6 +182,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Test chat-api mặc định `DATABASE_URL` tới cổng 55532 (cổng của compose v2 đã xoá) khi không đặt biến | `apps/chat-api/tests/auth/*`, `tests/integration/*` | CI đặt `DATABASE_URL` nên không bị ảnh hưởng. `scripts/test-v3.mjs` không tự đặt biến này: chạy local mà quên đặt thì test PostgreSQL lỗi kết nối tới 55532. Nên đổi mặc định sang 55533 trong một task nhỏ. Phát hiện khi dọn v2 (#80) |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
+| Bản mẫu giao diện mới chưa kiểm bằng ảnh ở khổ desktop (khung trình duyệt của Claude Code rộng 411px); màn "kết thúc không thành công" (`stopped`/`rejected`/`failed`) chưa có bản mẫu | `docs/design/prototypes/` | Đã kiểm ở 375–411px, cả sáng và tối, không lỗi console. FE-06 làm màn kết thúc theo bố cục khoảnh khắc 6 |
 
 ## 6. Môi trường chạy
 
@@ -191,6 +209,10 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - LLM dự phòng là model Codex `cx/` trong cùng 9router, chuyển thủ công, không tự chuyển model khi lỗi (W4-00);
   - phép đo trước/sau của W3-10 phải dùng đúng `ag/gemini-3.8-flash`;
   - xoá mã và tài liệu v1/v2 khỏi `main` (#80). Cần đối chứng thì đọc từ tag `archive/v2-final`; không khôi phục vào `main` khi chưa có yêu cầu của chủ dự án.
+  - giao diện mới theo design system "Agentic" (#84): Primary `#FF5701`, nền `#F6F6F1`, thang chữ 14/16/18/24/32/40, không thêm màu ngoài bảng;
+  - chữ trên nút cam giữ màu trắng (3,2:1, ngoại lệ có chủ đích). Đặc tả áp dụng cùng quy tắc cho nút nền Success/Warning; người dùng merge mà không phản đối;
+  - chữ thường Be Vietnam Pro, tiêu đề Playfair Display, mã/ID JetBrains Mono;
+  - cỡ chữ tối thiểu 14px áp dụng khi làm app; bản mẫu giữ nguyên làm tham chiếu bố cục. Khi bản mẫu khác đặc tả thì theo đặc tả.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
