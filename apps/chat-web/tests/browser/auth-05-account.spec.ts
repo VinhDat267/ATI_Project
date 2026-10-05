@@ -24,13 +24,14 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     const one = await first.newPage(), two = await second.newPage();
     await login(one, email); await login(two, email);
 
-    await one.getByRole('button', { name: 'Tài khoản' }).click();
+    await one.getByRole('button', { name: /Menu người dùng/ }).click();
+    await one.getByRole('menuitem', { name: 'Tài khoản' }).click();
     await expect(one).toHaveURL(/\/account$/);
     await expect(one.getByText('Phiên này', { exact: true })).toBeVisible();
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(1);
     await one.screenshot({ path: info.outputPath('AUTH05-account.png'), fullPage: true });
     await one.getByRole('button', { name: 'Đăng xuất khỏi mọi thiết bị khác' }).click();
-    await expect(one.getByRole('status')).toContainText('Đã đăng xuất 1 phiên khác');
+    await expect(one.getByRole('main').getByRole('status')).toContainText('Đã đăng xuất 1 phiên khác');
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(0);
 
     // The other browser still shows the workspace until its next request meets the revoked session.
@@ -40,9 +41,9 @@ test('AUTH-05: logging out every other device sends the other browser to login o
 
     await one.getByLabel('Tên hiển thị').fill('Tên mới AUTH-05');
     await one.getByRole('button', { name: 'Lưu tên' }).click();
-    await expect(one.getByRole('status')).toContainText('Đã lưu tên mới');
+    await expect(one.getByRole('main').getByRole('status')).toContainText('Đã lưu tên mới');
     await one.getByRole('button', { name: 'Về workspace' }).click();
-    await expect(one.getByRole('complementary', { name: 'Danh sách hội thoại' }).getByText('Tên mới AUTH-05')).toBeVisible();
+    await expect(one.getByRole('button', { name: 'Menu người dùng: Tên mới AUTH-05', exact: true })).toBeVisible();
     expect((await db.query('SELECT name FROM users WHERE email=$1', [email])).rows[0].name).toBe('Tên mới AUTH-05');
   } finally { await first.close(); await second.close(); await db.end(); }
 });

@@ -18,7 +18,8 @@ test('AUTH-01: logout revokes server tokens and Back/Reload cannot restore chat'
   try {
     const pair = await login(page);
     const sid = JSON.parse(Buffer.from(pair.access.split('.')[1], 'base64url').toString()).sid;
-    await page.getByRole('button', { name: /Đăng xuất/ }).click();
+    await page.getByRole('button', { name: /Menu người dùng/ }).click();
+    await page.getByRole('menuitem', { name: /Đăng xuất/ }).click();
     await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('wap_refresh_token'))).toBeNull();
     expect((await page.request.get('/api/auth/me', { headers: { Authorization: `Bearer ${pair.access}` } })).status()).toBe(401);

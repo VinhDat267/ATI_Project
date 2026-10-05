@@ -6,6 +6,7 @@ import { VerifyEmailView } from './views/VerifyEmailView';
 import { ForgotPasswordView } from './views/ForgotPasswordView';
 import { ResetPasswordView } from './views/ResetPasswordView';
 import { GoogleCallbackView } from './views/GoogleCallbackView';
+import { ShellPageView } from './views/ShellPageView';
 
 export interface GoogleCallbackInput { code?: string; state?: string; error?: string }
 type PublicViewProps = ComponentProps<typeof LoginPage> & { navigate: (path: string, replace?: boolean) => void; token?: string; googleCallback?: GoogleCallbackInput };
@@ -23,6 +24,10 @@ export const routes = [
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
   { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
   { kind: 'account', pattern: /^\/account\/?$/ },
+  { kind: 'settings', pattern: /^\/settings\/?$/ },
+  { kind: 'history', pattern: /^\/history\/?$/ },
+  { kind: 'guide', pattern: /^\/guide\/?$/, publicView: (props: PublicViewProps) => createElement(ShellPageView, { title: 'Cẩm nang', publicPage: true, navigate: props.navigate }) },
+  { kind: 'privacy', pattern: /^\/privacy\/?$/, publicView: (props: PublicViewProps) => createElement(ShellPageView, { title: 'Chính sách an toàn', publicPage: true, navigate: props.navigate }) },
 ] as const;
 export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found'; token?: string; googleCallback?: GoogleCallbackInput } | { kind: 'conversation'; conversationId: string };
 

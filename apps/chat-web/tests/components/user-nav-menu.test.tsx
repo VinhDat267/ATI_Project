@@ -25,15 +25,17 @@ describe('UserNavMenu Component', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
     expect(screen.getByText('Nguyen Van A')).toBeInTheDocument();
     expect(screen.getByText('a@example.com')).toBeInTheDocument();
-    expect(screen.getByText('NG')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Menu người dùng/ })).toHaveTextContent('NA');
 
-    const settingsBtn = screen.getByRole('button', { name: /cài đặt/i });
+    const settingsBtn = screen.getByRole('menuitem', { name: 'Kết nối dịch vụ' });
     fireEvent.click(settingsBtn);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
 
-    const logoutBtn = screen.getByRole('button', { name: /đăng xuất/i });
+    fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
+    const logoutBtn = screen.getByRole('menuitem', { name: /đăng xuất/i });
     fireEvent.click(logoutBtn);
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
@@ -47,6 +49,7 @@ describe('UserNavMenu Component', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
     expect(screen.getByText('Người dùng')).toBeInTheDocument();
     expect(screen.getByText('AO')).toBeInTheDocument();
   });

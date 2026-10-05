@@ -59,7 +59,8 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     await login(page, email, password);
     await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
     const oldTokens = await page.evaluate(() => ({ access: localStorage.getItem('wap_access_token')!, refresh: localStorage.getItem('wap_refresh_token')! }));
-    await page.getByRole('button', { name: /Đăng xuất/ }).click();
+    await page.getByRole('button', { name: /Menu người dùng/ }).click();
+    await page.getByRole('menuitem', { name: /Đăng xuất/ }).click();
     // Create another active session so the reset proof cannot be satisfied by
     // the explicit browser logout alone.
     const second = await page.request.post('/api/auth/login', { data: { email, password } });

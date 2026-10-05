@@ -18,10 +18,10 @@ export function ResetPasswordView({ navigate, token }: AuthViewProps) {
   return <AuthFormFrame title="Đặt lại mật khẩu" description="Mọi phiên đăng nhập cũ sẽ kết thúc sau khi đổi mật khẩu." navigate={navigate}>
     <AuthFeedback error={!token ? 'Link đặt lại mật khẩu không hợp lệ hoặc đã được mở. Hãy yêu cầu một link mới.' : error} />
     {token ? <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="text-sm text-zinc-700">Mật khẩu mới<input type="password" className={authInputClass} value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
-      <label className="text-sm text-zinc-700">Nhập lại mật khẩu<input type="password" className={authInputClass} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
-      <p className="text-xs text-zinc-500">Mật khẩu từ 12 đến 128 ký tự.</p>
+      <label className="text-sm text-text-secondary">Mật khẩu mới<input type="password" className={authInputClass} value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
+      <label className="text-sm text-text-secondary">Nhập lại mật khẩu<input type="password" className={authInputClass} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
+      <p className="text-xs text-text-muted">Mật khẩu từ 12 đến 128 ký tự.</p>
       <button className={authButtonClass} disabled={busy}>{busy ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}</button>
-    </form> : <button type="button" className="text-sm text-[#0071e3] hover:underline" onClick={() => navigate('/forgot-password')}>Yêu cầu link mới</button>}
+    </form> : <button type="button" className="text-sm text-primary-text hover:underline" onClick={() => navigate('/forgot-password')}>Yêu cầu link mới</button>}
   </AuthFormFrame>;
 }

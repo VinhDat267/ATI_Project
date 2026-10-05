@@ -4,9 +4,9 @@ import { authStorage } from '../services/auth-storage';
 import { userErrorMessage } from '../services/user-error';
 import type { AccountProfile, AccountSession, User } from '../types';
 
-const buttonStyle = 'rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed';
-const fieldStyle = 'mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm';
-const sectionStyle = 'rounded-2xl border border-zinc-200 bg-white p-5';
+const buttonStyle = 'rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed';
+const fieldStyle = 'mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm';
+const sectionStyle = 'rounded-2xl border border-border bg-surface p-5';
 const roles = { member: 'Thành viên', admin: 'Quản trị viên' };
 const when = (value: string) => new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
 interface Props { user: User | null; navigate: (path: string) => void; onLogout: () => void }
@@ -77,22 +77,22 @@ export function AccountView({ user, navigate, onLogout }: Props) {
   });
   const others = sessions.filter(session => !session.current);
   if (!user) return <p role="status" className="p-6">Đang tải tài khoản...</p>;
-  return <main className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
-    <header className="border-b border-zinc-200 bg-white px-4 py-4 sm:px-8 flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="font-semibold text-xl">Tài khoản</h1><p className="text-sm text-zinc-500 mt-1">Hồ sơ, mật khẩu và các thiết bị đang đăng nhập.</p></div>
+  return <main className="min-h-screen bg-surface-inset text-text">
+    <header className="border-b border-border bg-surface px-4 py-4 sm:px-8 flex flex-wrap items-center justify-between gap-3">
+      <div><h1 className="font-semibold text-xl">Tài khoản</h1><p className="text-sm text-text-muted mt-1">Hồ sơ, mật khẩu và các thiết bị đang đăng nhập.</p></div>
       <div className="flex gap-2"><button type="button" onClick={() => navigate('/')} className={buttonStyle}>Về workspace</button><button type="button" onClick={onLogout} className={buttonStyle}>Đăng xuất</button></div>
     </header>
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 flex flex-col gap-5">
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
-      {!account && !error && <p role="status" className="text-sm text-zinc-600">Đang tải thông tin tài khoản...</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
+      {notice && <p role="status" className="text-sm text-success-text">{notice}</p>}
+      {!account && !error && <p role="status" className="text-sm text-text-secondary">Đang tải thông tin tài khoản...</p>}
       {account && <>
         <section aria-labelledby="account-profile" className={sectionStyle}>
           <h2 id="account-profile" className="font-semibold">Hồ sơ</h2>
           <dl className="mt-3 grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
-            <dt className="text-zinc-500">Email</dt><dd>{account.email}</dd>
-            <dt className="text-zinc-500">Vai trò</dt><dd>{roles[account.role]}</dd>
-            <dt className="text-zinc-500">Ngày tạo</dt><dd>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</dd>
+            <dt className="text-text-muted">Email</dt><dd>{account.email}</dd>
+            <dt className="text-text-muted">Vai trò</dt><dd>{roles[account.role]}</dd>
+            <dt className="text-text-muted">Ngày tạo</dt><dd>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</dd>
           </dl>
           <form onSubmit={saveName} className="mt-4 flex flex-wrap items-end gap-2">
             <label className="min-w-0 flex-1 text-sm">Tên hiển thị
@@ -114,7 +114,7 @@ export function AccountView({ user, navigate, onLogout }: Props) {
             <label className="text-sm">Nhập lại mật khẩu mới
               <input type="password" value={repeatPassword} onChange={event => setRepeatPassword(event.target.value)} required maxLength={128} autoComplete="new-password" className={fieldStyle} />
             </label>
-            <p id="account-password-rule" className="text-xs text-zinc-500">Từ 12 đến 128 ký tự. Sau khi đổi, các thiết bị khác sẽ bị đăng xuất.</p>
+            <p id="account-password-rule" className="text-xs text-text-muted">Từ 12 đến 128 ký tự. Sau khi đổi, các thiết bị khác sẽ bị đăng xuất.</p>
             <div><button type="submit" disabled={busy !== null} className={buttonStyle}>Đổi mật khẩu</button></div>
           </form> : <div className="mt-3 text-sm">
             <p>Tài khoản này đăng nhập bằng Google và chưa có mật khẩu. Để đặt mật khẩu, hãy dùng "Quên mật khẩu": hệ thống gửi link đặt mật khẩu tới {account.email}.</p>
@@ -125,16 +125,16 @@ export function AccountView({ user, navigate, onLogout }: Props) {
         {googleEnabled && <section aria-labelledby="account-methods" className={sectionStyle}>
           <h2 id="account-methods" className="font-semibold">Phương thức đăng nhập</h2>
           <ul className="mt-3 flex flex-col gap-3 text-sm">
-            <li><span className="text-zinc-500">Mật khẩu:</span> {account.hasPassword ? 'Đã đặt' : 'Chưa đặt'}</li>
+            <li><span className="text-text-muted">Mật khẩu:</span> {account.hasPassword ? 'Đã đặt' : 'Chưa đặt'}</li>
             <li className="flex flex-wrap items-center justify-between gap-2">
-              <span><span className="text-zinc-500">Google:</span> {account.hasGoogle ? `Đã liên kết${account.googleEmail ? ` (${account.googleEmail})` : ''}` : 'Chưa liên kết'}</span>
+              <span><span className="text-text-muted">Google:</span> {account.hasGoogle ? `Đã liên kết${account.googleEmail ? ` (${account.googleEmail})` : ''}` : 'Chưa liên kết'}</span>
               {account.hasGoogle
                 ? <button type="button" disabled={busy !== null || !account.hasPassword} aria-describedby={account.hasPassword ? undefined : 'account-unlink-rule'} className={buttonStyle}
                     onClick={() => void run('unlink', async () => { await apiClient.unlinkGoogle(); await load(); return 'Đã gỡ liên kết Google.'; })}>Gỡ liên kết</button>
                 : <button type="button" disabled={busy !== null} className={buttonStyle}
                     onClick={linkGoogle}>Liên kết Google</button>}
             </li>
-            {account.hasGoogle && !account.hasPassword && <li id="account-unlink-rule" className="text-xs text-zinc-500">Cần đặt mật khẩu trước khi gỡ liên kết Google, nếu không bạn sẽ không còn cách đăng nhập.</li>}
+            {account.hasGoogle && !account.hasPassword && <li id="account-unlink-rule" className="text-xs text-text-muted">Cần đặt mật khẩu trước khi gỡ liên kết Google, nếu không bạn sẽ không còn cách đăng nhập.</li>}
           </ul>
         </section>}
 
@@ -150,8 +150,8 @@ export function AccountView({ user, navigate, onLogout }: Props) {
           <ul className="mt-3 divide-y divide-zinc-100 text-sm">
             {[...sessions].sort((a, b) => Number(b.current) - Number(a.current)).map(session => <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <div>
-                <p className="font-medium">{session.device}{session.current && <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-normal text-blue-700">Phiên này</span>}</p>
-                <p className="mt-1 text-xs text-zinc-500">Đăng nhập: {when(session.createdAt)} · Dùng lần cuối: {when(session.lastUsedAt)}</p>
+                <p className="font-medium">{session.device}{session.current && <span className="ml-2 rounded-full bg-primary-tint px-2 py-0.5 text-xs font-normal text-primary-text">Phiên này</span>}</p>
+                <p className="mt-1 text-xs text-text-muted">Đăng nhập: {when(session.createdAt)} · Dùng lần cuối: {when(session.lastUsedAt)}</p>
               </div>
               {!session.current && <button type="button" disabled={busy !== null} className={buttonStyle}
                 onClick={() => void run(`session-${session.id}`, async () => { await apiClient.revokeAccountSession(session.id); await load(); return `Đã đăng xuất ${session.device}.`; })}>Đăng xuất phiên này</button>}
@@ -159,7 +159,7 @@ export function AccountView({ user, navigate, onLogout }: Props) {
           </ul>
         </section>
 
-        <p className="text-xs text-zinc-500">Trang này không có chức năng xóa tài khoản hay đổi email. Nếu muốn ngừng sử dụng, hãy nhờ quản trị viên khóa tài khoản.</p>
+        <p className="text-xs text-text-muted">Trang này không có chức năng xóa tài khoản hay đổi email. Nếu muốn ngừng sử dụng, hãy nhờ quản trị viên khóa tài khoản.</p>
       </>}
     </div>
   </main>;

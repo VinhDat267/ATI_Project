@@ -45,8 +45,8 @@ export function ReconciliationNotice({ snapshot, services: catalog = [], busy, e
   }))].join(', ') || 'dịch vụ liên quan';
   return (
     <section aria-label="Cần đối soát trước khi tiếp tục" aria-busy={busy}
-      className="my-4 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-zinc-800">
-      <h2 className="font-semibold text-amber-900">Cần đối soát trước khi tiếp tục</h2>
+      className="my-4 max-w-2xl rounded-2xl border border-border bg-warning-tint p-5 text-sm text-text">
+      <h2 className="font-semibold text-warning-text">Cần đối soát trước khi tiếp tục</h2>
       {canContinue ? <p className="mt-2">Quy trình bị gián đoạn giữa các bước. Không có bước nào chưa rõ kết quả; các bước còn lại chưa từng được gửi tới dịch vụ. Bạn có thể chạy tiếp các bước còn lại hoặc dừng kế hoạch.</p> : <>
         <p className="mt-2">Quy trình bị gián đoạn. Các bước UNKNOWN dưới đây có thể đã tạo thay đổi nhưng hệ thống chưa xác nhận được kết quả.</p>
         <p className="mt-2">Hãy tự kiểm tra trên {services} trước khi tiếp tục. Skip bỏ qua bước đang đối soát và chạy các bước còn lại; hãy xác nhận thay đổi trên dịch vụ đã đúng. Dừng plan giữ lại bằng chứng để bạn xử lý sau.</p>
@@ -55,24 +55,24 @@ export function ReconciliationNotice({ snapshot, services: catalog = [], busy, e
       <ul className="mt-3 space-y-3">
         {unknown.map(row => {
           const step = snapshot.plan.steps?.find(item => item.id === row.stepId);
-          return <li key={row.stepId} className="rounded-xl border border-amber-200 bg-white p-3 min-w-0">
+          return <li key={row.stepId} className="rounded-xl border border-border bg-surface p-3 min-w-0">
             <div className="flex flex-wrap gap-2"><code>{row.tool}</code><span className="font-semibold">UNKNOWN · {row.stepId}</span></div>
             {step?.description && <p className="mt-1">{step.description}</p>}
-            {step?.args && <><p className="mt-2 text-xs text-zinc-600">Tham số kế hoạch, đối chiếu output đã lưu:</p>
+            {step?.args && <><p className="mt-2 text-xs text-text-secondary">Tham số kế hoạch, đối chiếu output đã lưu:</p>
               <pre className="mt-1 whitespace-pre-wrap break-all text-xs">{JSON.stringify(savedArguments(step.args, snapshot), null, 2)}</pre></>}
           </li>;
         })}
       </ul>
-      {error && <p role="alert" className="mt-3 text-red-700">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-danger-text">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         {canContinue && <button type="button" disabled={busy} onClick={onContinue}
-          className="rounded-full bg-[#0071e3] px-4 py-2 text-white disabled:opacity-50">Chạy tiếp các bước còn lại</button>}
+          className="rounded-full bg-primary px-4 py-2 text-white disabled:opacity-50">Chạy tiếp các bước còn lại</button>}
         {paused && snapshot.recoveryActions.includes('skip') && <button type="button" disabled={busy}
-          onClick={() => onSkip(paused.stepId)} className="rounded-full bg-[#0071e3] px-4 py-2 text-white disabled:opacity-50">
+          onClick={() => onSkip(paused.stepId)} className="rounded-full bg-primary px-4 py-2 text-white disabled:opacity-50">
           Skip step này rồi chạy tiếp
         </button>}
         {snapshot.recoveryActions.includes('stop') && <button type="button" disabled={busy} onClick={onStop}
-          className="rounded-full border border-zinc-300 bg-white px-4 py-2 disabled:opacity-50">Dừng plan</button>}
+          className="rounded-full border border-border-strong bg-surface px-4 py-2 disabled:opacity-50">Dừng plan</button>}
       </div>
       {busy && <p role="status" className="mt-2 text-xs">Đang gửi yêu cầu và tải lại trạng thái…</p>}
     </section>

@@ -23,38 +23,38 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
 
 
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 shadow-md p-5 md:p-6 my-4 max-w-2xl">
+    <div className="bg-surface rounded-2xl border border-border shadow-md p-5 md:p-6 my-4 max-w-2xl">
       {/* Header Bar */}
-      <div className="flex items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+      <div className="flex items-center justify-between gap-3 pb-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-base">📋</span>
-          <h3 className="font-semibold text-zinc-900 text-base">
+          <h3 className="font-semibold text-text text-base">
             {plan.summary || 'Kế hoạch thực thi'}
           </h3>
         </div>
-        <span className="bg-[#fafafc] border border-zinc-200 text-xs font-medium text-zinc-600 px-2.5 py-0.5 rounded-lg">
+        <span className="bg-surface-inset border border-border text-xs font-medium text-text-secondary px-2.5 py-0.5 rounded-lg">
           {plan.steps.length} bước
         </span>
       </div>
 
       {/* Thinking Accordion */}
       {plan.thinking && (
-        <div className="my-3.5 bg-[#f5f5f7] border border-zinc-200/70 rounded-xl overflow-hidden transition">
+        <div className="my-3.5 bg-surface-inset border border-border rounded-xl overflow-hidden transition">
           <button
             type="button"
             onClick={() => setShowThinking(!showThinking)}
-            className="w-full text-left p-3 flex items-center justify-between text-xs font-semibold text-zinc-700 hover:bg-zinc-200/40 transition cursor-pointer"
+            className="w-full text-left p-3 flex items-center justify-between text-xs font-semibold text-text-secondary hover:bg-surface-raised transition cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
               <span>💭</span>
               <span>Phân tích & lập luận của AI</span>
             </span>
-            <span className="text-zinc-400 font-normal">
+            <span className="text-text-muted font-normal">
               {showThinking ? 'Ẩn ▲' : 'Xem ▼'}
             </span>
           </button>
           {showThinking && (
-            <div className="p-3 pt-0 text-xs text-zinc-600 italic leading-relaxed whitespace-pre-wrap">
+            <div className="p-3 pt-0 text-xs text-text-secondary italic leading-relaxed whitespace-pre-wrap">
               {plan.thinking}
             </div>
           )}
@@ -63,7 +63,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
 
       {/* Warnings Banner */}
       {plan.warnings && plan.warnings.length > 0 && (
-        <div className="my-3 p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+        <div className="my-3 p-3 bg-warning-tint border border-border rounded-xl text-xs text-warning-text flex items-start gap-2">
           <span className="text-sm">⚠️</span>
           <div className="flex-1">
             {plan.warnings.map((w, idx) => (
@@ -87,12 +87,12 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
       </div>
 
       {/* Action Bar */}
-      <div className="mt-6 pt-4 border-t border-zinc-100 flex flex-wrap items-center justify-end gap-3">
+      <div className="mt-6 pt-4 border-t border-border flex flex-wrap items-center justify-end gap-3">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="text-xs font-medium text-red-500 hover:bg-red-50 px-4 py-2 rounded-full transition cursor-pointer"
+            className="text-xs font-medium text-danger-text hover:bg-danger-tint px-4 py-2 rounded-full transition cursor-pointer"
           >
             Hủy
           </button>
@@ -101,7 +101,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
           <button
             type="button"
             onClick={onEdit}
-            className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition cursor-pointer"
+            className="text-xs font-medium text-primary-text border border-border-strong hover:bg-primary-tint px-4 py-2 rounded-full transition cursor-pointer"
           >
             Sửa qua Chat
           </button>
@@ -111,7 +111,7 @@ export const PlanPreview: React.FC<PlanPreviewProps> = ({
             type="button"
             onClick={onApprove}
             disabled={isApproving || approvalDisabled}
-            className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 disabled:opacity-50 px-6 py-2.5 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
+            className="text-xs font-medium bg-primary text-white hover:bg-primary disabled:opacity-50 px-6 py-2.5 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
             {isApproving ? (
               <>

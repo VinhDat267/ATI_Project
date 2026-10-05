@@ -22,7 +22,8 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await db.query("INSERT INTO users(id,email,password,name,status,role,email_verified) VALUES($1,$2,$3,'AUTH03 browser candidate','pending','member',true)", [id, email, hashPassword(password)]);
     expect((await member.request.post('/api/auth/login', { data: { email, password } })).status()).toBe(403);
     await login(admin, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
-    await admin.getByRole('button', { name: 'Quản lý người dùng' }).click();
+    await admin.getByRole('button', { name: /Menu người dùng/ }).click();
+    await admin.getByRole('menuitem', { name: 'Quản lý người dùng' }).click();
     await expect(admin).toHaveURL(/\/admin\/users$/);
     await admin.getByRole('tab', { name: /Chờ duyệt/ }).click();
     await admin.getByRole('searchbox', { name: 'Tìm theo email hoặc tên' }).fill(email);
@@ -43,7 +44,8 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     expect(notification.subject).toMatch(/duyệt/i);
     expect(notification.body_text).toMatch(/duyệt/i);
     await login(member, email, password);
-    await expect(member.getByRole('button', { name: 'Quản lý người dùng' })).toHaveCount(0);
+    await member.getByRole('button', { name: /Menu người dùng/ }).click();
+    await expect(member.getByRole('menuitem', { name: 'Quản lý người dùng' })).toHaveCount(0);
     await member.goto('/admin/users');
     await expect(member.getByRole('alert')).toContainText('quyền quản trị');
     await member.getByRole('button', { name: 'Về trang chính' }).click();

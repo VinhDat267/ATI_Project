@@ -39,7 +39,8 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens
 it('opens from the user menu', () => {
   const open = vi.fn();
   render(<UserNavMenu user={member} onOpenSettings={() => {}} onLogout={() => {}} onOpenAccount={open} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Tài khoản' }));
+  fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Tài khoản' }));
   expect(open).toHaveBeenCalledTimes(1);
 });
 

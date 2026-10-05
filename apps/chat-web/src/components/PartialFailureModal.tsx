@@ -93,11 +93,11 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
       }}
     >
       <div
-        className="bg-white rounded-2xl border-l-4 border-l-[#ff3b30] border-zinc-200 border shadow-2xl p-5 md:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-surface rounded-2xl border-l-4 border-l-danger border-border border shadow-2xl p-5 md:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-[#ff3b30] font-semibold text-sm">
+          <div className="flex items-center gap-2 text-primary-text font-semibold text-sm">
             <span className="text-base">⚠️</span>
             <h3 id="failure-modal-title">Tạm dừng quy trình tại bước: {stepId}</h3>
           </div>
@@ -106,31 +106,31 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             disabled={busy}
             onClick={handleClose}
             aria-label="Đóng hộp thoại"
-            className="text-zinc-400 hover:text-zinc-600 text-sm font-semibold p-1 rounded-md"
+            className="text-text-muted hover:text-text-secondary text-sm font-semibold p-1 rounded-md"
           >
             ✕
           </button>
         </div>
 
-        <div className="bg-[#f5f5f7] rounded-xl p-3.5 my-3 text-xs text-zinc-700 leading-relaxed border border-zinc-200/60">
-          <div className="font-semibold text-zinc-800 mb-1 flex items-center gap-1.5">
+        <div className="bg-surface-inset rounded-xl p-3.5 my-3 text-xs text-text-secondary leading-relaxed border border-border">
+          <div className="font-semibold text-text mb-1 flex items-center gap-1.5">
             <span>Công cụ:</span>
-            <span className="font-mono text-[#0071e3] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+            <span className="font-mono text-primary-text bg-primary-tint px-1.5 py-0.5 rounded border border-border">
               {tool}
             </span>
           </div>
-          <div className="text-red-600 font-medium my-1.5">
+          <div className="text-danger-text font-medium my-1.5">
             Lỗi: {errorMessage}
           </div>
-          <div className="text-zinc-500 text-[11px] mt-2 pt-2 border-t border-zinc-200">
+          <div className="text-text-muted text-sm mt-2 pt-2 border-t border-border">
             🛡️ Bảo vệ an toàn dữ liệu: Các bước đã hoàn thành được bảo toàn nguyên vẹn. Hệ thống tạm dừng để người vận hành kiểm soát.
           </div>
         </div>
 
         {/* Step Arguments Inspection & Editing */}
-        <div className="my-3 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+        <div className="my-3 p-3 bg-surface-inset rounded-xl border border-border">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-zinc-700">
+            <span className="text-xs font-semibold text-text-secondary">
               Tham số thực thi (Arguments):
             </span>
             <button
@@ -138,7 +138,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
               hidden={!allowEdit}
               disabled={busy}
               onClick={() => setIsEditing(!isEditing)}
-              className="text-xs text-[#0071e3] hover:underline cursor-pointer"
+              className="text-xs text-primary-text hover:underline cursor-pointer"
             >
               {isEditing ? 'Ẩn chỉnh sửa ▲' : 'Chỉnh sửa tham số ▼'}
             </button>
@@ -147,7 +147,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
           {/* Prompt Inspection and Editing */}
           {(promptText || isEditing) && (
             <div className="mb-2.5">
-              <span className="text-[11px] font-semibold text-zinc-600 block mb-1">
+              <span className="text-sm font-semibold text-text-secondary block mb-1">
                 Yêu cầu / Prompt:
               </span>
               {isEditing ? (
@@ -157,12 +157,12 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
                   onChange={(e) => setPromptText(e.target.value)}
                   placeholder="Nhập yêu cầu hoặc prompt..."
                   rows={2}
-                  className="w-full text-xs p-2.5 bg-white border border-zinc-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-zinc-800"
+                  className="w-full text-xs p-2.5 bg-surface border border-border-strong rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-text"
                 />
               ) : (
                 <p
                   data-testid="step-prompt-preview"
-                  className="text-xs text-zinc-700 bg-white p-2.5 rounded-lg border border-zinc-200 font-normal whitespace-pre-wrap"
+                  className="text-xs text-text-secondary bg-surface p-2.5 rounded-lg border border-border font-normal whitespace-pre-wrap"
                 >
                   {promptText}
                 </p>
@@ -172,7 +172,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
 
           {isEditing ? (
             <div className="space-y-1.5 mt-2">
-              <span className="text-[11px] font-semibold text-zinc-600 block mb-0.5">
+              <span className="text-sm font-semibold text-text-secondary block mb-0.5">
                 Tham số JSON (Arguments):
               </span>
               <textarea
@@ -184,14 +184,14 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
                 }}
                 placeholder='{\n  "param": "value"\n}'
                 rows={4}
-                className="w-full font-mono text-xs p-2.5 bg-white border border-zinc-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-zinc-800"
+                className="w-full font-mono text-xs p-2.5 bg-surface border border-border-strong rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-text"
               />
-              {jsonError && <p className="text-red-500 text-xs font-medium">{jsonError}</p>}
+              {jsonError && <p className="text-danger-text text-xs font-medium">{jsonError}</p>}
             </div>
           ) : (
             <pre
               data-testid="step-args-preview"
-              className="font-mono text-[11px] text-zinc-600 bg-white p-2.5 rounded-lg border border-zinc-200 overflow-x-auto max-h-28"
+              className="font-mono text-sm text-text-secondary bg-surface p-2.5 rounded-lg border border-border overflow-x-auto max-h-28"
             >
               {argsText || '(Không có tham số bổ sung)'}
             </pre>
@@ -199,13 +199,13 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
         </div>
 
         {/* 4 Recovery Actions */}
-        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-border">
           <button
             type="button"
             disabled={busy}
             hidden={!allowedActions.includes('retry')}
             onClick={onRetry}
-            className="text-xs font-medium bg-[#0071e3] text-white hover:bg-blue-600 px-4 py-2 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
+            className="text-xs font-medium bg-primary text-white hover:bg-primary px-4 py-2 rounded-full shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
             🔄 Thử lại bước này
           </button>
@@ -215,7 +215,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             disabled={busy}
             hidden={!allowEdit || !allowedActions.includes('retry')}
             onClick={handleEditAndRetryClick}
-            className="text-xs font-medium text-[#0066cc] border border-blue-400 hover:bg-blue-50 px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
+            className="text-xs font-medium text-primary-text border border-border-strong hover:bg-primary-tint px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
           >
             ✏️ Sửa & tiếp tục
           </button>
@@ -225,7 +225,7 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             disabled={busy}
             hidden={!allowedActions.includes('skip')}
             onClick={onSkip}
-            className="text-xs font-medium text-zinc-700 border border-zinc-300 hover:bg-zinc-100 px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
+            className="text-xs font-medium text-text-secondary border border-border-strong hover:bg-surface-raised px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-1.5"
           >
             ⏭ Bỏ qua bước này
           </button>
@@ -235,15 +235,15 @@ export const PartialFailureModal: React.FC<PartialFailureModalProps> = ({
             disabled={busy}
             hidden={!allowedActions.includes('stop')}
             onClick={() => setConfirmStop(true)}
-            className="text-xs font-medium text-red-500 hover:bg-red-50 px-3.5 py-2 rounded-full transition cursor-pointer ml-auto"
+            className="text-xs font-medium text-danger-text hover:bg-danger-tint px-3.5 py-2 rounded-full transition cursor-pointer ml-auto"
           >
             ⏹ Dừng lại toàn bộ
           </button>
         </div>
         {confirmStop && (
-          <div className="mt-3 p-3 border border-red-200 rounded-xl" role="group" aria-label="Xác nhận dừng">
+          <div className="mt-3 p-3 border border-border rounded-xl" role="group" aria-label="Xác nhận dừng">
             <p>Dừng hẳn? Không thể chạy tiếp sau khi dừng.</p>
-            <button type="button" disabled={busy} onClick={onStop} className="text-red-600 p-2">Dừng hẳn quy trình</button>
+            <button type="button" disabled={busy} onClick={onStop} className="text-danger-text p-2">Dừng hẳn quy trình</button>
             <button type="button" disabled={busy} onClick={() => setConfirmStop(false)} className="p-2">Quay lại xử lý lỗi</button>
           </div>
         )}

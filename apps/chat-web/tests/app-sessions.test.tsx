@@ -24,7 +24,8 @@ describe('AUTH-01 App logout', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     render(<App initialView="login" />);
-    fireEvent.click(await screen.findByRole('button', { name: /Đăng xuất/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Menu người dùng/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Đăng xuất/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' })));
     expect(authStorage.getStoredTokens().accessToken).toBe('current');
     finish();
