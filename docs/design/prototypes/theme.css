@@ -1,0 +1,222 @@
+/* ATI — giao diện tối dùng chung, sinh tự động từ các class màu đang dùng trong các trang.
+   Bật bằng class "dark" trên <html>. theme.js lưu lựa chọn vào localStorage "ati-theme". */
+html.dark{color-scheme:dark}
+html.dark body{background-color:#0B1020!important;color:#E2E8F0}
+html.dark ::placeholder{color:#64748B}
+html.dark svg [fill="#111827"],html.dark svg[fill="#111827"]{fill:#E5E7EB}
+html.dark ::selection{background:rgba(255,87,1,.35);color:#fff}
+.ati-theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;border-radius:10px;border:1px solid #E7E7E2;background:#fff;color:#4B5563;cursor:pointer;transition:background-color .15s,color .15s,border-color .15s}
+.ati-theme-toggle:hover{background:#F3F4F6;color:#111827}
+.ati-theme-toggle:focus-visible{outline:2px solid #FF5701;outline-offset:2px}
+.ati-theme-toggle svg{width:16px;height:16px}
+.ati-theme-toggle .ati-sun{display:none}
+html.dark .ati-theme-toggle{background:rgb(19,27,47);border-color:rgba(148,163,184,.25);color:#CBD5E1}
+html.dark .ati-theme-toggle:hover{background:rgb(31,42,68);color:#fff}
+html.dark .ati-theme-toggle .ati-sun{display:block}
+html.dark .ati-theme-toggle .ati-moon{display:none}
+@media (prefers-reduced-motion:reduce){.ati-theme-toggle{transition:none}}
+/* Màn hình hẹp: thanh trên có thêm nút Sáng/Tối, ẩn chữ "Quay lại" (giữ mũi tên, link vẫn có title) để không bị ép xuống dòng */
+@media (max-width:480px){header:has(#ati-theme-toggle) a > .sm\:hidden{display:none}}
+html.dark .bg-\[\#111827\]{background-color:#334155!important}
+html.dark .bg-\[\#E5E7EB\]{background-color:rgba(36,48,73,1)!important}
+html.dark .bg-\[\#E7E7E2\]{background-color:rgba(36,48,73,1)!important}
+html.dark .bg-\[\#F0FDF4\]{background-color:rgba(16,185,129,0.14)!important}
+html.dark .bg-\[\#F3F4F6\]{background-color:rgba(23,32,54,1)!important}
+html.dark .bg-\[\#F8F8F6\]{background-color:rgba(14,21,40,1)!important}
+html.dark .bg-\[\#F8F8F6\]\/60{background-color:rgba(14,21,40,0.6)!important}
+html.dark .bg-\[\#F8F8F6\]\/80{background-color:rgba(14,21,40,0.8)!important}
+html.dark .bg-\[\#F8F8F6\]\/90{background-color:rgba(14,21,40,0.9)!important}
+html.dark .bg-\[\#F8F8F6\]\/95{background-color:rgba(14,21,40,0.95)!important}
+html.dark .bg-\[\#FAF9F7\]{background-color:rgba(14,21,40,1)!important}
+html.dark .bg-\[\#FAFAF8\]{background-color:rgba(14,21,40,1)!important}
+html.dark .bg-\[\#FAFAFA\]{background-color:rgba(19,27,47,1)!important}
+html.dark .bg-\[\#FEE2E2\]{background-color:rgba(239,68,68,0.14)!important}
+html.dark .bg-\[\#FEF2F2\]{background-color:rgba(239,68,68,0.14)!important}
+html.dark .bg-\[\#FEF3C7\]{background-color:rgba(245,158,11,0.14)!important}
+html.dark .bg-\[\#FFEDD5\]{background-color:rgba(255,87,1,0.14)!important}
+html.dark .bg-\[\#FFF3ED\]{background-color:rgba(255,87,1,0.14)!important}
+html.dark .bg-\[\#FFF7ED\]{background-color:rgba(255,87,1,0.14)!important}
+html.dark .bg-\[\#FFF9F6\]{background-color:rgba(255,87,1,0.14)!important}
+html.dark .bg-\[\#FFFBEB\]{background-color:rgba(245,158,11,0.14)!important}
+html.dark .bg-\[\#FFFFFF\]{background-color:rgba(19,27,47,1)!important}
+html.dark .bg-amber-100{background-color:rgba(245,158,11,0.18)!important}
+html.dark .bg-amber-100\/70{background-color:rgba(245,158,11,0.126)!important}
+html.dark .bg-amber-200{background-color:rgba(245,158,11,0.24)!important}
+html.dark .bg-amber-50{background-color:rgba(245,158,11,0.14)!important}
+html.dark .bg-amber-50\/60{background-color:rgba(245,158,11,0.098)!important}
+html.dark .bg-amber-50\/80{background-color:rgba(245,158,11,0.112)!important}
+html.dark .bg-blue-100{background-color:rgba(59,130,246,0.18)!important}
+html.dark .bg-blue-100\/70{background-color:rgba(59,130,246,0.126)!important}
+html.dark .bg-blue-50{background-color:rgba(59,130,246,0.14)!important}
+html.dark .bg-blue-50\/70{background-color:rgba(59,130,246,0.098)!important}
+html.dark .bg-emerald-100{background-color:rgba(16,185,129,0.18)!important}
+html.dark .bg-emerald-50{background-color:rgba(16,185,129,0.14)!important}
+html.dark .bg-emerald-50\/60{background-color:rgba(16,185,129,0.098)!important}
+html.dark .bg-emerald-50\/70{background-color:rgba(16,185,129,0.098)!important}
+html.dark .bg-green-100{background-color:rgba(16,185,129,0.18)!important}
+html.dark .bg-green-50{background-color:rgba(16,185,129,0.14)!important}
+html.dark .bg-neutral-100{background-color:rgba(26,35,56,1)!important}
+html.dark .bg-neutral-200{background-color:rgba(36,48,73,1)!important}
+html.dark .bg-neutral-200\/60{background-color:rgba(36,48,73,0.6)!important}
+html.dark .bg-neutral-200\/70{background-color:rgba(36,48,73,0.7)!important}
+html.dark .bg-neutral-200\/80{background-color:rgba(36,48,73,0.8)!important}
+html.dark .bg-neutral-50{background-color:rgba(23,32,54,1)!important}
+html.dark .bg-neutral-50\/50{background-color:rgba(23,32,54,0.5)!important}
+html.dark .bg-orange-100{background-color:rgba(255,87,1,0.18)!important}
+html.dark .bg-orange-100\/70{background-color:rgba(255,87,1,0.126)!important}
+html.dark .bg-orange-50{background-color:rgba(255,87,1,0.14)!important}
+html.dark .bg-orange-50\/80{background-color:rgba(255,87,1,0.112)!important}
+html.dark .bg-purple-100{background-color:rgba(168,85,247,0.18)!important}
+html.dark .bg-purple-100\/70{background-color:rgba(168,85,247,0.126)!important}
+html.dark .bg-purple-50{background-color:rgba(168,85,247,0.14)!important}
+html.dark .bg-red-100{background-color:rgba(239,68,68,0.18)!important}
+html.dark .bg-red-50{background-color:rgba(239,68,68,0.14)!important}
+html.dark .bg-rose-50{background-color:rgba(244,63,94,0.14)!important}
+html.dark .bg-rose-50\/60{background-color:rgba(244,63,94,0.098)!important}
+html.dark .bg-white{background-color:rgba(19,27,47,1)!important}
+html.dark .bg-white\/20{background-color:rgba(19,27,47,0.2)!important}
+html.dark .bg-white\/60{background-color:rgba(19,27,47,0.6)!important}
+html.dark .bg-white\/70{background-color:rgba(19,27,47,0.7)!important}
+html.dark .bg-white\/80{background-color:rgba(19,27,47,0.8)!important}
+html.dark .border-\[\#111827\]{border-color:#CBD5E1!important}
+html.dark .border-\[\#BBF7D0\]{border-color:rgba(16,185,129,0.35)!important}
+html.dark .border-\[\#D1D5DB\]{border-color:rgba(148,163,184,0.32)!important}
+html.dark .border-\[\#E7E7E2\]{border-color:rgba(148,163,184,0.18)!important}
+html.dark .border-\[\#E7E7E2\]\/50{border-color:rgba(148,163,184,0.108)!important}
+html.dark .border-\[\#E7E7E2\]\/60{border-color:rgba(148,163,184,0.108)!important}
+html.dark .border-\[\#F0F0EB\]{border-color:rgba(148,163,184,0.18)!important}
+html.dark .border-\[\#F3F4F6\]{border-color:rgba(148,163,184,0.18)!important}
+html.dark .border-\[\#FDE68A\]{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-\[\#FECACA\]{border-color:rgba(239,68,68,0.35)!important}
+html.dark .border-\[\#FED7AA\]{border-color:rgba(255,87,1,0.35)!important}
+html.dark .border-amber-100{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-amber-200{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-amber-200\/60{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-amber-200\/70{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-amber-200\/80{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-amber-300{border-color:rgba(245,158,11,0.35)!important}
+html.dark .border-blue-100{border-color:rgba(59,130,246,0.35)!important}
+html.dark .border-blue-200{border-color:rgba(59,130,246,0.35)!important}
+html.dark .border-emerald-100{border-color:rgba(16,185,129,0.35)!important}
+html.dark .border-emerald-200{border-color:rgba(16,185,129,0.35)!important}
+html.dark .border-emerald-200\/60{border-color:rgba(16,185,129,0.35)!important}
+html.dark .border-green-100{border-color:rgba(16,185,129,0.35)!important}
+html.dark .border-neutral-100{border-color:rgba(148,163,184,0.18)!important}
+html.dark .border-neutral-200{border-color:rgba(148,163,184,0.18)!important}
+html.dark .border-neutral-300{border-color:rgba(148,163,184,0.32)!important}
+html.dark .border-neutral-300\/60{border-color:rgba(148,163,184,0.32)!important}
+html.dark .border-orange-100{border-color:rgba(255,87,1,0.35)!important}
+html.dark .border-orange-200{border-color:rgba(255,87,1,0.35)!important}
+html.dark .border-purple-100{border-color:rgba(168,85,247,0.35)!important}
+html.dark .border-red-200{border-color:rgba(239,68,68,0.35)!important}
+html.dark .border-rose-100{border-color:rgba(244,63,94,0.35)!important}
+html.dark .border-rose-200{border-color:rgba(244,63,94,0.35)!important}
+html.dark .divide-\[\#E7E7E2\] > :not([hidden]) ~ :not([hidden]){border-color:rgba(148,163,184,0.18)!important}
+html.dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]){border-color:rgba(148,163,184,0.18)!important}
+html.dark .focus\:bg-white:focus{background-color:rgba(19,27,47,1)!important}
+html.dark .from-\[\#F8F8F6\]{--tw-gradient-from:rgba(14,21,40,1) var(--tw-gradient-from-position)!important;--tw-gradient-to:transparent var(--tw-gradient-to-position)!important;--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)!important}
+html.dark .from-amber-50\/80{--tw-gradient-from:rgba(245,158,11,0.112) var(--tw-gradient-from-position)!important;--tw-gradient-to:transparent var(--tw-gradient-to-position)!important;--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)!important}
+html.dark .from-white{--tw-gradient-from:rgba(19,27,47,1) var(--tw-gradient-from-position)!important;--tw-gradient-to:transparent var(--tw-gradient-to-position)!important;--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)!important}
+html.dark .group:hover .group-hover\:text-black{color:#FFFFFF!important}
+html.dark .group:hover .group-hover\:text-neutral-900{color:#FFFFFF!important}
+html.dark .hover\:bg-\[\#EFEFEA\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#F0F0EB\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#F3F4F0\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#F3F4F6\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#F8F8F6\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#F8F8F6\]\/60:hover{background-color:rgba(31,42,68,0.6)!important}
+html.dark .hover\:bg-\[\#FAFAFA\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#FDFDFD\]:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-\[\#FEE2E2\]:hover{background-color:rgba(239,68,68,0.22)!important}
+html.dark .hover\:bg-\[\#FEF3C7\]:hover{background-color:rgba(245,158,11,0.22)!important}
+html.dark .hover\:bg-\[\#FFE6D9\]:hover{background-color:rgba(255,87,1,0.22)!important}
+html.dark .hover\:bg-\[\#FFEDD5\]:hover{background-color:rgba(255,87,1,0.22)!important}
+html.dark .hover\:bg-amber-50:hover{background-color:rgba(245,158,11,0.22)!important}
+html.dark .hover\:bg-black:hover{background-color:#475569!important}
+html.dark .hover\:bg-emerald-50:hover{background-color:rgba(16,185,129,0.22)!important}
+html.dark .hover\:bg-neutral-100:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-neutral-200:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-neutral-200\/50:hover{background-color:rgba(31,42,68,0.5)!important}
+html.dark .hover\:bg-neutral-200\/70:hover{background-color:rgba(31,42,68,0.7)!important}
+html.dark .hover\:bg-neutral-200\/80:hover{background-color:rgba(31,42,68,0.8)!important}
+html.dark .hover\:bg-neutral-50:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-red-100:hover{background-color:rgba(239,68,68,0.26)!important}
+html.dark .hover\:bg-red-50:hover{background-color:rgba(239,68,68,0.22)!important}
+html.dark .hover\:bg-white:hover{background-color:rgba(31,42,68,1)!important}
+html.dark .hover\:bg-white\/60:hover{background-color:rgba(31,42,68,0.6)!important}
+html.dark .hover\:border-\[\#111827\]:hover{border-color:#E2E8F0!important}
+html.dark .hover\:border-\[\#D1D5DB\]:hover{border-color:rgba(148,163,184,0.5)!important}
+html.dark .hover\:border-\[\#E7E7E2\]:hover{border-color:rgba(148,163,184,0.4)!important}
+html.dark .hover\:border-blue-300:hover{border-color:rgba(59,130,246,0.5)!important}
+html.dark .hover\:border-gray-400:hover{border-color:rgba(148,163,184,0.45)!important}
+html.dark .hover\:border-green-300:hover{border-color:rgba(16,185,129,0.5)!important}
+html.dark .hover\:border-neutral-300:hover{border-color:rgba(148,163,184,0.45)!important}
+html.dark .hover\:border-neutral-400:hover{border-color:rgba(148,163,184,0.45)!important}
+html.dark .hover\:border-purple-300:hover{border-color:rgba(168,85,247,0.5)!important}
+html.dark .hover\:border-red-200:hover{border-color:rgba(239,68,68,0.5)!important}
+html.dark .hover\:text-\[\#111827\]:hover{color:#FFFFFF!important}
+html.dark .hover\:text-\[\#4B5563\]:hover{color:#B4BFCD!important}
+html.dark .hover\:text-\[\#DC2626\]:hover{color:#FCA5A5!important}
+html.dark .hover\:text-amber-950:hover{color:#FCD34D!important}
+html.dark .hover\:text-neutral-700:hover{color:#FFFFFF!important}
+html.dark .hover\:text-red-600:hover{color:#FCA5A5!important}
+html.dark .hover\:text-red-700:hover{color:#FCA5A5!important}
+html.dark .placeholder-\[\#9CA3AF\]::placeholder{color:#64748B!important}
+html.dark .placeholder-neutral-400::placeholder{color:#64748B!important}
+html.dark .placeholder\:text-\[\#9CA3AF\]::placeholder{color:#64748B!important}
+html.dark .text-\[\#0052CC\]{color:#93C5FD!important}
+html.dark .text-\[\#0079BF\]{color:#93C5FD!important}
+html.dark .text-\[\#0F9D58\]{color:#6EE7B7!important}
+html.dark .text-\[\#111827\]{color:#F1F5F9!important}
+html.dark .text-\[\#16A34A\]{color:#6EE7B7!important}
+html.dark .text-\[\#24292E\]{color:#F1F5F9!important}
+html.dark .text-\[\#374151\]{color:#D5DCE6!important}
+html.dark .text-\[\#3B82F6\]{color:#93C5FD!important}
+html.dark .text-\[\#4285F4\]{color:#93C5FD!important}
+html.dark .text-\[\#4A154B\]{color:#D8B4FE!important}
+html.dark .text-\[\#4B5563\]{color:#B4BFCD!important}
+html.dark .text-\[\#6B7280\]{color:#A1AEC0!important}
+html.dark .text-\[\#9A3412\]{color:#FDBA74!important}
+html.dark .text-\[\#9CA3AF\]{color:#8F9CB1!important}
+html.dark .text-\[\#B45309\]{color:#FCD34D!important}
+html.dark .text-\[\#D1D5DB\]{color:#7C8AA0!important}
+html.dark .text-\[\#D97706\]{color:#FCD34D!important}
+html.dark .text-\[\#DC2626\]{color:#FCA5A5!important}
+html.dark .text-\[\#E7E7E2\]{color:#64748B!important}
+html.dark .text-\[\#EA580C\]{color:#FDBA74!important}
+html.dark .text-amber-600{color:#FCD34D!important}
+html.dark .text-amber-700{color:#FCD34D!important}
+html.dark .text-amber-800{color:#FCD34D!important}
+html.dark .text-amber-900{color:#FCD34D!important}
+html.dark .text-amber-950{color:#FCD34D!important}
+html.dark .text-blue-600{color:#93C5FD!important}
+html.dark .text-blue-700{color:#93C5FD!important}
+html.dark .text-blue-800{color:#93C5FD!important}
+html.dark .text-blue-900{color:#93C5FD!important}
+html.dark .text-emerald-600{color:#6EE7B7!important}
+html.dark .text-emerald-700{color:#6EE7B7!important}
+html.dark .text-emerald-800{color:#6EE7B7!important}
+html.dark .text-emerald-900{color:#6EE7B7!important}
+html.dark .text-emerald-950{color:#6EE7B7!important}
+html.dark .text-green-800{color:#6EE7B7!important}
+html.dark .text-neutral-400{color:#8F9CB1!important}
+html.dark .text-neutral-500{color:#A1AEC0!important}
+html.dark .text-neutral-600{color:#B4BFCD!important}
+html.dark .text-neutral-700{color:#D5DCE6!important}
+html.dark .text-neutral-800{color:#F1F5F9!important}
+html.dark .text-neutral-900{color:#F1F5F9!important}
+html.dark .text-orange-700{color:#FDBA74!important}
+html.dark .text-orange-800{color:#FDBA74!important}
+html.dark .text-orange-900{color:#FDBA74!important}
+html.dark .text-purple-600{color:#D8B4FE!important}
+html.dark .text-purple-700{color:#D8B4FE!important}
+html.dark .text-purple-800{color:#D8B4FE!important}
+html.dark .text-red-600{color:#FCA5A5!important}
+html.dark .text-red-700{color:#FCA5A5!important}
+html.dark .text-red-800{color:#FCA5A5!important}
+html.dark .text-rose-700{color:#FDA4AF!important}
+html.dark .text-rose-800{color:#FDA4AF!important}
+html.dark .text-rose-900{color:#FDA4AF!important}
+html.dark .to-amber-50\/40{--tw-gradient-to:rgba(245,158,11,0.098) var(--tw-gradient-to-position)!important}
+html.dark .via-\[\#F8F8F6\]\/95{--tw-gradient-stops:var(--tw-gradient-from),rgba(14,21,40,0.95) var(--tw-gradient-via-position),var(--tw-gradient-to)!important}
+html.dark .via-white{--tw-gradient-stops:var(--tw-gradient-from),rgba(19,27,47,1) var(--tw-gradient-via-position),var(--tw-gradient-to)!important}

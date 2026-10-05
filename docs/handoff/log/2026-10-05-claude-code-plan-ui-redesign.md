@@ -1,0 +1,24 @@
+# 2026-10-05 · Claude Code · Lập kế hoạch giao diện mới theo design system Agentic
+
+- **Bối cảnh:** người dùng muốn thiết kế lại toàn bộ UI/UX ("ấn tượng khi bảo vệ" nhưng thân thiện với người không rành kỹ thuật). Trong ngày 05/10, các trang được làm bằng OpenDesign (model `ag/gemini-3.8-flash-high` qua 9router, người dùng tự dán prompt), Claude Code viết prompt, kiểm tra trên trình duyệt và đối chiếu với mã thật sau mỗi lượt. Làm trong worktree `.claude/worktrees/ui-redesign-spec`, nhánh `docs/ui-redesign-spec` từ `origin/main` `841d9da`; thư mục chính có các file riêng chưa commit của người dùng, giữ nguyên.
+- **Hướng đã chọn:** "sân khấu theo khoảnh khắc" (mỗi lúc một việc cần làm), người dùng chính là thành viên không rành kỹ thuật; trang giới thiệu cuộn kể chuyện cho người mới của nhóm.
+- **Các vòng review bản mẫu (đối chiếu với mã):**
+  - xoá các tính năng không có trong API: mời thành viên, từ chối tài khoản chờ duyệt (`admin-user-repo` chỉ có approve/disable/enable/role; khoá chỉ áp dụng tài khoản `active`), gỡ khoá dịch vụ (không có route xoá), lịch sử cả nhóm (`listConversationPage(userId)`), lưu bản nháp khi hết phiên (frontend chỉ dùng `localStorage` cho token), vị trí địa lý của phiên, bảng chọn tài khoản Google giả;
+  - sửa các câu sai: đổi mật khẩu thu hồi các phiên khác (bản mẫu ghi ngược lại); đặt lại mật khẩu không gỡ giới hạn 5 lần/15 phút (`login-failures` chỉ xoá khi đăng nhập thành công); link xác minh 24 giờ, link đặt lại 30 phút (`auth-token-repo`); Google signup không cần xác minh email; bước `unknown` không được chạy lại;
+  - Trello Board ID phải là ID 24 ký tự (`trello/read-tools.ts` so `b.id`), hướng dẫn cũ chép mã ngắn sau `/b/` sẽ làm bảng bị lọc mất;
+  - mẫu câu lệnh không chạy được (commit GitHub, bình luận Trello, Telegram markdown) đã thay;
+  - tự sửa thêm: lỗi cú pháp làm `history.html` không chạy, link `login.html` không tồn tại, dữ liệu mẫu Sheets/Calendar bị tráo, class `xs:` không có trong Tailwind v3, link `settings.html#<dịch vụ>`; chế độ tối dùng chung cho 12 trang (`theme.css` sinh từ các class màu đang dùng, `theme.js`).
+- **Quyết định của người dùng (05/10):**
+  - theo design system "Agentic" do nhóm cung cấp: không thêm màu ngoài bảng (bỏ đề xuất `#C2410C`);
+  - chữ trên nút cam giữ màu trắng (3,2:1). Người dùng chọn phương án chữ `#111827` rồi đổi lại thành trắng ngay sau đó;
+  - chữ thường Be Vietnam Pro, tiêu đề Playfair Display;
+  - cỡ chữ tối thiểu 14px áp dụng khi làm app, không sửa bản mẫu.
+  - Claude Code mở rộng quy tắc chữ trắng sang nút nền Success/Warning để nhất quán (ghi ở đặc tả 3.2.1, cần người dùng xác nhận khi duyệt PR).
+- **Kết quả:**
+  - bản mẫu 12 trang và `theme.css`/`theme.js` ở `docs/design/prototypes/` kèm README; đổi một email mẫu `@gmail.com` sang `@example.com` (repo công khai), bản trong OpenDesign đổi theo;
+  - đặc tả `docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`: token và điểm lệch, route, bảng trạng thái → khoảnh khắc của cockpit, quy tắc trung thực, trợ năng, chế độ tối, thay đổi backend, kiểm thử, mốc và phương án cắt;
+  - task card FE-04 → FE-10 và UI-API-01; ROADMAP thêm 8 dòng, đoạn lập kế hoạch và thứ tự bỏ khi thiếu thời gian.
+  - Không sửa mã nguồn, CURRENT-STATE hay đặc tả v3.
+- **Kiểm tra:** PR chỉ có tài liệu và bản mẫu HTML nên không chạy `npm run check`. Bản mẫu đã kiểm trên trình duyệt trong ngày: không lỗi console, không cuộn ngang ở 375px, script parse được, không link hỏng, không class Tailwind v3 không tồn tại; quét khoá/token (mẫu `sk-`, `xox[bp]-`, `ghp_`, `ATATT…`) không thấy. Giao diện desktop của bản mẫu chưa kiểm bằng ảnh (khung trình duyệt của Claude Code rộng 411px).
+- **Sai sót trong phiên:** một lệnh `node -e` dùng nháy kép làm bash thay các đoạn trong backtick bằng chuỗi rỗng khi sửa ROADMAP; đã hoàn tác bằng `git checkout` và sửa lại bằng công cụ sửa file. Bash cũng thử chạy file đặc tả như lệnh nhưng dừng ở lỗi cú pháp dòng 3; nội dung file không đổi.
+- **Việc tiếp theo đề xuất:** giao FE-04 và UI-API-01 ngay (song song); FE-05 cần merge trước 16/10 để buổi thử W4-03 dùng giao diện mới; vẫn giao W3-10, W3-11, W4-00 như kế hoạch trước.

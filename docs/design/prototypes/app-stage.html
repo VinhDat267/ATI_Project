@@ -1,0 +1,2869 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATI - Sân khấu điều phối công việc</title>
+  
+  <!-- Google Fonts: Playfair Display, Be Vietnam Pro, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+  
+  <!-- Anti-FOUC Theme Script (Khởi tạo Dark Mode ngay trước khi render) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('ati-theme') || localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch(e) {}
+    })();
+  </script>
+
+  <!-- Tailwind CSS v3 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Bộ màu tối dùng chung; các quy tắc html.dark riêng của trang này (bên dưới) được ưu tiên -->
+  <link rel="stylesheet" href="theme.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              'primary-hover': '#E04C00',
+              'primary-light': '#FFF3ED',
+              bg: '#F8F8F6',
+              surface: '#FFFFFF',
+              border: '#E7E7E2',
+              'border-subtle': '#F0F0EB',
+              text: '#111827',
+              muted: '#6B7280',
+              success: '#16A34A',
+              warning: '#D97706',
+              danger: '#DC2626',
+            },
+            dark: {
+              bg: '#0b1020',
+              surface: '#131b2f',
+              'surface-warm': '#182343',
+              border: '#293653',
+              text: '#f8fafc',
+              muted: '#94a3b8',
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            body: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          boxShadow: {
+            'soft-card': '0 1px 3px rgba(0,0,0,0.02), 0 8px 24px -4px rgba(0,0,0,0.04)',
+            'elevated': '0 4px 6px -1px rgba(0,0,0,0.02), 0 20px 32px -6px rgba(0,0,0,0.07)',
+            'orange-glow': '0 0 0 3px rgba(255, 87, 1, 0.18)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --surface-warm: #F4F4F0;
+      --border: #E7E7E2;
+      --border-subtle: #F0F0EB;
+      --accent: #FF5701;
+      --text: #111827;
+      --fg: #111827;
+      --muted: #6B7280;
+      --font-display: 'Playfair Display', serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html.dark {
+      --bg: #0b1020;
+      --surface: #131b2f;
+      --surface-warm: #182343;
+      --border: #293653;
+      --border-subtle: #1e293b;
+      --accent: #FF5701;
+      --text: #f8fafc;
+      --fg: #f8fafc;
+      --muted: #94a3b8;
+      color-scheme: dark;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    /* ========================================================
+       DARK MODE TOKEN OVERRIDES (AGENTIC SYSTEM)
+       WCAG AA Contrast Compliant: Text >= 4.5:1, UI >= 3:1
+       ======================================================== */
+    html.dark body {
+      background-color: #0b1020;
+      color: #f8fafc;
+    }
+
+    /* Text Colors in Dark Mode */
+    html.dark .text-brand-text { color: #f8fafc !important; }
+    html.dark .text-brand-muted { color: #94a3b8 !important; }
+    html.dark .text-neutral-900,
+    html.dark .text-neutral-800,
+    html.dark .text-neutral-700 { color: #f1f5f9 !important; }
+    html.dark .text-neutral-600,
+    html.dark .text-neutral-500 { color: #94a3b8 !important; }
+    html.dark .text-neutral-400 { color: #8f9cb1 !important; } /* ≥ 4.5:1 trên nền thẻ tối */
+    html.dark .bg-brand-border { background-color: rgba(148, 163, 184, 0.25) !important; } /* vạch ngăn cạnh logo */
+
+    /* Surface & Background in Dark Mode */
+    html.dark .bg-white { background-color: #131b2f !important; }
+    html.dark .bg-neutral-50,
+    html.dark .bg-neutral-100 { background-color: #182343 !important; }
+    html.dark .hover\:bg-neutral-50:hover,
+    html.dark .hover\:bg-neutral-100:hover { background-color: #1e2b52 !important; }
+    html.dark .bg-neutral-200 { background-color: #243462 !important; }
+    html.dark .bg-neutral-300 { background-color: #293653 !important; }
+    html.dark .bg-\[\#EBECE7\] { background-color: #243462 !important; color: #f8fafc !important; }
+    html.dark .bg-\[\#FFF6EE\] { background-color: #261b14 !important; border-color: #4f2918 !important; }
+    html.dark .bg-orange-100 { background-color: #3b1d0e !important; }
+    html.dark .bg-blue-100 { background-color: #172c4e !important; }
+    html.dark .bg-green-100 { background-color: #113822 !important; }
+    html.dark .bg-purple-100 { background-color: #2c1a44 !important; }
+
+    /* Accent & Semantic Text Colors in Dark Mode */
+    html.dark .text-blue-600 { color: #60a5fa !important; }
+    html.dark .text-emerald-600 { color: #4ade80 !important; }
+    html.dark .text-purple-600 { color: #c084fc !important; }
+    html.dark .text-brand-primary { color: #FF5701 !important; }
+
+    /* Borders in Dark Mode */
+    html.dark .border-brand-border { border-color: #293653 !important; }
+    html.dark .border-brand-border-subtle { border-color: #1e293b !important; }
+    html.dark .border-neutral-200,
+    html.dark .border-neutral-300 { border-color: #293653 !important; }
+
+    /* Sticky Bars & Overlays */
+    html.dark header.sticky {
+      background-color: rgba(11, 16, 32, 0.92) !important;
+      border-bottom-color: #293653 !important;
+    }
+    html.dark #moment-4-sticky-bar {
+      background-color: rgba(11, 16, 32, 0.95) !important;
+      border-top-color: #293653 !important;
+    }
+    html.dark #global-bottom-bar {
+      background-image: linear-gradient(to top, #0b1020, rgba(11, 16, 32, 0.95), transparent) !important;
+    }
+
+    /* Test Mode Banner in Dark Mode */
+    html.dark #test-mode-banner {
+      background-color: #2a2208 !important;
+      border-color: #533f0a !important;
+      color: #fef08a !important;
+    }
+    html.dark #test-mode-banner svg { color: #facc15 !important; }
+    html.dark #btn-toggle-test-mode-explain { color: #fef08a !important; }
+    html.dark #test-mode-explanation {
+      background-color: #231b05 !important;
+      border-color: #533f0a !important;
+      color: #fef9c3 !important;
+    }
+
+    /* Drawers & Modals */
+    html.dark aside#chat-drawer,
+    html.dark aside#history-drawer,
+    html.dark #preview-modal-box {
+      background-color: #131b2f !important;
+      border-color: #293653 !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-50\/50,
+    html.dark aside#history-drawer .bg-neutral-50\/50,
+    html.dark #preview-modal-box .bg-neutral-50 {
+      background-color: rgba(24, 35, 67, 0.75) !important;
+      border-color: #293653 !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-100 {
+      background-color: #182343 !important;
+      color: #f8fafc !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-900 {
+      background-color: #FF5701 !important;
+      color: #ffffff !important;
+    }
+    html.dark aside#chat-drawer .bg-\[\#FFF5ED\] {
+      background-color: #261b14 !important;
+      border-color: #4f2918 !important;
+      color: #fed7aa !important;
+    }
+
+    /* User Menu & Demo Menu */
+    html.dark #user-menu,
+    html.dark #demo-menu {
+      background-color: #131b2f !important;
+      border-color: #293653 !important;
+      box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.6) !important;
+    }
+    html.dark .user-menu-item { color: #f8fafc !important; }
+    html.dark .user-menu-item:hover,
+    html.dark .user-menu-item:focus {
+      background-color: #182343 !important;
+      color: #FF5701 !important;
+    }
+    html.dark .demo-toggle-btn { color: #94a3b8 !important; }
+    html.dark .demo-toggle-btn:hover { color: #f8fafc !important; }
+    html.dark .demo-toggle-btn.is-active {
+      background: #182343 !important;
+      color: #f8fafc !important;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4) !important;
+    }
+
+    /* Soft Alert / Callout Boxes in Dark Mode */
+    html.dark .bg-orange-50 {
+      background-color: #251a13 !important;
+      border-color: #4f2818 !important;
+      color: #fdba74 !important;
+    }
+    html.dark .bg-amber-50 {
+      background-color: #291e0a !important;
+      border-color: #583e0e !important;
+      color: #fef08a !important;
+    }
+    html.dark .bg-emerald-50 {
+      background-color: #0d2818 !important;
+      border-color: #194d2f !important;
+      color: #86efac !important;
+    }
+    html.dark .bg-red-50 {
+      background-color: #2c1215 !important;
+      border-color: #5a1e26 !important;
+      color: #fca5a5 !important;
+    }
+    html.dark .bg-blue-50 {
+      background-color: #0f1d38 !important;
+      border-color: #1e3a6d !important;
+      color: #93c5fd !important;
+    }
+    html.dark .bg-purple-50 {
+      background-color: #221233 !important;
+      border-color: #431f69 !important;
+      color: #d8b4fe !important;
+    }
+
+    /* Colored Text Accents in Dark Mode */
+    html.dark .text-amber-700,
+    html.dark .text-amber-800,
+    html.dark .text-amber-900 { color: #fde047 !important; }
+    html.dark .text-emerald-700,
+    html.dark .text-emerald-800 { color: #86efac !important; }
+    html.dark .text-red-600,
+    html.dark .text-red-700,
+    html.dark .text-red-800 { color: #fca5a5 !important; }
+
+    /* Inputs & Textareas in Dark Mode */
+    html.dark input,
+    html.dark textarea {
+      color: #f8fafc !important;
+    }
+    html.dark input::placeholder,
+    html.dark textarea::placeholder {
+      color: #64748b !important;
+    }
+
+    /* Selection & Scrollbar in Dark Mode */
+    html.dark ::selection {
+      background-color: #4a210d;
+      color: #ff914d;
+    }
+    html.dark ::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+    html.dark ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* NHÓM 5: Tiêu đề nhận focus bằng code KHÔNG hiện viền cam */
+    [tabindex="-1"]:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Menu người dùng & nút demo */
+    .user-avatar-btn { width:2rem; height:2rem; border-radius:9999px; background:#FF5701; color:#fff; font-size:0.75rem; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .user-avatar-btn:hover { opacity:0.9; }
+    .user-menu-item { display:flex; width:100%; text-align:left; align-items:center; gap:0.625rem; padding:0.5rem 1rem; font-size:0.75rem; color:#111827; transition:background-color 150ms, color 150ms; }
+    .user-menu-item:hover, .user-menu-item:focus { background-color:#F5F5F4; color:#FF5701; outline:none; }
+    .demo-toggle-btn { padding:0.25rem 0.5rem; border-radius:0.375rem; font-size:0.75rem; font-weight:500; text-align:center; transition:all 150ms; color:#6B7280; }
+    .demo-toggle-btn:hover { color:#111827; }
+    .demo-toggle-btn.is-active { background:#FFFFFF; color:#111827; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
+
+    @keyframes pulseSoft {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.02); opacity: 0.95; }
+    }
+    .animate-pulse-soft {
+      animation: pulseSoft 2.2s infinite ease-in-out;
+    }
+
+    @keyframes drawCheck {
+      0% { stroke-dashoffset: 48; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .animate-draw-check {
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: drawCheck 0.55s 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    /* NHÓM 2: Chuyển cảnh giữa các khoảnh khắc fade + trượt ngắn chạy thật (180–260ms) */
+    .stage-section {
+      transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stage-section.is-hidden {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+    }
+    .stage-section.is-entering {
+      display: block;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .stage-section.is-active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .stage-section.is-exiting {
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+    }
+
+    /* Staggered card animation in moment 4 (Group 2: total under 300ms) */
+    @keyframes planCardIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .plan-card-stagger-1 { animation: planCardIn 180ms 0ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-2 { animation: planCardIn 180ms 50ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-3 { animation: planCardIn 180ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-4 { animation: planCardIn 180ms 150ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered receipts in moment 6 (Group 7: total under 1s) */
+    @keyframes receiptCardIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .receipt-stagger-1 { animation: receiptCardIn 220ms 0ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-2 { animation: receiptCardIn 220ms 120ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-3 { animation: receiptCardIn 220ms 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-4 { animation: receiptCardIn 220ms 360ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    @keyframes connectorDraw {
+      from { opacity: 0; transform: scaleX(0.7); }
+      to { opacity: 1; transform: scaleX(1); }
+    }
+    .connector-stagger-1 { animation: connectorDraw 200ms 100ms ease-out both; }
+    .connector-stagger-2 { animation: connectorDraw 200ms 220ms ease-out both; }
+    .connector-stagger-3 { animation: connectorDraw 200ms 340ms ease-out both; }
+
+    /* NHÓM 2: @media (prefers-reduced-motion: reduce) tắt mọi chuyển động lớn, nhịp lặp, ping */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+      .animate-ping, .animate-pulse, .animate-pulse-soft {
+        animation: none !important;
+      }
+      .animate-draw-check {
+        stroke-dashoffset: 0 !important;
+      }
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-[#FFE5D6] selection:text-[#FF5701] relative pb-24">
+
+  <!-- A11y Live Announcer Region -->
+  <div id="a11y-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Toast Notification Container (NHÓM 3: Thay alert/confirm/prompt) -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2" role="status" aria-live="polite"></div>
+
+  <!-- TOP SLIM PERSISTENT BAR (NHÓM 6: Khoảnh khắc 1 chỉ có logo & Lịch sử) -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-brand-border transition-all">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <a href="javascript:void(0)" onclick="setMoment(1)" class="flex items-center gap-2 group flex-shrink-0" title="Về đầu">
+          <div class="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-brand-text hidden sm:inline">ATI</span>
+        </a>
+        
+        <!-- Yêu cầu hiện tại (Ẩn ở khoảnh khắc 1) -->
+        <div id="top-bar-query-container" class="hidden items-center gap-3 min-w-0 flex-1">
+          <div class="h-4 w-px bg-brand-border flex-shrink-0"></div>
+          <div class="flex items-center gap-2 text-xs sm:text-sm text-brand-muted truncate max-w-xl">
+            <span class="px-1.5 py-0.5 rounded bg-[#EBECE7] text-brand-text font-medium text-[11px] flex-shrink-0">Yêu cầu hiện tại</span>
+            <span id="top-bar-query" class="text-brand-text truncate font-normal">Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button id="btn-open-history" onclick="toggleHistoryDrawer(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-text bg-white hover:bg-neutral-100 rounded-lg border border-brand-border shadow-sm transition-colors" aria-expanded="false" aria-controls="history-drawer">
+          <svg class="w-3.5 h-3.5 text-brand-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="hidden sm:inline">Lịch sử</span>
+        </button>
+        <!-- Nút Xem hội thoại (Ẩn ở khoảnh khắc 1, NHÓM 5 thay py-0.2 -> py-[2px]) -->
+        <button id="btn-open-chat" onclick="toggleChatDrawer(true)" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-brand-text hover:bg-black rounded-lg shadow-sm transition-all" aria-expanded="false" aria-controls="chat-drawer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          <span class="hidden sm:inline">Xem hội thoại</span>
+          <span id="chat-count-badge" class="px-1.5 py-[2px] bg-white/20 rounded-full text-[10px] font-bold">4</span>
+        </button>
+
+        <!-- Nút Theme Toggle Sáng / Tối -->
+        <button id="btn-theme-toggle" type="button" onclick="toggleTheme()" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-brand-text bg-white hover:bg-neutral-100 border border-brand-border shadow-sm transition-colors focus:outline-none" aria-label="Chuyển đổi giao diện Sáng / Tối" title="Chuyển đổi giao diện Sáng / Tối">
+          <!-- Icon Mặt trăng (hiển thị khi đang ở theme Sáng) -->
+          <svg id="theme-icon-moon" class="w-4 h-4 text-brand-muted block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          <!-- Icon Mặt trời (hiển thị khi đang ở theme Tối) -->
+          <svg id="theme-icon-sun" class="w-4 h-4 text-amber-400 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        </button>
+
+        <div class="relative inline-block text-left">
+          <button id="btn-user-menu" type="button" onclick="toggleUserMenu()" class="user-avatar-btn shadow-sm" aria-haspopup="menu" aria-expanded="false" aria-label="Tài khoản của Lan Nguyễn">LN</button>
+
+          <div id="user-menu" class="hidden absolute right-0 top-full mt-2 w-60 sm:w-64 max-w-[calc(100vw-24px)] bg-white rounded-2xl border border-brand-border shadow-2xl py-1.5 z-50 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="btn-user-menu" tabindex="-1">
+            <div class="px-4 py-3 border-b border-brand-border-subtle select-none">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-sm text-brand-text truncate">Lan Nguyễn</span>
+                <span id="user-menu-role-badge" class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-brand-text border border-brand-border flex-shrink-0">Quản trị viên</span>
+              </div>
+              <div class="text-xs text-brand-muted truncate mt-0.5">lan.nguyen@congty.vn</div>
+            </div>
+
+            <div class="py-1">
+              <a href="history.html" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Nhật ký điều phối</span>
+              </a>
+              <a href="settings.html" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                <span>Kết nối dịch vụ</span>
+              </a>
+              <a href="guide.html" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span>Cẩm nang & Mẫu câu lệnh</span>
+              </a>
+              <a href="account.html" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span>Tài khoản</span>
+              </a>
+              <a href="users.html" id="user-menu-item-manage-users" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <span>Quản lý người dùng</span>
+              </a>
+              <a href="privacy.html" role="menuitem" class="user-menu-item">
+                <svg class="w-4 h-4 text-brand-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span>Chính sách an toàn & Dữ liệu</span>
+              </a>
+              <button type="button" onclick="toggleTheme()" role="menuitem" class="user-menu-item">
+                <svg id="menu-theme-icon-moon" class="w-4 h-4 text-brand-muted flex-shrink-0 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                <svg id="menu-theme-icon-sun" class="w-4 h-4 text-amber-400 flex-shrink-0 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <span id="user-menu-theme-label">Giao diện tối</span>
+              </button>
+            </div>
+
+            <div class="border-t border-brand-border-subtle my-1"></div>
+
+            <div class="py-1">
+              <a href="index.html" role="menuitem" class="user-menu-item !text-red-600 hover:!bg-red-50 hover:!text-red-700">
+                <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                <span>Đăng xuất</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DẢI CHẾ ĐỘ THỬ NGHIỆM -->
+    <div id="test-mode-banner" role="status" class="w-full bg-[#FEF9C3] border-t border-amber-200/80 text-amber-900 transition-all">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 h-8 text-[11px] sm:text-xs">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <svg class="w-3.5 h-3.5 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="font-medium sm:hidden">Thử nghiệm · không gọi dịch vụ thật</span>
+          <span class="font-medium hidden sm:inline">Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật</span>
+        </div>
+        <button id="btn-toggle-test-mode-explain" type="button" onclick="toggleTestModeExplanation()" class="flex-shrink-0 text-amber-800 hover:text-amber-950 underline underline-offset-2 font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 rounded px-1 py-0.5" aria-expanded="false" aria-controls="test-mode-explanation">
+          Là gì?
+        </button>
+      </div>
+      <div id="test-mode-explanation" class="hidden px-4 sm:px-6 pb-2 text-[11px] sm:text-xs text-amber-800 leading-relaxed border-t border-amber-200/60 pt-1.5 max-w-5xl mx-auto">
+        Máy chủ đang chạy thử: ATI dùng kế hoạch soạn sẵn và không ghi gì lên Trello, Slack hay các công cụ khác. Chế độ do máy chủ quyết định khi khởi động.
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN STAGE (SÂN KHẤU TRÌNH DIỄN CHÍNH) -->
+  <main id="stage-container" class="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center">
+
+    <!-- ==================== KHOẢNH KHẮC 1: NHỜ VIỆC ==================== -->
+    <section id="moment-1" class="stage-section is-active space-y-8" aria-labelledby="heading-moment-1">
+      <div class="space-y-3 text-center sm:text-left">
+        <h1 id="heading-moment-1" class="font-display text-4xl sm:text-5xl lg:text-[52px] text-brand-text font-normal tracking-tight leading-[1.12]" tabindex="-1">
+          Hôm nay bạn muốn nhờ việc gì?
+        </h1>
+        <p class="text-base sm:text-lg text-brand-muted max-w-2xl leading-relaxed">
+          Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch và thao tác trên các công cụ của nhóm.
+        </p>
+      </div>
+
+      <!-- Large Input Area -->
+      <div class="relative bg-white rounded-2xl border border-brand-border shadow-soft-card p-3 sm:p-4 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all">
+        <label for="prompt-input" class="sr-only">Nội dung bạn muốn nhờ</label>
+        <textarea id="prompt-input" rows="3" class="w-full text-base sm:text-lg text-brand-text placeholder-neutral-400 bg-transparent resize-none border-0 focus:ring-0 focus:outline-none p-1" placeholder="Ví dụ: Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack..."></textarea>
+        <div class="flex items-center justify-between pt-2 border-t border-brand-border-subtle mt-1">
+          <span class="text-xs text-brand-muted inline-flex items-center gap-1">
+            <kbd class="px-1.5 py-0.5 bg-neutral-100 border border-neutral-300 rounded text-[10px] font-mono">Enter</kbd> để gửi
+          </span>
+          <button onclick="submitPrompt()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]">
+            <span>Gửi yêu cầu</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- NHÓM 8: Thẻ gợi ý dùng biểu tượng SVG, shape trang trí mờ ở góc, hover nâng nhẹ & chỉ dùng dịch vụ đã kết nối -->
+      <div class="space-y-3">
+        <div class="text-xs font-semibold uppercase tracking-wider text-brand-muted">Gợi ý việc phổ biến theo công cụ của bạn</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          
+          <!-- Gợi ý 1: Trello + Slack -->
+          <button onclick="useSuggestion('Tạo card Trello cho lỗi đăng nhập rồi báo nhóm trên Slack')" class="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5">
+            <div class="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors pointer-events-none"></div>
+            <div class="flex items-center -space-x-1.5 flex-shrink-0 mt-0.5">
+              <div class="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Trello">
+                <svg class="w-4 h-4 text-[#0079BF]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2h-15A2.5 2.5 0 002 4.5v15A2.5 2.5 0 004.5 22h15a2.5 2.5 0 002.5-2.5v-15A2.5 2.5 0 0019.5 2zm-8.25 14a1.25 1.25 0 01-1.25 1.25H6.25A1.25 1.25 0 015 16V6.25A1.25 1.25 0 016.25 5h3.75A1.25 1.25 0 0111.25 6.25V16zm7.75-5a1.25 1.25 0 01-1.25 1.25h-3.75A1.25 1.25 0 0112.75 11V6.25a1.25 1.25 0 011.25-1.25h3.75a1.25 1.25 0 011.25 1.25V11z"/></svg>
+              </div>
+              <div class="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Slack">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">Tạo card Trello cho lỗi đăng nhập rồi báo nhóm trên Slack</div>
+              <div class="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                <span class="text-blue-600 font-medium">Trello</span>
+                <span>→</span>
+                <span class="text-purple-600 font-medium">Slack</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Gợi ý 2: Google Sheets -->
+          <button onclick="useSuggestion('Ghi tiến độ tuần này vào Google Sheets')" class="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5">
+            <div class="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none"></div>
+            <div class="flex items-center flex-shrink-0 mt-0.5">
+              <div class="w-8 h-8 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Google Sheets">
+                <svg class="w-4 h-4 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">Ghi tiến độ tuần này vào Google Sheets</div>
+              <div class="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                <span class="text-emerald-600 font-medium">Google Sheets</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Gợi ý 3 (Đã đổi theo NHÓM 8): Notion + Slack -->
+          <button onclick="useSuggestion('Tạo trang Notion ghi biên bản họp và báo nhóm trên Slack')" class="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5">
+            <div class="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-neutral-900/5 group-hover:bg-neutral-900/10 transition-colors pointer-events-none"></div>
+            <div class="flex items-center -space-x-1.5 flex-shrink-0 mt-0.5">
+              <div class="w-8 h-8 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Notion">
+                <svg class="w-4 h-4 text-neutral-900" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l11.834-.699c.373 0 .466-.186.373-.466L18.17 2.25c-.28-.373-.746-.56-1.306-.56L3.9 2.53c-.56 0-.84.28-.653.653l1.212 1.025zm.84 3.73v12.493c0 .84.466 1.212 1.306 1.12l13.14-.746c.84-.093 1.026-.653 1.026-1.4V6.912c0-.56-.28-.84-.746-.746L5.865 6.912c-.466.093-.566.466-.566 1.026zm11.275 1.585l.093 8.39c.093.56-.186.84-.653.84-.373 0-.653-.28-1.026-.653l-4.568-7.178v7.272c0 .653-.373.84-.84.84-.56 0-.84-.28-.84-.84V9.616c0-.56.28-.84.746-.84.466 0 .84.28 1.212.746l4.475 7.086v-6.992c0-.653.373-.933.84-.933.466 0 .566.28.566.9zm-9.322 0c0-.56.28-.84.746-.84h.093c.466 0 .746.28.746.84v9.697c0 .56-.28.84-.746.84h-.093c-.466 0-.746-.28-.746-.84V9.523z"/></svg>
+              </div>
+              <div class="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Slack">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">Tạo trang Notion ghi biên bản họp và báo nhóm trên Slack</div>
+              <div class="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                <span class="text-neutral-800 font-medium">Notion</span>
+                <span>→</span>
+                <span class="text-purple-600 font-medium">Slack</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Gợi ý 4: Notion + GitHub -->
+          <button onclick="useSuggestion('Đồng bộ danh sách tính năng từ Notion sang kho mã GitHub')" class="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5">
+            <div class="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-neutral-900/5 group-hover:bg-neutral-900/10 transition-colors pointer-events-none"></div>
+            <div class="flex items-center -space-x-1.5 flex-shrink-0 mt-0.5">
+              <div class="w-8 h-8 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="Notion">
+                <svg class="w-4 h-4 text-neutral-900" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l11.834-.699c.373 0 .466-.186.373-.466L18.17 2.25c-.28-.373-.746-.56-1.306-.56L3.9 2.53c-.56 0-.84.28-.653.653l1.212 1.025zm.84 3.73v12.493c0 .84.466 1.212 1.306 1.12l13.14-.746c.84-.093 1.026-.653 1.026-1.4V6.912c0-.56-.28-.84-.746-.746L5.865 6.912c-.466.093-.566.466-.566 1.026zm11.275 1.585l.093 8.39c.093.56-.186.84-.653.84-.373 0-.653-.28-1.026-.653l-4.568-7.178v7.272c0 .653-.373.84-.84.84-.56 0-.84-.28-.84-.84V9.616c0-.56.28-.84.746-.84.466 0 .84.28 1.212.746l4.475 7.086v-6.992c0-.653.373-.933.84-.933.466 0 .566.28.566.9zm-9.322 0c0-.56.28-.84.746-.84h.093c.466 0 .746.28.746.84v9.697c0 .56-.28.84-.746.84h-.093c-.466 0-.746-.28-.746-.84V9.523z"/></svg>
+              </div>
+              <div class="w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform" title="GitHub">
+                <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">Đồng bộ danh sách tính năng từ Notion sang kho mã GitHub</div>
+              <div class="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                <span class="text-neutral-800 font-medium">Notion</span>
+                <span>→</span>
+                <span class="text-neutral-900 font-medium">GitHub</span>
+              </div>
+            </div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- NHÓM 8: Dải dịch vụ chia thành 2 hàng trọn chiều rộng, không bị cắt chữ hay rớt dòng lẻ loi -->
+      <div class="pt-4 border-t border-brand-border flex flex-col gap-2.5 text-xs text-brand-muted">
+        <!-- Hàng 1: Đã kết nối + 5 chip -->
+        <div class="flex items-center gap-1.5 flex-wrap w-full">
+          <span class="font-medium text-brand-text mr-1">Đã kết nối:</span>
+          
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm">
+            <svg class="w-3.5 h-3.5 text-[#0079BF]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2h-15A2.5 2.5 0 002 4.5v15A2.5 2.5 0 004.5 22h15a2.5 2.5 0 002.5-2.5v-15A2.5 2.5 0 0019.5 2zm-8.25 14a1.25 1.25 0 01-1.25 1.25H6.25A1.25 1.25 0 015 16V6.25A1.25 1.25 0 016.25 5h3.75A1.25 1.25 0 0111.25 6.25V16zm7.75-5a1.25 1.25 0 01-1.25 1.25h-3.75A1.25 1.25 0 0112.75 11V6.25a1.25 1.25 0 011.25-1.25h3.75a1.25 1.25 0 011.25 1.25V11z"/></svg>
+            <span>Trello</span>
+          </span>
+
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>
+            <span>Slack</span>
+          </span>
+
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm">
+            <svg class="w-3.5 h-3.5 text-neutral-900" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            <span>GitHub</span>
+          </span>
+
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm">
+            <svg class="w-3.5 h-3.5 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+            <span>Google Sheets</span>
+          </span>
+
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm">
+            <svg class="w-3.5 h-3.5 text-neutral-900" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l11.834-.699c.373 0 .466-.186.373-.466L18.17 2.25c-.28-.373-.746-.56-1.306-.56L3.9 2.53c-.56 0-.84.28-.653.653l1.212 1.025zm.84 3.73v12.493c0 .84.466 1.212 1.306 1.12l13.14-.746c.84-.093 1.026-.653 1.026-1.4V6.912c0-.56-.28-.84-.746-.746L5.865 6.912c-.466.093-.566.466-.566 1.026zm11.275 1.585l.093 8.39c.093.56-.186.84-.653.84-.373 0-.653-.28-1.026-.653l-4.568-7.178v7.272c0 .653-.373.84-.84.84-.56 0-.84-.28-.84-.84V9.616c0-.56.28-.84.746-.84.466 0 .84.28 1.212.746l4.475 7.086v-6.992c0-.653.373-.933.84-.933.466 0 .566.28.566.9zm-9.322 0c0-.56.28-.84.746-.84h.093c.466 0 .746.28.746.84v9.697c0 .56-.28.84-.746.84h-.093c-.466 0-.746-.28-.746-.84V9.523z"/></svg>
+            <span>Notion</span>
+          </span>
+        </div>
+
+        <!-- Hàng 2: Chưa kết nối + 3 mục biểu tượng xám + liên kết Kết nối thêm -->
+        <div class="flex items-center gap-2 text-neutral-500 flex-wrap w-full">
+          <span>Chưa kết nối:</span>
+          <span class="inline-flex items-center gap-1 text-neutral-400">
+            <svg class="w-3.5 h-3.5 text-neutral-400 opacity-60" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 002 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5v-5z"/></svg>
+            <span>Calendar</span>
+          </span>
+          <span>·</span>
+          <span class="inline-flex items-center gap-1 text-neutral-400">
+            <svg class="w-3.5 h-3.5 text-neutral-400 opacity-60" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/></svg>
+            <span>Telegram</span>
+          </span>
+          <span>·</span>
+          <span class="inline-flex items-center gap-1 text-neutral-400">
+            <svg class="w-3.5 h-3.5 text-neutral-400 opacity-60" viewBox="0 0 24 24" fill="currentColor"><path d="M11.53 2c0 2.4 1.97 4.35 4.4 4.35h1.72V8.1c0 2.4 1.97 4.35 4.4 4.35V2H11.53zm-5.76 5.8c0 2.4 1.97 4.35 4.4 4.35h1.73v1.75c0 2.4 1.97 4.35 4.4 4.35V7.8H5.77zM0 13.6c0 2.4 1.97 4.35 4.4 4.35h1.73v1.75c0 2.4 1.97 4.35 4.4 4.35V13.6H0z"/></svg>
+            <span>Jira</span>
+          </span>
+          <span>·</span>
+          <a href="settings.html" class="text-brand-primary hover:underline font-medium">Kết nối thêm</a>
+          <span>·</span>
+          <a href="guide.html" class="text-brand-primary hover:underline font-medium">Cẩm nang & Mẫu câu lệnh</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 2: ĐANG HIỂU ==================== -->
+    <section id="moment-2" class="stage-section is-hidden space-y-8" aria-labelledby="heading-moment-2">
+      <div class="p-6 bg-white rounded-2xl border border-brand-border shadow-soft-card space-y-2">
+        <div class="text-xs font-semibold uppercase tracking-wider text-brand-primary">Đang phân tích yêu cầu</div>
+        <h1 id="heading-moment-2" class="font-display text-2xl sm:text-3xl text-brand-text font-normal leading-snug" tabindex="-1">
+          <span id="moment-2-query-display">“Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack”</span>
+        </h1>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-brand-border p-6 shadow-soft-card space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-brand-border-subtle">
+          <div class="flex items-center gap-2">
+            <div id="moment-2-pulse" class="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping"></div>
+            <span id="moment-2-status-text" class="text-sm font-semibold text-brand-text">Tôi đang kiểm tra các tài nguyên liên quan</span>
+          </div>
+          <span class="text-xs text-brand-muted">Thường mất khoảng 3–5 giây</span>
+        </div>
+
+        <!-- NHÓM 2: 5 dòng hiện lần lượt, trạng thái "đang tìm…" với icon spinner -> "đã thấy" với icon check -> tự chuyển sang khoảnh khắc 4 -->
+        <ul class="space-y-3 text-sm" id="discovery-steps-list">
+          <!-- Step 1: Trello Board -->
+          <li id="disc-step-1" class="flex items-center justify-between text-neutral-800 transition-all duration-300">
+            <span class="flex items-center gap-2.5">
+              <span class="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <span class="w-2 h-2 rounded-full bg-brand-primary animate-pulse"></span>
+              </span>
+              <span>Đang tìm bảng <strong>To Do</strong> trên Trello…</span>
+            </span>
+            <span class="disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-600 flex-shrink-0" title="Đang tìm…" aria-label="Đang tìm…">
+              <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </span>
+          </li>
+
+          <!-- Step 2: Trello List -->
+          <li id="disc-step-2" class="flex items-center justify-between text-neutral-400 transition-all duration-300">
+            <span class="flex items-center gap-2.5">
+              <span class="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>
+              </span>
+              <span>Đang tìm danh sách <strong>Doing</strong>…</span>
+            </span>
+            <span class="disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-400 flex-shrink-0" title="Chờ…" aria-label="Chờ…">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </span>
+          </li>
+
+          <!-- Step 3: GitHub Repo -->
+          <li id="disc-step-3" class="flex items-center justify-between text-neutral-400 transition-all duration-300">
+            <span class="flex items-center gap-2.5">
+              <span class="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>
+              </span>
+              <span>Đang tìm kho mã <strong>ati-test</strong> trên GitHub…</span>
+            </span>
+            <span class="disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-400 flex-shrink-0" title="Chờ…" aria-label="Chờ…">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </span>
+          </li>
+
+          <!-- Step 4: Google Sheets -->
+          <li id="disc-step-4" class="flex items-center justify-between text-neutral-400 transition-all duration-300">
+            <span class="flex items-center gap-2.5">
+              <span class="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>
+              </span>
+              <span>Đang tìm bảng tính <strong>ATI Test Tracker</strong>…</span>
+            </span>
+            <span class="disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-400 flex-shrink-0" title="Chờ…" aria-label="Chờ…">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </span>
+          </li>
+
+          <!-- Step 5: Slack Channel -->
+          <li id="disc-step-5" class="flex items-center justify-between text-neutral-400 transition-all duration-300">
+            <span class="flex items-center gap-2.5">
+              <span class="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>
+              </span>
+              <span>Đang tìm kênh <strong>#ati-test</strong> trên Slack…</span>
+            </span>
+            <span class="disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-400 flex-shrink-0" title="Chờ…" aria-label="Chờ…">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-brand-muted pt-2">
+        <button onclick="setMoment(1)" class="hover:text-brand-text transition-colors">Hủy yêu cầu này</button>
+        <button onclick="setMoment(4)" class="inline-flex items-center gap-1 text-brand-primary font-medium hover:underline">
+          <span>Xem kế hoạch đã lập</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 3: HỎI LẠI ==================== -->
+    <section id="moment-3" class="stage-section is-hidden space-y-8" aria-labelledby="heading-moment-3">
+      <div class="space-y-3">
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-800 rounded-lg text-xs font-medium border border-amber-200">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span>Tôi cần bạn xác nhận thêm một thông tin</span>
+        </div>
+        <h1 id="heading-moment-3" class="font-display text-3xl sm:text-4xl lg:text-[44px] text-brand-text font-normal leading-tight" tabindex="-1">
+          Bạn muốn ghi vào bảng tính nào?
+        </h1>
+        <p class="text-base text-brand-muted max-w-xl">
+          Trong tài khoản Google Sheets của nhóm, tôi tìm thấy 2 bảng tính quản lý công việc đang hoạt động.
+        </p>
+      </div>
+
+      <div class="space-y-3 max-w-xl">
+        <button onclick="chooseSheetOption('ATI Test Tracker')" class="w-full text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border-2 border-brand-primary shadow-sm transition-all flex items-center justify-between gap-3 group">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-green-50 text-[#0F9D58] flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+              <svg class="w-5 h-5 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-base font-semibold text-brand-text group-hover:text-brand-primary transition-colors flex items-center gap-2 flex-wrap">
+                <span class="truncate">ATI Test Tracker</span>
+                <span class="text-[11px] font-medium px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full flex-shrink-0">Khuyên dùng</span>
+              </div>
+              <div class="text-xs text-brand-muted mt-0.5 truncate">Trang tính "Tasks" · Cập nhật 2 giờ trước</div>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-brand-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        </button>
+
+        <button onclick="chooseSheetOption('Sprint Report Q4')" class="w-full text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-sm transition-all flex items-center justify-between gap-3 group">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+              <svg class="w-5 h-5 text-neutral-500" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-base font-medium text-brand-text group-hover:text-neutral-900 transition-colors truncate">Sprint Report Q4</div>
+              <div class="text-xs text-brand-muted mt-0.5 truncate">Trang tính "Backlog" · Cập nhật 3 ngày trước</div>
+            </div>
+          </div>
+          <div class="w-5 h-5 rounded-full border border-neutral-300 flex-shrink-0"></div>
+        </button>
+
+        <!-- NHÓM 3: Mở ô nhập tại chỗ, không dùng prompt() -->
+        <div id="custom-sheet-container" class="bg-white rounded-2xl border border-dashed border-neutral-300 shadow-sm transition-all overflow-hidden">
+          <button id="btn-toggle-custom-sheet" onclick="toggleCustomSheetInput(true)" class="w-full text-left p-4 hover:bg-neutral-50 flex items-center justify-between group">
+            <div class="flex items-center gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-neutral-50 text-neutral-400 flex items-center justify-center font-bold text-sm">+</div>
+              <div>
+                <div class="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors">Để tôi gõ tên hoặc link bảng tính khác</div>
+                <div class="text-xs text-brand-muted mt-0.5">Nhập link hoặc tên Google Sheets bất kỳ của bạn</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          
+          <div id="custom-sheet-form" class="hidden p-4 pt-1 bg-neutral-50 border-t border-dashed border-neutral-200 space-y-2">
+            <label for="custom-sheet-input" class="text-xs font-medium text-brand-text">Nhập tên hoặc link Google Sheets:</label>
+            <div class="flex items-center gap-2">
+              <input type="text" id="custom-sheet-input" placeholder="Ví dụ: ATI Tracking Q4 hoặc https://docs.google.com/spreadsheets/..." class="flex-1 px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm text-brand-text focus:outline-none focus:border-brand-primary" onkeydown="if(event.key==='Enter') submitCustomSheet()">
+              <button onclick="submitCustomSheet()" class="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-semibold rounded-xl shadow-sm transition-colors whitespace-nowrap">
+                Chọn bảng này
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button onclick="setMoment(4)" class="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all">
+          Xác nhận và tiếp tục
+        </button>
+        <button onclick="setMoment(1)" class="px-4 py-2.5 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors">
+          Quay lại
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 4: CHỜ DUYỆT (QUAN TRỌNG NHẤT) ==================== -->
+    <section id="moment-4" class="stage-section is-hidden space-y-6 relative" aria-labelledby="heading-moment-4">
+      <div class="space-y-2">
+        <h1 id="heading-moment-4" class="font-display text-4xl sm:text-5xl text-brand-text font-normal tracking-tight leading-tight" tabindex="-1">
+          Tôi sẽ làm 4 việc, theo thứ tự
+        </h1>
+        <p class="text-sm sm:text-base text-brand-muted">
+          Xin hãy xem trước nội dung sẽ được ghi vào các công cụ dưới đây trước khi duyệt.
+        </p>
+      </div>
+
+      <!-- 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) -->
+      <div class="space-y-3" id="plan-cards-container">
+        
+        <!-- Task 1: Trello -->
+        <article class="plan-card-stagger-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300" data-od-id="plan-item-1">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-blue-50 text-[#0079BF] flex items-center justify-center flex-shrink-0 mt-0.5 border border-blue-100 shadow-sm">
+                <svg class="w-4 h-4 text-[#0079BF]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2h-15A2.5 2.5 0 002 4.5v15A2.5 2.5 0 004.5 22h15a2.5 2.5 0 002.5-2.5v-15A2.5 2.5 0 0019.5 2zm-8.25 14a1.25 1.25 0 01-1.25 1.25H6.25A1.25 1.25 0 015 16V6.25A1.25 1.25 0 016.25 5h3.75A1.25 1.25 0 0111.25 6.25V16zm7.75-5a1.25 1.25 0 01-1.25 1.25h-3.75A1.25 1.25 0 0112.75 11V6.25a1.25 1.25 0 011.25-1.25h3.75a1.25 1.25 0 011.25 1.25V11z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md">Trello</span>
+                  <span class="text-xs font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded-md">Tạo mới</span>
+                  <span class="text-xs text-brand-muted">Việc 1</span>
+                </div>
+                <h2 class="text-base font-semibold text-brand-text mt-1.5 leading-snug">
+                  Tạo card "Sửa lỗi đăng nhập Google" trong danh sách Doing của bảng To Do
+                </h2>
+                <p class="text-xs text-brand-muted mt-1">Đích đến: Bảng To Do &gt; Cột Doing</p>
+              </div>
+            </div>
+            <button onclick="openPreviewModal('trello')" class="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước nội dung card Trello">
+              <svg class="w-3.5 h-3.5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Xem trước</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- Task 2: GitHub -->
+        <article class="plan-card-stagger-2 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300" data-od-id="plan-item-2">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center flex-shrink-0 mt-0.5 border border-neutral-800 shadow-sm">
+                <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-semibold px-2 py-0.5 bg-neutral-100 text-neutral-800 rounded-md">GitHub</span>
+                  <span class="text-xs font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded-md">Tạo mới</span>
+                  <span class="text-xs text-brand-muted">Việc 2</span>
+                </div>
+                <h2 class="text-base font-semibold text-brand-text mt-1.5 leading-snug">
+                  Tạo issue trong kho ati-test; nội dung có gắn link của card vừa tạo ở việc 1
+                </h2>
+                <p class="text-xs text-brand-muted mt-1">Đích đến: kho ati-test &gt; tab Issues</p>
+              </div>
+            </div>
+            <button onclick="openPreviewModal('github')" class="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước nội dung issue GitHub">
+              <svg class="w-3.5 h-3.5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Xem trước</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- Task 3: Google Sheets -->
+        <article class="plan-card-stagger-3 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300" data-od-id="plan-item-3">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-green-50 text-[#0F9D58] flex items-center justify-center flex-shrink-0 mt-0.5 border border-green-100 shadow-sm">
+                <svg class="w-4 h-4 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-semibold px-2 py-0.5 bg-green-50 text-green-800 rounded-md">Google Sheets</span>
+                  <span class="text-xs font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded-md">Thêm dòng</span>
+                  <span class="text-xs text-brand-muted">Việc 3</span>
+                </div>
+                <h2 class="text-base font-semibold text-brand-text mt-1.5 leading-snug">
+                  Thêm một dòng vào trang Tasks của bảng tính ATI Test Tracker gồm ngày, tiêu đề, link issue, link card
+                </h2>
+                <p class="text-xs text-brand-muted mt-1">Đích đến: Bảng ATI Test Tracker &gt; Trang Tasks</p>
+              </div>
+            </div>
+            <button onclick="openPreviewModal('sheets')" class="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước dòng Google Sheets">
+              <svg class="w-3.5 h-3.5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Xem trước</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- Task 4: Slack -->
+        <article class="plan-card-stagger-4 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300" data-od-id="plan-item-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5 border border-purple-100 shadow-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-semibold px-2 py-0.5 bg-purple-50 text-purple-800 rounded-md">Slack</span>
+                  <span class="text-xs font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded-md">Gửi tin</span>
+                  <span class="text-xs text-brand-muted">Việc 4</span>
+                </div>
+                <h2 class="text-base font-semibold text-brand-text mt-1.5 leading-snug">
+                  Gửi tin vào kênh #ati-test báo nhóm, kèm link card và issue
+                </h2>
+                <p class="text-xs text-brand-muted mt-1">Đích đến: Kênh #ati-test</p>
+              </div>
+            </div>
+            <button onclick="openPreviewModal('slack')" class="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước tin nhắn Slack">
+              <svg class="w-3.5 h-3.5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Xem trước</span>
+            </button>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Warning Banner -->
+      <div class="p-4 rounded-xl bg-[#FFF6EE] border border-[#FFDFC6] flex items-start gap-3">
+        <svg class="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="text-xs sm:text-sm text-neutral-800 space-y-0.5">
+          <div class="font-semibold text-neutral-900">Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.</div>
+          <div class="text-neutral-600">Kế hoạch được giữ trong 30 phút. Bạn có thể sửa đổi bằng chat hoặc bấm duyệt để bắt đầu ngay.</div>
+        </div>
+      </div>
+
+      <!-- Technical Details Section (Am hiểu kỹ thuật - chỉ xuất hiện khi bật) -->
+      <div id="tech-details-panel" class="hidden p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs space-y-3 border border-neutral-800">
+        <div class="text-[11px] text-neutral-400 font-sans font-semibold uppercase tracking-wider">Thao tác hệ thống &amp; luồng dữ liệu liên việc</div>
+        <div class="space-y-2">
+          <div class="p-2.5 rounded bg-black/40 border border-neutral-800">
+            <span class="text-orange-400 font-semibold">1. trello.create_card</span>
+            <div class="text-neutral-400 pl-4 mt-0.5">
+              tham số: { board: "To Do", list: "Doing", name: "Sửa lỗi đăng nhập Google" }<br>
+              returns: <span class="text-emerald-400">card_id="c_942"</span>, <span class="text-emerald-400">card_url="https://trello.com/c/sample-auth-fix"</span>
+            </div>
+          </div>
+          <div class="p-2.5 rounded bg-black/40 border border-neutral-800">
+            <span class="text-orange-400 font-semibold">2. github.create_issue</span>
+            <div class="text-neutral-400 pl-4 mt-0.5">
+              tham số: { repo: "ati-test", title: "Sửa lỗi đăng nhập Google", body: "...kèm link <span class="text-emerald-400">${card_url}</span>..." }<br>
+              returns: <span class="text-emerald-400">issue_num=42</span>, <span class="text-emerald-400">issue_url="https://github.com/org/ati-test/issues/42"</span>
+            </div>
+          </div>
+          <div class="p-2.5 rounded bg-black/40 border border-neutral-800">
+            <span class="text-orange-400 font-semibold">3. sheets.append_rows</span>
+            <div class="text-neutral-400 pl-4 mt-0.5">
+              tham số: { spreadsheet: "ATI Test Tracker", sheet: "Tasks", row: ["05/10/2026", "Sửa lỗi đăng nhập Google", <span class="text-emerald-400">${issue_url}</span>, <span class="text-emerald-400">${card_url}</span>] }
+            </div>
+          </div>
+          <div class="p-2.5 rounded bg-black/40 border border-neutral-800">
+            <span class="text-orange-400 font-semibold">4. slack.send_message</span>
+            <div class="text-neutral-400 pl-4 mt-0.5">
+              tham số: { channel: "#ati-test", text: "Thông báo nhóm: Đã tạo việc sửa lỗi... card: <span class="text-emerald-400">${card_url}</span>, issue: <span class="text-emerald-400">${issue_url}</span>" }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NHÓM 1: Thanh hành động sticky ở đáy màn hình, luôn nhìn thấy và bấm được; KHÔNG bị che; có ô sửa qua chat ngay phía trên -->
+      <div id="moment-4-sticky-bar" class="sticky bottom-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#F8F8F6]/95 backdrop-blur-md border-t border-brand-border mt-6 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
+        
+        <!-- Ô nhập sửa qua Chat ngay phía trên thanh hành động (Ẩn mặc định) -->
+        <div id="moment-4-inline-chat" class="hidden mb-3 p-2 bg-white rounded-xl border border-brand-border shadow-soft-card flex items-center gap-2 transition-all">
+          <input type="text" id="moment-4-chat-input" class="flex-1 text-xs sm:text-sm text-brand-text placeholder-neutral-400 bg-transparent border-0 focus:ring-0 focus:outline-none px-2 py-1" placeholder="Bạn muốn sửa điều gì?" onkeydown="if(event.key==='Enter') submitMoment4InlineChat()">
+          <button onclick="submitMoment4InlineChat()" class="px-3.5 py-1.5 bg-brand-text hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1">
+            <span>Gửi</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+          <button onclick="toggleMoment4ChatEdit(false)" class="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors" aria-label="Đóng ô sửa">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
+            <button id="btn-approve-plan" onclick="approvePlanAndStartExecution()" class="w-full sm:w-auto px-5 sm:px-7 py-3 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm sm:text-base font-bold rounded-xl shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 flex-shrink-0">
+              <span>Duyệt kế hoạch</span>
+              <span class="text-base sm:text-lg">✓</span>
+            </button>
+            <button onclick="toggleMoment4ChatEdit(true)" class="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-white hover:bg-neutral-100 border border-brand-border text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 flex-shrink-0">
+              <svg class="w-4 h-4 text-brand-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              <span>Sửa qua Chat</span>
+            </button>
+            <button onclick="setMoment(1)" class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-brand-muted hover:text-brand-danger transition-colors flex-shrink-0">
+              Hủy
+            </button>
+          </div>
+
+          <div>
+            <button onclick="toggleTechnicalDetails()" class="text-xs text-brand-muted hover:text-brand-text font-mono inline-flex items-center gap-1.5 py-1 px-2 rounded hover:bg-neutral-100 transition-colors" aria-expanded="false" id="btn-tech-toggle">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+              <span>Chi tiết kỹ thuật</span>
+              <span id="tech-toggle-arrow">▼</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 5: ĐANG LÀM ==================== -->
+    <section id="moment-5" class="stage-section is-hidden space-y-6" aria-labelledby="heading-moment-5">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h1 id="heading-moment-5" class="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabindex="-1">
+            Đang thực hiện công việc
+          </h1>
+          <p class="text-sm text-brand-muted mt-1">Xin vui lòng chờ một lát, tôi đang thao tác theo thứ tự.</p>
+        </div>
+        <div class="text-right">
+          <div id="exec-progress-label" class="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-brand-primary font-semibold text-xs rounded-full border border-orange-200">
+            <span class="w-2 h-2 rounded-full bg-brand-primary animate-pulse"></span>
+            <span id="exec-step-counter">Việc 2/4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-full bg-neutral-200 h-1.5 rounded-full overflow-hidden">
+        <div id="exec-progress-bar" class="bg-brand-primary h-full transition-all duration-500 rounded-full" style="width: 50%;"></div>
+      </div>
+
+      <!-- NHÓM 4 & 8: Thời lượng viết kiểu Việt Nam "1,2 giây", font thân, icon SVG dịch vụ -->
+      <div class="space-y-3" id="exec-timeline">
+        
+        <!-- Task 1: Trello -->
+        <div id="exec-item-1" class="p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="exec-icon-1" class="w-8 h-8 rounded-xl bg-blue-50 text-[#0079BF] flex items-center justify-center flex-shrink-0 border border-blue-100 shadow-sm">
+              <svg class="w-4 h-4 text-[#0079BF]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2h-15A2.5 2.5 0 002 4.5v15A2.5 2.5 0 004.5 22h15a2.5 2.5 0 002.5-2.5v-15A2.5 2.5 0 0019.5 2zm-8.25 14a1.25 1.25 0 01-1.25 1.25H6.25A1.25 1.25 0 015 16V6.25A1.25 1.25 0 016.25 5h3.75A1.25 1.25 0 0111.25 6.25V16zm7.75-5a1.25 1.25 0 01-1.25 1.25h-3.75A1.25 1.25 0 0112.75 11V6.25a1.25 1.25 0 011.25-1.25h3.75a1.25 1.25 0 011.25 1.25V11z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold text-brand-text flex items-center gap-2 flex-wrap">
+                <span class="truncate">Tạo card trên Trello</span>
+                <span id="exec-check-1" class="text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium flex-shrink-0">✓ Đã tạo</span>
+              </div>
+              <div class="text-xs text-neutral-600 font-normal mt-0.5 truncate">Bảng To Do &gt; Doing · <a href="https://trello.com/c/sample-auth-fix" target="_blank" class="text-blue-600 hover:underline">Mở card</a></div>
+            </div>
+          </div>
+          <span id="exec-time-1" class="text-xs text-neutral-500 font-body flex-shrink-0">1,2 giây</span>
+        </div>
+
+        <!-- Task 2: GitHub -->
+        <div id="exec-item-2" class="p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="exec-icon-2" class="w-8 h-8 rounded-xl bg-orange-100 text-brand-primary flex items-center justify-center flex-shrink-0 shadow-sm font-bold text-xs">
+              <svg class="w-4 h-4 text-brand-primary" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold text-brand-text flex items-center gap-2 flex-wrap">
+                <span class="truncate">Tạo issue trong kho ati-test</span>
+                <span id="exec-badge-2" class="text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium flex-shrink-0">Đang làm</span>
+              </div>
+              <div id="exec-desc-2" class="text-xs text-brand-primary font-normal mt-0.5 truncate">Đang gửi yêu cầu tạo issue và chèn link Trello...</div>
+            </div>
+          </div>
+          <span id="exec-time-2" class="text-xs font-semibold text-brand-primary font-body flex-shrink-0">Đang chạy</span>
+        </div>
+
+        <!-- Task 3: Google Sheets -->
+        <div id="exec-item-3" class="p-4 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 flex items-center justify-between gap-3 opacity-60">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="exec-icon-3" class="w-8 h-8 rounded-xl bg-neutral-200 text-neutral-600 flex items-center justify-center flex-shrink-0 shadow-sm font-bold text-xs">
+              <svg class="w-4 h-4 text-neutral-500" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-neutral-700 flex items-center gap-2 flex-wrap">
+                <span class="truncate">Thêm dòng vào bảng tính</span>
+                <span id="exec-badge-3" class="text-xs text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-medium flex-shrink-0">Chờ</span>
+              </div>
+              <div id="exec-desc-3" class="text-xs text-neutral-500 mt-0.5 truncate">Đang chờ việc 2 hoàn thành</div>
+            </div>
+          </div>
+          <span id="exec-time-3" class="text-xs text-neutral-400 font-body flex-shrink-0">Chờ</span>
+        </div>
+
+        <!-- Task 4: Slack -->
+        <div id="exec-item-4" class="p-4 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 flex items-center justify-between gap-3 opacity-60">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="exec-icon-4" class="w-8 h-8 rounded-xl bg-neutral-200 text-neutral-600 flex items-center justify-center flex-shrink-0 shadow-sm font-bold text-xs">
+              <svg class="w-4 h-4 text-neutral-500" viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-neutral-700 flex items-center gap-2 flex-wrap">
+                <span class="truncate">Gửi tin nhắn vào kênh #ati-test</span>
+                <span id="exec-badge-4" class="text-xs text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-medium">Chờ</span>
+              </div>
+              <div id="exec-desc-4" class="text-xs text-neutral-500 mt-0.5">Đang chờ việc 3 hoàn thành</div>
+            </div>
+          </div>
+          <span id="exec-time-4" class="text-xs text-neutral-400 font-body">Chờ</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <span class="text-xs text-brand-muted">Đang chạy tự động an toàn</span>
+        <button onclick="setMoment(6)" class="text-xs text-brand-muted hover:text-brand-text underline">Bỏ qua animation tới kết quả</button>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 6: XONG (NHÓM 7: GIÀU NỘI DUNG, VẪN GỌN) ==================== -->
+    <section id="moment-6" class="stage-section is-hidden space-y-7 w-full max-w-[1120px] mx-auto" aria-labelledby="heading-moment-6">
+      <div class="space-y-3">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-sm">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path class="animate-draw-check" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div>
+          <h1 id="heading-moment-6" class="font-display text-3xl sm:text-4xl lg:text-[42px] text-brand-text font-normal tracking-tight" tabindex="-1">
+            Đã xong 4 việc trên 4 công cụ
+          </h1>
+          <div class="mt-1.5 flex items-center gap-2">
+            <span id="moment-6-duration-tag" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold font-body">
+              Trong 3,8 giây
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NHÓM 7: Chuỗi 4 biên nhận dạng lưới 2x2 trên desktop (1->2 ở hàng trên, chuyển Z xuống 3, 3->4 ở hàng dưới), 1 cột trên mobile -->
+      <div class="space-y-3">
+        <div id="receipt-chain" class="flex flex-col gap-3">
+          
+          <!-- HÀNG TRÊN (Desktop: Trello -> GitHub) -->
+          <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-stretch md:items-center gap-3">
+            <!-- Mục 1: Trello -->
+            <div class="receipt-stagger-1 flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between hover:border-blue-300 transition-all group">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 text-[#0079BF] flex items-center justify-center p-1.5 border border-blue-100 shadow-sm flex-shrink-0">
+                      <svg class="w-4 h-4 text-[#0079BF]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2h-15A2.5 2.5 0 002 4.5v15A2.5 2.5 0 004.5 22h15a2.5 2.5 0 002.5-2.5v-15A2.5 2.5 0 0019.5 2zm-8.25 14a1.25 1.25 0 01-1.25 1.25H6.25A1.25 1.25 0 015 16V6.25A1.25 1.25 0 016.25 5h3.75A1.25 1.25 0 0111.25 6.25V16zm7.75-5a1.25 1.25 0 01-1.25 1.25h-3.75A1.25 1.25 0 0112.75 11V6.25a1.25 1.25 0 011.25-1.25h3.75a1.25 1.25 0 011.25 1.25V11z"/></svg>
+                    </div>
+                    <span class="text-xs font-semibold text-brand-muted uppercase tracking-wider truncate">Trello Card</span>
+                  </div>
+                  <span class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">✓ Đã tạo thẻ</span>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-brand-text line-clamp-2 leading-snug">Sửa lỗi đăng nhập Google</h3>
+                  <p class="text-xs text-brand-muted mt-1">Bảng To Do &gt; <strong class="text-neutral-700">Doing</strong></p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
+                <a href="https://trello.com/c/sample-auth-fix" target="_blank" class="text-xs font-semibold text-[#0079BF] hover:underline inline-flex items-center gap-1">
+                  <span>Mở card</span>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Connector 1 -->
+            <div class="connector-stagger-1 flex md:flex-col items-center justify-center py-1 md:py-0 md:px-1 flex-shrink-0">
+              <div class="hidden md:block w-4 lg:w-8 h-0.5 bg-neutral-300 my-auto"></div>
+              <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 border border-neutral-200 rounded-md text-[10px] font-medium whitespace-nowrap shadow-sm" title="Dữ liệu được truyền sang bước tiếp theo">
+                <span class="md:hidden">link card ↓</span>
+                <span class="hidden md:inline">link card →</span>
+              </span>
+              <div class="hidden md:block w-4 lg:w-8 h-0.5 bg-neutral-300 my-auto"></div>
+            </div>
+
+            <!-- Mục 2: GitHub -->
+            <div class="receipt-stagger-2 flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between hover:border-neutral-400 transition-all group">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-neutral-900 text-white flex items-center justify-center p-1.5 border border-neutral-800 shadow-sm flex-shrink-0">
+                      <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                    </div>
+                    <span class="text-xs font-semibold text-brand-muted uppercase tracking-wider truncate">GitHub Issue</span>
+                  </div>
+                  <span class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">✓ Đã tạo issue</span>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-brand-text line-clamp-2 leading-snug">Issue #42</h3>
+                  <p class="text-xs text-neutral-700 mt-1 leading-snug">Kho ati-test · Sửa lỗi đăng nhập Google</p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
+                <a href="https://github.com/org/ati-test/issues/42" target="_blank" class="text-xs font-semibold text-neutral-900 hover:underline inline-flex items-center gap-1">
+                  <span>Mở issue</span>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connector 2: Chuyển tiếp dạng chữ Z từ Hàng 1 (GitHub) sang Hàng 2 (Google Sheets) -->
+          <div class="connector-stagger-2 flex items-center justify-center my-0.5 md:my-1 w-full">
+            <div class="hidden md:flex items-center justify-between w-full px-4 gap-3 text-neutral-400">
+              <div class="flex-1 h-px bg-neutral-200"></div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 bg-neutral-100 border border-neutral-200 rounded-full text-[11px] font-medium text-neutral-600 shadow-sm" title="Dữ liệu được truyền từ GitHub sang Google Sheets">
+                <span>GitHub #42</span>
+                <svg class="w-3.5 h-3.5 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                <span class="text-neutral-700 font-semibold">link issue + link card</span>
+                <svg class="w-3.5 h-3.5 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                <span>Google Sheets</span>
+              </div>
+              <div class="flex-1 h-px bg-neutral-200"></div>
+            </div>
+            <!-- Mobile: xếp dọc nối tiếp 2 xuống 3 -->
+            <div class="flex md:hidden items-center justify-center py-1">
+              <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 border border-neutral-200 rounded-md text-[10px] font-medium whitespace-nowrap shadow-sm" title="Dữ liệu được truyền sang bước tiếp theo">
+                link issue + link card ↓
+              </span>
+            </div>
+          </div>
+
+          <!-- HÀNG DƯỚI (Desktop: Google Sheets -> Slack) -->
+          <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-stretch md:items-center gap-3">
+            <!-- Mục 3: Google Sheets -->
+            <div id="receipt-sheets-card" class="receipt-stagger-3 flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between hover:border-green-300 transition-all group">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-green-50 text-[#0F9D58] flex items-center justify-center p-1.5 border border-green-100 shadow-sm flex-shrink-0">
+                      <svg class="w-4 h-4 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 14H6v-3h7v3zm0-4.5H6V9.5h7v3zm0-4.5H6V5h7v3.5zm5 9h-4v-3h4v3zm0-4.5h-4V9.5h4v3zm0-4.5h-4V5h4v3.5z"/></svg>
+                    </div>
+                    <span class="text-xs font-semibold text-brand-muted uppercase tracking-wider truncate">Google Sheets</span>
+                  </div>
+                  <span id="receipt-sheets-status" class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">✓ Đã ghi dòng</span>
+                </div>
+                <div>
+                  <h3 id="receipt-sheets-title" class="text-sm sm:text-base font-bold text-brand-text line-clamp-2 leading-snug">Dòng 104</h3>
+                  <p id="receipt-sheets-desc" class="text-xs text-brand-muted mt-1 leading-snug">05/10/2026 · Sửa lỗi đăng nhập Google · link issue · link card</p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
+                <a id="receipt-sheets-link" href="https://docs.google.com/spreadsheets/d/sample" target="_blank" class="text-xs font-semibold text-[#0F9D58] hover:underline inline-flex items-center gap-1">
+                  <span>Xem dòng</span>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Connector 3 -->
+            <div class="connector-stagger-3 flex md:flex-col items-center justify-center py-1 md:py-0 md:px-1 flex-shrink-0">
+              <div class="hidden md:block w-4 lg:w-8 h-0.5 bg-neutral-300 my-auto"></div>
+              <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 border border-neutral-200 rounded-md text-[10px] font-medium whitespace-nowrap shadow-sm" title="Dữ liệu được truyền sang bước tiếp theo">
+                <span class="md:hidden">link card + link issue ↓</span>
+                <span class="hidden md:inline">link card + link issue →</span>
+              </span>
+              <div class="hidden md:block w-4 lg:w-8 h-0.5 bg-neutral-300 my-auto"></div>
+            </div>
+
+            <!-- Mục 4: Slack -->
+            <div id="receipt-slack-card" class="receipt-stagger-4 flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between hover:border-purple-300 transition-all group">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center p-1.5 border border-purple-100 shadow-sm flex-shrink-0">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/><path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/><path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/><path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/></svg>
+                    </div>
+                    <span class="text-xs font-semibold text-brand-muted uppercase tracking-wider truncate">Slack #ati-test</span>
+                  </div>
+                  <span id="receipt-slack-status" class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">✓ Đã gửi tin</span>
+                </div>
+                <div>
+                  <p id="receipt-slack-desc" class="text-xs sm:text-sm text-neutral-700 mt-1 italic line-clamp-2 leading-snug">
+                    “Đã tạo card Trello và issue #42 cho lỗi đăng nhập Google.”
+                  </p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
+                <a href="https://slack.com/app_redirect?channel=ati-test" target="_blank" class="text-xs font-semibold text-purple-700 hover:underline inline-flex items-center gap-1">
+                  <span>Xem tin</span>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Dòng lưu ý theo NHÓM 7: Cần sửa? Mở từng mục để chỉnh trực tiếp trên công cụ đó. -->
+        <div class="text-xs text-brand-muted text-center sm:text-left pt-1">
+          Cần sửa? Mở từng mục để chỉnh trực tiếp trên công cụ đó.
+        </div>
+      </div>
+
+      <!-- NHÓM 7: "Tiếp theo" với 2 gợi ý theo kết quả vừa có + nút Nhờ việc khác -->
+      <div class="pt-4 border-t border-brand-border space-y-3">
+        <div class="text-xs font-semibold uppercase tracking-wider text-brand-muted">Tiếp theo:</div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="handleMoment6Followup('Gán người phụ trách cho card này')" class="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group">
+            <span class="text-brand-primary font-bold">+</span>
+            <span>Gán người phụ trách cho card này</span>
+          </button>
+          <button onclick="handleMoment6Followup('Đặt lịch review cho issue #42')" class="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group">
+            <span class="text-brand-primary font-bold">+</span>
+            <span>Đặt lịch review cho issue #42</span>
+          </button>
+          <button onclick="resetToMoment1()" class="px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all">
+            Nhờ việc khác
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 7: CẦN BẠN XỬ LÝ - LỖI ĐÃ BIẾT (NHÓM 4 & 3) ==================== -->
+    <section id="moment-7" class="stage-section is-hidden space-y-6" aria-labelledby="heading-moment-7">
+      <div class="space-y-2">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-lg border border-red-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Cần bạn xử lý · Lỗi phân quyền</span>
+        </div>
+        <h1 id="heading-moment-7" class="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabindex="-1">
+          Google Sheets chưa cho phép ghi
+        </h1>
+        <p class="text-sm text-brand-muted">
+          Việc số 3 không thể hoàn thành do giới hạn quyền truy cập từ Google.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-brand-border p-5 sm:p-6 shadow-soft-card space-y-4">
+        <div class="space-y-1">
+          <div class="text-xs font-semibold uppercase tracking-wider text-neutral-400">Chuyện gì đã xảy ra</div>
+          <!-- NHÓM 4: Không khẳng định "chỉ có quyền Người xem (Viewer)" -->
+          <p class="text-sm text-brand-text leading-relaxed">
+            Google Sheets từ chối ghi vì ATI chưa có quyền chỉnh sửa bảng tính ATI Test Tracker.
+          </p>
+        </div>
+
+        <div class="space-y-1 pt-3 border-t border-brand-border-subtle">
+          <div class="text-xs font-semibold uppercase tracking-wider text-neutral-400">Ảnh hưởng hiện tại</div>
+          <div class="space-y-1 text-sm text-brand-text">
+            <div class="flex items-center gap-2 text-emerald-700">
+              <span class="font-bold">✓</span>
+              <span>Việc 1 (Trello) và Việc 2 (GitHub) đã tạo xong thành công và được giữ nguyên.</span>
+            </div>
+            <div class="flex items-center gap-2 text-amber-700">
+              <span class="font-bold">!</span>
+              <span>Việc 4 (gửi tin Slack) tạm thời chưa làm, để tránh gửi thông báo thiếu dòng ghi chú.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs sm:text-sm text-brand-text space-y-1">
+          <span class="font-semibold text-brand-primary">Cần làm gì:</span>
+          <p>Nhờ quản trị viên cấp quyền chỉnh sửa cho tài khoản ATI trên bảng tính này, rồi bấm <strong>Thử lại việc 3</strong>.</p>
+        </div>
+      </div>
+
+      <!-- NHÓM 3: Xử lý nút bấm đúng luồng nghiệp vụ, không dùng alert -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="retryTask3()" class="px-6 py-3 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]">
+          Thử lại việc 3
+        </button>
+        <button onclick="skipTask3()" class="px-5 py-3 bg-white hover:bg-neutral-100 border border-brand-border text-brand-text text-sm font-medium rounded-xl shadow-sm transition-colors">
+          Bỏ qua việc này
+        </button>
+        <button onclick="setMoment(1)" class="px-4 py-3 text-sm font-medium text-brand-muted hover:text-brand-danger transition-colors">
+          Dừng
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 8: CẦN BẠN XỬ LÝ - CHƯA CHẮC KẾT QUẢ ==================== -->
+    <section id="moment-8" class="stage-section is-hidden space-y-6" aria-labelledby="heading-moment-8">
+      <div class="space-y-2">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 text-xs font-semibold rounded-lg border border-amber-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span>Cần bạn xử lý · Chưa chắc kết quả</span>
+        </div>
+        <h1 id="heading-moment-8" class="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabindex="-1">
+          Chưa rõ tin nhắn đã tới kênh #ati-test chưa
+        </h1>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-brand-border p-5 sm:p-6 shadow-soft-card space-y-4">
+        <p class="text-base text-brand-text leading-relaxed">
+          Tôi không chắc tin nhắn đã tới <strong>#ati-test</strong> chưa, vì mạng bị gián đoạn đúng lúc đang gửi. Hãy mở #ati-test để xem.
+        </p>
+
+        <div class="space-y-2 p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-xs sm:text-sm">
+          <div class="font-semibold text-neutral-800">Hướng dẫn xử lý:</div>
+          <ul class="space-y-1.5 text-neutral-700">
+            <li class="flex items-start gap-2">
+              <span class="text-emerald-600 font-bold">•</span>
+              <span>Nếu tin đã có trong kênh → chọn <strong>"Tin đã có, bỏ qua"</strong>.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-red-600 font-bold">•</span>
+              <span>Nếu chưa có → chọn <strong>"Dừng"</strong> rồi nhờ gửi lại bằng một yêu cầu mới.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="text-xs text-neutral-500 italic">
+          * Lưu ý an toàn: Để tránh gửi lặp tin nhắn vào kênh nhóm, hệ thống không tự động thử lại ở bước này.
+        </div>
+      </div>
+
+      <!-- NHÓM 3: "Tin đã có, bỏ qua" -> Xong, việc 4 ghi "Bạn đã xác nhận tin đã có" -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="confirmSlackMessageExists()" class="px-6 py-3 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all">
+          Tin đã có, bỏ qua
+        </button>
+        <button onclick="setMoment(1)" class="px-5 py-3 bg-white hover:bg-neutral-100 border border-brand-border text-brand-text text-sm font-medium rounded-xl shadow-sm transition-colors">
+          Dừng
+        </button>
+        <a href="https://slack.com/app_redirect?channel=ati-test" target="_blank" class="px-4 py-3 text-sm font-medium text-brand-muted hover:text-brand-text inline-flex items-center gap-1.5 transition-colors">
+          <span>Mở #ati-test</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- ==================== KHOẢNH KHẮC 9: CẦN BẠN XỬ LÝ - HỆ THỐNG VỪA KHỞI ĐỘNG LẠI ==================== -->
+    <section id="moment-9" class="stage-section is-hidden space-y-6" aria-labelledby="heading-moment-9">
+      <div class="space-y-2">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 text-neutral-800 text-xs font-semibold rounded-lg border border-neutral-300">
+          <svg class="w-4 h-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Khôi phục phiên làm việc</span>
+        </div>
+        <h1 id="heading-moment-9" class="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabindex="-1">
+          Hệ thống vừa khởi động lại
+        </h1>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-brand-border p-5 sm:p-6 shadow-soft-card space-y-4">
+        <p class="text-base text-brand-text leading-relaxed">
+          Hệ thống vừa khởi động lại trong lúc đang làm việc của bạn. Việc 1 và 2 đã xong trước đó (kèm link). Việc 3 và 4 chưa làm.
+        </p>
+
+        <div class="space-y-2.5 pt-2">
+          <div class="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-between text-xs sm:text-sm">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">✓</span>
+              <span class="font-medium text-neutral-800">Việc 1: Tạo card Trello</span>
+            </div>
+            <a href="https://trello.com/c/sample-auth-fix" target="_blank" class="text-brand-primary hover:underline font-medium inline-flex items-center gap-1">
+              <span>Đã xong (Mở card)</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+          </div>
+
+          <div class="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-between text-xs sm:text-sm">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">✓</span>
+              <span class="font-medium text-neutral-800">Việc 2: Tạo issue kho ati-test</span>
+            </div>
+            <a href="https://github.com/org/ati-test/issues/42" target="_blank" class="text-brand-primary hover:underline font-medium inline-flex items-center gap-1">
+              <span>Đã xong (Mở issue)</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+          </div>
+
+          <div class="p-3 rounded-xl bg-white border border-dashed border-neutral-300 flex items-center justify-between text-xs sm:text-sm text-neutral-500">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center font-bold text-xs">3</span>
+              <span>Việc 3: Thêm dòng vào Google Sheets</span>
+            </div>
+            <span class="text-neutral-500 italic">Chưa làm</span>
+          </div>
+
+          <div class="p-3 rounded-xl bg-white border border-dashed border-neutral-300 flex items-center justify-between text-xs sm:text-sm text-neutral-500">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center font-bold text-xs">4</span>
+              <span>Việc 4: Gửi tin nhắn vào kênh Slack</span>
+            </div>
+            <span class="text-neutral-500 italic">Chưa làm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NHÓM 3: "Làm tiếp các việc còn lại" -> khoảnh khắc 5 chạy tiếp từ việc 3 -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="resumeRemainingTasks()" class="px-6 py-3 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]">
+          Làm tiếp các việc còn lại
+        </button>
+        <button onclick="setMoment(1)" class="px-5 py-3 bg-white hover:bg-neutral-100 border border-brand-border text-brand-text text-sm font-medium rounded-xl shadow-sm transition-colors">
+          Dừng
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PERSISTENT BOTTOM INPUT BAR (NHÓM 6: Ẩn ở khoảnh khắc 1; NHÓM 1: Ẩn ở khoảnh khắc 4) -->
+  <footer id="global-bottom-bar" class="hidden fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-[#F8F8F6] via-[#F8F8F6]/95 to-transparent pt-6 pb-4 px-4 sm:px-6 pointer-events-none">
+    <div class="max-w-3xl mx-auto pointer-events-auto">
+      <div class="bg-white rounded-2xl border border-brand-border shadow-elevated p-2 sm:p-2.5 flex items-center gap-2 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all">
+        <div class="p-2 text-brand-muted hidden sm:block">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        </div>
+        <label for="bottom-chat-input" class="sr-only">Nhắn thêm với tôi</label>
+        <input id="bottom-chat-input" type="text" class="flex-1 text-sm sm:text-base text-brand-text placeholder-neutral-400 bg-transparent border-0 focus:ring-0 focus:outline-none px-2 py-1" placeholder="Nhắn thêm với tôi để sửa kế hoạch hoặc thêm chi tiết..." onkeydown="handleBottomInputKey(event)">
+        <button onclick="submitBottomInput()" class="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-medium rounded-xl transition-colors flex-shrink-0 flex items-center gap-1.5" aria-label="Gửi tin nhắn">
+          <span>Gửi</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- NHÓM 5: Viên "Kịch bản demo" ở góc trên bên phải ngay dưới thanh đầu (cả mobile và desktop) không che thanh hành động ở đáy -->
+  <div id="demo-pill-container" class="fixed top-[88px] right-3 z-40 w-max inline-block pointer-events-none transition-[top] duration-200">
+    <div class="relative w-max">
+      <button id="demo-pill-btn" onclick="toggleDemoMenu()" class="pointer-events-auto inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 bg-neutral-900/90 hover:bg-black text-white text-[11px] sm:text-xs font-medium rounded-full shadow-lg backdrop-blur-md transition-all hover:scale-105 active:scale-95" aria-haspopup="true" aria-expanded="false" title="Nhấn phím 1-9 để chuyển nhanh">
+        <span class="w-2 h-2 rounded-full bg-brand-primary animate-ping"></span>
+        <span class="hidden sm:inline">Kịch bản demo</span>
+        <span class="sm:hidden">Demo</span>
+        <kbd class="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-mono">1–9</kbd>
+      </button>
+
+      <!-- Menu demo: bung xuống ở góc trên phải -->
+      <div id="demo-menu" class="hidden absolute top-10 sm:top-11 right-0 w-72 sm:w-80 bg-white rounded-2xl border border-brand-border shadow-2xl p-2.5 space-y-2 text-xs z-50 pointer-events-auto">
+        <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-muted border-b border-brand-border-subtle flex justify-between items-center">
+          <span>Chọn 1 trong 9 khoảnh khắc</span>
+          <span class="text-neutral-400 font-mono text-[10px]">Phím tắt 1-9</span>
+        </div>
+        <div class="max-h-60 sm:max-h-72 overflow-y-auto space-y-1 py-1">
+          <button onclick="setMoment(1)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="1">
+            <span class="text-brand-text font-medium group-hover:text-brand-primary">1. Nhờ việc (Bắt đầu)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">1</kbd>
+          </button>
+          <button onclick="setMoment(2)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="2">
+            <span class="text-brand-text font-medium group-hover:text-brand-primary">2. Đang hiểu (Truy tìm tài nguyên)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">2</kbd>
+          </button>
+          <button onclick="setMoment(3)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="3">
+            <span class="text-brand-text font-medium group-hover:text-brand-primary">3. Hỏi lại (Xác nhận bảng tính)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">3</kbd>
+          </button>
+          <button onclick="setMoment(4)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="4">
+            <span class="text-brand-text font-semibold text-brand-primary">4. Chờ duyệt (Quan trọng nhất)</span>
+            <kbd class="text-[10px] font-mono text-brand-primary bg-orange-100 px-1.5 py-0.5 rounded font-bold">4</kbd>
+          </button>
+          <button onclick="setMoment(5)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="5">
+            <span class="text-brand-text font-medium group-hover:text-brand-primary">5. Đang làm (Hành trình dọc)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">5</kbd>
+          </button>
+          <button onclick="setMoment(6)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="6">
+            <span class="text-brand-text font-medium group-hover:text-brand-primary">6. Xong (Kết quả &amp; liên kết)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">6</kbd>
+          </button>
+          <button onclick="setMoment(7)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="7">
+            <span class="text-brand-text font-medium text-red-600">7. Lỗi đã biết (Quyền Sheets)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">7</kbd>
+          </button>
+          <button onclick="setMoment(8)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="8">
+            <span class="text-brand-text font-medium text-amber-600">8. Chưa chắc kết quả (Mạng Slack)</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">8</kbd>
+          </button>
+          <button onclick="setMoment(9)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 flex items-center justify-between group moment-btn" data-moment="9">
+            <span class="text-brand-text font-medium text-neutral-700">9. Hệ thống khởi động lại</span>
+            <kbd class="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">9</kbd>
+          </button>
+        </div>
+
+        <div class="pt-2 border-t border-brand-border-subtle space-y-2.5">
+          <div>
+            <div class="px-1 text-[11px] font-medium text-brand-muted mb-1">Xem như:</div>
+            <div class="grid grid-cols-2 gap-1.5 p-0.5 bg-neutral-100 rounded-lg">
+              <button id="role-btn-admin" type="button" onclick="setRole('admin')" class="demo-toggle-btn is-active" aria-pressed="true">Quản trị viên</button>
+              <button id="role-btn-member" type="button" onclick="setRole('member')" class="demo-toggle-btn" aria-pressed="false">Thành viên</button>
+            </div>
+          </div>
+          <div>
+            <div class="px-1 text-[11px] font-medium text-brand-muted mb-1">Máy chủ:</div>
+            <div class="grid grid-cols-2 gap-1.5 p-0.5 bg-neutral-100 rounded-lg">
+              <button id="server-btn-mock" type="button" onclick="setServerMode('mock')" class="demo-toggle-btn is-active" aria-pressed="true">Thử nghiệm</button>
+              <button id="server-btn-real" type="button" onclick="setServerMode('real')" class="demo-toggle-btn" aria-pressed="false">Thật</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT CHAT DRAWER (NHÓM 4: Bỏ Phiên #104, khớp đối thoại khoảnh khắc 3, NHÓM 5: Focus trap & Esc) -->
+  <aside id="chat-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white border-l border-brand-border shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" role="dialog" aria-modal="true" aria-labelledby="chat-drawer-title">
+    <div class="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-neutral-50/50">
+      <div class="flex items-center gap-2">
+        <h2 id="chat-drawer-title" class="font-display font-semibold text-lg text-brand-text">Nhật ký hội thoại</h2>
+      </div>
+      <button onclick="toggleChatDrawer(false)" class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors" aria-label="Đóng ngăn kéo">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div id="chat-messages-container" class="flex-1 overflow-y-auto p-5 space-y-4 text-xs sm:text-sm">
+      <div class="flex flex-col items-end space-y-1">
+        <span class="text-[11px] text-brand-muted">Bạn · 10:14</span>
+        <div class="p-3 bg-neutral-900 text-white rounded-2xl rounded-tr-none max-w-[85%] leading-relaxed">
+          Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack
+        </div>
+      </div>
+
+      <div class="flex flex-col items-start space-y-1">
+        <span class="text-[11px] text-brand-muted">ATI · 10:14</span>
+        <div class="p-3 bg-neutral-100 text-brand-text rounded-2xl rounded-tl-none max-w-[88%] space-y-2 leading-relaxed">
+          <p>Tôi đã tìm thấy các dịch vụ liên quan (Trello, GitHub, Google Sheets, Slack).</p>
+          <p>Bạn muốn ghi vào bảng tính nào?</p>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-end space-y-1">
+        <span class="text-[11px] text-brand-muted">Bạn · 10:15</span>
+        <div class="p-3 bg-neutral-900 text-white rounded-2xl rounded-tr-none max-w-[85%] leading-relaxed">
+          ATI Test Tracker
+        </div>
+      </div>
+
+      <div class="flex flex-col items-start space-y-1">
+        <span class="text-[11px] text-brand-muted">ATI · 10:15</span>
+        <div class="p-3 bg-[#FFF5ED] border border-[#FFDEC9] text-brand-text rounded-2xl rounded-tl-none max-w-[88%] space-y-2 leading-relaxed">
+          <div class="font-semibold text-brand-primary">Kế hoạch 4 việc đã sẵn sàng trên sân khấu chính.</div>
+          <p>Bạn có thể bấm "Duyệt kế hoạch ✓" trên màn hình hoặc nhắn trực tiếp vào đây nếu cần sửa đổi.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 border-t border-brand-border bg-neutral-50/50">
+      <div class="flex items-center gap-2">
+        <input type="text" id="drawer-chat-input" class="flex-1 px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm focus:outline-none focus:border-brand-primary" placeholder="Nhắn tiếp trong phiên này..." onkeydown="if(event.key==='Enter') sendDrawerMessage()">
+        <button onclick="sendDrawerMessage()" class="p-2 bg-brand-primary text-white rounded-xl hover:bg-brand-primary-hover transition-colors" aria-label="Gửi tin nhắn">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- HISTORY DRAWER (NHÓM 5: Focus trap & Esc) -->
+  <aside id="history-drawer" class="fixed inset-y-0 left-0 z-50 w-full sm:w-[380px] bg-white border-r border-brand-border shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col" role="dialog" aria-modal="true" aria-labelledby="history-drawer-title">
+    <div class="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-neutral-50/50">
+      <h2 id="history-drawer-title" class="font-display font-semibold text-lg text-brand-text">Lịch sử yêu cầu</h2>
+      <button onclick="toggleHistoryDrawer(false)" class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors" aria-label="Đóng lịch sử">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-2 text-xs sm:text-sm">
+      <div class="p-3 rounded-xl bg-orange-50 border border-orange-200">
+        <div class="flex justify-between items-center text-[11px] text-brand-primary font-semibold">
+          <span>ĐANG CHẠY</span>
+          <span>10:14 Hôm nay</span>
+        </div>
+        <div class="font-medium text-brand-text mt-1">Sửa lỗi đăng nhập Google, tạo card Trello, issue GitHub, cập nhật Sheet và Slack</div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 border border-brand-border transition-colors cursor-pointer" onclick="loadHistoricalRequest('Ghi báo cáo tiến độ tuần 42 vào Google Sheets và thông báo nhóm Slack')">
+        <div class="flex justify-between items-center text-[11px] text-neutral-500">
+          <span>HOÀN THÀNH</span>
+          <span>Hôm qua, 16:30</span>
+        </div>
+        <div class="font-medium text-neutral-800 mt-1">Ghi báo cáo tiến độ tuần 42 vào Google Sheets và thông báo nhóm Slack</div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 border border-brand-border transition-colors cursor-pointer" onclick="loadHistoricalRequest('Đặt lịch họp review bản demo và gửi thiệp mời qua Notion')">
+        <div class="flex justify-between items-center text-[11px] text-neutral-500">
+          <span>HOÀN THÀNH</span>
+          <span>Thứ Sáu tuần trước</span>
+        </div>
+        <div class="font-medium text-neutral-800 mt-1">Đặt lịch họp review bản demo và gửi thiệp mời qua Notion</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MODAL: XEM TRƯỚC NỘI DUNG TỪNG VIỆC (NHÓM 4: Đúng sự thật, không bịa chi tiết; NHÓM 5: Focus trap, Esc, backdrop) -->
+  <div id="preview-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" onclick="handlePreviewBackdropClick(event)">
+    <div id="preview-modal-box" class="bg-white rounded-2xl max-w-xl w-full border border-brand-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-neutral-50">
+        <div class="flex items-center gap-2">
+          <span id="preview-service-tag" class="px-2 py-0.5 rounded text-xs font-semibold bg-neutral-200 text-neutral-800">Dịch vụ</span>
+          <h3 id="preview-modal-title" class="font-display font-semibold text-base text-brand-text">Xem trước nội dung</h3>
+        </div>
+        <button onclick="closePreviewModal()" class="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 transition-colors" aria-label="Đóng xem trước">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-brand-text" id="preview-modal-content"></div>
+
+      <div class="px-5 py-3 border-t border-brand-border bg-neutral-50 flex justify-end">
+        <button onclick="closePreviewModal()" class="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-xl transition-colors">
+          Đóng xem trước
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY BACKDROP FOR DRAWERS (NHÓM 5: backdrop-blur-sm thay cho backdrop-blur-xs) -->
+  <div id="drawer-backdrop" class="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm hidden transition-opacity" onclick="closeAllDrawers()"></div>
+
+  <!-- JAVASCRIPT THUẦN (LOGIC, TRANSITIONS, SHORTCUTS, ACCESSIBILITY, TOASTS) -->
+  <script>
+    let currentMoment = 1;
+    let isExecuting = false;
+    let chatCount = 4;
+    let executionMode = 'normal'; // 'normal', 'retry3', 'skip3', 'resumeFrom3'
+    let lastActiveElement = null;
+    let activeTrapCleanup = null;
+    let discoveryTimer = null;
+
+    const SAMPLE_QUERY = 'Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack';
+
+    // NHÓM 3: Toast Notification thay alert()
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg transition-all duration-300 transform -translate-y-2 opacity-0 flex items-center gap-2 border';
+      
+      if (type === 'warning') {
+        toast.className += ' bg-amber-50 text-amber-900 border-amber-200';
+      } else if (type === 'success') {
+        toast.className += ' bg-emerald-50 text-emerald-900 border-emerald-200';
+      } else {
+        toast.className += ' bg-neutral-900 text-white border-neutral-800';
+      }
+
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      // Animation in
+      requestAnimationFrame(() => {
+        toast.classList.remove('-translate-y-2', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+      });
+
+      // Auto dismiss
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 2600);
+    }
+
+    // NHÓM 2: Chuyển cảnh mượt mà fade + trượt ngắn 180–260ms
+    function setMoment(num) {
+      if (num < 1 || num > 9) return;
+      if (discoveryTimer) {
+        clearTimeout(discoveryTimer);
+        discoveryTimer = null;
+      }
+
+      const oldMoment = currentMoment;
+      currentMoment = num;
+
+      const fromEl = document.getElementById('moment-' + oldMoment);
+      const toEl = document.getElementById('moment-' + num);
+
+      // Cập nhật câu query mẫu nếu nhảy qua menu demo
+      const currentQuery = document.getElementById('top-bar-query').textContent.trim() || SAMPLE_QUERY;
+      document.getElementById('top-bar-query').textContent = currentQuery;
+      const m2Display = document.getElementById('moment-2-query-display');
+      if (m2Display) m2Display.textContent = '“' + currentQuery + '”';
+
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (fromEl && toEl && fromEl !== toEl && !prefersReduced) {
+        fromEl.classList.remove('is-active');
+        fromEl.classList.add('is-exiting');
+
+        setTimeout(() => {
+          fromEl.classList.remove('is-exiting');
+          fromEl.classList.add('is-hidden');
+
+          toEl.classList.remove('is-hidden');
+          toEl.classList.add('is-entering');
+          void toEl.offsetWidth; // Force layout
+          toEl.classList.remove('is-entering');
+          toEl.classList.add('is-active');
+
+          onMomentActivated(num);
+        }, 190);
+      } else {
+        for (let i = 1; i <= 9; i++) {
+          const el = document.getElementById('moment-' + i);
+          if (el) {
+            if (i === num) {
+              el.classList.remove('is-hidden', 'is-exiting', 'is-entering');
+              el.classList.add('is-active');
+            } else {
+              el.classList.remove('is-active', 'is-exiting', 'is-entering');
+              el.classList.add('is-hidden');
+            }
+          }
+        }
+        onMomentActivated(num);
+      }
+    }
+
+    function onMomentActivated(num) {
+      // Cập nhật menu demo
+      document.querySelectorAll('.moment-btn').forEach(btn => {
+        const m = parseInt(btn.getAttribute('data-moment'));
+        if (m === num) {
+          btn.classList.add('bg-orange-50', 'text-brand-primary');
+        } else {
+          btn.classList.remove('bg-orange-50', 'text-brand-primary');
+        }
+      });
+
+      // NHÓM 6: Chỉ hiện thứ đúng với trạng thái hiện tại
+      const topBarQueryContainer = document.getElementById('top-bar-query-container');
+      const btnOpenChat = document.getElementById('btn-open-chat');
+      const globalBottomBar = document.getElementById('global-bottom-bar');
+
+      if (num === 1) {
+        // Khoảnh khắc 1: KHÔNG có nhãn "Yêu cầu hiện tại", KHÔNG có nút "Xem hội thoại", KHÔNG có ô "Nhắn thêm…" ở đáy
+        if (topBarQueryContainer) topBarQueryContainer.classList.add('hidden');
+        if (btnOpenChat) btnOpenChat.classList.add('hidden');
+        if (globalBottomBar) globalBottomBar.classList.add('hidden');
+      } else if (num === 4) {
+        // Khoảnh khắc 4: Thanh trên hiện, KHÔNG hiện ô nhắn thêm ở đáy (đã có thanh sticky riêng theo NHÓM 1)
+        if (topBarQueryContainer) topBarQueryContainer.classList.remove('hidden');
+        if (btnOpenChat) btnOpenChat.classList.remove('hidden');
+        if (globalBottomBar) globalBottomBar.classList.add('hidden');
+        toggleMoment4ChatEdit(false);
+      } else {
+        // Khoảnh khắc 2, 3, 5, 6, 7, 8, 9: Thanh trên hiện, ô đáy hiện
+        if (topBarQueryContainer) topBarQueryContainer.classList.remove('hidden');
+        if (btnOpenChat) btnOpenChat.classList.remove('hidden');
+        if (globalBottomBar) globalBottomBar.classList.remove('hidden');
+      }
+
+      // Tiêu đề nhận focus bằng code (tabindex="-1") KHÔNG hiện viền cam
+      const heading = document.getElementById('heading-moment-' + num);
+      if (heading) heading.focus();
+
+      // Mở rộng khung chứa của khoảnh khắc 6 lên tối đa ~1120px
+      const stageContainer = document.getElementById('stage-container');
+      if (stageContainer) {
+        if (num === 6) {
+          stageContainer.classList.remove('max-w-4xl');
+          stageContainer.classList.add('max-w-[1120px]');
+        } else {
+          stageContainer.classList.remove('max-w-[1120px]');
+          stageContainer.classList.add('max-w-4xl');
+        }
+      }
+
+      const announcer = document.getElementById('a11y-announcer');
+      if (announcer && heading) {
+        announcer.textContent = 'Đã chuyển sang khoảnh khắc ' + num + ': ' + heading.innerText;
+      }
+
+      toggleDemoMenu(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Kích hoạt logic đặc thù cho từng khoảnh khắc
+      if (num === 2) {
+        startMoment2Discovery();
+      } else if (num === 5) {
+        startExecutionFlow();
+      } else if (num === 6) {
+        applyMoment6State();
+      }
+    }
+
+    // NHÓM 6: Xử lý gửi ở khoảnh khắc 1
+    function submitPrompt() {
+      const input = document.getElementById('prompt-input');
+      const text = input ? input.value.trim() : '';
+      if (!text) {
+        showToast('Hãy mô tả việc bạn cần nhờ', 'warning');
+        if (input) input.focus();
+        return;
+      }
+      document.getElementById('top-bar-query').textContent = text;
+      setMoment(2);
+    }
+
+    // NHÓM 6: Chọn thẻ gợi ý thì điền vào ô nhập lớn và chuyển sang khoảnh khắc 2 (không nhảy thẳng tới 4)
+    function useSuggestion(text) {
+      document.getElementById('top-bar-query').textContent = text;
+      const input = document.getElementById('prompt-input');
+      if (input) input.value = text;
+      setMoment(2);
+    }
+
+    // NHÓM 2: Khoảnh khắc 2 (Đang hiểu) - 5 dòng hiện lần lượt (0.5–0.7s/dòng), rồi tự chuyển sang khoảnh khắc 4
+    function updateStepBadge(el, status) {
+      const badge = el.querySelector('.disc-badge');
+      if (!badge) return;
+      if (status === 'found') {
+        badge.className = 'disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0';
+        badge.title = 'Đã thấy';
+        badge.setAttribute('aria-label', 'Đã thấy');
+        badge.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+      } else if (status === 'searching') {
+        badge.className = 'disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-600 flex-shrink-0';
+        badge.title = 'Đang tìm…';
+        badge.setAttribute('aria-label', 'Đang tìm…');
+        badge.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+      } else {
+        badge.className = 'disc-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-400 flex-shrink-0';
+        badge.title = 'Chờ…';
+        badge.setAttribute('aria-label', 'Chờ…');
+        badge.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+      }
+    }
+
+    function startMoment2Discovery() {
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const steps = [
+        { id: 'disc-step-1', name: 'Đang tìm bảng <strong>To Do</strong> trên Trello…' },
+        { id: 'disc-step-2', name: 'Đang tìm danh sách <strong>Doing</strong>…' },
+        { id: 'disc-step-3', name: 'Đang tìm kho mã <strong>ati-test</strong> trên GitHub…' },
+        { id: 'disc-step-4', name: 'Đang tìm bảng tính <strong>ATI Test Tracker</strong>…' },
+        { id: 'disc-step-5', name: 'Đang tìm kênh <strong>#ati-test</strong> trên Slack…' },
+      ];
+
+      // Reset all steps
+      steps.forEach((s, idx) => {
+        const el = document.getElementById(s.id);
+        if (!el) return;
+        if (idx === 0) {
+          el.className = 'flex items-center justify-between text-neutral-800 transition-all duration-300';
+          el.querySelector('.disc-icon').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-primary animate-pulse"></span>';
+          updateStepBadge(el, 'searching');
+        } else {
+          el.className = 'flex items-center justify-between text-neutral-400 transition-all duration-300';
+          el.querySelector('.disc-icon').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>';
+          updateStepBadge(el, 'waiting');
+        }
+      });
+
+      if (prefersReduced) {
+        // Tắt animation: đánh dấu tất cả hoàn tất ngay
+        steps.forEach(s => markStepFound(s.id));
+        discoveryTimer = setTimeout(() => {
+          if (currentMoment === 2) setMoment(4);
+        }, 600);
+        return;
+      }
+
+      function markStepFound(stepId) {
+        const el = document.getElementById(stepId);
+        if (!el) return;
+        el.className = 'flex items-center justify-between text-neutral-800 transition-all duration-300';
+        el.querySelector('.disc-icon').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>';
+        updateStepBadge(el, 'found');
+      }
+
+      function activateStepSearching(stepId) {
+        const el = document.getElementById(stepId);
+        if (!el) return;
+        el.className = 'flex items-center justify-between text-neutral-800 transition-all duration-300';
+        el.querySelector('.disc-icon').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-primary animate-pulse"></span>';
+        updateStepBadge(el, 'searching');
+      }
+
+      // Step 1 -> Step 2
+      discoveryTimer = setTimeout(() => {
+        if (currentMoment !== 2) return;
+        markStepFound('disc-step-1');
+        activateStepSearching('disc-step-2');
+
+        // Step 2 -> Step 3
+        discoveryTimer = setTimeout(() => {
+          if (currentMoment !== 2) return;
+          markStepFound('disc-step-2');
+          activateStepSearching('disc-step-3');
+
+          // Step 3 -> Step 4
+          discoveryTimer = setTimeout(() => {
+            if (currentMoment !== 2) return;
+            markStepFound('disc-step-3');
+            activateStepSearching('disc-step-4');
+
+            // Step 4 -> Step 5
+            discoveryTimer = setTimeout(() => {
+              if (currentMoment !== 2) return;
+              markStepFound('disc-step-4');
+              activateStepSearching('disc-step-5');
+
+              // Step 5 finish -> chuyển sang khoảnh khắc 4
+              discoveryTimer = setTimeout(() => {
+                if (currentMoment !== 2) return;
+                markStepFound('disc-step-5');
+                discoveryTimer = setTimeout(() => {
+                  if (currentMoment === 2) setMoment(4);
+                }, 500);
+              }, 600);
+            }, 600);
+          }, 600);
+        }, 600);
+      }, 600);
+    }
+
+    // NHÓM 3: Khoảnh khắc 3 - Mở ô nhập tại chỗ, không dùng prompt()
+    function toggleCustomSheetInput(open) {
+      const form = document.getElementById('custom-sheet-form');
+      const input = document.getElementById('custom-sheet-input');
+      if (!form) return;
+      if (open) {
+        form.classList.remove('hidden');
+        if (input) input.focus();
+      } else {
+        form.classList.add('hidden');
+      }
+    }
+
+    function submitCustomSheet() {
+      const input = document.getElementById('custom-sheet-input');
+      const val = input ? input.value.trim() : '';
+      if (!val) {
+        showToast('Vui lòng nhập tên hoặc đường dẫn bảng tính', 'warning');
+        if (input) input.focus();
+        return;
+      }
+      chooseSheetOption(val);
+    }
+
+    function chooseSheetOption(name) {
+      showToast('Đã chọn bảng tính: ' + name, 'success');
+      setMoment(4);
+    }
+
+    // NHÓM 1: Bấm "Sửa qua Chat" mở ô nhập ngay phía trên thanh hành động, focus vào đó, gợi ý "Bạn muốn sửa điều gì?"
+    function toggleMoment4ChatEdit(open) {
+      const box = document.getElementById('moment-4-inline-chat');
+      const input = document.getElementById('moment-4-chat-input');
+      if (!box) return;
+      if (open) {
+        box.classList.remove('hidden');
+        if (input) {
+          input.focus();
+          input.value = '';
+        }
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    function submitMoment4InlineChat() {
+      const input = document.getElementById('moment-4-chat-input');
+      const text = input ? input.value.trim() : '';
+      if (!text) return;
+      input.value = '';
+      toggleMoment4ChatEdit(false);
+
+      // Thêm vào ngăn kéo hội thoại
+      appendChatMessage('Bạn', text);
+      showToast('Đã gửi yêu cầu chỉnh sửa: "' + text + '"', 'success');
+    }
+
+    function toggleTechnicalDetails() {
+      const panel = document.getElementById('tech-details-panel');
+      const arrow = document.getElementById('tech-toggle-arrow');
+      const btn = document.getElementById('btn-tech-toggle');
+      if (!panel) return;
+      const isHidden = panel.classList.contains('hidden');
+      if (isHidden) {
+        panel.classList.remove('hidden');
+        if (arrow) arrow.textContent = '▲';
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      } else {
+        panel.classList.add('hidden');
+        if (arrow) arrow.textContent = '▼';
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    // NHÓM 2: Bấm Duyệt -> thu gọn mượt thành hành trình của khoảnh khắc 5
+    function approvePlanAndStartExecution() {
+      executionMode = 'normal';
+      setMoment(5);
+    }
+
+    // Luồng thực thi khoảnh khắc 5 theo executionMode (NHÓM 3 & NHÓM 4)
+    function startExecutionFlow() {
+      isExecuting = true;
+      const stepCounter = document.getElementById('exec-step-counter');
+      const progressBar = document.getElementById('exec-progress-bar');
+      const item2 = document.getElementById('exec-item-2');
+      const item3 = document.getElementById('exec-item-3');
+      const item4 = document.getElementById('exec-item-4');
+
+      if (executionMode === 'retry3' || executionMode === 'resumeFrom3') {
+        // Việc 1 & 2 đã xong, bắt đầu từ việc 3
+        if (stepCounter) stepCounter.textContent = 'Việc 3/4';
+        if (progressBar) progressBar.style.width = '65%';
+
+        // Item 2 đã xong
+        if (item2) {
+          item2.className = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
+          item2.querySelector('#exec-badge-2').className = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium';
+          item2.querySelector('#exec-badge-2').textContent = '✓ Đã tạo';
+          item2.querySelector('#exec-desc-2').innerHTML = 'Đã tạo issue #42 · <a href="https://github.com/org/ati-test/issues/42" target="_blank" class="text-blue-600 hover:underline">Mở trên GitHub</a>';
+          item2.querySelector('#exec-desc-2').className = 'text-xs text-neutral-600 font-normal mt-0.5';
+          item2.querySelector('#exec-time-2').className = 'text-xs text-neutral-500 font-body';
+          item2.querySelector('#exec-time-2').textContent = '1,4 giây';
+        }
+
+        // Item 3 đang làm
+        if (item3) {
+          item3.className = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
+          item3.querySelector('#exec-badge-3').className = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
+          item3.querySelector('#exec-badge-3').textContent = 'Đang làm';
+          item3.querySelector('#exec-desc-3').textContent = 'Đang ghi nhận dòng 104 vào bảng tính ATI Test Tracker...';
+          item3.querySelector('#exec-time-3').className = 'text-xs font-semibold text-brand-primary font-body';
+          item3.querySelector('#exec-time-3').textContent = 'Đang chạy';
+        }
+
+        setTimeout(() => {
+          if (currentMoment !== 5) return;
+          if (stepCounter) stepCounter.textContent = 'Việc 4/4';
+          if (progressBar) progressBar.style.width = '90%';
+
+          if (item3) {
+            item3.className = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
+            item3.querySelector('#exec-badge-3').className = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium';
+            item3.querySelector('#exec-badge-3').textContent = '✓ Đã thêm';
+            item3.querySelector('#exec-desc-3').innerHTML = 'Đã thêm dòng 104 · <a href="https://docs.google.com/spreadsheets/d/sample" target="_blank" class="text-[#0F9D58] hover:underline">Xem dòng</a>';
+            item3.querySelector('#exec-time-3').className = 'text-xs text-neutral-500 font-body';
+            item3.querySelector('#exec-time-3').textContent = '0,9 giây';
+          }
+
+          if (item4) {
+            item4.className = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
+            item4.querySelector('#exec-badge-4').className = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
+            item4.querySelector('#exec-badge-4').textContent = 'Đang làm';
+            item4.querySelector('#exec-desc-4').textContent = 'Đang gửi tin nhắn thông báo vào kênh #ati-test...';
+            item4.querySelector('#exec-time-4').className = 'text-xs font-semibold text-brand-primary font-body';
+            item4.querySelector('#exec-time-4').textContent = 'Đang chạy';
+          }
+
+          setTimeout(() => {
+            if (currentMoment !== 5) return;
+            if (progressBar) progressBar.style.width = '100%';
+            setTimeout(() => {
+              setMoment(6);
+              isExecuting = false;
+            }, 350);
+          }, 1100);
+        }, 1300);
+
+      } else if (executionMode === 'skip3') {
+        // Việc 1 & 2 đã xong, việc 3 bỏ qua, chạy việc 4
+        if (stepCounter) stepCounter.textContent = 'Việc 4/4';
+        if (progressBar) progressBar.style.width = '75%';
+
+        if (item2) {
+          item2.className = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
+          item2.querySelector('#exec-badge-2').className = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium';
+          item2.querySelector('#exec-badge-2').textContent = '✓ Đã tạo';
+          item2.querySelector('#exec-time-2').className = 'text-xs text-neutral-500 font-body';
+          item2.querySelector('#exec-time-2').textContent = '1,4 giây';
+        }
+
+        if (item3) {
+          item3.className = 'p-4 bg-neutral-100 rounded-2xl border border-neutral-300 flex items-center justify-between gap-3 opacity-80';
+          item3.querySelector('#exec-badge-3').className = 'text-xs text-neutral-600 bg-neutral-200 px-1.5 py-0.5 rounded font-medium';
+          item3.querySelector('#exec-badge-3').textContent = 'Đã bỏ qua';
+          item3.querySelector('#exec-desc-3').textContent = 'Đã bỏ qua bước ghi bảng tính theo yêu cầu của bạn.';
+          item3.querySelector('#exec-time-3').className = 'text-xs text-neutral-400 font-body';
+          item3.querySelector('#exec-time-3').textContent = 'Bỏ qua';
+        }
+
+        if (item4) {
+          item4.className = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
+          item4.querySelector('#exec-badge-4').className = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
+          item4.querySelector('#exec-badge-4').textContent = 'Đang làm';
+          item4.querySelector('#exec-desc-4').textContent = 'Đang gửi tin nhắn thông báo vào kênh #ati-test...';
+          item4.querySelector('#exec-time-4').className = 'text-xs font-semibold text-brand-primary font-body';
+          item4.querySelector('#exec-time-4').textContent = 'Đang chạy';
+        }
+
+        setTimeout(() => {
+          if (currentMoment !== 5) return;
+          if (progressBar) progressBar.style.width = '100%';
+          setTimeout(() => {
+            setMoment(6);
+            isExecuting = false;
+          }, 350);
+        }, 1300);
+
+      } else {
+        // Normal execution (việc 1 đã xong, việc 2 -> 3 -> 4)
+        if (stepCounter) stepCounter.textContent = 'Việc 2/4';
+        if (progressBar) progressBar.style.width = '35%';
+
+        setTimeout(() => {
+          if (currentMoment !== 5) return;
+          if (stepCounter) stepCounter.textContent = 'Việc 3/4';
+          if (progressBar) progressBar.style.width = '70%';
+
+          if (item2) {
+            item2.className = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
+            item2.querySelector('#exec-badge-2').className = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium';
+            item2.querySelector('#exec-badge-2').textContent = '✓ Đã tạo';
+            item2.querySelector('#exec-desc-2').innerHTML = 'Đã tạo issue #42 · <a href="https://github.com/org/ati-test/issues/42" target="_blank" class="text-blue-600 hover:underline">Mở trên GitHub</a>';
+            item2.querySelector('#exec-desc-2').className = 'text-xs text-neutral-600 font-normal mt-0.5';
+            item2.querySelector('#exec-time-2').className = 'text-xs text-neutral-500 font-body';
+            item2.querySelector('#exec-time-2').textContent = '1,4 giây';
+          }
+
+          if (item3) {
+            item3.className = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
+            item3.querySelector('#exec-badge-3').className = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
+            item3.querySelector('#exec-badge-3').textContent = 'Đang làm';
+            item3.querySelector('#exec-desc-3').textContent = 'Đang chèn ngày, link card và issue vào trang Tasks...';
+            item3.querySelector('#exec-time-3').className = 'text-xs font-semibold text-brand-primary font-body';
+            item3.querySelector('#exec-time-3').textContent = 'Đang chạy';
+          }
+        }, 1300);
+
+        setTimeout(() => {
+          if (currentMoment !== 5) return;
+          if (stepCounter) stepCounter.textContent = 'Việc 4/4';
+          if (progressBar) progressBar.style.width = '90%';
+
+          if (item3) {
+            item3.className = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
+            item3.querySelector('#exec-badge-3').className = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium';
+            item3.querySelector('#exec-badge-3').textContent = '✓ Đã thêm';
+            item3.querySelector('#exec-desc-3').innerHTML = 'Đã thêm dòng 104 · <a href="https://docs.google.com/spreadsheets/d/sample" target="_blank" class="text-[#0F9D58] hover:underline">Xem dòng</a>';
+            item3.querySelector('#exec-time-3').className = 'text-xs text-neutral-500 font-body';
+            item3.querySelector('#exec-time-3').textContent = '0,9 giây';
+          }
+
+          if (item4) {
+            item4.className = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
+            item4.querySelector('#exec-badge-4').className = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
+            item4.querySelector('#exec-badge-4').textContent = 'Đang làm';
+            item4.querySelector('#exec-desc-4').textContent = 'Đang gửi tin nhắn thông báo vào kênh #ati-test...';
+            item4.querySelector('#exec-time-4').className = 'text-xs font-semibold text-brand-primary font-body';
+            item4.querySelector('#exec-time-4').textContent = 'Đang chạy';
+          }
+        }, 2500);
+
+        setTimeout(() => {
+          if (currentMoment !== 5) return;
+          if (progressBar) progressBar.style.width = '100%';
+          setTimeout(() => {
+            setMoment(6);
+            isExecuting = false;
+          }, 350);
+        }, 3600);
+      }
+    }
+
+    // NHÓM 7: Cập nhật giao diện khoảnh khắc 6 theo kết quả
+    function applyMoment6State() {
+      const heading = document.getElementById('heading-moment-6');
+      const sheetsStatus = document.getElementById('receipt-sheets-status');
+      const sheetsDesc = document.getElementById('receipt-sheets-desc');
+      const slackStatus = document.getElementById('receipt-slack-status');
+      const slackDesc = document.getElementById('receipt-slack-desc');
+
+      if (executionMode === 'skip3') {
+        if (heading) heading.textContent = 'Đã xong 3 việc trên 4 công cụ';
+        if (sheetsStatus) {
+          sheetsStatus.className = 'text-[11px] font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap';
+          sheetsStatus.textContent = 'Đã bỏ qua';
+        }
+        if (sheetsDesc) {
+          sheetsDesc.textContent = 'Đã bỏ qua việc ghi Sheets vì chưa có quyền chỉnh sửa bảng tính.';
+        }
+      } else {
+        if (heading) heading.textContent = 'Đã xong 4 việc trên 4 công cụ';
+        if (sheetsStatus) {
+          sheetsStatus.className = 'text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap';
+          sheetsStatus.textContent = '✓ Đã ghi dòng';
+        }
+        if (sheetsDesc) {
+          sheetsDesc.textContent = '05/10/2026 · Sửa lỗi đăng nhập Google · link issue · link card';
+        }
+      }
+
+      if (executionMode === 'confirmedSlack') {
+        if (slackStatus) {
+          slackStatus.className = 'text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap';
+          slackStatus.textContent = '✓ Đã xác nhận';
+        }
+        if (slackDesc) {
+          slackDesc.textContent = 'Bạn đã xác nhận tin đã có trong kênh #ati-test.';
+        }
+      } else {
+        if (slackStatus) {
+          slackStatus.className = 'text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap';
+          slackStatus.textContent = '✓ Đã gửi tin';
+        }
+        if (slackDesc) {
+          slackDesc.textContent = '“Đã tạo card Trello và issue #42 cho lỗi đăng nhập Google.”';
+        }
+      }
+    }
+
+    // NHÓM 7: Gợi ý tiếp theo ở khoảnh khắc 6
+    function handleMoment6Followup(text) {
+      const input = document.getElementById('prompt-input');
+      if (input) input.value = text;
+      setMoment(1);
+      setTimeout(() => {
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        }
+      }, 250);
+    }
+
+    function resetToMoment1() {
+      const input = document.getElementById('prompt-input');
+      if (input) input.value = '';
+      setMoment(1);
+    }
+
+    // NHÓM 3: "Thử lại việc 3" (khoảnh khắc 7)
+    function retryTask3() {
+      executionMode = 'retry3';
+      showToast('Đang thử lại việc 3 với Google Sheets...', 'info');
+      setMoment(5);
+    }
+
+    // NHÓM 3: "Bỏ qua việc này" (khoảnh khắc 7)
+    function skipTask3() {
+      executionMode = 'skip3';
+      showToast('Đã bỏ qua việc 3, tiếp tục việc 4 (Slack)...', 'info');
+      setMoment(5);
+    }
+
+    // NHÓM 3: "Tin đã có, bỏ qua" (khoảnh khắc 8)
+    function confirmSlackMessageExists() {
+      executionMode = 'confirmedSlack';
+      showToast('Đã ghi nhận tin đã có', 'success');
+      setMoment(6);
+    }
+
+    // NHÓM 3: "Làm tiếp các việc còn lại" (khoảnh khắc 9)
+    function resumeRemainingTasks() {
+      executionMode = 'resumeFrom3';
+      showToast('Tiếp tục việc 3 (Google Sheets) và việc 4 (Slack)...', 'info');
+      setMoment(5);
+    }
+
+    // Ô nhập đáy màn hình
+    function handleBottomInputKey(e) {
+      if (e.key === 'Enter') submitBottomInput();
+    }
+
+    function submitBottomInput() {
+      const input = document.getElementById('bottom-chat-input');
+      if (!input || !input.value.trim()) return;
+      const text = input.value.trim();
+      input.value = '';
+
+      appendChatMessage('Bạn', text);
+      showToast('Đã gửi tin nhắn: "' + text + '"', 'success');
+    }
+
+    // Ngăn kéo hội thoại (NHÓM 3)
+    function sendDrawerMessage() {
+      const input = document.getElementById('drawer-chat-input');
+      if (!input || !input.value.trim()) return;
+      const text = input.value.trim();
+      input.value = '';
+
+      appendChatMessage('Bạn', text);
+      showToast('Đã thêm tin vào hội thoại', 'info');
+    }
+
+    function appendChatMessage(sender, text) {
+      const container = document.getElementById('chat-messages-container');
+      if (!container) return;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'flex flex-col items-end space-y-1';
+      bubble.innerHTML = `
+        <span class="text-[11px] text-brand-muted">${sender} · Vừa xong</span>
+        <div class="p-3 bg-neutral-900 text-white rounded-2xl rounded-tr-none max-w-[85%] leading-relaxed">
+          ${escapeHtml(text)}
+        </div>
+      `;
+      container.appendChild(bubble);
+      container.scrollTop = container.scrollHeight;
+
+      chatCount++;
+      const badge = document.getElementById('chat-count-badge');
+      if (badge) badge.textContent = chatCount;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function loadHistoricalRequest(query) {
+      const input = document.getElementById('prompt-input');
+      if (input) input.value = query;
+      document.getElementById('top-bar-query').textContent = query;
+      toggleHistoryDrawer(false);
+      showToast('Đã tải lại yêu cầu: ' + query, 'info');
+      setMoment(2);
+    }
+
+    // NHÓM 4: Nội dung xem trước đúng sự thật, không bịa
+    function openPreviewModal(type) {
+      lastActiveElement = document.activeElement;
+      const modal = document.getElementById('preview-modal');
+      const tag = document.getElementById('preview-service-tag');
+      const title = document.getElementById('preview-modal-title');
+      const content = document.getElementById('preview-modal-content');
+      if (!modal || !content) return;
+
+      if (type === 'trello') {
+        tag.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800';
+        tag.textContent = 'Trello Card';
+        title.textContent = 'Nội dung card sẽ tạo';
+        content.innerHTML = `
+          <div class="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Tiêu đề card:</span>
+              <div class="text-sm font-bold text-neutral-900 mt-0.5">Sửa lỗi đăng nhập Google</div>
+            </div>
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Vị trí:</span>
+              <div class="text-xs text-neutral-700 mt-0.5">Bảng: <strong>To Do</strong> · Danh sách: <strong>Doing</strong></div>
+            </div>
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Mô tả ngắn:</span>
+              <p class="text-xs text-neutral-700 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed">
+                Tạo card theo dõi và xử lý sự cố đăng nhập Google theo yêu cầu của người dùng.
+              </p>
+            </div>
+          </div>
+        `;
+      } else if (type === 'github') {
+        tag.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-neutral-900 text-white';
+        tag.textContent = 'GitHub Issue';
+        title.textContent = 'Nội dung issue sẽ tạo';
+        content.innerHTML = `
+          <div class="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Kho mã:</span>
+              <div class="text-xs font-medium text-neutral-800 mt-0.5">ati-test</div>
+            </div>
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Tiêu đề:</span>
+              <div class="text-sm font-bold text-neutral-900 mt-0.5">Sửa lỗi đăng nhập Google</div>
+            </div>
+            <div>
+              <span class="text-[11px] text-neutral-400 uppercase font-semibold">Nội dung issue:</span>
+              <div class="text-xs text-neutral-800 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed space-y-1.5">
+                <div>Ghi nhận sự cố người dùng không thể đăng nhập bằng tài khoản Google.</div>
+                <div>Liên kết card Trello: <span class="text-blue-600 underline">https://trello.com/c/sample-auth-fix</span></div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (type === 'sheets') {
+        tag.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800';
+        tag.textContent = 'Google Sheets Row';
+        title.textContent = 'Giá trị các cột sẽ thêm vào dòng mới';
+        content.innerHTML = `
+          <div class="space-y-3">
+            <div class="text-xs text-neutral-600">Bảng tính: <strong>ATI Test Tracker</strong> &gt; Trang: <strong>Tasks</strong></div>
+            <div class="border border-neutral-200 rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-neutral-100 text-neutral-600 font-semibold border-b border-neutral-200">
+                  <tr><th class="p-2.5">Cột</th><th class="p-2.5">Giá trị sẽ ghi</th></tr>
+                </thead>
+                <tbody class="divide-y divide-neutral-200 bg-white">
+                  <tr><td class="p-2.5 font-medium text-neutral-500">A · Ngày tạo</td><td class="p-2.5">05/10/2026</td></tr>
+                  <tr><td class="p-2.5 font-medium text-neutral-500">B · Tiêu đề</td><td class="p-2.5 font-semibold text-neutral-900">Sửa lỗi đăng nhập Google</td></tr>
+                  <tr><td class="p-2.5 font-medium text-neutral-500">C · Link Issue</td><td class="p-2.5 text-blue-600 truncate max-w-[200px]">https://github.com/org/ati-test/issues/42</td></tr>
+                  <tr><td class="p-2.5 font-medium text-neutral-500">D · Link Card</td><td class="p-2.5 text-blue-600 truncate max-w-[200px]">https://trello.com/c/sample-auth-fix</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else if (type === 'slack') {
+        tag.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800';
+        tag.textContent = 'Slack Message';
+        title.textContent = 'Nguyên văn tin nhắn gửi vào kênh #ati-test';
+        content.innerHTML = `
+          <div class="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2.5">
+            <div class="flex items-center justify-between text-xs text-neutral-500">
+              <span>Gửi tới: <strong>#ati-test</strong></span>
+              <span>Người gửi: <strong>ATI Assistant (Bot)</strong></span>
+            </div>
+            <div class="bg-white p-3 rounded-lg border border-neutral-200 text-xs text-neutral-900 leading-relaxed font-sans space-y-1.5">
+              <div class="font-bold">Thông báo nhóm: Đã tạo việc sửa lỗi đăng nhập Google</div>
+              <div>Tôi vừa hoàn tất tạo các liên kết hỗ trợ:</div>
+              <div>• Card Trello: <span class="text-blue-600 underline">https://trello.com/c/sample-auth-fix</span></div>
+              <div>• Issue GitHub: <span class="text-blue-600 underline">https://github.com/org/ati-test/issues/42</span></div>
+            </div>
+          </div>
+        `;
+      }
+
+      modal.classList.remove('hidden');
+      setupFocusTrap(modal);
+    }
+
+    function closePreviewModal() {
+      const modal = document.getElementById('preview-modal');
+      if (modal) modal.classList.add('hidden');
+      if (activeTrapCleanup) { activeTrapCleanup(); activeTrapCleanup = null; }
+      if (lastActiveElement) { lastActiveElement.focus(); lastActiveElement = null; }
+    }
+
+    function handlePreviewBackdropClick(e) {
+      if (e.target.id === 'preview-modal') {
+        closePreviewModal();
+      }
+    }
+
+    // NHÓM 5: Focus trap helper cho Drawers & Modals
+    function setupFocusTrap(containerEl) {
+      if (activeTrapCleanup) activeTrapCleanup();
+
+      const focusable = containerEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      first.focus();
+
+      function onKey(e) {
+        if (e.key === 'Tab') {
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        } else if (e.key === 'Escape') {
+          closeAllDrawers();
+          closePreviewModal();
+        }
+      }
+
+      containerEl.addEventListener('keydown', onKey);
+      activeTrapCleanup = () => containerEl.removeEventListener('keydown', onKey);
+    }
+
+    function toggleChatDrawer(open) {
+      const drawer = document.getElementById('chat-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const btn = document.getElementById('btn-open-chat');
+      if (open) {
+        lastActiveElement = document.activeElement;
+        drawer.classList.remove('translate-x-full');
+        backdrop.classList.remove('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        setupFocusTrap(drawer);
+        setTimeout(() => document.getElementById('drawer-chat-input')?.focus(), 250);
+      } else {
+        drawer.classList.add('translate-x-full');
+        backdrop.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (activeTrapCleanup) { activeTrapCleanup(); activeTrapCleanup = null; }
+        if (lastActiveElement) { lastActiveElement.focus(); lastActiveElement = null; }
+      }
+    }
+
+    function toggleHistoryDrawer(open) {
+      const drawer = document.getElementById('history-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const btn = document.getElementById('btn-open-history');
+      if (open) {
+        lastActiveElement = document.activeElement;
+        drawer.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        setupFocusTrap(drawer);
+      } else {
+        drawer.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (activeTrapCleanup) { activeTrapCleanup(); activeTrapCleanup = null; }
+        if (lastActiveElement) { lastActiveElement.focus(); lastActiveElement = null; }
+      }
+    }
+
+    function closeAllDrawers() {
+      toggleChatDrawer(false);
+      toggleHistoryDrawer(false);
+    }
+
+    function toggleDemoMenu(forceState) {
+      const menu = document.getElementById('demo-menu');
+      const btn = document.getElementById('demo-pill-btn');
+      if (!menu) return;
+      const willOpen = typeof forceState === 'boolean' ? forceState : menu.classList.contains('hidden');
+      if (willOpen) {
+        toggleUserMenu(false);
+        menu.classList.remove('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      } else {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    let currentRole = 'admin', currentServerMode = 'mock';
+
+    function getVisibleUserMenuItems() {
+      const m = document.getElementById('user-menu');
+      return m ? Array.from(m.querySelectorAll('.user-menu-item')).filter(el => !el.classList.contains('hidden') && el.offsetParent !== null) : [];
+    }
+
+    function toggleUserMenu(force) {
+      const m = document.getElementById('user-menu'), b = document.getElementById('btn-user-menu');
+      if (!m) return;
+      const open = typeof force === 'boolean' ? force : m.classList.contains('hidden');
+      if (open) {
+        toggleDemoMenu(false);
+        m.classList.remove('hidden');
+        b?.setAttribute('aria-expanded', 'true');
+        getVisibleUserMenuItems()[0]?.focus();
+      } else {
+        m.classList.add('hidden');
+        b?.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function onAccountClick() { toggleUserMenu(false); window.location.href = 'account.html'; }
+    function onManageUsersClick() { toggleUserMenu(false); window.location.href = 'users.html'; }
+
+    function updateToggle(btn, active) {
+      if (!btn) return;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+
+    function setRole(r) {
+      currentRole = r;
+      const adm = r === 'admin';
+      const b = document.getElementById('user-menu-role-badge');
+      const u = document.getElementById('user-menu-item-manage-users');
+      if (b) b.textContent = adm ? 'Quản trị viên' : 'Thành viên';
+      if (u) u.classList.toggle('hidden', !adm);
+      updateToggle(document.getElementById('role-btn-admin'), adm);
+      updateToggle(document.getElementById('role-btn-member'), !adm);
+    }
+
+    function setServerMode(m) {
+      currentServerMode = m;
+      const mock = m === 'mock';
+      const b = document.getElementById('test-mode-banner');
+      if (b) b.classList.toggle('hidden', !mock);
+      updateToggle(document.getElementById('server-btn-mock'), mock);
+      updateToggle(document.getElementById('server-btn-real'), !mock);
+      updateDemoPillPosition();
+    }
+
+    function toggleTestModeExplanation() {
+      const exp = document.getElementById('test-mode-explanation');
+      const btn = document.getElementById('btn-toggle-test-mode-explain');
+      if (!exp) return;
+      const willShow = exp.classList.contains('hidden');
+      exp.classList.toggle('hidden', !willShow);
+      btn?.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+      updateDemoPillPosition();
+    }
+
+    function updateDemoPillPosition() {
+      const container = document.getElementById('demo-pill-container');
+      const banner = document.getElementById('test-mode-banner');
+      if (!container) return;
+      container.style.top = (banner && !banner.classList.contains('hidden') ? 56 + (banner.offsetHeight || 32) : 56) + 'px';
+    }
+
+    function handleUserMenuKeydown(e) {
+      const m = document.getElementById('user-menu');
+      if (!m || m.classList.contains('hidden')) return;
+      const items = getVisibleUserMenuItems();
+      if (!items.length) return;
+      const idx = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
+      else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); toggleUserMenu(false); document.getElementById('btn-user-menu')?.focus(); }
+      else if (e.key === 'Tab') { toggleUserMenu(false); }
+    }
+
+    // Keyboard Shortcuts (1-9 và Esc)
+    window.addEventListener('keydown', function(e) {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+        if (e.key === 'Escape') e.target.blur();
+        return;
+      }
+      if (e.key >= '1' && e.key <= '9') {
+        setMoment(parseInt(e.key));
+      } else if (e.key === 'Escape') {
+        const u = document.getElementById('user-menu'), wasOpen = u && !u.classList.contains('hidden');
+        closeAllDrawers(); closePreviewModal(); toggleDemoMenu(false); toggleUserMenu(false);
+        if (wasOpen) document.getElementById('btn-user-menu')?.focus();
+      }
+    });
+
+    // ========================================================
+    // THEME MANAGEMENT (DARK / LIGHT MODE)
+    // Thiết kế theo Agentic Dark Mode (#0b1020, #131b2f, #182343, #293653, #f8fafc, #FF5701)
+    // ========================================================
+    function announceA11y(msg) {
+      const announcer = document.getElementById('a11y-announcer');
+      if (announcer) announcer.textContent = msg;
+    }
+
+    function getPreferredTheme() {
+      try {
+        const saved = localStorage.getItem('ati-theme') || localStorage.getItem('theme');
+        if (saved === 'dark' || saved === 'light') return saved;
+      } catch (e) {}
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function applyTheme(theme, save = true) {
+      const isDark = theme === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      document.documentElement.setAttribute('data-theme', theme);
+
+      if (save) {
+        try {
+          localStorage.setItem('ati-theme', theme);
+        } catch (e) {}
+      }
+
+      // Cập nhật nhãn và tooltip trên nút toggle và menu người dùng
+      const btnToggle = document.getElementById('btn-theme-toggle');
+      if (btnToggle) {
+        btnToggle.setAttribute('aria-label', isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối');
+        btnToggle.setAttribute('title', isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối');
+      }
+
+      const menuLabel = document.getElementById('user-menu-theme-label');
+      if (menuLabel) {
+        menuLabel.textContent = isDark ? 'Giao diện sáng' : 'Giao diện tối';
+      }
+
+      if (save) {
+        announceA11y('Đã chuyển sang giao diện ' + (isDark ? 'tối' : 'sáng'));
+      }
+    }
+
+    function toggleTheme() {
+      const isCurrentlyDark = document.documentElement.classList.contains('dark');
+      applyTheme(isCurrentlyDark ? 'light' : 'dark', true);
+    }
+
+    // Lắng nghe thay đổi từ hệ điều hành nếu chưa có cấu hình thủ công
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        const hasManual = localStorage.getItem('ati-theme') || localStorage.getItem('theme');
+        if (!hasManual) {
+          applyTheme(e.matches ? 'dark' : 'light', false);
+        }
+      });
+    } catch (e) {}
+
+    // Bấm ra ngoài đóng user menu & demo menu
+    document.addEventListener('click', function(e) {
+      const u = document.getElementById('user-menu'), bu = document.getElementById('btn-user-menu');
+      if (u && !u.classList.contains('hidden') && !u.contains(e.target) && !bu?.contains(e.target)) toggleUserMenu(false);
+      const dm = document.getElementById('demo-menu'), bd = document.getElementById('demo-pill-btn');
+      if (dm && !dm.classList.contains('hidden') && !dm.contains(e.target) && !bd?.contains(e.target)) toggleDemoMenu(false);
+    });
+
+    window.addEventListener('resize', updateDemoPillPosition);
+
+    // Khởi tạo trạng thái ban đầu: Khoảnh khắc 1 & Theme
+    document.addEventListener('DOMContentLoaded', () => {
+      // Đồng bộ nhãn nút theme với theme hiện tại (không phát toast/a11y thừa)
+      applyTheme(getPreferredTheme(), false);
+
+      onMomentActivated(1);
+      updateDemoPillPosition();
+
+      // Đăng ký sự kiện bàn phím cho menu người dùng
+      const userMenu = document.getElementById('user-menu');
+      if (userMenu) {
+        userMenu.addEventListener('keydown', handleUserMenuKeydown);
+      }
+      const btnUser = document.getElementById('btn-user-menu');
+      if (btnUser) {
+        btnUser.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            toggleUserMenu(true);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

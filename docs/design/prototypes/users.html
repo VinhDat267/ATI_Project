@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý người dùng & Duyệt tài khoản — ATI</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <!-- Giao diện Sáng / Tối dùng chung (localStorage "ati-theme") -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#FF5701',
+              bg: '#F8F8F6',
+              text: '#111827',
+              border: '#E7E7E2',
+              muted: '#6B7280',
+              surface: '#FFFFFF',
+              success: '#16A34A',
+              warn: '#D97706',
+              danger: '#DC2626'
+            }
+          },
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05)',
+            'drawer': '-8px 0 32px rgba(0, 0, 0, 0.08)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --muted: #6B7280;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --success: #16A34A;
+      --warn: #D97706;
+      --danger: #DC2626;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Focus Visible Ring */
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #FF5701;
+      outline-offset: 2px;
+    }
+
+    /* Tối ưu màn hình hẹp dưới 420px */
+    @media (max-width: 419px) {
+      #role-pill-badge {
+        display: none !important;
+      }
+    }
+
+    /* prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]">
+
+  <!-- Toast Thông báo nổi -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2" role="status" aria-live="polite"></div>
+
+  <!-- THANH TRÊN (COCKPIT HEADER) -->
+  <header class="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Cụm Logo & Điều hướng quay lại -->
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <a href="app-stage.html" class="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
+          <div class="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">A</div>
+          <span class="font-display font-bold text-lg tracking-tight text-[#111827]">ATI</span>
+        </a>
+
+        <div class="h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="app-stage.html" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Về không gian làm việc</span>
+          <span class="sm:hidden">Quay lại</span>
+        </a>
+
+        <div class="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0"></div>
+
+        <a href="history.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Nhật ký</span>
+        </a>
+
+        <a href="settings.html" class="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>Kết nối dịch vụ</span>
+        </a>
+
+        <a href="account.html" class="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Tài khoản">
+          <svg class="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          <span>Tài khoản</span>
+        </a>
+      </div>
+
+      <!-- Cụm Phải: Vai trò + Kịch bản Demo + Avatar -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        
+        <!-- Nhãn vai trò -->
+        <span id="role-pill-badge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          <span id="role-text-header">Quản trị viên</span>
+        </span>
+
+        <!-- Menu Kịch bản demo -->
+        <div class="relative">
+          <button id="btn-demo-scenario" type="button" class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-[#E7E7E2] bg-white text-[#4B5563] hover:text-[#111827] hover:border-neutral-400 transition-colors shadow-sm" aria-haspopup="true" aria-expanded="false" title="Tùy chọn kịch bản thử nghiệm">
+            <svg class="w-3.5 h-3.5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            <span class="hidden sm:inline">Kịch bản</span>
+            <svg class="w-3 h-3 text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <!-- Dropdown menu demo -->
+          <div id="demo-menu-dropdown" class="hidden absolute right-0 mt-2 w-64 rounded-xl bg-white border border-[#E7E7E2] shadow-xl p-3 space-y-3 z-40 text-xs">
+            <div>
+              <p class="font-semibold text-[#111827] mb-1.5">Xem như vai trò:</p>
+              <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F8F8F6] rounded-lg border border-[#E7E7E2]">
+                <button type="button" id="demo-role-admin" class="py-1 px-2 rounded-md font-medium text-center transition-colors bg-white shadow-sm text-[#FF5701]">Quản trị viên</button>
+                <button type="button" id="demo-role-member" class="py-1 px-2 rounded-md font-medium text-center transition-colors text-[#4B5563] hover:text-[#111827]">Thành viên</button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-[#E7E7E2] space-y-1.5">
+              <button type="button" id="btn-demo-add-pending" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 text-[#4B5563] flex items-center justify-between">
+                <span>Thêm 1 yêu cầu duyệt mẫu</span>
+                <span class="text-[#FF5701] font-semibold">+1</span>
+              </button>
+              <button type="button" id="btn-demo-reset-data" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
+                Khôi phục danh sách mẫu
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avatar Người dùng -->
+        <a href="account.html" class="w-8 h-8 rounded-full bg-[#FF5701] text-white flex items-center justify-center font-semibold text-xs tracking-wider shadow-sm hover:ring-2 hover:ring-[#FF5701]/30 transition-all" title="Tài khoản của Lan Nguyễn">
+          LN
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- NỘI DUNG CHÍNH -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+    <!-- PHẦN TIÊU ĐỀ & NGUYÊN TẮC AN TOÀN -->
+    <section class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <nav class="flex items-center gap-1.5 text-xs text-[#6B7280] mb-2" aria-label="Đường dẫn chuyển trang">
+            <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Không gian làm việc</a>
+            <span>/</span>
+            <span class="text-[#111827] font-medium">Quản lý người dùng</span>
+          </nav>
+          <h1 class="text-2xl sm:text-3xl font-display font-bold text-[#111827]">Quản lý người dùng & Duyệt tài khoản</h1>
+          <p class="text-sm text-[#6B7280] mt-1">Kiểm soát ai được quyền sử dụng ATI trong nhóm và phê duyệt các đăng ký mới.</p>
+        </div>
+
+        <!-- Hướng dẫn tự đăng ký cho thành viên mới -->
+        <div id="header-action-invite" class="w-full sm:w-auto max-w-md p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs text-[#4B5563] flex items-center gap-2.5">
+          <svg class="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="leading-relaxed">Thành viên mới tự đăng ký ở trang chủ (email hoặc Google), sau đó xuất hiện ở tab Chờ duyệt.</span>
+        </div>
+      </div>
+
+      <!-- Dòng nguyên tắc minh bạch -->
+      <div class="p-3.5 sm:p-4 rounded-xl bg-[#FFFFFF] border border-[#E7E7E2] shadow-sm flex items-start gap-3">
+        <div class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <p class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+          <strong class="text-[#111827] font-semibold">Quy tắc nhóm:</strong> ATI chỉ đọc và ghi theo yêu cầu của các thành viên đã được duyệt kích hoạt. Quản trị viên toàn quyền quyết định ai được tham gia nhóm và phạm vi tài nguyên công cụ được phép sử dụng.
+        </p>
+      </div>
+    </section>
+
+    <!-- THẺ THỐNG KÊ TỔNG QUAN (4 METRIC CARDS) -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" aria-label="Thống kê tổng quan thành viên">
+      <!-- Thẻ 1: Tổng thành viên -->
+      <div class="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm space-y-1">
+        <p class="text-xs font-medium text-[#6B7280]">Tổng thành viên</p>
+        <div class="flex items-baseline gap-2">
+          <span id="stat-total-members" class="text-2xl font-bold font-display text-[#111827]">6</span>
+          <span class="text-xs text-neutral-400">người</span>
+        </div>
+      </div>
+
+      <!-- Thẻ 2: Chờ phê duyệt -->
+      <div class="p-4 rounded-xl bg-white border border-amber-200 shadow-sm space-y-1 bg-gradient-to-br from-white to-amber-50/40">
+        <p class="text-xs font-medium text-amber-800 flex items-center justify-between">
+          <span>Chờ phê duyệt</span>
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        </p>
+        <div class="flex items-baseline gap-2">
+          <span id="stat-pending-approvals" class="text-2xl font-bold font-display text-[#FF5701]">3</span>
+          <span class="text-xs text-amber-700 font-medium">yêu cầu mới</span>
+        </div>
+      </div>
+
+      <!-- Thẻ 3: Đang hoạt động -->
+      <div class="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm space-y-1">
+        <p class="text-xs font-medium text-[#6B7280]">Đang hoạt động</p>
+        <div class="flex items-baseline gap-2">
+          <span id="stat-active-members" class="text-2xl font-bold font-display text-emerald-600">5</span>
+          <span class="text-xs text-neutral-400">tài khoản</span>
+        </div>
+      </div>
+
+      <!-- Thẻ 4: Đang bị khóa -->
+      <div class="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm space-y-1">
+        <p class="text-xs font-medium text-[#6B7280]">Đang bị khóa</p>
+        <div class="flex items-baseline gap-2">
+          <span id="stat-locked-members" class="text-2xl font-bold font-display text-neutral-500">1</span>
+          <span class="text-xs text-neutral-400">tài khoản</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- THANH TABS CHUYỂN ĐỔI & BỘ LỌC TÌM KIẾM -->
+    <section class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E7E2] pb-3">
+        
+        <!-- Segmented Navigation Tabs -->
+        <div class="inline-flex p-1 bg-[#FFFFFF] border border-[#E7E7E2] rounded-xl shadow-sm self-start" role="tablist" aria-label="Phân nhóm quản lý người dùng">
+          <button type="button" id="tab-btn-pending" role="tab" aria-selected="true" aria-controls="view-pending" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#FF5701] text-white shadow-sm">
+            <span>Chờ duyệt</span>
+            <span id="tab-badge-pending-count" class="px-1.5 py-[2px] rounded-full text-[11px] font-bold bg-white text-[#FF5701]">3</span>
+          </button>
+          
+          <button type="button" id="tab-btn-members" role="tab" aria-selected="false" aria-controls="view-members" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#6B7280] hover:text-[#111827]">
+            <span>Thành viên</span>
+            <span id="tab-badge-members-count" class="px-1.5 py-[2px] rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-600">6</span>
+          </button>
+        </div>
+
+        <!-- Bộ lọc & Ô tìm kiếm thành viên -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-64">
+            <input type="text" id="input-search-users" placeholder="Tìm theo tên hoặc email…" class="w-full text-xs sm:text-sm px-3 py-2 pl-8 rounded-lg border border-[#E7E7E2] bg-white text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-colors" aria-label="Tìm kiếm theo tên hoặc email">
+            <svg class="w-4 h-4 text-[#9CA3AF] absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+
+          <!-- Lọc vai trò (chỉ hiện ở tab Thành viên) -->
+          <select id="select-filter-role" class="hidden text-xs sm:text-sm px-2.5 py-2 rounded-lg border border-[#E7E7E2] bg-white text-[#4B5563] focus:border-[#FF5701] transition-colors" aria-label="Lọc theo vai trò">
+            <option value="all">Tất cả vai trò</option>
+            <option value="admin">Quản trị viên</option>
+            <option value="member">Thành viên</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- CẢNH BÁO KHI XEM VỚI VAI TRÒ THÀNH VIÊN -->
+      <div id="banner-member-readonly" class="hidden p-3 rounded-xl bg-neutral-100 border border-[#E7E7E2] text-xs text-[#4B5563] flex items-center gap-2">
+        <svg class="w-4 h-4 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Bạn đang xem với vai trò <strong>Thành viên</strong>. Chỉ Quản trị viên mới có quyền duyệt tài khoản mới, đổi vai trò hoặc tạm khóa thành viên.</span>
+      </div>
+
+      <!-- VIEW 1: DANH SÁCH CHỜ DUYỆT (PENDING APPROVALS) -->
+      <div id="view-pending" role="tabpanel" aria-labelledby="tab-btn-pending" class="space-y-3">
+        <div id="pending-list-container" class="space-y-3">
+          <!-- JS sẽ render các thẻ yêu cầu chờ duyệt ở đây -->
+        </div>
+
+        <!-- Trạng thái trống khi đã duyệt hết -->
+        <div id="pending-empty-state" class="hidden p-8 sm:p-12 text-center rounded-2xl bg-white border border-[#E7E7E2] shadow-sm space-y-3">
+          <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <h3 class="text-base font-semibold text-[#111827]">Không có yêu cầu nào đang chờ duyệt</h3>
+          <p class="text-xs sm:text-sm text-[#6B7280] max-w-sm mx-auto">Mọi tài khoản đăng ký mới đã được xử lý. Khi có người dùng mới đăng ký, thông báo sẽ xuất hiện tại đây.</p>
+        </div>
+      </div>
+
+      <!-- VIEW 2: DANH SÁCH THÀNH VIÊN (ACTIVE MEMBERS) -->
+      <div id="view-members" role="tabpanel" aria-labelledby="tab-btn-members" class="hidden space-y-3">
+        
+        <!-- Bảng danh sách trên Desktop -->
+        <div class="hidden sm:block overflow-hidden rounded-2xl bg-white border border-[#E7E7E2] shadow-sm">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-[#F8F8F6] text-xs font-semibold text-[#6B7280] border-b border-[#E7E7E2]">
+              <tr>
+                <th scope="col" class="py-3 px-4">Thành viên</th>
+                <th scope="col" class="py-3 px-4">Vai trò</th>
+                <th scope="col" class="py-3 px-4">Trạng thái</th>
+                <th scope="col" class="py-3 px-4">Ngày tham gia</th>
+                <th scope="col" class="py-3 px-4">Thiết bị</th>
+                <th scope="col" class="py-3 px-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="table-members-body" class="divide-y divide-[#E7E7E2]">
+              <!-- JS sẽ render các hàng thành viên ở đây -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Danh sách thẻ trên Mobile -->
+        <div id="mobile-members-container" class="sm:hidden space-y-2.5">
+          <!-- JS sẽ render các thẻ thành viên mobile ở đây -->
+        </div>
+
+        <!-- Trạng thái trống khi tìm kiếm không ra kết quả -->
+        <div id="members-empty-search" class="hidden p-8 text-center rounded-2xl bg-white border border-[#E7E7E2] space-y-2">
+          <p class="text-sm font-semibold text-[#111827]">Không tìm thấy thành viên phù hợp</p>
+          <p class="text-xs text-[#6B7280]">Hãy thử thay đổi từ khóa tìm kiếm hoặc bỏ bộ lọc vai trò.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- CHÂN TRANG NHỎ -->
+  <footer class="mt-auto border-t border-[#E7E7E2] py-6 text-center text-xs text-[#6B7280]">
+    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <span>ATI — AI Workflow Automation Platform · 2026</span>
+      <div class="flex items-center gap-4 text-xs">
+        <a href="app-stage.html" class="hover:text-[#111827] transition-colors">Sân khấu điều phối</a>
+        <a href="history.html" class="hover:text-[#111827] transition-colors">Nhật ký điều phối</a>
+        <a href="settings.html" class="hover:text-[#111827] transition-colors">Kết nối dịch vụ</a>
+        <a href="account.html" class="hover:text-[#111827] transition-colors">Tài khoản</a>
+        <a href="privacy.html" class="text-[#FF5701] hover:underline font-medium transition-colors">Chính sách an toàn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== CÁC MODAL HÀNH ĐỘNG ==================== -->
+
+  <!-- 1. MODAL XÁC NHẬN DUYỆT TÀI KHOẢN -->
+  <div id="modal-approve" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-approve-title">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 space-y-4">
+      <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+
+      <div class="space-y-1">
+        <h3 id="modal-approve-title" class="text-base font-display font-bold text-[#111827]">Duyệt kích hoạt tài khoản</h3>
+        <p class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+          Bạn sắp phê duyệt cho <strong id="approve-user-name" class="text-[#111827]">...</strong> (<span id="approve-user-email" class="text-[#6B7280]">...</span>) tham gia vào nhóm ATI.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <label for="select-approve-role" class="block text-xs font-semibold text-[#111827]">Cấp vai trò cho người này:</label>
+        <select id="select-approve-role" class="w-full text-sm px-3.5 py-2.5 rounded-xl border border-[#E7E7E2] bg-white focus:border-[#FF5701] transition-colors">
+          <option value="member" selected>Thành viên</option>
+          <option value="admin">Quản trị viên</option>
+        </select>
+      </div>
+
+      <div class="p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs text-[#4B5563] space-y-1">
+        <p>✓ Hệ thống sẽ gửi email báo duyệt kích hoạt ngay tới người dùng.</p>
+        <p>✓ Người này có thể đăng nhập ngay và gửi yêu cầu trong không gian làm việc.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" class="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">Hủy</button>
+        <button type="button" id="btn-confirm-approve" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">Xác nhận duyệt ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MODAL KHÓA / MỞ KHÓA TÀI KHOẢN -->
+  <div id="modal-toggle-lock" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-lock-title">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 space-y-4">
+      <div id="lock-icon-box" class="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+
+      <div class="space-y-1">
+        <h3 id="modal-lock-title" class="text-base font-display font-bold text-[#111827]">Khóa tài khoản</h3>
+        <p id="modal-lock-desc" class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+          Người này bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi được mở khoá.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" class="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">Hủy</button>
+        <button type="button" id="btn-confirm-toggle-lock" class="px-4 py-2 rounded-xl bg-amber-600 text-white text-xs sm:text-sm font-semibold hover:bg-amber-700 transition-colors shadow-sm">Xác nhận khóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. MODAL ĐỔI VAI TRÒ THÀNH VIÊN -->
+  <div id="modal-change-role" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-role-title">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 space-y-4">
+      <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      </div>
+
+      <div class="space-y-1">
+        <h3 id="modal-role-title" class="text-base font-display font-bold text-[#111827]">Thay đổi vai trò thành viên</h3>
+        <p class="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+          Cập nhật vai trò cho <strong id="role-user-name" class="text-[#111827]">...</strong>
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <label for="select-new-role" class="block text-xs font-semibold text-[#111827]">Vai trò mới:</label>
+        <select id="select-new-role" class="w-full text-sm px-3.5 py-2.5 rounded-xl border border-[#E7E7E2] bg-white focus:border-[#FF5701] transition-colors">
+          <option value="member">Thành viên (chỉ gửi yêu cầu, không đổi kết nối chung)</option>
+          <option value="admin">Quản trị viên (quản lý kết nối, duyệt và khóa người dùng)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" class="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">Hủy</button>
+        <button type="button" id="btn-confirm-change-role" class="px-4 py-2 rounded-xl bg-[#FF5701] text-white text-xs sm:text-sm font-semibold hover:bg-[#e04d01] transition-colors shadow-sm">Lưu vai trò</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT ĐIỀU KHIỂN TOÀN BỘ LOGIC -->
+  <script>
+    // ==================== DỮ LIỆU BAN ĐẦU ====================
+    let currentRole = 'admin'; // 'admin' | 'member'
+    let currentTab = 'pending'; // 'pending' | 'members'
+    let selectedUserId = null;
+
+    // Danh sách yêu cầu chờ duyệt ban đầu (gồm mục đã xác minh và mục chưa xác minh)
+    let pendingUsers = [
+      {
+        id: 'pen_101',
+        name: 'Hoàng Minh Khôi',
+        email: 'khoi.hoang@congty.vn',
+        provider: 'Email',
+        emailVerified: true,
+        requestedAt: '15 phút trước',
+        avatarInitials: 'HK'
+      },
+      {
+        id: 'pen_102',
+        name: 'Lê Quỳnh Chi',
+        email: 'chi.le@congty.vn',
+        provider: 'Google',
+        emailVerified: true,
+        requestedAt: '2 giờ trước',
+        avatarInitials: 'QC'
+      },
+      {
+        id: 'pen_103',
+        name: 'Phạm Đức Anh',
+        email: 'ducanh.pham@congty.vn',
+        provider: 'Email',
+        emailVerified: false,
+        requestedAt: '35 phút trước',
+        avatarInitials: 'ĐA'
+      }
+    ];
+
+    // Danh sách thành viên trong nhóm ban đầu (6 thành viên)
+    let activeMembers = [
+      {
+        id: 'usr_001',
+        name: 'Lan Nguyễn',
+        email: 'lan.nguyen@congty.vn',
+        role: 'admin',
+        status: 'active', // 'active' | 'locked'
+        joinedDate: '15/01/2026',
+        sessionsCount: 3,
+        avatarInitials: 'LN',
+        isSelf: true
+      },
+      {
+        id: 'usr_002',
+        name: 'Nguyễn Văn An',
+        email: 'admin@congty.vn',
+        role: 'admin',
+        status: 'active',
+        joinedDate: '10/01/2026',
+        sessionsCount: 2,
+        avatarInitials: 'NA',
+        isSelf: false
+      },
+      {
+        id: 'usr_003',
+        name: 'Tuấn Đặng',
+        email: 'tuan.dang@congty.vn',
+        role: 'member',
+        status: 'active',
+        joinedDate: '02/02/2026',
+        sessionsCount: 1,
+        avatarInitials: 'TD',
+        isSelf: false
+      },
+      {
+        id: 'usr_004',
+        name: 'Trần Mai Phương',
+        email: 'phuong.tran@congty.vn',
+        role: 'member',
+        status: 'active',
+        joinedDate: '12/02/2026',
+        sessionsCount: 2,
+        avatarInitials: 'MP',
+        isSelf: false
+      },
+      {
+        id: 'usr_005',
+        name: 'Đỗ Thành Long',
+        email: 'long.do@congty.vn',
+        role: 'member',
+        status: 'active',
+        joinedDate: '15/02/2026',
+        sessionsCount: 1,
+        avatarInitials: 'TL',
+        isSelf: false
+      },
+      {
+        id: 'usr_006',
+        name: 'Phạm Quốc Bảo',
+        email: 'bao.pham@congty.vn',
+        role: 'member',
+        status: 'locked', // Đang bị tạm khóa
+        joinedDate: '18/02/2026',
+        sessionsCount: 0,
+        avatarInitials: 'QB',
+        isSelf: false
+      }
+    ];
+
+    // ==================== CÁC PHẦN TỬ DOM ====================
+    const statTotalMembers = document.getElementById('stat-total-members');
+    const statPendingApprovals = document.getElementById('stat-pending-approvals');
+    const statActiveMembers = document.getElementById('stat-active-members');
+    const statLockedMembers = document.getElementById('stat-locked-members');
+
+    const tabBtnPending = document.getElementById('tab-btn-pending');
+    const tabBtnMembers = document.getElementById('tab-btn-members');
+    const tabBadgePendingCount = document.getElementById('tab-badge-pending-count');
+    const tabBadgeMembersCount = document.getElementById('tab-badge-members-count');
+
+    const viewPending = document.getElementById('view-pending');
+    const viewMembers = document.getElementById('view-members');
+    const pendingListContainer = document.getElementById('pending-list-container');
+    const pendingEmptyState = document.getElementById('pending-empty-state');
+    const tableMembersBody = document.getElementById('table-members-body');
+    const mobileMembersContainer = document.getElementById('mobile-members-container');
+    const membersEmptySearch = document.getElementById('members-empty-search');
+
+    const inputSearchUsers = document.getElementById('input-search-users');
+    const selectFilterRole = document.getElementById('select-filter-role');
+    const bannerMemberReadonly = document.getElementById('banner-member-readonly');
+    const headerActionInvite = document.getElementById('header-action-invite');
+
+    // ==================== HÀM TIỆN ÍCH & TOAST ====================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'px-4 py-2.5 rounded-xl bg-white border border-[#E7E7E2] shadow-lg text-xs font-medium text-[#111827] flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto';
+      
+      let iconColor = 'text-[#FF5701]';
+      if (type === 'success') iconColor = 'text-emerald-600';
+      if (type === 'warn') iconColor = 'text-amber-600';
+      if (type === 'danger') iconColor = 'text-red-600';
+
+      toast.innerHTML = `
+        <span class="${iconColor} font-bold text-sm">●</span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // ==================== CẬP NHẬT GIAO DIỆN & SỐ LIỆU ====================
+    function updateStats() {
+      const total = activeMembers.length;
+      const pending = pendingUsers.length;
+      const active = activeMembers.filter(m => m.status === 'active').length;
+      const locked = activeMembers.filter(m => m.status === 'locked').length;
+
+      statTotalMembers.textContent = total;
+      statPendingApprovals.textContent = pending;
+      statActiveMembers.textContent = active;
+      statLockedMembers.textContent = locked;
+
+      tabBadgePendingCount.textContent = pending;
+      tabBadgeMembersCount.textContent = total;
+
+      if (pending === 0) {
+        tabBadgePendingCount.classList.remove('bg-white', 'text-[#FF5701]');
+        tabBadgePendingCount.classList.add('bg-neutral-100', 'text-neutral-500');
+      } else {
+        tabBadgePendingCount.classList.add('bg-white', 'text-[#FF5701]');
+        tabBadgePendingCount.classList.remove('bg-neutral-100', 'text-neutral-500');
+      }
+    }
+
+    // ==================== RENDER DANH SÁCH CHỜ DUYỆT ====================
+    function renderPendingList() {
+      pendingListContainer.innerHTML = '';
+      const query = inputSearchUsers.value.trim().toLowerCase();
+
+      const filtered = pendingUsers.filter(u => {
+        return u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        pendingListContainer.classList.add('hidden');
+        pendingEmptyState.classList.remove('hidden');
+        return;
+      }
+
+      pendingListContainer.classList.remove('hidden');
+      pendingEmptyState.classList.add('hidden');
+
+      filtered.forEach(u => {
+        const card = document.createElement('div');
+        card.className = 'p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-neutral-300';
+        
+        const isAdmin = currentRole === 'admin';
+        const isVerified = !!u.emailVerified;
+
+        card.innerHTML = `
+          <div class="flex items-start gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-full ${isVerified ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-600'} font-bold text-sm flex items-center justify-center flex-shrink-0">
+              ${u.avatarInitials}
+            </div>
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-sm text-[#111827]">${u.name}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                  Chờ duyệt
+                </span>
+                ${!isVerified ? `
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-300">
+                    Chưa xác minh email
+                  </span>
+                ` : ''}
+                <span class="text-xs text-[#9CA3AF]">·</span>
+                <span class="text-xs text-[#6B7280]">${u.requestedAt}</span>
+              </div>
+              <p class="text-xs text-[#4B5563] break-all sm:truncate">${u.email}</p>
+              <div class="flex items-center gap-2 text-[11px] text-[#6B7280] pt-0.5">
+                <span class="inline-flex items-center gap-1 font-medium text-neutral-600">
+                  <svg class="w-3 h-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Đăng ký qua ${u.provider}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:items-end gap-1.5 self-end sm:self-center flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E7E7E2] w-full sm:w-auto">
+            ${isAdmin ? `
+              ${isVerified ? `
+                <button type="button" onclick="openApproveModal('${u.id}')" class="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1.5">
+                  <span>Duyệt & kích hoạt</span>
+                  <span>✓</span>
+                </button>
+                <span class="text-[11px] text-[#6B7280]">Chưa duyệt thì tài khoản không đăng nhập được.</span>
+              ` : `
+                <button type="button" disabled class="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-400 border border-neutral-200 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1.5" title="Người này cần bấm link xác minh trong email trước.">
+                  <span>Duyệt & kích hoạt</span>
+                  <span>✓</span>
+                </button>
+                <span class="text-[11px] text-amber-700 font-medium">Người này cần bấm link xác minh trong email trước.</span>
+              `}
+            ` : `
+              <span class="text-xs text-[#9CA3AF] italic">Cần quyền Quản trị viên để duyệt</span>
+            `}
+          </div>
+        `;
+
+        pendingListContainer.appendChild(card);
+      });
+    }
+
+    // ==================== RENDER DANH SÁCH THÀNH VIÊN ====================
+    function renderMembersList() {
+      tableMembersBody.innerHTML = '';
+      mobileMembersContainer.innerHTML = '';
+
+      const query = inputSearchUsers.value.trim().toLowerCase();
+      const roleFilter = selectFilterRole.value;
+
+      const filtered = activeMembers.filter(m => {
+        const matchesQuery = m.name.toLowerCase().includes(query) || m.email.toLowerCase().includes(query);
+        const matchesRole = (roleFilter === 'all') || (m.role === roleFilter);
+        return matchesQuery && matchesRole;
+      });
+
+      if (filtered.length === 0) {
+        tableMembersBody.closest('.overflow-hidden').classList.add('hidden');
+        mobileMembersContainer.classList.add('hidden');
+        membersEmptySearch.classList.remove('hidden');
+        return;
+      }
+
+      tableMembersBody.closest('.overflow-hidden').classList.remove('hidden');
+      mobileMembersContainer.classList.remove('hidden');
+      membersEmptySearch.classList.add('hidden');
+
+      const isAdmin = currentRole === 'admin';
+
+      filtered.forEach(m => {
+        const isLocked = m.status === 'locked';
+        const roleLabel = m.role === 'admin' ? 'Quản trị viên' : 'Thành viên';
+        const roleBadgeClass = m.role === 'admin' 
+          ? 'bg-amber-50 text-amber-800 border-amber-200' 
+          : 'bg-neutral-100 text-neutral-700 border-neutral-200';
+        
+        const statusLabel = isLocked ? 'Bị tạm khóa' : 'Đang hoạt động';
+        const statusBadgeClass = isLocked 
+          ? 'bg-red-50 text-red-700 border-red-200' 
+          : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+        // 1. Dòng bảng Desktop
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#F8F8F6]/60 transition-colors';
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#FF5701] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center flex-shrink-0">
+                ${m.avatarInitials}
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-semibold text-[#111827] text-xs sm:text-sm">${m.name}</span>
+                  ${m.isSelf ? '<span class="text-[10px] font-bold px-1.5 py-[2px] rounded bg-neutral-200 text-neutral-700">Bạn</span>' : ''}
+                </div>
+                <p class="text-xs text-[#6B7280]">${m.email}</p>
+              </div>
+            </div>
+          </td>
+
+          <td class="py-3 px-4">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${roleBadgeClass}">
+              ${roleLabel}
+            </span>
+          </td>
+
+          <td class="py-3 px-4">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadgeClass}">
+              <span class="w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-red-500' : 'bg-emerald-500'}"></span>
+              ${statusLabel}
+            </span>
+          </td>
+
+          <td class="py-3 px-4 text-xs text-[#6B7280]">
+            ${m.joinedDate}
+          </td>
+
+          <td class="py-3 px-4 text-xs text-[#6B7280]">
+            ${m.sessionsCount} thiết bị
+          </td>
+
+          <td class="py-3 px-4 text-right">
+            ${isAdmin && !m.isSelf ? `
+              <div class="inline-flex items-center gap-1">
+                <button type="button" onclick="openRoleModal('${m.id}')" class="px-2 py-1 rounded text-xs text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors" title="Đổi vai trò">
+                  Đổi vai trò
+                </button>
+                <button type="button" onclick="openLockModal('${m.id}')" class="px-2 py-1 rounded text-xs ${isLocked ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50'} transition-colors" title="${isLocked ? 'Mở khóa' : 'Khóa'}">
+                  ${isLocked ? 'Mở khóa' : 'Khóa'}
+                </button>
+              </div>
+            ` : (m.isSelf ? '<span class="text-xs text-[#9CA3AF]">—</span>' : '<span class="text-xs text-[#9CA3AF] italic">Chỉ xem</span>')}
+          </td>
+        `;
+
+        tableMembersBody.appendChild(tr);
+
+        // 2. Thẻ trên Mobile
+        const cardMobile = document.createElement('div');
+        cardMobile.className = 'p-3.5 rounded-xl bg-white border border-[#E7E7E2] shadow-sm space-y-2.5';
+        cardMobile.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#FF5701] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center">
+                ${m.avatarInitials}
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-semibold text-xs sm:text-sm text-[#111827]">${m.name}</span>
+                  ${m.isSelf ? '<span class="text-[10px] font-bold px-1.5 py-[2px] rounded bg-neutral-200 text-neutral-700">Bạn</span>' : ''}
+                </div>
+                <p class="text-[11px] text-[#6B7280]">${m.email}</p>
+              </div>
+            </div>
+
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${roleBadgeClass}">
+              ${roleLabel}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-[#6B7280] pt-1 border-t border-[#E7E7E2]">
+            <span class="inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-red-500' : 'bg-emerald-500'}"></span>
+              ${statusLabel}
+            </span>
+            <span>Tham gia: ${m.joinedDate}</span>
+          </div>
+
+          ${isAdmin && !m.isSelf ? `
+            <div class="flex items-center justify-end gap-2 pt-1 border-t border-[#E7E7E2]">
+              <button type="button" onclick="openRoleModal('${m.id}')" class="px-2.5 py-1 rounded text-xs text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50">
+                Đổi vai trò
+              </button>
+              <button type="button" onclick="openLockModal('${m.id}')" class="px-2.5 py-1 rounded text-xs ${isLocked ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-amber-700 bg-amber-50 border border-amber-200'}">
+                ${isLocked ? 'Mở khóa' : 'Khóa'}
+              </button>
+            </div>
+          ` : ''}
+        `;
+        mobileMembersContainer.appendChild(cardMobile);
+      });
+    }
+
+    // ==================== ĐIỀU KHIỂN TABS ====================
+    function switchTab(tab) {
+      currentTab = tab;
+      if (tab === 'pending') {
+        tabBtnPending.setAttribute('aria-selected', 'true');
+        tabBtnPending.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#FF5701] text-white shadow-sm';
+        
+        tabBtnMembers.setAttribute('aria-selected', 'false');
+        tabBtnMembers.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#6B7280] hover:text-[#111827]';
+        
+        viewPending.classList.remove('hidden');
+        viewMembers.classList.add('hidden');
+        selectFilterRole.classList.add('hidden');
+        renderPendingList();
+      } else {
+        tabBtnMembers.setAttribute('aria-selected', 'true');
+        tabBtnMembers.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#FF5701] text-white shadow-sm';
+        
+        tabBtnPending.setAttribute('aria-selected', 'false');
+        tabBtnPending.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#6B7280] hover:text-[#111827]';
+        
+        viewMembers.classList.remove('hidden');
+        viewPending.classList.add('hidden');
+        selectFilterRole.classList.remove('hidden');
+        renderMembersList();
+      }
+    }
+
+    tabBtnPending.addEventListener('click', () => switchTab('pending'));
+    tabBtnMembers.addEventListener('click', () => switchTab('members'));
+
+    inputSearchUsers.addEventListener('input', () => {
+      if (currentTab === 'pending') renderPendingList();
+      else renderMembersList();
+    });
+
+    selectFilterRole.addEventListener('change', () => {
+      renderMembersList();
+    });
+
+    // ==================== CHUYỂN ĐỔI VAI TRÒ DEMO ====================
+    function setRole(role) {
+      currentRole = role;
+      const isAdmin = role === 'admin';
+      
+      document.getElementById('role-text-header').textContent = isAdmin ? 'Quản trị viên' : 'Thành viên';
+      const badge = document.getElementById('role-pill-badge');
+      if (isAdmin) {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200';
+        bannerMemberReadonly.classList.add('hidden');
+        headerActionInvite.classList.remove('hidden');
+      } else {
+        badge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 border border-neutral-300';
+        bannerMemberReadonly.classList.remove('hidden');
+        headerActionInvite.classList.add('hidden');
+      }
+
+      // Cập nhật nút trong demo menu
+      const btnAdmin = document.getElementById('demo-role-admin');
+      const btnMember = document.getElementById('demo-role-member');
+      if (isAdmin) {
+        btnAdmin.className = 'py-1 px-2 rounded-md font-medium text-center transition-colors bg-white shadow-sm text-[#FF5701]';
+        btnMember.className = 'py-1 px-2 rounded-md font-medium text-center transition-colors text-[#4B5563] hover:text-[#111827]';
+      } else {
+        btnMember.className = 'py-1 px-2 rounded-md font-medium text-center transition-colors bg-white shadow-sm text-[#FF5701]';
+        btnAdmin.className = 'py-1 px-2 rounded-md font-medium text-center transition-colors text-[#4B5563] hover:text-[#111827]';
+      }
+
+      renderPendingList();
+      renderMembersList();
+      showToast(`Đã chuyển vai trò xem sang: ${isAdmin ? 'Quản trị viên' : 'Thành viên'}`);
+    }
+
+    document.getElementById('demo-role-admin').addEventListener('click', () => setRole('admin'));
+    document.getElementById('demo-role-member').addEventListener('click', () => setRole('member'));
+
+    // Toggle menu dropdown demo
+    const btnDemoScenario = document.getElementById('btn-demo-scenario');
+    const demoMenuDropdown = document.getElementById('demo-menu-dropdown');
+    btnDemoScenario.addEventListener('click', (e) => {
+      e.stopPropagation();
+      demoMenuDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!demoMenuDropdown.contains(e.target) && e.target !== btnDemoScenario) {
+        demoMenuDropdown.classList.add('hidden');
+      }
+    });
+
+    // Thêm yêu cầu duyệt mẫu
+    document.getElementById('btn-demo-add-pending').addEventListener('click', () => {
+      const newId = 'pen_' + Math.floor(Math.random() * 899 + 100);
+      pendingUsers.unshift({
+        id: newId,
+        name: 'Trần Gia Hưng',
+        email: 'hung.tran@congty.vn',
+        provider: 'Email',
+        emailVerified: true,
+        requestedAt: 'Vừa xong',
+        avatarInitials: 'GH'
+      });
+      updateStats();
+      if (currentTab === 'pending') renderPendingList();
+      demoMenuDropdown.classList.add('hidden');
+      showToast('Đã thêm 1 yêu cầu duyệt mới từ Trần Gia Hưng', 'info');
+    });
+
+    // Khôi phục dữ liệu mẫu
+    document.getElementById('btn-demo-reset-data').addEventListener('click', () => {
+      pendingUsers = [
+        {
+          id: 'pen_101',
+          name: 'Hoàng Minh Khôi',
+          email: 'khoi.hoang@congty.vn',
+          provider: 'Email',
+          emailVerified: true,
+          requestedAt: '15 phút trước',
+          avatarInitials: 'HK'
+        },
+        {
+          id: 'pen_102',
+          name: 'Lê Quỳnh Chi',
+          email: 'chi.le@congty.vn',
+          provider: 'Google',
+          emailVerified: true,
+          requestedAt: '2 giờ trước',
+          avatarInitials: 'QC'
+        },
+        {
+          id: 'pen_103',
+          name: 'Phạm Đức Anh',
+          email: 'ducanh.pham@congty.vn',
+          provider: 'Email',
+          emailVerified: false,
+          requestedAt: '35 phút trước',
+          avatarInitials: 'ĐA'
+        }
+      ];
+      updateStats();
+      if (currentTab === 'pending') renderPendingList();
+      else renderMembersList();
+      demoMenuDropdown.classList.add('hidden');
+      showToast('Đã khôi phục danh sách người dùng mẫu ban đầu');
+    });
+
+    // ==================== CÁC MODAL HÀNH ĐỘNG ====================
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // Đóng modal khi bấm nút đóng hoặc phím Escape
+    document.querySelectorAll('.btn-close-modal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.closest('[role="dialog"]').classList.add('hidden');
+      });
+    });
+
+    document.querySelectorAll('[role="dialog"]').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('[role="dialog"]').forEach(m => m.classList.add('hidden'));
+        demoMenuDropdown.classList.add('hidden');
+      }
+    });
+
+    // 1. Mở modal Duyệt tài khoản
+    window.openApproveModal = function(id) {
+      const user = pendingUsers.find(u => u.id === id);
+      if (!user) return;
+      selectedUserId = id;
+      document.getElementById('approve-user-name').textContent = user.name;
+      document.getElementById('approve-user-email').textContent = user.email;
+      openModal('modal-approve');
+    };
+
+    document.getElementById('btn-confirm-approve').addEventListener('click', () => {
+      const user = pendingUsers.find(u => u.id === selectedUserId);
+      if (!user) return;
+      const assignedRole = document.getElementById('select-approve-role').value;
+
+      // Xóa khỏi danh sách chờ duyệt
+      pendingUsers = pendingUsers.filter(u => u.id !== selectedUserId);
+
+      // Thêm vào danh sách thành viên hoạt động
+      activeMembers.unshift({
+        id: 'usr_' + Date.now().toString().slice(-4),
+        name: user.name,
+        email: user.email,
+        role: assignedRole,
+        status: 'active',
+        joinedDate: 'Hôm nay',
+        sessionsCount: 1,
+        avatarInitials: user.avatarInitials,
+        isSelf: false
+      });
+
+      closeModal('modal-approve');
+      updateStats();
+      renderPendingList();
+      showToast('Đã duyệt. Hệ thống gửi email báo cho người dùng.', 'success');
+    });
+
+    // 2. Mở modal Khóa / Mở khóa
+    window.openLockModal = function(id) {
+      const user = activeMembers.find(m => m.id === id);
+      if (!user) return;
+      selectedUserId = id;
+      const isLocked = user.status === 'locked';
+
+      const title = document.getElementById('modal-lock-title');
+      const desc = document.getElementById('modal-lock-desc');
+      const btn = document.getElementById('btn-confirm-toggle-lock');
+      const iconBox = document.getElementById('lock-icon-box');
+
+      if (isLocked) {
+        title.textContent = 'Mở khóa tài khoản';
+        desc.innerHTML = `Mở khóa tài khoản cho <strong class="text-[#111827]">${user.name}</strong>. Sau khi mở khóa, người này có thể đăng nhập lại và sử dụng hệ thống bình thường.`;
+        btn.textContent = 'Xác nhận mở khóa';
+        btn.className = 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm';
+        iconBox.className = 'w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center';
+      } else {
+        title.textContent = 'Khóa tài khoản';
+        desc.innerHTML = `Khóa tài khoản <strong class="text-[#111827]">${user.name}</strong>?<br class="hidden sm:inline"> Người này bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi được mở khoá.`;
+        btn.textContent = 'Xác nhận khóa';
+        btn.className = 'px-4 py-2 rounded-xl bg-amber-600 text-white text-xs sm:text-sm font-semibold hover:bg-amber-700 transition-colors shadow-sm';
+        iconBox.className = 'w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center';
+      }
+
+      openModal('modal-toggle-lock');
+    };
+
+    document.getElementById('btn-confirm-toggle-lock').addEventListener('click', () => {
+      const user = activeMembers.find(m => m.id === selectedUserId);
+      if (!user) return;
+
+      const isLocked = user.status === 'locked';
+      user.status = isLocked ? 'active' : 'locked';
+      if (!isLocked) user.sessionsCount = 0; // Khi khóa thì thu hồi hết phiên
+
+      closeModal('modal-toggle-lock');
+      updateStats();
+      renderMembersList();
+      showToast(isLocked ? `Đã mở khóa tài khoản cho ${user.name}` : `Đã khóa tài khoản của ${user.name}`, isLocked ? 'success' : 'warn');
+    });
+
+    // 5. Mở modal Đổi vai trò
+    window.openRoleModal = function(id) {
+      const user = activeMembers.find(m => m.id === id);
+      if (!user) return;
+      selectedUserId = id;
+
+      document.getElementById('role-user-name').textContent = user.name;
+      document.getElementById('select-new-role').value = user.role;
+      openModal('modal-change-role');
+    };
+
+    document.getElementById('btn-confirm-change-role').addEventListener('click', () => {
+      const user = activeMembers.find(m => m.id === selectedUserId);
+      if (!user) return;
+
+      const newRole = document.getElementById('select-new-role').value;
+      user.role = newRole;
+
+      closeModal('modal-change-role');
+      renderMembersList();
+      showToast(`Đã cập nhật vai trò của ${user.name} thành: ${newRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}`, 'success');
+    });
+
+    // Khởi tạo trang ban đầu
+    updateStats();
+    renderPendingList();
+  </script>
+</body>
+</html>
