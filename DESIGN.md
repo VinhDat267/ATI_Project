@@ -1,702 +1,399 @@
 ---
-version: beta
-name: ATI Warm Workshop (Airtable Style)
-approval_status: approved
-approved_at: "2026-09-21"
-approval_scope: "Current web visual Design System"
-description: "Airtable-inspired warm workspace with color-coded chapters: parchment cream canvas (#FAF5E8), pure white card surfaces (#FFFFFF) with subtle elevation, midnight indigo ink (#040E20), silver hairline dividers (#E0E2E6), 8/16/24px radii, layered subtle shadow, sticky decision card, and color-coded chapters: Cobalt Blue for AI planning, Terracotta for writes/approvals, Forest Ink for reads/success."
+version: alpha
+name: Planora
+description: >-
+  A warm editorial workflow workspace. Cream canvas and paper surfaces,
+  forest-green actions, expressive serif headings and Vietnamese sans-serif
+  controls make planning feel human, legible and deliberate. Motion tells
+  the request-to-plan-to-action story without competing with the work.
+status: draft-for-review
+updated: "2026-10-05"
+scope: "Planora v3 frontend; apps/chat-web only"
+reference: "https://getdesign.md"
+implementation_reference: "ef13c5695ce2da030ff613422b4f8d6e1d7e72c3"
 colors:
-  primary: "#181D26"
-  primary-hover: "#040E20"
-  primary-subtle: "#F8FAFC"
-  on-primary: "#FFFFFF"
-  canvas: "#FAF5E8"
-  surface-soft: "#FFFFFF"
-  surface-strong: "#F8FAFC"
-  ink: "#040E20"
-  muted: "#525965"
-  hairline: "#E0E2E6"
-  hairline-soft: "#EDEEF1"
-  border-control: "#9297A0"
-  focus-ring: "#181D26"
-  progress: "#1B61C9"
-  progress-subtle: "#C7E5F2"
-  success: "#0A2E0E"
-  success-subtle: "#DCFCE7"
-  action: "#AA2D00"
-  action-subtle: "#FCAB79"
-  danger: "#912E1F"
-  danger-hover: "#AA2D00"
-  danger-subtle: "#FEE2E2"
-  unknown: "#AA2D00"
-  unknown-subtle: "#FFEDD5"
-  neutral: "#333840"
-  neutral-subtle: "#F8FAFC"
-  planner: "#254FAD"
-  planner-subtle: "#C7E5F2"
-  demo: "#912E1F"
-  demo-subtle: "#FEF9C3"
+  canvas: "#f8f4eb"
+  paper: "#fffdf7"
+  sidebar: "#eee9dd"
+  ink: "#2e382d"
+  muted: "#656b5b"
+  divider: "#deded0"
+  primary: "#3c5741"
+  primary-hover: "#2f4633"
+  primary-soft: "#e4e9d8"
+  on-primary: "#fffdf7"
+  pending-surface: "#f6e6cf"
+  pending-ink: "#85532b"
+  error-surface: "#f8e6df"
+  error-ink: "#9a3f32"
+  unknown-surface: "#eee6f2"
+  unknown-ink: "#654576"
 typography:
-  display-md:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 26px
-    fontWeight: 600
-    lineHeight: 34px
-    letterSpacing: -0.02em
-  headline-sm:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 21px
-    fontWeight: 600
-    lineHeight: 28px
-    letterSpacing: -0.01em
-  title-md:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 16px
-    fontWeight: 600
-    lineHeight: 22px
-  body-lg:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 16px
-    fontWeight: 400
-    lineHeight: 24px
-  body-md:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 15px
-    fontWeight: 400
-    lineHeight: 22px
-  body-sm:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 20px
-  button-md:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 16px
-    fontWeight: 600
-    lineHeight: 20px
-  button-sm:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 14px
-    fontWeight: 600
-    lineHeight: 20px
-  nav-link:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 15px
-    fontWeight: 500
-    lineHeight: 20px
-  badge:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 13px
-    fontWeight: 600
-    lineHeight: 18px
-  caption:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 13px
-    fontWeight: 400
-    lineHeight: 18px
-    fontFeature: "'tnum' 1"
-  overline:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 12px
-    fontWeight: 700
-    lineHeight: 16px
-    letterSpacing: 0.04em
-  wordmark:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 20px
-    fontWeight: 700
-    lineHeight: 24px
-    letterSpacing: -0.01em
-  display-md-mobile:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 23px
-    fontWeight: 600
-    lineHeight: 31px
-    letterSpacing: -0.01em
-  headline-sm-mobile:
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif"
-    fontSize: 18px
-    fontWeight: 600
-    lineHeight: 25px
-  mono-md:
-    fontFamily: "'Cascadia Mono', Consolas, ui-monospace, 'SFMono-Regular', Menlo, monospace"
-    fontSize: 13px
-    fontWeight: 400
-    lineHeight: 20px
-  mono-sm:
-    fontFamily: "'Cascadia Mono', Consolas, ui-monospace, 'SFMono-Regular', Menlo, monospace"
-    fontSize: 12px
-    fontWeight: 400
-    lineHeight: 18px
-rounded:
-  none: 0px
-  xs: 4px
-  sm: 8px
-  md: 14px
-  lg: 20px
-  full: 9999px
+  sans: "Be, 'Segoe UI', sans-serif"
+  serif: "'Times New Roman', Georgia, serif"
+  body-size: "14px"
+  body-line-height: 1.65
+  body-weights: [400, 500, 600]
 spacing:
-  xxs: 2px
-  xs: 4px
-  sm: 8px
-  md: 12px
-  base: 16px
-  lg: 24px
-  xl: 32px
-  xxl: 48px
-  section: 64px
-  nav-height: 80px
-  content-max: 1120px
-  rail-width: 372px
-  rail-gap: 72px
-  gutter-desktop: 80px
-  gutter-mobile: 24px
-  control-height: 48px
-  control-height-compact: 36px
-components:
-  page:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-  top-nav:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.nav-link}"
-    height: "{spacing.nav-height}"
-  nav-link:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.muted}"
-    typography: "{typography.nav-link}"
-  nav-link-active:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.nav-link}"
-  divider:
-    backgroundColor: "{colors.hairline}"
-    height: 1px
-  divider-soft:
-    backgroundColor: "{colors.hairline-soft}"
-    height: 1px
-  icon-button-circle:
-    backgroundColor: "{colors.surface-strong}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.full}"
-    size: 36px
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.button-md}"
-    rounded: "{rounded.sm}"
-    height: "{spacing.control-height}"
-    padding: 0px 24px
-  button-primary-hover:
-    backgroundColor: "{colors.primary-hover}"
-    textColor: "{colors.on-primary}"
-  button-secondary:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.button-md}"
-    rounded: "{rounded.sm}"
-    height: "{spacing.control-height}"
-    padding: 0px 24px
-  button-secondary-hover:
-    backgroundColor: "{colors.surface-soft}"
-    textColor: "{colors.ink}"
-  button-text:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.button-sm}"
-  button-danger:
-    backgroundColor: "{colors.danger}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.button-md}"
-    rounded: "{rounded.sm}"
-    height: "{spacing.control-height}"
-  button-danger-hover:
-    backgroundColor: "{colors.danger-hover}"
-    textColor: "{colors.on-primary}"
-  input:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-lg}"
-    rounded: "{rounded.sm}"
-    height: 56px
-    padding: 0px 12px
-  input-border:
-    backgroundColor: "{colors.border-control}"
-    width: 1px
-  focus-ring:
-    backgroundColor: "{colors.focus-ring}"
-    width: 2px
-  decision-card:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 24px
-    width: "{spacing.rail-width}"
-  decision-timer:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.title-md}"
-  decision-timer-urgent:
-    backgroundColor: "{colors.action-subtle}"
-    textColor: "{colors.action}"
-    typography: "{typography.title-md}"
-    rounded: "{rounded.sm}"
-  write-summary:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.headline-sm}"
-  summary-box:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.sm}"
-    padding: 10px 12px
-  summary-label:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.overline}"
-  step-row:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-lg}"
-    height: 48px
-  step-row-meta:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.muted}"
-    typography: "{typography.body-sm}"
-  step-icon-read:
-    backgroundColor: "{colors.surface-strong}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.full}"
-    size: 48px
-  step-icon-write:
-    backgroundColor: "{colors.action-subtle}"
-    textColor: "{colors.action}"
-    rounded: "{rounded.full}"
-    size: 48px
-  write-card:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.md}"
-  payload-table-head:
-    backgroundColor: "{colors.surface-soft}"
-    textColor: "{colors.muted}"
-    typography: "{typography.caption}"
-  payload-block:
-    backgroundColor: "{colors.surface-soft}"
-    textColor: "{colors.ink}"
-    typography: "{typography.mono-md}"
-    rounded: "{rounded.sm}"
-    padding: 12px 16px
-  selected-row:
-    backgroundColor: "{colors.primary-subtle}"
-    textColor: "{colors.primary}"
-  status-progress:
-    backgroundColor: "{colors.progress-subtle}"
-    textColor: "{colors.progress}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-action:
-    backgroundColor: "{colors.action-subtle}"
-    textColor: "{colors.action}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-success:
-    backgroundColor: "{colors.success-subtle}"
-    textColor: "{colors.success}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-danger:
-    backgroundColor: "{colors.danger-subtle}"
-    textColor: "{colors.danger}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-unknown:
-    backgroundColor: "{colors.unknown-subtle}"
-    textColor: "{colors.unknown}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-neutral:
-    backgroundColor: "{colors.neutral-subtle}"
-    textColor: "{colors.neutral}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  status-planner:
-    backgroundColor: "{colors.planner-subtle}"
-    textColor: "{colors.planner}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 10px
-  banner-action:
-    backgroundColor: "{colors.action-subtle}"
-    textColor: "{colors.action}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 20px
-  banner-unknown:
-    backgroundColor: "{colors.unknown-subtle}"
-    textColor: "{colors.unknown}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 20px
-  banner-danger:
-    backgroundColor: "{colors.danger-subtle}"
-    textColor: "{colors.danger}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 20px
-  origin-banner:
-    backgroundColor: "{colors.surface-soft}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 20px
-  origin-strip:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.sm}"
-    padding: 12px 16px
-  recovery-option:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.title-md}"
-    rounded: "{rounded.sm}"
-    padding: 12px 16px
-  badge-demo:
-    backgroundColor: "{colors.demo-subtle}"
-    textColor: "{colors.demo}"
-    typography: "{typography.badge}"
-    rounded: "{rounded.full}"
-    padding: 4px 12px
-  identifier:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.muted}"
-    typography: "{typography.mono-sm}"
-  tooltip:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.sm}"
-    padding: 6px 10px
-  dialog:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.lg}"
-    padding: 24px
-  mobile-decision-bar:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-sm}"
-    height: 80px
-    padding: 12px 24px
+  scale: [4, 8, 12, 16, 24, 32, 48, 64]
+  unit: px
+  sidebar-width: "248px"
+  chat-max-width: "1120px"
+  public-max-width: "1280px"
+  auth-max-width: "1360px"
+  settings-max-width: "1040px"
+radius:
+  control: "12px"
+  dropdown: "14px"
+  story-card: "18px"
+  surface: "20px"
+  hero: "24px"
+  auth-editorial: "26px"
+  pill: "999px"
+motion:
+  fast: "160ms"
+  panel: "320ms"
+  enter: "520ms"
+  ease: "cubic-bezier(0.22, 1, 0.36, 1)"
 ---
 
-# ATI UI/UX and Design System
-
-**Trạng thái: `DIRECTION_SELECTED` — người dùng chốt “kiểu Airbnb, nhấn navy” ngày 17/09/2026** sau khi so sánh ba phương án V05 trên canvas review (gốc, giàu hơn, kiểu Airbnb). Token và quy tắc dưới đây là hợp đồng thị giác cho WEB-01C trở đi theo [ADR-002](docs/ADR-002-FRONTEND-UI-DATA-LAYER.md). Chưa kiểm chứng trong ứng dụng thật; cần review trực quan bộ màn đã vẽ lại (V05 chờ duyệt, V05 cần đối chiếu, V05 mobile, V02) trước khi coi là `APPROVED_FOR_IMPLEMENTATION`. Hướng navy/slate dạng sidebar (17/09) và Airbnb gốc chỉ còn trong lịch sử git.
-
-## Overview
-
-ATI là công cụ **duyệt và kiểm soát thao tác ghi** cho trưởng nhóm dự án môn học. Giao diện mượn **ngôn ngữ hình khối và khoảng trắng** của một marketplace tiêu dùng (tham khảo phân tích Airbnb): nền trắng, chữ gần đen, đường kẻ mảnh thay khung, bo góc mềm, nút lớn dễ bấm, chỉ một mức bóng. Mục tiêu cảm xúc: **thân thiện, rõ ràng, đáng tin** — người không rành kỹ thuật vẫn hiểu “cái gì sẽ bị ghi, ở đâu, còn bao lâu để quyết”.
-
-Nguyên tắc cốt lõi:
-
-- **Một màu nhấn: navy (#1E3A5F).** Chỉ dùng cho hành động chính và mục đang chọn. Đỏ/cam/amber được dành riêng cho trạng thái, không bao giờ làm màu thương hiệu.
-- **Nội dung trước, khung sau.** Section ngăn bằng hairline và khoảng trắng 32px; chỉ nội dung cần gom (payload, thẻ quyết định) mới có khung bo 14px.
-- **Điều người dùng sắp đồng ý là thứ lớn nhất, không phải thời hạn.** Khối “Bạn sắp ghi” (`headline-sm`) đứng đầu thẻ quyết định; đồng hồ là một dòng `title-md` ngay trên nút duyệt và chỉ nổi lên ở 2 phút cuối (chốt 18/09/2026, thay đồng hồ 56px của phương án A). Mọi tiêu đề giữ độ đậm vừa (600).
-- **Màu trạng thái luôn kèm icon và chữ.** Server là authority: không phần trăm tiến trình tự tính, không báo thành công trước khi server xác nhận.
-- **Light-only trong B/local.** Dark mode ngoài phạm vi; token đặt theo vai trò để có thể thêm sau.
-
-**Không sao chép thương hiệu Airbnb:** không dùng màu Rausch, font Airbnb Cereal, logo, minh hoạ, ảnh hay bố cục marketing/listing của họ. Chỉ mượn nguyên tắc hình khối, khoảng trắng, mật độ và mẫu “thẻ đặt chỗ dính bên phải”.
-
-## Colors
-
-**Nhấn và nền**
-
-- **Navy (#1E3A5F) — `primary`:** nút chính (“Duyệt 2 thao tác ghi”, “Lập kế hoạch”), avatar/logo, hàng đang chọn (`primary-subtle` #E8EEF6). Chữ trắng 11.5:1. Hover `primary-hover` (#162D4A).
-- **Canvas (#FFFFFF):** nền toàn trang và card. **Surface soft (#F7F7F7):** đầu bảng payload, khối JSON, bong bóng tin nhắn xem trước. **Surface strong (#F2F2F2):** nút icon tròn, icon bước đọc.
-- **Ink (#222222):** chữ chính, nút secondary viền, link dạng gạch chân, focus ring. 15.9:1 trên trắng.
-- **Muted (#6A6A6A):** chữ phụ, nav chưa chọn, timestamp. 5.41:1 trên trắng, 5.05:1 trên `surface-soft`, 4.83:1 trên `surface-strong` — đạt AA trên mọi nền trung tính của hệ.
-- **Hairline (#DDDDDD) / hairline soft (#EBEBEB):** divider section, viền card, dòng bảng. Chỉ mang tính trang trí.
-- **Border control (#8A8A8A):** viền input, checkbox, hộp tóm tắt trong thẻ quyết định — 3.45:1, đạt ngưỡng 3:1 cho thành phần giao diện.
-
-**Họ màu ngữ nghĩa** (giữ nguyên từ bản trước; mọi cặp đạt AA ≥ 4.5:1)
-
-| Token | Đậm / nhạt | Ý nghĩa | Contrast |
-|---|---|---|---|
-| `progress` | #1D4ED8 / #DBEAFE | Hệ thống đang xử lý | 5.49:1 |
-| `action` | #92400E / #FEF3C7 | Cần người dùng quyết định (chờ duyệt, TTL) | 6.37:1 |
-| `success` | #166534 / #DCFCE7 | Hoàn tất có xác nhận | 6.49:1 |
-| `danger` | #B91C1C / #FEE2E2 | Lỗi đã biết, hành động phá huỷ | 5.30:1 |
-| `unknown` | #9A3412 / #FFEDD5 | Kết quả ghi chưa xác định | 6.38:1 |
-| `neutral` | #334155 / #F1F5F9 | Từ chối, huỷ, hết hạn | 9.45:1 |
-| `planner` | #5B21B6 / #EDE9FE | Planner từ chối / cần bổ sung | 7.57:1 |
-| `demo` | #854D0E / #FEF9C3 | Dữ liệu mô phỏng | 6.38:1 |
-
-## Typography
-
-**Be Vietnam Pro** (SIL Open Font License, thiết kế cho tiếng Việt) cho toàn bộ giao diện, **tự host** trong `apps/web` (không tải từ Google Fonts/CDN theo ADR-001/002), fallback Segoe UI/system-ui. Chỉ nạp 400/500/600/700, subset `latin` + `vietnamese`. Mono: Cascadia Mono/Consolas/SF Mono cho mã run, hash, tên tool, JSON.
-
-| Token | Cỡ/dòng | Đậm | Dùng cho |
-|---|---|---|---|
-| `display-md` | 26/34 | 600 | Tiêu đề trang, yêu cầu gốc của run |
-| `headline-sm` | 21/28 | 600 | Tiêu đề section (“Kế hoạch gồm 3 bước”) |
-| `title-md` | 16/22 | 600 | Tiêu đề card, thẻ ghi |
-| `body-lg` | 16/24 | 400 | Tên bước, input, đoạn quan trọng |
-| `body-md` | 15/22 | 400 | Chữ mặc định |
-| `body-sm` | 14/20 | 400 | Dòng phụ, bảng payload |
-| `button-md` / `button-sm` | 16/20, 14/20 | 600 | Nút 48px / nút chữ |
-| `nav-link` | 15/20 | 500 | Top nav (mục chọn dùng 600) |
-| `badge` | 13/18 | 600 | Pill trạng thái |
-| `caption` | 13/18, tabular | 400 | Timestamp, thời lượng |
-| `overline` | 12/16, +0.04em | 700 | Nhãn ô trong hộp tóm tắt (THAO TÁC GHI, ĐÍCH) — chỉ nhãn ngắn |
-| `wordmark` | 20/24, -0.01em | 700 | Chữ “ATI” cạnh logo (mobile 18/22) |
-| `mono-md` / `mono-sm` | 13/20, 12/18 | 400 | Mã run, mã băm, tên tool, JSON |
-
-**Thang mobile (< 744px)** — chỉ hai role đổi cỡ, phần còn lại giữ nguyên để không sinh thêm biến thể:
-
-| Token | Cỡ/dòng | Thay cho | Dùng cho |
-|---|---|---|---|
-| `display-md-mobile` | 23/31 | `display-md` 26/34 | Tiêu đề trang và yêu cầu gốc |
-| `headline-sm-mobile` | 18/25 | `headline-sm` 21/28 | Tiêu đề section |
-
-Mỗi bước liền kề của thang phải cách nhau ≥ 1.25× ở ít nhất một bậc: mobile là 23 → 18 (1.28), desktop là 26 → 21 → 16 (1.24 và 1.31). Không dùng cỡ ngoài thang (đã bỏ 17px, 12.5px, 19px, 20px thân chữ).
-
-Line-height thân chữ ≥ 1.45 để dấu tiếng Việt chồng không chạm dòng trên. Không viết hoa toàn câu; `overline` chỉ cho nhãn 1–3 từ (11px làm bẹt dấu trên chữ hoa tiếng Việt nên sàn là 12px).
-
-**Độ dài dòng:** văn xuôi tối đa ~75 ký tự — `max-width` 600px ở 16px, 560px ở 15px, 520px ở 14px; khung có icon thì cộng thêm bề rộng icon, gap và padding. Tiêu đề, nội dung yêu cầu và bảng dữ liệu không áp trần này.
-
-## Layout
-
-- **Desktop (≥ 1128px):** top nav 80px trắng, hairline dưới: logo trái, 4 mục điều hướng ở giữa (Tổng quan, Tạo yêu cầu, Lần chạy, Công cụ & kết nối), nhãn “Dữ liệu mô phỏng” + nút tài khoản dạng pill bên phải. Nội dung rộng tối đa **1120px** căn giữa, lề tối thiểu 80px.
-- **Chi tiết run (V05):** hai cột — nội dung trái (co giãn) và **thẻ quyết định 372px dính bên phải**, cách nhau 72px. Trạng thái không cần quyết định (đối chiếu, kết thúc): cột phải là thẻ tóm tắt kết quả, không có nút ghi.
-- **Tablet (744–1127px):** top nav giữ logo + nút menu; một cột, thẻ quyết định nằm trên nội dung.
-- **Mobile (< 744px, tối thiểu 320px):** gutter 24px (16px khi < 360px); thẻ quyết định thành **thanh dính đáy ~98px** gồm một dòng “Còn mm:ss · hết hạn lúc … theo máy chủ” (mốc tuyệt đối, vì người dùng mobile hay rời app rồi quay lại) và nút chính rộng hết thanh, nút duyệt có `aria-describedby` tới mốc hết hạn và câu cảnh báo; câu “Nếu dữ liệu nguồn thay đổi…” nằm trong banner chờ duyệt ở đầu trang — chỗ người dùng đọc đầu tiên khi quay lại; nút phụ nằm trong nội dung. Payload dạng bảng **không cuộn ngang trên màn duyệt**: mỗi dòng thành một bản ghi có nhãn (DÒNG n · Tuần / Thành viên / Công việc / Tình trạng) để đọc hết mọi ô trước khi đồng ý; trang không cuộn ngang.
-- **Nhịp khoảng cách:** section cách nhau bằng hairline + padding 32px; nhóm liên quan 16–20px; card padding 20–24px; khoảng lớn giữa vùng trang 64px.
-- **Chiều cao điều khiển:** 48px (nút chính/phụ), 56px (input), 36px (nút icon tròn, nút chữ — chỉ trên desktop có con trỏ). Mobile: mọi điều khiển ≥ 44px, kể cả nút chữ, nút quay lại và nút hiện mật khẩu. Link chữ đứng riêng ở mọi độ rộng có vùng chạm cao 44px (`min-height`), chữ giữ nguyên cỡ.
-
-## Elevation & Depth
-
-Hệ có **đúng một mức bóng**:
-
-`box-shadow: rgba(0,0,0,0.02) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px 0, rgba(0,0,0,0.1) 0 4px 8px 0`
-
-dùng cho thẻ quyết định, nút tài khoản, dropdown/popover và thanh quyết định mobile. Mọi bề mặt khác phẳng, phân tách bằng hairline và khoảng trắng. Dialog dùng scrim `ink` 50%. Không blur, không bóng màu, không nâng card khi hover. Chuyển động 150ms ease-out cho hover/focus/mở disclosure, tôn trọng `prefers-reduced-motion`, không animation khi polling cập nhật.
-
-## Shapes
-
-- `xs` 4px: code inline.
-- `sm` 8px: nút, input, hộp tóm tắt, khối JSON, tooltip.
-- `md` 14px: card, thẻ ghi, thẻ quyết định, banner.
-- `lg` 20px: dialog.
-- `full`: pill trạng thái, nhãn demo, nút icon tròn, icon bước, avatar, nút tài khoản.
-
-Không góc vuông trên phần tử tương tác; `none` chỉ cho hairline và hàng bảng.
-
-## Components
-
-Component lấy từ shadcn/ui (Radix), chỉnh theo token; không giá trị màu/spacing tuỳ ý.
-
-### Top navigation
-
-`top-nav` 80px. Mục đang chọn: chữ `ink` 600 + gạch chân 2px `ink` sát đáy nav, `aria-current="page"`; mục khác `muted` 500. Có badge số lượng việc cần xử lý cạnh “Lần chạy” khi > 0 (pill `action`).
-
-### Buttons
-
-- **Primary** (`button-primary`): navy, 48px, bo 8px, chữ 16/600. Một nút chính mỗi vùng; trong thẻ quyết định dàn full-width.
-- **Secondary** (`button-secondary`): nền trắng, viền 1px `ink`, chữ `ink`. “Từ chối ghi”.
-- **Text** (`button-text`): chữ `ink` 600 gạch chân, không nền. “Xem JSON gốc”, “Yêu cầu huỷ lần chạy”, “Xem chứng cứ đầy đủ”.
-- **Icon tròn** (`icon-button-circle`): 36px nền `surface-strong`, luôn có `aria-label` (nút quay lại).
-- **Danger**: chỉ cho hành động phá huỷ thật; B/local chưa có. Không dùng cho Từ chối/Huỷ.
-- **Đang gửi:** khoá nút, giữ nhãn, spinner sau 150ms; không đổi nhãn sang thành công trước phản hồi server. Disabled có lý do hiển thị gần đó.
-
-### Decision card (thẻ quyết định)
-
-Thẻ 372px dính bên phải, bo 14px, hairline + mức bóng duy nhất, padding 24px. Thứ tự cố định:
-
-1. `write-summary`: nhãn “Bạn sắp ghi” (`muted`), rồi mỗi thao tác ghi một dòng `headline-sm` kèm icon tròn 40px nền `action-subtle` (“Thêm 3 dòng vào “Báo cáo tuần””, “Gửi 1 tin nhắn vào #nhom-ati”); tên đích không xuống dòng giữa chừng. Đây là phần tử lớn nhất thẻ.
-2. Hairline, dòng khoá–giá trị “Chế độ lập kế hoạch”.
-3. `decision-timer` ngay trên nút duyệt: icon đồng hồ trong vòng 32px + “Còn mm:ss” (`title-md`, tabular) + “Hết hạn lúc hh:mm:ss theo máy chủ” (`caption`). Thời hạn lấy từ `approval.expires_at`; về 0 thì khoá nút và tải lại chi tiết. Còn ≤ 2 phút: `decision-timer-urgent` (nền `action-subtle`, chữ `action`, icon đồng hồ cát, “Sắp hết hạn · còn mm:ss”), không đổi bố cục, không nhấp nháy.
-4. Nút primary “Duyệt N thao tác ghi” (`aria-describedby` tới `write-summary` và dòng hết hạn), nút secondary “Từ chối ghi”, dòng phụ căn giữa.
-5. Hairline, rồi múi giờ và disclosure “Chi tiết kỹ thuật” (phiên bản kế hoạch, mã bản xem trước).
-
-Trên mobile, dòng đồng hồ + nút primary rộng hết thanh thành `mobile-decision-bar` dính đáy (~98px); `write-summary` là các bản ghi có nhãn trong nội dung, phần còn lại nằm cuối nội dung.
-
-### Steps list
-
-Mỗi bước là một hàng: icon tròn 48px (`step-icon-read` nền `surface-strong` cho bước đọc; `step-icon-write` nền `action-subtle` cho bước ghi đang chờ), tên bước `body-lg` 500, dòng phụ `body-sm` `muted` (“Bước 2 · ghi · dùng dữ liệu của bước 1”), trạng thái bên phải là chữ màu ngữ nghĩa có icon. Không đóng khung từng hàng.
-
-### Write card (thẻ ghi)
-
-Viền hairline bo 14px. Đầu thẻ: tiêu đề `title-md` (“Bảng ‘Báo cáo tuần’ · thêm 3 dòng”), dòng tool/đích mono `muted`, nút text “Xem JSON gốc” bên phải. Thân thẻ hiển thị payload **ở dạng người đọc được**: bảng cho dòng dữ liệu (đầu bảng `surface-soft`; mobile đổi thành bản ghi có nhãn), bong bóng xem trước cho tin nhắn. JSON gốc mở trong `payload-block`. Payload không sửa được.
-
-### Run status
-
-Pill `badge` 13/600, bo full, padding 4×10, **icon + nhãn tiếng Việt**; trạng thái đang chạy có spinner trừ khi reduced motion.
-
-| RunStatus | Nhãn hiển thị | Biến thể | Icon (lucide) |
-|---|---|---|---|
-| `planning` | Đang lập kế hoạch | `status-progress` | `loader-circle` |
-| `validating` | Đang kiểm tra kế hoạch | `status-progress` | `loader-circle` |
-| `dry_running` | Đang đọc dữ liệu xem trước | `status-progress` | `loader-circle` |
-| `awaiting_approval` | Chờ duyệt | `status-action` | `hand` |
-| `running` | Đang thực thi | `status-progress` | `loader-circle` |
-| `replanning` | Đang điều chỉnh kế hoạch | `status-progress` | `refresh-cw` |
-| `succeeded` | Hoàn tất | `status-success` | `circle-check` |
-| `failed` | Thất bại | `status-danger` | `circle-x` |
-| `rejected` | Đã từ chối ghi | `status-neutral` | `ban` |
-| `cancelled` | Đã huỷ | `status-neutral` | `circle-slash` |
-| `expired` | Hết hạn duyệt | `status-neutral` | `clock-alert` |
-| `refused` | Không thể lập kế hoạch | `status-planner` | `message-circle-x` |
-| `needs_input` | Cần bổ sung thông tin | `status-planner` | `message-circle-question` |
-| `reconciliation_required` | Cần đối chiếu | `status-unknown` | `triangle-alert` |
-
-### Banners
-
-Bo 14px, padding 20px, icon trong vòng tròn trắng 40px, tiêu đề 16/600 + đoạn 15/24.
-
-- **`banner-action`** (chờ duyệt): “Hệ thống đang chờ bạn quyết định”. Không tự đóng.
-- **`banner-unknown`** (cần đối chiếu): giải thích thao tác chưa rõ kết quả và việc cần tự kiểm tra; **không tự đóng, không có nút đóng, retry hay resume**; `role="alert"`.
-- **`banner-danger`**: lỗi phiên/mạng/thất bại, nêu cách thoát.
-- **`origin-banner`** (V03, yêu cầu điền sẵn từ lần chạy khác): nền `surface-soft`, icon `history`, tiêu đề nêu mã lần chạy gốc và câu trả lời của người dùng, link quay về lần chạy gốc. Khi yêu cầu sẽ ghi lại thứ có thể đã ghi (câu trả lời “Không thấy”), banner dùng `banner-unknown` thay cho nền trung tính.
-
-### Recovery (khôi phục sau lần chạy kết thúc)
-
-Chốt 18/09/2026 sau vòng thiết kế luồng. Mọi màn kết thúc có đường đi tiếp bằng một cú bấm, và không bao giờ bắt người dùng gõ lại yêu cầu.
-
-- **Chỉ màn đối chiếu hỏi về nơi nhận.** Thay nút “Tạo lại” bằng `recovery-question`: câu hỏi `title-md` (“Trên bảng “Báo cáo tuần” đã có 4 dòng tuần 37 chưa?”) và các đáp án `recovery-option`, xếp dọc, sức nặng ngang nhau. Mỗi đáp án là **link** (dẫn sang V03 đã điền sẵn), gồm nhãn đậm, dòng hệ quả `muted` và chevron: “Đã thấy đủ 4 dòng” → yêu cầu chỉ gửi thông báo; “Không thấy” → đủ yêu cầu. `conflict` thêm đáp án thứ ba “Thấy nhưng khác nội dung”, là `<button aria-expanded>` mở hướng dẫn sửa trực tiếp trên bảng tại chỗ, không tạo lại. Dưới nhóm luôn có dòng “Câu trả lời chỉ dùng để điền sẵn yêu cầu mới. Lần chạy này vẫn ở trạng thái “Cần đối chiếu”.” Không có cổng “So sánh” (API không trả dữ liệu hiện tại ở nơi nhận, nên cổng đó không cho thêm thông tin).
-- **`confirmed`:** nút primary “Tạo yêu cầu chỉ gửi thông báo”, không hỏi.
-- **`expired`, `failed`:** nút primary “Dùng lại yêu cầu này” (icon `rotate-ccw`) + dòng giải thích điều sẽ khác; “Tạo yêu cầu trống” là link. **`needs_input`:** primary “Dùng câu gợi ý này”, link “Dùng lại câu gốc”. **`refused`:** giữ “Tạo yêu cầu mới” (dùng lại sẽ bị từ chối lần nữa).
-- **Nguồn gốc đi theo tới màn duyệt.** Màn duyệt của lần chạy tạo lại có `origin-strip` (viền `hairline`, icon `history`, “Tạo lại từ lần chạy … · bạn trả lời “…””, link “Xem lần chạy gốc”) giữa tiêu đề và nội dung, và dòng “Tạo lại từ” trong phần chi tiết của thẻ quyết định. Kế hoạch khớp câu trả lời: một dòng `success` trong `write-summary` (“Khớp câu trả lời của bạn: không ghi lại dòng nào vào …”). Kế hoạch ghi vào đích người dùng đã xác nhận là có dữ liệu: `banner-unknown` “Kế hoạch này ghi lại … bạn đã thấy trên bảng” thay banner chờ duyệt, dòng ghi trùng mang nhãn “Trùng với câu trả lời của bạn”, **“Từ chối và sửa yêu cầu” thành primary**, nút duyệt lui thành secondary “Vẫn duyệt N thao tác ghi” với `aria-describedby` bắt đầu bằng cảnh báo. Không khoá nút duyệt: người dùng có thể đã đổi ý.
-
-### Inputs
-
-56px, bo 8px, viền 1px `border-control`; focus: viền 2px `ink`, không glow. Label luôn phía trên (`body-sm` 600); helper `caption` `muted`; lỗi dùng `danger` kèm icon và `aria-describedby`. Ô yêu cầu (V03) là textarea tự giãn, `body-lg`, tối thiểu 4 dòng.
-
-### Request composer (V03)
-
-- **Nhãn chế độ planner** cạnh tiêu đề, không đặt phía trên tiêu đề: demo dùng `badge-demo` (“Kế hoạch mẫu”); AI dùng pill `primary-subtle`/`primary` (“AI lập kế hoạch”). Luôn hiển thị.
-- **Ô yêu cầu:** chế độ demo chỉ đọc, nền `surface-soft`, icon khoá và lý do trong thanh dưới ô; chế độ AI sửa được, nền `canvas`, focus viền 2px `ink`, gợi ý viết trong thanh dưới ô. Bộ đếm ký tự chỉ hiện khi gần giới hạn 4000.
-- **Mẫu (demo):** thẻ radio thật bo 14px; đang chọn viền 2px `ink`; vô hiệu nền `surface-soft`, chữ `muted`, kèm lý do có icon.
-- **Gợi ý (AI):** chip pill 40px viền `hairline`, chữ `ink` 14/500; chèn vào ô, không tự gửi.
-- **Tuỳ chọn nâng cao:** disclosure ngăn bằng hairline trên/dưới, tiêu đề 16/600 + dòng tóm tắt `muted`.
-- **Cột “Hệ thống làm được gì”:** viền hairline bo 14px, không bóng; nhóm việc với icon tròn 40px, trạng thái kết nối có icon + chữ, cam kết trước khi ghi; chế độ AI thêm các kết quả planner có thể trả về.
-
-### Run history (V04)
-
-- **Filter pill:** 40px, bo full, viền 1px `hairline`, chữ `ink` 14/500 kèm số đếm `muted` tabular; đang chọn nền `ink`, chữ và số trắng 600, `aria-pressed="true"`. Mobile: một `select` 48px có nhãn “Nhóm trạng thái” (giá trị đang lọc luôn nhìn thấy, bộ chọn của hệ điều hành lo phần chạm), ngay dưới là “Đang hiển thị x / y lần chạy đã tải” và nút chữ “Bỏ lọc” — không dùng hàng pill cuộn ngang vì pill đang bật có thể nằm ngoài màn hình.
-- **Ô tìm kiếm:** 48px, viền `border-control`, icon kính lúp trái, nút xoá tròn `icon-button-circle` khi có từ khoá; label ẩn nhưng đọc được.
-- **Hàng lần chạy:** link toàn hàng; lưới badge 208px · nội dung · thời gian 150px (mobile xếp dọc); yêu cầu `body-lg` 500 tối đa 2 dòng; dòng phụ `body-sm` `muted`, phần cần chú ý dùng màu ngữ nghĩa 600; mã run `mono-sm` `muted`; ngăn bằng `hairline-soft`; focus viền 2px `ink` bo 8px, nền `surface-soft`.
-- **Trạng thái rỗng:** khung hairline bo 14px, icon tròn 56px `surface-strong`, tiêu đề `headline-sm`, đoạn `muted` tối đa ~520px, một hành động.
-
-### Tools & connections (V06)
-
-- **Khối server:** ngăn bằng hairline; icon 52px bo 14px nền `surface-strong`; tên `headline-sm` + slug `mono`; dòng tóm tắt `body-sm` `muted` tabular; badge trạng thái bên phải (`success` đã kết nối, `neutral` chưa kiểm tra/tắt theo cấu hình, `danger` lỗi, `unknown` chưa review).
-- **Hàng tool:** lưới icon tròn 40px · nhãn `body-lg` 500 + mô tả `body-sm` `muted` · pill Đọc/Ghi · nút “Chi tiết kỹ thuật” có chevron và `aria-expanded`; ngăn bằng `hairline-soft`, cao ≥ 64px.
-- **Pill Đọc/Ghi:** 24px, bo full, chữ 12/600 kèm icon (sách/bút); Đọc nền `surface-strong` chữ `ink`, Ghi nền `neutral-subtle` chữ `neutral`. Không dùng màu `action` vì đây là chính sách, không phải việc đang chờ.
-- **Chi tiết kỹ thuật:** khung `surface-soft` bo 14px thụt theo cột nhãn; ô nhãn `overline`; giá trị kỹ thuật `mono-md`; bảng tham số nền `canvas` bo 8px; nút sao chép `icon-button-circle` 32px có `aria-label`.
-- **Nút kiểm tra bị giới hạn:** nền `surface-strong`, chữ `muted`, dòng đếm ngược `body-sm` tabular kèm icon đồng hồ, `role="status"`.
-
-### Sign-in (V01)
-
-- **Khung:** không top nav; logo trái, badge demo phải; hai cột 1120px (giới thiệu · thẻ form 420px), căn giữa dọc; mobile form trước.
-- **Giới thiệu:** tiêu đề 40/50px đậm 600 tracking -0.03em (ngoại lệ đã ghi trong Do's and Don'ts); đoạn `body-lg` `muted`; 3 bước dạng hàng icon tròn 48px `surface-strong` + tiêu đề `body-lg` 500 + dòng phụ `body-sm` `muted`, không đánh số.
-- **Thẻ form:** `decision-card` style (hairline, bo 14px, mức bóng duy nhất, padding 32px); input 56px; nút hiện/ẩn mật khẩu `icon-button-circle` 40px bên trong ô; helper `caption` `muted`; banner lỗi/hết phiên bo 14px đặt dưới tiêu đề form; dòng môi trường `caption` `muted` sau hairline.
-
-### Copy & labeling conventions
-
-Nguồn chuẩn cho mọi màn (chốt sau vòng hoàn thiện UI ngày 17/09/2026); code và test dùng đúng các chuỗi này.
-
-| Chỗ dùng | Chuẩn | Không dùng |
-|---|---|---|
-| Tên sản phẩm | **ATI** | ati |
-| Nhãn dữ liệu fixture | Pill “Dữ liệu mô phỏng” 28px/13px ở mọi kích thước màn; **chỉ** khi transport là fixture, và màn đó phải kể đúng yêu cầu/dữ liệu fixture đang có trên server | “Mô phỏng”; hiện trên màn kể chuyện chạy thật; kể chuyện fixture mà nội dung không có trong fixture |
-| Chế độ lập kế hoạch | “Kế hoạch mẫu” · “AI lập kế hoạch”; nhãn khoá–giá trị “Chế độ lập kế hoạch” | “Demo · kế hoạch mẫu”, “Chế độ planner” |
-| Chủ thể trong câu | “Hệ thống …” (hỏi, trả lời, không lập được kế hoạch) | “Planner …” |
-| Trạng thái bước | Xong · Đang chạy · Chưa chạy (còn có thể chạy) · Không chạy (sẽ không chạy) · Thất bại · Chờ duyệt — luôn kèm icon | Hoàn tất (dành cho trạng thái run), Không thực hiện, không diễn ra |
-| Tiêu đề danh sách bước | “Kế hoạch gồm N bước” (trước khi thực thi: chờ duyệt, hết hạn) · “Kết quả từng bước” (từ lúc thực thi) · “Tiến trình” (dải giai đoạn khi chưa có kế hoạch) | “Các bước” |
-| Nhật ký | “Hoạt động” | “Nhật ký sự kiện” |
-| Thẻ bên phải V05 (không quyết định) | Nhãn “Tóm tắt lần chạy” + giá trị là tình trạng hiện tại | “Trạng thái”, “Kết quả lần chạy” |
-| Hộp tóm tắt | XONG “x / y bước” · ĐANG CHẠY / THẤT BẠI / CHƯA RÕ “Bước n” · ĐÃ GHI “Chưa ghi gì” / “N thao tác” · KẾ HOẠCH “Chưa có” (đang lập) / “Không có” (kết thúc) | ĐÃ XONG, HOÀN TẤT, “Không có thao tác ghi nào” |
-| Chứng cứ | Nút secondary “Xem chứng cứ” trong thẻ phải của run có kế hoạch đã kết thúc; link chữ “Xem chứng cứ” cuối mục Hoạt động | “Xem chứng cứ đầy đủ” |
-| Huỷ | Nút chữ gạch chân “Yêu cầu huỷ lần chạy” cuối thẻ phải, kèm hệ quả (“Huỷ sẽ dừng trước bước kế tiếp” / “không hoàn tác thao tác đang chạy”) | Nút secondary “Yêu cầu huỷ”, đặt góc trên |
-| Kết nối server | “Đã kết nối” · “Đang tắt theo cấu hình” · “Chưa kiểm tra trong phiên này” · “Không kết nối được” | “Sẵn sàng”, “Đang tắt” |
-| Mốc thời gian | “Tải lúc” (danh sách) · “Cập nhật lúc” (chi tiết đang poll) · “Kiểm tra lúc” (V06) · “quan sát lúc” (`observed_at`) | giờ trần không nhãn |
-| Badge nav | “Lần chạy” + số việc cần xử lý (amber) trên mọi trang có nav khi > 0; có chữ ẩn “cần xử lý:” | chỉ hiện ở Tổng quan |
-| Nhãn trạng thái run | Đúng bảng Run status (ví dụ “Đang đọc dữ liệu xem trước”, “Đang điều chỉnh kế hoạch”) | rút gọn tuỳ màn |
-| Tiêu đề run | Nguyên văn yêu cầu ở mọi màn (cắt bằng CSS, không viết lại) | bản rút gọn bằng tay |
-
-### Hardening rules (chốt 17/09/2026)
-
-- **Control không được mâu thuẫn với chữ cạnh nó.** Hành động bị server từ chối chắc chắn (vd. `409 ACTIVE_RUN`) thì nút bị `disabled` với lý do liên kết qua `aria-describedby`; khi kết quả gửi chưa rõ, hành động chính là **kiểm tra** (nút primary “Mở Lần chạy để kiểm tra”), gửi lại chỉ là nút secondary “Gửi lại yêu cầu” kèm điều kiện.
-- **Giới hạn không phải lỗi.** `409 HISTORY_LIMIT` dùng banner `neutral` với icon thông tin, không có “Thử lại”/“Làm mới” vô ích; `unknown` chỉ dành cho kết quả ghi chưa rõ, `danger` cho lỗi thật.
-- **Trạng thái chỉ có ở API thật không mang gợi ý fixture.** `401`, `429`, phiên hết hạn không có badge “Dữ liệu mô phỏng”, gợi ý email demo hay “mật khẩu bất kỳ”; ô lỗi có `aria-invalid="true"` và `aria-describedby` trỏ tới banner.
-- **Đồng hồ thời hạn** có `role="timer"` với `aria-label` đầy đủ phút/giây; một vùng `aria-live="polite"` ẩn chỉ thông báo theo mốc (9, 5, 2, 1 phút, hết hạn); mốc 2 phút cũng là lúc dòng đồng hồ chuyển sang `decision-timer-urgent`, không đọc mỗi giây. Banner chờ duyệt có `role="status"`.
-- **Tên truy cập duy nhất:** nút lặp lại phải nêu đối tượng (“Chi tiết kỹ thuật: Thêm dòng vào bảng tính”, “Xem JSON gốc: Kênh #nhom-ati”, “Xem nội dung: Bảng “Báo cáo tuần””). Hàng lần chạy là một link với `aria-label` gọn “Trạng thái: yêu cầu, thời gian”.
-- **Focus nhìn thấy được ở mọi trang:** `:focus-visible { outline: 2px solid ink; outline-offset: 2px }` áp chung, không phần tử nào tự tắt outline.
-- **Thẻ dẫn tới việc cần làm là một link cả thẻ** (thẻ “Cần xử lý” ở Tổng quan, hàng V04): `aria-label` gọn “Hành động: yêu cầu (trạng thái, thời gian)”, chữ hành động có mũi tên ở cuối thẻ chỉ là dấu hiệu nhìn thấy, không phải link lồng.
-- **Điều hướng là link, hành động là nút:** “Xem chứng cứ” là `<a>` có dáng nút phụ. Hai link cùng tên được phép khi cùng đích (vd. “Tạo yêu cầu” ở nav và CTA trang).
-- **Đăng nhập có một dàn ý ở mọi độ rộng:** H1 “Đăng nhập”, form đứng trước khối giới thiệu trong DOM (desktop dùng grid để đặt giới thiệu bên trái). `aria-invalid` và viền `danger` chỉ khi chính giá trị ô sai (401); 429 và hết phiên không đánh dấu ô.
-- **Nút chỉ có icon** mang `font: inherit` để không rơi về cỡ chữ mặc định của trình duyệt khi có thêm chữ.
-- **Lựa chọn bị chặn vẫn đọc được lý do:** radio mẫu không khả dụng dùng `aria-disabled="true"` (vẫn nhận focus) + `aria-describedby` tới dòng lý do, không dùng thuộc tính `disabled`.
-- **Văn bản dài:** tiêu đề run hiển thị nguyên văn nhưng cắt tối đa 3 dòng trên V05 (2 dòng trong danh sách) bằng CSS, có “Xem toàn bộ yêu cầu” khi bị cắt; payload/bảng cuộn ngang trong khung riêng; thời gian dùng `Intl.DateTimeFormat('vi-VN', { timeZone })`.
-
-### Distill rules (chốt 18/09/2026)
-
-- **Định danh kỹ thuật nằm sau disclosure “Chi tiết kỹ thuật”.** Thẻ tóm tắt lần chạy chỉ để lộ dữ kiện người dùng đọc được (Duyệt bởi, Múi giờ, Chế độ lập kế hoạch); phiên bản kế hoạch và mã băm bản xem trước nằm sau nút “Chi tiết kỹ thuật” (chevron + `aria-expanded`), đúng mẫu đã dùng ở V06. Chỉ màn `succeeded` mở sẵn disclosure vì đó là lúc người dùng cần chứng cứ; các màn khác đóng.
-- **Không lặp bảng chú giải trạng thái trong sản phẩm.** Bản đồ 14 `RunStatus` chỉ sống trong tài liệu này; mỗi hàng và mỗi thẻ đã tự mang pill trạng thái của nó.
-- **Mỗi con số nói một lần.** Tổng số lần chạy đã tải thuộc dòng chân danh sách; tiêu đề phụ chỉ giữ “Tải lúc” và nghĩa của cột thời gian. Số việc cần xử lý thuộc badge nav và khu “Cần xử lý”, không nhắc lại ở tiêu đề phụ.
-- **Màn chờ nói thời gian đã trôi** ngay trong banner trạng thái, dạng “mốc bắt đầu · đã N”: “Nhận yêu cầu lúc 14:22:07 · đã 4 giây”, “Bắt đầu chạy lúc 14:23:04 · đã 8 giây”.
-- **Mục “Hoạt động” chỉ xuất hiện khi nó thêm thông tin** so với dải “Tiến trình”. Ở `planning` hai mốc duy nhất trùng với dải giai đoạn nên bỏ cả mục lẫn hairline ngăn section, không để lại đường kẻ mồ côi.
-- **Artboard bằng chiều cao nội dung** (làm tròn lên bội số 20px): khoảng trắng dưới cùng là `padding-bottom: 64px` của `main`, không phải phần thừa của khung.
-
-### Icons & bề mặt trình duyệt
-
-- **Một bộ icon, một độ dày nét:** lucide, `viewBox="0 0 24 24"`, `stroke-width="2"` ở mọi kích thước hiển thị (12–32px) vì nét co giãn theo viewBox — không “chỉnh quang học” bằng 1.8 hay 2.4. Nét mảnh 1.4 chỉ thuộc logo ATI, không phải icon giao diện. Không dùng emoji hay ký tự Unicode thay icon.
-- **Kích thước icon** theo vai trò: 14–16px trong pill và dòng chữ, 16px trong nút, 20px trong vòng tròn 40–48px, 32px cho logo.
-- **Bề mặt trình duyệt cũng thuộc hệ:** `::selection` nền `primary-subtle` chữ `primary`; link `ink` với `text-underline-offset: 3px`, hover `primary`; số liệu thời gian và đếm dùng `font-variant-numeric: tabular-nums`; focus là viền 2px `ink`, không glow.
-
-### Lists, tables, dialog, tooltip, demo badge
-
-- **Danh sách lần chạy:** hàng cao ≥ 64px, ngăn bằng `hairline-soft`, pill trạng thái bên trái, yêu cầu `body-lg` 500 + dòng phụ `muted`, thời gian `caption`. Hover nền `surface-soft`. Mobile: xếp dọc.
-- **Dialog** bo 20px: chỉ cho xác nhận quyết định; focus vào nút an toàn; Esc đóng; trả focus.
-- **Tooltip** nền `ink`, chữ trắng, bo 8px; chỉ bổ sung, có với focus bàn phím.
-- **Demo badge**: pill “Dữ liệu mô phỏng” luôn ở top nav khi build fixture.
-
-## Do's and Don'ts
-
-- **Do** dùng navy chỉ cho hành động chính và mục đang chọn; mọi màu khác phải mang nghĩa trạng thái.
-- **Do** ghép màu trạng thái với icon và chữ; kiểm lại ở chế độ xám.
-- **Do** đặt thời hạn, số thao tác ghi và đích trong thẻ quyết định trước mọi chi tiết khác.
-- **Do** hiển thị payload dạng bảng/xem trước cho người đọc, JSON gốc luôn mở được.
-- **Do** ngăn section bằng hairline và khoảng trắng; chỉ đóng khung nội dung cần gom.
-- **Do** giữ vị trí cuộn, disclosure và focus khi dữ liệu polling cập nhật.
-- **Do** tự host Be Vietnam Pro; mọi token mới thêm vào DESIGN.md trước khi dùng.
-- **Don't** dùng màu Rausch, font Cereal, logo, ảnh hay bố cục marketing của Airbnb.
-- **Don't** thêm mức bóng thứ hai, blur, gradient hay bóng màu.
-- **Don't** dùng đậm 700 cho chữ nội dung; 700 chỉ dành cho `overline` và `wordmark`. Không có con số khổng lồ nào trên màn thao tác; ngoại lệ cỡ chữ duy nhất là tiêu đề giới thiệu ở trang Đăng nhập (V01) 40/50px, đậm 600.
-- **Don't** dùng giá trị tuỳ ý (`bg-[#...]`, `p-[13px]`) trong view/component.
-- **Don't** tự đóng banner chờ duyệt, cần đối chiếu hoặc lỗi; không thêm retry/resume cho ghi chưa rõ.
-- **Don't** hiển thị phần trăm tiến trình hay số liệu trang trí không có ý nghĩa đo.
-- **Don't** dùng danger đặc cho Từ chối/Huỷ.
-
-## Implementation notes
-
-- Kiểm tra hợp lệ và contrast bằng `@google/design.md@0.4.0 lint DESIGN.md` trước khi commit thay đổi token.
-- `export --format css-tailwind` của bản 0.4.0 **chưa dùng trực tiếp được**: bọc cả font stack trong một cặp nháy kép; bỏ `fontFeature` và component token; sinh `--leading-*` thay vì `--text-<name>--line-height`. WEB-01C cần bước sinh `apps/web/src/app/theme.css` có hậu xử lý và test; không chỉnh tay file sinh ra.
-- Component token dùng `backgroundColor` cho `divider`, `input-border`, `focus-ring` để biểu diễn màu đường kẻ, vì spec alpha chưa có thuộc tính border; khi áp vào CSS đó là `border-color`/`outline-color`.
-- Font Be Vietnam Pro tự host: đặt file woff2 (400/500/600/700, subset latin + vietnamese) trong `apps/web/src/assets/fonts/`, khai báo `@font-face` với `font-display: swap`, ghi license OFL kèm file.
-- Spacing đặt tên cùng tồn tại với thang số mặc định của Tailwind; trong code ưu tiên tên token.
-- Mockup tham chiếu: canvas review “ATI Run Screens” (riêng tư). Mockup không chứng minh accessibility, responsive hay hành vi polling; các kiểm tra đó thuộc WEB-03.
-- **Ngoại lệ chỉ có ở mockup:** artboard nạp Be Vietnam Pro từ Google Fonts vì canvas không có pipeline font cục bộ; `apps/web` vẫn tự host theo ADR-001/002. Các board mở đầu bằng “Cũ ·” là phương án đã loại, giữ để đối chiếu và **không** nằm trong phạm vi kiểm tra.
-- **Cảnh báo `cramped-padding` được chấp nhận** khi chiều cao cố định thay cho padding: đo trên bản render, hàng tool 65px cách nội dung 11px trên/dưới, vòng tròn icon 40px cách 11px, pill 26px cách chữ 4.6–5.4px (đo lại ở critique 18/09). Mọi cảnh báo khác của detector phải sửa chứ không bỏ qua.
+# Planora — DESIGN.md
+
+Tài liệu thiết kế chính cho frontend v3. Giữ hướng B đã được chủ dự án chọn;
+bản chuẩn hóa này chờ review, không phải yêu cầu thay đổi giao diện đã chạy.
+Front matter là danh sách token có vai trò; chín mục dưới đây giải thích cách
+dùng theo cấu trúc tham khảo [getdesign.md](https://getdesign.md/) và
+[collection của VoltAgent](https://github.com/VoltAgent/awesome-design-md).
+Đây là tài liệu viết riêng từ code Planora, không phải file tải từ dịch vụ trả phí
+hoặc chứng nhận tuân thủ một JSON schema của Google.
+
+**Quyền lực:** DESIGN.md quy định thị giác và tương tác. Hành vi nghiệp vụ,
+quyền hạn, phê duyệt và phục hồi vẫn theo
+[đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md).
+`apps/chat-web/DESIGN.md` chỉ trỏ về tài liệu này. `System Design/DESIGN.md`
+là tham khảo lịch sử; không lấy palette Apple/indigo hoặc nhãn ATI cũ cho UI mới.
+Không áp dụng tài liệu này để sửa các package v2 được AGENTS.md bảo vệ.
+
+## 1. Visual Theme & Atmosphere
+
+Planora là không gian tổ chức công việc: một lời nhắn, một kế hoạch có thể
+kiểm tra, các hành động được người dùng quyết định. Cảm giác như bàn làm việc
+với giấy và mực xanh, có trật tự nhưng không lạnh. Tên sản phẩm là **Planora**;
+ATI chỉ xuất hiện trong tài liệu môn học/lịch sử, không ở logo hay footer sản phẩm.
+
+Trang công khai thoáng và có điểm nhấn serif. Workspace ưu tiên đọc nội dung,
+đích nhận và quyết định; không thu nhỏ nội dung công việc thành poster quảng cáo.
+Giữ tinh thần khoảng 80% tĩnh, 20% chuyển động có mục đích.
+
+### Phạm vi hoạt động — xác minh ngày 05/10/2026
+
+Website: https://planora-ivory-tau.vercel.app. Đã đọc `/api/health` và
+`/api/auth/config`, cả hai HTTP200; deployment `accounts-workspace`:
+
+| Mảng | Hiện trạng phải phản ánh trong UI |
+| --- | --- |
+| Giới thiệu, đăng nhập, workspace shell | Đã triển khai; đăng nhập bằng tài khoản đã cấp |
+| Hội thoại | API lưu thật; tạo, lịch sử, lưu trữ, xóa mềm và khôi phục |
+| Tài khoản | Thông tin phiên và đăng xuất thật; chưa có UI chỉnh hồ sơ/đổi mật khẩu |
+| Dịch vụ | Có UI/schema cấu hình theo quyền; logo không chứng minh đã kết nối |
+| AI chat, lập kế hoạch, thực thi | Có UI/luồng trong mã nguồn đầy đủ; **chưa bật ở backend cloud hiện tại** (`planning=false`, `execution=false`) |
+| Đăng ký/xác minh email | Có view trong code; **cloud đang đóng** (`signupEnabled=false`) |
+| Google, quên/reset mật khẩu | Chưa khả dụng; `googleEnabled=false`; không thêm nút giả |
+| Sheets, Calendar, Notion, Telegram, Jira | Roadmap; không hiển thị như tích hợp đang hoạt động |
+
+Đối với cloud, không hứa gửi tin nhắn sẽ tạo kế hoạch ngay. Nội dung minh họa
+trên landing mang nhãn ví dụ; success/running/connected trong workspace chỉ
+được suy ra từ API của chính thao tác đó. Render Free có cold start; trạng thái
+chờ mạng không được biến thành tiến độ AI giả.
+
+## 2. Color Palette & Roles
+
+Token khai báo ở [index.css](apps/chat-web/src/index.css); tên semantic ở front
+matter ánh xạ tới CSS hiện có, không giả định các biến `--color-*` đã được tạo.
+
+| Vai trò | CSS / giá trị | Quy tắc |
+| --- | --- | --- |
+| Canvas | `--bg` / `#f8f4eb` | Nền toàn trang, không gradient chủ đạo |
+| Paper | `--paper` / `#fffdf7` | Composer, kế hoạch, menu, modal |
+| Sidebar | `--side` / `#eee9dd` | Tách khu điều hướng bằng surface |
+| Ink | `--ink` / `#2e382d` | Heading, nội dung và tài nguyên quan trọng |
+| Muted | `--muted` / `#656b5b` | Metadata/giải thích; không giảm opacity nội dung bắt buộc đọc |
+| Divider | `--line` / `#deded0` | Hairline1px; không dùng để viết chữ |
+| Primary | `--green` / `#3c5741` | Một CTA chính trong mỗi vùng quyết định |
+| Primary hover | `#2f4633` | Hover nút xanh; chữ `--paper` |
+| Soft | `--soft` / `#e4e9d8` | Selected nav, nền status nhẹ |
+| Pending | `--warm` / `#f6e6cf`, `--clay` / `#85532b` | Chờ duyệt; focus outline dùng clay |
+| Error | `#f8e6df` / `#9a3f32` | Lỗi và xóa; bắt buộc có nhãn/icon |
+| Unknown | `#eee6f2` / `#654576` | Chưa rõ kết quả; không đồng nhất failed |
+
+Success dùng xanh và dấu kiểm; running có icon/nhãn trạng thái, không suy ra
+% nếu server không cung cấp. Chip roadmap viền đứt/nền trung tính với “Dự kiến”.
+Các nền minh họa hiện có: hero `#e9e9dc`, editorial auth `#e7eadb`, CTA `#e8ecdd`.
+Đây là các surface theo ngữ cảnh, không thêm accent mới cho mỗi service.
+
+## 3. Typography Rules
+
+Sans **Be Vietnam Pro**, tên family CSS `Be`, tự host400/500/600 ở
+`apps/chat-web/public/fonts/`, giấy phép OFL. Serif hệ thống **Times New Roman**
+rồi Georgia; không tải font mạng mới. Giữ dấu tiếng Việt, không upper-case
+đoạn văn dài. Code/ID/JSON dùng Consolas hoặc monospace hệ thống.
+
+| Ngữ cảnh | Mốc CSS hiện tại | Hướng dùng |
+| --- | --- | --- |
+| Body | Sans14px /1.65,400 | Văn bản thao tác; không ép còn10–11px |
+| Hero landing | Serif66px /1.08 ở desktop rộng | Chia dòng có chủ ý; italic xanh chỉ một phần |
+| Heading workspace chung | Serif40px /1.15 | Rõ hierarchy; không tranh với plan CTA |
+| How heading | Serif38px | Reveal theo dòng, giữ đủ chỗ cho dấu |
+| Auth heading | Serif50px /1.05 | Form dễ đọc, không tăng thành hero toàn màn |
+| Auth editorial | Serif46px /1.1 | Một thông điệp ngắn, không lặp quy trình homepage |
+| Heading cấp2 chung | Serif30px /1.25 | Tên vùng và kế hoạch |
+| Button chung | Sans13px,500 | Nhãn động từ rõ, giữ target44px |
+| Eyebrow | Sans11px,600, tracking0.1em | Nhãn section ngắn, không thay heading |
+| Metadata | Sans11–12px trong UI hiện có | Chỉ thời gian, nhãn phụ; không giấu lỗi ở đây |
+
+Các mốc trên là selector desktop, không một thang bắt buộc cho mọi component.
+CSS context/media query có override; ưu tiên CSS cuối cùng được import.
+Yêu cầu cho UI mới: body/control tối thiểu14px, input mobile16px, title wrap
+tự nhiên. Đây là yêu cầu chất lượng cho lần sửa UI sau, chưa phải refactor đã làm.
+Không thêm weight700 cho family chỉ có ba tệp; ưu tiên500/600.
+
+## 4. Component Stylings
+
+### Buttons, inputs, feedback
+
+Primary pill: xanh rừng, chữ paper, target tối thiểu44px, padding10×18px,
+gap9px, nhãn13px/500. Secondary: paper/viền1px, ink; tertiary nền trong.
+Danger là chữ đất đỏ và xác nhận riêng cho xóa. Disabled: opacity0.55,
+không hover/submit; pending có aria-busy và khóa thao tác trùng.
+Focus-visible outline2px clay, offset4px; không xóa focus keyboard.
+
+Auth input cao54px, bo12px, icon và toggle không chồng chữ; label luôn thấy,
+required/autocomplete đúng mục đích. Focus border xanh + ring nhẹ3px.
+Hiện/ẩn mật khẩu là nút có accessible name; không điền credential mẫu.
+Lỗi đặt gần form, `role=alert`, giữ dữ liệu có ích, không echo secret.
+
+### Brand and service marks
+
+[Brand.tsx](apps/chat-web/src/components/Brand.tsx) sở hữu monogram P và
+wordmark planora; favicon/avatar dùng cùng hình. Không vẽ lại logo ở mỗi view.
+`ServiceLogo` dùng asset tự host trong `public/logos`; icon chức năng dùng Lucide.
+Giữ màu, tỷ lệ và tên GitHub/Trello/Slack. Logo có tên cạnh bên là decorative.
+Nguồn/điều kiện dùng: [logo README](apps/chat-web/public/logos/README.md).
+Mốc kích thước: card32px, hero22px, plan23px, icon chung20px; không xoay logo
+service theo hover. Roadmap có logo nhưng vẫn phải mang trạng thái dự kiến.
+
+### Public landing and footer
+
+Thứ tự giữ nguyên: hero → marquee `#ecosystem` → Cách hoạt động `#how` và
+roadmap → thông tin Dịch vụ `#services` → CTA → footer. Navbar Dịch vụ tới
+`#services`, không tới marquee. CTA đi login/workspace theo phiên; dịch vụ
+yêu cầu login giữ đích `next=services`.
+
+How01/02/03 dùng paper card bo18px, border hairline, số serif và miniature
+UI request → plan → result. Mini UI có nhãn ví dụ, không đồng hồ/% giả.
+Footer dùng wordmark, hai dòng serif, link Cách hoạt động/Dịch vụ/Workspace
+và lên đầu trang có đích thật. Không ghi “Dự án ATI”, không link pháp lý rỗng.
+
+### Auth editorial
+
+[LoginStory](apps/chat-web/src/components/LoginStory.tsx): lớp giấy và seal P,
+một thông điệp ngắn “Điều lớn lao, từ một khởi đầu nhỏ.”. Artwork decorative,
+không phải mini dashboard và không đưa lại ba tab quy trình homepage.
+Login/signup/verify chia sẻ editorial/footer; form là nội dung ưu tiên.
+CTA tạo tài khoản chỉ mở khi auth config cho phép. Đăng ký không tự cấp phiên;
+xác minh thành công không tự duyệt user. Hiện chờ admin khi backend trả trạng thái đó.
+
+### Workspace, history and menus
+
+Shell dùng `Workspace`; sidebar: brand → Hội thoại mới → Hội thoại/Dịch vụ →
+tìm kiếm → **Gần đây** → tài khoản/đăng xuất. Lưu trữ và Đã xóa nằm ở Settings,
+không tạo ba tab cạnh lịch sử. Timestamp/tên lấy API, không dùng UUID như tên
+người dùng tự viết; ID fallback hợp lệ khi chưa có title.
+
+Menu ⋯ paper212px, bo14px, padding6px, hàng42px desktop/44px mobile,
+icon16px; separator trước Xóa. Popover ở top layer, canh phải/gap8px,
+clamp12px và lật lên nếu thiếu chỗ. Keyboard: Arrow/Home/End, Escape trả focus,
+click ngoài/scroll/resize đóng. Xóa cần modal xác nhận và là xóa mềm, khôi phục
+được ở Settings; không đổi nó thành xóa vĩnh viễn trong một lần “làm đẹp”.
+
+Composer chung: Enter gửi, Shift+Enter xuống dòng, IME không bị gửi sớm.
+Giữ draft riêng theo hội thoại trong phiên, không persist nội dung vào localStorage.
+Feed chỉ autoscroll khi gần cuối; `role=log`, không cướp vị trí đang đọc.
+
+### Plan, progress, result and recovery
+
+Các trạng thái dùng **cùng workspace**, không thêm page cho mỗi giai đoạn.
+Plan step trình bày logo, số thứ tự, hành động/tool, read/write, tài nguyên,
+payload và phụ thuộc. Không bịa tên từ ID: dùng tên server cung cấp, nếu thiếu
+ghi “(ID)”. Cho đọc payload trước duyệt; JSON chỉ là fallback thu gọn.
+
+Review dock phía trên composer: “Duyệt và thực thi” primary; “Sửa qua chat”
+secondary; “Hủy” tertiary. Thiếu plan ID hoặc đang submit thì khóa đúng nút.
+Sửa qua chat chỉ điền draft, không tự thực thi. Hủy lỗi thì giữ kế hoạch.
+
+Gather/clarification dùng sự kiện thật; chạy/hoàn tất dựa snapshot/SSE/API,
+không suy diễn từ animation. Result ưu tiên tài nguyên/link HTTP(S) an toàn,
+`noopener noreferrer`; duration chỉ khi dữ liệu có. UNKNOWN nói rõ chưa biết
+đã ghi hay chưa, không Retry mù. Chỉ hiển thị Skip/Continue/Retry mà server cho
+phép. Đóng/Escape hộp thoại lỗi không Stop; Stop cần xác nhận riêng.
+
+### Services and account settings
+
+Service card có logo, mô tả, trạng thái thật, Allowed Scope và hai thao tác
+**Kiểm tra kết nối / Cấu hình**. Credential input không điền sẵn secret, không
+lưu trong localStorage. Lưu thành công không đồng nghĩa kiểm tra kết nối thành
+công. Fields/scope lấy schema API; roadmap không có nút cấu hình hoạt động.
+
+Settings: account, archived, deleted; admin có duyệt tài khoản theo quyền API.
+Account hiển thị tên/email thật, link dịch vụ và đăng xuất; chưa hứa edit profile,
+avatar upload, đổi role/password bằng các control chưa được nối backend/UI.
+Restore cập nhật danh sách sau API success; mục Deleted không mở chat trước restore.
+
+### Lazy loading and process loading
+
+| Chờ loại gì | Hiện trạng / cách hiển thị | Lỗi |
+| --- | --- | --- |
+| Chunk Services/Settings | React.lazy + Suspense; skeleton gần layout đích | ViewBoundary, nút tải lại |
+| Chunk Signup/Verify | Lazy, fallback status bằng chữ hiện có | Không claim đã có skeleton hoàn chỉnh |
+| API history/catalog/settings | Loading riêng vùng dữ liệu; empty chỉ sau success | Lỗi/thử lại, không coi lỗi là danh sách trống |
+| Login/approve/restore/config | Nút busy, khóa gửi trùng | Giữ ngữ cảnh, phản hồi theo thao tác |
+| Gather/planning | Nội dung tiến trình theo sự kiện thật | Clarification/lỗi kết thúc trạng thái đang chờ |
+| Execution | Timeline từng bước và snapshot bền vững | Recovery theo quyền server; không reset success |
+| Cloud cold start/offline | Đang kết nối/chưa truy cập được | Thử lại rõ ràng; không dựng AI progress |
+
+Landing, login và workspace hiện import trực tiếp; không nói “mọi page lazy”.
+Skeleton không chạy vô hạn khi request lỗi. Cache/optimistic UI không được cấp
+thành công cho thao tác ghi trước khi API xác nhận. Không phát thông báo screen
+reader mỗi frame của motion.
+
+## 5. Layout Principles
+
+Nhịp4/8/12/16/24/32/48/64px; khoảng lớn dành cho phân tách nội dung, không
+phải lấp bằng card. Desktop shell248px + `minmax(0,1fr)`, chat/review tối đa
+1120px. Public max1280px, lề48px; hero2cột gap70px. Auth max1360px,
+grid1.2/0.8, form max420px, gap52–100px. Settings max1040px, nav220px/gap42px.
+Đây là kích thước của các vùng khác nhau, không gom về một container tùy ý.
+
+### Bốn vùng trải nghiệm, bảy view hiện có
+
+| View | Route | Ghi chú |
+| --- | --- | --- |
+| Giới thiệu | `/` hoặc `/?view=landing` | Công khai kể cả khi đã login |
+| Đăng nhập | `/?view=login` | Trả về đích protected đã yêu cầu |
+| Đăng ký | `/?view=signup` | Phụ thuộc config; cloud hiện đóng |
+| Xác minh | `/?view=verify-email&token=…` | Token bỏ khỏi URL; không đưa vào log/ảnh |
+| Workspace | `/?view=workspace&c=…` | Chat/review/progress/result/recovery chung view |
+| Dịch vụ | `/?view=services&c=…` | Dùng workspace shell, cần phiên |
+| Cài đặt | `/?view=settings&c=…&section=account` | account/archived/deleted; admin là nội dung có điều kiện |
+
+History API/query string hiện có; không thêm router để đổi tên page.
+Protected route khi chưa có phiên chuyển login, whitelist `next`; giữ `c`/section
+khi thích hợp. Back/Forward, direct fragment và reload phải có nghĩa.
+Giữ lựa chọn ngay khi click; guard request chậm để hội thoại cũ không đè hội thoại mới.
+Plan state, error modal và menu không được tính như page riêng.
+
+## 6. Depth & Elevation
+
+Surface + border là công cụ chính. Paper khác canvas đủ nhẹ; card không “bay”
+mặc định. Shadow hero hiện có `0 6px 16px #2e382d08, 0 22px 42px -16px #2e382d24`.
+How hover được phép bóng mềm; không copy mức đó sang mọi input/menu.
+Modal/backdrop có mục đích tách quyết định, không blur/glassmorphism toàn trang.
+
+### Motion contract
+
+| Vùng | Biên độ/thời gian đã có | Ràng buộc |
+| --- | --- | --- |
+| Hero idle | Y0→−6→0px,4s ease-in-out | Wrapper float tách rotator; không scale/glow |
+| Hero drag | Y0.35°/px vô hạn; X−0.15°/px,±12° | Threshold5px, giữ click con, pause float/resume400ms |
+| Hero inertia | ≤0.08°/ms,≤240ms, friction85ms | Grab mới hủy, không reset rotation |
+| Hero mặt/cạnh | Perspective1200px; dày14px/10px | Backface hidden, mặt khuất inert/aria-hidden |
+| Marquee |18s linear,4nhóm, dịch−25% | Một accessible list; bản sao aria-hidden; không nút pause theo lựa chọn chủ dự án |
+| How story | Token6px + hairline theo scroll | Desktop ngang, mobile dọc; không giả tiến độ hệ thống |
+| How hover | Lift−6px,280ms | Fine pointer; không phóng chữ/logo |
+| Reveal |650–750ms, stagger75–150ms | Chỉ khi vào viewport; heading mask không cắt dấu |
+| Roadmap | Unfold350ms, line400ms | Click/keyboard/tap; không hover-only hay mốc thời gian bịa |
+| CTA | Magnetic±3px, arrow4px, paper shift±8px | Desktop fine pointer; không đuổi con trỏ |
+| Auth artwork | Float6px/6s, seal thêm3px/nghiêng2° | Chữ/form/bóng đứng yên |
+| Press/menu | Scale0.985/160ms; menu entrance160ms | Không bounce; focus không dịch khỏi màn |
+
+Hero mở desktop X6°/Y−12°, mobile X0°/Y0°; chỉ khởi tạo lúc mount, không reset
+khi float resume. Touch dùng `pan-y pinch-zoom`, vẫn cuộn trang dọc; arrow keys
+xoay15° khi rotator focus, không lấy phím controls con.
+
+Native IntersectionObserver/rAF/transform/opacity, refs cho scroll/pointer;
+không setState mỗi frame, không loop idle, không thêm animation library.
+Observer/listener/timer/frame được cleanup. Content tĩnh là baseline; enhancement
+chỉ bật khi API trình duyệt có sẵn. Reduced-motion tắt float/marquee/token/
+parallax/magnetic/inertia/reveal movement; manual hero drag và roadmap vẫn dùng
+được, nội dung không bị ẩn. CSS hiện tại còn tắt transition toàn cục ở reduce;
+không mô tả “opacity animation vẫn bật” như đã triển khai.
+
+## 7. Do's and Don'ts
+
+**Làm:** hierarchy bằng serif + khoảng trống; CTA rõ; payload/tài nguyên dễ đọc;
+labels tiếng Việt ngắn; status có chữ + icon; ví dụ đặt nhãn ngay trong vùng;
+focus/empty/error/retry có ý nghĩa. Tích hợp/capability căn cứ API, không logo.
+
+**Không:** neon/glow, gradient rực, particle, số liệu chưa đo, connected giả,
+avatar người dùng bịa, dashboard AI tương lai, card lồng vô cớ, chữ marketing
+lặp trên auth. Không hứa tính năng roadmap đang hoạt động, không khóa dọc bằng
+`touch-action:none`, không che nội dung bằng reveal khi JS/observer thiếu.
+Không công khai secret trong docs, build, URL, localStorage hoặc ảnh.
+
+Các trạng thái bắt buộc review cho component mới: default/hover/focus-visible/
+pressed/disabled/loading/error/empty/success nếu có. Không chỉ review screenshot
+happy path. Đối với dịch vụ, thêm denied/not-configured/disconnected; execution
+thêm failed/unknown/reconciliation-required. Các nhãn này phải khớp contract API,
+không tự đặt enum backend mới.
+
+## 8. Responsive Behavior
+
+| Breakpoint hiện có | Hành vi |
+| --- | --- |
+| ≥1024px | Sidebar shell cố định; content không tràn theo cột |
+| ≤1023px | Sidebar drawer; Escape/backdrop đóng, focus return, inert phía sau |
+| ≤1180px | Plan step chuyển chuỗi dọc (media761–1180 và mobile) |
+| ≤760px | Hero/How/Services1cột; workflow token dọc; auth form trước editorial; lề16–20px |
+| ≤700px | Settings nav thành hàng, profile fields xếp dọc |
+| 320px | Target44px, input16px, title/payload/ID wrap, không overflow page |
+
+Desktop hover/magnetic không chạy trên coarse pointer. Drawers/modals có focus
+trap/return, Escape theo đúng cấp; Escape menu không đóng cả drawer cùng lúc.
+Composer/review dock không che tin nhắn khi mở bàn phím. Dùng min-width0 cho
+cột và overflow-wrap cho ID; không sửa lỗi layout bằng overflow-x:hidden ở body.
+
+Yêu cầu nghiệm thu cho lần sửa UI sau:320×740,390×844,768×1024,1440×900;
+zoom200%, keyboard-only, reduced-motion, request lỗi/chậm. Đây là checklist,
+không phải tuyên bố toàn bộ matrix đã chạy trong lượt tài liệu này.
+
+## 9. Agent Prompt Guide
+
+Đọc DESIGN.md trước khi sửa UI; đọc AGENTS.md, handoff và spec v3 cho nghiệp vụ.
+Xác định component/CSS/hook đang sở hữu tương tác, mở rộng tại chỗ. Dùng token
+đã có; không tạo bản copy Brand/ServiceLogo/Modal hoặc rewrite hero logic.
+Nếu cần token mới, giải thích vai trò và cập nhật source lẫn tài liệu cùng task.
+
+Prompt áp dụng:
+
+> Thiết kế [component/view] cho Planora theo DESIGN.md tại gốc repo. Giữ nền
+> kem, paper, xanh rừng, serif editorial và Be Vietnam Pro. Tái sử dụng component
+> v3 hiện có; đọc capability/API trước khi hiện control. Có keyboard focus,
+> loading/error/empty, mobile và reduced-motion. Không thay bố cục ngoài phạm vi,
+> không thêm dịch vụ/metric/success giả; không gọi provider ghi khi chưa duyệt.
+
+### Evidence and maintenance
+
+Nguồn triển khai: [App](apps/chat-web/src/App.tsx),
+[base CSS](apps/chat-web/src/index.css), [auth CSS](apps/chat-web/src/login.css),
+[sidebar CSS](apps/chat-web/src/sidebar.css), [settings CSS](apps/chat-web/src/settings.css),
+[story CSS](apps/chat-web/src/landing-story.css), [motion CSS](apps/chat-web/src/motion.css),
+[hero hook](apps/chat-web/src/hooks/use-hero-motion.ts),
+[story hook](apps/chat-web/src/hooks/use-landing-story.ts).
+Cloud account/workspace được triển khai từ
+[backend commit669a413](https://github.com/VinhDat267/ATI_Project/tree/669a4131699445a54863d42521e92380abe92fbd/apps/chat-api/deploy).
+
+Thứ tự căn cứ: yêu cầu mới đã chốt → spec v3 về nghiệp vụ → capability/API
+thực tế → CSS/component hiện tại về giá trị → DESIGN.md giải thích. Nếu mâu
+thuẫn, ghi rõ lệch và sửa trong task phù hợp, không ngầm thay đổi production.
+Mỗi lần thay phong cách/component cập nhật đúng mục; handoff giữ bằng chứng
+test/browser và giới hạn ở log riêng, không biến DESIGN.md thành nhật ký deploy.
