@@ -1,3 +1,0 @@
-{
-  "extends": "../../packages/dsl/tsconfig.json", "compilerOptions": { "rootDir": "src", "outDir": "dist" }, "include": ["src/**/*.ts"]
-}

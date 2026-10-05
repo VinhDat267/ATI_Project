@@ -1,6 +1,6 @@
 # ADR-001 — React + TypeScript + Vite cho frontend B/local
 
-Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00. **PARTIALLY_SUPERSEDED 17/09/2026:** phần CSS thuần, “không UI kit/query cache/React plugin” và budget 160 KiB được thay bởi [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md) (Tailwind CSS v4, shadcn/ui trên Radix, TanStack Query, Fast Refresh); renderer, proxy, hash routes và ràng buộc bảo mật dưới đây vẫn hiệu lực. WEB-01B đã tạo fixture shell ở trạng thái **PROVISIONAL_IMPLEMENTATION**; live frontend chưa tích hợp API. System design cấp hệ thống là [tài liệu riêng](superpowers/specs/2026-09-15-platform-system-design.md) và phải được duyệt trước WEB-01C/WEB-02. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau [thiết kế UX](superpowers/specs/2026-09-15-platform-ux-design.md). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
+Ngày: 15/09/2026. **DECIDED_FOR_PLAN** trong WEB-00. **PARTIALLY_SUPERSEDED 17/09/2026:** phần CSS thuần, “không UI kit/query cache/React plugin” và budget 160 KiB được thay bởi [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md) (Tailwind CSS v4, shadcn/ui trên Radix, TanStack Query, Fast Refresh); renderer, proxy, hash routes và ràng buộc bảo mật dưới đây vẫn hiệu lực. WEB-01B đã tạo fixture shell ở trạng thái **PROVISIONAL_IMPLEMENTATION**; live frontend chưa tích hợp API. System design cấp hệ thống là tài liệu riêng (`superpowers/specs/2026-09-15-platform-system-design.md`, đã xoá khỏi main, xem tag `archive/v2-final`) và phải được duyệt trước WEB-01C/WEB-02. Người dùng đã giao bước đánh giá stack và lập kế hoạch sau thiết kế UX (`superpowers/specs/2026-09-15-platform-ux-design.md`, đã xoá khỏi main, xem tag `archive/v2-final`). Phạm vi điều hướng là 6 view/4 mục chính; workflow editor, workflow tái sử dụng và SaaS vẫn ngoài B.
 
 ## Quyết định
 
@@ -10,7 +10,7 @@ Không thêm router library, global state library, query cache library, UI kit h
 
 ## Căn cứ được đo
 
-Nguồn: [measurement.json](web-evidence/WEB-00/measurement.json), tái chạy bằng `node docs/web-evidence/WEB-00/measure.mjs` từ root. Script tạo thư mục tạm mới, chỉ copy package manifests/lock và ba file DSL thuần; không copy env, DB hoặc secrets. Cài ứng viên bằng `npm ci --ignore-scripts`, không thay node_modules/lock của workspace chính. npm control không đổi số mục hoặc tập name@version của baseline.
+Nguồn: measurement.json (`web-evidence/WEB-00/measurement.json`, đã xoá khỏi main, xem tag `archive/v2-final`), tái chạy bằng `node docs/web-evidence/WEB-00/measure.mjs` từ root. Script tạo thư mục tạm mới, chỉ copy package manifests/lock và ba file DSL thuần; không copy env, DB hoặc secrets. Cài ứng viên bằng `npm ci --ignore-scripts`, không thay node_modules/lock của workspace chính. npm control không đổi số mục hoặc tập name@version của baseline.
 
 | Ứng viên có cùng Vite + Playwright + parser | Mục node_modules trong lock | Tăng so 258 | JS mẫu, bytes | Gzip mẫu, bytes |
 |---|---:|---:|---:|---:|
@@ -55,4 +55,4 @@ Navigation sáu view thay điều khoản hai màn hình ở baseline/FR/lịch;
 
 Ước lượng làm việc có review: WEB-01 8–12 giờ, WEB-02 12–18 giờ, WEB-03 8–12 giờ, tổng 28–42 giờ; là dự báo mới, không phải giờ đã tiêu hay cam kết nằm trong 14 giờ UI cũ. Chưa gồm API-CATALOG, đóng API gate, hoặc AI. Sau WEB-01 đo thời gian thực rồi hiệu chỉnh lịch. Có thể thu nhỏ trang Tổng quan/Tools thành bố cục đơn giản; không cắt approval/reconnect/session/unknown safeguards.
 
-Nếu đổi renderer, giữ contracts, API client, event reducer và controller; thay React adapters/views và browser snapshots. Thay đổi không miễn phí nhưng không buộc viết lại engine. Xem [kế hoạch triển khai](superpowers/plans/2026-09-15-frontend-platform.md).
+Nếu đổi renderer, giữ contracts, API client, event reducer và controller; thay React adapters/views và browser snapshots. Thay đổi không miễn phí nhưng không buộc viết lại engine. Xem kế hoạch triển khai (`superpowers/plans/2026-09-15-frontend-platform.md`, đã xoá khỏi main, xem tag `archive/v2-final`).

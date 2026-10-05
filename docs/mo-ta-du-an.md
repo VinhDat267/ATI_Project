@@ -1,6 +1,6 @@
 # Mô tả dự án — B/local
 
-Dự án nghiên cứu cách biến mô tả công việc thành workflow gọi MCP có preview và kiểm soát hành động. Phạm vi chính thức là [BASELINE](BASELINE.md); các con số/luồng lớn hơn trong bản trước đã được lưu archive.
+Dự án nghiên cứu cách biến mô tả công việc thành workflow gọi MCP có preview và kiểm soát hành động. Phạm vi chính thức là BASELINE (`BASELINE.md`, đã xoá khỏi main, xem tag `archive/v2-final`); các con số/luồng lớn hơn trong bản trước đã được lưu archive.
 
 ## Vấn đề và giá trị giả định
 

@@ -1,7 +1,7 @@
 # Yêu cầu chức năng — scope MVP v2 / đối chiếu B/local
 
 **SCOPE_APPROVED 21/09/2026; IMPLEMENTATION_NOT_VERIFIED.**
-[Đặc tả](superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md) có ưu
+Đặc tả (`superpowers/specs/2026-09-21-workflow-platform-mvp-v2-design.md`, đã xoá khỏi main, xem tag `archive/v2-final`) có ưu
 tiên khi khác profile B cũ bên dưới. 78 ID cũ giữ nguyên, không cộng với 11 ID
 delta để tuyên bố tỷ lệ hoàn thành. Mọi ID v2 sau là MUST của phạm vi đích.
 
@@ -25,7 +25,7 @@ vẫn áp cho tool local; không buộc cài arbitrary MCP server cho SaaS.
 
 ## Profile B/local trước v2 (yêu cầu nền và evidence lịch sử)
 
-Nguồn scope: [BASELINE](BASELINE.md). Giữ 78 ID cũ để truy vết; cột B thay độ ưu tiên cũ, không cộng tất cả thành MVP. M = mục tiêu bắt buộc của B, S = tùy quỹ, OUT = ngoài scope. Đây là yêu cầu, không trạng thái implementation.
+Nguồn scope: BASELINE (`BASELINE.md`, đã xoá khỏi main, xem tag `archive/v2-final`). Giữ 78 ID cũ để truy vết; cột B thay độ ưu tiên cũ, không cộng tất cả thành MVP. M = mục tiêu bắt buộc của B, S = tùy quỹ, OUT = ngoài scope. Đây là yêu cầu, không trạng thái implementation.
 
 Phân loại: 78 FR = 59 M + 1 S + 18 OUT. Đã bỏ các tổng 45/44 sai. Các invariant ở EXECUTION-CONTRACT là bắt buộc, không được cắt để kịp lịch.
 
@@ -116,7 +116,7 @@ Phân loại: 78 FR = 59 M + 1 S + 18 OUT. Đã bỏ các tổng 45/44 sai. Các
 - Planning: dev/holdout theo EVALUATION; không chỉ kiểm tools có mặt. Query expansion là thí nghiệm có đối chứng.
 - Validation: phản ví dụ schema/policy/reference; input reference deferred được kiểm sau resolve; output isError hoặc sai schema không được tính success.
 - Approval/engine: exact preview, đổi version/hash, duplicate approval, payload conflict, lost response/crash, cooperative cancel và local replan phải có trace quan sát được.
-- UI: sáu view (đăng nhập, tổng quan, tạo yêu cầu, lịch sử lần chạy, chi tiết lần chạy, công cụ & kết nối), bốn mục điều hướng; poll/reconnect theo seq, fetch preview, hiển thị refused/needs_input/reconciliation_required. [UX platform](superpowers/specs/2026-09-15-platform-ux-design.md) tổ chức lại các FR hiện có; không thêm workflow editor/reuse hoặc CRUD ngoài B. Tool catalog live đã có DTO/API riêng; nghiệm thu FR-CON-04 vẫn cần kiểm tra discovery thật và reviewed 8+2 tool.
+- UI: sáu view (đăng nhập, tổng quan, tạo yêu cầu, lịch sử lần chạy, chi tiết lần chạy, công cụ & kết nối), bốn mục điều hướng; poll/reconnect theo seq, fetch preview, hiển thị refused/needs_input/reconciliation_required. UX platform (`superpowers/specs/2026-09-15-platform-ux-design.md`, đã xoá khỏi main, xem tag `archive/v2-final`) tổ chức lại các FR hiện có; không thêm workflow editor/reuse hoặc CRUD ngoài B. Tool catalog live đã có DTO/API riêng; nghiệm thu FR-CON-04 vẫn cần kiểm tra discovery thật và reviewed 8+2 tool.
 
 ## Phi chức năng — mục tiêu, chưa có số đo
 
