@@ -1,11 +1,11 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 05/10/2026, sau merge #84 tại `ab0817e`: kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01). Chỉ tài liệu, mã nguồn không đổi. Trước đó:
+**Cập nhật lần cuối:** 05/10/2026, sau merge FE-04 #88 tại `89d1999` và UI-API-01 #86 tại `210d3b6`: token/theme/shell và API cho giao diện mới đã vào `main`, review độc lập đạt, CI đúng hai head xanh. FE-05 là việc tiếp theo. Trước đó: #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01);
 - #82 DOC-01 (`841d9da`): sửa năm link lưu trữ mà review độc lập #80 phát hiện;
 - #80 xoá v1/v2 (`7060a37`);
 - #77 kế hoạch tuần 4 (`badccb3`).
 
-Agent cập nhật: Claude Code (reviewer).
+Agent cập nhật: Codex (reviewer sau merge #88/#86).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -15,7 +15,7 @@ Agent cập nhật: Claude Code (reviewer).
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03 và FE-03b đã merge. Giao diện mới theo design system Agentic có kế hoạch qua #84 (FE-04 → FE-10, UI-API-01), chưa thi công;
+> - **frontend:** FE-01 → FE-03, FE-03b và FE-04 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell; tiếp theo FE-05 cockpit, rồi FE-06 và FE-07 song song. Các trang và khoảnh khắc còn lại chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -66,13 +66,15 @@ Mã và tài liệu v1/v2 (`apps/api`, `apps/web`, `apps/mcp-task-hub`, `package
 
 ## 3. Số liệu mới nhất
 
-Mỗi số liệu ghi kèm ngày đo và commit. Số liệu phần mềm mới nhất từ [CI PR #80](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959), SUCCESS trên head `dc3dba8` ngày 05/10/2026, sau khi xoá v1/v2. Claude Code cũng chạy lại `npm ci`, `npm run check` và browser trên PostgreSQL tmpfs riêng; cả hai cho đúng số của CI #75 bên dưới. Trước đó: [CI PR #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347), SUCCESS trên head `df3b7e8`, ngày 05/10/2026 giờ Việt Nam; implementer và reviewer độc lập chạy `npm run check` trên PostgreSQL tmpfs riêng trong AUTH-06. Tree merge `bfd824f` bằng head CI (`git diff --exit-code` đạt); PR chỉ đổi tài liệu/ignore, mã sản phẩm vẫn ở `198fe6d`. Browser32/32 chạy trên CI với OIDC giả, chưa chạy lại local trong AUTH-06. Bằng chứng Gmail/Google thật có native UI, DB/API và các bước người dùng trực tiếp xác nhận, ghi riêng ở đoạn AUTH-06/task card. Ba phép đo model thật W3-06 vẫn dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; chưa đo lại sau các thay đổi sản phẩm tiếp theo, gồm wording refusal W3-00b. Không gọi model hoặc ghi workflow dịch vụ trong AUTH-06. Các bằng chứng live cũ giữ ngày và giới hạn; nghiệm thu auth không xác lập chính sách hủy request backend đang chạy hay độ bền gửi thư qua restart.
+Bản gộp sau #88/#86 tại `210d3b6`, ngày 05/10/2026: reviewer chạy mới `npm run check` exit 0 (**1.303 v3 + 165 eval**), canonical browser exit 0 (**39/39 qua đủ 11 scenario**), PostgreSQL tmpfs riêng và sandbox/OIDC giả. [CI main FE-04](https://github.com/VinhDat267/ATI_Project/actions/runs/37331111009) SUCCESS đúng `89d1999`; [CI main bản gộp](https://github.com/VinhDat267/ATI_Project/actions/runs/37331218389) SUCCESS đúng `210d3b6`. Model/golden/provider live không chạy lại; các bằng chứng live dưới đây giữ mốc đo cũ.
+
+Mỗi số liệu ghi kèm ngày đo và commit. Số liệu lịch sử trước hai PR mới từ [CI PR #80](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959), SUCCESS trên head `dc3dba8` ngày 05/10/2026, sau khi xoá v1/v2. Claude Code cũng chạy lại `npm ci`, `npm run check` và browser trên PostgreSQL tmpfs riêng; cả hai cho đúng số của CI #75 bên dưới. Trước đó: [CI PR #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347), SUCCESS trên head `df3b7e8`, ngày 05/10/2026 giờ Việt Nam; implementer và reviewer độc lập chạy `npm run check` trên PostgreSQL tmpfs riêng trong AUTH-06. Tree merge `bfd824f` bằng head CI (`git diff --exit-code` đạt); PR chỉ đổi tài liệu/ignore, mã sản phẩm vẫn ở `198fe6d`. Browser32/32 chạy trên CI với OIDC giả, chưa chạy lại local trong AUTH-06. Bằng chứng Gmail/Google thật có native UI, DB/API và các bước người dùng trực tiếp xác nhận, ghi riêng ở đoạn AUTH-06/task card. Ba phép đo model thật W3-06 vẫn dùng runtime `7ba60ef`, catalog33tool/8service và fixtures tổng hợp; chưa đo lại sau các thay đổi sản phẩm tiếp theo, gồm wording refusal W3-00b. Không gọi model hoặc ghi workflow dịch vụ trong AUTH-06. Các bằng chứng live cũ giữ ngày và giới hạn; nghiệm thu auth không xác lập chính sách hủy request backend đang chạy hay độ bền gửi thư qua restart.
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 1.245/1.245 = 47 schema + 340 adapters + 188 planner + 25 executor + 331 API + 314 web | 05/10, [CI #80](https://github.com/VinhDat267/ATI_Project/actions/runs/37251935959) head `dc3dba8` và chạy local trên PostgreSQL tmpfs; trước đó 04–05/10, [CI #75](https://github.com/VinhDat267/ATI_Project/actions/runs/37222271347) head `df3b7e8` | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 1.303/1.303 = 47 schema + 340 adapters + 196 planner + 25 executor + 349 API + 346 web | 05/10, bản gộp `210d3b6`, reviewer chạy local trên PostgreSQL tmpfs riêng | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 32/32 ca, 11 scenario | như trên; auth04 gồm Google login và bốn ca AUTH-05 Google, dùng OIDC giả | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 39/39 ca, 11 scenario | như trên; auth04 gồm Google login và bốn ca AUTH-05 Google, dùng OIDC giả | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Gmail SMTP và Google OAuth thật | Email xác minh/duyệt/reset, login mật khẩu mới, link một lần; Google mới pending/approve/login và tài khoản mật khẩu unlink/link/relogin đạt; SMTP535 và Google redirect mismatch đạt | 04–05/10, mã sản phẩm `198fe6d`, handoff merge #75 `bfd824f` | Native Gmail/Google/ATI UI + DB/API và xác nhận người dùng; [task AUTH-06](tasks/AUTH-06-auth-live-setup.md) |
 | Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
@@ -99,6 +101,12 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **UI-API-01 xong #86** (`210d3b6`), merge 05/10 lúc 22:14:34 Việt Nam: refusal thêm metadata có cấu trúc, router cấp danh sách dịch vụ chưa kết nối (không nhận danh sách model tự khai); quản trị viên lưu riêng scope bằng PUT, giữ khóa đã mã hóa và vô hiệu kết quả kiểm tra cũ; frontend có helper dùng protected transport.
+  - Review độc lập toàn nhánh và delta tài liệu đạt, 0 finding trên head `f357279`. Native PostgreSQL chứng minh advisory waiter và giữ khóa mới khi đổi scope đồng thời. Check **1.278 v3 + 165 eval**, browser **32/32 qua 11 nhóm**, exit 0 trong review riêng trước merge.
+  - [CI PR #86](https://github.com/VinhDat267/ATI_Project/actions/runs/37316087933) SUCCESS đúng head `f357279`; merge vào main sau FE-04 không có file giao nhau. Xem [log thi công](log/2026-10-05-codex-UI-API-01.md) và [log merge](log/2026-10-05-codex-FE04-UIAPI01-merge.md).
+- **FE-04 xong #88** (`89d1999`), merge 05/10 lúc 22:13:46 Việt Nam: token/font, sáng-tối theo OS/localStorage/cross-tab; AppShell, menu có bàn phím/phân quyền, banner sandbox và route mới. Chưa thay luồng chat bằng cockpit.
+  - Review độc lập đạt sau sửa bốn P2: locator AUTH-05, weight 600 cho nút màu đặc, tương phản landing tối và vùng chạm tối thiểu 40×40. Check **1.270 v3 + 165 eval**, browser **39/39 qua 11 nhóm**, exit 0 trong review riêng trước merge; tương phản đoạn landing tối đo thật **9,5665:1**.
+  - [CI PR #88](https://github.com/VinhDat267/ATI_Project/actions/runs/37328409989) SUCCESS đúng head `e5894c3`; cây merge bằng head đã review. Xem [log thi công](log/2026-10-05-codex-FE-04.md) và [log merge](log/2026-10-05-codex-FE04-UIAPI01-merge.md). Bằng chứng hai PR chỉ sandbox/OIDC giả; model và provider live chưa chạy lại.
 - #84 kế hoạch giao diện mới (`ab0817e`), merge 05/10 lúc 19:22:29 Việt Nam. Chỉ tài liệu; **tự review, người dùng cho merge khi chưa có review độc lập**. CI `v3` xanh trên head `c245170`.
   - `docs/design/prototypes/`: 12 trang HTML làm bằng OpenDesign, review với mã thật nhiều vòng trong ngày. Đã gỡ khỏi bản mẫu các tính năng không có trong API (mời thành viên, từ chối tài khoản, gỡ khoá, lịch sử cả nhóm, lưu bản nháp…) và các câu sai về hệ thống.
   - Đặc tả `docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`:
