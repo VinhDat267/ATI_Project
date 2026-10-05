@@ -110,7 +110,10 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - Task card FE-04 → FE-10 và UI-API-01; ROADMAP thêm 8 dòng. Phần tối thiểu để demo: FE-04 → FE-07.
   - Thứ tự cần giữ: FE-05 merge trước 16/10 để buổi thử W4-03 chạy trên giao diện mới. Nếu không kịp thì W4-03 dùng giao diện hiện tại và báo cáo ghi rõ.
   - Xem [log](log/2026-10-05-claude-code-plan-ui-redesign.md).
-- #82 DOC-01 (`841d9da`), merge 05/10 lúc 09:32:41 Việt Nam (Codex): review độc lập #80 phát hiện một lỗi P3. Năm link trong `docs/screens.html` và `docs/wireframes.html` trỏ tới tài liệu v2 đã xoá; nay trỏ sang bản tại tag `archive/v2-final` trên GitHub. Xem [log](log/2026-10-05-codex-DOC-01-pr80-archive-links.md).
+- **DOC-01 xong #82** (`841d9da`), merge 05/10 lúc 09:32:41 Việt Nam: đóng finding P3 của review độc lập #80; sửa năm href trong `docs/screens.html` và `docs/wireframes.html` tới tag `archive/v2-final`, có nhãn "lưu trữ"; bốn href local còn tồn tại giữ nguyên.
+  - Review độc lập `0ecaa18..36cef3b` đạt: base có năm đích thiếu; head có năm link archive (BASELINE 2/API 2/EXECUTION-CONTRACT 1), bốn link local và `missing=[]`. GitHub Contents API trả ba `html_url` đúng href; tag peel về `badccb3`; `git diff --check` exit 0.
+  - [CI PR #82](https://github.com/VinhDat267/ATI_Project/actions/runs/37255434085) SUCCESS trên head `36cef3b`; cây merge bằng head đã kiểm. [CI main](https://github.com/VinhDat267/ATI_Project/actions/runs/37255822408) SUCCESS đúng merge `841d9da`.
+  - Chỉ sửa liên kết tài liệu; không chạy lại suite ứng dụng local, model hoặc service workflow. Các giới hạn live và backlog giữ nguyên. Xem [task DOC-01](tasks/DOC-01-pr80-archive-links.md) và [log reviewer](log/2026-10-05-codex-DOC-01-merge.md).
 - #80 dọn repo (`7060a37`), merge 05/10 lúc 08:38:32 Việt Nam; tự review, người dùng cho merge khi chưa có review độc lập. Review độc lập sau merge chỉ phát hiện lỗi P3 link lưu trữ, đã sửa ở #82.
   - Xoá 899 file v1/v2 (1.511 → 612 file được theo dõi) theo thiết kế người dùng duyệt; giữ tài liệu đề tài ban đầu (mô tả dự án, yêu cầu chức năng, wireframe, ADR).
   - Khai báo lại ba package v3 trước đây chỉ có nhờ workspace v2: `tsx`, `@playwright/test`, `ajv`. Lock bỏ 145 gói, không đổi phiên bản gói nào.
