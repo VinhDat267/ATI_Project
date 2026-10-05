@@ -20,6 +20,7 @@ export interface ChatContainerProps {
   activeClarification?: ClarificationState | null;
   onClearClarification?: () => void;
   children?: React.ReactNode;
+  logOnly?: boolean;
 }
 
 export const ChatContainer: React.FC<ChatContainerProps> = ({
@@ -32,6 +33,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   activeClarification: propActiveClarification,
   onClearClarification,
   children,
+  logOnly = false,
 }) => {
   const [inputVal, setInputVal] = useState('');
   const scrollArea = useRef<HTMLDivElement>(null);
@@ -135,7 +137,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         )}
 
         {/* Gather Progress */}
-        {gatherState &&
+        {!logOnly && gatherState &&
           (gatherState.isGathering || gatherState.steps.length > 0) && (
             <GatherProgress
               summary={gatherState.summary}
@@ -144,7 +146,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           )}
 
         {/* Clarification Card */}
-        {activeClarification && (
+        {!logOnly && activeClarification && (
           <ClarificationCard
             question={activeClarification.question}
             options={activeClarification.options}
@@ -168,7 +170,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       </div>
 
       {/* Fixed/Docked Bottom Input Bar */}
-      <div className="border-t border-border bg-surface p-3 md:p-4 sticky bottom-0 z-20">
+      {!logOnly && <div className="border-t border-border bg-surface p-3 md:p-4 sticky bottom-0 z-20">
         <form
           onSubmit={handleSubmit}
           className="max-w-3xl mx-auto flex items-center gap-2 bg-surface-inset border border-border rounded-2xl p-1.5 focus-within:border-border-strong focus-within:bg-surface transition shadow-xs"
@@ -193,7 +195,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           </button>
         </form>
         {isPlanning && <p role="status" className="max-w-3xl mx-auto text-xs text-text-secondary mt-1">Đang lập kế hoạch…</p>}
-      </div>
+      </div>}
     </div>
   );
 };

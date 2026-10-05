@@ -7,7 +7,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email!); await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI Workflow Platform' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
 }
 const composer = (page: Page) => page.locator('form').filter({ has: page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...') });
 test('FE-03: grounded display names survive preview reload and approved result links are safe', async ({ page }, info) => {
@@ -29,11 +29,13 @@ test('FE-03: grounded display names survive preview reload and approved result l
     await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill('Tạo công việc Trello và thông báo Slack');
     await composer(page).getByRole('button', { name: 'Gửi', exact: true }).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
-    await expect(page.getByText('Cần làm (board Frontend)', { exact: true })).toBeVisible();
+    await expect(page.getByRole('list').getByText('Cần làm (board Frontend)', { exact: true })).toBeVisible();
+    await page.getByText('Chi tiết kỹ thuật', { exact: true }).click();
     await expect(page.getByText('list_frontend_todo', { exact: true })).toBeVisible();
     await expect(page.getByText('Ghi', { exact: true })).toHaveCount(3);
     await page.reload();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    await page.getByText('Chi tiết kỹ thuật', { exact: true }).click();
     await expect(page.locator('[data-testid="arg-listId"]').last()).toHaveText('list_frontend_todo');
     await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
     await expect(page.getByText(/Đã hoàn thành 3\/3 bước/)).toBeVisible();
@@ -42,7 +44,9 @@ test('FE-03: grounded display names survive preview reload and approved result l
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(page.getByText(/^Kế hoạch đã duyệt:/)).toBeVisible();
     await expect(page.getByRole('main')).toHaveCount(1); await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click();
     await expect(page.getByRole('log')).toHaveAttribute('aria-live', 'polite');
+    await page.keyboard.press('Escape');
     await page.screenshot({ path: info.outputPath('fe03-readable-result.png'), fullPage: true });
   } finally { await pool.end(); }
 });

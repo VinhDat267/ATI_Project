@@ -235,6 +235,7 @@ export function handleSSEEvent(
       store.addMessage({
         id: `refusal_${Date.now()}`,
         role: 'assistant',
+          metadata: { type: 'refusal' },
         content: `Từ chối yêu cầu: ${data.reason || 'Yêu cầu không được hỗ trợ'}${
           data.suggestion ? `\nGợi ý: ${data.suggestion}` : ''
         }`,
@@ -246,6 +247,7 @@ export function handleSSEEvent(
       store.addMessage({
         id: `err_${Date.now()}`,
         role: 'system',
+        metadata: { type: 'planning_error' },
         content: `Lỗi: ${data.message || data.error || 'Có lỗi xảy ra trong quá trình xử lý'}`,
       });
       break;

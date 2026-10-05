@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { openHistory as openCockpitHistory, transcriptText } from './cockpit-test-helpers';
 import { App } from '../src/App';
 import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
@@ -51,7 +52,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens
 
 async function openHistory() {
   render(<App />);
-  fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+  await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
   return screen.findByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
 }
 
@@ -162,9 +163,9 @@ describe('saved execution recovery in the actual App/history flow', () => {
     const originalRequest = request.getMockImplementation()!;
     request.mockImplementation((url: string, options?: RequestInit) => url === '/api/conversations/c1' ? pending : originalRequest(url, options));
     render(<App />);
-    fireEvent.click(await screen.findByText('Đối soát đã lưu'));
-    fireEvent.click(screen.getByText('Hội thoại khác'));
-    await screen.findByText('Hội thoại B');
+    await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    await openCockpitHistory(); fireEvent.click(screen.getByText('Hội thoại khác'));
+    await transcriptText('Hội thoại B');
     await act(async () => finish({ conversation: { id: 'c1' }, messages: [{ id: 'late', content: 'Late A', role: 'user' }] }));
     await waitFor(() => expect(useChatStore.getState().conversationId).toBe('c2'));
     expect(screen.queryByText('Late A')).toBeNull();
@@ -185,7 +186,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
   it('offers only permitted actions for a saved partial failure and disables duplicate requests', async () => {
     snapshot.execution = { status: 'partial', pausedStepId: 'step_2' }; snapshot.plan.status = 'partial';
     snapshot.steps[1].status = 'failed'; snapshot.recoveryActions = ['stop'];
-    render(<App />); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
     const modal = await screen.findByRole('alertdialog');
     expect(within(modal).queryByRole('button', { name: /Thử lại|Sửa & tiếp tục|Bỏ qua/ })).toBeNull();
     let finish!: () => void;
@@ -215,7 +216,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     request.mockImplementation((url: string, options?: RequestInit) => url === '/api/conversations/c1/plans/active'
       ? Promise.resolve({ id: 'new-plan', summary: 'New pending', steps: [{ id: 'step_2', tool: 'slack.send_message', description: 'NEW operation', args: { text: 'NEW arguments' } }] })
       : originalRequest(url, options));
-    render(<App />); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
     const modal = await screen.findByRole('alertdialog');
     expect(within(modal).getByText('trello.add_member')).toBeInTheDocument();
     expect(within(modal).getByText('Gán Minh vào thẻ')).toBeInTheDocument();

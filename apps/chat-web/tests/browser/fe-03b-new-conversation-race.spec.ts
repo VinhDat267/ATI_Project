@@ -7,7 +7,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email!); await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI Workflow Platform' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
 }
 const conversationIds = async (pool: pg.Pool) => (await pool.query(
   'SELECT c.id FROM conversations c JOIN users u ON u.id = c.user_id WHERE u.email = $1', [email])).rows.map(row => row.id as string);

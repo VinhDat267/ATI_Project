@@ -30,6 +30,7 @@ export interface ChatStoreState {
   stepStatuses: Record<string, StepState>;
   stepErrors: Record<string, string>;
   executionSnapshot: ExecutionSnapshot | null;
+  retiredExecutionPlanId: string | null;
   executionRevision: number;
   planRevision: number;
   executionLoadError: string | null;
@@ -74,6 +75,7 @@ const initialState = {
   stepStatuses: {},
   stepErrors: {},
   executionSnapshot: null,
+  retiredExecutionPlanId: null,
   executionRevision: 0,
   planRevision: 0,
   executionLoadError: null,
@@ -130,10 +132,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const records = { ...state.planningByConversation };
     if (value) records[key] = previous ?? { requestId, startedAt: new Date().toISOString() };
     else delete records[key];
-    return { planningByConversation: records, isPlanning: !!records[planningKey(state.conversationId)] };
+    // Settling the selected request is authoritative too: invalidate reads opened during planning.
+    const settledOwner = !value && previous && id === state.conversationId;
+    return { planningByConversation: records, isPlanning: !!records[planningKey(state.conversationId)],
+      ...(settledOwner ? { executionRevision: state.executionRevision + 1, planRevision: state.planRevision + 1 } : {}) };
   }),
   beginPlanning: (id, requestId) => {
     if (get().planningByConversation[planningKey(id)]) return false;
+    set(state => {
+      if (state.conversationId !== id) return {};
+      const unsafe = state.planStatus === 'reconciliation_required' ||
+        state.executionSnapshot?.execution.status === 'reconciliation_required' ||
+        [...Object.values(state.stepStatuses), ...(state.executionSnapshot?.steps.map(step => step.status) ?? [])]
+          .some(status => status === 'unknown' || status === 'failed');
+      if (unsafe || !['idle', 'preview', 'completed', 'stopped', 'rejected'].includes(state.planStatus)) return {};
+      // The new request owns planning. Keep the saved receipt as history, not its active plan.
+      return { activePlan: null, planStatus: 'idle', activeClarification: null, gatherState: null,
+        retiredExecutionPlanId: state.executionSnapshot?.plan.id ?? state.activePlan?.id ?? state.retiredExecutionPlanId,
+        stepStatuses: {}, stepErrors: {}, planRevision: state.planRevision + 1,
+        executionRevision: state.executionRevision + 1 };
+    });
     get().setIsPlanning(true, id, requestId); return true;
   },
   transferPlanning: (id, targetId, requestId) => set(state => {
@@ -158,6 +176,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   setExecutionSnapshot: (snapshot) => set(state => {
     if (!snapshot) return { executionSnapshot: null, stepStatuses: {}, stepErrors: {}, executionRevision: state.executionRevision + 1 };
     const hasNewPreview = state.activePlan?.id !== snapshot.plan.id && ['preview', 'approving'].includes(state.planStatus);
+    const hasNewRequest = (state.isPlanning || state.retiredExecutionPlanId === snapshot.plan.id) &&
+      ['completed', 'stopped'].includes(snapshot.execution.status) &&
+      !snapshot.steps.some(step => step.status === 'unknown' || step.status === 'failed');
     const plan: ActivePlan = {
       id: snapshot.plan.id,
       summary: snapshot.plan.summary || 'Quy trình đã lưu',
@@ -168,7 +189,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       executionSnapshot: snapshot,
       executionRevision: state.executionRevision + 1,
       executionLoadError: null,
-      ...(hasNewPreview ? {} : { activePlan: plan, planStatus: snapshot.execution.status }),
+      ...(hasNewPreview || hasNewRequest ? {} : { activePlan: plan, planStatus: snapshot.execution.status }),
       stepStatuses: Object.fromEntries(snapshot.steps.map(row => [row.stepId, row.status])),
       stepErrors: Object.fromEntries(snapshot.steps.flatMap(row => {
         const error = typeof row.error === 'string' ? row.error : row.error?.message;
@@ -209,6 +230,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       stepStatuses: {},
       stepErrors: {},
       executionSnapshot: null,
+      retiredExecutionPlanId: null,
       executionLoadError: null,
       executionRevision: state.executionRevision + 1,
       planRevision: state.planRevision + 1,

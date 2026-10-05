@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { openHistory } from './cockpit-test-helpers';
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
@@ -27,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); authStorage.clearStoredTokens(); });
 async function selectHistory() {
-  render(<App />); fireEvent.click(await screen.findByText('History'));
+  render(<App />); await openHistory(); fireEvent.click(await screen.findByText('History'));
   await waitFor(() => expect(fetchEventSource).toHaveBeenCalled());
   await waitFor(() => expect(apiClient.getActivePlan).toHaveBeenCalled());
   return vi.mocked(fetchEventSource).mock.calls.at(-1)![1];
