@@ -28,6 +28,13 @@
    - lập kế hoạch lâu (quá 15 s): hiển thị tiến trình tra cứu thật từ `gatherState`; "Thôi chờ, giữ lại câu yêu cầu" kèm câu "Nếu kế hoạch đến sau, nó vẫn nằm trong hội thoại và chưa chạy cho tới khi bạn duyệt";
    - lỗi máy chủ: câu của hệ thống "Không thể lập kế hoạch lúc này. Hãy thử lại."; không mã lỗi tự đặt.
 8. Bỏ `PartialFailureModal` và `ReconciliationNotice` khi đã có thay thế; giữ nguyên lời gọi API khôi phục.
+9. **Sửa từ kiểm tra app thật FE-05 (Claude Code, 06/10/2026, sandbox, head `09b8031`):**
+   - **P3 — vị trí cuộn khi đổi khoảnh khắc:** vùng nội dung cockpit giữ `scrollTop` của khoảnh khắc trước. Ví dụ: cuộn xuống để bấm Duyệt (scrollTop 93px) thì tiêu đề "ATI đang làm" và "Việc đã xong" bị khuất một phần, ở cả 1440px và 375px. Mỗi lần khoảnh khắc đổi thì cuộn vùng nội dung về đầu.
+   - **P3 — mất focus sau khi duyệt:** nút "Duyệt kế hoạch" biến mất khi sang khoảnh khắc 5, focus rơi về `body`. Khi khoảnh khắc đổi do hành động của người dùng hoặc do dữ liệu mới, đưa focus vào `h1` của khoảnh khắc mới (`tabIndex={-1}`). **Không** giành focus khi người dùng đang gõ trong ô nhập hoặc đang ở trong ngăn kéo/hộp thoại.
+   - Góp ý nhỏ, làm nếu kịp:
+     - thời lượng dùng định dạng Việt ("0,005 giây" hoặc "< 0,1 giây"), không "0.005s"/"0.0 giây";
+     - ở 375px phần đầu trang (thanh trên, dải thử nghiệm, 4 nút, "Yêu cầu hiện tại") chiếm gần nửa chiều cao, nên gộp hoặc thu gọn;
+     - ngăn hội thoại hiện có tin của người dùng và tin lỗi, chưa có dòng cho kế hoạch đã duyệt hoặc biên nhận. Xem xét thêm một dòng tóm tắt (không chép JSON).
 
 ## Tiêu chí nghiệm thu
 
@@ -37,6 +44,7 @@
 - [ ] Test phản hồi muộn: lệnh khôi phục của plan A trả về sau khi người dùng đã sang hội thoại B → không đổi màn của B.
 - [ ] Các test W2-04, W2-05, `partial-failure-modal`, `execution-progress` được chuyển sang component mới, không mất ca.
 - [ ] Browser: sandbox có kịch bản bước `unknown` và `reconciliation_required` (thêm vào harness nếu chưa có) chạy đúng; không cuộn ngang ở 375px.
+- [ ] Browser (mục 9): cuộn xuống ở khoảnh khắc 4, bấm Duyệt → ở khoảnh khắc 5 và 6, `h1` nằm trọn trong vùng nhìn thấy và nhận focus; đang gõ trong ô nhập khi khoảnh khắc đổi thì focus vẫn ở ô nhập. Kiểm ở 1440px và 375px.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi
