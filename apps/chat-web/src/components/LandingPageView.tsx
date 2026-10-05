@@ -250,11 +250,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
               <div>
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm">
+                    <span className="w-8 h-8 rounded-xl bg-danger-tint text-danger-text flex items-center justify-center font-bold text-sm">
                       ✕
                     </span>
                     <div>
-                      <span className="text-sm uppercase font-bold tracking-wider text-rose-600 block">
+                      <span className="text-sm uppercase font-bold tracking-wider text-danger-text block">
                         Quy trình truyền thống
                       </span>
                       <h3 className="font-bold text-base sm:text-lg text-text leading-snug">
@@ -264,7 +264,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                   </div>
                 </div>
 
-                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">
+                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-danger-tint text-danger-text text-xs font-semibold">
                   <span>⏱️</span>
                   <span>Chuyển tab và nhập liệu nhiều lần</span>
                 </div>
@@ -273,7 +273,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                 <div className="mt-6 space-y-4 text-xs sm:text-sm text-text-secondary">
                   <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs">
                     <div className="font-semibold text-text flex items-center gap-1.5 text-xs mb-1">
-                      <span className="text-rose-500">1.</span>
+                      <span className="text-danger-text">1.</span>
                       <span>Thao tác ứng dụng rời rạc</span>
                     </div>
                     <p className="text-text-secondary text-xs leading-relaxed">
@@ -283,7 +283,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
                   <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs">
                     <div className="font-semibold text-text flex items-center gap-1.5 text-xs mb-1">
-                      <span className="text-rose-500">2.</span>
+                      <span className="text-danger-text">2.</span>
                       <span>Phân công &amp; Gắn kết nối</span>
                     </div>
                     <p className="text-text-secondary text-xs leading-relaxed">
@@ -293,7 +293,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
                   <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs">
                     <div className="font-semibold text-text flex items-center gap-1.5 text-xs mb-1">
-                      <span className="text-rose-500">3.</span>
+                      <span className="text-danger-text">3.</span>
                       <span>Trao đổi &amp; Cập nhật tiến độ</span>
                     </div>
                     <p className="text-text-secondary text-xs leading-relaxed">
@@ -303,7 +303,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
 
                   <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs">
                     <div className="font-semibold text-text flex items-center gap-1.5 text-xs mb-1">
-                      <span className="text-rose-500">4.</span>
+                      <span className="text-danger-text">4.</span>
                       <span>Rủi ro sai sót &amp; Mệt mỏi</span>
                     </div>
                     <p className="text-text-secondary text-xs leading-relaxed">
@@ -313,14 +313,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-border text-xs text-rose-700 font-medium flex items-center gap-1.5">
+              <div className="mt-6 pt-4 border-t border-border text-xs text-danger-text font-medium flex items-center gap-1.5">
                 <span>⚠️</span>
                 <span>Hệ quả: Thao tác lặp lại và khó theo dõi công việc giữa các ứng dụng.</span>
               </div>
             </div>
 
             {/* Cột SAU (Với AI Workflow Platform) */}
-            <div className="bg-gradient-to-b from-primary-tint via-white to-primary-tint border-2 border-border-strong rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
+            <div className="bg-gradient-to-b from-primary-tint via-surface to-primary-tint border-2 border-border-strong rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 px-3.5 py-1 bg-gradient-to-l from-primary-tint to-primary-tint text-primary-text text-sm font-bold rounded-bl-2xl uppercase tracking-wider">
                 Đột phá
               </div>

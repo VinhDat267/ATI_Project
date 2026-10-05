@@ -140,7 +140,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
                 type="button"
                 onClick={() => handleRemoveScope(sc)}
                 aria-label={`Xóa phạm vi ${sc}`}
-                className="text-text-muted hover:text-danger-text font-bold text-xs"
+                className="shrink-0 text-text-muted hover:text-danger-text font-bold text-xs"
               >
                 ✕
               </button>

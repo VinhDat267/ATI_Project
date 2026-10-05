@@ -296,7 +296,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onCl
               type="button"
               onClick={() => setIsSidebarOpen(false)}
               aria-label="Đóng danh sách hội thoại"
-              className="md:hidden text-text-muted hover:text-text-secondary text-sm"
+              className="md:hidden shrink-0 text-text-muted hover:text-text-secondary text-sm"
             >
               ✕
             </button>
@@ -328,7 +328,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onCl
               type="button"
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Mở danh sách hội thoại"
-              className="md:hidden p-1.5 rounded-lg hover:bg-surface-raised text-text-secondary"
+              className="md:hidden shrink-0 p-1.5 rounded-lg hover:bg-surface-raised text-text-secondary"
             >
               ☰
             </button>

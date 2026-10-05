@@ -81,7 +81,7 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
               <button type="button" disabled={saving} onClick={() => setEditing(null)}>Hủy đổi tên</button></div>
           </form> : <><button type="button" onClick={() => void select(conv.id)} className="min-w-0 flex-1 text-left cursor-pointer flex items-center">
             <span className="truncate flex-1">{label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}
-          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="text-text-muted p-1">✎</button></>}
+          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="shrink-0 text-text-muted p-1">✎</button></>}
         </div>;
       })}
       {isLoading && <p role="status" className="px-2 py-3 text-xs text-text-muted italic">Đang tải danh sách...</p>}

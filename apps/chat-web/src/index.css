@@ -92,8 +92,10 @@ html.dark {
   button, a, input, textarea, select, summary { min-height: 40px; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
-  button[class*="bg-primary"], button[class*="bg-success"], button[class*="bg-warning"] { font-weight: 600; }
 }
+/* These accessibility requirements must outrank retained Tailwind sizing/weight utilities. */
+button { min-width: 40px; }
+button:is(.bg-primary, .bg-success, .bg-warning).text-white { font-weight: 600; }
 :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .app-shell:has(.workspace) { height: 100dvh; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

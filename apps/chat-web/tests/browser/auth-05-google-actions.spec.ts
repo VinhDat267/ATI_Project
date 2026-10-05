@@ -45,7 +45,7 @@ test('AUTH-05 Google: link and unlink refresh expired access while preserving th
   expect((await db.query('SELECT google_sub FROM users WHERE id=$1', [userId])).rows[0].google_sub).toBe('fixture-google-user');
   expect(await expireAccess(page)).toBe(originalSid);
   await page.getByRole('button', { name: 'Gỡ liên kết', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Đã gỡ liên kết Google');
+  await expect(page.getByRole('main').getByRole('status')).toContainText('Đã gỡ liên kết Google');
   expect(paths.filter(path => path === '/api/auth/refresh')).toHaveLength(2);
   expect((await db.query('SELECT google_sub,google_email FROM users WHERE id=$1', [userId])).rows[0]).toEqual({ google_sub: null, google_email: null });
   await expect(page.getByText('Phiên này', { exact: true })).toBeVisible();
