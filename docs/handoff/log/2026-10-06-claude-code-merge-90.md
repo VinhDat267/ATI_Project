@@ -1,0 +1,33 @@
+# 2026-10-06 · Claude Code · Chạy thử app thật FE-05, merge #90 và đồng bộ trạng thái
+
+- **Kiểm tra trước merge (người dùng yêu cầu "chạy app thật, bấm thử và chụp cockpit trước khi merge"):**
+  - Worktree riêng `.claude/worktrees/review-fe05`, detached tại head PR `09b80310`; không đụng worktree `fe-05` của Codex. `npm ci`; PostgreSQL 16 tmpfs tạm ở `127.0.0.1:55533`; `db:migrate:v3` (0001–0008); `admin:provision:v3` với tài khoản test trong CI (`ci-browser@localhost.test`). `.env` của worktree chỉ có `RUNTIME_MODE=sandbox`, DB tạm, tài khoản test và `APP_TIME_ZONE`.
+  - Chạy `npm run up` (API 3000, web 5174) qua công cụ xem trước của app desktop. Log API: "Đã kết nối thành công tới PostgreSQL database (ati_v3)", Smart Mock planner; `/api/health` trả `sandbox`.
+  - Bấm thử bằng câu của bộ test sandbox. Đạt:
+    - khoảnh khắc 1 → 2 → 3 (hỏi lại) và 1 với lỗi lập kế hoạch (câu của hệ thống);
+    - 4 (duyệt): logo dịch vụ, nhãn Tạo mới/Cập nhật; "Xem trước" là dialog `aria-modal`, Esc đóng, focus về nút; nội dung tham chiếu hiện `‹kết quả step_1: url›`;
+    - 5 → 6: biên nhận 3/3, link `https` có `target=_blank rel=noopener noreferrer`, không câu "đã xác nhận";
+    - ngăn hội thoại: `role=log` `aria-live=polite`, toàn trang một ô nhập, Esc trả focus về nút mở;
+    - 375px: `scrollWidth` 375, không chữ chồng ở header, link dài xuống dòng; sáng/tối đổi được và lưu `ati-theme`.
+  - **P3:**
+    - đổi khoảnh khắc giữ `scrollTop` cũ (93px), nên `h1` của khoảnh khắc mới bị khuất một phần ở cả 1440 và 375;
+    - sau "Duyệt kế hoạch" focus rơi về `body`.
+    - Góp ý: định dạng thời lượng "0.005s"/"0.0 giây"; phần đầu trang chiếm gần nửa chiều cao ở 375px; ngăn hội thoại chưa có dòng cho kế hoạch/biên nhận.
+    - Không phải lỗi PR: câu hỏi "Không tìm thấy Slack…" và lỗi khi gửi "Tạo công việc Trello" đến từ planner giả của sandbox (plan mẫu có bước Slack, router chỉ chọn Trello nên validator chặn).
+  - Console: 4 lỗi 502 `/api/auth/config` chỉ xảy ra khi API chưa khởi động xong; sau đó mọi request `/api/*` trả 200.
+  - 9 ảnh chụp đã gửi người dùng trong phiên; không commit.
+- **Sự cố trong lúc kiểm (đã xử lý, không gây thay đổi dữ liệu):**
+  - Lần khởi động đầu, công cụ xem trước đọc `.claude/launch.json` ở thư mục chính (cấu hình `v3-sandbox` của người dùng), nên chạy code `main` với `.env` riêng và thử nối DB dev `15433`. DB đó đang tắt; API báo `ECONNREFUSED` và thoát sau 10 giây; không ghi gì.
+  - Claude Code thêm tạm một cấu hình `cd` vào worktree (thêm `set PORT=3000` như cấu hình gốc, vì công cụ đặt `PORT=5174` cho API). Sau khi kiểm thì gỡ ra; `launch.json` trở lại đúng nội dung ban đầu.
+  - Đã xoá container `ati-review-fe05` và worktree; các cổng 3000/5174/55533 trống; file riêng của người dùng giữ nguyên.
+- **Merge #90:** người dùng nói "merge". CI `v3` SUCCESS trên head `09b80310fae6beba7cbf2cfb86c0e0e201872a19` (head không đổi so với lúc kiểm), `MERGEABLE`. `gh pr merge 90 --merge --match-head-commit 09b8031…`. Không dùng `--delete-branch` vì nhánh đang mở trong worktree của Codex; xoá nhánh remote bằng `git push origin --delete`, nhánh local và worktree để Codex dọn. Merge commit `ee65cd0` lúc 23:42:18 UTC ngày 05/10 (06:42:18 Việt Nam ngày 06/10). CI main đúng `ee65cd0` SUCCESS.
+- **PR này** (chỉ tài liệu, worktree từ `ee65cd0`):
+  - CURRENT-STATE:
+    - dòng cập nhật lần cuối;
+    - mảng frontend;
+    - đoạn số liệu sau FE-05 và bảng số liệu (ghi rõ do agent thi công chạy, CI xanh; Claude Code không chạy lại suite đầy đủ);
+    - mục 4 thêm #90;
+    - mục 5 thêm hàng P3 cockpit.
+  - ROADMAP: FE-05 → xong; FE-06 ghi giao được ngay, kèm 2 P3.
+  - FE-06: thêm việc 9 và một tiêu chí browser cho hai P3 cùng các góp ý nhỏ.
+- **Việc tiếp theo đề xuất:** giao FE-06; giao song song FE-07, FE-08, FE-09; W3-10 (nên merge trước 20/10), W3-11, W4-00 vẫn chưa có người nhận.
