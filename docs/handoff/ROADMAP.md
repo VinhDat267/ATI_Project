@@ -86,7 +86,7 @@ Ba task làm song song được với nhau và với khung W4-01/W4-03, W4-02, c
 
 Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, không đổi sang provider khác giữa chừng một campaign.
 
-**Lập kế hoạch giao diện mới 05/10/2026** (Claude Code). Bản mẫu 12 trang làm bằng OpenDesign và review nhiều vòng trong ngày, lưu ở [`docs/design/prototypes/`](../design/prototypes/README.md). Đặc tả: [`2026-10-05-ui-redesign-agentic-design.md`](../superpowers/specs/2026-10-05-ui-redesign-agentic-design.md). Người dùng chốt ngày 05/10:
+**Lập kế hoạch giao diện mới 05/10/2026** (Claude Code; vào `main` qua #84 tại `ab0817e`). Bản mẫu 12 trang làm bằng OpenDesign và review nhiều vòng trong ngày, lưu ở [`docs/design/prototypes/`](../design/prototypes/README.md). Đặc tả: [`2026-10-05-ui-redesign-agentic-design.md`](../superpowers/specs/2026-10-05-ui-redesign-agentic-design.md). Người dùng chốt ngày 05/10:
 - theo design system "Agentic" (Primary `#FF5701`, Secondary `#F6F6F1`, thang chữ 14/16/18/24/32/40);
 - chữ trên nút cam giữ **màu trắng** (3,2:1, ngoại lệ có chủ đích, đặc tả mục 3.2);
 - chữ thường dùng Be Vietnam Pro, tiêu đề dùng Playfair Display;
