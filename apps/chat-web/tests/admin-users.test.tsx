@@ -12,6 +12,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/admin/users');
   authStorage.clearStoredTokens(); useChatStore.getState().reset();
   authStorage.setStoredTokens({ accessToken: 'access', user: admin });
+  vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: admin });
   vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: false, googleEnabled: false });
   vi.spyOn(apiClient, 'request').mockResolvedValue({ users: [candidate], total: 1, pendingCount: 1, page: 1, limit: 20 });
@@ -40,12 +41,14 @@ it('hides the admin entry and denies direct navigation for a member', async () =
   expect(apiClient.request).not.toHaveBeenCalled();
   cleanup();
   render(<UserNavMenu user={member} onOpenSettings={() => {}} onLogout={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
   expect(screen.queryByText('Quản lý người dùng')).toBeNull();
 });
 
 it('shows the admin navigation entry only with the current admin role', () => {
   render(<UserNavMenu user={admin} onOpenSettings={() => {}} onLogout={() => {}} />);
-  expect(screen.getByRole('button', { name: 'Quản lý người dùng' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
+  expect(screen.getByRole('menuitem', { name: 'Quản lý người dùng' })).toBeInTheDocument();
 });
 
 it('keeps pending accounts in the approval flow without lock or unlock actions', async () => {

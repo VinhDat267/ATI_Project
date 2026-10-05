@@ -106,7 +106,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col h-full bg-surface relative">
       {/* Messages Scroll Area */}
       <div
         ref={scrollArea}
@@ -168,10 +168,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       </div>
 
       {/* Fixed/Docked Bottom Input Bar */}
-      <div className="border-t border-zinc-200 bg-white p-3 md:p-4 sticky bottom-0 z-20">
+      <div className="border-t border-border bg-surface p-3 md:p-4 sticky bottom-0 z-20">
         <form
           onSubmit={handleSubmit}
-          className="max-w-3xl mx-auto flex items-center gap-2 bg-[#f5f5f7] border border-zinc-200 rounded-2xl p-1.5 focus-within:border-blue-500 focus-within:bg-white transition shadow-xs"
+          className="max-w-3xl mx-auto flex items-center gap-2 bg-surface-inset border border-border rounded-2xl p-1.5 focus-within:border-border-strong focus-within:bg-surface transition shadow-xs"
         >
           <textarea
             ref={inputRef}
@@ -182,17 +182,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             onKeyDown={handleKeyDown}
             aria-label="Mô tả công việc bạn muốn thực hiện"
             placeholder="Mô tả công việc bạn muốn thực hiện..."
-            className="flex-1 bg-transparent px-3 py-2 text-sm leading-6 max-h-36 resize-none overflow-y-auto text-zinc-900 placeholder-zinc-400 focus:outline-none"
+            className="flex-1 bg-transparent px-3 py-2 text-sm leading-6 max-h-36 resize-none overflow-y-auto text-text placeholder-text-muted focus:outline-none"
           />
           <button
             type="submit"
             disabled={!inputVal.trim() || isPlanning}
-            className="w-10 h-10 rounded-full bg-[#0071e3] text-white flex items-center justify-center disabled:opacity-40 hover:bg-blue-600 transition shadow-xs shrink-0"
+            className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary transition shadow-xs shrink-0"
           >
             <span className="text-xs font-semibold">Gửi</span>
           </button>
         </form>
-        {isPlanning && <p role="status" className="max-w-3xl mx-auto text-xs text-zinc-600 mt-1">Đang lập kế hoạch…</p>}
+        {isPlanning && <p role="status" className="max-w-3xl mx-auto text-xs text-text-secondary mt-1">Đang lập kế hoạch…</p>}
       </div>
     </div>
   );

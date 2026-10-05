@@ -6,9 +6,7 @@ import { ChatContainer } from '../components/ChatContainer';
 import { PlanPreview } from '../components/PlanPreview';
 import { ExecutionProgress } from '../components/ExecutionProgress';
 import { PartialFailureModal } from '../components/PartialFailureModal';
-import { SettingsModal } from '../components/SettingsModal';
 import { SidebarHistory } from '../components/layout/SidebarHistory';
-import { UserNavMenu } from '../components/layout/UserNavMenu';
 import { MissionControlLaunchpad } from '../components/MissionControlLaunchpad';
 import { ReconciliationNotice } from '../components/ReconciliationNotice';
 import { userErrorMessage } from '../services/user-error';
@@ -24,7 +22,7 @@ interface WorkspaceProps {
   onClearAuthError: () => void; onLogout: () => void;
   route: AppRoute; navigate: (path: string, replace?: boolean) => void;
 }
-export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError, onClearAuthError, onLogout, route, navigate }) => {
+export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onClearAuthError, route, navigate }) => {
   const {
     conversationId,
     messages,
@@ -44,11 +42,11 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
     reset,
   } = useChatStore();
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
-  const [runtimeLoading, setRuntimeLoading] = useState(true);
+
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [servicesError, setServicesError] = useState<string | null>(null);
@@ -83,7 +81,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
     let current = true;
     apiClient.getRuntime().then(data => {
       if (current && ['sandbox', 'live'].includes(data?.runtimeMode)) setRuntimeMode(data.runtimeMode);
-    }).catch(() => { if (current) setRuntimeMode(null); }).finally(() => { if (current) setRuntimeLoading(false); });
+    }).catch(() => { if (current) setRuntimeMode(null); });
     return () => { current = false; };
   }, []);
   useEffect(() => {
@@ -268,7 +266,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
   const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
 
   return (
-    <div className="flex h-dvh w-screen overflow-hidden bg-white text-[#1d1d1f]">
+    <div className="workspace flex h-full w-full overflow-hidden bg-surface text-text">
       {/* Mobile sidebar backdrop overlay */}
       {isSidebarOpen && (
         <div
@@ -280,17 +278,17 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
 
       {/* Sidebar for Desktop & Mobile Drawer */}
       <aside aria-label="Danh sách hội thoại"
-        className={`fixed md:static inset-y-0 left-0 z-40 w-72 bg-[#f5f5f7] border-r border-zinc-200 flex flex-col justify-between transition-transform transform ${
+        className={`fixed md:static inset-y-0 left-0 z-40 w-72 bg-surface-inset border-r border-border flex flex-col justify-between transition-transform transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         <div className="p-4 flex flex-col flex-1 overflow-hidden">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#0071e3] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <div className="w-7 h-7 rounded-lg bg-primary-tint text-primary-text flex items-center justify-center font-bold text-xs shadow-xs">
                 AI
               </div>
-              <span className="font-semibold text-sm tracking-tight text-zinc-900">
+              <span className="font-semibold text-sm tracking-tight text-text">
                 AI Workflow Platform
               </span>
             </div>
@@ -298,7 +296,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
               type="button"
               onClick={() => setIsSidebarOpen(false)}
               aria-label="Đóng danh sách hội thoại"
-              className="md:hidden text-zinc-400 hover:text-zinc-600 text-sm"
+              className="md:hidden text-text-muted hover:text-text-secondary text-sm"
             >
               ✕
             </button>
@@ -307,7 +305,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           <button
             type="button"
             onClick={handleNewConversation}
-            className="w-full bg-[#0071e3] text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-blue-600 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            className="w-full bg-primary text-white text-xs font-medium py-2.5 px-4 rounded-full shadow-xs hover:bg-primary transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
           >
             <span>+</span>
             <span>Cuộc hội thoại mới</span>
@@ -319,30 +317,22 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
             onCloseMobileSidebar={() => setIsSidebarOpen(false)}
           />
         </div>
-
-        <UserNavMenu
-          user={user}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onLogout={onLogout}
-          onManageUsers={() => navigate('/admin/users')}
-          onOpenAccount={() => navigate('/account')}
-        />
       </aside>
 
       {/* Main Chat Workspace */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-surface">
         {/* Top bar */}
-        <div className="h-14 border-b border-zinc-200 px-4 md:px-6 flex items-center justify-between bg-white z-10 shrink-0">
+        <div className="h-14 border-b border-border px-4 md:px-6 flex items-center justify-between bg-surface z-10 shrink-0">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Mở danh sách hội thoại"
-              className="md:hidden p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-600"
+              className="md:hidden p-1.5 rounded-lg hover:bg-surface-raised text-text-secondary"
             >
               ☰
             </button>
-            <h1 className="font-semibold text-sm md:text-base text-zinc-900">
+            <h1 className="font-semibold text-sm md:text-base text-text">
               AI Workflow Platform
             </h1>
           </div>
@@ -350,9 +340,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => navigate('/settings')}
               aria-label="Mở cài đặt dịch vụ"
-              className="text-xs text-zinc-600 border border-zinc-200 hover:bg-zinc-50 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5"
+              className="text-xs text-text-secondary border border-border hover:bg-surface-inset px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5"
             >
               <span>⚙️</span>
               <span className="hidden sm:inline">Cài đặt dịch vụ</span>
@@ -361,23 +351,20 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
         </div>
 
         {authError && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between">
+          <div className="bg-warning-tint border-b border-border px-4 py-2 text-xs text-warning-text flex items-center justify-between">
             <span>⚠️ {authError}</span>
             <button
               type="button"
               onClick={onClearAuthError}
               aria-label="Đóng thông báo đăng nhập"
-              className="text-amber-600 hover:text-amber-800 font-bold ml-2 cursor-pointer"
+              className="text-warning-text hover:text-warning-text font-bold ml-2 cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
-
-        {runtimeMode === 'sandbox' && <p role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900">Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật</p>}
-        {runtimeMode === null && !runtimeLoading && <p role="status" className="px-4 py-2 text-xs text-zinc-600">Chưa xác định được chế độ chạy của máy chủ.</p>}
-        {disconnected && <p role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-900">Mất kết nối, đang thử lại…</p>}
-        {actionError && <p role="alert" className="px-4 py-2 text-sm text-red-700">{actionError}</p>}
+        {disconnected && <p role="status" className="bg-warning-tint border-b border-border px-4 py-2 text-sm text-warning-text">Mất kết nối, đang thử lại…</p>}
+        {actionError && <p role="alert" className="px-4 py-2 text-sm text-danger-text">{actionError}</p>}
         {/* Chat Feed */}
         <div className="flex-1 overflow-hidden relative">
           {history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6 text-sm">Đang tải hội thoại...</p> : <ChatContainer
@@ -406,17 +393,17 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
 
             {activePlan && !['preview', 'approving', 'idle', 'rejected'].includes(planStatus) && <details className="my-3"><summary className="cursor-pointer text-sm">Kế hoạch đã duyệt: {activePlan.summary}</summary><PlanPreview plan={activePlan} /></details>}
             {activePlan && !activePlan.id && <p role="alert">Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại trước khi duyệt.</p>}
-            {failureId && !needsReconciliation && dismissedFailure === failureKey && <div role="status" className="my-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            {failureId && !needsReconciliation && dismissedFailure === failureKey && <div role="status" className="my-3 p-3 bg-warning-tint border border-border rounded-xl">
               <p>Quy trình vẫn đang tạm dừng tại bước {failureId}.</p>
-              <button type="button" onClick={() => setDismissedFailure(null)} className="text-blue-700 p-2">Mở lại xử lý lỗi</button>
+              <button type="button" onClick={() => setDismissedFailure(null)} className="text-primary-text p-2">Mở lại xử lý lỗi</button>
             </div>}
             {/* Live Execution Progress Card */}
-            {executionLoadError && <p role="alert" className="my-3 text-sm text-red-700">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
+            {executionLoadError && <p role="alert" className="my-3 text-sm text-danger-text">Không tải được trạng thái thực thi: {executionLoadError}. Hãy mở lại hội thoại.</p>}
             {executionSnapshot && needsReconciliation && <ReconciliationNotice
               snapshot={executionSnapshot} services={services} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
-            {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-green-700">Quy trình đã hoàn thành.</p>}
-            {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-zinc-700">Quy trình đã dừng.</p>}
-            {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-red-700">{recoveryError}</p>}
+            {executionStatus === 'completed' && <p role="status" className="mt-4 text-sm text-success-text">Quy trình đã hoàn thành.</p>}
+            {executionStatus === 'stopped' && <p role="status" className="mt-4 text-sm text-text-secondary">Quy trình đã dừng.</p>}
+            {recoveryError && !needsReconciliation && <p role="alert" className="text-sm text-danger-text">{recoveryError}</p>}
             {progressPlan && Object.keys(stepStatuses).length > 0 && (
               <ExecutionProgress
                 status={executionStatus}
@@ -462,14 +449,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, authError
           </ChatContainer>}
         </div>
       </main>
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        authToken={authToken}
-        onServicesChanged={loadServices}
-      />
     </div>
   );
 };

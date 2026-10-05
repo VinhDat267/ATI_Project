@@ -64,29 +64,29 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
     finally { setSaving(false); }
   };
   return <div className="mt-6 flex-1 flex flex-col min-h-0">
-    <span className="text-[11px] font-semibold text-zinc-400 tracking-wider uppercase px-1 shrink-0">Lịch sử hội thoại</span>
+    <span className="text-sm font-semibold text-text-muted tracking-wider uppercase px-1 shrink-0">Lịch sử hội thoại</span>
     <input type="search" aria-label="Tìm hội thoại theo tiêu đề" value={search} onChange={event => setSearch(event.target.value)}
-      className="mt-2 w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white" placeholder="Tìm hội thoại..." />
-    {error && <p role="alert" className="text-xs text-red-700 py-2">{error}</p>}
+      className="mt-2 w-full border border-border rounded-lg p-2 text-xs bg-surface" placeholder="Tìm hội thoại..." />
+    {error && <p role="alert" className="text-xs text-danger-text py-2">{error}</p>}
     <div role="region" aria-label="Danh sách hội thoại" className="mt-2 flex-1 overflow-y-auto flex flex-col gap-1 pr-1"
       onScroll={event => { const area = event.currentTarget; if (area.scrollHeight - area.scrollTop - area.clientHeight < 100 && nextCursor && !busy.current) void load(nextCursor); }}>
       {conversations.map(conv => {
         const label = conv.title || 'Hội thoại mới';
         const time = formatConversationTime(conv.updatedAt || conv.updated_at || conv.created_at);
         return <div key={conv.id} className={`rounded-xl p-2.5 text-xs font-medium flex gap-1 items-center transition ${conv.id === currentConversationId
-          ? 'bg-white border border-zinc-200/80 shadow-2xs border-l-2 border-l-[#0071e3] text-zinc-900' : 'hover:bg-zinc-200/50 text-zinc-600'}`}>
+          ? 'bg-surface border border-border shadow-2xs border-l-2 border-l-primary text-text' : 'hover:bg-surface-raised text-text-secondary'}`}>
           {editing === conv.id ? <form className="flex-1 min-w-0" onSubmit={event => { event.preventDefault(); void rename(conv.id); }}>
-            <input autoFocus aria-label="Tiêu đề hội thoại" value={title} onChange={event => setTitle(event.target.value)} className="w-full border border-zinc-200 rounded p-1" />
-            <div className="flex gap-2 mt-1"><button type="submit" disabled={saving} aria-label="Lưu tên hội thoại" className="text-blue-700">Lưu</button>
+            <input autoFocus aria-label="Tiêu đề hội thoại" value={title} onChange={event => setTitle(event.target.value)} className="w-full border border-border rounded p-1" />
+            <div className="flex gap-2 mt-1"><button type="submit" disabled={saving} aria-label="Lưu tên hội thoại" className="text-primary-text">Lưu</button>
               <button type="button" disabled={saving} onClick={() => setEditing(null)}>Hủy đổi tên</button></div>
           </form> : <><button type="button" onClick={() => void select(conv.id)} className="min-w-0 flex-1 text-left cursor-pointer flex items-center">
-            <span className="truncate flex-1">{label}</span>{time && <span className="text-[10px] text-zinc-400 ml-2 shrink-0">{time}</span>}
-          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="text-zinc-500 p-1">✎</button></>}
+            <span className="truncate flex-1">{label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}
+          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="text-text-muted p-1">✎</button></>}
         </div>;
       })}
-      {isLoading && <p role="status" className="px-2 py-3 text-xs text-zinc-400 italic">Đang tải danh sách...</p>}
-      {!isLoading && !conversations.length && <p className="px-2 py-3 text-xs text-zinc-400 italic">{search ? 'Không có hội thoại phù hợp' : 'Chưa có hội thoại nào'}</p>}
-      {nextCursor && <button type="button" disabled={isLoading} onClick={() => void load(nextCursor)} className="text-xs text-blue-700 p-2">Tải thêm hội thoại</button>}
+      {isLoading && <p role="status" className="px-2 py-3 text-xs text-text-muted italic">Đang tải danh sách...</p>}
+      {!isLoading && !conversations.length && <p className="px-2 py-3 text-xs text-text-muted italic">{search ? 'Không có hội thoại phù hợp' : 'Chưa có hội thoại nào'}</p>}
+      {nextCursor && <button type="button" disabled={isLoading} onClick={() => void load(nextCursor)} className="text-xs text-primary-text p-2">Tải thêm hội thoại</button>}
     </div>
   </div>;
 }

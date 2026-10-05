@@ -59,8 +59,8 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
     return () => { mounted = false; unsubscribe(); };
   }, [navigate]);
   return <AuthFormFrame title="Đăng nhập Google" description="Xác thực tài khoản Google để sử dụng hệ thống." navigate={navigate}>
-    {busy && <p role="status" className="text-sm text-zinc-600">Đang xử lý đăng nhập Google...</p>}
+    {busy && <p role="status" className="text-sm text-text-secondary">Đang xử lý đăng nhập Google...</p>}
     <AuthFeedback error={error} message={message} />
-    {linked && <button type="button" onClick={() => navigate('/account')} className="mt-4 rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-100">Về trang tài khoản</button>}
+    {linked && <button type="button" onClick={() => navigate('/account')} className="mt-4 rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-raised">Về trang tài khoản</button>}
   </AuthFormFrame>;
 }

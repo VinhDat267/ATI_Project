@@ -24,7 +24,8 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     const one = await first.newPage(), two = await second.newPage();
     await login(one, email); await login(two, email);
 
-    await one.getByRole('button', { name: 'Tài khoản' }).click();
+    await one.getByRole('button', { name: /Menu người dùng/ }).click();
+    await one.getByRole('menuitem', { name: 'Tài khoản' }).click();
     await expect(one).toHaveURL(/\/account$/);
     await expect(one.getByText('Phiên này', { exact: true })).toBeVisible();
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(1);

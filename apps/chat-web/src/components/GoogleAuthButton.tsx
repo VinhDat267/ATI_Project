@@ -21,7 +21,7 @@ export function GoogleAuthButton({ disabled = false }: { disabled?: boolean }) {
   return <>
     <AuthFeedback error={error} />
     <button type="button" onClick={start} disabled={disabled || busy}
-      className="w-full py-3 rounded-xl border border-zinc-200 bg-white text-zinc-800 font-semibold text-sm hover:bg-zinc-50 disabled:opacity-60 disabled:cursor-wait">
+      className="w-full py-3 rounded-xl border border-border bg-surface text-text font-semibold text-sm hover:bg-surface-inset disabled:opacity-60 disabled:cursor-wait">
       {busy ? 'Đang chuyển tới Google...' : 'Tiếp tục với Google'}
     </button>
   </>;

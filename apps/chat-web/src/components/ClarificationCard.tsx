@@ -33,18 +33,18 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
 
   return (
     <div
-      className="bg-white rounded-2xl p-5 border border-zinc-200 shadow-sm max-w-xl my-3 border-l-4"
-      style={{ borderLeftColor: '#0071e3' }}
+      className="bg-surface rounded-2xl p-5 border border-border shadow-sm max-w-xl my-3 border-l-4"
+      style={{ borderLeftColor: 'var(--primary)' }}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="font-semibold text-zinc-900 text-sm leading-relaxed">
+        <p className="font-semibold text-text text-sm leading-relaxed">
           {question}
         </p>
         {onSkip && (
           <button
             type="button"
             onClick={onSkip}
-            className="text-xs text-zinc-400 hover:text-zinc-600 transition"
+            className="text-xs text-text-muted hover:text-text-secondary transition"
           >
             Bỏ qua
           </button>
@@ -62,8 +62,8 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
                 onClick={() => handleOptionClick(opt)}
                 className={`text-xs px-3.5 py-1.5 rounded-lg border transition font-medium ${
                   isSelected
-                    ? 'bg-[#0071e3] text-white border-[#0071e3] shadow-xs'
-                    : 'bg-[#fafafc] text-zinc-800 border-zinc-200 hover:bg-[#f5f5f7] hover:border-blue-400'
+                    ? 'bg-primary text-white border-border-strong shadow-xs'
+                    : 'bg-surface-inset text-text border-border hover:bg-surface-inset hover:border-border-strong'
                 }`}
               >
                 {opt}
@@ -81,12 +81,12 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
             onChange={(e) => setCustomText(e.target.value)}
             aria-label="Nhập câu trả lời làm rõ yêu cầu"
             placeholder="Nhập câu trả lời..."
-            className="flex-1 bg-[#f5f5f7] border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 bg-surface-inset border border-border rounded-xl px-3.5 py-2 text-xs text-text placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             type="submit"
             disabled={!customText.trim()}
-            className="bg-[#0071e3] text-white text-xs font-medium px-4 py-2 rounded-full hover:bg-blue-600 disabled:opacity-50 transition shadow-xs"
+            className="bg-primary text-white text-xs font-medium px-4 py-2 rounded-full hover:bg-primary disabled:opacity-50 transition shadow-xs"
           >
             Gửi
           </button>

@@ -15,7 +15,7 @@ export function ForgotPasswordView({ navigate }: AuthViewProps) {
   return <AuthFormFrame title="Quên mật khẩu" description="Nhập email để nhận link đặt lại mật khẩu." navigate={navigate}>
     <AuthFeedback error={error} message={message} />
     {!message && <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="text-sm text-zinc-700">Email<input type="email" className={authInputClass} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required maxLength={254} /></label>
+      <label className="text-sm text-text-secondary">Email<input type="email" className={authInputClass} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required maxLength={254} /></label>
       <button className={authButtonClass} disabled={busy}>{busy ? 'Đang gửi...' : 'Gửi link đặt lại mật khẩu'}</button>
     </form>}
   </AuthFormFrame>;

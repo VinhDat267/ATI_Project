@@ -18,7 +18,8 @@ async function openAccount(page: Page) {
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
-  await page.getByRole('button', { name: 'Tài khoản', exact: true }).click();
+  await page.getByRole('button', { name: /Menu người dùng/ }).click();
+    await page.getByRole('menuitem', { name: 'Tài khoản', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Liên kết Google', exact: true })).toBeVisible();
 }
 async function expireAccess(page: Page) {
