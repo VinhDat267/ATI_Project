@@ -213,6 +213,9 @@ async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
     else if (action === 'scroll') await page.locator(selector).evaluate(el => el.scrollIntoView({ block: 'center', inline: 'center' }));
     else if (action === 'wait') await page.waitForTimeout(Number(selector));
     else throw new Error(`Bước không hỗ trợ: ${action}`);
+    // Chờ hai khung hình để trang ổn định trước bước sau. Thiếu bước này, bấm ngay sau khi cuộn thì Playwright đôi khi
+    // tự cuộn thêm và vị trí cuộn cuối khác nhau giữa các lần (users-xac-nhan-khoa: 583 hay 189, ở cả hai bản).
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   }
   if (steps.length) await page.waitForTimeout(300);
   // Thao tác có thể làm hiện chữ ở độ đậm/bảng mã chưa tải; chờ font xong rồi mới chụp.

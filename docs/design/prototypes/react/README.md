@@ -89,6 +89,7 @@ Script mở bản HTML gốc (server tĩnh, cổng 5190) và bản React (Vite, 
 Ngoài lúc mở trang (đủ 4 tổ hợp), mỗi trang có các trạng thái thao tác khai trong `scripts/parity-states.mjs`, chạy ở 1440 sáng và 375 tối. Ví dụ: bấm tab, mở menu demo, điền form, chọn trong `<select>`, chờ hẹn giờ, mở trang kèm `?type=` hoặc `#notion`.
 - Các bước chạy y hệt trên hai bản, nên selector chỉ dùng id hoặc chữ có ở cả hai.
 - Nút nằm trong khung cuộn (`overflow-hidden`) thì thêm bước `scroll` trước khi bấm: Playwright tự cuộn khác nhau giữa các lần nên vị trí cuộn của trang không ổn định.
+- Sau mỗi bước, script chờ hai khung hình rồi mới làm bước sau. Bấm ngay sau khi cuộn thì Playwright đôi khi tự cuộn thêm, nên vị trí cuộn cuối khác nhau giữa các lần ở cả hai bản (`users-xac-nhan-khoa` 375: lúc 583, lúc 189).
 - Sau các bước, script chờ font tải xong rồi mới chụp, vì thao tác có thể làm hiện chữ ở độ đậm chưa dùng.
 - Ngay trước khi chụp, script ép vẽ lại cả trang bằng cách đổi bề rộng khung nhìn thêm 1px rồi trả lại, làm y hệt cho cả hai bản. Bản React dựng trang bằng JS sau lần vẽ đầu, nên Chromium giữ lại mảnh header đã vẽ ở lượt trước: mép avatar tròn lệch tới 67 mức màu ở 9 pixel, dù DOM, style và vị trí giống hệt. Trang cao hơn khung nhìn thì Playwright đã giãn khung để chụp cả trang nên tự vẽ lại; trang vừa khít khung nhìn (1440×900) thì không, nên lệch chỉ lộ ở đó.
 - Chạy một trạng thái: `node scripts/verify-parity.mjs errors --state=loi-may-chu`.
