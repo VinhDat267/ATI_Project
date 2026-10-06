@@ -1,5 +1,6 @@
 // So bản React với bản mẫu HTML gốc: từng phần tử (thẻ, class, vị trí, computed style) và ảnh chụp từng pixel.
-//   node scripts/verify-parity.mjs [trang ...]        ví dụ: node scripts/verify-parity.mjs 404 privacy
+//   node scripts/verify-parity.mjs [trang ...] [--state=tên]   ví dụ: node scripts/verify-parity.mjs 404 privacy
+// Mỗi trang so lúc mở trang (4 tổ hợp) và các trạng thái thao tác khai ở scripts/parity-states.mjs.
 // Kết quả ở .parity/: ảnh gốc, ảnh React, ảnh khác biệt và report.json. Exit 1 nếu còn khác biệt.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -7,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { STATES } from './parity-states.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const reactDir = path.resolve(here, '..');
@@ -19,7 +21,10 @@ const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital
 const ROUTES = { index: '/', 404: '/404' };
 const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 375, height: 812 }];
 const THEMES = ['light', 'dark'];
-const pages = process.argv.slice(2).length ? process.argv.slice(2) : ['404', 'privacy'];
+const args = process.argv.slice(2);
+const onlyState = args.find(a => a.startsWith('--state='))?.slice('--state='.length);
+const named = args.filter(a => !a.startsWith('--'));
+const pages = named.length ? named : ['404', 'privacy', 'errors', 'responses', 'auth-action'];
 
 function serveStatic(root, port) {
   const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript' };
@@ -75,7 +80,9 @@ function snapshotInPage() {
   const norm = (prop, value) => {
     let v = normColors(value);
     if (prop === 'boxShadow') {
-      const layers = v === 'none' ? [] : splitTop(v).filter(l => !l.startsWith('rgba(0,0,0,0)'));
+      // Bỏ các lớp bóng không vẽ gì: màu trong suốt, hoặc mọi kích thước bằng 0 (lớp ring-offset của v3).
+      const invisible = l => l.startsWith('rgba(0,0,0,0)') || (!/\binset\b/.test(l) && (l.match(/-?[\d.]+px/g) ?? []).every(n => parseFloat(n) === 0));
+      const layers = v === 'none' ? [] : splitTop(v).filter(l => !invisible(l));
       v = layers.length ? layers.join(', ') : 'none';
     }
     if (prop === 'fontFamily') v = v.replace(/'/g, '"');
@@ -86,8 +93,9 @@ function snapshotInPage() {
   const skip = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'NOSCRIPT', 'TEMPLATE', 'TITLE']);
   const items = [];
   const describe = el => {
-    const cs = getComputedStyle(el);
+    // Đọc vị trí trước để trình duyệt tính xong layout, rồi mới đọc style (margin auto chỉ ra số px khi layout đã xong).
     const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
     const style = {};
     for (const p of PROPS) style[p] = norm(p, cs[p]);
     items.push({
@@ -95,7 +103,7 @@ function snapshotInPage() {
       id: el.id || '',
       // Bản React đổi space-*/divide-* sang v3-* (xem v3-compat.css); quy về tên gốc để so.
       cls: (el.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)
-        .map(c => c.replace(/(^|:)v3-divide-color-/, '$1divide-').replace(/(^|:)v3-/, '$1')).sort().join(' '),
+        .map(c => c.replace(/(^|:)v3-divide-color-/, '$1divide-').replace(/(^|:)v3-/, '$1').replace(/!$/, '')).sort().join(' '),
       text: [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').replace(/\s+/g, ' ').trim(),
       rect: [r.x + scrollX, r.y + scrollY, r.width, r.height].map(n => Math.round(n * 2) / 2),
       style,
@@ -134,7 +142,12 @@ function compare(orig, react) {
     }
     if (a.text !== b.text) diffs.push({ index: i, kind: 'text', element: label(a), original: a.text, react: b.text });
     if (a.rect.some((n, k) => Math.abs(n - b.rect[k]) > 1)) diffs.push({ index: i, kind: 'rect', element: label(a), original: a.rect.join(','), react: b.rect.join(',') });
+    // Margin auto: Chrome đôi khi trả 0px thay vì giá trị đã tính (thấy ở phần tử trong khối fixed) dù vị trí trùng khớp.
+    // Vị trí của phần tử đã phản ánh margin auto, nên bỏ so giá trị margin theo chiều có auto.
+    const autoX = /(^|\s|:)(m|mx)-auto(\s|$)|(^|\s|:)m[lr]-auto(\s|$)/.test(a.cls);
+    const autoY = /(^|\s|:)(m|my)-auto(\s|$)|(^|\s|:)m[tb]-auto(\s|$)/.test(a.cls);
     for (const p of Object.keys(a.style)) {
+      if ((autoX && /^margin(Left|Right)$/.test(p)) || (autoY && /^margin(Top|Bottom)$/.test(p))) continue;
       if (!sameValue(a.style[p], b.style[p])) diffs.push({ index: i, kind: p, element: label(a), original: a.style[p], react: b.style[p] });
     }
   }
@@ -164,7 +177,7 @@ async function pixelDiff(browser, origPng, reactPng, diffPath) {
   return { size: result.sizeA.join('x') === result.sizeB.join('x') ? result.sizeA.join('x') : `${result.sizeA.join('x')} vs ${result.sizeB.join('x')}`, diffPixels: result.diff, ratio: result.diff / (result.width * result.height) };
 }
 
-async function capture(browser, url, viewport, theme, isOriginal) {
+async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
   const context = await browser.newContext({ viewport, reducedMotion: 'reduce', colorScheme: 'light', deviceScaleFactor: 1 });
   await context.addInitScript(t => { try { localStorage.setItem('ati-theme', t); } catch { /* bỏ qua */ } }, theme);
   const page = await context.newPage();
@@ -181,36 +194,79 @@ async function capture(browser, url, viewport, theme, isOriginal) {
   await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}' });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(400);
+  for (const [action, selector, value] of steps) {
+    if (action === 'click') await page.click(selector, { timeout: 5000 });
+    else if (action === 'fill') await page.fill(selector, value, { timeout: 5000 });
+    else if (action === 'press') await page.press(selector, value, { timeout: 5000 });
+    else if (action === 'wait') await page.waitForTimeout(Number(selector));
+    else throw new Error(`Bước không hỗ trợ: ${action}`);
+  }
+  if (steps.length) await page.waitForTimeout(300);
+  // Chờ hai khung hình để layout ổn định trước khi đọc style (tránh đọc margin auto giữa chừng).
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const items = await page.evaluate(snapshotInPage);
   const png = await page.screenshot({ fullPage: true });
   await context.close();
   return { items, png, errors };
 }
 
+let browser;
+const attemptCounter = new Map();
+async function runCase(pageId, { steps, query, viewport, theme }, name) {
+  const attempt = attemptCounter.get(name) ?? 0;
+  attemptCounter.set(name, attempt + 1);
+  let orig;
+  let react;
+  try {
+    orig = await capture(browser, `http://127.0.0.1:${ORIGINAL_PORT}/${pageId}.html${query}`, viewport, theme, true, steps);
+    react = await capture(browser, `http://127.0.0.1:${REACT_PORT}${ROUTES[pageId] ?? '/' + pageId}${query}`, viewport, theme, false, steps);
+  } catch (error) {
+    const message = String(error.message ?? error).split('\n')[0];
+    return { ok: false, attempt, record: { error: `bản ${orig ? 'React' : 'gốc'}: ${message}` } };
+  }
+  fs.writeFileSync(path.join(outDir, `${name}-original.png`), orig.png);
+  fs.writeFileSync(path.join(outDir, `${name}-react.png`), react.png);
+  const diffs = compare(orig.items, react.items);
+  const pixels = await pixelDiff(browser, orig.png, react.png, path.join(outDir, `${name}-diff.png`));
+  const ok = diffs.length === 0 && pixels.diffPixels === 0 && react.errors.length === 0;
+  return { ok, attempt, record: { elements: [orig.items.length, react.items.length], diffs: diffs.length, pixels, reactErrors: react.errors, originalErrors: orig.errors, firstDiffs: diffs.slice(0, 40) } };
+}
+
 fs.mkdirSync(outDir, { recursive: true });
 const staticServer = await serveStatic(prototypesDir, ORIGINAL_PORT);
 const vite = await createServer({ root: reactDir, configFile: path.join(reactDir, 'vite.config.ts'), logLevel: 'error', server: { port: REACT_PORT, strictPort: true, host: '127.0.0.1' } });
 await vite.listen();
-const browser = await chromium.launch();
+browser = await chromium.launch();
 const report = [];
 let failed = false;
 try {
   for (const pageId of pages) {
-    for (const viewport of VIEWPORTS) {
-      for (const theme of THEMES) {
-        const name = `${pageId}-${viewport.width}-${theme}`;
-        const orig = await capture(browser, `http://127.0.0.1:${ORIGINAL_PORT}/${pageId}.html`, viewport, theme, true);
-        const react = await capture(browser, `http://127.0.0.1:${REACT_PORT}${ROUTES[pageId] ?? '/' + pageId}`, viewport, theme, false);
-        fs.writeFileSync(path.join(outDir, `${name}-original.png`), orig.png);
-        fs.writeFileSync(path.join(outDir, `${name}-react.png`), react.png);
-        const diffs = compare(orig.items, react.items);
-        const pixels = await pixelDiff(browser, orig.png, react.png, path.join(outDir, `${name}-diff.png`));
-        const ok = diffs.length === 0 && pixels.diffPixels === 0 && react.errors.length === 0;
-        if (!ok) failed = true;
-        report.push({ case: name, ok, elements: [orig.items.length, react.items.length], diffs: diffs.length, pixels, reactErrors: react.errors, originalErrors: orig.errors, firstDiffs: diffs.slice(0, 40) });
-        console.log(`${ok ? 'ĐẠT ' : 'LỆCH'} ${name.padEnd(22)} phần tử ${orig.items.length}/${react.items.length}  khác ${diffs.length}  pixel ${pixels.diffPixels} (${(pixels.ratio * 100).toFixed(3)}%) ảnh ${pixels.size}${react.errors.length ? `  lỗi console React: ${react.errors.length}` : ''}`);
-        for (const d of diffs.slice(0, 8)) console.log(`     [${d.index}] ${d.kind} ${d.element ?? ''} gốc=${d.original} react=${d.react}`);
+    const cases = [
+      ...VIEWPORTS.flatMap(viewport => THEMES.map(theme => ({ state: null, steps: [], query: '', viewport, theme }))),
+      ...(STATES[pageId] ?? []).flatMap(({ name: state, steps, query = '' }) => [
+        { state, steps, query, viewport: VIEWPORTS[0], theme: 'light' },
+        { state, steps, query, viewport: VIEWPORTS[1], theme: 'dark' },
+      ]),
+    ].filter(c => !onlyState || c.state === onlyState);
+    for (const { state, steps, query, viewport, theme } of cases) {
+      const name = `${pageId}${state ? '-' + state : ''}-${viewport.width}-${theme}`;
+      // Lệch thì chạy lại đúng một lần và chỉ tính đạt nếu lần chạy lại khớp hoàn toàn: khác biệt thật luôn lặp lại,
+      // còn dao động của trình duyệt (lẻ pixel, đua thời gian) thì không.
+      let result;
+      let firstAttempt;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        result = await runCase(pageId, { steps, query, viewport, theme }, name);
+        if (result.ok) break;
+        if (attempt === 0) firstAttempt = result.record;
       }
+      const { ok, record, attempts } = { ...result, attempts: result.attempt + 1 };
+      if (!ok) failed = true;
+      // Ghi lại lần lệch đầu để biết dao động là gì.
+      report.push({ case: name, ok, attempts, ...record, ...(firstAttempt ? { firstAttempt } : {}) });
+      if (record.error) { console.log(`LỖI  ${name.padEnd(40)} ${record.error}`); continue; }
+      const { diffs, pixels, elements, reactErrors } = record;
+      console.log(`${ok ? 'ĐẠT ' : 'LỆCH'} ${name.padEnd(40)} phần tử ${elements[0]}/${elements[1]}  khác ${diffs}  pixel ${pixels.diffPixels} (${(pixels.ratio * 100).toFixed(3)}%) ảnh ${pixels.size}${reactErrors.length ? `  lỗi console React: ${reactErrors.length}` : ''}${attempts > 1 ? '  (chạy lại 1 lần)' : ''}`);
+      for (const d of record.firstDiffs.slice(0, 8)) console.log(`     [${d.index}] ${d.kind} ${d.element ?? ''} gốc=${d.original} react=${d.react}`);
     }
   }
 } finally {

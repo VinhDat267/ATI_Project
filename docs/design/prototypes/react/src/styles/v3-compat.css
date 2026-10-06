@@ -45,6 +45,12 @@
   }
 }
 
+/* outline-none của v3: viền trong suốt, vẫn hiện thành viền thật ở chế độ tương phản cao (forced colors). */
+@utility v3-outline-none {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
 /* v4 chỉ áp hover trên thiết bị có chuột; v3 áp mọi nơi. */
 @custom-variant hover (&:hover);
 /* app-stage.html khai darkMode: 'class'. */

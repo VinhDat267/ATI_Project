@@ -19,7 +19,7 @@ export function PrivacyPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           {/* Cụm trái: Logo ATI & Nhãn trang */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <a href="/" className="flex items-center gap-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
+            <a href="/" className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
               <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
                 A
               </div>
@@ -63,7 +63,7 @@ export function PrivacyPage() {
                 </span>
               </a>
             </div>
-            <a href="/app-stage" className="px-2.5 sm:px-3.5 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all duration-150 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] text-xs sm:text-sm flex-shrink-0">
+            <a href="/app-stage" className="px-2.5 sm:px-3.5 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all duration-150 inline-flex items-center gap-1.5 focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] text-xs sm:text-sm flex-shrink-0">
               <svg className="w-4 h-4 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>

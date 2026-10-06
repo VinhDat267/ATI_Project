@@ -1,6 +1,6 @@
 # PROTO-01 · Chuyển 12 bản mẫu HTML sang React, giữ nguyên design system
 
-**Trạng thái:** bước 1 xong (chờ review/merge), bước 2–4 chờ · **Nhánh bước 1:** `feat/proto-react-01` · **Phụ thuộc:** không
+**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 thi công xong (chờ review/merge), bước 3–4 chờ · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2) · **Phụ thuộc:** không
 **Người yêu cầu:** chủ dự án, 06/10/2026 · **Thi công bước 1:** Claude Code (theo yêu cầu trực tiếp của người dùng)
 
 ## Vì sao
@@ -69,3 +69,44 @@ Người dùng đã nói muốn giữ design system của bản mẫu; cần s�
 - Bản gốc được nạp thêm đủ font khi so (README giải thích).
 - Script so cần mạng.
 - `parse5` dùng qua phụ thuộc của `jsdom` ở `node_modules` gốc.
+
+## Kết quả bước 2 (Claude Code, 06/10/2026)
+
+**Đã làm:**
+- ba trang `Errors`, `Responses`, `AuthAction` sinh bằng bộ chuyển, rồi viết lại toàn bộ JS bằng state React:
+  - `errors` 288 dòng, 25 handler;
+  - `responses` 324 dòng, 18 handler;
+  - `auth-action` 389 dòng, 32 handler;
+- không còn lời gọi `todo()`;
+- script so có thêm trạng thái thao tác (`scripts/parity-states.mjs`): bấm, điền, nhấn phím, chờ, mở trang kèm query; lỗi ở một trường hợp không làm dừng cả lần chạy.
+
+**RED → GREEN** (`node scripts/verify-parity.mjs <trang>`):
+
+| Trang | Lần đầu | Nguyên nhân | Sửa |
+|---|---|---|---|
+| `responses` | 16/20 trường hợp lệch (lần chạy trước đó dừng giữa chừng vì menu demo che tab 4, đã sửa kịch bản) | `outline-none` (v4 bỏ hẳn viền); lớp bóng ring-offset 0px của v3 | `v3-outline-none`; bỏ qua lớp bóng không vẽ gì |
+| `errors` | 34/36 đạt | toast cảnh báo có `text-white` và `text-amber-400`; v3 cho màu hổ phách thắng, v4 cho trắng thắng | `!` cho màu theo loại toast |
+| `auth-action` | tab đang chọn mất viền cam | v3 CDN xếp class theo thứ tự xuất hiện trong trang: `border-[#FF5701]` thắng `border-transparent` nhưng `border-[#E7E7E2]` thua | Chỉ `border-[#FF5701]` có `!`. Lần thử đầu gắn `!` cho cả hai màu làm lệch thêm 40 chỗ, đã bỏ |
+
+**Các trường hợp loại khỏi bộ so:**
+- "lưu khi mật khẩu quá ngắn": lệch vài pixel do bong bóng kiểm tra form của Chrome (giao diện trình duyệt); phần trang khớp (0 phần tử lệch).
+- Margin `auto` và lẻ pixel thỉnh thoảng lệch rồi không lặp lại khi chạy lại:
+  - Chrome đôi khi trả 0px cho margin `auto` của phần tử trong khối `fixed`, dù vị trí trùng khớp;
+  - 7 pixel lệch dưới một pixel ở mép bong bóng chat.
+
+  Script giờ đọc vị trí trước rồi mới đọc style, không so margin theo chiều có `auto` (vị trí vẫn được so), và chạy lại đúng một lần những trường hợp lệch. Một trường hợp chỉ đạt khi lần chạy lại khớp hoàn toàn.
+- Kịch bản `responses` chờ 150ms sau khi bấm tab, vì bản mẫu đưa focus vào tiêu đề sau 50ms; bấm tiếp quá sớm làm kết quả focus phụ thuộc thời điểm.
+
+**Kết quả cuối** (`node scripts/verify-parity.mjs`, 5 trang, exit 0): **110/110 trường hợp đạt**, 0 phần tử lệch, 0 pixel lệch.
+- 404 (4) và privacy (4) của bước 1 vẫn đạt sau khi đổi `v3-outline-none` dùng chung;
+- errors: 4 lúc mở + 14 trạng thái × 2;
+- responses: 4 + 8 × 2;
+- auth-action: 4 + 23 × 2.
+
+Hai trường hợp phải chạy lại một lần mới đạt: `responses-tinh-huong-3-chon-375-dark` và `auth-action-doi-tai-khoan-1440-light`. Chạy riêng lại thì đạt ngay lần đầu. Ngoài ra:
+- `npm run typecheck` exit 0;
+- `npm run build` exit 0 (CSS 50,22 kB, JS 429,56 kB).
+
+**Giữ nguyên lỗi của bản mẫu** (liệt kê ở README `react/`):
+- dòng phụ tình huống 4 của `responses` trống cho tới khi đổi vai trò;
+- nhánh JS "mật khẩu ngắn" của `auth-action` không chạy được.

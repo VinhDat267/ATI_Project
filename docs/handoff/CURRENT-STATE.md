@@ -17,7 +17,7 @@ Agent cập nhật: Claude Code (reviewer sau merge #90).
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Tiếp theo FE-05b (làm cockpit giống bản mẫu, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). FE-07, FE-08, FE-09 giao song song được. Các trang và khoảnh khắc còn lại chưa thi công;
+> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Tiếp theo FE-05b (làm cockpit giống bản mẫu, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). Song song: [PROTO-01](tasks/PROTO-01-prototypes-to-react.md) chuyển 12 bản mẫu sang React trong `docs/design/prototypes/react/`, giữ design system bản mẫu, chưa đưa vào app; bước 1 (404, privacy) đã merge #93, bước 2 (errors, responses, auth-action) chờ review. FE-07, FE-08, FE-09 giao song song được. Các trang và khoảnh khắc còn lại chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -104,6 +104,18 @@ Audit tuần 2 (Claude Code) chạy probe trên PostgreSQL thật: chết giữa
 Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần người dùng thật duyệt plan).
 
 ## 4. Đã làm gần đây (PR đã merge)
+
+- **PROTO-01 bước 1 xong #93** (`00e9c5f`), merge 06/10 lúc 18:37:29 Việt Nam.
+  - Có `docs/design/prototypes/react/`: bản React của bản mẫu, cùng React/Vite/Tailwind 4.3 với app. Dùng `node_modules` gốc, không thêm gói, ngoài workspace nên CI không chạy.
+  - Trong thư mục có: bộ chuyển HTML → JSX, token theo trang, bảng màu v3, lớp tương thích Tailwind v3 → v4, và script so từng phần tử/từng pixel với HTML gốc.
+  - Trang 404 và privacy khớp 8/8 trường hợp.
+  - CI `v3` xanh đúng head `1359d7e`. Claude Code thi công theo yêu cầu người dùng, tự review; người dùng cho merge.
+- #92 (`18980ec`), merge 06/10 lúc 18:04:20 Việt Nam:
+  - bản mẫu là chuẩn hình thức (đặc tả giao diện mục 1, 1.1, 1.2); cách làm là chuyển markup bản mẫu sang JSX;
+  - task card FE-05b;
+  - FE-06 → FE-10 có tiêu chí giống bản mẫu.
+
+  Chỉ tài liệu, tự review. Xem [log](log/2026-10-06-claude-code-plan-visual-parity.md).
 
 - **FE-05 xong #90** (`ee65cd0`), merge 06/10 lúc 06:42:18 Việt Nam: luồng chính chuyển sang cockpit (nhờ việc → tìm đúng chỗ → hỏi lại → duyệt → đang làm → biên nhận).
   - Bộ chọn khoảnh khắc thuần theo bảng đặc tả mục 5. Một ô nhập chung; ngăn hội thoại và ngăn lịch sử có focus trap, Esc, trả focus. Phản hồi muộn được gắn đúng hội thoại, kế hoạch và yêu cầu.

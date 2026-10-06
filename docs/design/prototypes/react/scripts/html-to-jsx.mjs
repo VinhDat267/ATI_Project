@@ -52,14 +52,15 @@ const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'detail
   'nav', 'ol', 'p', 'section', 'summary', 'table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th', 'ul']);
 
 const camel = name => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-// Tailwind v4 đổi cách tính space-x/space-y/divide (margin/viền ở phần tử trước thay vì phần tử sau).
-// Đổi sang các utility v3-* khai trong src/styles/v3-compat.css để giữ đúng cách tính của v3.
+// Tailwind v4 đổi cách tính space-x/space-y/divide (margin/viền ở phần tử trước thay vì phần tử sau) và
+// outline-none (v3: viền trong suốt 2px, vẫn hiện ở chế độ tương phản cao; v4: bỏ hẳn viền).
+// Đổi sang các utility v3-* khai trong src/styles/v3-compat.css để giữ đúng cách của v3.
 function v3Classes(value) {
   return value.trim().split(/\s+/).map(token => {
-    const match = /^((?:[^:[\]]*:)*)(space-[xy]-.+|divide-.+)$/.exec(token);
+    const match = /^((?:[^:[\]]*:)*)(space-[xy]-.+|divide-.+|outline-none)$/.exec(token);
     if (!match) return token;
     const [, variants, base] = match;
-    if (/^space-[xy]-/.test(base)) return `${variants}v3-${base}`;
+    if (/^space-[xy]-/.test(base) || base === 'outline-none') return `${variants}v3-${base}`;
     if (/^divide-[xy](-\d+)?$/.test(base)) return `${variants}v3-${base}`;
     return `${variants}v3-divide-color-${base.slice('divide-'.length)}`;
   }).join(' ');
