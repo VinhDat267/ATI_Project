@@ -1,0 +1,25 @@
+# 2026-10-06 · Claude Code · PROTO-01 bước 2: errors, responses, auth-action
+
+- **Yêu cầu:** người dùng nói "merge rồi làm tiếp bước 2".
+  - PR #93 (bước 1) merge tại `00e9c5f` sau khi CI `v3` xanh đúng head `1359d7e`.
+  - Bước 2 làm trong worktree `.claude/worktrees/proto-react-02`, nhánh `feat/proto-react-02` từ `origin/main` `00e9c5f`.
+- **Cách làm:**
+  - sinh khung bằng `scripts/html-to-jsx.mjs`;
+  - viết lại JS của bản mẫu bằng state React: tab, menu demo, toast, hẹn giờ, đồng hồ đếm, form, query `?type=`/`?mode=`/`?state=`;
+  - thêm trạng thái thao tác vào script so;
+  - sửa từng khác biệt mà script tìm ra. Chi tiết RED → GREEN ở [task card](../tasks/PROTO-01-prototypes-to-react.md), các điểm tương thích mới và lỗi bản mẫu đang giữ ở [README](../../design/prototypes/react/README.md).
+- **Phát hiện đáng chú ý:**
+  - Tailwind v3 CDN quyết định class nào thắng khi hai class cùng thuộc tính trên một phần tử theo thứ tự class xuất hiện lần đầu trong trang, còn v4 xếp theo tên class. Chỉ gặp ở class do JS thêm vào (toast, tab); mỗi chỗ đánh dấu `!` và ghi chú lý do.
+  - Lần thử đầu gắn `!` cho cả hai màu viền tab làm lệch thêm 40 chỗ. Đã thu hẹp lại đúng màu cần thắng.
+- **Sửa dùng chung** (áp dụng cho cả 5 trang):
+  - `outline-none` → `v3-outline-none`;
+  - script so bỏ qua lớp bóng không vẽ gì;
+  - script chờ hai khung hình và đọc vị trí trước khi đọc style;
+  - không so giá trị margin theo chiều có `auto` (vị trí vẫn được so);
+  - trường hợp lệch được chạy lại đúng một lần, chỉ đạt nếu lần chạy lại khớp hoàn toàn; lần lệch đầu được ghi vào `report.json`;
+  - lỗi ở một trường hợp không làm dừng cả lần chạy.
+- **Sự cố nhỏ trong phiên:**
+  - script sửa file đếm sai số lần khớp khi regex không có cờ `g`, nhưng dừng trước khi ghi nên file không đổi. Đã sửa cách đếm rồi chạy lại.
+  - một lệnh ghi tạm kết quả ra `.claude/worktrees/aa-verify.txt`, đã xoá ngay.
+- **Kết quả:** `node scripts/verify-parity.mjs` exit 0, 110/110 trường hợp đạt (0 phần tử lệch, 0 pixel lệch); hai trường hợp đạt sau một lần chạy lại và đạt ngay khi chạy riêng. Typecheck, build exit 0.
+- **Không làm:** không sửa `apps/`, không sửa 12 file HTML gốc, không gọi dịch vụ hay model.

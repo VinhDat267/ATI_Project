@@ -50,7 +50,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3–5 | Trang giới thiệu và các màn đăng nhập/đăng ký/xác minh/đặt lại | [FE-08](tasks/FE-08-landing-and-auth-screens.md) | chờ; mốc 23/10 |
 | 3–5 | Trang Tài khoản, Quản lý người dùng, Lịch sử | [FE-09](tasks/FE-09-account-users-history.md) | chờ; mốc 27/10 |
 | 3–5 | Cẩm nang, Chính sách an toàn, 404, rà soát tương phản/trợ năng toàn app | [FE-10](tasks/FE-10-guide-privacy-and-audit.md) | chờ; mốc 28/10 |
-| 3–5 (thêm 06/10) | Bản React của 12 bản mẫu trong `docs/design/prototypes/react/`, giữ design system bản mẫu, so từng phần tử/pixel với HTML gốc; chưa đưa vào app | [PROTO-01](tasks/PROTO-01-prototypes-to-react.md) | bước 1 (khung, công cụ so, 404, privacy) thi công xong, chờ review/merge; bước 2–4 chờ |
+| 3–5 (thêm 06/10) | Bản React của 12 bản mẫu trong `docs/design/prototypes/react/`, giữ design system bản mẫu, so từng phần tử/pixel với HTML gốc; chưa đưa vào app | [PROTO-01](tasks/PROTO-01-prototypes-to-react.md) | bước 1 (khung, công cụ so, 404, privacy) xong #93 tại `00e9c5f`; bước 2 (errors, responses, auth-action) thi công xong, chờ review/merge; bước 3–4 chờ |
 | 4 (làm sớm, trước các phép đo) | Đường LLM dự phòng: chuyển thủ công sang một model Codex (`cx/`) trong 9router; probe chọn model, bộ đo tối thiểu, một lượt qua app, runbook | [W4-00](tasks/W4-00-llm-fallback-provider.md) | chờ; người dùng xác nhận nguồn `cx/` gọi được và quota |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
