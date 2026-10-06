@@ -1,0 +1,760 @@
+// Chuyển từ docs/design/prototypes/privacy.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
+import { usePrototypePage, type PageMeta } from '../../app/usePrototypePage';
+import css from './page.css?inline';
+
+export const meta: PageMeta = {
+  id: "privacy",
+  title: "Chính sách an toàn & Dữ liệu — ATI",
+  htmlClass: "scroll-smooth",
+  bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827] antialiased selection:bg-[#FF5701]/10 selection:text-[#FF5701]",
+  css,
+};
+
+export function PrivacyPage() {
+  usePrototypePage(meta);
+  return (
+    <>
+      {/* ==================== HEADER (COCKPIT BAR) ==================== */}
+      <header className="sticky top-0 z-40 bg-[#F8F8F6]/95 backdrop-blur-md border-b border-[#E7E7E2]" data-od-id="privacy-header">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Cụm trái: Logo ATI & Nhãn trang */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <a href="/" className="flex items-center gap-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
+              <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
+                A
+              </div>
+              <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
+                ATI
+              </span>
+            </a>
+            <span className="text-[#E7E7E2] select-none flex-shrink-0" aria-hidden="true">
+              /
+            </span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs sm:text-sm font-medium text-[#111827] truncate">
+                Chính sách an toàn &amp; Dữ liệu
+              </span>
+            </div>
+          </div>
+          {/* Cụm phải: Điều hướng nhanh */}
+          <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+              <a href="/guide" className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  {' '}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  {' '}
+                </svg>
+                <span>
+                  Cẩm nang
+                </span>
+              </a>
+              {' '}
+              <a href="/settings" className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  {' '}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  {' '}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  {' '}
+                </svg>
+                <span>
+                  Kết nối dịch vụ
+                </span>
+              </a>
+            </div>
+            <a href="/app-stage" className="px-2.5 sm:px-3.5 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all duration-150 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] text-xs sm:text-sm flex-shrink-0">
+              <svg className="w-4 h-4 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="hidden sm:inline">
+                Về không gian làm việc
+              </span>
+              <span className="sm:hidden">
+                Quay lại
+              </span>
+            </a>
+          </div>
+        </div>
+      </header>
+      {/* ==================== MAIN CONTENT CONTAINER ==================== */}
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12" id="main-content">
+        {/* HERO HEADER */}
+        <header className="mb-10 text-center sm:text-left border-b border-[#E7E7E2] pb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701] border border-[#FF5701]/20 mb-3">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              {' '}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              {' '}
+            </svg>
+            <span>
+              CAM KẾT AN TOÀN &amp; MINH BẠCH DỮ LIỆU
+            </span>
+          </div>
+          {' '}
+          <h1 className="font-display font-medium text-3xl sm:text-4xl lg:text-[42px] text-[#111827] tracking-tight leading-tight mb-4">
+            Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.
+          </h1>
+          <p className="text-base sm:text-lg text-[#4B5563] leading-relaxed max-w-3xl mb-4 font-normal">
+            {"ATI được thiết kế từ đầu với một ranh giới rõ ràng: "}
+            <strong className="text-[#111827] font-semibold">
+              không tự ý hành động khi chưa có lệnh duyệt, không hiển thị lại khoá truy cập đã lưu, chỉ hoạt động trong phạm vi được quản trị viên cấp phép
+            </strong>
+            , và luôn dừng lại hỏi ý kiến bạn khi đường truyền mạng gặp gián đoạn.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#6B7280]">
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                {' '}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                {' '}
+              </svg>
+              {" Áp dụng cho toàn bộ không gian làm việc ATI"}
+            </span>
+          </div>
+          {/* Quick Anchor Pills */}
+          <nav className="mt-6 flex flex-wrap gap-2 pt-4 border-t border-[#E7E7E2]/60 text-xs font-medium" aria-label="Mục lục chính sách">
+            <a href="#core-commitments" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 1. Bốn cam kết cốt lõi "}
+            </a>
+            <a href="#access-keys" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 2. Lưu trữ khoá an toàn "}
+            </a>
+            <a href="#google-oauth" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 3. Đăng nhập bằng Google "}
+            </a>
+            <a href="#member-roles" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 4. Phân quyền thành viên & Quản trị "}
+            </a>
+            <a href="#network-fail" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 5. Mạng gián đoạn & Khắc phục "}
+            </a>
+            <a href="#retention-delete" className="px-3 py-1.5 rounded-lg bg-white border border-[#E7E7E2] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
+              {" 6. Lưu trữ & Quyền xoá dữ liệu "}
+            </a>
+          </nav>
+        </header>
+        {/* ======================================================= */}
+        {/* PHẦN 1: BỐN CAM KẾT AN TOÀN CỐT LÕI (TRỌNG TÂM SẢN PHẨM) */}
+        {/* ======================================================= */}
+        <section id="core-commitments" className="mb-14 scroll-mt-20" data-od-id="section-core-commitments">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 className="font-display font-medium text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                1. Bốn cam kết an toàn cốt lõi
+              </h2>
+              <p className="text-sm text-[#6B7280] mt-1">
+                Đây là những nguyên tắc bất di bất dịch định hình toàn bộ kiến trúc sản phẩm của ATI.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Cam kết 1: Không ghi khi chưa duyệt */}
+            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E7E7E2] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FF5701]">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      {' '}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      {' '}
+                    </svg>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100/70 text-orange-800">
+                    {" Cam kết #1 "}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-[#111827] mb-2 leading-snug">
+                  Không ghi gì khi chưa được duyệt
+                </h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
+                  {"ATI phân tách rạch ròi giữa việc "}
+                  <strong className="text-[#111827]">
+                    lên kế hoạch
+                  </strong>
+                  {" và "}
+                  <strong className="text-[#111827]">
+                    ghi dữ liệu
+                  </strong>
+                  . Khi bạn gõ một câu yêu cầu, hệ thống chỉ tra cứu tìm đúng bảng, kênh, kho mã và trình bày bản xem trước nguyên văn từng nội dung.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
+                <span className="font-semibold text-[#111827]">
+                  Hành vi thực tế:
+                </span>
+                {" Chỉ khi bạn bấm nút cam "}
+                <strong className="text-[#FF5701]">
+                  “Duyệt kế hoạch ✓”
+                </strong>
+                , ATI mới bắt đầu tạo thẻ hay gửi tin. Nếu bạn huỷ bỏ hoặc đóng trang, không có bất kỳ ký tự nào bị ghi lên công cụ của bạn.
+              </div>
+            </article>
+            {/* Cam kết 2: Khoá lưu trữ an toàn, không hiển thị lại */}
+            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E7E7E2] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      {' '}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      {' '}
+                    </svg>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100/70 text-blue-800">
+                    {" Cam kết #2 "}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-[#111827] mb-2 leading-snug">
+                  Khoá lưu trữ an toàn, không hiển thị lại
+                </h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
+                  Các khoá truy cập (Slack Bot token, GitHub Personal access token, Google Service Account PEM...) chỉ do Quản trị viên nhập. Sau khi lưu, khoá được mã hoá tức thì và không bao giờ hiển thị lại trên giao diện của bất kỳ ai — kể cả chính Quản trị viên.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
+                <span className="font-semibold text-[#111827]">
+                  Hành vi thực tế:
+                </span>
+                {" Các ô nhập khoá đã lưu luôn ở trạng thái trống với gợi ý: "}
+                <em>
+                  “Đã lưu · nhập lại nếu muốn thay”
+                </em>
+                . Muốn sửa đổi bất kỳ cài đặt nào đều phải nhập lại khoá mới.
+              </div>
+            </article>
+            {/* Cam kết 3: Chỉ hoạt động trong phạm vi được cấp phép */}
+            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E7E7E2] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      {' '}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      {' '}
+                    </svg>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100/70 text-purple-800">
+                    {" Cam kết #3 "}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-[#111827] mb-2 leading-snug">
+                  Chỉ hoạt động trong phạm vi được cấp phép
+                </h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
+                  ATI không có quyền lục soát tài khoản của bạn. Hệ thống bị giới hạn nghiêm ngặt, chỉ được phép đọc và ghi trên đúng những bảng Trello, kênh Slack, kho mã GitHub, bảng tính Sheets mà Quản trị viên đã chỉ định rõ ràng.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
+                <span className="font-semibold text-[#111827]">
+                  Hành vi thực tế:
+                </span>
+                {" Nếu bạn yêu cầu gửi tin vào kênh "}
+                <code className="font-mono text-[#111827]">
+                  #marketing
+                </code>
+                {" nhưng trong Cài đặt chỉ cho phép "}
+                <code className="font-mono text-[#111827]">
+                  #ati-test
+                </code>
+                , ATI sẽ hỏi lại bạn muốn gửi vào kênh nào trong các kênh được phép, không tự gửi nhầm chỗ.
+              </div>
+            </article>
+            {/* Cam kết 4: Dừng lại hỏi người dùng khi mạng gián đoạn */}
+            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E7E7E2] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      {' '}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      {' '}
+                    </svg>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100/70 text-amber-800">
+                    {" Cam kết #4 "}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-[#111827] mb-2 leading-snug">
+                  Dừng lại hỏi người dùng khi mạng gián đoạn
+                </h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
+                  Nếu đường truyền bị ngắt đúng vào thời điểm ATI đang gửi lệnh ghi (ví dụ: đang ghi dòng vào Sheets), hệ thống không thể chắc chắn dữ liệu đã vào hay chưa. Thay vì tự ý thử lại để tránh trùng lặp, ATI dừng lại ngay lập tức và hỏi ý kiến bạn.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
+                <span className="font-semibold text-[#111827]">
+                  Hành vi thực tế:
+                </span>
+                {" ATI hiển thị màn hình cảnh báo rõ ràng những việc đã hoàn tất, việc đang làm dở, và để bạn bấm kiểm tra công cụ thực tế trước khi quyết định tiếp tục hay bỏ qua."}
+              </div>
+            </article>
+          </div>
+        </section>
+        {/* ======================================================= */}
+        {/* PHẦN 2: LƯU TRỮ KHOÁ DỊCH VỤ AN TOÀN */}
+        {/* ======================================================= */}
+        <section id="access-keys" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E7E7E2] shadow-soft-card" data-od-id="section-access-keys">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#111827]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                {' '}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                {' '}
+              </svg>
+            </div>
+            <h2 className="font-display font-medium text-2xl text-[#111827] tracking-tight">
+              2. Quản lý và lưu trữ khoá dịch vụ
+            </h2>
+          </div>
+          <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed mb-6 font-normal">
+            Trong ATI, các khoá kết nối là tài sản bảo mật chung của cả nhóm. Chúng tôi áp dụng quy chế nghiêm ngặt trong việc tiếp nhận, lưu trữ và sử dụng khoá:
+          </p>
+          <div className="v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                ✓
+              </div>
+              <div>
+                <strong className="text-[#111827]">
+                  Chỉ Quản trị viên mới được cấu hình khoá:
+                </strong>
+                {" Thành viên thường chỉ có thể xem trạng thái kết nối (Chưa kiểm tra / Kết nối tốt / Không kết nối được) và bấm nút kiểm tra kết nối, hoàn toàn không xem được chuỗi khoá hay chỉnh sửa nơi được phép dùng."}
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                ✓
+              </div>
+              <div>
+                <strong className="text-[#111827]">
+                  Không lưu trữ ngược ra giao diện:
+                </strong>
+                {" Khi mở ngăn chỉnh sửa dịch vụ, các trường khoá luôn được bảo vệ ở trạng thái trống."}
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                ✓
+              </div>
+              <div>
+                <strong className="text-[#111827]">
+                  Bắt buộc nhập lại đủ khoá khi cập nhật:
+                </strong>
+                {" Hiện tại, muốn lưu bất kỳ thay đổi nào (kể cả chỉ thêm một kênh) đều phải nhập lại đủ khoá."}
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 pt-5 border-t border-[#E7E7E2] flex items-center justify-between flex-wrap gap-3">
+            <span className="text-xs text-[#6B7280]">
+              Muốn kiểm tra hoặc cấu hình các dịch vụ đang kết nối?
+            </span>
+            <a href="/settings" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-[#111827] text-xs font-medium transition-colors">
+              <span>
+                Xem màn Kết nối dịch vụ
+              </span>
+              <span>
+                →
+              </span>
+            </a>
+          </div>
+        </section>
+        {/* ======================================================= */}
+        {/* PHẦN 3: ĐĂNG NHẬP BẰNG GOOGLE (GOOGLE OAUTH POLICY) */}
+        {/* ======================================================= */}
+        <section id="google-oauth" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E7E7E2] shadow-soft-card" data-od-id="section-google-oauth">
+          <div className="flex items-center gap-3 mb-4">
+            {/* Google Logo chuẩn SVG */}
+            <div className="w-8 h-8 rounded-xl bg-white border border-[#E7E7E2] p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                {' '}
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                {' '}
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                {' '}
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                {' '}
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                {' '}
+              </svg>
+            </div>
+            <h2 className="font-display font-medium text-2xl text-[#111827] tracking-tight">
+              3. Chính sách đăng nhập bằng tài khoản Google
+            </h2>
+          </div>
+          <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed mb-6 font-normal">
+            ATI cung cấp tuỳ chọn “Tiếp tục với Google” nhằm mang lại trải nghiệm đăng nhập thuận tiện, an toàn và không cần ghi nhớ thêm mật khẩu. Chúng tôi cam kết minh bạch tuyệt đối về việc sử dụng thông tin từ Google:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            {/* Nhóm thông tin ATI nhận */}
+            <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+              <div className="flex items-center gap-2 mb-2 text-emerald-800 font-semibold text-xs uppercase tracking-wider">
+                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  {' '}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  {' '}
+                </svg>
+                <span>
+                  Dữ liệu ATI nhận từ Google
+                </span>
+              </div>
+              <ul className="v3-space-y-1.5 text-xs sm:text-sm text-[#374151]">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold">
+                    •
+                  </span>
+                  <span>
+                    <strong>
+                      Địa chỉ email
+                    </strong>
+                    {" để định danh tài khoản công việc."}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold">
+                    •
+                  </span>
+                  <span>
+                    <strong>
+                      Họ và tên hiển thị
+                    </strong>
+                    {" để chào hỏi và gán người yêu cầu."}
+                  </span>
+                </li>
+              </ul>
+            </div>
+            {/* Nhóm thông tin ATI KHÔNG BAO GIỜ chạm tới */}
+            <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100">
+              <div className="flex items-center gap-2 mb-2 text-rose-800 font-semibold text-xs uppercase tracking-wider">
+                <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  {' '}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  {' '}
+                </svg>
+                <span>
+                  ATI TUYỆT ĐỐI KHÔNG TRUY CẬP
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-[#374151] leading-relaxed">
+                Đăng nhập Google chỉ dùng để xác định bạn là ai. ATI không đọc Gmail, Drive hay lịch cá nhân của bạn. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
+              </p>
+            </div>
+          </div>
+          {/* Quy định duyệt tài khoản Google mới */}
+          <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">
+            <div className="font-semibold text-[#111827] mb-1 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#FF5701]" />
+              <span>
+                Lưu ý quan trọng về tài khoản Google mới:
+              </span>
+            </div>
+            <p className="leading-relaxed">
+              {"Đăng ký bằng tài khoản Google mới vẫn phải trải qua bước "}
+              <strong className="text-[#111827]">
+                Quản trị viên nhóm phê duyệt
+              </strong>
+              {" giống như đăng ký bằng email thông thường. Điều này nhằm ngăn chặn người ngoài tổ chức tự ý đăng nhập vào các tài nguyên chung (Trello, Slack, GitHub) của nhóm bạn."}
+            </p>
+          </div>
+        </section>
+        {/* ======================================================= */}
+        {/* PHẦN 4: PHÂN QUYỀN THÀNH VIÊN VÀ QUẢN TRỊ VIÊN */}
+        {/* ======================================================= */}
+        <section id="member-roles" className="mb-14 scroll-mt-20" data-od-id="section-member-roles">
+          <h2 className="font-display font-medium text-2xl sm:text-[26px] text-[#111827] tracking-tight mb-2">
+            4. Phân định quyền hạn: Thành viên &amp; Quản trị viên
+          </h2>
+          <p className="text-sm text-[#6B7280] mb-6">
+            Hệ thống phân chia 2 vai trò rõ ràng để vừa đảm bảo tính tiện lợi trong công việc, vừa hạn chế rủi ro lộ khoá dịch vụ.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Cột Thành viên */}
+            <div className="p-6 bg-white rounded-3xl border border-[#E7E7E2] shadow-soft-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#111827] flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span>
+                    Thành viên (Member)
+                  </span>
+                </h3>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                  Người dùng thường
+                </span>
+              </div>
+              <p className="text-xs text-[#6B7280] mb-4">
+                Dành cho các thành viên trong nhóm dùng ATI để điều phối công việc hằng ngày.
+              </p>
+              <ul className="v3-space-y-2.5 text-xs sm:text-sm text-[#374151]">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Gõ yêu cầu bằng tiếng Việt tự nhiên trên Sân khấu.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Xem trước, duyệt hoặc từ chối kế hoạch thực thi cá nhân.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Kiểm tra trạng thái kết nối của các dịch vụ đã thiết lập.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Xem nhật ký điều phối và kết quả các việc do mình yêu cầu.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Đổi tên hiển thị, mật khẩu và thu hồi các phiên đăng nhập cá nhân.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 text-[#9CA3AF]">
+                  <span className="font-bold mt-0.5">
+                    ✕
+                  </span>
+                  <span>
+                    Không thể xem hoặc thay đổi khoá kết nối dịch vụ chung.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 text-[#9CA3AF]">
+                  <span className="font-bold mt-0.5">
+                    ✕
+                  </span>
+                  <span>
+                    Không thể phê duyệt thành viên mới hoặc khoá tài khoản người khác.
+                  </span>
+                </li>
+              </ul>
+            </div>
+            {/* Cột Quản trị viên */}
+            <div className="p-6 bg-white rounded-3xl border border-[#FF5701]/30 shadow-soft-card relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF5701]/5 rounded-bl-full pointer-events-none" aria-hidden="true" />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#111827] flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#FF5701]" />
+                  <span>
+                    Quản trị viên (Admin)
+                  </span>
+                </h3>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-50 text-[#FF5701] font-semibold border border-orange-200">
+                  Toàn quyền kiểm soát
+                </span>
+              </div>
+              <p className="text-xs text-[#6B7280] mb-4">
+                Dành cho trưởng nhóm, người quản lý môi trường làm việc và tích hợp công cụ.
+              </p>
+              <ul className="v3-space-y-2.5 text-xs sm:text-sm text-[#374151]">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Toàn bộ quyền hạn của Thành viên.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Nhập, kiểm tra và cập nhật khoá kết nối cho 8 dịch vụ chung.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Thêm hoặc xoá nơi ATI được phép truy cập (Board, Channel, Repo...).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Duyệt tài khoản mới (đã xác minh email).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Tạm khoá tài khoản thành viên (thu hồi mọi phiên ngay lập tức).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#FF5701] font-bold mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Đổi vai trò Thành viên / Quản trị viên; không tự khoá hoặc tự bỏ quyền của chính mình.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+        {/* ======================================================= */}
+        {/* PHẦN 5: XỬ LÝ SỰ CỐ MẠNG & THU HỒI PHIÊN */}
+        {/* ======================================================= */}
+        <section id="network-fail" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E7E7E2] shadow-soft-card" data-od-id="section-network-fail">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#111827]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                {' '}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                {' '}
+              </svg>
+            </div>
+            <h2 className="font-display font-medium text-2xl text-[#111827] tracking-tight">
+              5. Quy trình bảo vệ khi gián đoạn mạng và hết phiên
+            </h2>
+          </div>
+          <div className="v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
+            <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <h3 className="font-bold text-[#111827] mb-1.5 text-sm sm:text-base">
+                Mạng ngắt giữa chừng khi đang ghi dữ liệu
+              </h3>
+              <p className="leading-relaxed">
+                Nếu kết nối mạng của bạn hoặc kết nối giữa ATI và dịch vụ bên thứ ba (Slack, GitHub, Sheets...) bị ngắt trong lúc việc đang thực hiện, hệ thống không tự ý phát lệnh lại. Thay vào đó, giao diện làm việc sẽ hiển thị thông báo chi tiết: liệt kê chính xác các việc đã hoàn tất kèm đường dẫn kết quả, việc đang dở dang và việc chưa làm, để bạn có thể kiểm tra thực tế trên công cụ rồi mới quyết định tiếp tục hay dừng lại.
+              </p>
+            </div>
+            <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <h3 className="font-bold text-[#111827] mb-1.5 text-sm sm:text-base">
+                Thời hạn phiên đăng nhập
+              </h3>
+              <p className="leading-relaxed">
+                Phiên đăng nhập có hạn 7 ngày. Khi phiên hết hạn, bạn đăng nhập lại; lịch sử hội thoại và kế hoạch đã lưu vẫn còn.
+              </p>
+            </div>
+            <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2]">
+              <h3 className="font-bold text-[#111827] mb-1.5 text-sm sm:text-base">
+                Thu hồi phiên truy cập tức thì
+              </h3>
+              <p className="leading-relaxed">
+                Trong mục Cài đặt tài khoản (
+                <a href="/account" className="text-[#FF5701] underline underline-offset-2">
+                  account.html
+                </a>
+                ), bạn có thể kiểm tra danh sách toàn bộ các thiết bị (trình duyệt, máy tính, điện thoại) đang đăng nhập và bấm nút “Đăng xuất khỏi mọi thiết bị khác” để chấm dứt phiên ngay lập tức khi phát hiện nghi vấn.
+              </p>
+            </div>
+          </div>
+        </section>
+        {/* ======================================================= */}
+        {/* PHẦN 6: LƯU TRỮ VÀ QUYỀN XOÁ DỮ LIỆU */}
+        {/* ======================================================= */}
+        <section id="retention-delete" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E7E7E2] shadow-soft-card" data-od-id="section-retention-delete">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#111827]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                {' '}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                {' '}
+              </svg>
+            </div>
+            <h2 className="font-display font-medium text-2xl text-[#111827] tracking-tight">
+              6. Thời hạn lưu trữ và quyền xoá dữ liệu
+            </h2>
+          </div>
+          <div className="v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
+            <p className="leading-relaxed">
+              <strong className="text-[#111827]">
+                Nhật ký điều phối:
+              </strong>
+              {" ATI lưu trong cơ sở dữ liệu của nhóm: các tin nhắn trong hội thoại, kế hoạch bạn đã duyệt và kết quả từng bước (kể cả dữ liệu ATI đọc được khi tra cứu, như tên bảng, tiêu đề issue, nội dung ô). Khoá dịch vụ được mã hoá khi lưu."}
+            </p>
+            <p className="leading-relaxed">
+              <strong className="text-[#111827]">
+                Dữ liệu trên công cụ đối tác:
+              </strong>
+              {" Mọi thẻ Trello, issue GitHub, dòng Sheets hay tin nhắn Slack sau khi hoàn thành đều thuộc quyền sở hữu của bạn trên các nền tảng tương ứng. Khi cần chỉnh sửa hay xoá, bạn thao tác trực tiếp trên giao diện của công cụ đó theo quyền hạn của tài khoản."}
+            </p>
+            <p className="leading-relaxed">
+              <strong className="text-[#111827]">
+                Ngừng sử dụng dịch vụ:
+              </strong>
+              {" Muốn ngừng dùng một dịch vụ, quản trị viên thu hồi khoá ngay trên trang của dịch vụ đó (Trello, Slack, GitHub…)."}
+            </p>
+          </div>
+          {/* Khối liên hệ báo cáo bảo mật */}
+          <div className="mt-8 pt-6 border-t border-[#E7E7E2] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#F8F8F6] p-5 rounded-2xl border border-[#E7E7E2]">
+            <div>
+              <h4 className="text-sm font-bold text-[#111827]">
+                Bạn có thắc mắc hoặc cần báo cáo vấn đề an toàn?
+              </h4>
+              <p className="text-xs text-[#6B7280] mt-0.5">
+                Đội ngũ kỹ thuật nội bộ luôn sẵn sàng hỗ trợ và giải đáp minh bạch.
+              </p>
+            </div>
+            <div className="px-4 py-2 min-h-[40px] rounded-xl bg-white border border-[#E7E7E2] text-[#111827] text-xs font-semibold shadow-sm flex-shrink-0 inline-flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                {' '}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                {' '}
+              </svg>
+              <span>
+                Hãy báo quản trị viên của nhóm.
+              </span>
+            </div>
+          </div>
+        </section>
+      </main>
+      {/* ==================== FOOTER ==================== */}
+      <footer className="mt-auto border-t border-[#E7E7E2] bg-white py-8 px-4 sm:px-6" data-od-id="privacy-footer">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">
+              A
+            </div>
+            <span className="font-semibold text-[#111827]">
+              ATI
+            </span>
+            <span>
+              — AI Workflow Automation Platform · 2026
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[#4B5563]">
+            <a href="/" className="hover:text-[#111827] transition-colors">
+              Trang chủ
+            </a>
+            <a href="/app-stage" className="hover:text-[#111827] transition-colors">
+              Không gian làm việc
+            </a>
+            <a href="/guide" className="hover:text-[#111827] transition-colors">
+              Cẩm nang
+            </a>
+            <a href="/settings" className="hover:text-[#111827] transition-colors">
+              Kết nối dịch vụ
+            </a>
+            <a href="/history" className="hover:text-[#111827] transition-colors">
+              Nhật ký điều phối
+            </a>
+            <a href="/privacy" className="text-[#FF5701] font-medium transition-colors" aria-current="page">
+              Chính sách an toàn
+            </a>
+          </div>
+        </div>
+      </footer>
+    </>
+  );
+}

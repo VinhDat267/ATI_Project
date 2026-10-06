@@ -1,0 +1,51 @@
+/* Giá trị và biến thể mặc định của Tailwind v3 mà v4 đã đổi. Bản mẫu viết theo v3 nên giữ nguyên v3. */
+@theme {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --blur-sm: 4px;
+  --radius-sm: 0.125rem;
+  --drop-shadow-sm: 0 1px 1px rgb(0 0 0 / 0.05);
+  /* v4 lưu line-height của text-* dạng tỉ lệ nên đổi cỡ chữ (ví dụ lg:text-[42px]) thì dòng cao theo;
+     v3 dùng giá trị tuyệt đối, phần tử con kế thừa số px chứ không kế thừa tỉ lệ. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+}
+
+/* space-x/space-y/divide theo cách tính của v3: margin/viền đặt ở các phần tử sau phần tử đầu, bỏ qua [hidden].
+   Bộ chuyển đổi tên class sang v3-* (scripts/html-to-jsx.mjs), vì v4 đặt margin/viền ở các phần tử trước phần tử cuối. */
+@utility v3-space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(calc(var(--spacing) * --value(number)) * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(calc(var(--spacing) * --value(number)) * var(--tw-space-y-reverse));
+  }
+}
+@utility v3-space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 0;
+    margin-right: calc(calc(var(--spacing) * --value(number)) * var(--tw-space-x-reverse));
+    margin-left: calc(calc(var(--spacing) * --value(number)) * calc(1 - var(--tw-space-x-reverse)));
+  }
+}
+@utility v3-divide-y {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-divide-y-reverse: 0;
+    border-top-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+    border-bottom-width: calc(1px * var(--tw-divide-y-reverse));
+  }
+}
+@utility v3-divide-color-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    border-color: --value(--color-*, [color]);
+  }
+}
+
+/* v4 chỉ áp hover trên thiết bị có chuột; v3 áp mọi nơi. */
+@custom-variant hover (&:hover);
+/* app-stage.html khai darkMode: 'class'. */
+@custom-variant dark (&:where(.dark, .dark *));

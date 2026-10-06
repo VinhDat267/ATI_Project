@@ -1,0 +1,4 @@
+dist/
+.parity/
+node_modules/
+.impeccable/

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATI · Bản mẫu React</title>
+  <!-- Đặt Sáng/Tối trước khi vẽ, giống theme.js của bản mẫu (localStorage "ati-theme", chưa chọn thì theo hệ điều hành). -->
+  <script>
+    (function () {
+      var theme = null;
+      try { var v = localStorage.getItem('ati-theme'); theme = v === 'dark' || v === 'light' ? v : null; } catch (e) { /* bỏ qua */ }
+      if (!theme) theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Đủ các font và độ đậm mà 12 bản mẫu dùng. -->
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap" rel="stylesheet">
+  <style>#root { display: contents; }</style>
+  <!-- theme.css và CSS riêng của trang được chèn ngay trước mốc này, trước Tailwind, đúng thứ tự như bản mẫu. -->
+  <meta name="proto-css-anchor">
+  <script type="module" src="/src/main.tsx"></script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

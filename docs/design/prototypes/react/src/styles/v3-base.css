@@ -1,0 +1,29 @@
+/* v4: leading-* luôn thắng cỡ chữ text-* nhờ biến --tw-leading. v3: theo thứ tự CSS, nên `leading-tight sm:text-4xl`
+   lấy chiều cao dòng của text-4xl ở màn hình từ sm. Vô hiệu biến này để line-height theo cascade như v3. */
+*,
+::before,
+::after,
+::backdrop {
+  --tw-leading: initial !important;
+}
+
+/* Phần preflight của Tailwind v3 khác v4: màu viền mặc định, màu placeholder, con trỏ trên nút. */
+*,
+::after,
+::before,
+::backdrop,
+::file-selector-button {
+  border-color: #e5e7eb;
+}
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+  color: #9ca3af;
+}
+button,
+[role="button"] {
+  cursor: pointer;
+}
+:disabled {
+  cursor: default;
+}

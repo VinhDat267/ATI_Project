@@ -1,6 +1,8 @@
 # Bản mẫu giao diện ATI (05/10/2026)
 
-Mười hai trang HTML tự chứa, làm bằng OpenDesign và review qua nhiều vòng ngày 05/10/2026. Đây là **tham chiếu bố cục và nội dung** cho các task FE-04 → FE-10, không phải mã để chép vào app.
+Mười hai trang HTML tự chứa, làm bằng OpenDesign và review qua nhiều vòng ngày 05/10/2026. Từ 06/10 bản mẫu là **chuẩn về hình thức** cho các task FE-05b → FE-10 (đặc tả mục 1 và 1.1).
+
+Thư mục [`react/`](react/README.md) chứa bản React của các trang này (cùng công nghệ với `apps/chat-web`, giữ nguyên design system), kèm script so từng phần tử và từng pixel với bản HTML. Bản React chưa đưa vào app.
 
 Đặc tả đi kèm: [`docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`](../../superpowers/specs/2026-10-05-ui-redesign-agentic-design.md). Khi bản mẫu và đặc tả khác nhau, **theo đặc tả** (nhất là mục 3.2 cỡ chữ và mục 6 quy tắc trung thực).
 
