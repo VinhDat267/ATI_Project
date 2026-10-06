@@ -30,6 +30,7 @@
 - [ ] Test: màn chờ duyệt không chứa email/tên quản trị viên.
 - [ ] Các test AUTH-02, AUTH-04, AUTH-05 (unit và browser) vẫn xanh; browser spec cập nhật cách tìm phần tử trong cùng PR.
 - [ ] Browser: trang giới thiệu ở 1440px và 375px, sáng và tối, không cuộn ngang; với `prefers-reduced-motion` không có sân khấu dính.
+- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `index.html` (từng đoạn cuộn và các modal đăng nhập/đăng ký/quên mật khẩu) và `auth-action.html` (từng trạng thái) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

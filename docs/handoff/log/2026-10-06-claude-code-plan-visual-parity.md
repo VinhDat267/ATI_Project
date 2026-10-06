@@ -1,0 +1,47 @@
+# 2026-10-06 · Claude Code · So cockpit FE-05 với bản mẫu, lập FE-05b và tiêu chí "giống bản mẫu"
+
+- **Bối cảnh:** người dùng hỏi vì sao app không giống hẳn các trang HTML đã thiết kế trên OpenDesign. Đặc tả 05/10 ghi bản mẫu là "tham chiếu bố cục và nội dung", nên FE-04/FE-05 làm đúng hành vi nhưng hình thức khác nhiều. Người dùng chốt: muốn app giống bản mẫu vì thiết kế đã đẹp.
+- **Cách so:**
+  - bản mẫu `app-stage.html` qua server tĩnh `127.0.0.1:5180`, chuyển khoảnh khắc bằng `setMoment(n)`;
+  - app ở `main` `d5fcc46` chạy sandbox trong worktree tạm, PostgreSQL tmpfs riêng ở cổng 55533, tài khoản test CI;
+  - chụp bằng Playwright ở 1440×900 và 375×812, chế độ tối, `reducedMotion: reduce`. Ở 1440: 13 ảnh bản mẫu, 10 ảnh app, kể cả ngăn hội thoại. Ở 375: 4 ảnh bản mẫu, 3 ảnh app;
+  - khoảnh khắc 2 không có cặp ảnh: sandbox lập kế hoạch quá nhanh, còn ảnh bản mẫu bị chụp nhầm sang khoảnh khắc 4. Khoảnh khắc này được so bằng mã HTML của bản mẫu và mã `Cockpit.tsx`. Khoảnh khắc 5 của app chỉ chụp được lúc các bước còn "Chờ chạy";
+  - đo bằng script trong trang: cỡ `h1`, bề rộng nội dung, chiều cao thanh trên, nút gửi.
+  - Ảnh nằm trong thư mục tạm của phiên, không commit.
+- **Kết quả đo chính:**
+  - phần đầu trang ở 1440px: bản mẫu 86–94px, app khoảng 250px (thanh trên 114px + hàng 4 nút + hàng "Yêu cầu hiện tại"). Ở 375px: khoảng 110px so với khoảng 320px;
+  - `h1` bản mẫu 52px (khoảnh khắc 1), 48px (4), 42px (6), app 40px;
+  - nội dung bản mẫu rộng 848px, khoảnh khắc 6 rộng 1072px; app 768px ở mọi khoảnh khắc;
+  - nút gửi bản mẫu "Gửi yêu cầu", bo 12px; app "Gửi", dạng viên.
+- **Khác biệt theo khoảnh khắc** (chi tiết trong [FE-05b](../tasks/FE-05b-cockpit-visual-parity.md)):
+  - khoảnh khắc 1: tiêu đề, ô nhập dạng thẻ, lưới gợi ý 2×2, hàng đã kết nối/chưa kết nối;
+  - khoảnh khắc 3: huy hiệu, câu hỏi làm `h1`, thẻ chọn;
+  - khoảnh khắc 4: thẻ từng việc với chip dịch vụ/hành động, thông báo ghi thật, thanh hành động dính đáy;
+  - khoảnh khắc 5: huy hiệu "Việc k/N", thanh tiến độ theo số bước, chip trạng thái;
+  - khoảnh khắc 6: dấu tích, chip thời gian, lưới biên nhận nối nhau;
+  - ô nhắn thêm một dòng; ngăn hội thoại có nền mờ phía sau, bong bóng hai phía và tin tóm tắt.
+- **Quyết định trong kế hoạch** (Claude Code đề xuất, người dùng duyệt khi merge PR):
+  - đặc tả mục 1 đổi thành "bản mẫu là chuẩn về hình thức"; mục 1.1 mới liệt kê 9 khác biệt được phép;
+  - giữ thang chữ tối đa 40px thay vì 42–52px của bản mẫu, vì thang 14–40 là quyết định 05/10. Người dùng muốn giống hẳn cỡ tiêu đề thì cần thêm một điểm lệch vào 3.2;
+  - đoạn chữ thường trên nền cam (bong bóng tin của người dùng ở chế độ tối) dùng chữ `#111827` (khoảng 5,5:1); ngoại lệ chữ trắng 3.2.1 chỉ áp dụng cho nút;
+  - bỏ câu "Thường mất khoảng 3–5 giây" của khoảnh khắc 2: p50 đo ngày 03/10 là 5,5–6,1 giây và p95 của bộ services là 31 giây;
+  - khoảnh khắc 3: ô nhập dưới cùng ẩn để giữ quy tắc một ô nhập; lựa chọn không có dòng phụ hay "Khuyên dùng" vì API chỉ trả chuỗi.
+- **Cách làm (người dùng chốt sau khi mở PR):**
+  - chuyển thẳng markup của bản mẫu sang React, giữ cấu trúc và class, rồi nối dữ liệu thật. Bản đầu của PR ghi "không chép mã, dựng lại bằng component", đã sửa thành đặc tả mục 1.2;
+  - Claude Code đếm trong `app-stage.html` các chỗ không chuyển nguyên được:
+    - khoảng 80 class màu khác nhau (625 lần dùng) phải đổi sang token, vì chế độ tối của bản mẫu nằm trong `theme.css`;
+    - 75 class Tailwind v3 đã đổi tên ở v4 (`flex-shrink-0`, `shadow-sm`, `outline-none`, `backdrop-blur-sm`);
+    - khoảng 200 chỗ chữ 10–12px phải nâng lên 14px.
+- **Thay đổi tài liệu:**
+  - task card mới FE-05b, mốc 11/10, phải xong trước FE-06;
+  - FE-06 phụ thuộc FE-05b; mục 9 (2 P3 và góp ý nhỏ từ #91) chuyển sang FE-05b vì FE-05b dựng lại vùng cuộn và thanh trên;
+  - FE-06 → FE-10 có thêm tiêu chí ảnh đặt cạnh bản mẫu; FE-10 có thêm bước rà soát cuối;
+  - ROADMAP thêm dòng FE-05b, sửa thứ tự và phần tối thiểu để demo;
+  - CURRENT-STATE: dòng frontend, mục 5 (hai hàng), mục 7 thêm quyết định 06/10.
+- **Kiểm tra:** chỉ tài liệu nên không chạy `npm run check`. Link tương đối trong các file sửa/mới được kiểm bằng script Node.
+- **Dọn dẹp:**
+  - `.claude/launch.json` (file riêng, không theo dõi) được thêm tạm hai cấu hình xem trước, đã trả về nội dung gốc;
+  - đã dừng hai server xem trước, xoá container `ati-parity`, worktree `parity-app` và thư mục `.playwright-mcp/` do Playwright tạo;
+  - các file riêng của người dùng trong thư mục chính giữ nguyên;
+  - không ghi gì lên dịch vụ thật, không gọi model.
+- **Việc tiếp theo đề xuất:** giao FE-05b ngay (cùng FE-07 nếu muốn chạy song song); FE-06 giao sau khi FE-05b merge.

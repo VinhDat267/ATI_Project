@@ -11,7 +11,77 @@
 - Người dùng chính: thành viên nhóm không rành kỹ thuật. Quản trị viên là người dùng thứ hai (kết nối dịch vụ, duyệt tài khoản).
 - Mục tiêu phụ: gây ấn tượng khi bảo vệ, nhưng không đổi lấy sự trung thực của giao diện (mục 6).
 - **Giữ nguyên hành vi backend**, trừ ba thay đổi nhỏ ở UI-API-01 (mục 9). Không đổi planner, executor, adapter, catalog.
-- Các bản mẫu là **tham chiếu bố cục và nội dung**, không phải mã để chép. Mọi thứ trong bản mẫu ghi "demo", "Kịch bản demo", "Xem như", "Máy chủ: Thử nghiệm/Thật" là công cụ trình diễn, **không đưa vào app**.
+- **Bản mẫu là chuẩn về hình thức** (người dùng chốt 06/10/2026, thay câu "tham chiếu bố cục và nội dung" của bản 05/10).
+  - App phải giống bản mẫu về bố cục, thứ tự, thành phần, màu, khoảng cách và chữ trên giao diện, chỉ được khác ở các điểm trong mục 1.1.
+  - Cách làm: chuyển markup của bản mẫu sang JSX, giữ cấu trúc thẻ và class Tailwind, rồi chỉnh theo mục 1.2 và nối dữ liệu thật. Không nạp Tailwind CDN, `theme.css`, `theme.js` hay JS demo của bản mẫu.
+  - Mọi thứ trong bản mẫu ghi "demo", "Kịch bản demo", "Xem như", "Máy chủ: Thử nghiệm/Thật" là công cụ trình diễn, **không đưa vào app**.
+- Mỗi task FE có tiêu chí "giống bản mẫu":
+  - ảnh app và ảnh bản mẫu đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối;
+  - khác biệt còn lại phải thuộc mục 1.1 hoặc được ghi kèm lý do trong phần "Kết quả" của task.
+
+### 1.1 Khác biệt có chủ đích với bản mẫu
+
+1. **Công cụ trình diễn:** "Kịch bản demo", phím 1–9, "Bỏ qua animation tới kết quả", "Xem như", "Máy chủ: Thử nghiệm/Thật", dữ liệu mẫu viết cứng.
+2. **Dữ liệu thật thay dữ liệu mẫu.**
+   - Tên, số việc, dịch vụ, nơi ghi, thời lượng, số tin và giờ lấy từ store/API.
+   - Phần nào bản mẫu có mà API không có dữ liệu thì bỏ phần đó, giữ khung. Ví dụ: lựa chọn hỏi lại chỉ là chuỗi, nên không có dòng "Cập nhật 2 giờ trước" hay nhãn "Khuyên dùng".
+3. **Quy tắc trung thực** (mục 6) có hiệu lực cao hơn chữ trong bản mẫu:
+   - không có số issue/dòng trước khi bước chạy xong;
+   - chip "Đã tạo/Đã ghi/Đã gửi" chỉ khi bước `succeeded`;
+   - thanh tiến độ bằng số bước xong / tổng, không tự chạy;
+   - không có câu ước lượng chưa đo ("Thường mất khoảng 3–5 giây").
+4. **Cỡ chữ:** tối thiểu 14px (3.2.3). Tiêu đề lớn nhất theo thang 3.1 là 40px; bản mẫu dùng 42–52px ở desktop.
+5. **Màu:**
+   - dùng token 3.1/3.3;
+   - nền `#F6F6F1` thay `#F8F8F6` (3.2.4);
+   - chế độ tối theo token (mục 8), không theo `theme.css`;
+   - ngoại lệ chữ trắng trên cam (3.2.1) chỉ cho nút. Đoạn chữ thường trên nền cam (ví dụ bong bóng tin của người dùng ở chế độ tối) dùng chữ `#111827` (khoảng 5,5:1).
+6. **Trợ năng** (mục 7): vùng chạm tối thiểu 40×40px (nút thanh trên của bản mẫu cao 32px), viền focus, landmark, một `h1` mỗi màn.
+7. **Gợi ý việc** ở khoảnh khắc 1 và 6 chỉ dùng dịch vụ đã thiết lập:
+   - gợi ý hai dịch vụ chỉ khi cả hai đã thiết lập;
+   - chưa có dịch vụ nào thì vùng gợi ý thay bằng câu "Chưa có dịch vụ nào được kết nối" và link tới `/settings`.
+8. **Quy tắc cockpit** (mục 5): chỉ một ô nhập chat hiển thị một lúc, kể cả khi bản mẫu hiện hai.
+9. **Màn chưa có bản mẫu** (kết thúc không thành công) theo bố cục gần nhất (khoảnh khắc 6).
+
+### 1.2 Chuyển bản mẫu sang React
+
+Người dùng chốt cách làm ngày 06/10/2026. Lấy đúng đoạn HTML của phần cần làm trong bản mẫu (ví dụ `<section id="moment-4">` của `app-stage.html`), chuyển sang JSX, rồi sửa theo các bước dưới. Có thể viết script chuyển một lần rồi sửa tay.
+
+1. **Cú pháp JSX:**
+   - `class` → `className`, `for` → `htmlFor`;
+   - thuộc tính SVG viết camelCase (`stroke-linecap` → `strokeLinecap`);
+   - `style="…"` → object;
+   - mỗi phần thành một component (ví dụ `<section id="moment-4">` → component khoảnh khắc 4).
+2. **Màu sang token**, để chế độ tối chạy bằng token (mục 8). Bản mẫu làm chế độ tối bằng `theme.css` ghi đè class sáng, app không dùng file này. `app-stage.html` có khoảng 80 class màu khác nhau, dùng 625 lần.
+
+   | Bản mẫu | App |
+   |---|---|
+   | `brand-primary` | `primary` |
+   | `brand-primary-light` | `primary-tint` |
+   | `brand-bg`, `bg-[#F8F8F6]` | `bg-page` |
+   | `bg-white`, `brand-surface` | `surface` |
+   | `neutral-50`, `neutral-100` (nền) | `surface-inset`, `surface-raised` |
+   | `brand-border`, `brand-border-subtle` | `border` |
+   | `brand-text`, `neutral-800/900` (chữ) | `text` |
+   | `brand-muted`, `neutral-400/500/600` (chữ) | `text-secondary` hoặc `text-muted` |
+   | `emerald-*` / `amber-*` / `red-*` | `success-*` / `warning-*` / `danger-*` (`-tint` cho nền, `-text` cho chữ) |
+   | `blue-*`, `purple-*`… trên chip dịch vụ | `surface-raised` + `text`. Màu thương hiệu chỉ dùng trong logo (mục 3.3) |
+   | `font-body` | `font-sans` |
+   | `shadow-soft-card`, `shadow-elevated`, `shadow-orange-glow` | khai báo cùng giá trị trong `@theme` của app |
+
+3. **Tên class Tailwind v3 → v4** (app dùng Tailwind 4.3):
+   - `flex-shrink-0` → `shrink-0` (72 chỗ);
+   - `shadow-sm` → `shadow-xs` (58 chỗ);
+   - `outline-none` → `outline-hidden`;
+   - `backdrop-blur-sm` → `backdrop-blur-xs`.
+   Các class khác cần kiểm theo hướng dẫn nâng cấp của Tailwind.
+4. **Cỡ chữ:** `text-xs`, `text-[10px]`, `text-[11px]` (khoảng 200 chỗ) → `text-sm` (14px). Kiểm lại dòng nào bị tràn thì dùng `truncate` hoặc cho xuống dòng.
+5. **Dữ liệu:** thay chữ và số mẫu bằng dữ liệu từ store/API theo mục 1.1 điểm 2–3. Phần không có dữ liệu thật thì bỏ.
+6. **Hành vi:**
+   - bỏ JS của bản mẫu (`setMoment`, hẹn giờ, menu demo, dữ liệu viết cứng);
+   - khoảnh khắc lấy từ `selectMoment` và store;
+   - giữ các bảo đảm đã có: phản hồi muộn không giành điều hướng, focus của ngăn/hộp thoại, một ô nhập.
+7. **Trợ năng:** giữ `role`/`aria-*` có sẵn trong bản mẫu, bổ sung theo mục 7 (vùng chạm 40×40, viền focus).
 
 ## 2. Bản mẫu và màn hình tương ứng
 
@@ -167,7 +237,8 @@ Hành vi "yêu cầu chỉ để xem thì hỏi lại ngay" thuộc **W3-10**, k
 |---|---|---|
 | FE-04 | Token, font, chế độ tối, khung trang (thanh trên, menu người dùng, dải thử nghiệm), route mới rỗng | 10/10 |
 | UI-API-01 | Từ chối có cấu trúc, lưu riêng nơi được dùng | 12/10 (song song FE-04) |
-| FE-05 | Cockpit khoảnh khắc 1–6, ngăn hội thoại, ngăn lịch sử | 16/10 |
+| FE-05 | Cockpit khoảnh khắc 1–6, ngăn hội thoại, ngăn lịch sử | 16/10 (xong 06/10, #90) |
+| FE-05b | Làm cockpit giống bản mẫu: thanh trên, khoảnh khắc 1–6, ô nhắn thêm, hai ngăn (thêm 06/10) | 11/10, trước FE-06 |
 | FE-06 | Cockpit khoảnh khắc 7–9, màn từ chối/hỏi lại, trạng thái lỗi chung | 20/10 |
 | FE-07 | Trang Kết nối dịch vụ | 20/10 (song song FE-06) |
 | FE-08 | Trang giới thiệu và các màn đăng nhập/xác minh/đặt lại | 23/10 |
@@ -176,7 +247,7 @@ Hành vi "yêu cầu chỉ để xem thì hỏi lại ngay" thuộc **W3-10**, k
 
 - Ngừng thêm tính năng từ 29/10 (ROADMAP tuần 5).
 - **Buổi thử W4-03 (22–28/10)** đo tỉ lệ plan dùng được qua giao diện. Nếu FE-05 chưa merge trước buổi thử thì W4-03 chạy trên giao diện hiện tại và báo cáo ghi rõ; không đổi giao diện giữa chừng một buổi đo.
-- Nếu trễ, cắt theo thứ tự: FE-10 phần Cẩm nang/Chính sách → FE-09 phần Lịch sử → FE-08 trang giới thiệu (giữ trang hiện tại). FE-04, FE-05, FE-06, FE-07 là phần tối thiểu để demo.
+- Nếu trễ, cắt theo thứ tự: FE-10 phần Cẩm nang/Chính sách → FE-09 phần Lịch sử → FE-08 trang giới thiệu (giữ trang hiện tại). FE-04, FE-05, FE-05b, FE-06, FE-07 là phần tối thiểu để demo.
 
 ## 12. Rủi ro
 

@@ -29,6 +29,7 @@ Ba trang này đã có chức năng (AUTH-03, AUTH-05, FE-02) nhưng giao diện
 - [ ] Test: đổi tên hội thoại lưu bằng Enter, huỷ bằng Esc, phản hồi muộn không ghi đè tên vừa gõ lại.
 - [ ] Các test `account-view`, `account-action-regressions`, `admin-users`, `app-routing`, browser AUTH-03/AUTH-05/FE-02 vẫn xanh.
 - [ ] Không cuộn ngang ở 375px; chế độ tối đạt tương phản.
+- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `account.html`, `users.html`, `history.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

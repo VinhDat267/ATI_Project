@@ -17,7 +17,7 @@ Agent cập nhật: Claude Code (reviewer sau merge #90).
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Tiếp theo FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung, kèm 2 P3 từ kiểm tra FE-05). FE-07, FE-08, FE-09 giao song song được. Các trang và khoảnh khắc còn lại chưa thi công;
+> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Tiếp theo FE-05b (làm cockpit giống bản mẫu, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). FE-07, FE-08, FE-09 giao song song được. Các trang và khoảnh khắc còn lại chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -212,8 +212,9 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Test chat-api mặc định `DATABASE_URL` tới cổng 55532 (cổng của compose v2 đã xoá) khi không đặt biến | `apps/chat-api/tests/auth/*`, `tests/integration/*` | CI đặt `DATABASE_URL` nên không bị ảnh hưởng. `scripts/test-v3.mjs` không tự đặt biến này: chạy local mà quên đặt thì test PostgreSQL lỗi kết nối tới 55532. Nên đổi mặc định sang 55533 trong một task nhỏ. Phát hiện khi dọn v2 (#80) |
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
-| Bản mẫu giao diện mới chưa kiểm bằng ảnh ở khổ desktop (khung trình duyệt của Claude Code rộng 411px); màn "kết thúc không thành công" (`stopped`/`rejected`/`failed`) chưa có bản mẫu | `docs/design/prototypes/` | Đã kiểm ở 375–411px, cả sáng và tối, không lỗi console. FE-06 làm màn kết thúc theo bố cục khoảnh khắc 6 |
-| P3 cockpit (kiểm tra app thật FE-05, 06/10): đổi khoảnh khắc giữ vị trí cuộn cũ nên tiêu đề mới bị khuất (scrollTop 93px ở 1440 và 375); bấm "Duyệt kế hoạch" xong focus rơi về `body` | `apps/chat-web` cockpit | Chuyển vào phạm vi [FE-06](tasks/FE-06-cockpit-recovery-and-responses.md). Góp ý nhỏ cùng đợt: thời lượng "0.005s"/"0.0 giây" chưa theo định dạng Việt; phần đầu trang chiếm gần nửa màn hình ở 375px; ngăn hội thoại không có dòng cho kế hoạch/biên nhận |
+| Màn "kết thúc không thành công" (`stopped`/`rejected`/`failed`) chưa có bản mẫu; các bản mẫu ngoài `app-stage.html` chưa kiểm bằng ảnh ở khổ desktop | `docs/design/prototypes/` | `app-stage.html` đã chụp ở 1440 và 375 (chế độ tối) ngày 06/10 khi so với FE-05; các trang khác đã kiểm ở 375–411px, sáng và tối, không lỗi console. FE-06 làm màn kết thúc theo bố cục khoảnh khắc 6 |
+| P3 cockpit (kiểm tra app thật FE-05, 06/10): đổi khoảnh khắc giữ vị trí cuộn cũ nên tiêu đề mới bị khuất (scrollTop 93px ở 1440 và 375); bấm "Duyệt kế hoạch" xong focus rơi về `body` | `apps/chat-web` cockpit | Chuyển vào phạm vi [FE-05b](tasks/FE-05b-cockpit-visual-parity.md) (trước đó ở FE-06). Góp ý nhỏ cùng đợt: thời lượng "0.005s"/"0.0 giây" chưa theo định dạng Việt; phần đầu trang chiếm gần nửa màn hình ở 375px; ngăn hội thoại không có dòng cho kế hoạch/biên nhận |
+| Cockpit FE-05 khác bản mẫu về hình thức (so ngày 06/10 ở 1440 và 375, chế độ tối): phần đầu trang 250px so với 94px ở 1440px; khoảnh khắc 4 thiếu thẻ từng việc và thanh hành động dính đáy; biên nhận khoảnh khắc 6 là danh sách trường thô | `apps/chat-web` cockpit | Sửa ở [FE-05b](tasks/FE-05b-cockpit-visual-parity.md), trước FE-06 |
 
 ## 6. Môi trường chạy
 
@@ -243,7 +244,9 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - giao diện mới theo design system "Agentic" (#84): Primary `#FF5701`, nền `#F6F6F1`, thang chữ 14/16/18/24/32/40, không thêm màu ngoài bảng;
   - chữ trên nút cam giữ màu trắng (3,2:1, ngoại lệ có chủ đích). Đặc tả áp dụng cùng quy tắc cho nút nền Success/Warning; người dùng merge mà không phản đối;
   - chữ thường Be Vietnam Pro, tiêu đề Playfair Display, mã/ID JetBrains Mono;
-  - cỡ chữ tối thiểu 14px áp dụng khi làm app; bản mẫu giữ nguyên làm tham chiếu bố cục. Khi bản mẫu khác đặc tả thì theo đặc tả.
+  - cỡ chữ tối thiểu 14px áp dụng khi làm app; bản mẫu giữ nguyên, không sửa theo app.
+
+- **Chốt 06/10/2026:** bản mẫu là chuẩn về hình thức. App phải giống bản mẫu, chỉ khác ở các điểm trong đặc tả giao diện mục 1.1 (công cụ demo, dữ liệu thật, quy tắc trung thực, chữ ≥ 14px và tiêu đề ≤ 40px, token màu, trợ năng, gợi ý theo dịch vụ đã thiết lập, một ô nhập). Cách làm: chuyển markup bản mẫu sang JSX, đổi màu sang token và class Tailwind v3 sang v4, nối dữ liệu thật (đặc tả mục 1.2). Mỗi task FE có tiêu chí ảnh đặt cạnh bản mẫu ở 1440 và 375, sáng và tối.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
