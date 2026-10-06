@@ -38,7 +38,7 @@
 - [ ] Test phản hồi muộn: lệnh khôi phục của plan A trả về sau khi người dùng đã sang hội thoại B → không đổi màn của B.
 - [ ] Các test W2-04, W2-05, `partial-failure-modal`, `execution-progress` được chuyển sang component mới, không mất ca.
 - [ ] Browser: sandbox có kịch bản bước `unknown` và `reconciliation_required` (thêm vào harness nếu chưa có) chạy đúng; không cuộn ngang ở 375px.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1): ảnh app đặt cạnh ảnh bản mẫu ở 1440×900 và 375×812, sáng và tối, cho `app-stage.html` khoảnh khắc 7–9, `responses.html` (4 tình huống) và `errors.html`. Màn kết thúc không thành công so với khoảnh khắc 6. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app đặt cạnh ảnh bản mẫu ở 1440×900 và 375×812, sáng và tối, cho `app-stage.html` khoảnh khắc 7–9, `responses.html` (4 tình huống) và `errors.html`. Màn kết thúc không thành công so với khoảnh khắc 6. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

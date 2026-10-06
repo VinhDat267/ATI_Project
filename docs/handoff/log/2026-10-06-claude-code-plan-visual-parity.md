@@ -26,6 +26,12 @@
   - đoạn chữ thường trên nền cam (bong bóng tin của người dùng ở chế độ tối) dùng chữ `#111827` (khoảng 5,5:1); ngoại lệ chữ trắng 3.2.1 chỉ áp dụng cho nút;
   - bỏ câu "Thường mất khoảng 3–5 giây" của khoảnh khắc 2: p50 đo ngày 03/10 là 5,5–6,1 giây và p95 của bộ services là 31 giây;
   - khoảnh khắc 3: ô nhập dưới cùng ẩn để giữ quy tắc một ô nhập; lựa chọn không có dòng phụ hay "Khuyên dùng" vì API chỉ trả chuỗi.
+- **Cách làm (người dùng chốt sau khi mở PR):**
+  - chuyển thẳng markup của bản mẫu sang React, giữ cấu trúc và class, rồi nối dữ liệu thật. Bản đầu của PR ghi "không chép mã, dựng lại bằng component", đã sửa thành đặc tả mục 1.2;
+  - Claude Code đếm trong `app-stage.html` các chỗ không chuyển nguyên được:
+    - khoảng 80 class màu khác nhau (625 lần dùng) phải đổi sang token, vì chế độ tối của bản mẫu nằm trong `theme.css`;
+    - 75 class Tailwind v3 đã đổi tên ở v4 (`flex-shrink-0`, `shadow-sm`, `outline-none`, `backdrop-blur-sm`);
+    - khoảng 200 chỗ chữ 10–12px phải nâng lên 14px.
 - **Thay đổi tài liệu:**
   - task card mới FE-05b, mốc 11/10, phải xong trước FE-06;
   - FE-06 phụ thuộc FE-05b; mục 9 (2 P3 và góp ý nhỏ từ #91) chuyển sang FE-05b vì FE-05b dựng lại vùng cuộn và thanh trên;

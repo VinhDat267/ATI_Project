@@ -1,7 +1,7 @@
 # FE-05b · Cockpit: làm giống bản mẫu (khoảnh khắc 1–6, thanh trên, ô nhắn thêm, hai ngăn)
 
 **Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-05b-cockpit-visual-parity` · **Phụ thuộc:** FE-05 đã merge (#90) · **Mốc:** 11/10/2026 (trước FE-06)
-**Đặc tả:** mục 1 và 1.1 (sửa 06/10), 3, 5, 6, 7 · **Bản mẫu:** `app-stage.html` thanh trên, khoảnh khắc 1–6, ô nhắn thêm ở đáy, ngăn "Lịch sử yêu cầu", ngăn "Nhật ký hội thoại", hộp "Xem trước nội dung"
+**Đặc tả:** mục 1, 1.1 và 1.2 (sửa 06/10), 3, 5, 6, 7 · **Bản mẫu:** `app-stage.html` thanh trên, khoảnh khắc 1–6, ô nhắn thêm ở đáy, ngăn "Lịch sử yêu cầu", ngăn "Nhật ký hội thoại", hộp "Xem trước nội dung"
 
 ## Vì sao quan trọng
 
@@ -26,7 +26,21 @@ Claude Code so bản mẫu với `main` `d5fcc46` ở sandbox, 1440×900 và 375
 
 ## Việc cần làm
 
-Mỗi mục: làm theo bản mẫu, trừ những gì đặc tả mục 1.1 cho phép khác. Dựng lại bằng component React và token; không chép mã Tailwind v3 hay JS của bản mẫu.
+**Cách làm (đặc tả mục 1.2):** với mỗi mục dưới đây, lấy đoạn HTML tương ứng trong `app-stage.html` và chuyển sang JSX, giữ cấu trúc thẻ và class. Sau đó:
+- đổi màu sang token;
+- đổi tên class Tailwind v3 sang v4;
+- nâng chữ nhỏ lên 14px;
+- thay dữ liệu mẫu bằng store/API;
+- bỏ JS demo.
+
+Chỉ được khác bản mẫu ở các điểm trong đặc tả mục 1.1. Các mục dưới đây mô tả phần cần nối dữ liệu và những chỗ phải khác.
+
+| Mục | Đoạn trong `app-stage.html` |
+|---|---|
+| 1 | `<header class="sticky …">` |
+| 2–7 | `<section id="moment-1">` → `<section id="moment-6">` |
+| 8 | `<footer id="global-bottom-bar">` |
+| 9 | `<aside id="chat-drawer">`, `<aside id="history-drawer">`, `#preview-modal`, `#drawer-backdrop` |
 
 1. **Thanh trên và dải thử nghiệm** (`AppShell` + cockpit):
    - khung giữa trang như bản mẫu; logo ô vuông cam chữ "A" kèm chữ "ATI" (ẩn chữ dưới 640px);

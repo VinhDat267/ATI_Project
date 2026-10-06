@@ -38,7 +38,7 @@
 - [ ] Test W3-00b (giữ draft khi phản hồi lưu đến muộn) chuyển sang trang mới và vẫn xanh.
 - [ ] Không còn các chữ "Allowed Scope", "Write Safety", "Least Privilege", "AES" trên giao diện.
 - [ ] Browser: quản trị viên lưu và kiểm tra một dịch vụ sandbox; không cuộn ngang ở 375px; chế độ tối đạt tương phản.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1): ảnh app và ảnh `settings.html` (danh sách, ngăn từng dịch vụ, vai trò quản trị viên và thành viên) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `settings.html` (danh sách, ngăn từng dịch vụ, vai trò quản trị viên và thành viên) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

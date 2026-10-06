@@ -246,7 +246,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - chữ thường Be Vietnam Pro, tiêu đề Playfair Display, mã/ID JetBrains Mono;
   - cỡ chữ tối thiểu 14px áp dụng khi làm app; bản mẫu giữ nguyên, không sửa theo app.
 
-- **Chốt 06/10/2026:** bản mẫu là chuẩn về hình thức. App phải giống bản mẫu, chỉ khác ở các điểm trong đặc tả giao diện mục 1.1 (công cụ demo, dữ liệu thật, quy tắc trung thực, chữ ≥ 14px và tiêu đề ≤ 40px, token màu, trợ năng, gợi ý theo dịch vụ đã thiết lập, một ô nhập). Mỗi task FE có tiêu chí ảnh đặt cạnh bản mẫu ở 1440 và 375, sáng và tối.
+- **Chốt 06/10/2026:** bản mẫu là chuẩn về hình thức. App phải giống bản mẫu, chỉ khác ở các điểm trong đặc tả giao diện mục 1.1 (công cụ demo, dữ liệu thật, quy tắc trung thực, chữ ≥ 14px và tiêu đề ≤ 40px, token màu, trợ năng, gợi ý theo dịch vụ đã thiết lập, một ô nhập). Cách làm: chuyển markup bản mẫu sang JSX, đổi màu sang token và class Tailwind v3 sang v4, nối dữ liệu thật (đặc tả mục 1.2). Mỗi task FE có tiêu chí ảnh đặt cạnh bản mẫu ở 1440 và 375, sáng và tối.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.

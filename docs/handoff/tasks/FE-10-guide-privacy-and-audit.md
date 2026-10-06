@@ -24,7 +24,7 @@ Cẩm nang giúp quản trị viên tự kết nối dịch vụ đúng cách. T
 - [ ] Test quét bundle build không chứa các chuỗi cấm (ví dụ "100%", "REQ-20", "security@", "Allowed Scope", "Đăng xuất mọi thiết bị" trong menu).
 - [ ] Test tương phản tự động chạy trên mọi route ở hai chế độ; chỉ ngoại lệ đặc tả 3.2.1 được bỏ qua.
 - [ ] `/guide`, `/privacy` xem được khi chưa đăng nhập; route lạ hiện 404 mới.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1): ảnh app và ảnh `guide.html`, `privacy.html`, `404.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `guide.html`, `privacy.html`, `404.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] Rà soát cuối: chụp lại mọi route và khoảnh khắc đã làm ở FE-05b → FE-09 cạnh bản mẫu tương ứng, liệt kê khác biệt còn lại ngoài đặc tả 1.1 (nếu có) thành việc sửa hoặc ghi lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
