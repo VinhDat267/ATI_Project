@@ -1,0 +1,10 @@
+/* Tailwind v4 (cùng bản với apps/chat-web) dựng lại đúng giao diện Tailwind v3 CDN của bản mẫu.
+   Không gói vào cascade layer: bản CDN v3 sinh CSS thường, nên thứ tự và độ ưu tiên giữa
+   theme.css, CSS riêng của trang và utility phải giống hệt bản mẫu. */
+@import "tailwindcss/theme.css";
+@import "./tokens.css";
+@import "./v3-palette.css";
+@import "./v3-compat.css";
+@import "tailwindcss/preflight.css";
+@import "./v3-base.css";
+@import "tailwindcss/utilities.css";

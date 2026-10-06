@@ -1,0 +1,14 @@
+{
+  "name": "ati-prototypes-react",
+  "private": true,
+  "type": "module",
+  "description": "Bản React của 12 bản mẫu giao diện; dùng node_modules ở gốc repo, không cài thêm gói.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "verify": "node scripts/verify-parity.mjs",
+    "convert": "node scripts/html-to-jsx.mjs",
+    "tokens": "node scripts/gen-tokens.mjs && node scripts/extract-v3-palette.mjs"
+  }
+}
