@@ -217,6 +217,12 @@ async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
   if (steps.length) await page.waitForTimeout(300);
   // Thao tác có thể làm hiện chữ ở độ đậm/bảng mã chưa tải; chờ font xong rồi mới chụp.
   await page.evaluate(() => document.fonts.ready);
+  // Ép vẽ lại cả trang trước khi chụp, cho cả hai bản. Bản React dựng trang bằng JS sau lần vẽ đầu, Chromium giữ lại
+  // mảnh header đã vẽ ở lượt trước nên mép avatar tròn lệch vài mức màu dù DOM và style giống hệt. Ảnh cả trang của trang
+  // cao hơn khung nhìn đã tự vẽ lại (Playwright giãn khung để chụp); trang vừa khít khung nhìn thì không, nên lệch chỉ lộ ở đó.
+  await page.setViewportSize({ width: viewport.width + 1, height: viewport.height });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.setViewportSize(viewport);
   // Chờ hai khung hình để layout ổn định trước khi đọc style (tránh đọc margin auto giữa chừng).
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const items = await page.evaluate(snapshotInPage);

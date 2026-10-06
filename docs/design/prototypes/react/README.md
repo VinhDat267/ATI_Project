@@ -90,13 +90,14 @@ Ngoài lúc mở trang (đủ 4 tổ hợp), mỗi trang có các trạng thái 
 - Các bước chạy y hệt trên hai bản, nên selector chỉ dùng id hoặc chữ có ở cả hai.
 - Nút nằm trong khung cuộn (`overflow-hidden`) thì thêm bước `scroll` trước khi bấm: Playwright tự cuộn khác nhau giữa các lần nên vị trí cuộn của trang không ổn định.
 - Sau các bước, script chờ font tải xong rồi mới chụp, vì thao tác có thể làm hiện chữ ở độ đậm chưa dùng.
+- Ngay trước khi chụp, script ép vẽ lại cả trang bằng cách đổi bề rộng khung nhìn thêm 1px rồi trả lại, làm y hệt cho cả hai bản. Bản React dựng trang bằng JS sau lần vẽ đầu, nên Chromium giữ lại mảnh header đã vẽ ở lượt trước: mép avatar tròn lệch tới 67 mức màu ở 9 pixel, dù DOM, style và vị trí giống hệt. Trang cao hơn khung nhìn thì Playwright đã giãn khung để chụp cả trang nên tự vẽ lại; trang vừa khít khung nhìn (1440×900) thì không, nên lệch chỉ lộ ở đó.
 - Chạy một trạng thái: `node scripts/verify-parity.mjs errors --state=loi-may-chu`.
 - Khi so tên class, script bỏ tiền tố `v3-` và dấu `!`.
 - Bóng đổ không vẽ gì (trong suốt, hoặc mọi kích thước bằng 0) được bỏ qua.
 - Không so giá trị margin theo chiều có `auto` (`mx-auto`, `ml-auto`…), vì Chrome đôi khi trả 0px dù phần tử đã được căn đúng. Vị trí của phần tử vẫn được so nên kết quả margin auto vẫn được kiểm.
 - Trường hợp nào lệch thì chạy lại đúng một lần, chỉ tính đạt nếu lần chạy lại khớp hoàn toàn. Khác biệt thật luôn lặp lại; các dao động của trình duyệt (lẻ pixel, đua thời gian) thì không. Kết quả ghi "(chạy lại 1 lần)" và `attempts` trong `report.json`; ảnh của lần lệch đầu giữ ở `.parity/<trường hợp>-first-*.png`.
-- Dao động hay gặp nhất: vài chục đến vài trăm pixel ở nét chữ Playfair Display (tiêu đề, tên dịch vụ), không lệch phần tử nào. Ảnh khác biệt chỉ có chấm đỏ rải trên chữ. Lệch ở chỗ khác hoặc lặp lại khi chạy lại là khác biệt thật.
-- Mỗi trang, và mỗi lần chạy lại, dùng một tiến trình Chromium mới. Khi cả 10 trang chạy chung một tiến trình, về cuối loạt có 2 trường hợp lệch vài pixel ở nét chữ và mép avatar tròn, lặp lại cả ở lần chạy lại trong cùng tiến trình, dù chạy riêng trang đó thì đạt.
+- Dao động còn lại: vài chục đến vài trăm pixel ở nét chữ Playfair Display (tiêu đề, tên dịch vụ), không lệch phần tử nào. Ảnh khác biệt chỉ có chấm đỏ rải trên chữ. Chụp lặp lại cho thấy chỉ bản React đổi (khoảng 1/12 lần, kể cả khi đã ép vẽ lại), bản gốc thì không; nguyên nhân chưa tìm ra. Lệch ở chỗ khác hoặc lặp lại khi chạy lại là khác biệt thật.
+- Mỗi trang, và mỗi lần chạy lại, dùng một tiến trình Chromium mới.
 
 ## Lỗi của bản mẫu đang giữ nguyên
 
