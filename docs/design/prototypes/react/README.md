@@ -27,17 +27,25 @@ npm run verify     # so với bản HTML gốc, cần mạng (Tailwind CDN, Goog
 | `errors.html` | `/errors` (`?type=`) | khớp bản gốc ở lúc mở và 14 trạng thái thao tác |
 | `responses.html` | `/responses` | khớp bản gốc ở lúc mở và 8 trạng thái thao tác |
 | `auth-action.html` | `/auth-action` (`?mode=`, `?state=`) | khớp bản gốc ở lúc mở và 23 trạng thái thao tác |
-| `account.html`, `users.html`, `settings.html`, `history.html`, `guide.html` | | chưa chuyển (bước 3) |
+| `account.html` | `/account` | khớp bản gốc ở lúc mở và 28 trạng thái thao tác |
+| `users.html` | `/users` | khớp bản gốc ở lúc mở và 20 trạng thái thao tác |
+| `settings.html` | `/settings` (`#notion` mở thẳng ngăn của dịch vụ) | khớp bản gốc ở lúc mở và 26 trạng thái thao tác |
+| `history.html` | `/history` | khớp bản gốc ở lúc mở và 23 trạng thái thao tác |
+| `guide.html` | `/guide` (`?tab=`, `?service=`) | khớp bản gốc ở lúc mở và 12 trạng thái thao tác |
 | `index.html`, `app-stage.html` | | chưa chuyển (bước 4) |
 
 ## Cách chuyển một trang
 
 1. `node scripts/html-to-jsx.mjs <file>.html <TênComponent>` sinh `src/pages/<TênComponent>/<TênComponent>Page.tsx` (JSX của `<body>`) và `page.css` (các thẻ `<style>`), rồi in số handler và số dòng script cần viết tay.
 2. Thêm route vào `src/App.tsx` và `ROUTES` trong `scripts/verify-parity.mjs` nếu route khác tên file. Khai các trạng thái thao tác cần so trong `scripts/parity-states.mjs`.
-3. Viết lại JS của bản mẫu bằng state React. Hàm `todo()` đánh dấu chỗ chưa chuyển; bản hoàn chỉnh không còn lời gọi nào.
+3. Viết lại JS của bản mẫu bằng state React. Hàm `todo()` đánh dấu chỗ chưa chuyển; bản hoàn chỉnh không còn lời gọi nào. Hai công cụ giúp phần này:
+   - `node scripts/extract-data.mjs <file>.html <TênComponent> <TÊN_HẰNG[:jsx]>…` chép nguyên văn các hằng dữ liệu (danh sách dịch vụ, hội thoại mẫu…) sang `src/pages/<TênComponent>/data.tsx`; hậu tố `:jsx` đổi map chuỗi SVG thành JSX. Kiểu dữ liệu khai thêm bằng tay.
+   - `node scripts/template-to-jsx.mjs <file>.html [tên-hàm…]` in JSX của các chuỗi template HTML trong JS (`innerHTML = \`…\``), kèm số dòng gốc và các handler cần chuyển tay.
 4. `npm run verify -- <tên-file>` đến khi đạt.
 
-Bộ chuyển xử lý: `class` → `className`, thuộc tính SVG, `style` → object, `value`/`checked`/`selected` → `defaultValue`/`defaultChecked`, link `x.html#y` → `/x#y`, khoảng trắng giữa các phần tử theo đúng cách HTML hiển thị.
+Bộ chuyển (`scripts/lib/html-jsx.mjs`, dùng chung cho hai công cụ trên) xử lý: `class` → `className`, thuộc tính SVG, `style` → object, `value`/`checked`/`selected` → `defaultValue`/`defaultChecked`, link `x.html#y` → `/x#y`, khoảng trắng giữa các phần tử theo đúng cách HTML hiển thị.
+
+Bản mẫu thường chỉ vẽ lại một phần DOM ở một số thao tác (`renderServiceLists()`, `renderRequestsList()`…); giữa các lần đó phần còn lại giữ nội dung cũ, kể cả khi đang ẩn. Bản React giữ đúng điều này: dữ liệu nằm trong `useRef` như biến toàn cục của bản mẫu, còn giao diện là ảnh chụp trong state, chỉ cập nhật đúng lúc bản mẫu gọi hàm vẽ lại. Ví dụ ngăn chi tiết của `settings` vẫn giữ dịch vụ vừa đóng, danh sách của `history` dựng lại thẻ (như `innerHTML` mới) mỗi lần vẽ.
 
 ## Giữ đúng giao diện khi đổi Tailwind v3 (bản mẫu) sang v4 (app)
 
@@ -48,10 +56,11 @@ Bộ chuyển xử lý: `class` → `className`, thuộc tính SVG, `style` → 
 | `shadow-sm`, `blur-sm`, `rounded-sm`, `drop-shadow-sm` đổi giá trị | Khai lại giá trị v3 | `src/styles/v3-compat.css` |
 | `line-height` của `text-*` thành tỉ lệ | Khai lại giá trị tuyệt đối của v3 | `src/styles/v3-compat.css` |
 | `leading-*` luôn thắng `text-*` nhờ `--tw-leading` | Vô hiệu `--tw-leading` để theo thứ tự CSS như v3 | `src/styles/v3-base.css` |
-| `space-x/y`, `divide-y` đặt margin/viền ở phần tử trước | Đổi tên thành `v3-space-*`, `v3-divide-*` và tự khai theo cách tính v3 | `src/styles/v3-compat.css`, bộ chuyển |
+| `space-x/y`, `divide-y` đặt margin/viền ở phần tử trước | Đổi tên thành `v3-space-*`, `v3-divide-y` và tự khai theo cách tính v3 | `src/styles/v3-compat.css`, bộ chuyển |
+| Gradient (`bg-gradient-to-*`, `from-/via-/to-*`) và màu `divide-*`: chế độ tối của bản mẫu (`theme.css`) ghi đè các class này theo tên và theo biến của v3 (`--tw-gradient-from`…). v4 đặt hướng trong `--tw-gradient-position` và khai `@property` kiểu `<color>` cho biến gradient, nên ghi đè của `theme.css` làm mất hướng và màu | Giữ tên class gốc, viết lại bằng CSS thường theo cách tính v3; loại các class này khỏi v4 bằng `@source not inline(...)`. Thêm class mới loại này thì thêm ở cả hai chỗ | `src/styles/v3-theme-targets.css`, `src/styles/tailwind.css` |
 | `hover:` chỉ áp trên thiết bị có chuột | `@custom-variant hover (&:hover)` | `src/styles/v3-compat.css` |
 | `outline-none` bỏ hẳn viền; v3 dùng viền trong suốt 2px, vẫn hiện ở chế độ tương phản cao | Đổi tên thành `v3-outline-none`, khai như v3 | `src/styles/v3-compat.css`, bộ chuyển |
-| Hai class cùng thuộc tính trên một phần tử (ví dụ `border-transparent` và `border-[#FF5701]`): v3 CDN cho class xuất hiện sau trong trang thắng, v4 xếp theo tên class | Chỉ gặp ở class do JS thêm vào. Đánh dấu `!` cho class phải thắng, ghi chú ngay tại chỗ | `ErrorsPage.tsx` (toast), `AuthActionPage.tsx` (tab) |
+| Hai class cùng thuộc tính trên một phần tử (ví dụ `border-transparent` và `border-[#FF5701]`, hay `hidden` và `inline-flex`): v3 CDN xếp theo thứ tự xuất hiện trong trang hoặc theo bảng giá trị của từng plugin, v4 xếp theo tên class | Chỉ gặp ở class do JS thêm vào. Đánh dấu `!` cho class phải thắng, ghi chú ngay tại chỗ. `hidden` thêm vào phần tử `flex`/`grid` không cần, vì v4 cũng cho `hidden` thắng | `ErrorsPage.tsx` (toast), `AuthActionPage.tsx` (tab), `AccountPage.tsx` (nút đăng xuất các phiên khác) |
 | Màu viền mặc định, placeholder, con trỏ trên nút | Quy tắc preflight của v3 | `src/styles/v3-base.css` |
 | CSS v4 nằm trong cascade layer | Nạp preflight/utilities không qua layer; `theme.css` và CSS của trang chèn trước Tailwind như thứ tự trong bản mẫu | `src/styles/tailwind.css`, `src/main.tsx`, `src/app/usePrototypePage.ts` |
 
@@ -77,13 +86,17 @@ Script mở bản HTML gốc (server tĩnh, cổng 5190) và bản React (Vite, 
 - Hiệu ứng chuyển động được tắt khi chụp.
 - Bản gốc được nạp thêm đủ font của design system, vì vài trang chỉ nạp một phần độ đậm (ví dụ `404.html` không nạp JetBrains Mono nên chữ mã rơi về font mono hệ thống). Bản React nạp đủ font ở `index.html`.
 
-Ngoài lúc mở trang (đủ 4 tổ hợp), mỗi trang có các trạng thái thao tác khai trong `scripts/parity-states.mjs`, chạy ở 1440 sáng và 375 tối. Ví dụ: bấm tab, mở menu demo, điền form, chờ hẹn giờ, mở trang kèm `?type=`.
+Ngoài lúc mở trang (đủ 4 tổ hợp), mỗi trang có các trạng thái thao tác khai trong `scripts/parity-states.mjs`, chạy ở 1440 sáng và 375 tối. Ví dụ: bấm tab, mở menu demo, điền form, chọn trong `<select>`, chờ hẹn giờ, mở trang kèm `?type=` hoặc `#notion`.
 - Các bước chạy y hệt trên hai bản, nên selector chỉ dùng id hoặc chữ có ở cả hai.
+- Nút nằm trong khung cuộn (`overflow-hidden`) thì thêm bước `scroll` trước khi bấm: Playwright tự cuộn khác nhau giữa các lần nên vị trí cuộn của trang không ổn định.
+- Sau các bước, script chờ font tải xong rồi mới chụp, vì thao tác có thể làm hiện chữ ở độ đậm chưa dùng.
 - Chạy một trạng thái: `node scripts/verify-parity.mjs errors --state=loi-may-chu`.
 - Khi so tên class, script bỏ tiền tố `v3-` và dấu `!`.
 - Bóng đổ không vẽ gì (trong suốt, hoặc mọi kích thước bằng 0) được bỏ qua.
 - Không so giá trị margin theo chiều có `auto` (`mx-auto`, `ml-auto`…), vì Chrome đôi khi trả 0px dù phần tử đã được căn đúng. Vị trí của phần tử vẫn được so nên kết quả margin auto vẫn được kiểm.
-- Trường hợp nào lệch thì chạy lại đúng một lần, chỉ tính đạt nếu lần chạy lại khớp hoàn toàn. Khác biệt thật luôn lặp lại; các dao động của trình duyệt (lẻ pixel, đua thời gian) thì không. Kết quả ghi "(chạy lại 1 lần)" và `attempts` trong `report.json`.
+- Trường hợp nào lệch thì chạy lại đúng một lần, chỉ tính đạt nếu lần chạy lại khớp hoàn toàn. Khác biệt thật luôn lặp lại; các dao động của trình duyệt (lẻ pixel, đua thời gian) thì không. Kết quả ghi "(chạy lại 1 lần)" và `attempts` trong `report.json`; ảnh của lần lệch đầu giữ ở `.parity/<trường hợp>-first-*.png`.
+- Dao động hay gặp nhất: vài chục đến vài trăm pixel ở nét chữ Playfair Display (tiêu đề, tên dịch vụ), không lệch phần tử nào. Ảnh khác biệt chỉ có chấm đỏ rải trên chữ. Lệch ở chỗ khác hoặc lặp lại khi chạy lại là khác biệt thật.
+- Mỗi trang, và mỗi lần chạy lại, dùng một tiến trình Chromium mới. Khi cả 10 trang chạy chung một tiến trình, về cuối loạt có 2 trường hợp lệch vài pixel ở nét chữ và mép avatar tròn, lặp lại cả ở lần chạy lại trong cùng tiến trình, dù chạy riêng trang đó thì đạt.
 
 ## Lỗi của bản mẫu đang giữ nguyên
 
@@ -91,5 +104,10 @@ Bản React chép đúng hành vi bản mẫu, kể cả các chỗ dưới đâ
 
 - `responses.html`: dòng phụ của tình huống 4 ("Kênh bạn cần chưa có trong danh sách?") chỉ được vẽ sau khi đổi vai trò trong menu demo. Lúc mới mở, ô này trống.
 - `auth-action.html`: nhánh JS báo "Mật khẩu mới phải có ít nhất 12 ký tự!" không bao giờ chạy, vì thuộc tính `minlength` của ô nhập chặn form trước và Chrome hiện bong bóng của trình duyệt.
-- `errors.html`, `auth-action.html`: nhiều thao tác chuyển về `app-stage.html` sau 1–2 giây. Trang này chưa chuyển sang React nên tạm hiện trang 404.
+- `errors.html`, `auth-action.html`, `history.html` ("Mở lại trên sân khấu"): nhiều thao tác chuyển về `app-stage.html` sau 0,5–2 giây. Trang này chưa chuyển sang React nên tạm hiện trang 404.
+- `users.html`: sau khi vẽ danh sách thành viên, khung bảng desktop bị gỡ class `hidden` (vốn đi cùng `sm:block`), nên ở màn hẹp bảng hiện cùng danh sách thẻ.
+- `history.html`: vai trò quản trị ghi `style.display = 'inline-flex'` cho link "Người dùng", đè class `hidden lg:inline-flex`, nên link hiện cả ở màn hẹp.
+- `account.html`:
+  - đổi mật khẩu thành công chỉ đặt lại độ rộng thanh độ mạnh và chữ "Ít nhất 12 ký tự", còn màu của lần kiểm tra trước vẫn giữ;
+  - "Đặt lại dữ liệu" dựng lại thẻ phiên đã thu hồi ở cuối danh sách, nên thu hồi iPhone rồi đặt lại thì thứ tự thành macOS trước iPhone.
 - Màu của một phần tử đôi khi phụ thuộc thứ tự class xuất hiện trong trang (xem dòng cuối bảng tương thích). Kết quả hiện tại đúng như bản mẫu, nhưng dễ đổi khi sửa trang.

@@ -1,0 +1,48 @@
+/* Utility giữ đúng tên class và cách tính của Tailwind v3, vì theme.css (chế độ tối của bản mẫu) ghi đè chúng theo tên
+   và theo biến của v3. tailwind.css loại các class này khỏi Tailwind v4 (@source not inline) để v4 không sinh quy tắc
+   riêng (và @property kiểu <color> cho biến gradient). File này đứng sau utilities nên thắng nếu trùng tên.
+
+   Gradient (app-stage, guide, users): v3 đặt hướng trong background-image và dùng --tw-gradient-from/-to/-stops,
+   v4 đặt hướng trong --tw-gradient-position. */
+/* Như phần base của v3: vị trí điểm màu mặc định rỗng (không ghi vị trí). */
+*, ::before, ::after {
+  --tw-gradient-from-position: ;
+  --tw-gradient-via-position: ;
+  --tw-gradient-to-position: ;
+}
+
+.bg-gradient-to-t { background-image: linear-gradient(to top, var(--tw-gradient-stops)); }
+.bg-gradient-to-r { background-image: linear-gradient(to right, var(--tw-gradient-stops)); }
+.bg-gradient-to-br { background-image: linear-gradient(to bottom right, var(--tw-gradient-stops)); }
+
+.from-\[\#F8F8F6\] {
+  --tw-gradient-from: #F8F8F6 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(248 248 246 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.from-amber-50\/80 {
+  --tw-gradient-from: rgb(255 251 235 / 0.8) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(255 251 235 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.from-white {
+  --tw-gradient-from: #fff var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.via-\[\#F8F8F6\]\/95 {
+  --tw-gradient-to: rgb(248 248 246 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgb(248 248 246 / 0.95) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.via-white {
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), #fff var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+
+.to-amber-50\/40 { --tw-gradient-to: rgb(255 251 235 / 0.4) var(--tw-gradient-to-position); }
+.to-transparent { --tw-gradient-to: transparent var(--tw-gradient-to-position); }
+
+/* Màu đường chia giữa các phần tử (app-stage, users), theo cách tính v3: viền ở các phần tử sau phần tử đầu. */
+.divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { --tw-divide-opacity: 1; border-color: rgb(229 229 229 / var(--tw-divide-opacity)); }
+.divide-\[\#E7E7E2\] > :not([hidden]) ~ :not([hidden]) { --tw-divide-opacity: 1; border-color: rgb(231 231 226 / var(--tw-divide-opacity)); }

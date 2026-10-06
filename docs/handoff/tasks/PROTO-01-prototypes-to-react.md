@@ -1,6 +1,6 @@
 # PROTO-01 · Chuyển 12 bản mẫu HTML sang React, giữ nguyên design system
 
-**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 thi công xong (chờ review/merge), bước 3–4 chờ · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2) · **Phụ thuộc:** không
+**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 xong (#94 tại `852342c`), bước 3 thi công xong (chờ review/merge), bước 4 chờ · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2), `feat/proto-react-03` (bước 3) · **Phụ thuộc:** không
 **Người yêu cầu:** chủ dự án, 06/10/2026 · **Thi công bước 1:** Claude Code (theo yêu cầu trực tiếp của người dùng)
 
 ## Vì sao
@@ -110,3 +110,60 @@ Hai trường hợp phải chạy lại một lần mới đạt: `responses-tin
 **Giữ nguyên lỗi của bản mẫu** (liệt kê ở README `react/`):
 - dòng phụ tình huống 4 của `responses` trống cho tới khi đổi vai trò;
 - nhánh JS "mật khẩu ngắn" của `auth-action` không chạy được.
+
+## Kết quả bước 3 (Claude Code, 07/10/2026)
+
+**Đã làm:** năm trang sinh bằng bộ chuyển, rồi viết lại toàn bộ JS bằng state React, không còn lời gọi `todo()`.
+
+| Trang | JS của bản mẫu | Hành vi viết lại |
+|---|---|---|
+| `account` | 515 dòng | đổi tên, đổi mật khẩu và thanh độ mạnh, ẩn/hiện mật khẩu, thu hồi phiên, gỡ/liên kết Google, 3 kịch bản Google/mật khẩu, 2 hộp thoại |
+| `users` | 685 dòng | 2 tab, tìm và lọc, duyệt tài khoản, khoá/mở khoá, đổi vai trò, 3 hộp thoại, thêm yêu cầu mẫu |
+| `settings` | 885 dòng | 2 nhóm dịch vụ, ngăn chi tiết (ô khoá theo dịch vụ, nơi được dùng, lưu, kiểm tra kết nối thành công/từ chối/quá giờ), vai trò thành viên, bẫy focus, `#dịch-vụ` |
+| `history` | 1.028 dòng | nhóm theo ngày, tìm/lọc/chip nhanh, tải thêm, đổi tên tại chỗ, ngăn biên nhận, sao chép, thêm/khôi phục dữ liệu mẫu, vai trò lưu ở `localStorage` |
+| `guide` | 1.037 dòng | 3 tab, 8 dịch vụ, tìm và lọc mẫu lệnh, sao chép, `?tab=`/`?service=`, vai trò |
+
+Công cụ mới (`docs/design/prototypes/react/scripts/`):
+- `lib/html-jsx.mjs`: lõi của bộ chuyển, tách từ `html-to-jsx.mjs`. Kết quả của `html-to-jsx.mjs` trên `privacy` và `guide` giống hệt trước khi tách.
+- `template-to-jsx.mjs`: chuyển chuỗi template HTML trong JS sang JSX.
+- `extract-data.mjs`: chép nguyên văn hằng dữ liệu sang `data.tsx`.
+
+Bản mẫu chỉ vẽ lại một phần DOM ở một số thao tác. Bản React giữ dữ liệu trong `useRef` như biến toàn cục và giữ giao diện là ảnh chụp trong state, chỉ cập nhật khi bản mẫu gọi hàm vẽ lại (README `react/` giải thích).
+
+**RED → GREEN** (`node scripts/verify-parity.mjs <trang>`):
+
+| Trang | Lệch | Nguyên nhân | Sửa |
+|---|---|---|---|
+| `guide` | gradient ở chế độ tối mất hướng và mất màu | `theme.css` ghi đè gradient theo biến của v3; v4 đặt hướng ở biến khác và khai `@property` kiểu `<color>` cho biến gradient | `src/styles/v3-theme-targets.css`: giữ tên class gốc, viết CSS theo cách v3; loại khỏi v4 bằng `@source not inline(...)` |
+| `users` | màu đường chia dòng bảng ở chế độ tối | tên `v3-divide-color-*` không khớp selector của `theme.css` | giữ tên `divide-*`, đưa vào `v3-theme-targets.css` |
+| `users` | vị trí cuộn lệch khi chạy cả loạt | Playwright tự cuộn khác nhau với nút trong khung `overflow-hidden` | bước `scroll` trước khi bấm |
+| `history` | ô đổi tên ở 375px: 1.412 pixel, lặp lại cả hai lần | React ghi `value` bằng thuộc tính DOM nên con trỏ nằm cuối chữ, ô hẹp cuộn về cuối; bản mẫu đọc `value` từ HTML nên con trỏ ở đầu | đặt con trỏ về đầu khi tạo ô |
+| `account` | 3 trạng thái sau khi hết phiên khác: nút "Đăng xuất khỏi tất cả phiên khác" vẫn hiện | bản mẫu thêm `hidden` vào nút `inline-flex`; v3 cho `hidden` thắng, v4 cho `inline-flex` thắng | `hidden!`, có ghi chú |
+| `settings` | không lệch thật | | |
+
+Script so có thêm:
+- bước `select` và `scroll`;
+- chờ font sau các thao tác;
+- giữ ảnh của lần lệch đầu (`-first-*.png`);
+- mặc định chạy cả 10 trang;
+- mỗi trang và mỗi lần chạy lại dùng một tiến trình Chromium mới.
+
+Các lần lệch đầu rồi đạt khi chạy lại đều là nét chữ Playfair Display (vài chục đến vài trăm pixel rải trên chữ, 0 phần tử lệch). Đã xem ảnh của từng lần.
+
+**Lần chạy toàn bộ đầu tiên** (10 trang, chung một tiến trình Chromium): 346/348 đạt, exit 1. Hai trường hợp lệch ở cả lần chạy lại, 0 phần tử lệch:
+- `users-xac-nhan-duyet-1440-light`: 9 pixel ở mép trên và mép dưới avatar `LN`;
+- `history-bien-nhan-tam-dung-1440-light`: 170 pixel ở viền màu của chữ "cầu" trong tiêu đề Playfair, vị trí glyph trùng nhau.
+
+Cả hai đã đạt khi chạy riêng từng trang, và chỉ xuất hiện ở trang thứ 7 và 9 của loạt chạy. Vì vậy mới đổi sang dùng tiến trình Chromium mới cho mỗi trang và mỗi lần chạy lại.
+
+**Kết quả cuối:** **chưa đạt**. `node scripts/verify-parity.mjs` (10 trang, mỗi trang một tiến trình Chromium) exit 1: 347/348 trường hợp đạt, còn lệch 1: `history-loc-tam-dung-1440-light` (9 pixel). 8 trường hợp đạt sau một lần chạy lại: `account-esc-dong-1440-light`, `account-mo-go-google-375-dark`, `settings-mo-trello-1440-light`, `settings-mo-calendar-1440-light`, `settings-jira-url-sai-375-dark`, `settings-luu-thieu-khoa-1440-light`, `settings-kiem-tra-roi-dong-375-dark`, `guide-sao-chep-375-dark`. Chưa xem ảnh khác biệt của lần chạy này (script tự mở PR dạng draft khi người dùng đang ngủ); ảnh và `report.json` ở `.parity/` trên máy. `npm run typecheck` exit 0; `npm run build` exit 0.
+
+**Không so được hoặc chỉ so một phần:**
+- `settings`: kết quả "quá giờ" chờ 10 giây, chỉ so lúc đang chờ. Bấm nền để đóng ngăn chỉ thử bằng Esc, vì ở 375px panel phủ kín nền.
+- `account`: nút gỡ Google bị khoá ở kịch bản "chỉ Google" nên không bấm được trong kịch bản so.
+- Sao chép vào bộ nhớ tạm (`history`, `guide`) phụ thuộc quyền clipboard của Chromium headless; hai bản cho cùng kết quả.
+
+**Giữ nguyên lỗi của bản mẫu** (README `react/`):
+- `users`: bảng desktop hiện cả ở màn hẹp sau khi vẽ danh sách;
+- `history`: link "Người dùng" hiện ở màn hẹp khi là quản trị viên; "Mở lại trên sân khấu" tạm ra trang 404;
+- `account`: đổi mật khẩu xong thanh độ mạnh giữ màu cũ; đặt lại dữ liệu có thể đổi thứ tự thẻ phiên.
