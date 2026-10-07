@@ -1,11 +1,13 @@
 # FE-05b · Cockpit: làm giống bản mẫu (khoảnh khắc 1–6, thanh trên, ô nhắn thêm, hai ngăn)
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-05b-cockpit-visual-parity` · **Phụ thuộc:** FE-05 đã merge (#90) · **Mốc:** 11/10/2026 (trước FE-06)
-**Đặc tả:** mục 1, 1.1 và 1.2 (sửa 06/10), 3, 5, 6, 7 · **Bản mẫu:** `app-stage.html` thanh trên, khoảnh khắc 1–6, ô nhắn thêm ở đáy, ngăn "Lịch sử yêu cầu", ngăn "Nhật ký hội thoại", hộp "Xem trước nội dung"
+**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-05b-cockpit-visual-parity` · **Phụ thuộc:** FE-05 đã merge (#90), FE-04b đã merge · **Mốc:** 13/10/2026 (trước FE-06; dời từ 11/10 khi đổi cách làm 07/10). Được tách 2 PR: (a) thanh trên + khoảnh khắc 1–3 + mục 10; (b) khoảnh khắc 4–6 + ô nhắn thêm + hai ngăn + hộp xem trước
+**Đặc tả:** mục 1, 1.1 và 1.2 (bản 07/10), 5, 6, 7 · **Nguồn:** `docs/design/prototypes/react/src/pages/AppStage/AppStagePage.tsx` và `page.css` (bản React của `app-stage.html`): thanh trên, khoảnh khắc 1–6, ô nhắn thêm ở đáy, ngăn "Lịch sử yêu cầu", ngăn "Nhật ký hội thoại", hộp "Xem trước nội dung"
 
 ## Vì sao quan trọng
 
 FE-05 làm đúng hành vi của cockpit nhưng hình thức khác bản mẫu khá xa. Ngày 06/10/2026 người dùng chốt: **bản mẫu là chuẩn về hình thức**, app phải giống bản mẫu, chỉ được khác ở các điểm trong đặc tả mục 1.1. FE-06 dựng khoảnh khắc 7–9 trên cùng khung này, nên FE-05b phải xong trước.
+
+**Đổi cách làm 07/10/2026:** người dùng chốt đưa thẳng bản React của bản mẫu vào app (đặc tả mục 1, bản 07/10). Cockpit của app trở thành trang `AppStage` của bản React với dữ liệu thật: giữ nguyên markup, class và cỡ chữ/màu của bản mẫu, không đổi sang token hay nâng chữ lên 14px như bản 06/10 của task này.
 
 Claude Code so bản mẫu với `main` `d5fcc46` ở sandbox, 1440×900 và 375×812, chế độ tối (06/10). Khác biệt lớn nhất:
 
@@ -26,16 +28,15 @@ Claude Code so bản mẫu với `main` `d5fcc46` ở sandbox, 1440×900 và 375
 
 ## Việc cần làm
 
-**Cách làm (đặc tả mục 1.2):** với mỗi mục dưới đây, lấy đoạn HTML tương ứng trong `app-stage.html` và chuyển sang JSX, giữ cấu trúc thẻ và class. Sau đó:
-- đổi màu sang token;
-- đổi tên class Tailwind v3 sang v4;
-- nâng chữ nhỏ lên 14px;
-- thay dữ liệu mẫu bằng store/API;
-- bỏ JS demo.
+**Cách làm (đặc tả mục 1.2, bản 07/10):**
+- chép `AppStagePage.tsx` và `page.css` của bản React sang app, tách thành component theo các đoạn trong bảng dưới (id của đoạn giữ như bản mẫu);
+- giữ nguyên markup và class, kể cả tên `v3-*`, hậu tố `!` và ghi chú tại chỗ (ví dụ `hidden!` của nút "Xem hội thoại");
+- bỏ JS demo (mô hình ảnh chụp, `setMoment` bằng phím 1–9, hẹn giờ giả, menu demo, `executionMode` giả); khoảnh khắc lấy từ `selectMoment`, nội dung lấy từ store/API;
+- giữ các bảo đảm của FE-05 (phản hồi muộn gắn đúng hội thoại/kế hoạch/yêu cầu, một ô nhập, focus của ngăn và hộp thoại).
 
-Chỉ được khác bản mẫu ở các điểm trong đặc tả mục 1.1. Các mục dưới đây mô tả phần cần nối dữ liệu và những chỗ phải khác.
+Chỉ được khác bản React ở các điểm trong đặc tả mục 1.1 (bản 07/10). Các mục dưới đây mô tả phần cần nối dữ liệu và những chỗ phải khác.
 
-| Mục | Đoạn trong `app-stage.html` |
+| Mục | Đoạn trong bản mẫu (cùng id trong `AppStagePage.tsx`) |
 |---|---|
 | 1 | `<header class="sticky …">` |
 | 2–7 | `<section id="moment-1">` → `<section id="moment-6">` |
@@ -51,8 +52,8 @@ Chỉ được khác bản mẫu ở các điểm trong đặc tả mục 1.1. C
    - **bỏ hàng 4 nút** của cockpit và hàng "Yêu cầu hiện tại" riêng:
      - "Cuộc hội thoại mới" nằm ở đầu ngăn lịch sử và ở nút "Nhờ việc khác";
      - "Kết nối dịch vụ" nằm ở menu người dùng và link "Kết nối thêm" ở khoảnh khắc 1;
-   - dải thử nghiệm một dòng, chữ 14px.
-   - Gợi ý cách làm: `AppShell` nhận phần bổ sung cho thanh trên qua prop hoặc context; không dựng hai thanh.
+   - dải thử nghiệm như bản mẫu, chỉ hiện khi `runtimeMode` là sandbox (đặc tả 1.1 điểm 9).
+   - Cockpit dùng thanh trên của bản React (`<header>` của `AppStagePage.tsx`); `AppShell` của FE-04 không dựng thanh trên ở route cockpit, để không có hai thanh. Menu người dùng (vai trò, tài khoản, đăng xuất) nối vào hành vi hiện có của `UserNavMenu`.
 2. **Khoảnh khắc 1 · Nhờ việc:**
    - tiêu đề "Hôm nay bạn muốn nhờ việc gì?", bỏ dòng "ATI · Điều phối công việc"; dòng mô tả 18px;
    - ô nhập dạng thẻ: placeholder là một câu ví dụ; đáy thẻ có "Enter để gửi" và nút "Gửi yêu cầu →";
@@ -109,16 +110,16 @@ Chỉ được khác bản mẫu ở các điểm trong đặc tả mục 1.1. C
 
 ## Tiêu chí nghiệm thu
 
-- [ ] **Giống bản mẫu:** ảnh app và ảnh `app-stage.html` đặt cạnh nhau cho thanh trên, khoảnh khắc 1–6, hai ngăn và hộp xem trước:
+- [ ] **Giống bản mẫu:** ảnh app và ảnh trang `/app-stage` của bản React đặt cạnh nhau cho thanh trên, khoảnh khắc 1–6, hai ngăn và hộp xem trước:
   - kích thước 1440×900 và 375×812, sáng và tối;
-  - bản mẫu chụp bằng `setMoment(n)` qua một server tĩnh;
+  - bản React chạy bằng `npm run dev` trong `docs/design/prototypes/react/`, chuyển khoảnh khắc bằng phím 1–9;
   - danh sách ảnh và SHA256 ghi trong log; ảnh không commit;
   - mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] Đo bằng browser test: phần đầu trang (thanh trên + dải thử nghiệm) cao ≤ 100px ở 1440px và ≤ 120px ở 375px; không còn hàng nút riêng của cockpit; không cuộn ngang ở 375px.
 - [ ] Test: ô nhập hiển thị đúng một cái ở mọi khoảnh khắc, kể cả khi mở "Sửa qua Chat", chọn "Để tôi gõ…" và mở/đóng ngăn hội thoại.
 - [ ] Test: thanh tiến độ khoảnh khắc 5 bằng số bước xong / tổng; mũi tên nối ở khoảnh khắc 6 chỉ có khi plan có tham chiếu giữa hai bước; không có số issue/dòng trước khi bước chạy xong.
 - [ ] Test và browser cho mục 10: cuộn xuống ở khoảnh khắc 4, bấm Duyệt → ở khoảnh khắc 5 và 6, `h1` nằm trọn trong vùng nhìn thấy và nhận focus; đang gõ trong ô nhập khi khoảnh khắc đổi thì focus vẫn ở ô nhập. Kiểm ở 1440px và 375px.
-- [ ] Test tương phản token vẫn xanh; chữ thường trong bong bóng tin đạt 4,5:1 (đặc tả 1.1 mục 5).
+- [ ] Cỡ chữ, màu và khoảng cách giống bản React (không nâng lên 14px, không đổi sang token). Test tương phản token của FE-04 cho cockpit được bỏ, ghi rõ trong PR (đặc tả 1.2 điểm 6).
 - [ ] Các test FE-02, FE-03, FE-03b, W2-04, AUTH-05 và toàn bộ test FE-05 vẫn xanh: đổi cách tìm phần tử nếu cần, không bỏ ca.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 

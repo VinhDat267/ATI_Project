@@ -1,6 +1,6 @@
 # PROTO-01 · Chuyển 12 bản mẫu HTML sang React, giữ nguyên design system
 
-**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 xong (#94 tại `852342c`), bước 3 xong (#95 tại `458c5ad`), bước 4 thi công xong (chờ review/merge) · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2), `feat/proto-react-03` (bước 3), `feat/proto-react-04` (bước 4, tách từ bước 3) · **Phụ thuộc:** không
+**Trạng thái:** xong cả 4 bước · bước 1 xong (#93 tại `00e9c5f`), bước 2 xong (#94 tại `852342c`), bước 3 xong (#95 tại `458c5ad`), bước 4 xong (#96 tại `581addd`) · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2), `feat/proto-react-03` (bước 3), `feat/proto-react-04` (bước 4, tách từ bước 3) · **Phụ thuộc:** không
 **Người yêu cầu:** chủ dự án, 06/10/2026 · **Thi công bước 1:** Claude Code (theo yêu cầu trực tiếp của người dùng)
 
 ## Vì sao
@@ -37,6 +37,8 @@ Người dùng muốn có bản React của 12 bản mẫu trong `docs/design/pr
 - token của FE-04.
 
 Người dùng đã nói muốn giữ design system của bản mẫu; cần sửa đặc tả trước khi tích hợp.
+
+**Đã chốt 07/10/2026:** người dùng chọn đưa thẳng bản React vào app, dùng design system của bản mẫu. Đặc tả giao diện mục 1, 1.1, 1.2 đã viết lại; việc đưa vào app làm ở [FE-04b](FE-04b-prototype-foundation.md) (lớp nền) và FE-05b → FE-10.
 
 ## Kết quả bước 1 (Claude Code, 06/10/2026)
 
@@ -236,3 +238,7 @@ Hai lần so toàn bộ trước đó bị dừng giữa chừng: lần đầu v
 **Không so được hoặc chỉ so một phần:**
 - `index`: sân khấu tương tác chỉ có từ khổ `lg`, nên 6 trạng thái của nó chỉ so ở 1440. Chữ gõ dần và hiệu ứng chuyển cảnh chỉ so ở trạng thái cuối.
 - `app-stage`: các bước chạy có hẹn giờ được so ở lúc bắt đầu và lúc xong, không so từng khung giữa chừng.
+
+### Sau merge #96 (Claude Code, 07/10/2026)
+
+#96 merge tại `581addd` lúc 14:14:47 (Việt Nam); cây merge bằng head `841e674`, CI PR và CI main xanh. Lần so toàn bộ 12 trang chạy lại trên `main` `581addd`: 459/464 trường hợp, exit 1 (`index` 43/44, `app-stage` 57/58, `auth-action` 47/50, chín trang còn lại đạt hết; 9 trường hợp đạt ở lần chạy lại). Cả 5 trường hợp lệch đều là trạng thái chụp giữa chừng một hẹn giờ: `auth-action` "Đang gửi lại" (2 khổ) và đồng hồ đếm ngược, `index` trả focus sau Esc, `app-stage` gợi ý tự chuyển khoảnh khắc. Chạy riêng từng trạng thái đều đạt (2 trong 4 lần cần chạy lại). Chưa có lần so toàn bộ 12 trang nào exit 0.

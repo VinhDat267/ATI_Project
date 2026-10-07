@@ -1,6 +1,6 @@
 # FE-09 · Trang Tài khoản, Quản lý người dùng, Lịch sử
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-09-account-users-history` · **Phụ thuộc:** FE-04 đã merge · **Mốc:** 27/10/2026
+**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-09-account-users-history` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) · **Mốc:** 27/10/2026
 **Đặc tả:** mục 4, 6 · **Bản mẫu:** `account.html`, `users.html`, `history.html`
 
 ## Vì sao quan trọng
@@ -8,6 +8,8 @@
 Ba trang này đã có chức năng (AUTH-03, AUTH-05, FE-02) nhưng giao diện cũ. Bản mẫu đã được review để chỉ hiện đúng những gì API hỗ trợ.
 
 ## Việc cần làm
+
+**Cách làm (đổi 07/10/2026, đặc tả mục 1.2):** chép `Account/AccountPage.tsx`, `Users/UsersPage.tsx` (route `/admin/users`), `History/HistoryPage.tsx` từ `docs/design/prototypes/react/src/pages/` sang app sau khi FE-04b đã merge; giữ nguyên markup, class, cỡ chữ và màu của bản mẫu; bỏ JS demo, nối store/API; giữ các bảo đảm hành vi đang có. Ảnh "giống bản mẫu" so với trang tương ứng của bản React (`npm run dev` trong `docs/design/prototypes/react/`). Các mục dưới đây là phần dữ liệu và hành vi phải đúng.
 
 1. **`/account`** (thay `AccountView`):
    - hồ sơ: đổi tên; email chỉ đọc kèm trạng thái xác minh; vai trò;
@@ -28,8 +30,8 @@ Ba trang này đã có chức năng (AUTH-03, AUTH-05, FE-02) nhưng giao diện
 - [ ] Test: gỡ Google bắt buộc mật khẩu; tài khoản chưa có mật khẩu không gỡ được.
 - [ ] Test: đổi tên hội thoại lưu bằng Enter, huỷ bằng Esc, phản hồi muộn không ghi đè tên vừa gõ lại.
 - [ ] Các test `account-view`, `account-action-regressions`, `admin-users`, `app-routing`, browser AUTH-03/AUTH-05/FE-02 vẫn xanh.
-- [ ] Không cuộn ngang ở 375px; chế độ tối đạt tương phản.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `account.html`, `users.html`, `history.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] Không cuộn ngang ở 375px; chế độ tối giống bản React.
+- [ ] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app và ảnh bản React của `account.html`, `users.html`, `history.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

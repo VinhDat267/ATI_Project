@@ -9,6 +9,8 @@
 
 ## Việc cần làm
 
+**Cách làm (đổi 07/10/2026, đặc tả mục 1.2):** chép `AppStage/AppStagePage.tsx` (khoảnh khắc 7–9), `Responses/ResponsesPage.tsx` (4 tình huống, dựng trong cockpit), `Errors/ErrorsPage.tsx` (trạng thái lỗi chung, dựng ở đúng chỗ trong cockpit và toàn app) từ `docs/design/prototypes/react/src/pages/` sang app sau khi FE-04b đã merge; giữ nguyên markup, class, cỡ chữ và màu của bản mẫu; bỏ JS demo, nối store/API; giữ các bảo đảm hành vi đang có. Ảnh "giống bản mẫu" so với trang tương ứng của bản React (`npm run dev` trong `docs/design/prototypes/react/`). Các mục dưới đây là phần dữ liệu và hành vi phải đúng.
+
 1. **Khoảnh khắc 7 · Lỗi đã biết:** chuyện gì đã xảy ra, ảnh hưởng hiện tại, việc cần làm. Nút theo `recoveryActions`: Thử lại, Sửa rồi thử lại (giữ chức năng sửa tham số của `PartialFailureModal`, nhưng trình bày bằng trường có nhãn thay vì JSON thô khi có schema), Bỏ qua, Dừng (có xác nhận).
 2. **Khoảnh khắc 8 · Chưa rõ kết quả:**
    - nói rõ hệ thống không chắc lệnh đã tới dịch vụ hay chưa;
@@ -38,7 +40,7 @@
 - [ ] Test phản hồi muộn: lệnh khôi phục của plan A trả về sau khi người dùng đã sang hội thoại B → không đổi màn của B.
 - [ ] Các test W2-04, W2-05, `partial-failure-modal`, `execution-progress` được chuyển sang component mới, không mất ca.
 - [ ] Browser: sandbox có kịch bản bước `unknown` và `reconciliation_required` (thêm vào harness nếu chưa có) chạy đúng; không cuộn ngang ở 375px.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app đặt cạnh ảnh bản mẫu ở 1440×900 và 375×812, sáng và tối, cho `app-stage.html` khoảnh khắc 7–9, `responses.html` (4 tình huống) và `errors.html`. Màn kết thúc không thành công so với khoảnh khắc 6. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app đặt cạnh ảnh bản React ở 1440×900 và 375×812, sáng và tối, cho `app-stage.html` khoảnh khắc 7–9, `responses.html` (4 tình huống) và `errors.html`. Màn kết thúc không thành công so với khoảnh khắc 6. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

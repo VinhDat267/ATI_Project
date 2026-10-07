@@ -1,13 +1,13 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 06/10/2026, sau merge FE-05 #90 tại `ee65cd0`: cockpit khoảnh khắc 1–6, ngăn hội thoại và ngăn lịch sử đã vào `main`. Review độc lập đạt; Claude Code chạy thử app thật ở sandbox trước khi merge, không có lỗi chặn, 2 lỗi P3 chuyển vào FE-06. FE-06 là việc tiếp theo của cockpit. Trước đó:
+**Cập nhật lần cuối:** 07/10/2026, sau merge PROTO-01 bước 4 #96 tại `581addd`: cả 12 bản mẫu đã có bản React trong `docs/design/prototypes/react/`, khớp bản HTML gốc theo script so; chưa đưa vào app. Trước đó:
+- PROTO-01 bước 1–3: #93 (`00e9c5f`), #94 (`852342c`), #95 (`458c5ad`);
+- #92 (`18980ec`): bản mẫu là chuẩn hình thức, task card FE-05b;
+- FE-05 #90 (`ee65cd0`): cockpit khoảnh khắc 1–6, ngăn hội thoại và ngăn lịch sử; review độc lập đạt, 2 lỗi P3 chuyển vào FE-05b;
 - FE-04 #88 (`89d1999`) và UI-API-01 #86 (`210d3b6`): token/theme/shell và API cho giao diện mới;
-- #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01);
-- #82 DOC-01 (`841d9da`): sửa năm link lưu trữ mà review độc lập #80 phát hiện;
-- #80 xoá v1/v2 (`7060a37`);
-- #77 kế hoạch tuần 4 (`badccb3`).
+- #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01).
 
-Agent cập nhật: Claude Code (reviewer sau merge #90).
+Agent cập nhật: Claude Code (sau merge #96).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -17,7 +17,7 @@ Agent cập nhật: Claude Code (reviewer sau merge #90).
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Tiếp theo FE-05b (làm cockpit giống bản mẫu, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). Song song: [PROTO-01](tasks/PROTO-01-prototypes-to-react.md) chuyển 12 bản mẫu sang React trong `docs/design/prototypes/react/`, giữ design system bản mẫu, chưa đưa vào app; bước 1 (404, privacy) đã merge #93, bước 2 (errors, responses, auth-action) đã merge #94, bước 3 (account, users, settings, history, guide) đã merge #95, bước 4 (index, app-stage) chờ review. FE-07, FE-08, FE-09 giao song song được. Các trang và khoảnh khắc còn lại chưa thi công;
+> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Ngày 07/10 người dùng chốt **đưa thẳng bản React của bản mẫu vào app** ([PROTO-01](tasks/PROTO-01-prototypes-to-react.md), xong cả 4 bước #93 → #96), dùng design system của bản mẫu. Tiếp theo [FE-04b](tasks/FE-04b-prototype-foundation.md) (lớp nền), rồi FE-05b (cockpit = trang `app-stage` của bản React, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). FE-07, FE-08, FE-09 giao song song được sau FE-04b. Các trang và khoảnh khắc còn lại chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -105,6 +105,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **PROTO-01 bước 4 xong #96** (`581addd`), merge 07/10 lúc 14:14:47 Việt Nam: `index` (route `/`) và `app-stage` sang React; cả 12 trang không còn `todo()`.
+  - Lớp tương thích mới: class `transform` của v3 luôn đặt ma trận đơn vị (phần tử có lớp vẽ riêng, đổi cách khử răng cưa chữ bên cạnh), v4 không; giữ cách của v3 ở 20 chỗ trong 9 trang. Biến `--font-*` của trang đổi thành `--page-font-*` vì bị biến theme v4 đè.
+  - Script so có thêm so transform thực tế, bước `move`, tuỳ chọn `only`/`motion`; mặc định chạy 12 trang.
+  - Trước merge: so toàn bộ 462/464 (`index` 44/44, `app-stage` 72/72; 2 lệch là dao động nét chữ Playfair và hover), chạy lại `account settings` 116/116 exit 0. Sau merge, so lại trên `main` `581addd`: 459/464 trường hợp, exit 1 (`index` 43/44, `app-stage` 57/58, `auth-action` 47/50, chín trang còn lại đạt hết; 9 trường hợp đạt ở lần chạy lại). Cả 5 trường hợp lệch đều là trạng thái chụp giữa chừng một hẹn giờ: `auth-action` "Đang gửi lại" (2 khổ) và đồng hồ đếm ngược, `index` trả focus sau Esc, `app-stage` gợi ý tự chuyển khoảnh khắc. Chạy riêng từng trạng thái đều đạt (2 trong 4 lần cần chạy lại). Chưa có lần so toàn bộ 12 trang nào exit 0.
+  - [CI `v3`](https://github.com/VinhDat267/ATI_Project/actions/runs/37585664606) xanh đúng head `841e674`; cây merge bằng head; [CI main](https://github.com/VinhDat267/ATI_Project/actions/runs/37586153208) xanh đúng merge `581addd`. Claude Code thi công theo yêu cầu người dùng, tự review; người dùng cho merge. Xem [log](log/2026-10-07-claude-code-PROTO-01-step4.md).
 - **PROTO-01 bước 3 xong #95** (`458c5ad`), merge 07/10 lúc 11:18:40 Việt Nam: `account`, `users`, `settings`, `history`, `guide` sang React; lần so toàn bộ thứ tư khớp 348/348 trường hợp của 10 trang, exit 0 (head `b36a99b`). Script so có thêm: ép vẽ lại cả trang trước khi chụp (nguyên nhân lệch 9 pixel ở avatar) và chờ hai khung hình sau mỗi thao tác. [CI `v3`](https://github.com/VinhDat267/ATI_Project/actions/runs/37550955997) xanh đúng head `4dc4a39`; cây merge bằng head; [CI main](https://github.com/VinhDat267/ATI_Project/actions/runs/37570850340) xanh đúng merge `458c5ad`. Claude Code thi công theo yêu cầu người dùng, tự review; người dùng cho merge. Giới hạn: script lúc đó chưa so `transform`, bước 4 bổ sung và so lại cả 12 trang. Xem [log](log/2026-10-07-claude-code-PROTO-01-step3.md).
 - **PROTO-01 bước 2 xong #94** (`852342c`), merge 06/10 lúc 19:43:58 Việt Nam: `errors`, `responses`, `auth-action` khớp bản gốc ở 110/110 trường hợp (lúc mở và 45 trạng thái thao tác). [CI `v3`](https://github.com/VinhDat267/ATI_Project/actions/runs/37464836379) xanh đúng head `27a9421`. Claude Code thi công theo yêu cầu người dùng, tự review; người dùng cho merge. Xem [log](log/2026-10-06-claude-code-PROTO-01-step2.md).
 - **PROTO-01 bước 1 xong #93** (`00e9c5f`), merge 06/10 lúc 18:37:29 Việt Nam.
@@ -229,6 +234,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Màn "kết thúc không thành công" (`stopped`/`rejected`/`failed`) chưa có bản mẫu; các bản mẫu ngoài `app-stage.html` chưa kiểm bằng ảnh ở khổ desktop | `docs/design/prototypes/` | `app-stage.html` đã chụp ở 1440 và 375 (chế độ tối) ngày 06/10 khi so với FE-05; các trang khác đã kiểm ở 375–411px, sáng và tối, không lỗi console. FE-06 làm màn kết thúc theo bố cục khoảnh khắc 6 |
 | P3 cockpit (kiểm tra app thật FE-05, 06/10): đổi khoảnh khắc giữ vị trí cuộn cũ nên tiêu đề mới bị khuất (scrollTop 93px ở 1440 và 375); bấm "Duyệt kế hoạch" xong focus rơi về `body` | `apps/chat-web` cockpit | Chuyển vào phạm vi [FE-05b](tasks/FE-05b-cockpit-visual-parity.md) (trước đó ở FE-06). Góp ý nhỏ cùng đợt: thời lượng "0.005s"/"0.0 giây" chưa theo định dạng Việt; phần đầu trang chiếm gần nửa màn hình ở 375px; ngăn hội thoại không có dòng cho kế hoạch/biên nhận |
 | Cockpit FE-05 khác bản mẫu về hình thức (so ngày 06/10 ở 1440 và 375, chế độ tối): phần đầu trang 250px so với 94px ở 1440px; khoảnh khắc 4 thiếu thẻ từng việc và thanh hành động dính đáy; biên nhận khoảnh khắc 6 là danh sách trường thô | `apps/chat-web` cockpit | Sửa ở [FE-05b](tasks/FE-05b-cockpit-visual-parity.md), trước FE-06 |
+| Design system của bản mẫu không đạt một số yêu cầu trợ năng: chữ 10–12px, chữ nhỏ màu xám dưới 4,5:1, nút thanh trên 32px | app, sau FE-04b → FE-10 | Người dùng chấp nhận ngày 07/10 khi chốt đưa thẳng bản React vào app; FE-10 đo và ghi lại, chữ thường dưới 3:1 báo người dùng quyết định. Báo cáo môn học nên ghi giới hạn này |
+| Một số trạng thái của script so bản React với bản mẫu chụp giữa chừng một hẹn giờ, nên lệch khi máy chạy chậm: `auth-action` "Đang gửi lại" (700 ms) và đồng hồ đếm ngược, `index` trả focus sau Esc, `app-stage` gợi ý tự chuyển khoảnh khắc | `docs/design/prototypes/react/scripts/parity-states.mjs` | Không phải trang khác bản mẫu: ở các lần so khác chúng đạt, chạy riêng đạt. Lần so trên `main` `581addd` ngày 07/10: 459/464, cả 5 lệch thuộc loại này, chạy riêng đều đạt. Nên đổi sang chờ theo điều kiện; ưu tiên thấp vì bản React đã khớp |
 
 ## 6. Môi trường chạy
 
@@ -260,7 +267,12 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - chữ thường Be Vietnam Pro, tiêu đề Playfair Display, mã/ID JetBrains Mono;
   - cỡ chữ tối thiểu 14px áp dụng khi làm app; bản mẫu giữ nguyên, không sửa theo app.
 
-- **Chốt 06/10/2026:** bản mẫu là chuẩn về hình thức. App phải giống bản mẫu, chỉ khác ở các điểm trong đặc tả giao diện mục 1.1 (công cụ demo, dữ liệu thật, quy tắc trung thực, chữ ≥ 14px và tiêu đề ≤ 40px, token màu, trợ năng, gợi ý theo dịch vụ đã thiết lập, một ô nhập). Cách làm: chuyển markup bản mẫu sang JSX, đổi màu sang token và class Tailwind v3 sang v4, nối dữ liệu thật (đặc tả mục 1.2). Mỗi task FE có tiêu chí ảnh đặt cạnh bản mẫu ở 1440 và 375, sáng và tối.
+- **Chốt 06/10/2026:** bản mẫu là chuẩn về hình thức. App phải giống bản mẫu, chỉ khác ở các điểm trong đặc tả giao diện mục 1.1 (công cụ demo, dữ liệu thật, quy tắc trung thực, chữ ≥ 14px và tiêu đề ≤ 40px, token màu, trợ năng, gợi ý theo dịch vụ đã thiết lập, một ô nhập). Cách làm: chuyển markup bản mẫu sang JSX, đổi màu sang token và class Tailwind v3 sang v4, nối dữ liệu thật (đặc tả mục 1.2). Mỗi task FE có tiêu chí ảnh đặt cạnh bản mẫu ở 1440 và 375, sáng và tối. (Cách làm thay bằng bản 07/10 dưới đây.)
+
+- **Chốt 07/10/2026:** đưa thẳng bản React của bản mẫu (`docs/design/prototypes/react/`, PROTO-01) vào app. App dùng **design system của bản mẫu** thay token Agentic: chữ 10–12px, tiêu đề 42–52px, màu và nền `#F8F8F6`, chế độ tối theo `theme.css` của bản mẫu.
+  - Không còn hiệu lực cho app: chữ tối thiểu 14px, thang chữ 14–40, nền `#F6F6F1`, token màu Agentic (chốt 05/10), và cách làm "chuyển markup HTML sang JSX, đổi token, nâng chữ" (chốt 06/10). Giữ: cam `#FF5701`, ba font, chữ trắng trên nút cam (trùng với bản mẫu).
+  - Trợ năng làm đổi hình thức (chữ ≥ 14px, vùng chạm 40×40, tương phản 4,5:1 cho chữ nhỏ màu xám) chỉ đo và ghi lại ở FE-10; trợ năng không đổi hình thức (aria, landmark, một `h1`, focus) vẫn bắt buộc.
+  - Cách làm: đặc tả giao diện mục 1, 1.1, 1.2 bản 07/10; [FE-04b](tasks/FE-04b-prototype-foundation.md) đưa lớp nền vào trước, FE-05b → FE-10 chép trang của bản React rồi nối dữ liệu thật.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.

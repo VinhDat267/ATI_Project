@@ -1,6 +1,6 @@
 # FE-08 · Trang giới thiệu và các màn đăng nhập, đăng ký, xác minh, đặt lại
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-08-landing-auth` · **Phụ thuộc:** FE-04 đã merge · **Mốc:** 23/10/2026
+**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-08-landing-auth` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) · **Mốc:** 23/10/2026
 **Đặc tả:** mục 2, 4, 6 · **Bản mẫu:** `index.html` (trang giới thiệu, modal đăng nhập/đăng ký/quên mật khẩu/Google), `auth-action.html`
 
 ## Vì sao quan trọng
@@ -8,6 +8,8 @@
 Đây là màn đầu tiên người mới thấy. Bản mẫu đã sửa qua nhiều vòng để nói đúng quy trình thật (xác minh email → quản trị viên duyệt → nhận email), đúng quy tắc mật khẩu và đúng luồng Google.
 
 ## Việc cần làm
+
+**Cách làm (đổi 07/10/2026, đặc tả mục 1.2):** chép `Landing/LandingPage.tsx` (route `/` khi chưa đăng nhập; hộp đăng nhập/đăng ký/quên mật khẩu dùng cho các route `/login`, `/signup`, `/forgot-password`) và `AuthAction/AuthActionPage.tsx` từ `docs/design/prototypes/react/src/pages/` sang app sau khi FE-04b đã merge; giữ nguyên markup, class, cỡ chữ và màu của bản mẫu; bỏ JS demo, nối store/API; giữ các bảo đảm hành vi đang có. Ảnh "giống bản mẫu" so với trang tương ứng của bản React (`npm run dev` trong `docs/design/prototypes/react/`). Các mục dưới đây là phần dữ liệu và hành vi phải đúng.
 
 1. **`/` khi chưa đăng nhập:** trang giới thiệu cuộn kể chuyện 5 khoảnh khắc (sân khấu dính bên phải trên desktop, thẻ xếp dọc trên điện thoại và khi `prefers-reduced-motion`), phần nguyên tắc, 8 dịch vụ, hướng dẫn bắt đầu. Số liệu mẫu khớp cockpit (issue #42, dòng 104); không có số liệu chưa đo.
 2. **`/login`, `/signup`, `/forgot-password`:** giữ route (link trong email và nút trên trang giới thiệu trỏ tới đây), trình bày như thẻ modal của bản mẫu:
@@ -30,7 +32,7 @@
 - [ ] Test: màn chờ duyệt không chứa email/tên quản trị viên.
 - [ ] Các test AUTH-02, AUTH-04, AUTH-05 (unit và browser) vẫn xanh; browser spec cập nhật cách tìm phần tử trong cùng PR.
 - [ ] Browser: trang giới thiệu ở 1440px và 375px, sáng và tối, không cuộn ngang; với `prefers-reduced-motion` không có sân khấu dính.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `index.html` (từng đoạn cuộn và các modal đăng nhập/đăng ký/quên mật khẩu) và `auth-action.html` (từng trạng thái) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app và ảnh bản React của `index.html` (từng đoạn cuộn và các modal đăng nhập/đăng ký/quên mật khẩu) và `auth-action.html` (từng trạng thái) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi

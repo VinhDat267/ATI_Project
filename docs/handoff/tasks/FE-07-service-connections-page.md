@@ -1,6 +1,6 @@
 # FE-07 · Trang Kết nối dịch vụ
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-07-service-connections` · **Phụ thuộc:** FE-04 đã merge; UI-API-01 phần 2 để lưu riêng nơi được dùng · **Mốc:** 20/10/2026
+**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-07-service-connections` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge); UI-API-01 phần 2 để lưu riêng nơi được dùng · **Mốc:** 20/10/2026
 **Đặc tả:** mục 3, 6, 9 · **Bản mẫu:** `settings.html`
 
 ## Vì sao quan trọng
@@ -13,6 +13,8 @@
 - Lưu bắt buộc gửi đủ khoá (`hasValidCredentials`), chỉ quản trị viên (`isAdmin`); kiểm tra kết nối ai cũng gọi được; kết quả kiểm tra lưu trong bộ nhớ tiến trình.
 
 ## Việc cần làm
+
+**Cách làm (đổi 07/10/2026, đặc tả mục 1.2):** chép `Settings/SettingsPage.tsx` từ `docs/design/prototypes/react/src/pages/` sang app sau khi FE-04b đã merge; giữ nguyên markup, class, cỡ chữ và màu của bản mẫu; bỏ JS demo, nối store/API; giữ các bảo đảm hành vi đang có. Ảnh "giống bản mẫu" so với trang tương ứng của bản React (`npm run dev` trong `docs/design/prototypes/react/`). Các mục dưới đây là phần dữ liệu và hành vi phải đúng.
 
 1. Trang `/settings` thay `SettingsModal`:
    - tóm tắt "x / 8 dịch vụ đã thiết lập · y kết nối tốt";
@@ -37,8 +39,8 @@
 - [ ] Test: `#notion` mở đúng ngăn; Esc đóng và trả focus về hàng Notion kể cả khi danh sách vừa vẽ lại.
 - [ ] Test W3-00b (giữ draft khi phản hồi lưu đến muộn) chuyển sang trang mới và vẫn xanh.
 - [ ] Không còn các chữ "Allowed Scope", "Write Safety", "Least Privilege", "AES" trên giao diện.
-- [ ] Browser: quản trị viên lưu và kiểm tra một dịch vụ sandbox; không cuộn ngang ở 375px; chế độ tối đạt tương phản.
-- [ ] **Giống bản mẫu** (đặc tả mục 1 và 1.1; làm bằng cách chuyển markup bản mẫu sang JSX theo mục 1.2): ảnh app và ảnh `settings.html` (danh sách, ngăn từng dịch vụ, vai trò quản trị viên và thành viên) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [ ] Browser: quản trị viên lưu và kiểm tra một dịch vụ sandbox; không cuộn ngang ở 375px; chế độ tối giống bản React.
+- [ ] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app và ảnh bản React của `settings.html` (danh sách, ngăn từng dịch vụ, vai trò quản trị viên và thành viên) đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi
