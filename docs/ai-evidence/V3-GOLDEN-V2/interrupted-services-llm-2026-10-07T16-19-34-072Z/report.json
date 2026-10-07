@@ -1,0 +1,4699 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "services",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases-services.json",
+    "commit": "795229e24c64a38902e7efdce0680c729f37348a",
+    "sha256": "6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372",
+    "version": 1,
+    "cases": 44,
+    "selectedCases": 44
+  },
+  "sourceCommit": "845701cc153055b395170d871f08f349215320d2",
+  "sourceTrees": {
+    "packages/planner": "9dd8437ec04b607f3be044498a80b12ca6f3a8a8",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 35,
+  "plannedCaseRuns": 132,
+  "concurrency": 2,
+  "runAt": "2026-10-07T16:23:42.320Z",
+  "stopped": true,
+  "pendingIds": [
+    "ji04",
+    "ji05",
+    "ji06",
+    "ji07",
+    "ji08",
+    "wf01",
+    "wf02",
+    "wf03",
+    "wf04"
+  ],
+  "stopReason": "Evaluation stopped after provider failure",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only requests are labelled as immediate clarification with no searches under the 05/10 product policy.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "sheets": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "jira": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": true
+    },
+    "calendar": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "notion": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "telegram": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "github": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "trello": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.9142857142857143,
+        "toolSelectionAccuracy": 0.9047619047619048,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 0.8873239436619719,
+        "strictPassRate": 0.9142857142857143
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.9142857142857143,
+      "toolSelectionAccuracy": 0.9047619047619048,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 0.8873239436619719,
+      "strictPassRate": 0.9142857142857143
+    },
+    "byCategory": {
+      "read_only": {
+        "cases": 6,
+        "strictPassRate": 1
+      },
+      "single_step": {
+        "cases": 16,
+        "strictPassRate": 0.9375
+      },
+      "cross_service": {
+        "cases": 5,
+        "strictPassRate": 0.8
+      },
+      "clarification": {
+        "cases": 4,
+        "strictPassRate": 0.75
+      },
+      "refusal": {
+        "cases": 4,
+        "strictPassRate": 1
+      }
+    },
+    "byService": {
+      "sheets": {
+        "cases": 8,
+        "attempts": 8,
+        "scoredAttempts": 4,
+        "argumentAttempts": 4,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 14194,
+          "p95": 24972
+        }
+      },
+      "jira": {
+        "cases": 4,
+        "attempts": 4,
+        "scoredAttempts": 3,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 0.5,
+            "toolSelectionAccuracy": 0.3333333333333333,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 0.2857142857142857,
+            "strictPassRate": 0.5
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.5,
+          "toolSelectionAccuracy": 0.3333333333333333,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 0.2857142857142857,
+          "strictPassRate": 0.5
+        },
+        "latencyMs": {
+          "p50": 9969,
+          "p95": 24972
+        }
+      },
+      "calendar": {
+        "cases": 8,
+        "attempts": 8,
+        "scoredAttempts": 5,
+        "argumentAttempts": 5,
+        "runs": [
+          {
+            "kindAccuracy": 0.875,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.875
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.875,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.875
+        },
+        "latencyMs": {
+          "p50": 14413,
+          "p95": 57340
+        }
+      },
+      "slack": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 15977,
+          "p95": 15977
+        }
+      },
+      "notion": {
+        "cases": 8,
+        "attempts": 8,
+        "scoredAttempts": 5,
+        "argumentAttempts": 5,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 12109,
+          "p95": 17551
+        }
+      },
+      "telegram": {
+        "cases": 9,
+        "attempts": 9,
+        "scoredAttempts": 6,
+        "argumentAttempts": 6,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 10534,
+          "p95": 17188
+        }
+      },
+      "github": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 16264,
+          "p95": 16264
+        }
+      },
+      "trello": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 9969,
+          "p95": 9969
+        }
+      }
+    },
+    "stability": {
+      "sh01": "1/1",
+      "sh02": "1/1",
+      "sh03": "1/1",
+      "sh04": "1/1",
+      "sh05": "1/1",
+      "sh06": "1/1",
+      "sh07": "1/1",
+      "sh08": "1/1",
+      "ca01": "1/1",
+      "ca02": "1/1",
+      "ca03": "1/1",
+      "ca04": "0/1",
+      "ca05": "1/1",
+      "ca06": "1/1",
+      "ca07": "1/1",
+      "ca08": "1/1",
+      "no01": "1/1",
+      "no02": "1/1",
+      "no03": "1/1",
+      "no04": "1/1",
+      "no05": "1/1",
+      "no06": "1/1",
+      "no07": "1/1",
+      "no08": "1/1",
+      "tg01": "1/1",
+      "tg02": "1/1",
+      "tg03": "1/1",
+      "tg04": "1/1",
+      "tg05": "1/1",
+      "tg06": "1/1",
+      "tg07": "1/1",
+      "tg08": "1/1",
+      "ji01": "1/1",
+      "ji02": "0/1",
+      "ji03": "0/1"
+    },
+    "latencyMs": {
+      "p50": 13702,
+      "p95": 24972,
+      "max": 57340
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 59,
+    "attempts": 60,
+    "timeouts": 1,
+    "attemptDistribution": {
+      "1": 58,
+      "2": 1
+    },
+    "retryReasons": {
+      "timeout": 1
+    },
+    "timeMs": {
+      "total": 496395,
+      "model": 496134.8533000001,
+      "prefetch": 15.512600000070961,
+      "search": 3.860400000066875,
+      "other": 240.7736999997869
+    },
+    "timeShare": {
+      "model": 0.999475928041177,
+      "prefetch": 3.1250516222103286e-05,
+      "search": 7.776871241787034e-06,
+      "other": 0.00048504457135907275
+    },
+    "under15Seconds": {
+      "count": 22,
+      "total": 35,
+      "rate": 0.6285714285714286
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "sh01",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 14194,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Request is read-only, asking what write action to perform with the data.",
+            "question": "Bạn muốn làm gì với dữ liệu đọc được từ Tasks!A1:B2? Tôi có thể hỗ trợ ghi hoặc nối dữ liệu (append rows) vào một bảng tính khác.",
+            "options": [
+              "Thêm dữ liệu vào một trang tính khác trong Sheets",
+              "Hủy yêu cầu"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 14131.242600000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.008900000000039654,
+                  "durationMs": 14130.8828,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4578,
+                "completionTokens": 85,
+                "reasoningTokens": 277
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 61.7974999999999
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sh02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 21530,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use sheets.append_rows to append a row to Tasks sheet.",
+            "summary": "Thêm một dòng vào tab Tasks của bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào tab Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Fix footer",
+                      "To Do"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 7445.7083999999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004500000000007276,
+                  "durationMs": 7445.558300000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4442,
+                "completionTokens": 36,
+                "reasoningTokens": 142
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 36.04939999999988
+            },
+            {
+              "durationMs": 14041.814499999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.01450000000113505,
+                  "durationMs": 14041.3901,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5840,
+                "completionTokens": 99,
+                "reasoningTokens": 1138
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 7486.825199999999
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 7482.330599999999,
+              "durationMs": 3.391700000000128
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 7485.945599999999,
+              "durationMs": 0.47620000000097207
+            }
+          ]
+        },
+        {
+          "id": "sh03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 24972,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use jira.create_issue and sheets.append_rows to track the task.",
+            "summary": "Create Jira issue 'Audit forms' in FE and log its URL to Google Sheets.",
+            "steps": [
+              {
+                "id": "create_jira",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue Audit forms",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Audit forms"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "append_sheet",
+                "tool": "sheets.append_rows",
+                "description": "Append row to Tasks sheet",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      {
+                        "$ref": "create_jira.output.url"
+                      },
+                      "Audit forms"
+                    ]
+                  ]
+                },
+                "dependsOn": [
+                  "create_jira"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "FE",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5825.608299999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.005699999999706051,
+                  "durationMs": 5825.397599999998,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6203,
+                "completionTokens": 51,
+                "reasoningTokens": 265
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 23.834499999999025
+            },
+            {
+              "durationMs": 19119.973699999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001799999998183921,
+                  "durationMs": 19119.801600000003,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8176,
+                "completionTokens": 160,
+                "reasoningTokens": 1545
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5851.218499999999
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5849.368800000002,
+              "durationMs": 1.3352999999988242
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5850.713900000001,
+              "durationMs": 0.22430000000167638
+            }
+          ]
+        },
+        {
+          "id": "sh04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 13702,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn thêm dòng \"Kiểm thử\" vào bảng tính và tab nào?",
+            "options": [
+              "Frontend",
+              "Backend"
+            ],
+            "context": "Có hai bảng tính khả dụng: Frontend và Backend. Vui lòng cho biết bảng tính và tên tab cụ thể."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 8494.343,
+              "attempts": [
+                {
+                  "startedAtMs": 0.026499999999941792,
+                  "durationMs": 8494.141,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4735,
+                "completionTokens": 38,
+                "reasoningTokens": 436
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 42.144100000001345
+            },
+            {
+              "durationMs": 5165.1726999999955,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0017000000007101335,
+                  "durationMs": 5165.070099999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4925,
+                "completionTokens": 58,
+                "reasoningTokens": 165
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 8537.197799999998
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 8536.3564,
+              "durationMs": 0.5214999999989232
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 8536.8839,
+              "durationMs": 0.07609999999840511
+            }
+          ]
+        },
+        {
+          "id": "sh05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 7082,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "Deleting spreadsheets is not supported by the available Google Sheets tools.",
+            "reason": "Deleting a Google Sheets spreadsheet is not supported by the available tools.",
+            "suggestion": "You can delete the spreadsheet directly in Google Drive."
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 7065.9245999999985,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0029999999969732016,
+                  "durationMs": 7065.794399999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4395,
+                "completionTokens": 50,
+                "reasoningTokens": 108
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 15.243899999994028
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sh06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 15775,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append rows to Frontend spreadsheet using sheets.append_rows.",
+            "summary": "Thêm một dòng mới gồm \"Review board\" và \"Done\" vào tab Tasks trong bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào tab Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Review board",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 6492.1999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004099999998288695,
+                  "durationMs": 6492.050600000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6139,
+                "completionTokens": 32,
+                "reasoningTokens": 121
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 11.777099999999336
+            },
+            {
+              "durationMs": 9268.853799999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0025000000023283064,
+                  "durationMs": 9268.689599999998,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7354,
+                "completionTokens": 106,
+                "reasoningTokens": 420
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 6505.4956999999995
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 6504.0023,
+              "durationMs": 1.2574000000022352
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 6505.268900000003,
+              "durationMs": 0.09169999999721767
+            }
+          ]
+        },
+        {
+          "id": "sh07",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5673,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn làm gì với dữ liệu đọc được từ vùng Tasks!A1:B2?",
+            "options": [
+              "Thêm các dòng dữ liệu này vào một bảng tính khác hoặc tab khác (sheets.append_rows)"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 5668.3554,
+              "attempts": [
+                {
+                  "startedAtMs": 0.008600000001024455,
+                  "durationMs": 5668.109499999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4524,
+                "completionTokens": 53,
+                "reasoningTokens": 229
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5.049700000003213
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sh08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 15057,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Sử dụng sheets.append_rows để thêm dòng vào tab History.",
+            "summary": "Ghi một dòng nhật ký triển khai vào tab History của bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào tab History",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "History",
+                  "rows": [
+                    [
+                      "Release 1",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5845.286800000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004000000000814907,
+                  "durationMs": 5845.1802000000025,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4397,
+                "completionTokens": 35,
+                "reasoningTokens": 93
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.8496000000013737
+            },
+            {
+              "durationMs": 9209.631699999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0018000000054598786,
+                  "durationMs": 9209.493599999994,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5296,
+                "completionTokens": 104,
+                "reasoningTokens": 591
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5847.006000000001
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5846.144,
+              "durationMs": 0.6122000000032131
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5846.767899999999,
+              "durationMs": 0.118399999999383
+            }
+          ]
+        },
+        {
+          "id": "ca01",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 14413,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "No tools chosen; request is read-only.",
+            "question": "Bạn có muốn thực hiện hành động nào với các sự kiện này không, ví dụ như tạo một sự kiện mới trên Google Calendar?",
+            "options": [
+              "Tạo sự kiện mới trên Google Calendar"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 14407.735900000007,
+              "attempts": [
+                {
+                  "startedAtMs": 0.00420000000303844,
+                  "durationMs": 14407.63429999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5419,
+                "completionTokens": 60,
+                "reasoningTokens": 956
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 4.4632000000056
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "ca02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 14436,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create the Demo event using calendar.create_event on the Team calendar.",
+            "summary": "Tạo sự kiện \"Demo\" vào ngày mai từ 15:00 đến 16:00 trên lịch Team.",
+            "steps": [
+              {
+                "id": "create_event",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Demo trên lịch Team",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Demo",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "Team",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 6320.801200000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.006800000002840534,
+                  "durationMs": 6320.587899999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4710,
+                "completionTokens": 36,
+                "reasoningTokens": 224
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 3.1415000000051805
+            },
+            {
+              "durationMs": 8111.447,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0019000000029336661,
+                  "durationMs": 8111.3591000000015,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5140,
+                "completionTokens": 161,
+                "reasoningTokens": 388
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 6324.820399999997
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 6323.875500000002,
+              "durationMs": 0.554599999988568
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 6324.439599999991,
+              "durationMs": 0.094600000011269
+            }
+          ]
+        },
+        {
+          "id": "ca03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 15977,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event and slack.send_message to create event and post link.",
+            "summary": "Create 'Release review' event in Team calendar and post its URL to Slack #release.",
+            "steps": [
+              {
+                "id": "create_review_event",
+                "tool": "calendar.create_event",
+                "description": "Create Release review calendar event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Release review",
+                  "start": "2026-09-30T10:00:00+07:00",
+                  "end": "2026-09-30T11:00:00+07:00"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_release_channel",
+                "tool": "slack.send_message",
+                "description": "Share event URL to #release",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": {
+                    "$template": "Release review event: ${create_review_event.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_review_event"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "Team",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "release",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5894.378400000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.007400000002235174,
+                  "durationMs": 5894.245899999994,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5122,
+                "completionTokens": 51,
+                "reasoningTokens": 347
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.3496999999915715
+            },
+            {
+              "durationMs": 10079.370900000009,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0031000000017229468,
+                  "durationMs": 10079.266199999998,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5704,
+                "completionTokens": 220,
+                "reasoningTokens": 467
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5896.920199999993
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5895.882700000002,
+              "durationMs": 0.6679999999905704
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5896.554999999993,
+              "durationMs": 0.20720000000437722
+            }
+          ]
+        },
+        {
+          "id": "ca04",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 57340,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "reason": "Google Calendar integration cannot invite attendees or send event invitations.",
+            "suggestion": "You can create the event without inviting attendees, or invite them directly in Google Calendar."
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 57335.01669999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004899999999906868,
+                  "durationMs": 30013.44750000001,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30013.476800000004,
+                  "durationMs": 27321.439700000003,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7043,
+                "completionTokens": 40,
+                "reasoningTokens": 2577
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5.052700000000186
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "ca05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9047,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No available tools support deleting calendar events.",
+            "reason": "Hệ thống hiện không hỗ trợ thao tác xóa sự kiện trên Google Calendar.",
+            "suggestion": "Bạn có thể xóa sự kiện trực tiếp trên giao diện Google Calendar hoặc dùng hệ thống để xem và tạo sự kiện mới."
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 9046.01539999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0044000000052619725,
+                  "durationMs": 9045.9225,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4784,
+                "completionTokens": 64,
+                "reasoningTokens": 325
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.8491000000067288
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "ca06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 14311,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create event using calendar.create_event.",
+            "summary": "Create 'Board review' event in Team calendar on Friday from 2pm to 3pm",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Board review event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Board review",
+                  "start": "2026-10-02T14:00:00+07:00",
+                  "end": "2026-10-02T15:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "Team",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5981.2304,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0062000000034458935,
+                  "durationMs": 5981.093899999993,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6438,
+                "completionTokens": 39,
+                "reasoningTokens": 244
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.069999999992433
+            },
+            {
+              "durationMs": 8327.690400000007,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0026000000070780516,
+                  "durationMs": 8327.540800000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7388,
+                "completionTokens": 143,
+                "reasoningTokens": 407
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5983.349799999996
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5982.270499999999,
+              "durationMs": 0.799299999998766
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5983.077499999999,
+              "durationMs": 0.11740000000281725
+            }
+          ]
+        },
+        {
+          "id": "ca07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 16732,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use calendar.create_event to schedule the event.",
+            "summary": "Tạo sự kiện Release trên lịch Release vào thứ Năm, 01/10/2026 từ 09:00 đến 10:00.",
+            "steps": [
+              {
+                "id": "create_event",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Release trên lịch",
+                "args": {
+                  "calendarId": "release@example.test",
+                  "summary": "Release",
+                  "start": "2026-10-01T09:00:00+07:00",
+                  "end": "2026-10-01T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "Release",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 7244.89409999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.006300000008195639,
+                  "durationMs": 7244.803599999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4720,
+                "completionTokens": 38,
+                "reasoningTokens": 236
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.7651000000041677
+            },
+            {
+              "durationMs": 9485.880000000005,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0011999999987892807,
+                  "durationMs": 9485.7981,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5086,
+                "completionTokens": 168,
+                "reasoningTokens": 334
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 7246.125499999995
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 7245.66829999999,
+              "durationMs": 0.2679000000061933
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 7245.941200000001,
+              "durationMs": 0.09249999999883585
+            }
+          ]
+        },
+        {
+          "id": "ca08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 13176,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create Retro event using calendar.create_event in Team calendar.",
+            "summary": "Schedule Retro on the Team calendar next Monday from 9:00 AM to 10:00 AM.",
+            "steps": [
+              {
+                "id": "create_retro",
+                "tool": "calendar.create_event",
+                "description": "Create Retro event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Retro",
+                  "start": "2026-10-05T09:00:00+07:00",
+                  "end": "2026-10-05T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "Team",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 7176.565300000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0013999999937368557,
+                  "durationMs": 7176.505999999994,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4697,
+                "completionTokens": 38,
+                "reasoningTokens": 224
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.6477000000013504
+            },
+            {
+              "durationMs": 5998.255899999989,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0005999999993946403,
+                  "durationMs": 5998.203899999993,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4940,
+                "completionTokens": 150,
+                "reasoningTokens": 199
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 7177.5478999999905
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 7177.2046999999875,
+              "durationMs": 0.21900000001187436
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 7177.426699999996,
+              "durationMs": 0.04990000001271255
+            }
+          ]
+        },
+        {
+          "id": "no01",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5939,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Request is read-only; asking for intended write action using Notion.",
+            "question": "Bạn muốn làm gì với thông tin trang tìm được? Tôi có thể hỗ trợ tạo trang mới hoặc thêm nội dung vào trang có sẵn trong Notion.",
+            "options": [
+              "Tạo một trang Notion mới tổng hợp kết quả",
+              "Thêm nội dung kết quả vào một trang Notion có sẵn"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 5938.196199999977,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002099999983329326,
+                  "durationMs": 5938.107199999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4693,
+                "completionTokens": 82,
+                "reasoningTokens": 212
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.8580000000074506
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "no02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 11274,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using notion.create_page to create the page.",
+            "summary": "Tạo trang \"Sprint notes\" trong database Frontend trên Notion với nội dung \"Demo completed\".",
+            "steps": [
+              {
+                "id": "create_sprint_notes",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Sprint notes",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Sprint notes",
+                  "content": "Demo completed"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5121.243099999992,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0031000000017229468,
+                  "durationMs": 5121.157600000006,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4598,
+                "completionTokens": 32,
+                "reasoningTokens": 115
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1639000000141095
+            },
+            {
+              "durationMs": 6150.355100000015,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001799999998183921,
+                  "durationMs": 6150.264400000015,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5181,
+                "completionTokens": 130,
+                "reasoningTokens": 215
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5123.412400000001
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5122.382699999987,
+              "durationMs": 0.46520000000600703
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5122.853399999993,
+              "durationMs": 0.4108999999880325
+            }
+          ]
+        },
+        {
+          "id": "no03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 16456,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page and telegram.send_message.",
+            "summary": "Create a page in the Frontend Notion database and share its URL to the frontend Telegram chat.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.create_page",
+                "description": "Create Demo notes Notion page",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Demo notes"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "telegram.send_message",
+                "description": "Send page URL to Telegram chat",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$ref": "step_1.output.url"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 4853.083899999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0039000000106170774,
+                  "durationMs": 4852.988899999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4962,
+                "completionTokens": 51,
+                "reasoningTokens": 140
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.043100000009872
+            },
+            {
+              "durationMs": 11600.841199999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0009999999892897904,
+                  "durationMs": 11600.737599999993,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5931,
+                "completionTokens": 189,
+                "reasoningTokens": 435
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 4854.784500000009
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 4854.1241000000155,
+              "durationMs": 0.4200999999884516
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 4854.54740000001,
+              "durationMs": 0.09719999998924322
+            }
+          ]
+        },
+        {
+          "id": "no04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 15906,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn tạo trang \"Báo cáo\" vào database nào dưới đây?",
+            "options": [
+              "Frontend",
+              "Backend"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 9447.147499999992,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0023999999975785613,
+                  "durationMs": 9447.059600000008,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5020,
+                "completionTokens": 34,
+                "reasoningTokens": 538
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.7418999999936204
+            },
+            {
+              "durationMs": 6457.760699999984,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001400000008288771,
+                  "durationMs": 6457.675599999988,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5377,
+                "completionTokens": 30,
+                "reasoningTokens": 307
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 9448.464000000007
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 9447.897100000002,
+              "durationMs": 0.3956000000180211
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 9448.296200000012,
+              "durationMs": 0.07670000000507571
+            }
+          ]
+        },
+        {
+          "id": "no05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9293,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools available for deleting Notion pages.",
+            "reason": "The platform does not have permissions or tools to delete Notion pages.",
+            "suggestion": "You can delete or trash the page directly in Notion."
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 9292.309399999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001799999998183921,
+                  "durationMs": 9292.25099999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5118,
+                "completionTokens": 47,
+                "reasoningTokens": 645
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.8533999999926891
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "no06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 15954,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page to create the page in Frontend database.",
+            "summary": "Tạo trang 'Board review' trong database Notion Frontend với nội dung 'Review ready'.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Board review",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Board review",
+                  "content": "Review ready"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 6149.1826,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0023999999975785613,
+                  "durationMs": 6149.0466000000015,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6267,
+                "completionTokens": 32,
+                "reasoningTokens": 63
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9743999999773223
+            },
+            {
+              "durationMs": 9802.595700000005,
+              "attempts": [
+                {
+                  "startedAtMs": 0.042400000005727634,
+                  "durationMs": 9802.384900000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7362,
+                "completionTokens": 129,
+                "reasoningTokens": 157
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 6151.338099999994
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 6150.276799999992,
+              "durationMs": 0.8460999999952037
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 6151.128399999987,
+              "durationMs": 0.10130000000935979
+            }
+          ]
+        },
+        {
+          "id": "no07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 17551,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append text to Notion page using notion.append_text.",
+            "summary": "Append \"QA passed\" to the Release notes page in the Frontend database.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.append_text",
+                "description": "Append QA passed to page",
+                "args": {
+                  "pageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  "text": "QA passed"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                }
+              ]
+            },
+            {
+              "tool": "notion.query_database",
+              "args": {
+                "databaseId": "11111111-1111-4111-8111-111111111111",
+                "query": "Release notes",
+                "limit": 10
+              },
+              "result": {
+                "pages": [
+                  {
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "title": "Release notes",
+                    "url": "https://www.notion.so/aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa",
+                    "properties": {
+                      "Name": "Release notes",
+                      "Status": "Draft"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 4469.443299999984,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004799999995157123,
+                  "durationMs": 4469.305400000012,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4558,
+                "completionTokens": 38,
+                "reasoningTokens": 76
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1570000000065193
+            },
+            {
+              "durationMs": 4503.120999999985,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002299999992828816,
+                  "durationMs": 4503.008000000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5049,
+                "completionTokens": 75,
+                "reasoningTokens": 78
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 4471.38870000001
+            },
+            {
+              "durationMs": 8575.583299999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 8575.503100000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5553,
+                "completionTokens": 94,
+                "reasoningTokens": 196
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 8975.224099999992
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 4470.655899999983,
+              "durationMs": 0.48910000000614673
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 4471.149199999985,
+              "durationMs": 0.10200000001350418
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 8974.499899999995,
+              "durationMs": 0.6027999999932945
+            }
+          ]
+        },
+        {
+          "id": "no08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 12109,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a new page using notion.create_page.",
+            "summary": "Tạo trang 'Lịch sử triển khai' trong database Notion Frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Lịch sử triển khai",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Lịch sử triển khai",
+                  "content": "Release 1 complete"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "Frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5684.43180000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 5684.370900000009,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4641,
+                "completionTokens": 34,
+                "reasoningTokens": 154
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.521999999997206
+            },
+            {
+              "durationMs": 6422.990900000004,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0028999999922234565,
+                  "durationMs": 6422.825000000012,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5195,
+                "completionTokens": 130,
+                "reasoningTokens": 223
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5685.566700000025
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5684.9518999999855,
+              "durationMs": 0.42089999999734573
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5685.376699999993,
+              "durationMs": 0.09260000000358559
+            }
+          ]
+        },
+        {
+          "id": "tg01",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6803,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Request is read-only; asking for intended write action using telegram.send_message.",
+            "question": "Bạn muốn thực hiện thao tác gì tiếp theo với danh sách chat? Bạn có muốn gửi tin nhắn vào một chat cụ thể không?",
+            "options": [
+              "Gửi tin nhắn vào chat cụ thể"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 6802.236399999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0013000000035390258,
+                  "durationMs": 6802.170199999993,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4140,
+                "completionTokens": 68,
+                "reasoningTokens": 278
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.7166999999899417
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "tg02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10109,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message via telegram.send_message.",
+            "summary": "[redacted case prompt]",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Send message to chat frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "Build green"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 3971.626199999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 3971.584600000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 3911,
+                "completionTokens": 31,
+                "reasoningTokens": 55
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.43460000000777654
+            },
+            {
+              "durationMs": 6135.809500000003,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0015999999886844307,
+                  "durationMs": 6135.651299999998,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4228,
+                "completionTokens": 88,
+                "reasoningTokens": 95
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 3973.526600000012
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 3972.1241000000155,
+              "durationMs": 0.8702000000048429
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 3973.00450000001,
+              "durationMs": 0.38529999999445863
+            }
+          ]
+        },
+        {
+          "id": "tg03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 16264,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use github.create_issue and telegram.send_message.",
+            "summary": "Tạo issue Fix navbar trong repo acme/web và gửi liên kết tới chat Telegram frontend.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue Fix navbar",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Fix navbar"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "send_telegram",
+                "tool": "telegram.send_message",
+                "description": "Gửi link issue vào Telegram frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5412.841599999985,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999797903001,
+                  "durationMs": 5412.784600000014,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4909,
+                "completionTokens": 36,
+                "reasoningTokens": 187
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.6195000000006985
+            },
+            {
+              "durationMs": 10849.645700000023,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999797903001,
+                  "durationMs": 10849.555300000007,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5723,
+                "completionTokens": 161,
+                "reasoningTokens": 606
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5414.026500000007
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5413.472899999993,
+              "durationMs": 0.3879000000015367
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5413.864399999991,
+              "durationMs": 0.0769000000145752
+            }
+          ]
+        },
+        {
+          "id": "tg04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 17188,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Choosing telegram.send_message pending chat selection.",
+            "question": "Which Telegram chat would you like to send \"Deploy done\" to?",
+            "options": [
+              "frontend",
+              "release"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 9193.089000000007,
+              "attempts": [
+                {
+                  "startedAtMs": 0.03140000000712462,
+                  "durationMs": 9193.008799999981,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4155,
+                "completionTokens": 37,
+                "reasoningTokens": 294
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.4878000000026077
+            },
+            {
+              "durationMs": 7993.34090000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999940395355,
+                  "durationMs": 7993.275400000013,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4618,
+                "completionTokens": 42,
+                "reasoningTokens": 434
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 9193.925400000007
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 9193.567499999976,
+              "durationMs": 0.2021000000240747
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 9193.772099999973,
+              "durationMs": 0.07620000001043081
+            }
+          ]
+        },
+        {
+          "id": "tg05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 7414,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tool available to delete Telegram messages.",
+            "reason": "Hệ thống hiện không hỗ trợ tính năng xóa tin nhắn trên Telegram.",
+            "suggestion": "Bạn chỉ có thể gửi tin nhắn mới hoặc xem danh sách chat qua Telegram."
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 7413.334000000003,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0015999999886844307,
+                  "durationMs": 7413.267800000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4478,
+                "completionTokens": 54,
+                "reasoningTokens": 326
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.6362000000081025
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "tg06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10712,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message to Telegram frontend chat using telegram.send_message.",
+            "summary": "Gửi tin nhắn \"Frontend done\" vào nhóm Telegram frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Gửi tin nhắn vào nhóm frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "Frontend done"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 4962.761999999988,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0022000000171829015,
+                  "durationMs": 4962.690600000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 3933,
+                "completionTokens": 37,
+                "reasoningTokens": 76
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.7100999999966007
+            },
+            {
+              "durationMs": 5748.026099999988,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0011999999987892807,
+                  "durationMs": 5747.955699999991,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4270,
+                "completionTokens": 97,
+                "reasoningTokens": 130
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 4964.138699999981
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 4963.532299999992,
+              "durationMs": 0.38650000002235174
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 4963.9245999999985,
+              "durationMs": 0.10839999999734573
+            }
+          ]
+        },
+        {
+          "id": "tg07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 9500,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send update message to Telegram chat using telegram.send_message.",
+            "summary": "Gửi tin nhắn thông báo cập nhật vào chat Telegram frontend",
+            "steps": [
+              {
+                "id": "send_msg",
+                "tool": "telegram.send_message",
+                "description": "Gửi thông báo vào chat frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "lịch sử triển khai đã cập nhật"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "frontend",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 3886.563999999984,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999797903001,
+                  "durationMs": 3886.523200000025,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 3924,
+                "completionTokens": 37,
+                "reasoningTokens": 61
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.44959999999264255
+            },
+            {
+              "durationMs": 5612.747499999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0004000000189989805,
+                  "durationMs": 5612.6977999999945,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4303,
+                "completionTokens": 102,
+                "reasoningTokens": 157
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 3887.4196999999986
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 3887.0228999999817,
+              "durationMs": 0.27870000002440065
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 3887.303899999999,
+              "durationMs": 0.04709999999613501
+            }
+          ]
+        },
+        {
+          "id": "tg08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 10534,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message using telegram.send_message tool.",
+            "summary": "Gửi tin nhắn \"Release ready\" đến nhóm chat release trên Telegram.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Gửi tin nhắn thông báo",
+                "args": {
+                  "chatId": "-1009876543210",
+                  "text": "Release ready"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "release",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 5755.501099999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0029999999969732016,
+                  "durationMs": 5755.412100000016,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 3959,
+                "completionTokens": 32,
+                "reasoningTokens": 102
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9604000000108499
+            },
+            {
+              "durationMs": 4776.777000000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0005999999993946403,
+                  "durationMs": 4776.717100000009,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4247,
+                "completionTokens": 95,
+                "reasoningTokens": 113
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5756.847299999994
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5756.446399999986,
+              "durationMs": 0.24710000000777654
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5756.696399999986,
+              "durationMs": 0.051900000020395964
+            }
+          ]
+        },
+        {
+          "id": "ji01",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9535,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarify write action for Jira and GitHub tools.",
+            "question": "Workflows require an action to perform. What would you like to do with the Jira issues found?",
+            "options": [
+              "Add a comment to the Jira issues",
+              "Create tracking issues in a GitHub repository"
+            ]
+          },
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 9534.782500000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 9534.719299999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5913,
+                "completionTokens": 60,
+                "reasoningTokens": 753
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.48860000001150183
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "ji02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 10468,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "FE",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                }
+              ]
+            }
+          ],
+          "modelCalls": [
+            {
+              "durationMs": 10310.734499999991,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0028999999922234565,
+                  "durationMs": 10310.630399999995,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5903,
+                "completionTokens": 37,
+                "reasoningTokens": 741
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.4590000000025611
+            },
+            {
+              "durationMs": 155.22529999999097,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0013999999791849405,
+                  "durationMs": 155.01540000000386,
+                  "outcome": "cancelled"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 10312.881900000008
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 10312.2028,
+              "durationMs": 0.4761999999755062
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 10312.683099999995,
+              "durationMs": 0.08280000000377186
+            }
+          ]
+        },
+        {
+          "id": "ji03",
+          "category": "cross_service",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 5
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 9969,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Request failed (details omitted from public evidence)",
+          "providerError": "Request failed (details omitted from public evidence)",
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 9968.127299999993,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0023999999975785613,
+                  "durationMs": 9967.988400000002,
+                  "outcome": "error"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 0.7497999999905005
+            }
+          ],
+          "phases": []
+        }
+      ]
+    }
+  ]
+}

@@ -178,12 +178,20 @@ Local verification: `npm run check` exit 0 (874 v3 + 151 evaluation tests),
 test passed. Browser/live-service runs were not repeated for this evaluation
 change. See the [verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
 
-### W3-10 — instrumentation and read-only policy (measurement pending)
+### W3-10 — instrumentation and immediate read-only clarification
 
-On 07/10, GET `http://localhost:20128/v1/models` failed with `ECONNREFUSED`
-on IPv4 and IPv6. Measurement stopped before any model call. The gateway was
-not started or reconfigured. No complete or partial W3-10 model campaign exists;
-all after-measurement cells below are **NOT_RUN**, not zeros or estimated results.
+The initial GET models failed with `ECONNREFUSED`, so measurement stopped.
+After the user started 9router, fresh GET models returned HTTP 200 with the
+requested model listed. The first campaign stopped after 2/132 case attempts
+because the response model was `gemini-3.8-flash-n`. The user then confirmed this
+exact alias; `845701c` accepts it only for request `ag/gemini-3.8-flash`, preserving
+the raw served name and rejection of other models/suffixes/routes.
+The next services campaign stopped after 35/132 attempts on a provider fault
+at ji03; ji02 was cancelled. After the user confirmed gateway readiness again,
+fresh GET models returned HTTP 200 and all three full campaigns completed at
+source `50761b16ff3f87d7160b533cbc77e387eea3e972`, each with llm/concurrency2/three runs.
+Interrupted samples remain separate and are excluded from the comparison.
+Neither the gateway nor its configuration was changed by this task.
 See [the verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md).
 
 The 05/10 product policy requires immediate clarification for a read-only request,
@@ -191,7 +199,8 @@ without searching first. The prompt asks for suitable write actions among the
 routed services. Directory prefetch now waits for the model's first search request;
 clarification, refusal and grounded plans skip directory I/O. A write request
 with missing resources can consequently need an additional model turn compared
-with eager prefetch; its latency and strict-pass impact remain unmeasured.
+with eager prefetch. The measurements below show the resulting increase in calls
+and latency for write workflows, while strict quality is preserved.
 Validator rejects plans containing no write step before grounding and the planner
 returns a fixed Vietnamese clarification without a repair call. Mixed read/write
 plans retain existing validation: individual read steps are allowed so this change
@@ -215,19 +224,47 @@ scores. For three runs, per-service labelled tool denominators change as follows
 
 | Services group | W3-06 runs | Before p50 / p95 | Before under 15 s | W3-10 p50 / p95 / under 15 s |
 |---|---|---|---|---|
-| read_only | 18 | 25.4 / 53.0 s | 0/18 (0%) | NOT_RUN |
-| single_step | 57 | 4.6 / 20.2 s | 53/57 (93.0%) | NOT_RUN |
-| clarification | 15 | 7.2 / 41.1 s | 13/15 (86.7%) | NOT_RUN |
-| refusal | 15 | 4.6 / 18.1 s | 14/15 (93.3%) | NOT_RUN |
-| cross_service | 27 | 7.7 / 10.9 s | 27/27 (100%) | NOT_RUN |
-| All services | 132 | 6.105 / 31.097 s | 107/132 (81.1%) | NOT_RUN |
+| read_only | 18 | 25.354 / 53.021 s | 0/18 (0%) | 7.447 / 19.104 s / 17/18 (94.4%) |
+| single_step | 57 | 4.608 / 20.188 s | 53/57 (93.0%) | 13.228 / 25.800 s / 36/57 (63.2%) |
+| clarification | 15 | 7.150 / 41.108 s | 13/15 (86.7%) | 13.090 / 18.841 s / 11/15 (73.3%) |
+| refusal | 15 | 4.621 / 18.139 s | 14/15 (93.3%) | 7.491 / 24.034 s / 13/15 (86.7%) |
+| cross_service | 27 | 7.653 / 10.921 s | 27/27 (100%) | 21.452 / 33.204 s / 2/27 (7.4%) |
+| All services | 132 | 6.105 / 31.097 s | 107/132 (81.1%) | 13.090 / 27.042 s / 79/132 (59.8%) |
 
-Core parity baseline remains 150/150; freeform remains 51/54. W3-10 parity,
-18/18 immediate read-only responses and services p95 <15 s are **not verified**.
+| Set | Strict before → after | p50 / p95 before → after (s) | Under 15 s before → after | Model calls before → after |
+|---|---|---|---|---|
+| core | 150/150 → 150/150 | 5.454 / 13.105 → 15.067 / 25.285 | 144/150 (96.0%) → 73/150 (48.7%) | 171 → 258 |
+| freeform | 51/54 → 52/54 | 5.942 / 13.092 → 15.804 / 26.668 | 52/54 (96.3%) → 21/54 (38.9%) | 63 → 111 |
+| services | 111/132 → 129/132 | 6.105 / 31.097 → 13.090 / 27.042 | 107/132 (81.1%) → 79/132 (59.8%) | 172 → 225 |
+
+Full evidence: [core](../docs/ai-evidence/V3-GOLDEN-V2/core-llm-2026-10-07T16-34-09-538Z/summary.md),
+[freeform](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-10-07T16-53-33-903Z/summary.md),
+[services](../docs/ai-evidence/V3-GOLDEN-V2/services-llm-2026-10-07T17-01-10-381Z/summary.md),
+[all group tables and per-case failures](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON.md).
+Core/freeform strict quality does not decrease; no case in any set loses strict
+passes. ff15 remains the sole freeform failure in runs1/2 and passes run3.
+ca04 remains refusal instead of clarification in all three runs, as in W3-06:
+the model refuses unsupported Calendar attendee invitations. Its labels stay
+unchanged. The services gain is exactly the 18 immediate read-only clarifications
+under the new policy, with one call, one attempt, zero search/prefetch in each.
+The services p95 target **is not attained**: 27.042 s exceeds 15 s. Write-workflow
+latency and the overall under-15 fraction worsen despite the read-only improvement.
+This measurement includes the main changes after W3-06 requested by this task:
+fixtures and core/freeform labels match W3-06; the catalog remains 33 tools but
+its fingerprint includes earlier W3-08 bounded-output descriptions/schemas.
+W3-10 does not change the catalog; this is a temporal comparison, not an isolated
+causal estimate of the prompt or gateway.
+
+Interrupted samples: [alias guard, 2/132](../docs/ai-evidence/V3-GOLDEN-V2/interrupted-services-llm-2026-10-07T16-02-38-022Z/CONTEXT.md)
+and [provider fault, 35/132](../docs/ai-evidence/V3-GOLDEN-V2/interrupted-services-llm-2026-10-07T16-19-34-072Z/CONTEXT.md).
+The latter is source `845701c`, llm/concurrency2, 32/35 strict with no full run,
+59 calls / 60 attempts / one timeout. Both samples retain the fault and sibling
+cancellation. Their metrics and stop reasons are documented in their contexts;
+they are excluded from the completed-campaign tables above.
 
 `report.json` now includes each `modelCalls` entry's start offset from the turn,
 duration including retries/backoff, final served model, nullable prompt/completion/
-reasoning tokens, and each actual transport attempt's start offset from the call,
+reasoning tokens, and each actual transport attempt's start offset from the transport retry loop,
 duration, outcome, HTTP status and retry reason. OpenAI-compatible provider exposes
 these through `lastCallMetrics`; `generatePlan` still returns `Promise<string>`.
 Providers without this optional side channel have an empty attempts list and null
@@ -237,21 +274,53 @@ has its own phase. Summary records attempts-per-call distribution, retry reasons
 timeouts and the shares of model, directory, search and remaining turn time.
 No prompt, API key or header is stored in diagnostics; public errors are classified
 instead of copying potentially sensitive provider error bodies.
+`50761b1` also redacts full case prompts echoed inside response strings only in
+the public copy after scoring. It does not change model output or scores. The
+35-case public report redacts only tg02 `response.summary`; its context records
+both hashes and verifies every other field is unchanged.
+The complete freeform report conservatively masks two ff04 response strings
+matching the short core cl07 prompt, which was not its input; its
+[public-redaction audit](../docs/ai-evidence/V3-GOLDEN-V2/freeform-llm-2026-10-07T16-53-33-903Z/PUBLIC-REDACTIONS.md)
+records both hashes and unchanged fields. Re-scoring all 380 published case-runs
+(three full campaigns plus concurrency1) reproduces every stored score.
 
-| Time component | Before (W3-06) | After (W3-10) |
+| Time component | Before (W3-06) | After (W3-10 services, full 132) |
 |---|---|---|
-| Model / retries / timeout | Call count only; individual attempt duration and tokens absent | NOT_RUN; instrumentation tested offline |
-| Directory / search rounds | Not recorded separately | NOT_RUN; phase timing tested offline |
-| Remaining time / under 15 s | Whole-turn latency available | NOT_RUN |
+| Model / retries / timeout | 172 calls; individual attempt duration and tokens absent | 225 calls / 228 attempts / 3 timeouts; model 1982514.173 ms (99.9732%) |
+| Directory / search rounds | Not recorded separately | Directory 56.763 ms (0.0029%); search 12.450 ms (0.0006%) |
+| Remaining time / under 15 s | Whole-turn latency available; 107/132 (81.1%) under 15 s | Other 461.614 ms (0.0233%); 79/132 (59.8%) under 15 s |
+
+Attempts per call: core {1:255, 2:3}, freeform {1:111}, services {1:222, 2:3}.
+Retry reasons: three timeouts in core, zero in freeform, three in services;
+no observed HTTP transient retry. Model time shares are respectively 99.9784%,
+99.9683%, 99.9732%. Phase times use fixtures and cannot establish production
+adapter I/O latency. Values sum individual turn durations, not concurrent campaign
+wall time. The full services tail contains ji03 run2 (58.253 s), ji07 run1
+(58.180 s) and ca02 run2 (46.920 s), each with a 30 s timeout then success;
+ji07's retry still takes 23.013 s with 2563 reasoning tokens. Other slow turns
+have two calls without retry, such as wf02 run1 (33.204 s, final call 2155
+reasoning tokens). Read-only calls decrease 54→18, but single-step calls increase
+60→111 and cross-service 27→54 after deferred directory prefetch. Observed
+latency includes network/gateway queueing and reasoning; client timing cannot
+separate them, and gateway metadata did not identify attributable 429/account
+switches. The one-call refusal group also slows with unchanged call count,
+so the whole before/after difference cannot be assigned to extra search turns.
 
 Resume only after a successful fresh GET `/v1/models`, using the user's original
 `.env` through `node --env-file`, never copying it. Run core 50, freeform 18 and
 services 44, each three times with `PLANNER_SEARCH_MODE=llm`, `EVAL_CONCURRENCY=2`,
 `LLM_PROVIDER=openai-compatible`, `LLM_MODEL=ag/gemini-3.8-flash` and
 `LLM_BASE_URL=http://localhost:20128/v1`. Keep interrupted campaigns separately.
-Optional services concurrency-one run can examine gateway contention. Transport
-deadline/retry settings remain unchanged pending measured evidence; no tail-latency
-cause or improvement is claimed. Earlier request hedging and thinking variants
+The optional [services concurrency-one campaign](../docs/ai-evidence/V3-GOLDEN-V2/services-llm-2026-10-07T17-18-22-282Z/summary.md)
+completed 43/44 strict at the same source: p50/p95 13.312/29.845 s,
+29/44 under15s (65.9%), 75 calls/76 attempts/one timeout. Its p95 does not
+improve on concurrency2's 27.042 s. It is one run at a later time versus three
+runs, so it cannot establish a causal contention/account-switch effect.
+Keep concurrency2 and the existing transport deadline/retry settings: successful
+retries vary from 5.669 s (core cs02 run3) to 23.013 s (services ji07 run1),
+while non-timeout multi-call workflows already exceed 15 s. A shorter deadline
+does not address their call count and has no tested quality benefit here.
+Earlier request hedging and thinking variants
 showed no reliable benefit (see Planning latency); they are not reintroduced.
 
 ### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
