@@ -8,3 +8,6 @@
 @import "tailwindcss/preflight.css";
 @import "./v3-base.css";
 @import "tailwindcss/utilities.css";
+@import "./v3-theme-targets.css";
+/* Các class theme.css ghi đè theo tên: v4 không sinh utility riêng, v3-theme-targets.css đảm nhận. */
+@source not inline("bg-gradient-to-t bg-gradient-to-r bg-gradient-to-br from-[#F8F8F6] from-amber-50/80 from-white via-[#F8F8F6]/95 via-white to-amber-50/40 to-transparent divide-neutral-200 divide-[#E7E7E2]");

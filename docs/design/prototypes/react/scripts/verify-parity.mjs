@@ -24,7 +24,7 @@ const THEMES = ['light', 'dark'];
 const args = process.argv.slice(2);
 const onlyState = args.find(a => a.startsWith('--state='))?.slice('--state='.length);
 const named = args.filter(a => !a.startsWith('--'));
-const pages = named.length ? named : ['404', 'privacy', 'errors', 'responses', 'auth-action'];
+const pages = named.length ? named : ['404', 'privacy', 'errors', 'responses', 'auth-action', 'account', 'users', 'settings', 'history', 'guide'];
 
 function serveStatic(root, port) {
   const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript' };
@@ -86,6 +86,16 @@ function snapshotInPage() {
       v = layers.length ? layers.join(', ') : 'none';
     }
     if (prop === 'fontFamily') v = v.replace(/'/g, '"');
+    // Gradient: v3 để mặc định vị trí điểm màu, v4 ghi rõ 0% / 50% / 100%; hai cách vẽ như nhau.
+    if (prop === 'backgroundImage') {
+      v = v.replace(/linear-gradient\(((?:[^()]|\([^()]*\))*)\)/g, (_, inner) => {
+        const args = splitTop(inner);
+        const lead = /^(to |-?[\d.]+(deg|rad|turn))/.test(args[0]) ? [args.shift()] : [];
+        const defaults = args.length === 3 ? ['0%', '50%', '100%'] : args.length === 2 ? ['0%', '100%'] : [];
+        const stops = args.map((stop, i) => (defaults[i] && stop.endsWith(' ' + defaults[i]) ? stop.slice(0, -defaults[i].length - 1) : stop));
+        return `linear-gradient(${[...lead, ...stops].join(', ')})`;
+      });
+    }
     // rounded-full: v3 là 9999px, v4 là calc(infinity * 1px); hiển thị như nhau.
     if (/Radius$/.test(prop) && parseFloat(v) >= 9999) v = 'full';
     return v;
@@ -101,9 +111,9 @@ function snapshotInPage() {
     items.push({
       tag: el.tagName.toLowerCase(),
       id: el.id || '',
-      // Bản React đổi space-*/divide-* sang v3-* (xem v3-compat.css); quy về tên gốc để so.
+      // Bản React đổi space-*/divide-y/outline-none sang v3-* (xem v3-compat.css) và dùng hậu tố ! khi cần; quy về tên gốc để so.
       cls: (el.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)
-        .map(c => c.replace(/(^|:)v3-divide-color-/, '$1divide-').replace(/(^|:)v3-/, '$1').replace(/!$/, '')).sort().join(' '),
+        .map(c => c.replace(/(^|:)v3-/, '$1').replace(/!$/, '')).sort().join(' '),
       text: [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').replace(/\s+/g, ' ').trim(),
       rect: [r.x + scrollX, r.y + scrollY, r.width, r.height].map(n => Math.round(n * 2) / 2),
       style,
@@ -195,13 +205,27 @@ async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(400);
   for (const [action, selector, value] of steps) {
-    if (action === 'click') await page.click(selector, { timeout: 5000 });
+    if (action === 'click') await page.click(selector, { timeout: 5000, ...(value ?? {}) });
     else if (action === 'fill') await page.fill(selector, value, { timeout: 5000 });
     else if (action === 'press') await page.press(selector, value, { timeout: 5000 });
+    else if (action === 'select') await page.selectOption(selector, value, { timeout: 5000 });
+    // Cuộn phần tử vào giữa màn hình trước khi bấm, để vị trí cuộn không phụ thuộc cách Playwright tự cuộn (có thể khác nhau giữa các lần thử).
+    else if (action === 'scroll') await page.locator(selector).evaluate(el => el.scrollIntoView({ block: 'center', inline: 'center' }));
     else if (action === 'wait') await page.waitForTimeout(Number(selector));
     else throw new Error(`Bước không hỗ trợ: ${action}`);
+    // Chờ hai khung hình để trang ổn định trước bước sau. Thiếu bước này, bấm ngay sau khi cuộn thì Playwright đôi khi
+    // tự cuộn thêm và vị trí cuộn cuối khác nhau giữa các lần (users-xac-nhan-khoa: 583 hay 189, ở cả hai bản).
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   }
   if (steps.length) await page.waitForTimeout(300);
+  // Thao tác có thể làm hiện chữ ở độ đậm/bảng mã chưa tải; chờ font xong rồi mới chụp.
+  await page.evaluate(() => document.fonts.ready);
+  // Ép vẽ lại cả trang trước khi chụp, cho cả hai bản. Bản React dựng trang bằng JS sau lần vẽ đầu, Chromium giữ lại
+  // mảnh header đã vẽ ở lượt trước nên mép avatar tròn lệch vài mức màu dù DOM và style giống hệt. Ảnh cả trang của trang
+  // cao hơn khung nhìn đã tự vẽ lại (Playwright giãn khung để chụp); trang vừa khít khung nhìn thì không, nên lệch chỉ lộ ở đó.
+  await page.setViewportSize({ width: viewport.width + 1, height: viewport.height });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.setViewportSize(viewport);
   // Chờ hai khung hình để layout ổn định trước khi đọc style (tránh đọc margin auto giữa chừng).
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const items = await page.evaluate(snapshotInPage);
@@ -236,11 +260,13 @@ fs.mkdirSync(outDir, { recursive: true });
 const staticServer = await serveStatic(prototypesDir, ORIGINAL_PORT);
 const vite = await createServer({ root: reactDir, configFile: path.join(reactDir, 'vite.config.ts'), logLevel: 'error', server: { port: REACT_PORT, strictPort: true, host: '127.0.0.1' } });
 await vite.listen();
-browser = await chromium.launch();
 const report = [];
 let failed = false;
 try {
   for (const pageId of pages) {
+    // Mỗi trang dùng một tiến trình Chromium mới: sau vài trăm context trong cùng tiến trình, nét chữ và mép hình tròn
+    // đôi khi vẽ lệch lẻ pixel và lặp lại ở cả lần chạy lại, dù chạy riêng trang đó thì đạt.
+    browser = await chromium.launch();
     const cases = [
       ...VIEWPORTS.flatMap(viewport => THEMES.map(theme => ({ state: null, steps: [], query: '', viewport, theme }))),
       ...(STATES[pageId] ?? []).flatMap(({ name: state, steps, query = '' }) => [
@@ -257,7 +283,17 @@ try {
       for (let attempt = 0; attempt < 2; attempt++) {
         result = await runCase(pageId, { steps, query, viewport, theme }, name);
         if (result.ok) break;
-        if (attempt === 0) firstAttempt = result.record;
+        if (attempt === 0) {
+          // Lần chạy lại dùng tiến trình Chromium mới, để dao động của tiến trình cũ không lặp lại.
+          await browser.close();
+          browser = await chromium.launch();
+          firstAttempt = result.record;
+          // Giữ ảnh của lần lệch đầu (lần chạy lại ghi đè tên gốc) để xem dao động nằm ở đâu.
+          for (const kind of ['original', 'react', 'diff']) {
+            const file = path.join(outDir, `${name}-${kind}.png`);
+            if (fs.existsSync(file)) fs.copyFileSync(file, path.join(outDir, `${name}-first-${kind}.png`));
+          }
+        }
       }
       const { ok, record, attempts } = { ...result, attempts: result.attempt + 1 };
       if (!ok) failed = true;
@@ -268,10 +304,12 @@ try {
       console.log(`${ok ? 'ĐẠT ' : 'LỆCH'} ${name.padEnd(40)} phần tử ${elements[0]}/${elements[1]}  khác ${diffs}  pixel ${pixels.diffPixels} (${(pixels.ratio * 100).toFixed(3)}%) ảnh ${pixels.size}${reactErrors.length ? `  lỗi console React: ${reactErrors.length}` : ''}${attempts > 1 ? '  (chạy lại 1 lần)' : ''}`);
       for (const d of record.firstDiffs.slice(0, 8)) console.log(`     [${d.index}] ${d.kind} ${d.element ?? ''} gốc=${d.original} react=${d.react}`);
     }
+    await browser.close();
+    browser = undefined;
   }
 } finally {
   fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
-  await browser.close();
+  await browser?.close();
   await vite.close();
   staticServer.close();
 }

@@ -1,0 +1,45 @@
+/* <style> của account.html, giữ nguyên thứ tự. */
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --muted: #6B7280;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --success: #16A34A;
+      --warn: #D97706;
+      --danger: #DC2626;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: #F8F8F6;
+      color: #111827;
+      font-family: 'Be Vietnam Pro', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Focus Visible Ring */
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #FF5701;
+      outline-offset: 2px;
+    }
+
+    /* Tối ưu màn hình hẹp dưới 420px */
+    @media (max-width: 419px) {
+      #role-pill-badge {
+        display: none !important;
+      }
+    }
+
+    /* prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
