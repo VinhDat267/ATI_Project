@@ -33,14 +33,15 @@ for (const scenario of scenarios) {
   let stopFixture;
   try {
     if (scenario.name === 'auth04') {
-      const fixture = await startGoogleFixture();
+      const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/auth/google/callback`;
+      const fixture = await startGoogleFixture({ redirectUri });
       stopFixture = fixture.stop;
       Object.assign(env, {
         // Expired-token probes and the API must use the same per-run signing key.
         JWT_SECRET: env.JWT_SECRET || randomBytes(32).toString('hex'),
         AUTH_SIGNUP_ENABLED: 'true', GOOGLE_OAUTH_CLIENT_ID: 'auth04-test.apps.googleusercontent.com',
         GOOGLE_OAUTH_CLIENT_SECRET: 'fake-oidc-secret',
-        GOOGLE_OAUTH_REDIRECT_URI: 'http://127.0.0.1:5174/auth/google/callback',
+        GOOGLE_OAUTH_REDIRECT_URI: redirectUri,
         GOOGLE_OAUTH_AUTH_URL: `${fixture.origin}/authorize`,
         GOOGLE_OAUTH_TOKEN_URL: `${fixture.origin}/token`,
         GOOGLE_OAUTH_JWKS_URL: `${fixture.origin}/jwks`,

@@ -22,6 +22,7 @@ const plan = { id:'p1',summary:'Tạo issue và gửi báo cáo',resourceLabels:
 function renderCockpit() { return render(<Cockpit services={[{id:'github',name:'GitHub',configured:true,connected:false,connectionStatus:'unchecked'},{id:'slack',name:'Slack',configured:false,connected:false,connectionStatus:'unconfigured'}]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />); }
 it.each(['idle','preview','approving','executing','completed','stopped','rejected','failed'] as const)('one draft survives conversation drawer at %s', status => {
   useChatStore.setState({activePlan:plan,planStatus:status}); renderCockpit();
+  if(status==='preview') fireEvent.click(screen.getByRole('button',{name:'Sửa qua Chat'}));
   fireEvent.change(screen.getByRole('textbox'), {target:{value:'Draft stays'}});
   const opener=screen.getByRole('button',{name:'Xem hội thoại'}); opener.focus(); fireEvent.click(opener);
   const dialog=screen.getByRole('dialog',{name:'Nhật ký hội thoại'});
@@ -66,9 +67,10 @@ it('preview contains actual intended text and grounded destination without inven
   fireEvent.click(screen.getByRole('button',{name:'Xem trước'}));
   const dialog=screen.getByRole('dialog',{name:'Xem trước nội dung'});
   expect(within(dialog).getByText('Kiểm tra cockpit')).toBeInTheDocument(); expect(within(dialog).getByText('Nội dung cần ghi')).toBeInTheDocument();
-  expect(within(dialog).getByText(/Đích:/)).toHaveTextContent('ati-test');
+  expect(within(dialog).getByText(/Đích:/).parentElement).toHaveTextContent('ati-test');
   expect(within(dialog).queryByText('repo',{exact:true})).toBeNull();
-  const close=within(dialog).getByRole('button',{name:'Đóng Xem trước nội dung'}); close.focus(); fireEvent.keyDown(document,{key:'Tab'}); expect(close).toHaveFocus();
+  const close=within(dialog).getByRole('button',{name:'Đóng Xem trước nội dung'}); close.focus(); fireEvent.keyDown(document,{key:'Tab',shiftKey:true}); expect(within(dialog).getByRole('button',{name:'Đóng xem trước'})).toHaveFocus();
+  fireEvent.keyDown(document,{key:'Tab'}); expect(close).toHaveFocus();
   fireEvent.keyDown(document,{key:'Escape'}); expect(screen.getByRole('button',{name:'Xem trước'})).toHaveFocus();
 });
 it('clarification uses its single main textarea with no second free-text form', () => {
@@ -78,13 +80,14 @@ it('clarification uses its single main textarea with no second free-text form', 
 });
 it('receipt uses actual elapsed timestamps and only http(s) outcome links', () => {
   useChatStore.setState({planStatus:'completed',executionSnapshot:{plan:{...plan,convId:'c1',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded',startedAt:'2026-10-05T10:00:00.000Z',completedAt:'2026-10-05T10:00:02.500Z',durationMs:2500,output:{url:'https://github.com/ati/test/issues/42',html_url:'javascript:alert(1)',number:42}}]}}); renderCockpit();
-  const link=screen.getByRole('link',{name:'https://github.com/ati/test/issues/42'}); expect(link).toHaveAttribute('rel','noopener noreferrer'); expect(link).toHaveAttribute('target','_blank');
-  expect(screen.queryByRole('link',{name:'javascript:alert(1)'})).toBeNull(); expect(screen.getByText('Thời gian thực thi: 2.5 giây')).toBeInTheDocument(); expect(screen.queryByText(/đã xác nhận/i)).toBeNull();
+  const link=screen.getByRole('link',{name:'Mở issue'}); expect(link).toHaveAttribute('rel','noopener noreferrer'); expect(link).toHaveAttribute('target','_blank');
+  expect(screen.queryByRole('link',{name:'javascript:alert(1)'})).toBeNull(); expect(screen.getByText('Trong 2,5 giây')).toBeInTheDocument(); expect(screen.queryByText(/đã xác nhận/i)).toBeNull();
 });
-it('offers two honest follow-up suggestions even when no service is configured',()=>{
+it('offers a settings link and a new request when no service is configured',()=>{
   useChatStore.setState({planStatus:'completed'});
   render(<Cockpit services={[]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />);
-  expect(within(screen.getByRole('group',{name:'Gợi ý tiếp theo'})).getAllByRole('button')).toHaveLength(2);
+  expect(within(screen.getByRole('group',{name:'Gợi ý tiếp theo'})).getByRole('link',{name:'Kết nối thêm'})).toHaveAttribute('href','/settings');
+  expect(screen.getByRole('button',{name:'Nhờ việc khác'})).toBeInTheDocument();
 });
 it('returns focus to a rerendered opener using its stable identity', () => {
   const view=render(<><button key="a" id="stable-opener">Open</button></>); screen.getByRole('button',{name:'Open'}).focus();
@@ -96,7 +99,7 @@ it('late plan for A cannot change B cockpit moment', async () => {
   useChatStore.setState({conversationId:'B'}); renderCockpit();
   const {handleSSEEvent}=await import('../src/hooks/use-sse');
   act(()=>handleSSEEvent('plan_preview',JSON.stringify({planId:'plan-A',summary:'Late A',steps:plan.steps}),undefined,'A'));
-  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','1'); expect(screen.queryByText('Late A')).toBeNull();
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','1'); expect(screen.queryByText('Late A')).toBeNull();
 });
 it('late cancellation for A cannot clear the selected B plan', async () => {
   let finish!:()=>void; vi.mocked(apiClient.rejectPlan).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve(undefined); }));
@@ -127,20 +130,20 @@ it.each(['preview','completed'] as const)('beginPlanning retires the previous %s
   useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:status});
   expect(useChatStore.getState().beginPlanning('A','new-request')).toBe(true);
   renderCockpit();
-  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','2');
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','2');
   expect(useChatStore.getState().activePlan).toBeNull();
 });
 it('a read-only old completed snapshot cannot reacquire the stage while a new request is planning',()=>{
   const store=useChatStore.getState(); store.setConversationId('A');
   store.beginPlanning('A','new-request');
   store.setExecutionSnapshot({plan:{...plan,convId:'A',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded'}]});
-  renderCockpit(); expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','2');
+  renderCockpit(); expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','2');
   expect(useChatStore.getState().executionSnapshot?.plan.id).toBe('p1');
 });
 it.each(['unknown','failed'] as const)('a new planning request preserves unsafe %s evidence',status=>{
   useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'partial',stepStatuses:{s1:status}});
   useChatStore.getState().beginPlanning('A','new-request'); renderCockpit();
-  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment',status==='unknown'?'8':'7');
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment',status==='unknown'?'8':'7');
   expect(useChatStore.getState().activePlan?.id).toBe('p1');
 });
 it('current progress rejects old snapshot output even when the plans reuse a step ID, then follows actual SSE',async()=>{
@@ -149,7 +152,7 @@ it('current progress rejects old snapshot output even when the plans reuse a ste
   store.setActivePlan({...plan,id:'new-plan',summary:'New plan',steps:[{id:'s1',tool:'slack.send_message',description:'NEW operation',args:{channel:'#general',text:'New content'}}]});
   store.setPlanStatus('approving'); renderCockpit();
   expect(screen.getByText('NEW operation',{exact:true})).toBeInTheDocument();
-  expect(screen.queryByRole('link',{name:'https://github.com/ati/test/issues/42'})).toBeNull();
+  expect(screen.queryByRole('link',{name:'Mở issue'})).toBeNull();
   expect(screen.queryByText('Đã hoàn thành 1/1 bước.',{exact:true})).toBeNull();
   const {handleSSEEvent}=await import('../src/hooks/use-sse');
   act(()=>handleSSEEvent('exec_start',JSON.stringify({planId:'new-plan'}),undefined,'A'));
@@ -158,8 +161,8 @@ it('current progress rejects old snapshot output even when the plans reuse a ste
   expect(screen.getByText('NEW operation',{exact:true})).toBeInTheDocument();
   act(()=>handleSSEEvent('exec_step',JSON.stringify({planId:'new-plan',stepId:'s1',status:'succeeded'}),undefined,'A'));
   act(()=>handleSSEEvent('exec_done',JSON.stringify({planId:'new-plan',status:'completed'}),undefined,'A'));
-  expect(screen.getByRole('region',{name:'Cockpit'})).toHaveAttribute('data-moment','6');
-  expect(screen.queryByRole('link',{name:'https://github.com/ati/test/issues/42'})).toBeNull();
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','6');
+  expect(screen.queryByRole('link',{name:'Mở issue'})).toBeNull();
 });
 it.each([
   {content:'Stored planning failure',metadata:{type:'planning_error'}},

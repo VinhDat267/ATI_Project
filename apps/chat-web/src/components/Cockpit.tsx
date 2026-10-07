@@ -4,19 +4,22 @@ import presentation from '../assets/cockpit-services.json';
 import { useChatStore } from '../store/chat-store';
 import { selectMoment } from '../services/cockpit-moment';
 import type { PlanStep, ServiceInfo, User } from '../types';
-import { ChatContainer } from './ChatContainer';
-import { SidebarHistory } from './layout/SidebarHistory';
-import { ServiceLogo } from './ServiceLogo';
-import { CockpitDialog } from './CockpitDialog';
 import { ExecutionProgress } from './ExecutionProgress';
-import { ExecutionReceipt } from './ExecutionReceipt';
-import { PlanStepItem, formatArgValue } from './PlanStepItem';
 
 import { usePrototypePage } from '../prototype/usePrototypePage';
 import { meta } from '../pages/Cockpit/meta';
 import { CockpitHeader } from '../pages/Cockpit/CockpitHeader';
 import { RequestMoment, DiscoveryMoment } from '../pages/Cockpit/RequestMoments';
 import { ClarificationMoment } from '../pages/Cockpit/ClarificationMoment';
+import { PlanMoment } from '../pages/Cockpit/PlanMoment';
+import { ExecutionMoment } from '../pages/Cockpit/ExecutionMoment';
+import { ReceiptMoment } from '../pages/Cockpit/ReceiptMoment';
+import { ChatComposer } from '../pages/Cockpit/ChatComposer';
+import { ConversationDrawer } from '../pages/Cockpit/ConversationDrawer';
+import { HistoryDrawer } from '../pages/Cockpit/HistoryDrawer';
+import { PreviewModal } from '../pages/Cockpit/PreviewModal';
+import { DrawerBackdrop } from '../pages/Cockpit/DrawerBackdrop';
+import { formatDuration } from '../pages/Cockpit/presentation';
 
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
@@ -49,6 +52,7 @@ export function Cockpit(props: Props) {
   const [preview, setPreview] = useState<PlanStep | null>(null);
   const [draft, setDraft] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const stage = useRef<HTMLElement>(null);
   const previousMoment = useRef(moment);
   const editing = useRef(false);
@@ -59,16 +63,17 @@ export function Cockpit(props: Props) {
     const scroller = document.scrollingElement ?? document.documentElement;
     scroller.scrollTop = 0; document.body.scrollTop = 0;
     if (drawer || preview || document.activeElement?.closest('[role="dialog"], [role="alertdialog"], dialog[open]')) return;
-    if (editing.current) input.current?.focus({ preventScroll: true });
+    if (editing.current && input.current) input.current.focus({ preventScroll: true });
     else stage.current?.querySelector<HTMLHeadingElement>('h1')?.focus({ preventScroll: true });
   }, [moment, drawer, preview]);
   const input = useRef<HTMLTextAreaElement>(null);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (moment !== 5) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [moment]);
+  useLayoutEffect(() => {
+    if (editOpen && !drawer && input.current) {
+      input.current.focus();
+      input.current.setSelectionRange(input.current.value.length, input.current.value.length);
+    }
+  }, [editOpen]);
+  useEffect(() => { setEditOpen(false); }, [state.conversationId, state.activePlan?.id]);
   useEffect(() => {
     const prefill = (event: Event) => { const text = (event as CustomEvent<{ text: string }>).detail?.text; if (text) { setDraft(text); input.current?.focus(); } };
     window.addEventListener('chat:prefill', prefill); return () => window.removeEventListener('chat:prefill', prefill);
@@ -81,11 +86,11 @@ export function Cockpit(props: Props) {
   };
   const onKeyDown = (event: import('react').KeyboardEvent<HTMLTextAreaElement>, text = draft) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(text); } };
   const navigate = props.navigate ?? ((path: string) => { window.location.href = path; });
-  const composer = <form aria-label="Nhập yêu cầu" aria-busy={state.isPlanning} onSubmit={event => { event.preventDefault(); send(draft); }} className="rounded-2xl border border-border bg-surface p-3 shadow-sm">
-    <textarea ref={input} rows={moment === 1 && !drawer ? 4 : 2} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={onKeyDown} aria-label={moment === 3 ? 'Nhập câu trả lời làm rõ yêu cầu' : 'Mô tả công việc bạn muốn thực hiện'} placeholder="Mô tả công việc bạn muốn thực hiện..." className="w-full min-w-0 resize-none bg-transparent leading-6 outline-none" />
-    <div className="flex items-center justify-between gap-3"><span className="text-sm text-text-secondary">Enter gửi · Shift+Enter xuống dòng</span><button type="submit" disabled={!draft.trim() || state.isPlanning} className="rounded-full bg-primary text-white px-5 py-2 font-semibold">Gửi</button></div>
-    {state.isPlanning && <p role="status" className="text-sm text-text-secondary mt-2">Đang lập kế hoạch…</p>}
-  </form>;
+  const composerProps = {draft,planning:state.isPlanning,input,onDraft:setDraft,onSend:send,onKeyDown};
+  const editPlan = () => {
+    setDraft(current => current || 'Điều chỉnh kế hoạch: ');
+    setEditOpen(true);
+  };
   // Recovery owns its durable execution. Ordinary progress belongs to the current active plan.
   const snapshot = [7, 8, 9].includes(moment as number) || state.activePlan?.id === state.executionSnapshot?.plan.id ||
     (!state.activePlan && !state.isPlanning && state.planStatus === state.executionSnapshot?.execution.status)
@@ -93,9 +98,9 @@ export function Cockpit(props: Props) {
   const plan = snapshot?.plan ?? state.activePlan;
   const executionSteps = (plan?.steps ?? snapshot?.steps.map(step => ({ id: step.stepId, tool: step.tool, description: step.stepId, args: {} })) ?? []).map(step => {
     const saved = snapshot?.steps.find(row => row.stepId === step.id);
-    const elapsed = saved?.durationMs ?? (saved?.startedAt ? Math.max(0, (saved.completedAt ? Date.parse(saved.completedAt) : now) - Date.parse(saved.startedAt)) : null);
+    const elapsed = saved?.durationMs ?? (saved?.startedAt ? Math.max(0, (saved.completedAt ? Date.parse(saved.completedAt) : Date.now()) - Date.parse(saved.startedAt)) : null);
     const liveStatus = state.executionSnapshot && !snapshot ? undefined : state.stepStatuses[step.id];
-    return { id: step.id, tool: step.tool, description: step.description, status: saved?.status ?? liveStatus ?? 'pending', output: saved?.output, completedAt: saved?.completedAt, error: liveStatus ? state.stepErrors[step.id] : undefined, duration: elapsed != null && Number.isFinite(elapsed) ? `${elapsed / 1000}s` : undefined };
+    return { id: step.id, tool: step.tool, description: step.description, status: saved?.status ?? liveStatus ?? 'pending', output: saved?.output, completedAt: saved?.completedAt, error: liveStatus ? state.stepErrors[step.id] : undefined, duration: elapsed != null && Number.isFinite(elapsed) ? formatDuration(elapsed) : undefined };
   });
   const started = snapshot?.steps.flatMap(row => row.startedAt && Number.isFinite(Date.parse(row.startedAt)) ? [Date.parse(row.startedAt)] : []) ?? [];
   const ended = snapshot?.steps.flatMap(row => row.completedAt && Number.isFinite(Date.parse(row.completedAt)) ? [Date.parse(row.completedAt)] : []) ?? [];
@@ -108,40 +113,34 @@ export function Cockpit(props: Props) {
   return <>
     <div data-cockpit-background className="contents" onFocusCapture={event => { editing.current = (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) && !drawer && !preview; }} onBlurCapture={event => { if (!(event.relatedTarget instanceof HTMLTextAreaElement || event.relatedTarget instanceof HTMLInputElement) && (event.relatedTarget !== null || (event.target as HTMLElement).isConnected)) editing.current = false; }}>
       <CockpitHeader historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} request={request ?? ''} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
-      <main ref={stage} id="stage-container" className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center min-w-0">
-        {props.contentOverride ?? (moment === 1 ? <RequestMoment feedback={terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
+      <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center min-w-0`}>
+        {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
+        {moment === 6 && <span role="status" className="sr-only">Quy trình đã hoàn thành.</span>}
+        {props.contentOverride ?? (moment === 1 ? <RequestMoment feedback={terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 ? <ReceiptMoment steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
           <p className="text-sm uppercase tracking-widest text-text-secondary mb-3">ATI · Điều phối công việc</p>
           <h1 id={`heading-moment-${String(moment)}`} tabIndex={-1} className="text-3xl sm:text-4xl mb-6">{title}</h1>
           {terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>}
-          {moment === 4 && state.activePlan && <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <h2 className="text-xl mb-5">{state.activePlan.summary}</h2>
-            <ol className="space-y-4">{state.activePlan.steps.map(step => { const definition = getToolDefinition(step.tool); const service = definition?.service ?? step.tool.split('.')[0]; return <li key={step.id} className="rounded-xl border border-border p-4"><div className="flex gap-3"><ServiceLogo service={service} /><div className="min-w-0 flex-1"><p className="font-semibold">{step.description}</p><p className="text-text-secondary break-words">{resourceDestination(step, state.activePlan?.resourceLabels)}</p><div className="flex flex-wrap items-center gap-3 mt-2"><span className="text-sm">{definition?.sideEffect === 'read' ? 'Đọc' : /create|append|send/.test(step.tool) ? 'Tạo mới' : 'Cập nhật'}</span><button id={`preview-${step.id}`} type="button" onClick={() => setPreview(step)} className="text-primary-text underline">Xem trước</button></div></div></div></li>; })}</ol>
-            {state.activePlan.warnings?.map((warning, index) => <p key={index} className="mt-4 text-warning-text">{warning}</p>)}
-            <details className="mt-5"><summary>Chi tiết kỹ thuật</summary><div className="mt-3">{state.activePlan.steps.map((step, index) => <PlanStepItem key={step.id} step={step} index={index} resourceLabels={state.activePlan?.resourceLabels} isLast={index === state.activePlan!.steps.length - 1} />)}<pre className="whitespace-pre-wrap break-all">{JSON.stringify(state.activePlan, null, 2)}</pre></div></details>
-            {!state.activePlan.id && <p role="alert">Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại trước khi duyệt.</p>}
-            <div className="flex flex-wrap gap-3 border-t border-border mt-6 pt-4"><button type="button" onClick={props.onApprove} disabled={!state.activePlan.id} className="rounded-full bg-primary text-white px-5 py-3">Duyệt kế hoạch</button><button type="button" onClick={() => { setDraft('Điều chỉnh kế hoạch: '); input.current?.focus(); }} className="rounded-full border border-border px-4 py-3">Sửa qua chat</button><button type="button" onClick={props.onCancel} className="rounded-full px-4 py-3 text-danger-text">Hủy</button></div>
-          </div>}
-          {[5, 6, 7, 8, 9, 'unsuccessful'].includes(moment) && <>
-            {executionSteps.length > 0 && (moment === 6 ? <ExecutionReceipt steps={executionSteps} services={props.services} /> : <ExecutionProgress steps={executionSteps} status={snapshot?.execution.status ?? state.planStatus} title="Tiến trình công việc" />)}
-            {moment === 5 && !executionSteps.length && <p role="status">Đang kích hoạt kế hoạch…</p>}
-            {moment === 6 && <p role="status" className="text-success-text">Quy trình đã hoàn thành.</p>}
+          {[7, 8, 9, 'unsuccessful'].includes(moment) && <>
+            {executionSteps.length > 0 && <ExecutionProgress steps={executionSteps} status={snapshot?.execution.status ?? state.planStatus} title="Tiến trình công việc" />}
             {moment === 'unsuccessful' && <p role="status">{state.planStatus === 'stopped' ? 'Quy trình đã dừng.' : state.planStatus === 'rejected' ? 'Kế hoạch đã hủy; chưa thực thi.' : 'Quy trình không hoàn thành.'}</p>}
-            {total !== null && (moment === 6 || moment === 'unsuccessful') && <p className="mt-4">Thời gian thực thi: {total.toFixed(1)} giây</p>}
-            {moment === 6 && <div role="group" aria-label="Gợi ý tiếp theo" className="mt-6 flex flex-wrap gap-3">{[...props.services.filter(service => service.configured).map(service => ({id:service.id,text:servicePrompt(service),settings:false})),{id:'next-request',text:'Mô tả công việc tiếp theo',settings:false},{id:'connect-services',text:'Kết nối thêm dịch vụ',settings:true}].slice(0,2).map(suggestion => <button key={suggestion.id} type="button" onClick={() => { if(suggestion.settings) props.onSettings(); else {props.onNewConversation(); setDraft(suggestion.id==='next-request'?'':suggestion.text); input.current?.focus();} }} className="rounded-xl border border-border px-4 py-3">{suggestion.text}</button>)}</div>}
-            {(moment === 6 || moment === 'unsuccessful') && <button type="button" onClick={props.onNewConversation} className="rounded-full bg-primary text-white px-5 py-3 mt-6">Nhờ việc khác</button>}
+            {total !== null && moment === 'unsuccessful' && <p className="mt-4">Thời gian thực thi: {formatDuration(total*1000)}</p>}
+            {moment === 'unsuccessful' && <button type="button" onClick={props.onNewConversation} className="rounded-full bg-primary text-white px-5 py-3 mt-6">Nhờ việc khác</button>}
           </>}
           {moment === 'refusal' && <div role="status" className="rounded-2xl border border-border bg-warning-tint p-5 whitespace-pre-wrap">{state.messages.at(-1)?.content}<button type="button" onClick={props.onSettings} className="block mt-4 underline">Kết nối dịch vụ</button></div>}
-          {props.recovery}
-          {moment !== 6 && state.executionSnapshot?.execution.status === 'completed' && state.activePlan?.id !== state.executionSnapshot.plan.id && <details className="mt-5"><summary>Kết quả kế hoạch trước: {state.executionSnapshot.plan.summary}</summary><p role="status">Quy trình đã hoàn thành.</p></details>}
+          {state.executionSnapshot?.execution.status === 'completed' && state.activePlan?.id !== state.executionSnapshot.plan.id && <details className="mt-5"><summary>Kết quả kế hoạch trước: {state.executionSnapshot.plan.summary}</summary><p role="status">Quy trình đã hoàn thành.</p></details>}
           {state.executionSnapshot?.execution.status === 'stopped' && moment !== 'unsuccessful' && <p role="status">Quy trình đã dừng.</p>}
           {moment !== 4 && state.activePlan && <details className="mt-5"><summary>Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span></summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify(state.activePlan, null, 2)}</pre></details>}
           {state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
         </section>)}
+        {props.recovery}
+        {[4,5,6].includes(moment as number) && state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
       </main>
-      {!props.contentOverride && moment !== 1 && moment !== 3 && !drawer && <div className="shrink-0 border-t border-border bg-bg-page px-4 sm:px-8 py-3"><div className="max-w-3xl mx-auto">{composer}</div></div>}
+      {!props.contentOverride && ![1,3,4].includes(moment as number) && drawer !== 'conversation' && <ChatComposer variant="bottom" {...composerProps}/>}
     </div>
-    {drawer === 'history' && <CockpitDialog id="history-drawer" title="Lịch sử yêu cầu" side="left" returnFocusId="btn-open-history" onClose={() => setDrawer(null)}><div className="p-4 h-full flex flex-col min-h-0"><button type="button" onClick={() => { setDrawer(null); props.onNewConversation(); }} className="rounded-full bg-primary text-white px-4 py-3">Cuộc hội thoại mới</button><SidebarHistory currentConversationId={state.conversationId} onSelectConversation={props.onSelectConversation} onCloseMobileSidebar={() => setDrawer(null)} /></div></CockpitDialog>}
-    {drawer === 'conversation' && <CockpitDialog id="chat-drawer" title="Nhật ký hội thoại" side="right" returnFocusId="btn-open-chat" onClose={() => setDrawer(null)}><div className="flex flex-col h-full"><div className="flex-1 min-h-0"><ChatContainer messages={state.messages} streamingText={state.streamingText} isStreaming={state.isStreaming} onSendMessage={props.onSendMessage} logOnly /></div><div className="shrink-0 p-3 border-t border-border">{composer}</div></div></CockpitDialog>}
-    {preview && <CockpitDialog title="Xem trước nội dung" returnFocusId={`preview-${preview.id}`} onClose={() => setPreview(null)}><div className="p-5"><h3 className="text-xl mb-4">{preview.description}</h3><p className="mb-4">Đích: {resourceDestination(preview, state.activePlan?.resourceLabels)}</p><dl className="space-y-3">{Object.entries(preview.args).filter(([key]) => !getToolDefinition(preview.tool)?.inputSchema.properties?.[key]?.['x-resource']).map(([key, value]) => <div key={key}><dt className="font-semibold">{({ title:'Tiêu đề', text:'Nội dung', body:'Nội dung', name:'Tên', summary:'Tiêu đề', description:'Mô tả' } as Record<string,string>)[key] ?? key}</dt><dd className="whitespace-pre-wrap break-words">{formatArgValue(value).text}</dd></div>)}</dl></div></CockpitDialog>}
+    {drawer && <DrawerBackdrop onClose={()=>setDrawer(null)}/>}
+    {drawer === 'history' && <HistoryDrawer conversationId={state.conversationId} onClose={()=>setDrawer(null)} onNewConversation={props.onNewConversation} onSelectConversation={props.onSelectConversation}/>}
+    {drawer === 'conversation' && <ConversationDrawer messages={state.messages} streamingText={state.streamingText} isStreaming={state.isStreaming} onClose={()=>setDrawer(null)} composer={<ChatComposer variant="drawer" {...composerProps}/>}/>}
+    {preview && <PreviewModal step={preview} services={props.services} labels={state.activePlan?.resourceLabels} destination={resourceDestination} onClose={()=>setPreview(null)}/>}
+
   </>;
 }

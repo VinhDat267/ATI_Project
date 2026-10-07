@@ -92,11 +92,11 @@ describe('App message sending', () => {
     fireEvent.click(hamburger);
 
     // Backdrop overlay should be present
-    const backdrop = screen.getByRole('dialog').parentElement;
+    const backdrop = document.getElementById('drawer-backdrop');
     expect(backdrop).not.toBeNull();
 
     // Clicking backdrop closes the sidebar
-    fireEvent.mouseDown(backdrop!);
+    fireEvent.click(backdrop!);
     expect(screen.queryByRole('dialog')).toBeNull();
 
     // Re-open mobile sidebar and test closing via Escape key

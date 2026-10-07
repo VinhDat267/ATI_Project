@@ -139,4 +139,12 @@ html.dark {
 :root[data-proto-page="app-stage"] .workspace, :root[data-proto-page="app-stage"] .workspace > div { display: contents; }
 :root[data-proto-page="app-stage"] :is(button, a, textarea, input, summary):not(#prompt-input, #custom-sheet-input):focus-visible { outline: 2px solid #FF5701; outline-offset: 2px; }
 :root[data-proto-page="app-stage"] button:disabled { opacity: .5; cursor: not-allowed; }
+/* Multiline replacements for the prototype's inputs, and space for their fixed footer. */
+:root[data-proto-page="app-stage"] body { padding-bottom: var(--cockpit-bottom-space, 96px); }
+:root[data-proto-page="app-stage"] :is(#bottom-chat-input, #drawer-chat-input, #moment-4-chat-input) { min-width: 0; width: 100%; resize: none; max-height: 144px; }
+:root[data-proto-page="app-stage"] :is(#bottom-chat-input, #moment-4-chat-input):focus-visible { outline: 2px solid transparent; outline-offset: 0; }
+:root[data-proto-page="app-stage"] [data-receipt-connector] span { white-space: normal; overflow-wrap: anywhere; text-align: center; }
+:root[data-proto-page="app-stage"] #history-drawer > div:last-child { display: flex; flex-direction: column; min-height: 0; }
+:root[data-proto-page="app-stage"] #history-drawer [aria-label="Danh sách hội thoại"] > * { flex-shrink: 0; }
+:root[data-proto-page="app-stage"] #preview-modal-content :is(p, td) { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
