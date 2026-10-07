@@ -144,19 +144,35 @@ Bản mẫu chỉ vẽ lại một phần DOM ở một số thao tác. Bản Re
 Script so có thêm:
 - bước `select` và `scroll`;
 - chờ font sau các thao tác;
+- ép vẽ lại cả trang trước khi chụp (xem mục 9 pixel dưới đây);
+- chờ hai khung hình sau mỗi bước thao tác (xem dưới đây);
 - giữ ảnh của lần lệch đầu (`-first-*.png`);
 - mặc định chạy cả 10 trang;
 - mỗi trang và mỗi lần chạy lại dùng một tiến trình Chromium mới.
 
-Các lần lệch đầu rồi đạt khi chạy lại đều là nét chữ Playfair Display (vài chục đến vài trăm pixel rải trên chữ, 0 phần tử lệch). Đã xem ảnh của từng lần.
+**Hai lần chạy toàn bộ đầu tiên** (07/10, rạng sáng) chưa đạt:
+- chung một tiến trình Chromium: 346/348, lệch `users-xac-nhan-duyet-1440-light` (9 pixel ở avatar) và `history-bien-nhan-tam-dung-1440-light` (170 pixel ở chữ Playfair);
+- mỗi trang một tiến trình mới: 347/348, lệch `history-loc-tam-dung-1440-light` (9 pixel ở avatar). Script tự mở PR #95 dạng draft vì kết quả này.
 
-**Lần chạy toàn bộ đầu tiên** (10 trang, chung một tiến trình Chromium): 346/348 đạt, exit 1. Hai trường hợp lệch ở cả lần chạy lại, 0 phần tử lệch:
-- `users-xac-nhan-duyet-1440-light`: 9 pixel ở mép trên và mép dưới avatar `LN`;
-- `history-bien-nhan-tam-dung-1440-light`: 170 pixel ở viền màu của chữ "cầu" trong tiêu đề Playfair, vị trí glyph trùng nhau.
+**Nguyên nhân 9 pixel ở avatar** (điều tra 07/10, theo yêu cầu người dùng):
 
-Cả hai đã đạt khi chạy riêng từng trang, và chỉ xuất hiện ở trang thứ 7 và 9 của loạt chạy. Vì vậy mới đổi sang dùng tiến trình Chromium mới cho mỗi trang và mỗi lần chạy lại.
+| Bước | Bằng chứng | Kết luận |
+|---|---|---|
+| Tái hiện | chạy riêng 3 trạng thái nghi vấn × 3 lần: 3 lần chụp lệch, đều 9 pixel, đều trang cao đúng 900px (1440×900) | chập chờn, chỉ ở trang vừa khít khung nhìn |
+| Bên nào đổi | chụp cùng trạng thái 8 lần mỗi bản, băm vùng avatar: bản gốc 1 kiểu; bản React 2 kiểu (3/8 lần khác), vị trí avatar/header, cuộn, chiều cao trang giống hệt | bản React vẽ không ổn định |
+| Chỗ lệch | so từng kiểu ảnh React với ảnh gốc: chỉ góc phải header (avatar tới 67 mức màu, nút Sáng/Tối tới 2 mức) | |
+| Giả thuyết 1: transition lúc tải | bản React chạy 110 transition `color`/`background-color` 0,01ms lúc tải (quy tắc `prefers-reduced-motion` của bản mẫu + `usePrototypePage` đổi class `body` sau lần vẽ đầu), bản gốc 0. Tắt transition từ đầu trang: React vẫn lệch 2/10 | **bác bỏ** |
+| Giả thuyết 2: mảnh vẽ cũ | ép vẽ lại cả trang trước khi chụp (đổi bề rộng khung nhìn 1px rồi trả lại): React khớp bản gốc 10/10. Trang cao 1388px: chỉ chụp vùng avatar thì React lệch 5/8, chụp cả trang trước (Playwright giãn khung) thì khớp 6/6 | **xác nhận**: nội dung cuối giống hệt, lệch chỉ do Chromium giữ mảnh header vẽ ở lượt trước khi React dựng trang bằng JS; trang cao hơn khung nhìn tự được vẽ lại khi chụp cả trang nên không lộ |
 
-**Kết quả cuối:** **chưa đạt**. `node scripts/verify-parity.mjs` (10 trang, mỗi trang một tiến trình Chromium) exit 1: 347/348 trường hợp đạt, còn lệch 1: `history-loc-tam-dung-1440-light` (9 pixel). 8 trường hợp đạt sau một lần chạy lại: `account-esc-dong-1440-light`, `account-mo-go-google-375-dark`, `settings-mo-trello-1440-light`, `settings-mo-calendar-1440-light`, `settings-jira-url-sai-375-dark`, `settings-luu-thieu-khoa-1440-light`, `settings-kiem-tra-roi-dong-375-dark`, `guide-sao-chep-375-dark`. Chưa xem ảnh khác biệt của lần chạy này (script tự mở PR dạng draft khi người dùng đang ngủ); ảnh và `report.json` ở `.parity/` trên máy. `npm run typecheck` exit 0; `npm run build` exit 0.
+Sửa ở script so, không ở trang: ép vẽ lại cả trang trước khi chụp, làm y hệt cho cả hai bản. Sau khi sửa, 3 trạng thái nghi vấn × 3 lần không còn lệch ở avatar. Không tìm hiểu sâu cơ chế raster bên trong Chromium.
+
+Lần chạy toàn bộ thứ ba (sau khi sửa 9 pixel) lộ ra một lệch khác, lặp lại cả hai lần: `users-xac-nhan-khoa-375-dark`, 313 phần tử, header `sticky` và toast `fixed` lệch đúng một độ cuộn. Giả thuyết đầu (đổi bề rộng làm Chromium chỉnh lại độ cuộn) bị số đo bác bỏ: `scrollY` không đổi khi đổi bề rộng, mà đã khác từ trước, ở cả hai bản (gốc 583/189/583/583/583, React 189/189/189/583/583). Chờ hai khung hình giữa các bước thì 10/10 lần đều 583. Sửa: script chờ hai khung hình sau mỗi bước; chạy riêng trạng thái đó 3/3 đạt, không cần chạy lại. Lần chạy toàn bộ thứ ba bị dừng giữa chừng vì kết quả không còn dùng được.
+
+Dao động thứ hai, nét chữ Playfair (nguồn của hầu hết lần "chạy lại"), là chuyện khác: băm vùng tiêu đề 12 lần mỗi bản, kể cả khi đã ép vẽ lại, bản gốc 1 kiểu, bản React 2 kiểu (1/12). Chưa tìm ra nguyên nhân; script vẫn chạy lại một lần như trước.
+
+**Kết quả cuối:** lần chạy toàn bộ thứ tư (07/10, head `b36a99b`, `node scripts/verify-parity.mjs`, exit 0) khớp **348/348** trường hợp của 10 trang, 0 phần tử lệch, 0 pixel lệch. 3 trường hợp đạt ở lần chạy lại: `404-1440-dark`, `settings-luu-thanh-cong-1440-light`, `settings-kiem-tra-thanh-cong-1440-light`.
+
+Giới hạn phát hiện sau lần chạy này (khi làm bước 4): script chưa so thuộc tính `transform`. Class `transform` của Tailwind v3 luôn đặt ma trận đơn vị nên phần tử có lớp vẽ riêng; v4 không đặt gì. Lệch này chỉ lộ thành pixel ở `index` (nét chữ một nút). Bước 4 sửa cho cả 12 trang và so lại.
 
 **Không so được hoặc chỉ so một phần:**
 - `settings`: kết quả "quá giờ" chờ 10 giây, chỉ so lúc đang chờ. Bấm nền để đóng ngăn chỉ thử bằng Esc, vì ở 375px panel phủ kín nền.
