@@ -35,17 +35,36 @@ const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'detail
   'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main',
   'nav', 'ol', 'p', 'section', 'summary', 'table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th', 'ul']);
 const MARKER = /__E(\d+)__/g;
+const KEYWORDS = new Set(['if', 'for', 'while', 'switch', 'return', 'typeof', 'void', 'new', 'delete', 'await']);
+// Ngoặc tròn cân bằng và không đóng quá số đã mở, bỏ qua phần trong chuỗi.
+function balanced(code) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'" || c === '`') quote = c;
+    else if (c === '(') depth++;
+    else if (c === ')' && --depth < 0) return false;
+  }
+  return depth === 0 && !quote;
+}
 
 const camel = name => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 // Tailwind v4 đổi cách tính space-x/space-y/divide (margin/viền ở phần tử trước thay vì phần tử sau) và
-// outline-none (v3: viền trong suốt 2px, vẫn hiện ở chế độ tương phản cao; v4: bỏ hẳn viền).
+// outline-none (v3: viền trong suốt 2px, vẫn hiện ở chế độ tương phản cao; v4: bỏ hẳn viền) và
+// transform (v3: luôn đặt transform, ma trận đơn vị khi chưa có translate/scale; v4: không đặt gì).
 // Đổi sang các utility v3-* khai trong src/styles/v3-compat.css để giữ đúng cách của v3.
 export function v3Classes(value) {
   return value.trim().split(/\s+/).map(token => {
-    const match = /^((?:[^:[\]]*:)*)(space-[xy]-.+|divide-.+|outline-none)$/.exec(token);
+    const match = /^((?:[^:[\]]*:)*)(-?space-[xy]-.+|divide-.+|outline-none|transform)$/.exec(token);
     if (!match) return token;
     const [, variants, base] = match;
-    if (/^space-[xy]-/.test(base) || base === 'outline-none') return `${variants}v3-${base}`;
+    // Khoảng cách âm (-space-x-1.5): v4 cần utility âm khai riêng, nên đổi thành -v3-space-*.
+    if (base.startsWith('-')) return `${variants}-v3-${base.slice(1)}`;
+    if (/^space-[xy]-/.test(base) || base === 'outline-none' || base === 'transform') return `${variants}v3-${base}`;
     if (/^divide-[xy](-\d+)?$/.test(base)) return `${variants}v3-${base}`;
     // Màu divide giữ tên gốc: theme.css ghi đè theo tên; v3-theme-targets.css khai lại theo cách tính v3.
     return token;
@@ -113,7 +132,8 @@ export function createRenderer({ exprs = [] } = {}) {
     if (!prop) throw new Error(`Chưa hỗ trợ sự kiện on${event}`);
     const code = restoreCode(rawCode);
     const call = /^\s*([A-Za-z_$][\w$]*)\s*\(([\s\S]*)\)\s*;?\s*$/.exec(code);
-    if (call && !/\)\s*;\s*[A-Za-z_$]/.test(code)) {
+    // Chỉ nhận lời gọi một hàm: không phải từ khoá (if(...) a()), tham số có ngoặc cân bằng (không phải a() + b()).
+    if (call && !KEYWORDS.has(call[1]) && balanced(call[2]) && !/\)\s*;\s*[A-Za-z_$]/.test(code)) {
       const [, fn, rawArgs] = call;
       const args = rawArgs.replace(/\bthis\b/g, 'event.currentTarget');
       handlers.push({ fn, code });

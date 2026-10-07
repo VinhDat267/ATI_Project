@@ -14,8 +14,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const reactDir = path.resolve(here, '..');
 const prototypesDir = path.resolve(reactDir, '..');
 const outDir = path.join(reactDir, '.parity');
-const ORIGINAL_PORT = 5190;
-const REACT_PORT = 5191;
+// Đổi cổng qua biến môi trường khi cần chạy hai lần so cùng lúc (ví dụ hai worktree).
+const ORIGINAL_PORT = Number(process.env.PARITY_ORIGINAL_PORT ?? 5190);
+const REACT_PORT = Number(process.env.PARITY_REACT_PORT ?? 5191);
 // Font đầy đủ của design system; bản React nạp sẵn, bản gốc được bổ sung khi so (xem README).
 const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap';
 const ROUTES = { index: '/', 404: '/404' };
@@ -24,7 +25,7 @@ const THEMES = ['light', 'dark'];
 const args = process.argv.slice(2);
 const onlyState = args.find(a => a.startsWith('--state='))?.slice('--state='.length);
 const named = args.filter(a => !a.startsWith('--'));
-const pages = named.length ? named : ['404', 'privacy', 'errors', 'responses', 'auth-action', 'account', 'users', 'settings', 'history', 'guide'];
+const pages = named.length ? named : ['404', 'privacy', 'errors', 'responses', 'auth-action', 'account', 'users', 'settings', 'history', 'guide', 'index', 'app-stage'];
 
 function serveStatic(root, port) {
   const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript' };
@@ -100,6 +101,35 @@ function snapshotInPage() {
     if (/Radius$/.test(prop) && parseFloat(v) >= 9999) v = 'full';
     return v;
   };
+  // v3 dồn translate/rotate/scale vào thuộc tính transform; v4 dùng các thuộc tính translate, rotate, scale riêng.
+  // Gộp cả bốn thành một ma trận để so. 'none' khi cả bốn đều none: khác với ma trận đơn vị, vì có transform thì
+  // phần tử thành lớp vẽ riêng (ảnh hưởng thứ tự vẽ và cách khử răng cưa chữ).
+  const effectiveTransform = (cs, el) => {
+    // Phần tử không có hộp (display: none): Chromium trả transform là none dù class có đặt, còn translate vẫn trả giá trị.
+    if (!el.getClientRects().length) return '';
+    if ([cs.transform, cs.translate, cs.rotate, cs.scale].every(v => v === 'none')) return 'none';
+    const len = (v, size) => (v.endsWith('%') ? (parseFloat(v) / 100) * size : parseFloat(v));
+    let m = new DOMMatrix();
+    if (cs.translate !== 'none') {
+      const [x = '0px', y = '0px', z = '0px'] = cs.translate.split(' ');
+      // Phần trăm tính theo kích thước của phần tử. SVG không có offsetWidth/offsetHeight nên lấy từ getBoundingClientRect
+      // (đúng khi không kèm rotate/scale, như các biểu tượng -translate-y-1/2 trong bản mẫu).
+      const box = el instanceof HTMLElement ? { width: el.offsetWidth, height: el.offsetHeight } : el.getBoundingClientRect();
+      m = m.translate(len(x, box.width), len(y, box.height), parseFloat(z));
+    }
+    if (cs.rotate !== 'none') {
+      const parts = cs.rotate.split(' ');
+      const angle = parseFloat(parts.at(-1)) * ({ deg: 1, rad: 180 / Math.PI, turn: 360, grad: 0.9 }[parts.at(-1).replace(/^[-\d.]+/, '')] ?? 1);
+      const axis = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }[parts[0]] ?? (parts.length === 4 ? parts.slice(0, 3).map(Number) : [0, 0, 1]);
+      m = m.rotateAxisAngle(...axis, angle);
+    }
+    if (cs.scale !== 'none') {
+      const [sx, sy = sx, sz = 1] = cs.scale.split(' ').map(s => (s.endsWith('%') ? parseFloat(s) / 100 : Number(s)));
+      m = m.scale(sx, sy, sz);
+    }
+    if (cs.transform !== 'none') m = m.multiply(new DOMMatrix(cs.transform));
+    return `matrix(${[m.a, m.b, m.c, m.d, m.e, m.f].map(n => Math.round(n * 1000) / 1000 || 0).join(',')})`;
+  };
   const skip = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'NOSCRIPT', 'TEMPLATE', 'TITLE']);
   const items = [];
   const describe = el => {
@@ -108,12 +138,13 @@ function snapshotInPage() {
     const cs = getComputedStyle(el);
     const style = {};
     for (const p of PROPS) style[p] = norm(p, cs[p]);
+    style.transform = effectiveTransform(cs, el);
     items.push({
       tag: el.tagName.toLowerCase(),
       id: el.id || '',
       // Bản React đổi space-*/divide-y/outline-none sang v3-* (xem v3-compat.css) và dùng hậu tố ! khi cần; quy về tên gốc để so.
       cls: (el.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)
-        .map(c => c.replace(/(^|:)v3-/, '$1').replace(/!$/, '')).sort().join(' '),
+        .map(c => c.replace(/(^|:)(-?)v3-/, '$1$2').replace(/!$/, '')).sort().join(' '),
       text: [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').replace(/\s+/g, ' ').trim(),
       rect: [r.x + scrollX, r.y + scrollY, r.width, r.height].map(n => Math.round(n * 2) / 2),
       style,
@@ -187,8 +218,9 @@ async function pixelDiff(browser, origPng, reactPng, diffPath) {
   return { size: result.sizeA.join('x') === result.sizeB.join('x') ? result.sizeA.join('x') : `${result.sizeA.join('x')} vs ${result.sizeB.join('x')}`, diffPixels: result.diff, ratio: result.diff / (result.width * result.height) };
 }
 
-async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
-  const context = await browser.newContext({ viewport, reducedMotion: 'reduce', colorScheme: 'light', deviceScaleFactor: 1 });
+async function capture(browser, url, viewport, theme, isOriginal, steps = [], motion = false) {
+  // Mặc định bật giảm chuyển động để hiệu ứng JS xong ngay; trạng thái `motion: true` tắt đi (index ẩn hẳn sân khấu tương tác khi giảm chuyển động).
+  const context = await browser.newContext({ viewport, reducedMotion: motion ? 'no-preference' : 'reduce', colorScheme: 'light', deviceScaleFactor: 1 });
   await context.addInitScript(t => { try { localStorage.setItem('ati-theme', t); } catch { /* bỏ qua */ } }, theme);
   const page = await context.newPage();
   const errors = [];
@@ -212,6 +244,9 @@ async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
     // Cuộn phần tử vào giữa màn hình trước khi bấm, để vị trí cuộn không phụ thuộc cách Playwright tự cuộn (có thể khác nhau giữa các lần thử).
     else if (action === 'scroll') await page.locator(selector).evaluate(el => el.scrollIntoView({ block: 'center', inline: 'center' }));
     else if (action === 'wait') await page.waitForTimeout(Number(selector));
+    // Đưa chuột tới toạ độ (x, y). Bấm xong mà nút bị đẩy khỏi chỗ con trỏ thì Chromium chỉ bỏ :hover ở lần di chuột kế
+    // tiếp, nên lúc chụp nút còn hay hết hover tuỳ thời điểm; đưa chuột ra chỗ khác cho hai bản cùng một trạng thái.
+    else if (action === 'move') await page.mouse.move(Number(selector), Number(value));
     else throw new Error(`Bước không hỗ trợ: ${action}`);
     // Chờ hai khung hình để trang ổn định trước bước sau. Thiếu bước này, bấm ngay sau khi cuộn thì Playwright đôi khi
     // tự cuộn thêm và vị trí cuộn cuối khác nhau giữa các lần (users-xac-nhan-khoa: 583 hay 189, ở cả hai bản).
@@ -236,14 +271,14 @@ async function capture(browser, url, viewport, theme, isOriginal, steps = []) {
 
 let browser;
 const attemptCounter = new Map();
-async function runCase(pageId, { steps, query, viewport, theme }, name) {
+async function runCase(pageId, { steps, query, viewport, theme, motion }, name) {
   const attempt = attemptCounter.get(name) ?? 0;
   attemptCounter.set(name, attempt + 1);
   let orig;
   let react;
   try {
-    orig = await capture(browser, `http://127.0.0.1:${ORIGINAL_PORT}/${pageId}.html${query}`, viewport, theme, true, steps);
-    react = await capture(browser, `http://127.0.0.1:${REACT_PORT}${ROUTES[pageId] ?? '/' + pageId}${query}`, viewport, theme, false, steps);
+    orig = await capture(browser, `http://127.0.0.1:${ORIGINAL_PORT}/${pageId}.html${query}`, viewport, theme, true, steps, motion);
+    react = await capture(browser, `http://127.0.0.1:${REACT_PORT}${ROUTES[pageId] ?? '/' + pageId}${query}`, viewport, theme, false, steps, motion);
   } catch (error) {
     const message = String(error.message ?? error).split('\n')[0];
     return { ok: false, attempt, record: { error: `bản ${orig ? 'React' : 'gốc'}: ${message}` } };
@@ -269,19 +304,19 @@ try {
     browser = await chromium.launch();
     const cases = [
       ...VIEWPORTS.flatMap(viewport => THEMES.map(theme => ({ state: null, steps: [], query: '', viewport, theme }))),
-      ...(STATES[pageId] ?? []).flatMap(({ name: state, steps, query = '' }) => [
-        { state, steps, query, viewport: VIEWPORTS[0], theme: 'light' },
-        { state, steps, query, viewport: VIEWPORTS[1], theme: 'dark' },
-      ]),
+      ...(STATES[pageId] ?? []).flatMap(({ name: state, steps, query = '', only, motion = false }) => [
+        { state, steps, query, motion, viewport: VIEWPORTS[0], theme: 'light' },
+        { state, steps, query, motion, viewport: VIEWPORTS[1], theme: 'dark' },
+      ].filter(c => !only || c.viewport.width === only)),
     ].filter(c => !onlyState || c.state === onlyState);
-    for (const { state, steps, query, viewport, theme } of cases) {
+    for (const { state, steps, query, viewport, theme, motion } of cases) {
       const name = `${pageId}${state ? '-' + state : ''}-${viewport.width}-${theme}`;
       // Lệch thì chạy lại đúng một lần và chỉ tính đạt nếu lần chạy lại khớp hoàn toàn: khác biệt thật luôn lặp lại,
       // còn dao động của trình duyệt (lẻ pixel, đua thời gian) thì không.
       let result;
       let firstAttempt;
       for (let attempt = 0; attempt < 2; attempt++) {
-        result = await runCase(pageId, { steps, query, viewport, theme }, name);
+        result = await runCase(pageId, { steps, query, viewport, theme, motion }, name);
         if (result.ok) break;
         if (attempt === 0) {
           // Lần chạy lại dùng tiến trình Chromium mới, để dao động của tiến trình cũ không lặp lại.

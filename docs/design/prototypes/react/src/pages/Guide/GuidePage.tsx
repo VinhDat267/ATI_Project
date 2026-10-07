@@ -683,7 +683,7 @@ export function GuidePage() {
       {/* ==================== TOAST NOTIFICATION CONTAINER ==================== */}
       <div id="toast-container" className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite">
         {toasts.map(toast => (
-          <div key={toast.id} className="pointer-events-auto bg-[#111827] text-white text-xs px-4 py-3 rounded-xl shadow-lg border border-neutral-700 flex items-center gap-2 max-w-sm transition-all transform duration-200" style={toast.fading ? { opacity: '0' } : undefined}>
+          <div key={toast.id} className="pointer-events-auto bg-[#111827] text-white text-xs px-4 py-3 rounded-xl shadow-lg border border-neutral-700 flex items-center gap-2 max-w-sm transition-all v3-transform duration-200" style={toast.fading ? { opacity: '0' } : undefined}>
             <svg className="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span className="flex-1">{toast.message}</span>
           </div>

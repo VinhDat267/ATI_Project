@@ -814,7 +814,7 @@ export function ErrorsPage() {
         </div>
       </footer>
       {/* Toast thông báo */}
-      <div id="toast-notification" className={toast?.visible ? 'fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-0 opacity-100' : 'fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none'}>
+      <div id="toast-notification" className={toast?.visible ? 'fixed bottom-6 right-6 z-50 v3-transform transition-all duration-300 translate-y-0 opacity-100' : 'fixed bottom-6 right-6 z-50 v3-transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none'}>
         <div className={`bg-[#111827] text-white px-4 py-2.5 rounded-xl shadow-lg border ${toast ? TOAST_BORDER[toast.type] : 'border-neutral-700'} text-xs font-medium flex items-center gap-2`} id="toast-content">
           {toastContent}
         </div>

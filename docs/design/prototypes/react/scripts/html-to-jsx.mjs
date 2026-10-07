@@ -55,7 +55,10 @@ ${jsx.join('\n')}
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, `${component}Page.tsx`), tsx);
 const styles = skipped.styles.map(css => css.replace(/^\n+/, '').replace(/\s+$/, ''));
-fs.writeFileSync(path.join(outDir, 'page.css'), `/* <style> của ${file}, giữ nguyên thứ tự. */\n${styles.join('\n\n')}\n`);
+// Biến --font-body/--font-display/--font-mono của trang trùng tên biến theme mà Tailwind v4 khai trên :root (đứng sau
+// nên đè biến của trang); đổi tên thành --page-font-* ở cả chỗ khai lẫn chỗ dùng. Tailwind v3 của bản mẫu không có biến này.
+const pageCss = styles.join('\n\n').replace(/--font-(body|display|mono)\b/g, '--page-font-$1');
+fs.writeFileSync(path.join(outDir, 'page.css'), `/* <style> của ${file}, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */\n${pageCss}\n`);
 console.log(`${file} → ${path.relative(process.cwd(), outDir)}`);
 console.log(`  JSX ${jsx.length} dòng, CSS ${skipped.styles.length} khối, script inline ${skipped.scripts.length} khối (${skipped.scripts.join('\n').split('\n').length} dòng, cần chuyển tay)`);
 console.log(`  handler: ${handlers.length} (${actionNames.length} hàm: ${actionNames.join(', ') || '—'}; ${todos.length} đoạn code cần chuyển tay)`);

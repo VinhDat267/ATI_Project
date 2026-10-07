@@ -1,0 +1,115 @@
+/* <style> của index.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --text: #111827;
+      --page-font-display: 'Playfair Display', serif;
+      --page-font-body: 'Be Vietnam Pro', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--page-font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* Tương tác focus rõ nét chuẩn WCAG AA */
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Hiệu ứng chuyển động mượt mà cho sân khấu bằng CSS Grid Overlay */
+    .stage-panels-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+
+    .stage-card-panel {
+      grid-area: 1 / 1 / 2 / 2;
+      width: 100%;
+      transition: opacity 250ms cubic-bezier(0.16, 1, 0.3, 1), visibility 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stage-card-panel.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .stage-card-panel.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Đường nối SVG vẽ dần ở khoảnh khắc 5 */
+    @keyframes drawConnector {
+      from { stroke-dashoffset: 80; }
+      to { stroke-dashoffset: 0; }
+    }
+    .connector-line-anim {
+      stroke-dasharray: 80;
+      stroke-dashoffset: 80;
+      animation: drawConnector 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Con trỏ nhấp nháy gõ chữ ở khoảnh khắc 1 */
+    @keyframes blinkCursor {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.15em;
+      vertical-align: text-bottom;
+      background-color: #FF5701;
+      animation: blinkCursor 0.9s infinite;
+    }
+
+    /* Chấm sóng lan tỏa nhẹ nhàng */
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-ring-active {
+      animation: pulseRing 2s infinite ease-in-out;
+    }
+
+    /* Chế độ giảm chuyển động cho người dùng nhạy cảm */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .stage-card-panel {
+        transition: none !important;
+      }
+      .typing-cursor {
+        display: none !important;
+      }
+      .connector-line-anim {
+        animation: none !important;
+        stroke-dashoffset: 0 !important;
+      }
+      .pulse-ring-active {
+        animation: none !important;
+      }
+      /* Ẩn phần stage sticky desktop và thay bằng danh sách các thẻ dọc tương tự mobile */
+      .stage-interactive-desktop {
+        display: none !important;
+      }
+      .stage-fallback-list {
+        display: block !important;
+      }
+    }

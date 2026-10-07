@@ -3,7 +3,77 @@
 //   ['click', selector] · ['fill', selector, giá trị] · ['press', selector, phím] · ['select', selector, giá trị] · ['scroll', selector] · ['wait', ms]
 // `query` mở trang kèm chuỗi truy vấn (ví dụ '?type=server').
 // Trạng thái thao tác chạy ở 1440 sáng và 375 tối; trạng thái mở trang chạy đủ 4 tổ hợp.
+// `only: 1440` cho trạng thái chỉ có ở một khổ màn hình (ví dụ sân khấu tương tác của index chỉ hiện từ khổ lg).
+// `motion: true` chạy không giảm chuyển động (mặc định có giảm, để hiệu ứng JS xong ngay).
 export const STATES = {
+  index: [
+    { name: 'mo-dang-nhap', steps: [['click', 'header a[href="#login"]']] },
+    { name: 'mo-dang-ky', steps: [['click', 'header a[href="#signup"]']] },
+    { name: 'tab-dang-ky', steps: [['click', 'header a[href="#login"]'], ['click', '#tab-btn-signup']] },
+    { name: 'hien-mat-khau', steps: [['click', 'header a[href="#login"]'], ['fill', '#login-password', 'matkhau123'], ['click', '#toggle-login-pwd']] },
+    { name: 'quen-mat-khau', steps: [['click', 'header a[href="#login"]'], ['click', '#btn-forgot-password']] },
+    { name: 'quen-mat-khau-gui', steps: [['click', 'header a[href="#login"]'], ['click', '#btn-forgot-password'], ['fill', '#forgot-email', 'lan.nguyen@congty.vn'], ['click', '#btn-submit-forgot']] },
+    { name: 'dang-nhap-thanh-cong', steps: [['click', 'header a[href="#login"]'], ['fill', '#login-email', 'lan.nguyen@congty.vn'], ['fill', '#login-password', 'matkhau123'], ['click', '#form-login >> button[type="submit"]']] },
+    { name: 'dang-nhap-bi-chan', steps: [['click', 'header a[href="#login"]'], ['fill', '#login-email', 'choduyet@congty.vn'], ['fill', '#login-password', 'matkhau123'], ['click', '#form-login >> button[type="submit"]'], ['wait', 500]] },
+    { name: 'dang-ky-gui', steps: [['click', 'header a[href="#signup"]'], ['fill', '#signup-name', 'Tuấn Đặng'], ['fill', '#signup-email', 'tuan.dang@example.com'], ['fill', '#signup-password', 'MatKhauRatDai123'], ['click', '#form-signup >> button[type="submit"]']] },
+    { name: 'dang-ky-xem-email', steps: [['click', 'header a[href="#signup"]'], ['fill', '#signup-name', 'Tuấn Đặng'], ['fill', '#signup-email', 'tuan.dang@example.com'], ['fill', '#signup-password', 'MatKhauRatDai123'], ['click', '#form-signup >> button[type="submit"]'], ['click', '#btn-open-email-from-success'], ['wait', 300]] },
+    { name: 'google-dang-chuyen', steps: [['click', 'a[href="#google"] >> nth=0']] },
+    { name: 'google-xong', steps: [['click', 'a[href="#google"] >> nth=0'], ['wait', 1200]] },
+    { name: 'esc-dong', steps: [['click', 'header a[href="#login"]'], ['wait', 300], ['press', 'body', 'Escape'], ['wait', 300]] },
+    { name: 'bam-nen-dong', steps: [['click', 'header a[href="#login"]'], ['wait', 300], ['click', '#auth-modal', { position: { x: 5, y: 5 } }], ['wait', 300]] },
+    { name: 'email-mo-phong', steps: [['click', '#btn-hero-email-preview'], ['wait', 300]] },
+    { name: 'email-doi-tai-khoan', steps: [['click', '#btn-hero-email-preview'], ['click', '#btn-sim-switch-tuan']] },
+    { name: 'email-esc-dong', steps: [['click', '#btn-hero-email-preview'], ['press', 'body', 'Escape'], ['wait', 300]] },
+    // Sân khấu tương tác chỉ hiện ở khổ lg và khi không giảm chuyển động. Gõ chữ ở khoảnh khắc 1 chỉ chạy lại khi lần gõ
+    // trước đã xong, mà bản React chạy dev gõ chậm hơn (~55 ms/ký tự, mỗi ký tự dựng lại cả trang; bản build thì ngang bản
+    // gốc ~38 ms/ký tự): gõ hết câu mất ~4,3 giây ở bản gốc, ~6 giây ở bản React dev. Nên chờ 7 giây cho lần gõ lúc mở
+    // trang xong ở cả hai bản rồi mới thao tác; bấm chấm thì trang cuộn mượt qua đoạn của khoảnh khắc 1 nên chữ gõ lại,
+    // chờ 8 giây cho lần gõ đó xong. Cuộn thì chờ hoạt cảnh của đoạn đó xong, để không chụp giữa chừng.
+    { name: 'san-khau-tuong-tac', only: 1440, motion: true, steps: [['wait', 7000]] },
+    { name: 'cuon-khoanh-khac-2', only: 1440, motion: true, steps: [['wait', 7000], ['scroll', '#trigger-moment-2'], ['wait', 2500]] },
+    { name: 'cuon-khoanh-khac-3', only: 1440, motion: true, steps: [['wait', 7000], ['scroll', '#trigger-moment-2'], ['wait', 2500], ['scroll', '#trigger-moment-3'], ['wait', 1200]] },
+    { name: 'cuon-khoanh-khac-5', only: 1440, motion: true, steps: [['wait', 7000], ['scroll', '#trigger-moment-2'], ['wait', 2500], ['scroll', '#trigger-moment-3'], ['wait', 1200], ['scroll', '#trigger-moment-4'], ['wait', 1200], ['scroll', '#trigger-moment-5'], ['wait', 1200]] },
+    { name: 'cham-khoanh-khac-2', only: 1440, motion: true, steps: [['wait', 7000], ['click', 'button.stage-dot[data-target="2"]'], ['wait', 8000]] },
+    { name: 'cham-ve-khoanh-khac-1', only: 1440, motion: true, steps: [['wait', 7000], ['click', 'button.stage-dot[data-target="2"]'], ['wait', 8000], ['click', 'button.stage-dot[data-target="1"]'], ['wait', 8000]] },
+  ],
+  'app-stage': [
+    { name: 'menu-demo', steps: [['click', '#demo-pill-btn']] },
+    { name: 'gui-yeu-cau-trong', steps: [['click', '#moment-1 >> button:has-text("Gửi yêu cầu")']] },
+    { name: 'gui-yeu-cau', steps: [['fill', '#prompt-input', 'Tạo card Trello cho lỗi đăng nhập Google'], ['click', '#moment-1 >> button:has-text("Gửi yêu cầu")']] },
+    { name: 'goi-y', steps: [['click', '#moment-1 >> button:has-text("Ghi tiến độ tuần này vào Google Sheets")']] },
+    { name: 'khoanh-khac-3', steps: [['press', 'body', '3']] },
+    { name: 'bang-tinh-khac', steps: [['press', 'body', '3'], ['click', '#btn-toggle-custom-sheet']] },
+    { name: 'chon-bang-tinh', steps: [['press', 'body', '3'], ['click', '#moment-3 >> button:has-text("Sprint Report Q4")']] },
+    { name: 'khoanh-khac-4', steps: [['press', 'body', '4']] },
+    { name: 'xem-truoc-trello', steps: [['press', 'body', '4'], ['click', 'button[aria-label="Xem trước nội dung card Trello"]']] },
+    { name: 'xem-truoc-sheets', steps: [['press', 'body', '4'], ['click', 'button[aria-label="Xem trước dòng Google Sheets"]']] },
+    { name: 'xem-truoc-esc', steps: [['press', 'body', '4'], ['click', 'button[aria-label="Xem trước tin nhắn Slack"]'], ['press', 'body', 'Escape']] },
+    { name: 'chi-tiet-ky-thuat', steps: [['press', 'body', '4'], ['click', '#btn-tech-toggle']] },
+    { name: 'sua-qua-chat', steps: [['press', 'body', '4'], ['click', '#moment-4 >> button:has-text("Sửa qua Chat")']] },
+    { name: 'sua-qua-chat-gui', steps: [['press', 'body', '4'], ['click', '#moment-4 >> button:has-text("Sửa qua Chat")'], ['fill', '#moment-4-chat-input', 'Đổi tên card'], ['press', '#moment-4-chat-input', 'Enter']] },
+    { name: 'duyet-dang-chay', steps: [['press', 'body', '4'], ['click', '#btn-approve-plan']] },
+    { name: 'duyet-chay-xong', steps: [['press', 'body', '4'], ['click', '#btn-approve-plan'], ['wait', 4300]] },
+    { name: 'khoanh-khac-6', steps: [['press', 'body', '6']] },
+    { name: 'khoanh-khac-7', steps: [['press', 'body', '7']] },
+    { name: 'bo-qua-viec-3', steps: [['press', 'body', '7'], ['click', '#moment-7 >> button:has-text("Bỏ qua việc này")']] },
+    // Luồng bỏ qua xong sau ~1,65 giây; toast ẩn ở 2,6 giây và bị gỡ ở 2,9 giây. Chờ 3,2 giây để không chụp sát mốc 2,6 giây
+    // (bản React chạy dev chậm hơn vài trăm ms nên dễ vượt mốc). Toast lúc đang hiện đã có trạng thái bo-qua-viec-3.
+    { name: 'bo-qua-viec-3-xong', steps: [['press', 'body', '7'], ['click', '#moment-7 >> button:has-text("Bỏ qua việc này")'], ['wait', 3200]] },
+    { name: 'thu-lai-viec-3', steps: [['press', 'body', '7'], ['click', '#moment-7 >> button:has-text("Thử lại việc 3")']] },
+    { name: 'khoanh-khac-8', steps: [['press', 'body', '8']] },
+    { name: 'xac-nhan-tin-slack', steps: [['press', 'body', '8'], ['click', '#moment-8 >> button:has-text("Tin đã có, bỏ qua")']] },
+    { name: 'khoanh-khac-9', steps: [['press', 'body', '9']] },
+    { name: 'lam-tiep', steps: [['press', 'body', '9'], ['click', '#moment-9 >> button:has-text("Làm tiếp các việc còn lại")']] },
+    { name: 'mo-hoi-thoai', steps: [['press', 'body', '4'], ['click', '#btn-open-chat'], ['wait', 400]] },
+    { name: 'gui-tin-ngan-keo', steps: [['press', 'body', '4'], ['click', '#btn-open-chat'], ['fill', '#drawer-chat-input', 'Thêm nhãn bug'], ['press', '#drawer-chat-input', 'Enter'], ['wait', 300]] },
+    { name: 'mo-lich-su', steps: [['click', '#btn-open-history'], ['wait', 400]] },
+    { name: 'tai-lai-lich-su', steps: [['click', '#btn-open-history'], ['click', '#history-drawer >> text=Ghi báo cáo tiến độ tuần 42'], ['wait', 400]] },
+    { name: 'menu-nguoi-dung', steps: [['click', '#btn-user-menu']] },
+    { name: 'thanh-vien', steps: [['click', '#demo-pill-btn'], ['click', '#role-btn-member'], ['click', '#btn-user-menu']] },
+    { name: 'may-chu-that', steps: [['click', '#demo-pill-btn'], ['click', '#server-btn-real']] },
+    { name: 'giai-thich-thu-nghiem', steps: [['click', '#btn-toggle-test-mode-explain']] },
+    { name: 'doi-giao-dien', steps: [['click', '#btn-theme-toggle']] },
+  ],
   users: [
     { name: 'tab-thanh-vien', steps: [['click', '#tab-btn-members']] },
     { name: 'tim-cho-duyet', steps: [['fill', '#input-search-users', 'chi']] },
@@ -37,7 +107,8 @@ export const STATES = {
     { name: 'jira-url-sai', steps: [['click', '#service-row-jira'], ['fill', '#key_1', 'abc']] },
     { name: 'github-noi-dung-sai', steps: [['click', '#service-row-github'], ['fill', '#new-scope-input', 'sai']] },
     { name: 'github-them-sai', steps: [['click', '#service-row-github'], ['fill', '#new-scope-input', 'sai'], ['click', '#btn-add-scope']] },
-    { name: 'them-noi-dung', steps: [['click', '#service-row-notion'], ['fill', '#new-scope-input', 'db-demo-01'], ['click', '#btn-add-scope']] },
+    // Ở 375px mục mới làm danh sách xuống dòng, nút Thêm bị đẩy khỏi con trỏ; đưa chuột ra góc để hover không phụ thuộc thời điểm.
+    { name: 'them-noi-dung', steps: [['click', '#service-row-notion'], ['fill', '#new-scope-input', 'db-demo-01'], ['click', '#btn-add-scope'], ['move', 0, 0]] },
     { name: 'xoa-noi-dung', steps: [['click', '#service-row-trello'], ['click', '#scope-chips-container >> button >> nth=0']] },
     { name: 'luu-thieu-noi-dung', steps: [['click', '#service-row-calendar'], ['click', '#btn-save-service-changes']] },
     { name: 'luu-thieu-khoa', steps: [['click', '#service-row-trello'], ['click', '#btn-save-service-changes']] },

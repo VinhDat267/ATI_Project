@@ -1,0 +1,336 @@
+/* <style> của app-stage.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --surface-warm: #F4F4F0;
+      --border: #E7E7E2;
+      --border-subtle: #F0F0EB;
+      --accent: #FF5701;
+      --text: #111827;
+      --fg: #111827;
+      --muted: #6B7280;
+      --page-font-display: 'Playfair Display', serif;
+      --page-font-body: 'Be Vietnam Pro', sans-serif;
+      --page-font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html.dark {
+      --bg: #0b1020;
+      --surface: #131b2f;
+      --surface-warm: #182343;
+      --border: #293653;
+      --border-subtle: #1e293b;
+      --accent: #FF5701;
+      --text: #f8fafc;
+      --fg: #f8fafc;
+      --muted: #94a3b8;
+      color-scheme: dark;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--page-font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    /* ========================================================
+       DARK MODE TOKEN OVERRIDES (AGENTIC SYSTEM)
+       WCAG AA Contrast Compliant: Text >= 4.5:1, UI >= 3:1
+       ======================================================== */
+    html.dark body {
+      background-color: #0b1020;
+      color: #f8fafc;
+    }
+
+    /* Text Colors in Dark Mode */
+    html.dark .text-brand-text { color: #f8fafc !important; }
+    html.dark .text-brand-muted { color: #94a3b8 !important; }
+    html.dark .text-neutral-900,
+    html.dark .text-neutral-800,
+    html.dark .text-neutral-700 { color: #f1f5f9 !important; }
+    html.dark .text-neutral-600,
+    html.dark .text-neutral-500 { color: #94a3b8 !important; }
+    html.dark .text-neutral-400 { color: #8f9cb1 !important; } /* ≥ 4.5:1 trên nền thẻ tối */
+    html.dark .bg-brand-border { background-color: rgba(148, 163, 184, 0.25) !important; } /* vạch ngăn cạnh logo */
+
+    /* Surface & Background in Dark Mode */
+    html.dark .bg-white { background-color: #131b2f !important; }
+    html.dark .bg-neutral-50,
+    html.dark .bg-neutral-100 { background-color: #182343 !important; }
+    html.dark .hover\:bg-neutral-50:hover,
+    html.dark .hover\:bg-neutral-100:hover { background-color: #1e2b52 !important; }
+    html.dark .bg-neutral-200 { background-color: #243462 !important; }
+    html.dark .bg-neutral-300 { background-color: #293653 !important; }
+    html.dark .bg-\[\#EBECE7\] { background-color: #243462 !important; color: #f8fafc !important; }
+    html.dark .bg-\[\#FFF6EE\] { background-color: #261b14 !important; border-color: #4f2918 !important; }
+    html.dark .bg-orange-100 { background-color: #3b1d0e !important; }
+    html.dark .bg-blue-100 { background-color: #172c4e !important; }
+    html.dark .bg-green-100 { background-color: #113822 !important; }
+    html.dark .bg-purple-100 { background-color: #2c1a44 !important; }
+
+    /* Accent & Semantic Text Colors in Dark Mode */
+    html.dark .text-blue-600 { color: #60a5fa !important; }
+    html.dark .text-emerald-600 { color: #4ade80 !important; }
+    html.dark .text-purple-600 { color: #c084fc !important; }
+    html.dark .text-brand-primary { color: #FF5701 !important; }
+
+    /* Borders in Dark Mode */
+    html.dark .border-brand-border { border-color: #293653 !important; }
+    html.dark .border-brand-border-subtle { border-color: #1e293b !important; }
+    html.dark .border-neutral-200,
+    html.dark .border-neutral-300 { border-color: #293653 !important; }
+
+    /* Sticky Bars & Overlays */
+    html.dark header.sticky {
+      background-color: rgba(11, 16, 32, 0.92) !important;
+      border-bottom-color: #293653 !important;
+    }
+    html.dark #moment-4-sticky-bar {
+      background-color: rgba(11, 16, 32, 0.95) !important;
+      border-top-color: #293653 !important;
+    }
+    html.dark #global-bottom-bar {
+      background-image: linear-gradient(to top, #0b1020, rgba(11, 16, 32, 0.95), transparent) !important;
+    }
+
+    /* Test Mode Banner in Dark Mode */
+    html.dark #test-mode-banner {
+      background-color: #2a2208 !important;
+      border-color: #533f0a !important;
+      color: #fef08a !important;
+    }
+    html.dark #test-mode-banner svg { color: #facc15 !important; }
+    html.dark #btn-toggle-test-mode-explain { color: #fef08a !important; }
+    html.dark #test-mode-explanation {
+      background-color: #231b05 !important;
+      border-color: #533f0a !important;
+      color: #fef9c3 !important;
+    }
+
+    /* Drawers & Modals */
+    html.dark aside#chat-drawer,
+    html.dark aside#history-drawer,
+    html.dark #preview-modal-box {
+      background-color: #131b2f !important;
+      border-color: #293653 !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-50\/50,
+    html.dark aside#history-drawer .bg-neutral-50\/50,
+    html.dark #preview-modal-box .bg-neutral-50 {
+      background-color: rgba(24, 35, 67, 0.75) !important;
+      border-color: #293653 !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-100 {
+      background-color: #182343 !important;
+      color: #f8fafc !important;
+    }
+    html.dark aside#chat-drawer .bg-neutral-900 {
+      background-color: #FF5701 !important;
+      color: #ffffff !important;
+    }
+    html.dark aside#chat-drawer .bg-\[\#FFF5ED\] {
+      background-color: #261b14 !important;
+      border-color: #4f2918 !important;
+      color: #fed7aa !important;
+    }
+
+    /* User Menu & Demo Menu */
+    html.dark #user-menu,
+    html.dark #demo-menu {
+      background-color: #131b2f !important;
+      border-color: #293653 !important;
+      box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.6) !important;
+    }
+    html.dark .user-menu-item { color: #f8fafc !important; }
+    html.dark .user-menu-item:hover,
+    html.dark .user-menu-item:focus {
+      background-color: #182343 !important;
+      color: #FF5701 !important;
+    }
+    html.dark .demo-toggle-btn { color: #94a3b8 !important; }
+    html.dark .demo-toggle-btn:hover { color: #f8fafc !important; }
+    html.dark .demo-toggle-btn.is-active {
+      background: #182343 !important;
+      color: #f8fafc !important;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4) !important;
+    }
+
+    /* Soft Alert / Callout Boxes in Dark Mode */
+    html.dark .bg-orange-50 {
+      background-color: #251a13 !important;
+      border-color: #4f2818 !important;
+      color: #fdba74 !important;
+    }
+    html.dark .bg-amber-50 {
+      background-color: #291e0a !important;
+      border-color: #583e0e !important;
+      color: #fef08a !important;
+    }
+    html.dark .bg-emerald-50 {
+      background-color: #0d2818 !important;
+      border-color: #194d2f !important;
+      color: #86efac !important;
+    }
+    html.dark .bg-red-50 {
+      background-color: #2c1215 !important;
+      border-color: #5a1e26 !important;
+      color: #fca5a5 !important;
+    }
+    html.dark .bg-blue-50 {
+      background-color: #0f1d38 !important;
+      border-color: #1e3a6d !important;
+      color: #93c5fd !important;
+    }
+    html.dark .bg-purple-50 {
+      background-color: #221233 !important;
+      border-color: #431f69 !important;
+      color: #d8b4fe !important;
+    }
+
+    /* Colored Text Accents in Dark Mode */
+    html.dark .text-amber-700,
+    html.dark .text-amber-800,
+    html.dark .text-amber-900 { color: #fde047 !important; }
+    html.dark .text-emerald-700,
+    html.dark .text-emerald-800 { color: #86efac !important; }
+    html.dark .text-red-600,
+    html.dark .text-red-700,
+    html.dark .text-red-800 { color: #fca5a5 !important; }
+
+    /* Inputs & Textareas in Dark Mode */
+    html.dark input,
+    html.dark textarea {
+      color: #f8fafc !important;
+    }
+    html.dark input::placeholder,
+    html.dark textarea::placeholder {
+      color: #64748b !important;
+    }
+
+    /* Selection & Scrollbar in Dark Mode */
+    html.dark ::selection {
+      background-color: #4a210d;
+      color: #ff914d;
+    }
+    html.dark ::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+    html.dark ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* NHÓM 5: Tiêu đề nhận focus bằng code KHÔNG hiện viền cam */
+    [tabindex="-1"]:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Menu người dùng & nút demo */
+    .user-avatar-btn { width:2rem; height:2rem; border-radius:9999px; background:#FF5701; color:#fff; font-size:0.75rem; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .user-avatar-btn:hover { opacity:0.9; }
+    .user-menu-item { display:flex; width:100%; text-align:left; align-items:center; gap:0.625rem; padding:0.5rem 1rem; font-size:0.75rem; color:#111827; transition:background-color 150ms, color 150ms; }
+    .user-menu-item:hover, .user-menu-item:focus { background-color:#F5F5F4; color:#FF5701; outline:none; }
+    .demo-toggle-btn { padding:0.25rem 0.5rem; border-radius:0.375rem; font-size:0.75rem; font-weight:500; text-align:center; transition:all 150ms; color:#6B7280; }
+    .demo-toggle-btn:hover { color:#111827; }
+    .demo-toggle-btn.is-active { background:#FFFFFF; color:#111827; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
+
+    @keyframes pulseSoft {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.02); opacity: 0.95; }
+    }
+    .animate-pulse-soft {
+      animation: pulseSoft 2.2s infinite ease-in-out;
+    }
+
+    @keyframes drawCheck {
+      0% { stroke-dashoffset: 48; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .animate-draw-check {
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: drawCheck 0.55s 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    /* NHÓM 2: Chuyển cảnh giữa các khoảnh khắc fade + trượt ngắn chạy thật (180–260ms) */
+    .stage-section {
+      transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stage-section.is-hidden {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+    }
+    .stage-section.is-entering {
+      display: block;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .stage-section.is-active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .stage-section.is-exiting {
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+    }
+
+    /* Staggered card animation in moment 4 (Group 2: total under 300ms) */
+    @keyframes planCardIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .plan-card-stagger-1 { animation: planCardIn 180ms 0ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-2 { animation: planCardIn 180ms 50ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-3 { animation: planCardIn 180ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .plan-card-stagger-4 { animation: planCardIn 180ms 150ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered receipts in moment 6 (Group 7: total under 1s) */
+    @keyframes receiptCardIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .receipt-stagger-1 { animation: receiptCardIn 220ms 0ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-2 { animation: receiptCardIn 220ms 120ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-3 { animation: receiptCardIn 220ms 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .receipt-stagger-4 { animation: receiptCardIn 220ms 360ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    @keyframes connectorDraw {
+      from { opacity: 0; transform: scaleX(0.7); }
+      to { opacity: 1; transform: scaleX(1); }
+    }
+    .connector-stagger-1 { animation: connectorDraw 200ms 100ms ease-out both; }
+    .connector-stagger-2 { animation: connectorDraw 200ms 220ms ease-out both; }
+    .connector-stagger-3 { animation: connectorDraw 200ms 340ms ease-out both; }
+
+    /* NHÓM 2: @media (prefers-reduced-motion: reduce) tắt mọi chuyển động lớn, nhịp lặp, ping */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+      .animate-ping, .animate-pulse, .animate-pulse-soft {
+        animation: none !important;
+      }
+      .animate-draw-check {
+        stroke-dashoffset: 0 !important;
+      }
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }

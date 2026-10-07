@@ -23,7 +23,7 @@ const ROLE_ON: Record<Role, string> = {
   member: 'px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-[#111827] shadow-sm transition-all',
 };
 const ROLE_OFF = 'px-2.5 py-1.5 rounded-md text-xs font-medium text-[#4B5563] hover:text-[#111827] transition-all';
-const TOAST_BASE = 'px-4 py-2.5 rounded-xl shadow-lg text-xs sm:text-sm font-medium transition-all transform duration-200 pointer-events-auto flex items-center gap-2';
+const TOAST_BASE = 'px-4 py-2.5 rounded-xl shadow-lg text-xs sm:text-sm font-medium transition-all v3-transform duration-200 pointer-events-auto flex items-center gap-2';
 const TOAST_PHASE = { enter: 'translate-y-2 opacity-0', shown: '', leaving: 'opacity-0 -translate-y-2' };
 const TOAST_BG: Record<string, string> = { info: 'bg-[#111827] text-white', success: 'bg-[#16A34A] text-white', error: 'bg-[#DC2626] text-white' };
 const WARNING_PATH = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z';

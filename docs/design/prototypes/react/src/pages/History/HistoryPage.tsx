@@ -29,7 +29,7 @@ const GROUPS = [
   { key: 'yesterday', title: 'Hôm qua' },
   { key: 'earlier', title: 'Tuần này & Trước đó' },
 ] as const;
-const TOAST_BASE = 'px-4 py-2.5 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all transform duration-200 pointer-events-auto flex items-center gap-2 max-w-md';
+const TOAST_BASE = 'px-4 py-2.5 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all v3-transform duration-200 pointer-events-auto flex items-center gap-2 max-w-md';
 const TOAST_COLOR: Record<ToastType, string> = {
   success: 'bg-[#111827] text-white border-neutral-700',
   error: 'bg-[#DC2626] text-white border-red-700',
@@ -895,7 +895,7 @@ Cam kết an toàn: Chưa ghi bất kỳ dữ liệu nào khi chưa được duy
         {/* Backdrop mờ */}
         <div id="drawer-backdrop" onClick={() => actions.closeDetailDrawer()} className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`} />
         <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-16">
-          <div id="drawer-panel" className={`w-screen max-w-2xl bg-white shadow-drawer border-l border-[#E7E7E2] flex flex-col transform ${shown ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out`}>
+          <div id="drawer-panel" className={`w-screen max-w-2xl bg-white shadow-drawer border-l border-[#E7E7E2] flex flex-col v3-transform ${shown ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out`}>
             {/* Header Drawer */}
             <div className="px-5 sm:px-6 py-4 border-b border-[#E7E7E2] flex items-center justify-between gap-3 bg-[#F8F8F6]">
               <div className="min-w-0">
