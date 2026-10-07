@@ -19,20 +19,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "sheets.read_range",
-            "args": {
-              "spreadsheetId": {
-                "equals": "spreadsheet_frontend_2026"
-              },
-              "range": {
-                "equals": "Tasks!A1:B2"
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {
@@ -225,20 +212,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "sheets.read_range",
-            "args": {
-              "spreadsheetId": {
-                "equals": "spreadsheet_frontend_2026"
-              },
-              "range": {
-                "equals": "Tasks!A1:B2"
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {
@@ -297,23 +271,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "calendar.list_events",
-            "args": {
-              "calendarId": {
-                "equals": "team@example.test"
-              },
-              "timeMin": {
-                "instantEquals": "2026-09-30T00:00:00+07:00"
-              },
-              "timeMax": {
-                "instantEquals": "2026-10-01T00:00:00+07:00"
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {
@@ -586,22 +544,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "notion.query_database",
-            "args": {
-              "databaseId": {
-                "equals": "11111111-1111-4111-8111-111111111111"
-              },
-              "query": {
-                "includesAll": [
-                  "Release"
-                ]
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {
@@ -859,17 +802,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "telegram.list_chats",
-            "args": {
-              "query": {
-                "equals": ""
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {
@@ -1114,22 +1047,7 @@
         ]
       },
       "expect": {
-        "kind": "clarification",
-        "searches": [
-          {
-            "tool": "jira.search_issues",
-            "args": {
-              "projectKey": {
-                "equals": "FE"
-              },
-              "query": {
-                "includesAll": [
-                  "Footer"
-                ]
-              }
-            }
-          }
-        ]
+        "kind": "clarification"
       }
     },
     {

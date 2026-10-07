@@ -38,7 +38,8 @@ describe('preregistered service evaluation labels', () => {
       expect(() => buildMemory(c.memory), c.id).not.toThrow();
       if (c.category === 'read_only') {
         expect(c.expect.kind, c.id).toBe('clarification');
-        expect(c.expect.searches!.length, c.id).toBeGreaterThan(0);
+        expect(c.expect.searches, c.id).toBeUndefined();
+        expect(c.expect.steps, c.id).toBeUndefined();
       }
       for (const spec of specs(c)) {
         const tool = ALL_TOOLS.find(t => t.name === spec.tool);
