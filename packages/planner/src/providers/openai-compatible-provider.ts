@@ -101,7 +101,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
       const count = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
       metrics.usage = { promptTokens: count(json.usage?.prompt_tokens), completionTokens: count(json.usage?.completion_tokens),
         reasoningTokens: count(json.usage?.completion_tokens_details?.reasoning_tokens ?? json.usage?.prompt_tokens_details?.reasoning_tokens) };
-      if (served && baseModel(served) !== baseModel(this.model)) {
+      // The owner confirmed this exact 9router response alias on 2026-10-07.
+      // Keep the raw served name in evidence; do not accept other suffixes/routes.
+      const confirmedRouterAlias = this.model === 'ag/gemini-3.8-flash' && served === 'gemini-3.8-flash-n';
+      if (served && baseModel(served) !== baseModel(this.model) && !confirmedRouterAlias) {
         throw new Error(`Completion was served by ${served}, not the configured ${this.model}; disable gateway fallback for this model`);
       }
       return messageText(json.choices?.[0]?.message?.content);
