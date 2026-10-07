@@ -1,5 +1,7 @@
 # Design system: Agentic theo bản mẫu ATI
 
+> Bản tóm tắt chuẩn, theo định dạng DESIGN.md (phần đầu YAML token và 8 mục), nằm ở [`DESIGN.md`](../../DESIGN.md) ở gốc repo, kèm `.impeccable/design.json`. Tài liệu này giữ số liệu sử dụng, bảng chế độ tối đầy đủ, chỗ tham chiếu từng thành phần trong bản React và các chỗ lệch giữa trang. Hai nơi phải khớp nhau; sửa một nơi thì sửa nơi kia.
+
 **Ngày:** 07/10/2026 · **Người viết:** Claude Code, theo yêu cầu của người dùng · **Nguồn:** 12 bản mẫu trong [`prototypes/`](prototypes/README.md) và bản React của chúng ([`prototypes/react/`](prototypes/react/README.md))
 
 Tài liệu này mô tả design system mà 12 bản mẫu thật sự dùng. Theo quyết định ngày 07/10/2026, app đưa thẳng bản React của bản mẫu vào (đặc tả giao diện mục 1 và 1.2, task FE-04b → FE-10). Vì vậy đây là chuẩn cho:

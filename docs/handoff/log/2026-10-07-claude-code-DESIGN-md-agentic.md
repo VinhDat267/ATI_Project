@@ -1,0 +1,23 @@
+# 2026-10-07 · Claude Code · DESIGN.md theo design system Agentic của 12 bản mẫu
+
+- **Yêu cầu:** "tôi muốn update luôn DESIGN.md ở gốc repo với Design System của 12 HTML luôn được không nhỉ". Làm theo quy trình `document` của skill impeccable (định dạng DESIGN.md của Google: phần đầu YAML token, 8 mục theo thứ tự chuẩn, file đi kèm `.impeccable/design.json`).
+- **Hiện trạng trước khi sửa:**
+  - `DESIGN.md` trên `main` là "ATI Warm Workshop (Airtable Style)" duyệt ngày 21/09 (thời v2), lỗi thời;
+  - trên máy người dùng có bản nháp chưa commit "Apple Gallery" (xanh `#0071e3`, Space Grotesk), cùng một bản nháp `PRODUCT.md` theo hướng đó;
+  - hook impeccable đọc bản nháp và báo nhầm font Be Vietnam Pro, Playfair Display ở `apps/chat-web/src/index.css`.
+- **Người dùng chốt:** bỏ bản nháp Apple của `DESIGN.md`; không đụng `PRODUCT.md`; hình ảnh chủ đạo "Sân khấu điều phối".
+- **Đã làm** (worktree `.claude/worktrees/design-md`, nhánh `docs/design-md-agentic` từ `main` `0cdb02a`):
+  - `DESIGN.md` viết lại:
+    - phần đầu YAML có 28 màu (sáng, trạng thái, chế độ tối), 8 vai trò chữ, 7 bậc bo góc, 7 bậc khoảng cách, 13 biến thể thành phần;
+    - 8 mục Overview → Do's and Don'ts, 4 quy tắc có tên;
+    - giá trị lấy từ 12 bản mẫu và bản React (`docs/design/design-system.md`); đã đối chiếu từng giá trị thành phần với class trong bản React, sửa 2 chỗ (màu chữ dải thử nghiệm `#78350F`, bề rộng nội dung theo trang);
+  - `.impeccable/design.json` (schemaVersion 2): dải OKLCH 8 bước cho từng màu, bóng, chuyển động, mốc màn hình, 9 thành phần có HTML/CSS tự đủ, phần lời lấy nguyên văn từ `DESIGN.md` bằng script;
+  - `docs/design/design-system.md`: ghi `DESIGN.md` là bản tóm tắt chuẩn, hai nơi phải khớp;
+  - `.gitignore`: bỏ qua bộ nhớ đệm của hook (`**/.impeccable/hook.cache.json`) và cấu hình riêng từng máy.
+- **Kiểm:**
+  - phần đầu YAML đọc được bằng PyYAML;
+  - 41 tham chiếu `{nhóm.token}` trong thành phần đều trỏ tới token có thật;
+  - tiêu đề mục đúng thứ tự chuẩn;
+  - `impeccable detect apps/chat-web/src/index.css` với `DESIGN.md` mới: exit 0, không còn báo font; với bản nháp Apple vẫn báo 2 font.
+- **Sau khi merge:** bản nháp `DESIGN.md` chưa commit trên máy người dùng sẽ chặn fast-forward `main`; người dùng đã chọn bỏ bản nháp, cần bỏ thay đổi cục bộ của file này trước khi kéo về. `PRODUCT.md` bản nháp vẫn ghi hướng Apple ở mục "Nhận diện thị giác"; người dùng tự xử lý.
+- **Không làm:** không sửa mã, không đụng `PRODUCT.md`, không ghi đè thay đổi chưa commit trên máy người dùng, không merge. Không sửa CURRENT-STATE/ROADMAP trong PR này để tránh đụng #98 đang mở; ghi vào lần cập nhật sau merge.
