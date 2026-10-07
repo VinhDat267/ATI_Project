@@ -232,6 +232,7 @@ export function RequestMoment({
               >
                 <ServiceLogo
                   service={service.id}
+                  mono
                   className="w-3.5 h-3.5 shrink-0 fill-current opacity-60"
                 />
                 {service.name}

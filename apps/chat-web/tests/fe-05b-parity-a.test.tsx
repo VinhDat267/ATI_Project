@@ -9,6 +9,8 @@ import {
   within,
 } from '@testing-library/react';
 import { Cockpit } from '../src/components/Cockpit';
+import { ServiceLogo } from '../src/components/ServiceLogo';
+import { handleSSEEvent } from '../src/hooks/use-sse';
 import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
 vi.mock('../src/services/api-client', () => ({
@@ -252,7 +254,7 @@ it('FE-05b uses service logos only for unambiguous service choices and renders c
   expect(heading.nextElementSibling).toHaveTextContent('Có nhiều nơi khớp yêu cầu. Hãy chọn một đích.');
   expect(within(screen.getByRole('radio', { name: 'GitHub' })).getByTitle('GitHub')).toBeInTheDocument();
   expect(within(screen.getByRole('radio', { name: 'Slack' })).getByTitle('Slack')).toBeInTheDocument();
-  expect(screen.getByRole('radio', { name: 'Slack' }).querySelector('svg')).toHaveAttribute('fill', '#611f69');
+  expect([...screen.getByRole('radio', { name: 'Slack' }).querySelectorAll('path')].map(path => path.getAttribute('fill'))).toEqual(['#E01E5A', '#36C5F0', '#2EB67D', '#ECB22E']);
   for (const name of ['Frontend', 'GitHub hoặc Slack']) {
     expect(within(screen.getByRole('radio', { name })).getByTitle('Lựa chọn')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name }).querySelector('svg')).toHaveAttribute('fill', 'none');
@@ -330,4 +332,22 @@ it('FE-05b a moment change preserves active typing and dialog focus', () => {
   close.focus();
   act(() => useChatStore.setState({ planStatus: 'completed' }));
   expect(close).toHaveFocus();
+});
+it('FE-05b a clarification with non-string options or context renders only the text parts', () => {
+  useChatStore.getState().setConversationId('c1');
+  setup();
+  act(() => handleSSEEvent('clarification', JSON.stringify({ question: 'Chọn kho nào?', options: ['Kho A', { id: 'x' }, 7, '  '], context: { internal: true } }), undefined, 'c1'));
+  expect(screen.getByRole('heading', { level: 1, name: 'Chọn kho nào?' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Kho A' })).toBeInTheDocument();
+  expect(screen.getAllByRole('radio')).toHaveLength(2);
+  expect(document.body.textContent).not.toContain('[object Object]');
+});
+it('FE-05b Slack logo uses the four-colour mark of the source, and is grey while not connected', () => {
+  const { container } = render(<ServiceLogo service="slack" />);
+  expect([...container.querySelectorAll('path')].map(path => path.getAttribute('fill'))).toEqual(['#E01E5A', '#36C5F0', '#2EB67D', '#ECB22E']);
+  cleanup();
+  setup();
+  const notConnected = screen.getByText('Chưa kết nối:').parentElement!;
+  expect(within(notConnected).getByText('Slack')).toBeInTheDocument();
+  expect([...notConnected.querySelectorAll('path')].map(path => path.getAttribute('fill'))).toEqual(Array(4).fill('currentColor'));
 });

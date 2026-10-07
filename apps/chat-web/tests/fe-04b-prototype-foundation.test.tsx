@@ -90,6 +90,12 @@ it('FE-04b: the 404 theme toggle uses the app theme (class, data-theme, saved ch
   expect(screen.getByRole('button', { name: 'Chuyển sang giao diện sáng' })).toHaveAttribute('aria-pressed', 'true');
 });
 
+it('FE-04b: theme.css stays a verbatim copy of the prototype theme', () => {
+  // Chỉ khác dòng ghi nguồn ở đầu file; quy tắc riêng của app không đặt vào đây.
+  const app = readFileSync('src/prototype/theme.css', 'utf8').replace(/^\/\*[^\n]*\*\/\r?\n/, '');
+  expect(app).toBe(readFileSync('../../docs/design/prototypes/theme.css', 'utf8'));
+});
+
 it('FE-04b: FE-04 sizing and focus rules only apply outside prototype pages', () => {
   const css = readFileSync('src/index.css', 'utf8');
   // Màn chưa chuyển giữ chữ tối thiểu 14px; trang của bản React dùng thang chữ của bản mẫu.
