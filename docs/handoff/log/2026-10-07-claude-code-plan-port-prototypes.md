@@ -51,6 +51,21 @@
   - mục 5 thêm hai hạn chế: trợ năng của design system bản mẫu; các trạng thái hẹn giờ của script so.
 - **PROTO-01:** trạng thái "xong cả 4 bước", mục "Ngoài phạm vi" ghi quyết định 07/10, thêm kết quả so lại sau merge.
 
+## Design system Agentic theo bản mẫu
+
+- **Yêu cầu:** "có nên tạo ra Design System từ 12 bản HTML mẫu không… 12 bản đó được tạo ra từ Open Design tôi chọn Design System là Agentic, bạn hãy lấy Design System Agentic từ trong Open Design được không".
+- **Lấy được:** gói Agentic của Open Design 0.24.1 nằm trong thư mục cài ứng dụng (`resources/open-design/design-systems/agentic/`). Gói không kèm giấy phép, ghi nguồn "OpenDesign curated bundled fixture"; không chép file vào repo.
+- **Phát hiện:**
+  - `DESIGN.md` (cam `#FF5701`, nền `#F6F6F1`, Playfair, chữ 14–40) và `tokens.css` (nền tối, nhấn xanh `#60a5fa`, Inter, chữ 12–66) của gói không khớp nhau;
+  - bản mẫu lấy phần sáng của `DESIGN.md`, phần tối gần với `tokens.css` nhưng giữ cam, rồi tự thêm Be Vietnam Pro, màu chữ phụ, viền, bóng, cỡ chữ 10–12px;
+  - 36 phần tử tắt viền focus mà chỉ 3 có vòng focus thay thế.
+- **Người dùng chốt:**
+  - tạo tài liệu trong repo;
+  - chỗ lệch giữa các trang giữ nguyên, màn mới dùng giá trị chuẩn.
+- **Làm:**
+  - [`docs/design/design-system.md`](../../design/design-system.md): nguồn gốc và bảng so ba nguồn, màu sáng/tối (giá trị tối lấy từ `theme.css`), thang chữ thực tế, bố cục, bo góc, bóng, chuyển động, chế độ tối, 15 thành phần kèm class mẫu và chỗ tham chiếu trong bản React, bảng chỗ lệch và giá trị chuẩn (lấy theo `app-stage`), trợ năng, quy tắc cho màn mới. Số liệu đếm bằng script trên 12 file HTML; tỉ lệ tương phản tính lại bằng công thức WCAG;
+  - link từ đặc tả 1.2, FE-04b, README bản mẫu (sửa luôn câu "theo đặc tả, nhất là mục 3.2 cỡ chữ" và "bản React chưa đưa vào app" đã lỗi thời), ROADMAP, CURRENT-STATE.
+
 ## Không làm
 
 Không sửa mã. Không đóng hay sửa #47, #87. Không lập task card tuần 5, không viết script chụp ảnh (người dùng không chọn). Kế hoạch tự review, nên có review độc lập trước khi giao FE-04b.

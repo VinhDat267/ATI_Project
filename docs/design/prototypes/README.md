@@ -1,10 +1,10 @@
 # Bản mẫu giao diện ATI (05/10/2026)
 
-Mười hai trang HTML tự chứa, làm bằng OpenDesign và review qua nhiều vòng ngày 05/10/2026. Từ 06/10 bản mẫu là **chuẩn về hình thức** cho các task FE-05b → FE-10 (đặc tả mục 1 và 1.1).
+Mười hai trang HTML tự chứa, làm bằng OpenDesign và review qua nhiều vòng ngày 05/10/2026. Bản mẫu làm theo design system **Agentic** của Open Design. Từ 07/10/2026 bản React của các trang này được **đưa thẳng vào app** (task FE-04b → FE-10, đặc tả mục 1, 1.1, 1.2 bản 07/10). Design system mà bản mẫu thật sự dùng (màu sáng/tối, chữ, bo góc, bóng, thành phần, chỗ lệch giữa các trang và giá trị chuẩn cho màn mới) ghi ở [`../design-system.md`](../design-system.md).
 
-Thư mục [`react/`](react/README.md) chứa bản React của các trang này (cùng công nghệ với `apps/chat-web`, giữ nguyên design system), kèm script so từng phần tử và từng pixel với bản HTML. Bản React chưa đưa vào app.
+Thư mục [`react/`](react/README.md) chứa bản React của các trang này (cùng công nghệ với `apps/chat-web`, giữ nguyên design system), kèm script so từng phần tử và từng pixel với bản HTML. Đây là nguồn để chép trang sang `apps/chat-web`.
 
-Đặc tả đi kèm: [`docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`](../../superpowers/specs/2026-10-05-ui-redesign-agentic-design.md). Khi bản mẫu và đặc tả khác nhau, **theo đặc tả** (nhất là mục 3.2 cỡ chữ và mục 6 quy tắc trung thực).
+Đặc tả đi kèm: [`docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md`](../../superpowers/specs/2026-10-05-ui-redesign-agentic-design.md). Khi bản mẫu và đặc tả khác nhau, theo bản mẫu, trừ các điểm ở đặc tả mục 1.1 (bản 07/10), nhất là mục 6 quy tắc trung thực. Các điều chỉnh riêng cho app trước đây (chữ tối thiểu 14px, nền `#F6F6F1`, mục 3.2 điểm 3–4) không còn áp dụng.
 
 ## Cách xem
 

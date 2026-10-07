@@ -272,6 +272,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - **Chốt 07/10/2026:** đưa thẳng bản React của bản mẫu (`docs/design/prototypes/react/`, PROTO-01) vào app. App theo **design system Agentic đúng như 12 bản mẫu thể hiện**: kể cả chữ 10–12px, tiêu đề 42–52px, nền `#F8F8F6`, chế độ tối theo `theme.css` của bản mẫu.
   - Không còn hiệu lực cho app: các điều chỉnh riêng cho app chốt 05/10 (chữ tối thiểu 14px, nền `#F6F6F1` thay `#F8F8F6`, bộ token suy ra của đặc tả 3.3/FE-04) và cách làm "chuyển markup HTML sang JSX, đổi token, nâng chữ" (chốt 06/10). Giữ: cam `#FF5701`, ba font, chữ trắng trên nút cam (đều có trong bản mẫu).
   - Trợ năng làm đổi hình thức (chữ ≥ 14px, vùng chạm 40×40, tương phản 4,5:1 cho chữ nhỏ màu xám) chỉ đo và ghi lại ở FE-10; trợ năng không đổi hình thức (aria, landmark, một `h1`, focus) vẫn bắt buộc.
+  - Design system rút từ 12 bản mẫu, đối chiếu gói Agentic của Open Design: [`docs/design/design-system.md`](../design/design-system.md). Chỗ lệch giữa các trang giữ nguyên; màn mới dùng giá trị chuẩn trong tài liệu (người dùng chốt 07/10).
   - Cách làm: đặc tả giao diện mục 1, 1.1, 1.2 bản 07/10; [FE-04b](tasks/FE-04b-prototype-foundation.md) đưa lớp nền vào trước, FE-05b → FE-10 chép trang của bản React rồi nối dữ liệu thật.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.

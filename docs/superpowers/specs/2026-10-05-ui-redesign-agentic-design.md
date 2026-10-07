@@ -47,6 +47,8 @@ Bỏ so với bản 06/10: điểm 4 cũ (chữ tối thiểu 14px, tiêu đề 
 
 ### 1.2 Đưa một trang của bản React vào app
 
+Design system mà bản mẫu thật sự dùng (bảng màu sáng/tối, thang chữ, bo góc, bóng, danh mục thành phần, giá trị chuẩn cho màn mới) ghi ở [`docs/design/design-system.md`](../../design/design-system.md). Màn và thành phần chưa có trong bản mẫu theo tài liệu đó.
+
 1. **Lớp nền, làm một lần ở FE-04b:**
    - chép các lớp CSS của bản React vào app: `v3-compat.css`, `v3-base.css`, `v3-palette.css`, `v3-theme-targets.css`, `tokens.css` (token theo trang `--p-*` theo `:root[data-proto-page]`), `theme.css` của bản mẫu, và cấu hình `@source not inline(...)` trong file Tailwind;
    - chép `usePrototypePage` (title, class của `<html>`/`<body>`, `data-proto-page`, CSS riêng của trang khi vào, gỡ khi rời);

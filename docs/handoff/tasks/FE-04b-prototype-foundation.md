@@ -1,7 +1,7 @@
 # FE-04b · Lớp nền của bản React trong app (design system bản mẫu)
 
 **Trạng thái:** chờ, giao được ngay · **Nhánh gợi ý:** `feat/fe-04b-prototype-foundation` · **Phụ thuộc:** PROTO-01 đã xong (#96 tại `581addd`) · **Mốc:** 09/10/2026, trước FE-05b và FE-07
-**Đặc tả:** mục 1, 1.1, 1.2 (bản 07/10), 8, 12 · **Nguồn:** `docs/design/prototypes/react/` (README, `src/styles/`, `src/app/`, `index.html`)
+**Đặc tả:** mục 1, 1.1, 1.2 (bản 07/10), 8, 12 · **Nguồn:** `docs/design/prototypes/react/` (README, `src/styles/`, `src/app/`, `index.html`); design system: [`docs/design/design-system.md`](../../design/design-system.md)
 
 ## Vì sao quan trọng
 
