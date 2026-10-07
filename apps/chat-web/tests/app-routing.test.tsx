@@ -37,7 +37,7 @@ it('leaves the login URL after successful login', async () => {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: user.email } });
   fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'long-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   expect(window.location.pathname).toBe('/');
 });
 it('reloads a direct conversation link with pending preview and execution snapshot', async () => {
@@ -78,7 +78,7 @@ it('shows an owner-scoped not-found view and clears prior data for a foreign lin
   render(<App />);
   expect(await screen.findByText('Không tìm thấy hội thoại.')).toBeInTheDocument();
   expect(screen.queryByText('Previous private message')).toBeNull();
-  expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull();
+  expect(screen.queryByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeNull();
   expect(apiClient.getActivePlan).not.toHaveBeenCalled();
 });
 it('puts selected history in the URL and clears it when browser Back returns home', async () => {

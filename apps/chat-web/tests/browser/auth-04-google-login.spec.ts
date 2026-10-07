@@ -24,7 +24,7 @@ test('AUTH-04: Google signup waits for approval, approved Google login enters ch
     await db.query("UPDATE users SET status='active', updated_at=now() WHERE id=$1 AND status='pending'", [userId]);
     await page.getByRole('button', { name: 'Quay lại đăng nhập' }).click();
     await page.getByRole('button', { name: 'Tiếp tục với Google' }).click();
-    await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
     expect(await page.evaluate(() => Boolean(localStorage.getItem('wap_access_token')))).toBe(true);
     expect(callbackQueries).toEqual(['', '']);

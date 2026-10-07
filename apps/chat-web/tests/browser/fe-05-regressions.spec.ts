@@ -7,7 +7,7 @@ async function login(page: Page) {
   await page.goto('/login'); await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);
   await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Bạn muốn nhờ ATI việc gì?'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Hôm nay bạn muốn nhờ việc gì?'})).toBeVisible();
 }
 async function seed(page: Page, pending = false, longURL = false, resultURL?: string) {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -38,7 +38,7 @@ for (const pending of [false,true]) test(`FE-05: a new request owns planning aft
   const gate=new Promise<void>(resolve=>unblock=resolve), started=new Promise<void>(resolve=>entered=resolve);
   await page.route('**/api/conversations/*/messages',async route=>{entered();await gate;await route.fulfill({status:503,json:{error:'Reviewer bounded transport failure'}});});
   try {
-    const input=page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    const input=page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await input.fill('NEW request waiting for planner'); await input.press('Enter'); await started;
     const actual=await page.getByRole('region',{name:'Cockpit'}).getAttribute('data-moment');
     await save(info,page,'new-request-stale-receipt',{...ids,actual,expected:'2',request:await page.locator('[data-cockpit-background]').innerText()});
@@ -53,7 +53,7 @@ for (const [service,url] of [
   await page.setViewportSize({width:375,height:900}); await login(page); const ids=await seed(page,false,true,url);
   const link=page.getByRole('link',{name:url,exact:true});
   await expect(link).toBeVisible(); await expect(link).toHaveAttribute('target','_blank'); await expect(link).toHaveAttribute('rel','noopener noreferrer');
-  const dimensions=await page.evaluate(()=>{const main=document.querySelector<HTMLElement>('[data-cockpit-background] > .overflow-y-auto')!;return {document:document.documentElement.scrollWidth,viewport:innerWidth,mainScroll:main.scrollWidth,mainClient:main.clientWidth};});
+  const dimensions=await page.evaluate(()=>{const main=document.querySelector<HTMLElement>('#stage-container')!;return {document:document.documentElement.scrollWidth,viewport:innerWidth,mainScroll:main.scrollWidth,mainClient:main.clientWidth};});
   await save(info,page,'long-receipt-link',{...ids,url,dimensions});
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
   expect(dimensions.mainScroll).toBeLessThanOrEqual(dimensions.mainClient);
@@ -80,22 +80,23 @@ test('FE-05: native terminal SSE planner error remains visible in the cockpit',a
   const message='Reviewer planner could not finish this request';
   await page.route('**/api/conversations/*/stream',async route=>{await gate;await route.fulfill({status:200,contentType:'text/event-stream',body:`event: error\ndata: ${JSON.stringify({message})}\n\n`});});
   let sends=0;
-  await page.route('**/api/conversations/*/messages',async route=>{sends++;await route.fulfill({status:202,json:{messageId:`bounded-message-${sends}`}});release();});
+  await page.route('**/api/conversations/*/messages',async route=>{sends++;await route.fulfill({status:202,json:{messageId:`bounded-message-${sends}`}});});
   try {
-    await page.getByRole('button',{name:'Cuộc hội thoại mới',exact:true}).click();await expect(page).toHaveURL(/\/c\//);
-    const input=page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');await input.fill('Request with an explicit planning failure');await input.press('Enter');
-    await expect(page.getByRole('region',{name:'Cockpit'}).getByRole('alert')).toHaveText(`Lỗi: ${message}`);
-    await expect(page.getByRole('region',{name:'Cockpit'}).getByRole('alert')).toBeInViewport();
-    await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click();
+    await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button',{name:'Cuộc hội thoại mới',exact:true}).click();await expect(page).toHaveURL(/\/c\//);
+    const input=page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });await input.fill('Request with an explicit planning failure');await input.press('Enter');
+    // Open while discovery is active; moment 1 hides the source chat button.
+    await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); release();
     await expect(page.getByRole('log').getByText(`Lỗi: ${message}`,{exact:true}).first()).toBeVisible();
     await page.screenshot({path:info.outputPath('terminal-error-in-log.png'),animations:'disabled'});
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('region',{name:'Cockpit'}).getByRole('alert')).toHaveText(`Lỗi: ${message}`);
+    await expect(page.getByRole('region',{name:'Cockpit'}).getByRole('alert')).toBeInViewport();
     const text=await page.getByRole('region',{name:'Cockpit'}).innerText();
     const errorVisible=text.includes(message);
     await save(info,page,'terminal-error-hidden',{errorVisible,text,expected:'A visible error fallback after planning ended; frontend SSE boundary proof only'});
     expect(errorVisible).toBe(true);
     await input.fill('A subsequent request after the terminal error');
-    await expect(page.getByRole('button',{name:'Gửi',exact:true})).toBeEnabled(); await input.press('Enter');
+    await expect(page.getByRole('button',{name:/^(Gửi|Gửi yêu cầu)$/})).toBeEnabled(); await input.press('Enter');
     await expect.poll(()=>sends).toBe(2);
   } finally {release();}
 });
@@ -125,7 +126,7 @@ for (const event of ['clarification','error']) for (const readPhase of ['during 
   });
   try {
     armed=true;
-    const input=page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    const input=page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await input.fill(`NEW request ending in ${event}`); await input.press('Enter');
     const cockpit=page.getByRole('region',{name:'Cockpit'}), expected=event==='clarification'?'3':'1';
     await expect(cockpit).toHaveAttribute('data-moment',expected); await snapshotStarted;
@@ -141,7 +142,7 @@ for (const event of ['clarification','error']) for (const readPhase of ['during 
     await expect(page.getByRole('link',{name:'https://github.com/ati/test/issues/42',exact:true})).toHaveCount(0);
     if(event==='clarification') {
       await expect(cockpit.getByText('NEW request needs a destination',{exact:true})).toBeVisible();
-      await expect(cockpit.getByRole('button',{name:'NEW destination A',exact:true})).toBeEnabled();
+      await expect(cockpit.getByRole('radio',{name:'NEW destination A',exact:true})).toBeEnabled();
     } else {
       await expect(cockpit.getByRole('alert')).toHaveText('Lỗi: NEW request failed before planning finished');
       await expect(cockpit.getByRole('alert')).toBeInViewport();

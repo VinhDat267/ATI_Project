@@ -5,6 +5,7 @@ import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
+import { meta as cockpitMeta } from '../src/pages/Cockpit/meta';
 
 vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = { id: 'u1', email: 'owner@example.test', name: 'Owner' };
@@ -53,8 +54,8 @@ it('FE-04b: a signed-in unknown path shows the 404 without the app shell; Back r
   expect(screen.queryByRole('button', { name: /Menu người dùng/ })).not.toBeInTheDocument();
 
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về không gian làm việc chính' }));
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
-  expect(pageScope()).toEqual({ page: undefined, body: APP_BODY, theme: 0, css: 0 });
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
+  expect(pageScope()).toEqual({ page: 'app-stage', body: cockpitMeta.bodyClass, theme: 1, css: 1 });
 
   act(() => window.history.back());
   await heading();
@@ -87,6 +88,12 @@ it('FE-04b: the 404 theme toggle uses the app theme (class, data-theme, saved ch
   expect(document.documentElement.dataset.theme).toBe('dark');
   expect(localStorage.getItem('ati-theme')).toBe('dark');
   expect(screen.getByRole('button', { name: 'Chuyển sang giao diện sáng' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('FE-04b: theme.css stays a verbatim copy of the prototype theme', () => {
+  // Chỉ khác dòng ghi nguồn ở đầu file; quy tắc riêng của app không đặt vào đây.
+  const app = readFileSync('src/prototype/theme.css', 'utf8').replace(/^\/\*[^\n]*\*\/\r?\n/, '');
+  expect(app).toBe(readFileSync('../../docs/design/prototypes/theme.css', 'utf8'));
 });
 
 it('FE-04b: FE-04 sizing and focus rules only apply outside prototype pages', () => {

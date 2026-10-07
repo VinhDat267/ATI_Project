@@ -8,7 +8,7 @@ async function login(page: Page, email: string, password: string) {
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByLabel('Mật khẩu').fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
 
 test('AUTH-03: admin approves a pending account, member logs in, disable revokes the browser session', async ({ browser }, testInfo) => {
@@ -56,7 +56,8 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await expect(admin.getByRole('dialog')).toContainText('Mọi phiên đăng nhập');
     await admin.getByRole('button', { name: 'Xác nhận khóa', exact: true }).click();
     await expect(admin.getByRole('dialog')).toHaveCount(0);
-    await member.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
+    // Opening history makes the next authenticated request and detects revocation.
+    await member.getByRole('button', {name:'Mở danh sách hội thoại'}).click();
     await expect(member.getByLabel('Email', { exact: true })).toBeVisible();
     expect((await member.request.get('/api/auth/me', { headers: { Authorization: `Bearer ${oldAccess}` } })).status()).toBe(401);
     expect((await member.request.post('/api/auth/refresh', { data: { refreshToken: oldRefresh } })).status()).toBe(401);

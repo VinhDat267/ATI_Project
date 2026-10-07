@@ -57,7 +57,7 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     if (approval.status() === 404) await db.query("UPDATE users SET status='active',updated_at=now() WHERE id=$1 AND status='pending' AND email_verified=true", [user.id]);
     else expect(approval.status()).toBe(200);
     await login(page, email, password);
-    await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
     const oldTokens = await page.evaluate(() => ({ access: localStorage.getItem('wap_access_token')!, refresh: localStorage.getItem('wap_refresh_token')! }));
     await page.getByRole('button', { name: /Menu người dùng/ }).click();
     await page.getByRole('menuitem', { name: /Đăng xuất/ }).click();
@@ -86,7 +86,7 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     await expect(page.getByRole('alert')).toContainText('mật khẩu không chính xác');
     await page.getByLabel('Mật khẩu', { exact: true }).fill(newPassword);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-    await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
     expect((await db.query('SELECT count(*)::int AS count FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL', [user.id])).rows[0].count).toBe(1);
     await page.goto(resetLink);
     await page.getByLabel('Mật khẩu mới', { exact: true }).fill(newPassword);

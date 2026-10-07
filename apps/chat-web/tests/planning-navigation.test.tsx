@@ -71,9 +71,9 @@ it('replaces the temporary New draft so one Back returns to the previous convers
   act(() => window.history.forward());
   await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
 });
-function sendButton() { return within(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...').closest('form')!).getByRole('button', { name: 'Gửi' }); }
+function sendButton() { return within(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).closest('form') ?? screen.getByRole('region', {name:'Cockpit'})).getByRole('button', { name: /^(Gửi|Gửi yêu cầu|Xác nhận và tiếp tục)$/ }); }
 function send(content: string) {
-  const input = screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  const input = screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   fireEvent.change(input, { target: { value: content } }); fireEvent.keyDown(input, { key: 'Enter' });
 }
 it('keeps an in-flight send locked after real Workspace history navigation c1 to c2 and back', async () => {
@@ -82,9 +82,9 @@ it('keeps an in-flight send locked after real Workspace history navigation c1 to
   await select('c2'); send('Independent request');
   await waitFor(() => expect(sends.map(row => row.convId)).toEqual(['c1', 'c2']));
   await select('c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate request' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate request' } });
   expect(sendButton()).toBeDisabled();
-  fireEvent.keyDown(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { key: 'Enter' });
+  fireEvent.keyDown(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { key: 'Enter' });
   expect(sends.filter(row => row.convId === 'c1')).toHaveLength(1);
   // Complete the original real POST and deliver its terminal event through the
   // current native SSE connection. The request becomes sendable only then.
@@ -104,7 +104,7 @@ it('keeps a new conversation creation and its known ID locked while navigating a
   await act(async () => reply(creations[0]!, { conversation: { id: 'c1' } }, 201));
   await waitFor(() => expect(sends.map(row => row.convId)).toEqual(['c1']));
   await select('c2'); await select('c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate after ID' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate after ID' } });
   expect(sendButton()).toBeDisabled();
   expect(sends).toHaveLength(1);
 });
@@ -126,7 +126,7 @@ it('keeps the current conversation locked when an earlier real POST fails after 
   await waitFor(() => expect(sends[0]!.response.writableFinished).toBe(true));
   // A harmless real HTTP round trip lets the rejected POST's fetch settle.
   await act(async () => { await nativeFetch(`${base}/api/runtime`); });
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate c2' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate c2' } });
   expect(sendButton()).toBeDisabled();
   expect(screen.queryByText(/Lỗi gửi tin nhắn/)).toBeNull();
 });
@@ -138,7 +138,7 @@ it.each(['plan', 'clarification', 'refusal', 'planning_error'])('unlocks from a 
   await select('c2');
   savedReplies.set('c1', [{ id: 'm1', role: 'user', content: 'First request' }, { id: 'terminal1', role: 'assistant', content: 'Saved terminal', metadata: { type, replyToMessageId: 'm1' } }]);
   await select('c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'After saved terminal' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'After saved terminal' } });
   expect(sendButton()).toBeEnabled();
   send('After saved terminal'); await waitFor(() => expect(sends).toHaveLength(2));
 });
@@ -151,7 +151,7 @@ it.each([202, 500])('ignores an old POST %s after terminal SSE allowed a newer r
   send('New request'); await waitFor(() => expect(sends).toHaveLength(2));
   await act(async () => reply(first.response, status === 202 ? { messageId: 'old-message' } : { error: 'Old failure' }, status));
   await act(async () => { await nativeFetch(`${base}/api/runtime`); });
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate new request' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate new request' } });
   expect(sendButton()).toBeDisabled();
   expect(useChatStore.getState().planningByConversation.c1?.requestId).toBe(sends[1]!.requestId);
   expect(useChatStore.getState().planningByConversation.c1?.messageId).toBeUndefined();
@@ -168,7 +168,7 @@ it('does not unlock a newer accepted request from a durable reply to an earlier 
   await select('c2');
   savedReplies.set('c1', [{ id: 'old-message', role: 'user', content: 'Old request' }, { id: 'old-terminal', role: 'assistant', content: 'Old terminal', metadata: { type: 'clarification', replyToMessageId: 'old-message' } }, { id: 'new-message', role: 'user', content: 'New request' }]);
   await select('c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate' } });
   expect(sendButton()).toBeDisabled();
 });
 it('keeps the selected conversation when asynchronous creation obtains another ID', async () => {
@@ -177,9 +177,9 @@ it('keeps the selected conversation when asynchronous creation obtains another I
   await waitFor(() => expect(creations).toHaveLength(1)); await select('c2');
   await act(async () => reply(creations[0]!, { conversation: { id: 'c1' } }, 201));
   await waitFor(() => expect(sends).toHaveLength(1));
-  expect(window.location.pathname).toBe('/c/c2'); expect(screen.getByText('Saved c2')).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/c/c2'); expect(within(screen.getByRole('log')).getByText('Saved c2')).toBeInTheDocument();
   await select('c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Duplicate' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Duplicate' } });
   expect(sendButton()).toBeDisabled();
 });
 it('clears every conversation planning record when the authenticated session is lost', async () => {
@@ -191,7 +191,7 @@ it('clears every conversation planning record when the authenticated session is 
   expect(useChatStore.getState().conversationId).toBeNull();
 });
 async function historyReady() { await openHistory(); await screen.findByRole('button', { name: 'Conversation one' }); closeCockpitDialog(); }
-const newConversationButton = () => { closeCockpitDialog(); return screen.getByRole('button', { name: /Cuộc hội thoại mới/ }); };
+const newConversationButton = () => { closeCockpitDialog(); fireEvent.click(screen.getByRole('button', {name:'Mở danh sách hội thoại'})); return screen.getByRole('button', { name: /Cuộc hội thoại mới/ }); };
 it('restores the previous conversation when New fails without replacing its planning record', async () => {
   render(<App />); await transcriptText('Saved c1');
   send('Existing c1 request'); await waitFor(() => expect(sends).toHaveLength(1));
@@ -201,9 +201,9 @@ it('restores the previous conversation when New fails without replacing its plan
   await screen.findByRole('alert');
   expect(window.location.pathname).toBe('/c/c1');
   expect(await transcriptText('Saved c1')).toBeInTheDocument();
-  expect(screen.getByText('Existing c1 request')).toBeInTheDocument();
+  expect(within(screen.getByRole('log')).getByText('Existing c1 request')).toBeInTheDocument();
   expect(useChatStore.getState().planningByConversation.c1?.requestId).toBe(requestId);
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Still locked' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Still locked' } });
   expect(sendButton()).toBeDisabled();
 });
 it('keeps another selected conversation when an abandoned New response fails', async () => {
@@ -213,27 +213,27 @@ it('keeps another selected conversation when an abandoned New response fails', a
   await act(async () => reply(creations[0]!, { error: 'Creation failed' }, 500));
   await screen.findByRole('alert');
   expect(window.location.pathname).toBe('/c/c2');
-  expect(screen.getByText('Saved c2')).toBeInTheDocument();
+  expect(within(screen.getByRole('log')).getByText('Saved c2')).toBeInTheDocument();
   expect(screen.queryByText('Saved c1')).toBeNull();
 });
 it('releases a known failed POST after leaving Workspace without restoring its error UI', async () => {
   render(<App />); await transcriptText('Saved c1');
   send('Request that will fail'); await waitFor(() => expect(sends).toHaveLength(1));
   act(() => { window.history.pushState({}, '', '/admin/users'); window.dispatchEvent(new PopStateEvent('popstate')); });
-  await waitFor(() => expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeNull());
   await act(async () => { reply(sends[0]!.response, { error: 'Rejected request' }, 500); await nativeFetch(`${base}/api/runtime`); });
   expect(useChatStore.getState().planningByConversation.c1).toBeUndefined();
   act(() => { window.history.pushState({}, '', '/c/c1'); window.dispatchEvent(new PopStateEvent('popstate')); });
   await transcriptText('Saved c1');
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Retry after returning' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Retry after returning' } });
   expect(sendButton()).toBeEnabled();
   expect(screen.queryByText(/Lỗi gửi tin nhắn/)).toBeNull();
 });
 async function leaveWorkspaceAndReturn() {
   act(() => { window.history.pushState({}, '', '/admin/users'); window.dispatchEvent(new PopStateEvent('popstate')); });
-  await waitFor(() => expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeNull());
   act(() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); });
-  return screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  return screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
 }
 it('releases an unsent draft when leaving Workspace in the same authenticated session', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
@@ -292,7 +292,7 @@ it('locks a queued New request and retains the next typed message before the ID 
   render(<App />); await transcriptText('Saved c1');
   fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
   send('First queued request');
-  const input = screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  const input = screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   fireEvent.change(input, { target: { value: 'Second typed request' } });
   expect(sendButton()).toBeDisabled();
   fireEvent.keyDown(input, { key: 'Enter' });
@@ -353,6 +353,6 @@ it('releases a message sent while New conversation fails and reports the failure
   await act(async () => reply(creations[0]!, { error: 'Máy chủ lỗi' }, 500));
   expect(await screen.findByText(/Không thể tạo phiên hội thoại mới/)).toBeInTheDocument();
   expect(sends).toHaveLength(0); expect(creations).toHaveLength(1);
-  fireEvent.change(screen.getByPlaceholderText('Mô tả công việc bạn muốn thực hiện...'), { target: { value: 'Try again' } });
+  fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Try again' } });
   expect(sendButton()).toBeEnabled();
 });

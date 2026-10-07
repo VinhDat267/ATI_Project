@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 const focusable = 'button:not([disabled]),a[href],input:not([disabled]),textarea:not([disabled]),select:not([disabled]),summary,[tabindex="0"]';
-export function CockpitDialog({ title, onClose, returnFocusId, side, children }: { title: string; onClose: () => void; returnFocusId: string; side?: 'left' | 'right'; children: ReactNode }) {
+export function CockpitDialog({ id, title, onClose, returnFocusId, side, children }: { id?: string; title: string; onClose: () => void; returnFocusId: string; side?: 'left' | 'right'; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose); closeRef.current = onClose;
   useLayoutEffect(() => {
@@ -28,7 +28,7 @@ export function CockpitDialog({ title, onClose, returnFocusId, side, children }:
     };
   }, [returnFocusId]);
   return <div className="fixed inset-0 z-50 flex bg-black/40" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`bg-surface text-text border border-border flex flex-col min-w-0 w-full ${side ? `max-w-md h-full ${side === 'right' ? 'ml-auto' : ''}` : 'max-w-2xl max-h-[85dvh] m-auto rounded-2xl'} shadow-xl`}>
+    <div id={id} ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`bg-surface text-text border border-border flex flex-col min-w-0 w-full ${side ? `max-w-md h-full ${side === 'right' ? 'ml-auto' : ''}` : 'max-w-2xl max-h-[85dvh] m-auto rounded-2xl'} shadow-xl`}>
       <div className="flex items-center justify-between gap-3 border-b border-border p-4"><h2 className="font-semibold">{title}</h2><button type="button" aria-label={`Đóng ${title}`} className="h-10 w-10 shrink-0" onClick={onClose}>✕</button></div>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>

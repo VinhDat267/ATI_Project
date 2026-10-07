@@ -171,10 +171,11 @@ export function handleSSEEvent(
 
     case 'clarification': {
       store.setIsStreaming(false);
+      // The validator only checks `question`; options/context come from the model unchecked.
       store.setClarification({
-        question: data.question || 'Vui lòng làm rõ yêu cầu:',
-        options: Array.isArray(data.options) ? data.options : [],
-        context: data.context,
+        question: typeof data.question === 'string' && data.question.trim() ? data.question : 'Vui lòng làm rõ yêu cầu:',
+        options: Array.isArray(data.options) ? data.options.filter((option: unknown): option is string => typeof option === 'string' && option.trim() !== '') : [],
+        context: typeof data.context === 'string' && data.context.trim() ? data.context : undefined,
       });
       break;
     }

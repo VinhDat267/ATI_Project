@@ -17,7 +17,7 @@ async function openAccount(page: Page) {
   await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
   await page.getByRole('button', { name: /Menu người dùng/ }).click();
     await page.getByRole('menuitem', { name: 'Tài khoản', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Liên kết Google', exact: true })).toBeVisible();
@@ -84,7 +84,7 @@ for (const leave of ['logout', 'workspace'] as const) {
       if (leave === 'logout') {
         await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
         await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).toBeVisible();
-      } else await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+      } else await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
       release();
       await page.waitForFunction(() => sessionStorage.getItem('auth05-test-start-read') === 'true');
       await expect(page).toHaveURL(/\/$/);

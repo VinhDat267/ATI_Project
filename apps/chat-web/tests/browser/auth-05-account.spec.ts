@@ -12,7 +12,7 @@ async function login(page: Page, email: string) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
 
 test('AUTH-05: logging out every other device sends the other browser to login on its next action; a new name reaches the menu', async ({ browser }, info) => {
@@ -35,7 +35,8 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(0);
 
     // The other browser still shows the workspace until its next request meets the revoked session.
-    await two.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
+    // Opening history makes the next authenticated request and detects revocation.
+    await two.getByRole('button', {name:'Mở danh sách hội thoại'}).click();
     await expect(two).toHaveURL(/\/login$/);
     await expect(two.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeVisible();
 

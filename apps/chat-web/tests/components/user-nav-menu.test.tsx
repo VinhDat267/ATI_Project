@@ -7,7 +7,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe('UserNavMenu Component', () => {
+describe.each([undefined, 'prototype'] as const)('UserNavMenu Component %s', variant => {
   it('renders user details and triggers onOpenSettings and onLogout', () => {
     const onOpenSettings = vi.fn();
     const onLogout = vi.fn();
@@ -19,6 +19,7 @@ describe('UserNavMenu Component', () => {
 
     render(
       <UserNavMenu
+        variant={variant}
         user={user}
         onOpenSettings={onOpenSettings}
         onLogout={onLogout}
@@ -43,6 +44,7 @@ describe('UserNavMenu Component', () => {
   it('renders fallback for guest/unnamed user', () => {
     render(
       <UserNavMenu
+        variant={variant}
         user={null}
         onOpenSettings={vi.fn()}
         onLogout={vi.fn()}

@@ -82,7 +82,7 @@ it('shows the login page when a subsequent API request revokes the authenticated
   vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [] });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [] });
   render(<App />);
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   authStorage.setStoredTokens({ refreshToken: 'opaque' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Phiên đã bị thu hồi.' }), { status: 401, headers: { 'Content-Type': 'application/json' } })));
   await act(async () => { await expect(new ApiClient().request('/api/services')).rejects.toMatchObject({ status: 401 }); });

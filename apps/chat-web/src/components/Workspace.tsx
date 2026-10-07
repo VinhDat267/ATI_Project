@@ -18,7 +18,7 @@ interface WorkspaceProps {
   onClearAuthError: () => void; onLogout: () => void;
   route: AppRoute; navigate: (path: string, replace?: boolean) => void;
 }
-export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onClearAuthError, route, navigate }) => {
+export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout, authError, onClearAuthError, route, navigate }) => {
   const {
     conversationId,
     activePlan,
@@ -240,13 +240,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onCl
   const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
 
   return (
-    <div className="workspace h-full w-full min-w-0 bg-bg-page text-text">
-      <main className="h-full flex flex-col min-w-0">
+    <div className="workspace w-full min-w-0">
+      <div className="min-w-0">
         {authError && <div role="alert" className="bg-warning-tint px-4 py-2 flex justify-between"><span>{authError}</span><button type="button" onClick={onClearAuthError} aria-label="Đóng thông báo đăng nhập">✕</button></div>}
         {disconnected && <p role="status" className="bg-warning-tint px-4 py-2 text-warning-text">Mất kết nối, đang thử lại…</p>}
         {actionError && <p role="alert" className="px-4 py-2 text-danger-text">{actionError}</p>}
-        <div className="flex-1 min-h-0">
-          <Cockpit services={services} servicesLoading={servicesLoading} servicesError={servicesError}
+        <div className="contents">
+          <Cockpit user={user} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError}
             contentOverride={history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6">Đang tải hội thoại...</p> : undefined}
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
             onSelectConversation={id => navigate(conversationPath(id))} onSettings={() => navigate('/settings')}
@@ -262,7 +262,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, authError, onCl
                 onRetry={() => handleRetry(failureId)} onEditAndRetry={() => handleRetry(failureId)} onSkip={() => handleSkip(failureId)} onStop={handleStop} onClose={() => setDismissedFailure(failureKey)} />}
             </>} />
         </div>
-      </main>
+      </div>
     </div>
   );
 };
