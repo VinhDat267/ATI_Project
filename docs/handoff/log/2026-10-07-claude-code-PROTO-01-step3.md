@@ -16,6 +16,7 @@
 - **Sự cố nhỏ trong phiên:**
   - một lệnh thay thế qua heredoc làm mất dấu `\` trong selector CSS và regex; đã sửa bằng công cụ ghi file và kiểm lại.
   - một script nối state dùng regex dừng nhầm ở dấu `>` của arrow function, nhưng dừng trước khi ghi nên file không đổi.
+  - commit tự động đêm 06–07/10 (`c50f382`) đưa nhầm hai script dò tạm `scripts/_crop.mjs`, `scripts/_px.mjs` vào PR; phát hiện khi làm bước 4, gỡ ở `ca3c1cd`.
 - **Đêm 06–07/10:** người dùng đi ngủ và cho phép tự mở PR rồi tắt máy. Một script ở nền chờ lần so toàn bộ, điền số liệu, commit `c50f382`, push, mở PR #95 dạng draft (347/348) và hẹn tắt máy. Không merge.
 - **Sáng 07/10, tìm nguyên nhân 9 pixel** (người dùng yêu cầu): bản React vẽ không ổn định ở góc phải header; 110 transition lúc tải có thật nhưng không phải nguyên nhân (tắt đi vẫn lệch); ép vẽ lại cả trang thì khớp 10/10. Chromium giữ mảnh header vẽ ở lượt trước khi React dựng trang bằng JS; chỉ trang vừa khít khung nhìn lộ ra vì ảnh cả trang của trang dài đã tự vẽ lại. Sửa ở script so. Bảng bằng chứng ở task card. Dao động nét chữ Playfair là chuyện khác, chưa tìm ra nguyên nhân.
 - **Sau đó:** lần chạy toàn bộ thứ ba lộ lệch vị trí cuộn ở `users-xac-nhan-khoa-375-dark`, có ở cả hai bản; script chờ hai khung hình sau mỗi bước (`b36a99b`). Lần chạy toàn bộ thứ tư khớp 348/348, exit 0.
