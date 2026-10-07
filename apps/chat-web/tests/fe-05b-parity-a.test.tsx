@@ -268,7 +268,7 @@ it('FE-05b releasing the composer to a blank area allows the next completion hea
   composer.blur();
   expect(document.activeElement).toBe(document.body);
   act(() => useChatStore.setState({ planStatus: 'completed' }));
-  expect(screen.getByRole('heading', { level: 1, name: 'Việc đã xong' })).toHaveFocus();
+  expect(screen.getByRole('heading', { level: 1, name: /^Đã xong \d+ việc trên \d+ công cụ$/ })).toHaveFocus();
 });
 it.each(['Enter', 'Gửi'] as const)(
   'FE-05b clarification drawer submits its edited draft through %s',
@@ -288,7 +288,7 @@ it.each(['Enter', 'Gửi'] as const)(
     if (action === 'Enter') fireEvent.keyDown(input, { key: 'Enter' });
     else
       fireEvent.click(
-        within(dialog).getByRole('button', { name: 'Gửi' }),
+        within(dialog).getByRole('button', { name: 'Gửi tin nhắn' }),
       );
     expect(send).toHaveBeenCalledExactlyOnceWith('Kho C từ nhật ký');
   },
@@ -321,6 +321,7 @@ it('FE-05b moment changes preserve focus inside other recovery dialogs', () => {
 it('FE-05b a moment change preserves active typing and dialog focus', () => {
   useChatStore.setState({ activePlan: plan, planStatus: 'preview' });
   setup();
+  fireEvent.click(screen.getByRole('button', { name: 'Sửa qua Chat' }));
   screen.getByRole('textbox').focus();
   act(() => useChatStore.setState({ planStatus: 'executing' }));
   expect(screen.getByRole('textbox')).toHaveFocus();

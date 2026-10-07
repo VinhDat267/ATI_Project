@@ -11,14 +11,14 @@ export default defineConfig({
   reporter: 'line',
   outputDir: '../../node_modules/.cache/v3-browser-results',
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: `http://127.0.0.1:${process.env.V3_WEB_PORT || 5174}`,
     browserName: 'chromium',
     headless: true,
     trace: 'off',
   },
   webServer: {
     command: process.env.GITHUB_ACTIONS === 'true' ? 'npm run up' : 'npm run up:local:v3',
-    url: 'http://127.0.0.1:3000/api/health',
+    url: `http://127.0.0.1:${process.env.PORT || 3000}/api/health`,
     cwd: '../..',
     reuseExistingServer: false,
     timeout: 30_000,

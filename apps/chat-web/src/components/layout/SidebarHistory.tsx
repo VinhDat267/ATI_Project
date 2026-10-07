@@ -6,11 +6,12 @@ import { formatConversationTime } from '../../services/conversation-time';
 import { loadConversationHistory } from '../../hooks/use-conversation-history';
 
 export interface SidebarHistoryProps {
+  prototype?: boolean;
   currentConversationId: string | null;
   onSelectConversation?: (id: string) => void;
   onCloseMobileSidebar?: () => void;
 }
-export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar }: SidebarHistoryProps) {
+export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar, prototype = false }: SidebarHistoryProps) {
   const conversations = useChatStore(state => state.conversations);
   const firstConfirmedUserMessage = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
   const [search, setSearch] = useState('');
@@ -73,14 +74,16 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
       {conversations.map(conv => {
         const label = conv.title || 'Hội thoại mới';
         const time = formatConversationTime(conv.updatedAt || conv.updated_at || conv.created_at);
-        return <div key={conv.id} className={`rounded-xl p-2.5 text-xs font-medium flex gap-1 items-center transition ${conv.id === currentConversationId
+        return <div key={conv.id} className={prototype ? `p-3 rounded-xl border transition-colors flex items-start gap-1 ${conv.id === currentConversationId ? 'bg-orange-50 border-orange-200' : 'bg-neutral-50 hover:bg-neutral-100 border-brand-border'}` : `rounded-xl p-2.5 text-xs font-medium flex gap-1 items-center transition ${conv.id === currentConversationId
           ? 'bg-surface border border-border shadow-2xs border-l-2 border-l-primary text-text' : 'hover:bg-surface-raised text-text-secondary'}`}>
           {editing === conv.id ? <form className="flex-1 min-w-0" onSubmit={event => { event.preventDefault(); void rename(conv.id); }}>
             <input autoFocus aria-label="Tiêu đề hội thoại" value={title} onChange={event => setTitle(event.target.value)} className="w-full border border-border rounded p-1" />
             <div className="flex gap-2 mt-1"><button type="submit" disabled={saving} aria-label="Lưu tên hội thoại" className="text-primary-text">Lưu</button>
               <button type="button" disabled={saving} onClick={() => setEditing(null)}>Hủy đổi tên</button></div>
-          </form> : <><button type="button" onClick={() => void select(conv.id)} className="min-w-0 flex-1 text-left cursor-pointer flex items-center">
-            <span className="truncate flex-1">{label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}
+          </form> : <><button type="button" aria-label={prototype ? label : undefined} onClick={() => void select(conv.id)} className={prototype ? 'min-w-0 flex-1 text-left cursor-pointer' : 'min-w-0 flex-1 text-left cursor-pointer flex items-center'}>
+            {prototype ? <><div className={`flex justify-between items-center text-[11px] ${conv.id === currentConversationId ? 'text-brand-primary font-semibold' : 'text-neutral-500'}`}>
+              {conv.status && <span className="uppercase">{({chatting:'Đang trao đổi',planning:'Đang lập kế hoạch',completed:'Hoàn thành',executing:'Đang chạy',partial:'Cần xử lý',failed:'Cần xử lý',reconciliation_required:'Cần đối soát',stopped:'Đã dừng'} as Record<string,string>)[conv.status] ?? 'Hội thoại'}</span>}{time && <span>{time}</span>}
+            </div><div className={`font-medium mt-1 ${conv.id === currentConversationId ? 'text-brand-text' : 'text-neutral-800'}`}>{label}</div></> : <><span className="truncate flex-1">{label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}</>}
           </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="shrink-0 text-text-muted p-1">✎</button></>}
         </div>;
       })}

@@ -65,7 +65,8 @@ it.each([false, true])('keeps loaded detail and preview after optional snapshot 
   if (newerExecution) act(() => useChatStore.getState().updateStepStatus('step_live', 'succeeded'));
   await act(async () => rejectSnapshot(Object.assign(new Error('Snapshot unavailable'), { status: 503 })));
   expect(await screen.findByText('Saved request')).toBeInTheDocument();
-  expect(screen.getByText('Pending preview')).toBeInTheDocument();
+  expect(useChatStore.getState().activePlan?.summary).toBe('Pending preview');
+  expect(await screen.findByRole('heading',{level:1,name:/Tôi sẽ làm/})).toBeInTheDocument();
   expect(useChatStore.getState().conversationId).toBe('saved');
   expect(useChatStore.getState().planStatus).toBe('preview');
   expect(useChatStore.getState().executionLoadError).toBe(newerExecution ? null : 'Snapshot unavailable');

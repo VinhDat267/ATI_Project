@@ -71,7 +71,7 @@ it('replaces the temporary New draft so one Back returns to the previous convers
   act(() => window.history.forward());
   await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
 });
-function sendButton() { return within(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).closest('form') ?? screen.getByRole('region', {name:'Cockpit'})).getByRole('button', { name: /^(Gửi|Gửi yêu cầu|Xác nhận và tiếp tục)$/ }); }
+function sendButton() { return within(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).closest('form') ?? screen.getByRole('region', {name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).getByRole('button', { name: /^(Gửi|Gửi tin nhắn|Gửi yêu cầu|Xác nhận và tiếp tục)$/ }); }
 function send(content: string) {
   const input = screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   fireEvent.change(input, { target: { value: content } }); fireEvent.keyDown(input, { key: 'Enter' });

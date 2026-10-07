@@ -97,7 +97,8 @@ export async function startFakeOidc(options = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const provider = await startFakeOidc({ port: Number(process.env.FAKE_OIDC_PORT ?? 55534) });
+  const provider = await startFakeOidc({ port: Number(process.env.FAKE_OIDC_PORT ?? 55534),
+    ...(process.env.FAKE_OIDC_REDIRECT_URI ? { redirectUri: process.env.FAKE_OIDC_REDIRECT_URI } : {}) });
   process.stdout.write(`${JSON.stringify({ status: 'ready', port: provider.server.address().port })}\n`);
   let stopping = false;
   const stop = async () => {

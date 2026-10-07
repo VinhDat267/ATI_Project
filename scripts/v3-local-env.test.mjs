@@ -9,6 +9,16 @@ import { assertBrowserV3Environment, assertLocalV3Environment } from './v3-local
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const local = 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 
+test('parallel browser tasks can explicitly select another dedicated test port', () => {
+  const env = { RUNTIME_MODE: 'sandbox', V3_LOCAL_DB_PORT: '55534', DATABASE_URL: local.replace(':55533/', ':55534/') };
+  assert.doesNotThrow(() => assertLocalV3Environment(env));
+  assert.doesNotThrow(() => assertBrowserV3Environment(env));
+  for (const port of ['15433', '5432', '015433', '05432', '1', '65536', 'abc', '55534/path']) {
+    assert.throws(() => assertBrowserV3Environment({ ...env, V3_LOCAL_DB_PORT: port, DATABASE_URL: local.replace(':55533/', `:${port}/`) }), /dedicated local v3 database/);
+  }
+  assert.throws(() => assertBrowserV3Environment({ ...env, DATABASE_URL: local }), /dedicated local v3 database/);
+});
+
 test('accepts only the dedicated local v3 database', () => {
   assert.doesNotThrow(() => assertLocalV3Environment({ RUNTIME_MODE: 'sandbox', DATABASE_URL: local }));
   for (const databaseUrl of [
