@@ -1,5 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+/* FE-04b: Tailwind không gói vào cascade layer, cùng thứ tự với bản React của bản mẫu
+   (docs/design/prototypes/react/src/styles/tailwind.css). theme.css và CSS riêng của trang bản mẫu được chèn trước
+   stylesheet này (usePrototypePage), nên thua utility khi cùng độ ưu tiên, như Tailwind v3 CDN của bản mẫu.
+   Các lớp trong src/prototype/styles/ chỉ đổi giao diện của trang bản mẫu (:root[data-proto-page]), trừ bóng shadow-sm. */
+@import "tailwindcss/theme.css";
+@import "./prototype/styles/tokens.css";
+@import "./prototype/styles/v3-palette.css";
+@import "./prototype/styles/v3-compat.css";
+@import "tailwindcss/preflight.css";
+@import "./prototype/styles/v3-base.css";
+@import "tailwindcss/utilities.css";
+@import "./prototype/styles/v3-theme-targets.css";
+/* Gradient và màu divide của bản mẫu đi theo cách v3 (v3-theme-targets.css); v4 không sinh các class này, để không khai
+   @property kiểu <color> làm hỏng ghi đè chế độ tối của theme.css. Màn chưa chuyển không dùng utility gradient. */
+@source not inline("bg-gradient-to-t bg-gradient-to-r bg-gradient-to-br from-[#F8F8F6] from-amber-50/80 from-white via-[#F8F8F6]/95 via-white to-amber-50/40 to-transparent divide-neutral-200 divide-[#E7E7E2]");
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -24,7 +38,30 @@
   --danger: #DC2626;
   --danger-tint: #FEF2F2;
   --danger-text: #B91C1C;
+  /* Cỡ chữ, chiều cao dòng và font của màn chưa chuyển (FE-04: chữ 14–40px, chiều cao dòng mặc định của Tailwind v4). */
+  --ati-text-xs: 14px; --ati-text-sm: 14px; --ati-text-base: 16px; --ati-text-lg: 18px; --ati-text-xl: 24px;
+  --ati-text-2xl: 24px; --ati-text-3xl: 32px; --ati-text-4xl: 40px; --ati-text-5xl: 40px; --ati-text-6xl: 40px;
+  --ati-lh-xs: calc(1 / 0.75); --ati-lh-sm: calc(1.25 / 0.875); --ati-lh-base: calc(1.5 / 1); --ati-lh-lg: calc(1.75 / 1.125);
+  --ati-lh-xl: calc(1.75 / 1.25); --ati-lh-2xl: calc(2 / 1.5); --ati-lh-3xl: calc(2.25 / 1.875); --ati-lh-4xl: calc(2.5 / 2.25);
+  --ati-lh-5xl: 1; --ati-lh-6xl: 1;
+  --ati-font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+  --ati-font-display: 'Playfair Display', Georgia, serif;
+  --ati-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
+/* Trang của bản React (FE-04b, đặc tả giao diện mục 1.2): thang chữ, chiều cao dòng và font dự phòng của Tailwind v3 như
+   bản mẫu. Font chính của trang lấy từ token theo trang (--p-font-*, tokens.css). */
+:root[data-proto-page] {
+  --ati-text-xs: 0.75rem; --ati-text-sm: 0.875rem; --ati-text-base: 1rem; --ati-text-lg: 1.125rem; --ati-text-xl: 1.25rem;
+  --ati-text-2xl: 1.5rem; --ati-text-3xl: 1.875rem; --ati-text-4xl: 2.25rem; --ati-text-5xl: 3rem; --ati-text-6xl: 3.75rem;
+  --ati-lh-xs: 1rem; --ati-lh-sm: 1.25rem; --ati-lh-base: 1.5rem; --ati-lh-lg: 1.75rem; --ati-lh-xl: 1.75rem;
+  --ati-lh-2xl: 2rem; --ati-lh-3xl: 2.25rem; --ati-lh-4xl: 2.5rem; --ati-lh-5xl: 1; --ati-lh-6xl: 1;
+  --ati-font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --ati-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Bản mẫu không tô nền <html>; nền của <body> phủ cả khung nhìn như trong bản mẫu. */
+  background: transparent;
+}
+/* Bản mẫu là các trang độc lập: header, main, footer là con trực tiếp của <body>. */
+:root[data-proto-page] #root { display: contents; }
 html.dark {
   --bg-page: #0B1020;
   --surface: #131B2F;
@@ -70,32 +107,33 @@ html.dark {
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
   --color-danger-text: var(--danger-text);
-  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --text-xs: 14px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --text-xl: 24px;
-  --text-2xl: 24px;
-  --text-3xl: 32px;
-  --text-4xl: 40px;
-  --text-5xl: 40px;
-  --text-6xl: 40px;
+  /* Theo trang: token của bản mẫu (--p-font-*) khi có, nếu không thì font của màn chưa chuyển. */
+  --font-sans: var(--p-font-sans, var(--ati-font-sans));
+  --font-display: var(--p-font-display, var(--ati-font-display));
+  --font-mono: var(--p-font-mono, var(--ati-font-mono));
+  --text-xs: var(--ati-text-xs); --text-xs--line-height: var(--ati-lh-xs);
+  --text-sm: var(--ati-text-sm); --text-sm--line-height: var(--ati-lh-sm);
+  --text-base: var(--ati-text-base); --text-base--line-height: var(--ati-lh-base);
+  --text-lg: var(--ati-text-lg); --text-lg--line-height: var(--ati-lh-lg);
+  --text-xl: var(--ati-text-xl); --text-xl--line-height: var(--ati-lh-xl);
+  --text-2xl: var(--ati-text-2xl); --text-2xl--line-height: var(--ati-lh-2xl);
+  --text-3xl: var(--ati-text-3xl); --text-3xl--line-height: var(--ati-lh-3xl);
+  --text-4xl: var(--ati-text-4xl); --text-4xl--line-height: var(--ati-lh-4xl);
+  --text-5xl: var(--ati-text-5xl); --text-5xl--line-height: var(--ati-lh-5xl);
+  --text-6xl: var(--ati-text-6xl); --text-6xl--line-height: var(--ati-lh-6xl);
 }
-@layer base {
-  body { font-family: var(--font-sans); background: var(--bg-page); color: var(--text); margin: 0; }
-  h1, h2, h3 { font-family: var(--font-display); }
-  code, pre { font-family: var(--font-mono); }
-  button, input, textarea, select { font: inherit; }
-  button, a, input, textarea, select, summary { min-height: 40px; }
-  button { cursor: pointer; }
-  button:disabled { cursor: not-allowed; }
-}
+/* Quy tắc nền và trợ năng của FE-04 chỉ cho màn chưa chuyển; trang của bản React theo bản mẫu (đặc tả 1.1 điểm 4).
+   Tailwind không còn ở cascade layer, nên :where() giữ độ ưu tiên thấp như phần base cũ (utility vẫn thắng). */
+:where(:root:not([data-proto-page])) body { font-family: var(--font-sans); background: var(--bg-page); color: var(--text); margin: 0; }
+:where(:root:not([data-proto-page])) :is(h1, h2, h3) { font-family: var(--font-display); }
+:where(:root:not([data-proto-page])) :is(code, pre) { font-family: var(--font-mono); }
+:where(:root:not([data-proto-page])) :is(button, input, textarea, select) { font: inherit; }
+:where(:root:not([data-proto-page])) :is(button, a, input, textarea, select, summary) { min-height: 40px; }
+:where(:root:not([data-proto-page])) button { cursor: pointer; }
+:where(:root:not([data-proto-page])) button:disabled { cursor: not-allowed; }
 /* These accessibility requirements must outrank retained Tailwind sizing/weight utilities. */
-button { min-width: 40px; }
-button:is(.bg-primary, .bg-success, .bg-warning).text-white { font-weight: 600; }
-:is(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+:root:not([data-proto-page]) button { min-width: 40px; }
+:root:not([data-proto-page]) button:is(.bg-primary, .bg-success, .bg-warning).text-white { font-weight: 600; }
+:root:not([data-proto-page]) :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .app-shell:has(.workspace) { height: 100dvh; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

@@ -12,7 +12,7 @@ export function AuthFormFrame({ title, description, children, navigate }: {
     <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08),_transparent_65%)]" />
     <div className="relative w-full max-w-md bg-surface rounded-3xl border border-border shadow-2xl shadow-blue-900/5 p-7 sm:p-9 flex flex-col gap-5">
       <header className="text-center flex flex-col items-center gap-2">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-tint to-primary-tint text-primary-text flex items-center justify-center font-bold">AI</div>
+        <div className="w-10 h-10 rounded-2xl bg-[linear-gradient(to_top_right_in_oklab,var(--primary-tint)_0%,var(--primary-tint)_100%)] text-primary-text flex items-center justify-center font-bold">AI</div>
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">{title}</h1>
         <p className="text-sm text-text-muted">{description}</p>
       </header>

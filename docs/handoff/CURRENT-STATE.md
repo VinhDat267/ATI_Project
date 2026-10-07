@@ -1,13 +1,14 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 07/10/2026, sau merge PROTO-01 bước 4 #96 tại `581addd`: cả 12 bản mẫu đã có bản React trong `docs/design/prototypes/react/`, khớp bản HTML gốc theo script so; chưa đưa vào app. Trước đó:
+**Cập nhật lần cuối:** 07/10/2026, sau merge #97 tại `0cdb02a`: kế hoạch đưa thẳng bản React của bản mẫu vào app (đặc tả mục 1, 1.1, 1.2 viết lại, thêm FE-04b) và tài liệu design system Agentic theo bản mẫu. FE-04b thi công xong, chờ review. Trước đó:
+- PROTO-01 bước 4 #96 (`581addd`): cả 12 bản mẫu đã có bản React trong `docs/design/prototypes/react/`;
 - PROTO-01 bước 1–3: #93 (`00e9c5f`), #94 (`852342c`), #95 (`458c5ad`);
 - #92 (`18980ec`): bản mẫu là chuẩn hình thức, task card FE-05b;
 - FE-05 #90 (`ee65cd0`): cockpit khoảnh khắc 1–6, ngăn hội thoại và ngăn lịch sử; review độc lập đạt, 2 lỗi P3 chuyển vào FE-05b;
 - FE-04 #88 (`89d1999`) và UI-API-01 #86 (`210d3b6`): token/theme/shell và API cho giao diện mới;
 - #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01).
 
-Agent cập nhật: Claude Code (sau merge #96).
+Agent cập nhật: Claude Code (sau merge #97, trong PR FE-04b).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -17,7 +18,7 @@ Agent cập nhật: Claude Code (sau merge #96).
 > **Kế hoạch tuần 3–4** vào `main` qua #25 tại `af82961`; #24 và #25 chỉ sửa tài liệu. Tiến độ bốn mảng:
 > - **service mới:** W3-00b đã merge #71 và review độc lập đạt sau sửa P2; W3-09 đã merge và nghiệm thu chỉ đọc với Jira thật. Cả năm adapter mới đã merge, W3-06 đã đo model thật với fixtures, **W3-07 xong**: năm service mới và workflow 4 service đã chạy thật. Policy chỉ đọc và latency services đã có task card W3-10 (#77); chạy qua frontend live là W3-11; parity ff15 vẫn mở;
 > - **tài khoản:** AUTH-01 → AUTH-06 và AUTH-02b đã merge; Gmail SMTP/Google thật đạt AUTH-06;
-> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Ngày 07/10 người dùng chốt **đưa thẳng bản React của bản mẫu vào app** ([PROTO-01](tasks/PROTO-01-prototypes-to-react.md), xong cả 4 bước #93 → #96): app theo Agentic đúng như 12 bản mẫu, bỏ các điều chỉnh riêng cho app của đặc tả (chữ tối thiểu 14px, nền `#F6F6F1`, token suy ra của FE-04). Tiếp theo [FE-04b](tasks/FE-04b-prototype-foundation.md) (lớp nền), rồi FE-05b (cockpit = trang `app-stage` của bản React, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). FE-07, FE-08, FE-09 giao song song được sau FE-04b. Các trang và khoảnh khắc còn lại chưa thi công;
+> - **frontend:** FE-01 → FE-03, FE-03b, FE-04 và FE-05 đã merge; UI-API-01 đã merge. Giao diện Agentic có token/theme/shell và cockpit khoảnh khắc 1–6. Ngày 07/10 người dùng chốt **đưa thẳng bản React của bản mẫu vào app** ([PROTO-01](tasks/PROTO-01-prototypes-to-react.md), xong cả 4 bước #93 → #96): app theo Agentic đúng như 12 bản mẫu, bỏ các điều chỉnh riêng cho app của đặc tả (chữ tối thiểu 14px, nền `#F6F6F1`, token suy ra của FE-04). Tiếp theo [FE-04b](tasks/FE-04b-prototype-foundation.md) (lớp nền; thi công xong 07/10, chờ review), rồi FE-05b (cockpit = trang `app-stage` của bản React, kèm 2 P3 từ kiểm tra FE-05), rồi FE-06 (khoảnh khắc 7–9, từ chối/hỏi lại, lỗi chung). FE-07, FE-08, FE-09 giao song song được sau FE-04b. Các trang và khoảnh khắc còn lại chưa thi công;
 > - **đánh giá:** W4-01 → W4-04.
 >
 > **FE-01 xong** qua #27 tại `9d262c6`; **W3-00 xong** qua #29 tại `c7a38c0`; **W3-01 xong** qua #30 tại `716f568`; **W3-02 xong** qua #31 tại `ab2c599`; **W3-03 xong** qua #32 tại `fca384d`; **W3-04 xong** qua #33 tại `4a4553b`; **W3-05 xong** qua #34 tại `dc80de4`; **W3-06 đo xong** qua #35 tại `a75ac35`, nhưng parity bộ cũ chưa đạt và nghiệm thu sản phẩm còn incomplete. `rf06` clarification đã được người dùng chốt trước commit/model call. **AUTH-01 xong** qua #41 tại `fbd993f`; **FE-02 xong** qua #42 tại `8b6c8e6`. AUTH-02/AUTH-03 và FE-03 đã merge; đăng ký email bật mặc định khi email được bật, live không SMTP tắt đăng ký email. AUTH-04 đã merge qua #66, AUTH-05 qua #68 và sửa sau review #73 tại `198fe6d`; W3-00b đã merge qua #71 tại `1200a3f`. W3-07 đã xong ngày 04/10 (xem đoạn dưới). Thứ tự và các mốc xem `ROADMAP.md`.
@@ -105,6 +106,10 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **#97 kế hoạch đưa bản React vào app** (`0cdb02a`), merge 07/10 lúc 15:48:56 Việt Nam. Chỉ tài liệu, tự review; người dùng cho merge. CI `v3` xanh đúng head `61cf11f`, cây merge bằng head.
+  - Người dùng chốt: đưa thẳng bản React của bản mẫu vào app; app theo Agentic đúng như 12 bản mẫu, bỏ các điều chỉnh riêng cho app (chữ tối thiểu 14px, nền `#F6F6F1`, token suy ra). Đặc tả mục 1, 1.1, 1.2 viết lại; thêm FE-04b; FE-05b dời 13/10; FE-06 → FE-10 chép trang của bản React.
+  - `docs/design/design-system.md`: design system rút từ 12 bản mẫu, đối chiếu gói Agentic của Open Design 0.24.1 (gói tự mâu thuẫn giữa `DESIGN.md` và `tokens.css`; không chép file vì không ghi giấy phép).
+  - Xem [log](log/2026-10-07-claude-code-plan-port-prototypes.md).
 - **PROTO-01 bước 4 xong #96** (`581addd`), merge 07/10 lúc 14:14:47 Việt Nam: `index` (route `/`) và `app-stage` sang React; cả 12 trang không còn `todo()`.
   - Lớp tương thích mới: class `transform` của v3 luôn đặt ma trận đơn vị (phần tử có lớp vẽ riêng, đổi cách khử răng cưa chữ bên cạnh), v4 không; giữ cách của v3 ở 20 chỗ trong 9 trang. Biến `--font-*` của trang đổi thành `--page-font-*` vì bị biến theme v4 đè.
   - Script so có thêm so transform thực tế, bước `move`, tuỳ chọn `only`/`motion`; mặc định chạy 12 trang.

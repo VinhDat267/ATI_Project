@@ -1,0 +1,71 @@
+/* Chép từ docs/design/prototypes/react/src/styles/v3-compat.css (main 0cdb02a).
+   Khác bản React: phần @theme khai theo phạm vi (xem ngay dưới); @custom-variant dark khai ở src/index.css. */
+/* Giá trị và biến thể mặc định của Tailwind v3 mà v4 đã đổi. Bản mẫu viết theo v3 nên giữ nguyên v3. */
+/* Phần @theme của bản React, trong app khai theo phạm vi:
+   - shadow-sm, drop-shadow-sm: Tailwind chép thẳng giá trị vào utility lúc dựng CSS, không đọc biến, nên khai trong @theme
+     (áp cho cả app, màn chưa chuyển có bóng nhạt hơn một chút);
+   - blur-sm, rounded-sm, line-height của text-*: utility đọc biến, nên chỉ đặt cho trang bản mẫu (:root[data-proto-page]).
+     Line-height của text-* do src/index.css đặt qua --ati-lh-* (cùng chỗ với cỡ chữ). */
+@theme {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --drop-shadow-sm: 0 1px 1px rgb(0 0 0 / 0.05);
+}
+:root[data-proto-page] {
+  --blur-sm: 4px;
+  --radius-sm: 0.125rem;
+}
+
+/* space-x/space-y/divide theo cách tính của v3: margin/viền đặt ở các phần tử sau phần tử đầu, bỏ qua [hidden].
+   Bộ chuyển đổi tên class sang v3-* (scripts/lib/html-jsx.mjs), vì v4 đặt margin/viền ở các phần tử trước phần tử cuối. */
+@utility v3-space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(calc(var(--spacing) * --value(number)) * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(calc(var(--spacing) * --value(number)) * var(--tw-space-y-reverse));
+  }
+}
+@utility v3-space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 0;
+    margin-right: calc(calc(var(--spacing) * --value(number)) * var(--tw-space-x-reverse));
+    margin-left: calc(calc(var(--spacing) * --value(number)) * calc(1 - var(--tw-space-x-reverse)));
+  }
+}
+/* Khoảng cách âm (-space-x-1.5, app-stage): v4 cần utility âm khai riêng. */
+@utility -v3-space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 0;
+    margin-right: calc(calc(var(--spacing) * --value(number) * -1) * var(--tw-space-x-reverse));
+    margin-left: calc(calc(var(--spacing) * --value(number) * -1) * calc(1 - var(--tw-space-x-reverse)));
+  }
+}
+@utility -v3-space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(calc(var(--spacing) * --value(number) * -1) * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(calc(var(--spacing) * --value(number) * -1) * var(--tw-space-y-reverse));
+  }
+}
+@utility v3-divide-y {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-divide-y-reverse: 0;
+    border-top-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+    border-bottom-width: calc(1px * var(--tw-divide-y-reverse));
+  }
+}
+
+/* outline-none của v3: viền trong suốt, vẫn hiện thành viền thật ở chế độ tương phản cao (forced colors). */
+@utility v3-outline-none {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Class transform của v3 luôn đặt transform (ma trận đơn vị khi chưa có translate/rotate/scale), nên phần tử có lớp vẽ
+   riêng: chữ trong đó được khử răng cưa khác (index, nút "Quay lại đăng nhập") và phần tử thành khối xếp chồng riêng.
+   v4 không đặt gì; translate/rotate/scale của v4 là thuộc tính riêng nên cộng dồn được với ma trận đơn vị này. */
+@utility v3-transform {
+  transform: translate(0, 0);
+}
+
+/* v4 chỉ áp hover trên thiết bị có chuột; v3 áp mọi nơi. */
+@custom-variant hover (&:hover);

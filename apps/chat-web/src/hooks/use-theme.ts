@@ -6,7 +6,7 @@ const systemTheme = (): Theme => window.matchMedia?.('(prefers-color-scheme: dar
 export function useTheme() {
   const preference = useRef<Theme | null>(storedTheme());
   const [theme, setTheme] = useState<Theme>(() => preference.current ?? systemTheme());
-  useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); document.documentElement.style.colorScheme = theme; }, [theme]);
+  useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); document.documentElement.setAttribute('data-theme', theme); document.documentElement.style.colorScheme = theme; }, [theme]);
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
     const systemChanged = () => { if (!preference.current) setTheme(systemTheme()); };

@@ -49,8 +49,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   return (
     <main className="min-h-screen lg:h-screen w-full flex flex-col justify-between items-center bg-surface-inset text-text font-sans p-6 sm:p-8 relative overflow-hidden">
       {/* Hiệu ứng ánh sáng nền ambient nhẹ nhàng đồng nhất toàn trang */}
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[46rem] h-[24rem] bg-gradient-to-b from-primary via-primary to-transparent rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[40rem] h-[20rem] bg-gradient-to-t from-primary via-cyan-400/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[46rem] h-[24rem] bg-[linear-gradient(to_bottom_in_oklab,var(--primary)_0%,var(--primary)_50%,transparent_100%)] rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[40rem] h-[20rem] bg-[linear-gradient(to_top_in_oklab,var(--primary)_0%,color-mix(in_oklab,var(--color-cyan-400)_5%,transparent)_50%,transparent_100%)] rounded-full blur-3xl pointer-events-none" />
 
       {/* 1. Phần Đầu trang: Nhận diện Thương hiệu & Định vị Nền tảng */}
       <header className="relative z-10 flex flex-col items-center text-center max-w-2xl mx-auto pt-2 sm:pt-4">
@@ -87,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         <div className="w-full bg-surface rounded-3xl border border-border shadow-2xl shadow-blue-900/5 backdrop-blur-xl p-7 sm:p-9 flex flex-col gap-5">
           {/* Header Form */}
           <div className="flex flex-col items-center text-center gap-1.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-tint to-primary-tint text-primary-text flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/25 mb-1">
+            <div className="w-10 h-10 rounded-2xl bg-[linear-gradient(to_top_right_in_oklab,var(--primary-tint)_0%,var(--primary-tint)_100%)] text-primary-text flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/25 mb-1">
               AI
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-text">

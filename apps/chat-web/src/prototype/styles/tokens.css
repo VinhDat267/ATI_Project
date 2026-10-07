@@ -1,0 +1,248 @@
+/* Chép từ docs/design/prototypes/react/src/styles/tokens.css (main 0cdb02a). Giữ nguyên nội dung. */
+/* Sinh tự động bởi scripts/gen-tokens.mjs từ tailwind.config của 12 bản mẫu. Không sửa tay. */
+@theme {
+  --color-brand-bg: var(--p-color-brand-bg);
+  --color-brand-border: var(--p-color-brand-border);
+  --color-brand-border-subtle: var(--p-color-brand-border-subtle);
+  --color-brand-danger: var(--p-color-brand-danger);
+  --color-brand-muted: var(--p-color-brand-muted);
+  --color-brand-primary: var(--p-color-brand-primary);
+  --color-brand-primary-hover: var(--p-color-brand-primary-hover);
+  --color-brand-primary-light: var(--p-color-brand-primary-light);
+  --color-brand-primary-subtle: var(--p-color-brand-primary-subtle);
+  --color-brand-subtle: var(--p-color-brand-subtle);
+  --color-brand-success: var(--p-color-brand-success);
+  --color-brand-success-subtle: var(--p-color-brand-success-subtle);
+  --color-brand-surface: var(--p-color-brand-surface);
+  --color-brand-text: var(--p-color-brand-text);
+  --color-brand-warn: var(--p-color-brand-warn);
+  --color-brand-warning: var(--p-color-brand-warning);
+  --color-dark-bg: var(--p-color-dark-bg);
+  --color-dark-border: var(--p-color-dark-border);
+  --color-dark-muted: var(--p-color-dark-muted);
+  --color-dark-surface: var(--p-color-dark-surface);
+  --color-dark-surface-warm: var(--p-color-dark-surface-warm);
+  --color-dark-text: var(--p-color-dark-text);
+  --font-body: var(--p-font-body);
+  --font-display: var(--p-font-display);
+  --font-mono: var(--p-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  --font-sans: var(--p-font-sans, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+  --shadow-drawer: var(--p-shadow-drawer);
+  --shadow-elevated: var(--p-shadow-elevated);
+  --shadow-orange-glow: var(--p-shadow-orange-glow);
+  --shadow-soft: var(--p-shadow-soft);
+  --shadow-soft-card: var(--p-shadow-soft-card);
+}
+
+:root[data-proto-page="404"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="account"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.08);
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="app-stage"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-border-subtle: #F0F0EB;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-primary-hover: #E04C00;
+  --p-color-brand-primary-light: #FFF3ED;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warning: #D97706;
+  --p-color-dark-bg: #0b1020;
+  --p-color-dark-border: #293653;
+  --p-color-dark-muted: #94a3b8;
+  --p-color-dark-surface: #131b2f;
+  --p-color-dark-surface-warm: #182343;
+  --p-color-dark-text: #f8fafc;
+  --p-font-body: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-shadow-elevated: 0 4px 6px -1px rgba(0,0,0,0.02), 0 20px 32px -6px rgba(0,0,0,0.07);
+  --p-shadow-orange-glow: 0 0 0 3px rgba(255, 87, 1, 0.18);
+  --p-shadow-soft-card: 0 1px 3px rgba(0,0,0,0.02), 0 8px 24px -4px rgba(0,0,0,0.04);
+}
+
+:root[data-proto-page="auth-action"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="errors"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="guide"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-primary-hover: #E04D00;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+:root[data-proto-page="history"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.08);
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="index"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-border-subtle: #F0F0EB;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-primary-hover: #E04C00;
+  --p-color-brand-primary-subtle: #FFF3ED;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-success-subtle: #F0FDF4;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warning: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  --p-shadow-elevated: 0 4px 6px -1px rgba(0,0,0,0.02), 0 20px 36px -6px rgba(0,0,0,0.08);
+  --p-shadow-orange-glow: 0 0 0 3px rgba(255, 87, 1, 0.2);
+  --p-shadow-soft-card: 0 1px 3px rgba(0,0,0,0.02), 0 10px 28px -4px rgba(0,0,0,0.05);
+}
+
+:root[data-proto-page="privacy"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-primary-hover: #E04D00;
+  --p-color-brand-subtle: #F3F4F6;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", monospace;
+  --p-font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+  --p-shadow-elevated: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --p-shadow-soft-card: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+:root[data-proto-page="responses"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="settings"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.08);
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-proto-page="users"] {
+  --p-color-brand-bg: #F8F8F6;
+  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-danger: #DC2626;
+  --p-color-brand-muted: #6B7280;
+  --p-color-brand-primary: #FF5701;
+  --p-color-brand-success: #16A34A;
+  --p-color-brand-surface: #FFFFFF;
+  --p-color-brand-text: #111827;
+  --p-color-brand-warn: #D97706;
+  --p-font-display: "Playfair Display", Georgia, serif;
+  --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --p-font-sans: "Be Vietnam Pro", Inter, system-ui, sans-serif;
+  --p-shadow-drawer: -8px 0 32px rgba(0, 0, 0, 0.08);
+  --p-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.03), 0 10px 30px rgba(0, 0, 0, 0.05);
+}

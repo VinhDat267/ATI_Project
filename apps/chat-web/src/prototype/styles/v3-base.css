@@ -1,0 +1,31 @@
+/* Chép từ docs/design/prototypes/react/src/styles/v3-base.css (main 0cdb02a).
+   Khác bản React: mọi selector bọc trong :where(:root[data-proto-page]) (độ ưu tiên không đổi), màn chưa chuyển giữ preflight v4. */
+/* v4: leading-* luôn thắng cỡ chữ text-* nhờ biến --tw-leading. v3: theo thứ tự CSS, nên `leading-tight sm:text-4xl`
+   lấy chiều cao dòng của text-4xl ở màn hình từ sm. Vô hiệu biến này để line-height theo cascade như v3. */
+:where(:root[data-proto-page]) *,
+:where(:root[data-proto-page]) ::before,
+:where(:root[data-proto-page]) ::after,
+:where(:root[data-proto-page]) ::backdrop {
+  --tw-leading: initial !important;
+}
+
+/* Phần preflight của Tailwind v3 khác v4: màu viền mặc định, màu placeholder, con trỏ trên nút. */
+:where(:root[data-proto-page]) *,
+:where(:root[data-proto-page]) ::after,
+:where(:root[data-proto-page]) ::before,
+:where(:root[data-proto-page]) ::backdrop,
+:where(:root[data-proto-page]) ::file-selector-button {
+  border-color: #e5e7eb;
+}
+:where(:root[data-proto-page]) input::placeholder,
+:where(:root[data-proto-page]) textarea::placeholder {
+  opacity: 1;
+  color: #9ca3af;
+}
+:where(:root[data-proto-page]) button,
+:where(:root[data-proto-page]) [role="button"] {
+  cursor: pointer;
+}
+:where(:root[data-proto-page]) :disabled {
+  cursor: default;
+}

@@ -8,6 +8,7 @@
         try { preference = localStorage.getItem('ati-theme'); } catch {}
         const dark = preference === 'dark' || (preference !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.toggle('dark', Boolean(dark));
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
       })();
     </script>
@@ -16,6 +17,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>AI Workflow Platform v3</title>
+    <!-- theme.css và CSS riêng của trang bản mẫu được chèn ngay trước mốc này, trước stylesheet của app (usePrototypePage). -->
+    <meta name="proto-css-anchor" />
   </head>
   <body class="bg-bg-page text-text antialiased">
     <div id="root"></div>

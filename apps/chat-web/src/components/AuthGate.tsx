@@ -3,7 +3,7 @@ import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import { apiClient, sharesAuthSession } from '../services/api-client';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore } from '../store/chat-store';
-import { NotFoundView } from '../views/NotFoundView';
+import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { routes, type AppRoute } from '../routes';
 import type { User } from '../types';
 
@@ -87,7 +87,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   };
   const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password', 'google-callback'].includes(route.kind);
   if (authToken && !isAccountFlow) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
-  if (route.kind === 'not-found') return <NotFoundView onGoHome={() => navigate('/')} />;
+  if (route.kind === 'not-found') return <NotFoundPage signedIn={false} navigate={navigate} />;
   const definition = routes.find(entry => entry.kind === route.kind);
   const PublicView = definition && 'publicView' in definition ? definition.publicView : routes[1].publicView;
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}

@@ -25,7 +25,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-tint to-primary-tint text-primary-text flex items-center justify-center font-bold text-xs shadow-md shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-[linear-gradient(to_top_right_in_oklab,var(--primary-tint)_0%,var(--primary-tint)_100%)] text-primary-text flex items-center justify-center font-bold text-xs shadow-md shadow-blue-500/20">
               AI
             </div>
             <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
       {/* 2. Hero Section */}
       <section className="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
         {/* Ambient background glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[54rem] h-[28rem] bg-gradient-to-b from-primary via-primary-tint to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[54rem] h-[28rem] bg-[linear-gradient(to_bottom_in_oklab,var(--primary)_0%,var(--primary-tint)_50%,transparent_100%)] rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
           {/* Eyebrow Pill */}
@@ -150,7 +150,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
           {/* Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-text leading-[1.15]">
             Biến một câu lệnh thành quy trình <br className="hidden sm:inline" />
-            <span className="bg-gradient-to-r from-primary to-primary bg-clip-text text-transparent">
+            <span className="bg-[linear-gradient(to_right_in_oklab,var(--primary)_0%,var(--primary)_100%)] bg-clip-text text-transparent">
               đa dịch vụ tự động
             </span>
           </h1>
@@ -320,8 +320,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
             </div>
 
             {/* Cột SAU (Với AI Workflow Platform) */}
-            <div className="bg-gradient-to-b from-primary-tint via-surface to-primary-tint border-2 border-border-strong rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 px-3.5 py-1 bg-gradient-to-l from-primary-tint to-primary-tint text-primary-text text-sm font-bold rounded-bl-2xl uppercase tracking-wider">
+            <div className="bg-[linear-gradient(to_bottom_in_oklab,var(--primary-tint)_0%,var(--surface)_50%,var(--primary-tint)_100%)] border-2 border-border-strong rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-blue-500/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 px-3.5 py-1 bg-[linear-gradient(to_left_in_oklab,var(--primary-tint)_0%,var(--primary-tint)_100%)] text-primary-text text-sm font-bold rounded-bl-2xl uppercase tracking-wider">
                 Đột phá
               </div>
 
@@ -552,7 +552,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onGoToLogin })
       </section>
 
       {/* 6. Call to Action Banner */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-primary-tint to-primary-tint text-primary-text text-center">
+      <section className="py-16 sm:py-20 bg-[linear-gradient(to_bottom_right_in_oklab,var(--primary-tint)_0%,var(--primary-tint)_100%)] text-primary-text text-center">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
             Sẵn sàng giải phóng đội ngũ của bạn?
