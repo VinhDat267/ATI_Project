@@ -42,13 +42,13 @@ Log stdout/stderr đầy đủ nằm ngoài repo tại `C:/Users/VinhDat/.codex/
 
 | Lệnh/ca RED | Output | Exit | Bằng chứng |
 |---|---|---:|---|
-| `npm test -w @wap/chat-web -- --reporter=dot tests/fe-05b-parity-b.test.tsx` trước thi công | `Tests 14 failed | 1 passed (15)` | 1 | fe05bb-red-unit.txt |
-| Cùng file, nested template/HTTPS đọc/history source class | `Tests 3 failed | 15 passed (18)` | 1 | fe05bb-red-edges.txt |
-| Giữ prefix sửa kế hoạch | `Tests 1 failed | 19 passed (20)` | 1 | fe05bb-red-edit-prefix.txt |
-| Header/tag preview theo source | `Tests 1 failed | 20 passed (21)` | 1 | fe05bb-red-preview-parity.txt |
-| Editor bị tháo khi đổi moment vẫn focus h1 | `Tests 1 failed | 21 passed (22)` | 1 | fe05bb-red-removed-input-focus.txt |
-| Nội dung preview Sheets/Slack từ source | `Tests 2 failed | 22 passed (24)` | 1 | fe05bb-red-preview-contents.txt |
-| SR announcement không thêm khoảng cách receipt | `Tests 1 failed | 24 passed (25)` | 1 | fe05bb-red-receipt-spacing.txt |
+| `npm test -w @wap/chat-web -- --reporter=dot tests/fe-05b-parity-b.test.tsx` trước thi công | `Tests 14 failed \| 1 passed (15)` | 1 | fe05bb-red-unit.txt |
+| Cùng file, nested template/HTTPS đọc/history source class | `Tests 3 failed \| 15 passed (18)` | 1 | fe05bb-red-edges.txt |
+| Giữ prefix sửa kế hoạch | `Tests 1 failed \| 19 passed (20)` | 1 | fe05bb-red-edit-prefix.txt |
+| Header/tag preview theo source | `Tests 1 failed \| 20 passed (21)` | 1 | fe05bb-red-preview-parity.txt |
+| Editor bị tháo khi đổi moment vẫn focus h1 | `Tests 1 failed \| 21 passed (22)` | 1 | fe05bb-red-removed-input-focus.txt |
+| Nội dung preview Sheets/Slack từ source | `Tests 2 failed \| 22 passed (24)` | 1 | fe05bb-red-preview-contents.txt |
+| SR announcement không thêm khoảng cách receipt | `Tests 1 failed \| 24 passed (25)` | 1 | fe05bb-red-receipt-spacing.txt |
 | `node --test scripts/v3-local-env.test.mjs`, DB riêng | `tests 4; pass 3; fail 1` | 1 | fe05bb-red-runner.txt |
 | `node --test scripts/google-oidc-fixture.test.mjs`, callback cổng riêng | `tests 2; pass 1; fail 1` (400 thay 302) | 1 | fe05bb-red-oidc-isolation.txt |
 
