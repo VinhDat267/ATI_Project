@@ -1,9 +1,11 @@
-// Source: AppStagePage.tsx moment 3. API supplies only question/options; no invented recommendation or timestamp.
+// Source: AppStagePage.tsx moment 3. API supplies question/options/context; no invented recommendation or timestamp.
 // The free-text card stays expanded to preserve the required single visible composer.
 import type { KeyboardEvent, RefObject } from 'react';
+import { SERVICE_REGISTRY } from '@wap/tool-schemas';
 import { ServiceLogo } from '../../components/ServiceLogo';
 interface Props {
   question: string;
+  context?: string;
   options: string[];
   selected: string | null;
   onSelect: (option: string | null) => void;
@@ -12,13 +14,13 @@ interface Props {
   planning: boolean;
   input: RefObject<HTMLTextAreaElement | null>;
   inputHidden?: boolean;
-  service: string;
   onSend: (text: string) => void;
   onBack: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 export function ClarificationMoment({
   question,
+  context,
   options,
   selected,
   onSelect,
@@ -27,7 +29,6 @@ export function ClarificationMoment({
   planning,
   input,
   inputHidden,
-  service,
   onSend,
   onBack,
   onKeyDown,
@@ -63,6 +64,7 @@ export function ClarificationMoment({
         >
           {question}
         </h1>
+        {context && <p className="text-base text-brand-muted max-w-2xl leading-relaxed">{context}</p>}
       </div>
       <form
         aria-label="Nhập yêu cầu"
@@ -113,7 +115,10 @@ export function ClarificationMoment({
             radios[next]?.focus();
           }}
         >
-          {options.map((option) => (
+          {options.map((option) => {
+            const normalized = option.trim().toLocaleLowerCase();
+            const service = SERVICE_REGISTRY.find(row => row.name.toLocaleLowerCase() === normalized || row.id === normalized);
+            return (
             <button
               key={option}
               type="button"
@@ -130,8 +135,8 @@ export function ClarificationMoment({
               }
             >
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
-                  <ServiceLogo service={service} className="w-5 h-5 shrink-0" />
+                <div title={service?.name ?? 'Lựa chọn'} className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                  {service ? <ServiceLogo service={service.id} className="w-5 h-5 shrink-0" /> : <svg aria-hidden="true" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg>}
                 </div>
                 <span className="text-base font-semibold text-brand-text group-hover:text-brand-primary transition-colors break-words">
                   {option}
@@ -149,7 +154,7 @@ export function ClarificationMoment({
                 {selected === option ? '✓' : ''}
               </div>
             </button>
-          ))}
+          ); })}
           <div
             id="custom-sheet-container"
             className="bg-white rounded-2xl border border-dashed border-neutral-300 shadow-sm transition-all overflow-hidden"

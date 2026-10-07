@@ -70,6 +70,9 @@ html.dark .bg-orange-50\/80{background-color:rgba(255,87,1,0.112)!important}
 html.dark .bg-purple-100{background-color:rgba(168,85,247,0.18)!important}
 html.dark .bg-purple-100\/70{background-color:rgba(168,85,247,0.126)!important}
 html.dark .bg-purple-50{background-color:rgba(168,85,247,0.14)!important}
+/* Cockpit suggestion decoration for the Slack service color. */
+html.dark[data-proto-page="app-stage"] .bg-purple-500\/5{background-color:rgba(168,85,247,0.05)!important}
+html.dark[data-proto-page="app-stage"] .group:hover .group-hover\:bg-purple-500\/10{background-color:rgba(168,85,247,0.1)!important}
 html.dark .bg-red-100{background-color:rgba(239,68,68,0.18)!important}
 html.dark .bg-red-50{background-color:rgba(239,68,68,0.14)!important}
 html.dark .bg-rose-50{background-color:rgba(244,63,94,0.14)!important}

@@ -47,8 +47,10 @@ for (const width of [1440, 375])
       });
       await expect(approve).toBeVisible();
       await expect(page.locator('textarea:visible')).toHaveCount(1);
+      let releaseApproval!: () => void;
+      const approvalGate = new Promise<void>(resolve => { releaseApproval = resolve; });
       await page.route('**/api/plans/*/approve', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await approvalGate;
         await route.continue();
       });
       await page.evaluate(() => {
@@ -69,6 +71,13 @@ for (const width of [1440, 375])
       expect(rect!.y + rect!.height).toBeLessThanOrEqual(
         width === 375 ? 812 : 900,
       );
+      try {
+        await page.getByRole('textbox').click();
+        await page.locator('#stage-container').click({ position: { x: 4, y: 4 } });
+        expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+      } finally {
+        releaseApproval();
+      }
       await expect(heading).toHaveText('Việc đã xong');
       await expect(heading).toBeFocused();
       expect(
@@ -112,6 +121,7 @@ test('FE-05b clarification before plan has one textarea and explicit radio confi
     .getByRole('radio', { name: 'Để tôi gõ tên hoặc link khác' })
     .click();
   await expect(page.locator('textarea:visible')).toHaveCount(1);
+  expect(await page.locator('#custom-sheet-input').evaluate(el => getComputedStyle(el).outlineColor)).toBe('rgba(0, 0, 0, 0)');
   await page.getByRole('radio').first().click();
   await expect(page.locator('#moment-3')).toBeVisible();
   await page.getByRole('button', { name: 'Xác nhận và tiếp tục' }).click();

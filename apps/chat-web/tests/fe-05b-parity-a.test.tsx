@@ -45,15 +45,15 @@ const plan = {
     },
   ],
 };
-function setup(customServices = services) {
+function setup(customServices = services, { loading = false, error = null as string | null } = {}) {
   const send = vi.fn(),
     navigate = vi.fn(),
     logout = vi.fn();
   const view = render(
     <Cockpit
       services={customServices}
-      servicesLoading={false}
-      servicesError={null}
+      servicesLoading={loading}
+      servicesError={error}
       onSendMessage={send}
       onNewConversation={vi.fn()}
       onSelectConversation={vi.fn()}
@@ -202,6 +202,71 @@ it('FE-05b no configured service replaces suggestions with the required settings
     'href',
     '/settings',
   );
+});
+it.each([
+  { loading: true, error: null, status: 'Đang tải dịch vụ…' },
+  { loading: false, error: 'Không tải được dịch vụ', status: 'Không tải được dịch vụ' },
+])('FE-05b does not report no connections while $status', ({ loading, error, status }) => {
+  setup([], { loading, error });
+  expect(screen.getByRole('status')).toHaveTextContent(status);
+  expect(screen.queryByText('Chưa có dịch vụ nào được kết nối')).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Kết nối dịch vụ' })).toBeNull();
+});
+const connected = [
+    { id: 'trello', name: 'Trello' },
+    { id: 'sheets', name: 'Google Sheets' },
+    { id: 'notion', name: 'Notion' },
+    { id: 'github', name: 'GitHub' },
+    { id: 'slack', name: 'Slack' },
+  ].map(service => ({ ...service, configured: true, connected: false, connectionStatus: 'unchecked' as const }));
+it('FE-05b limits configured service suggestions to four cards', () => {
+  setup(connected);
+  const grid = screen.getByText('Gợi ý việc phổ biến theo công cụ của bạn').nextElementSibling!;
+  expect(within(grid as HTMLElement).getAllByRole('button')).toHaveLength(4);
+});
+it.each([
+    ['Trello', 'bg-blue-50', 'text-blue-600', 'bg-blue-500/5'],
+    ['Google Sheets', 'bg-green-50', 'text-emerald-600', 'bg-emerald-500/5'],
+    ['Notion', 'bg-neutral-100', 'text-neutral-800', 'bg-neutral-900/5'],
+    ['GitHub', 'bg-neutral-900', 'text-neutral-900', 'bg-neutral-900/5'],
+  ])('FE-05b suggestion for %s keeps the source icon, typography and service colors', (name, background, textColor, decoration) => {
+    setup(connected);
+    const grid = screen.getByText('Gợi ý việc phổ biến theo công cụ của bạn').nextElementSibling!;
+    const card = within(grid as HTMLElement).getByRole('button', { name: new RegExp(name) });
+    expect(within(card).getByTitle(name)).toHaveClass('p-1.5', 'group-hover:scale-105', background);
+    expect(within(card).getByText(name, { exact: true })).toHaveClass('font-medium', textColor);
+    expect(card.firstElementChild).toHaveClass(decoration);
+    expect(card.querySelector('.leading-snug')).toHaveClass('font-medium');
+});
+it('FE-05b uses service logos only for unambiguous service choices and renders clarification context', () => {
+  useChatStore.setState({
+    gatherState: { steps: [{ tool: 'github.search_repositories', status: 'completed' }] } as any,
+    activeClarification: {
+      question: 'Bạn chọn đích nào?',
+      options: ['GitHub', 'Slack', 'Frontend', 'GitHub hoặc Slack'],
+      context: 'Có nhiều nơi khớp yêu cầu. Hãy chọn một đích.',
+    },
+  });
+  setup();
+  const heading = screen.getByRole('heading', { name: 'Bạn chọn đích nào?' });
+  expect(heading.nextElementSibling).toHaveTextContent('Có nhiều nơi khớp yêu cầu. Hãy chọn một đích.');
+  expect(within(screen.getByRole('radio', { name: 'GitHub' })).getByTitle('GitHub')).toBeInTheDocument();
+  expect(within(screen.getByRole('radio', { name: 'Slack' })).getByTitle('Slack')).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Slack' }).querySelector('svg')).toHaveAttribute('fill', '#611f69');
+  for (const name of ['Frontend', 'GitHub hoặc Slack']) {
+    expect(within(screen.getByRole('radio', { name })).getByTitle('Lựa chọn')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name }).querySelector('svg')).toHaveAttribute('fill', 'none');
+  }
+});
+it('FE-05b releasing the composer to a blank area allows the next completion heading to receive focus', () => {
+  useChatStore.setState({ activePlan: plan, planStatus: 'executing' });
+  setup();
+  const composer = screen.getByRole('textbox');
+  composer.focus();
+  composer.blur();
+  expect(document.activeElement).toBe(document.body);
+  act(() => useChatStore.setState({ planStatus: 'completed' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'Việc đã xong' })).toHaveFocus();
 });
 it.each(['Enter', 'Gửi'] as const)(
   'FE-05b clarification drawer submits its edited draft through %s',

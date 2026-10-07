@@ -23,7 +23,9 @@ test('FE-04: shell menu, protected routes, cross-tab theme and mobile sandbox wa
   await login(page);
   const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await composer.focus();
-  expect(await composer.evaluate(el => ({ width: getComputedStyle(el).outlineWidth, style: getComputedStyle(el).outlineStyle, color: getComputedStyle(el).outlineColor }))).toEqual({ width: '2px', style: 'solid', color: 'rgb(255, 87, 1)' });
+  // Spec 1.2.6: prototype inputs use their containing frame, without a second orange outline.
+  expect(await composer.evaluate(el => getComputedStyle(el).outlineColor)).toBe('rgba(0, 0, 0, 0)');
+  await expect.poll(() => composer.evaluate(el => getComputedStyle(el.closest('form')!).borderColor)).toBe('rgb(255, 87, 1)');
   const avatar = page.getByRole('button', { name: /Menu người dùng/ });
   await avatar.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'Nhật ký điều phối' })).toBeFocused();

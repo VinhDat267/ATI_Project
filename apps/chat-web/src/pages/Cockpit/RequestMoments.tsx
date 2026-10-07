@@ -2,6 +2,7 @@
 import type { KeyboardEvent, RefObject, ReactNode } from 'react';
 import { getServiceDefinition, getToolDefinition } from '@wap/tool-schemas';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 interface Props {
   services: ServiceInfo[];
@@ -24,6 +25,17 @@ const connections = {
   unhealthy: 'Không kết nối được',
   unchecked: 'Chưa kiểm tra',
   unconfigured: 'Chưa kết nối',
+};
+// Presentation metadata uses the same service-keyed asset table as logos and prompts.
+interface CardColors { icon: string; decoration: string; name: string; logo?: string }
+const cardColors: Record<string, CardColors> = Object.fromEntries(
+  Object.entries(presentation.services).map(([id, asset]) => [id, asset.suggestion]),
+);
+const neutralCard: CardColors = {
+  icon: 'bg-neutral-100 border-neutral-200',
+  decoration: 'bg-neutral-900/5 group-hover:bg-neutral-900/10',
+  name: 'text-neutral-800',
+  logo: 'text-neutral-900',
 };
 export function RequestMoment({
   services,
@@ -127,7 +139,10 @@ export function RequestMoment({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {services
               .filter((service) => service.configured)
-              .map((service) => (
+              .slice(0, 4)
+              .map((service) => {
+                const colors = cardColors[service.id] ?? neutralCard;
+                return (
                 <button
                   key={service.id}
                   type="button"
@@ -139,28 +154,28 @@ export function RequestMoment({
                   }}
                   className="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5"
                 >
-                  <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors pointer-events-none" />
+                  <div className={`absolute -right-6 -bottom-6 w-20 h-20 rounded-full ${colors.decoration} transition-colors pointer-events-none`} />
                   <div className="flex items-center -v3-space-x-1.5 flex-shrink-0 mt-0.5">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shadow-sm border border-blue-100">
+                    <div title={service.name} className={`w-8 h-8 rounded-xl ${colors.icon} border flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform`}>
                       <ServiceLogo
                         service={service.id}
-                        className="w-4 h-4 shrink-0"
+                        className={`w-4 h-4 ${colors.logo ?? ''}`}
                       />
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-brand-text group-hover:text-brand-primary transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
                       {servicePrompt(service)}
-                    </p>
-                    <p className="text-xs text-brand-muted mt-1">
-                      {service.name}
-                    </p>
+                    </div>
+                    <div className="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                      <span className={`${colors.name} font-medium`}>{service.name}</span>
+                    </div>
                   </div>
                 </button>
-              ))}
+              ); })}
           </div>
         </div>
-      ) : (
+      ) : !loading && !error ? (
         <div className="v3-space-y-3">
           <p className="text-sm text-brand-muted">
             Chưa có dịch vụ nào được kết nối
@@ -176,7 +191,7 @@ export function RequestMoment({
             Kết nối dịch vụ
           </a>
         </div>
-      )}
+      ) : null}
       <div className="pt-4 border-t border-brand-border flex flex-col gap-2.5 text-xs text-brand-muted">
         <div
           className="flex flex-wrap items-center gap-2 text-xs text-brand-muted"
