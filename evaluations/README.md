@@ -82,13 +82,13 @@ alone is insufficient. Clarification/refusal cases contribute to kind and
 strict-pass scores, not the tool denominator. Argument quality is conditional
 on correct tools; latency is the entire request involving the service.
 
-The planner protocol currently has no read-answer response kind. The prompt
-instructs write-only plan steps, but the production validator does not enforce
+At the W3-06 measurement, the planner protocol had no read-answer response kind. The prompt
+instructed write-only plan steps, but the production validator did not enforce
 that side-effect restriction: it accepted three read-only plans in this run.
 Read-only cases preregister a clarification plus successful read calls;
 read-tool scores and response-kind failures are reported separately. These
-results do not establish usable answers to read-only requests. Answer policy
-and enforcement of the prompt rule require a separate product follow-up.
+results do not establish usable answers to read-only requests. The 05/10 policy
+and W3-10 changes below supersede those labels; historical reports are preserved.
 Text matchers check selected keywords/references rather than complete semantic
 correctness. Quoted A1 ranges and other unlabelled equivalent representations
 may conservatively miss an exact matcher. Calendar timestamps use equivalent
@@ -133,7 +133,7 @@ record label commits `5fccffd` and `695ad87`. A semantic comparison confirms
 that only `rf06` changed. The other 49 core cases passed 147/147, versus 49/49
 in the historical run. Changed-label `rf06` passed 3/3 separately.
 Freeform fell from 18/18 to 51/54; `ff15` was 0/3. Its unchanged prompt,
-“Let the frontend team know the deploy finished”, expects Slack. The expanded
+“case ff15 (see its preregistered label)”, expects Slack. The expanded
 workspace has both Slack `#frontend` and Telegram `frontend`; the model asks
 which service to use in all three runs. The spec requires clarification for
 ambiguity. This is an observed score decline under the old oracle and expanded
@@ -177,6 +177,82 @@ Local verification: `npm run check` exit 0 (874 v3 + 151 evaluation tests),
 `npx tsc -p evaluations/golden-v2/tsconfig.json` exit 0; real local HTTP abort
 test passed. Browser/live-service runs were not repeated for this evaluation
 change. See the [verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
+
+### W3-10 — instrumentation and read-only policy (measurement pending)
+
+On 07/10, GET `http://localhost:20128/v1/models` failed with `ECONNREFUSED`
+on IPv4 and IPv6. Measurement stopped before any model call. The gateway was
+not started or reconfigured. No complete or partial W3-10 model campaign exists;
+all after-measurement cells below are **NOT_RUN**, not zeros or estimated results.
+See [the verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md).
+
+The 05/10 product policy requires immediate clarification for a read-only request,
+without searching first. The prompt asks for suitable write actions among the
+routed services. Directory prefetch now waits for the model's first search request;
+clarification, refusal and grounded plans skip directory I/O. A write request
+with missing resources can consequently need an additional model turn compared
+with eager prefetch; its latency and strict-pass impact remain unmeasured.
+Validator rejects plans containing no write step before grounding and the planner
+returns a fixed Vietnamese clarification without a repair call. Mixed read/write
+plans retain existing validation: individual read steps are allowed so this change
+does not break their existing contract. The prompt still prefers writes in plans.
+Immediate no-search handling is the `llm` protocol; legacy regex gather ordering
+is unchanged, while the no-write validator fallback applies in both modes.
+
+Label commit `795229e` removes search requirements only from sh01, sh07, ca01,
+no01, tg01 and ji01; all prompts, categories and other labels are unchanged.
+Their clarification contributes to kind/strict scores, without tool/argument
+scores. For three runs, per-service labelled tool denominators change as follows
+(argument denominators additionally depend on observed correct tools):
+
+| Service | W3-06 tool attempts | W3-10 labelled tool attempts |
+|---|---|---|
+| Sheets | 24 | 18 |
+| Calendar | 24 | 21 |
+| Notion | 27 | 24 |
+| Telegram | 30 | 27 |
+| Jira | 30 | 27 |
+
+| Services group | W3-06 runs | Before p50 / p95 | Before under 15 s | W3-10 p50 / p95 / under 15 s |
+|---|---|---|---|---|
+| read_only | 18 | 25.4 / 53.0 s | 0/18 (0%) | NOT_RUN |
+| single_step | 57 | 4.6 / 20.2 s | 53/57 (93.0%) | NOT_RUN |
+| clarification | 15 | 7.2 / 41.1 s | 13/15 (86.7%) | NOT_RUN |
+| refusal | 15 | 4.6 / 18.1 s | 14/15 (93.3%) | NOT_RUN |
+| cross_service | 27 | 7.7 / 10.9 s | 27/27 (100%) | NOT_RUN |
+| All services | 132 | 6.105 / 31.097 s | 107/132 (81.1%) | NOT_RUN |
+
+Core parity baseline remains 150/150; freeform remains 51/54. W3-10 parity,
+18/18 immediate read-only responses and services p95 <15 s are **not verified**.
+
+`report.json` now includes each `modelCalls` entry's start offset from the turn,
+duration including retries/backoff, final served model, nullable prompt/completion/
+reasoning tokens, and each actual transport attempt's start offset from the call,
+duration, outcome, HTTP status and retry reason. OpenAI-compatible provider exposes
+these through `lastCallMetrics`; `generatePlan` still returns `Promise<string>`.
+Providers without this optional side channel have an empty attempts list and null
+usage, rather than invented counts. `phases` measures directory prefetch and each
+parallel search round (wall time, not the sum of individual lookups); legacy gather
+has its own phase. Summary records attempts-per-call distribution, retry reasons,
+timeouts and the shares of model, directory, search and remaining turn time.
+No prompt, API key or header is stored in diagnostics; public errors are classified
+instead of copying potentially sensitive provider error bodies.
+
+| Time component | Before (W3-06) | After (W3-10) |
+|---|---|---|
+| Model / retries / timeout | Call count only; individual attempt duration and tokens absent | NOT_RUN; instrumentation tested offline |
+| Directory / search rounds | Not recorded separately | NOT_RUN; phase timing tested offline |
+| Remaining time / under 15 s | Whole-turn latency available | NOT_RUN |
+
+Resume only after a successful fresh GET `/v1/models`, using the user's original
+`.env` through `node --env-file`, never copying it. Run core 50, freeform 18 and
+services 44, each three times with `PLANNER_SEARCH_MODE=llm`, `EVAL_CONCURRENCY=2`,
+`LLM_PROVIDER=openai-compatible`, `LLM_MODEL=ag/gemini-3.8-flash` and
+`LLM_BASE_URL=http://localhost:20128/v1`. Keep interrupted campaigns separately.
+Optional services concurrency-one run can examine gateway contention. Transport
+deadline/retry settings remain unchanged pending measured evidence; no tail-latency
+cause or improvement is claimed. Earlier request hedging and thinking variants
+showed no reliable benefit (see Planning latency); they are not reintroduced.
 
 ### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
 

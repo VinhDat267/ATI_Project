@@ -103,7 +103,9 @@ Yêu cầu chỉ đọc được **hỏi lại ngay** ở lời gọi model đ�
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit sửa label:
-- Kết quả:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#102](https://github.com/VinhDat267/ATI_Project/pull/102), **draft, chưa nghiệm thu**; nhánh `fix/w3-10-read-only-latency`, worktree riêng từ `main` `8155c03` (đã có #98–#100). Không merge.
+- Commit sửa label: `795229e24c64a38902e7efdce0680c729f37348a`, lý do chính sách sản phẩm chốt 05/10; đúng sáu case chỉ bỏ `expect.searches`, 44/44 prompt không đổi. Commit A/B `7bec3d0` → label `795229e` → chuẩn hóa test `2c47eb9`; **0 lời gọi model thật**, chưa có commit báo cáo model.
+- Kết quả: A/B và mục 7 đã thi công. Kênh phụ `lastCallMetrics` có offset/duration từng call và từng attempt, HTTP/retry/timeout, served model và token nullable; `generatePlan` vẫn trả `Promise<string>`. Runner có thời gian directory/search round và phân rã summary, public error không chép nội dung provider. Prompt yêu cầu chỉ đọc hỏi lại ngay; directory chạy sau search đầu tiên để clarification không tra cứu. Validator chặn plan không có bước ghi trước grounding; fixed clarification tiếng Việt không tốn lượt sửa. **Không cấm từng bước đọc trong plan có ghi**, giữ hợp đồng mixed read/write hiện tại. Không đổi catalog, frontend hoặc production API; sáu fixture test chat-api được chỉnh tối thiểu thành search → plan, giữ SQL/HTTP/grounding.
+  - RED A 2 fail/5 pass; RED summary/privacy 2 fail/7 pass; RED B 10 fail/1 pass; RED label 1 fail/29 pass, đều exit1. GREEN offline376/376; regression11/11; eval typecheck exit0. `npm run check` exit0 (**1418 v3 + 169 eval**); `npm run test:browser:v3` exit0 (**61/61, 11 scenario**), PostgreSQL tạm riêng postgres16/tmpfs/cổng55533, sandbox, tài khoản ứng dụng CI; không dùng dev15433.
+  - Bằng chứng: [W3-10-VERIFICATION](../../ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md); bảng baseline/NOT_RUN và mẫu số mới tại `evaluations/README.md`; [log bàn giao](../log/2026-10-07-codex-W3-10.md).
+- Điều chưa làm hoặc khác với task card: GET `/v1/models` qua cấu hình LLM nạp từ `.env` gốc bằng `--env-file` thất bại `ECONNREFUSED` trên IPv4/IPv6 cổng20128. Đã dừng đo theo yêu cầu; không khởi động/sửa 9router hay đổi model/tài khoản. **Core50×3, freeform18×3, services44×3 và concurrency1 NOT_RUN**. Chưa xác minh read_only18/18 đúng1call/0search, parity150/150 và51/54, p95services<15s; chưa có dữ liệu để chọn cách xử lý đuôi chậm, giữ deadline/retry. README có bảng trước/sau và phân rã với ô sau đo NOT_RUN; không tuyên bố đạt latency. Legacy regex gather giữ thứ tự cũ, fallback no-write áp dụng cả hai mode; immediate no-search là protocol llm. Chờ 9router được người dùng chạy, phép đo đúng model `ag/gemini-3.8-flash` và Claude Code review độc lập.
