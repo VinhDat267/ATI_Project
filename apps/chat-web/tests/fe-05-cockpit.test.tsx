@@ -16,14 +16,14 @@ it('FE-05 exposes exactly one chat composer on the empty cockpit', () => {
   useChatStore.getState().reset();
   render(<Workspace authToken="test" user={null} authError={null} onClearAuthError={() => {}} onLogout={() => {}} route={{kind:'home'}} navigate={() => {}} />);
   expect(screen.getAllByRole('textbox')).toHaveLength(1);
-  expect(screen.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeInTheDocument();
 });
 const plan = { id:'p1',summary:'Tạo issue và gửi báo cáo',resourceLabels:{ repo:'ati-test' },steps:[{id:'s1',tool:'github.create_issue',description:'Tạo issue trong kho ati-test',args:{repo:'repo',title:'Kiểm tra cockpit',body:'Nội dung cần ghi'}}] };
 function renderCockpit() { return render(<Cockpit services={[{id:'github',name:'GitHub',configured:true,connected:false,connectionStatus:'unchecked'},{id:'slack',name:'Slack',configured:false,connected:false,connectionStatus:'unconfigured'}]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />); }
 it.each(['idle','preview','approving','executing','completed','stopped','rejected','failed'] as const)('one draft survives conversation drawer at %s', status => {
   useChatStore.setState({activePlan:plan,planStatus:status}); renderCockpit();
   fireEvent.change(screen.getByRole('textbox'), {target:{value:'Draft stays'}});
-  const opener=screen.getByRole('button',{name:'Nhật ký hội thoại'}); opener.focus(); fireEvent.click(opener);
+  const opener=screen.getByRole('button',{name:'Xem hội thoại'}); opener.focus(); fireEvent.click(opener);
   const dialog=screen.getByRole('dialog',{name:'Nhật ký hội thoại'});
   expect(screen.getAllByRole('textbox')).toHaveLength(1); expect(within(dialog).getByRole('textbox')).toHaveValue('Draft stays');
   fireEvent.keyDown(document,{key:'Escape'});
@@ -39,7 +39,7 @@ it.each([
 ] as const)('one composer through drawer transitions at %s',(_name,patch)=>{
   useChatStore.setState(patch as Partial<ChatStoreState>); renderCockpit();
   expect(screen.getAllByRole('textbox')).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button',{name:'Nhật ký hội thoại'}));
+  fireEvent.click(screen.getByRole('button',{name:'Xem hội thoại'}));
   expect(screen.getAllByRole('textbox')).toHaveLength(1);
   fireEvent.keyDown(document,{key:'Escape'}); expect(screen.getAllByRole('textbox')).toHaveLength(1);
 });
@@ -47,12 +47,12 @@ it('configured suggestions prefill the single textarea; unconfigured services ha
   renderCockpit(); fireEvent.click(screen.getByRole('button',{name:'Tạo issue mới trên GitHub'}));
   expect(screen.getByRole('textbox')).toHaveValue('Tạo issue mới trên GitHub');
   expect(screen.queryByRole('button',{name:'Gửi thông báo tiến độ qua Slack'})).toBeNull();
-  expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
+  expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getByText('Chưa kết nối:')).toBeInTheDocument();
   expect(screen.getByRole('link',{name:'Kết nối thêm'})).toHaveAttribute('href','/settings');
 });
 it('future services use the API name, generic SVG and a configured suggestion without adding core branches',()=>{
   render(<Cockpit services={[{id:'future-tool',name:'Công cụ nhóm',configured:true,connected:false,connectionStatus:'unchecked'}]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null} />);
-  expect(screen.getByText('Công cụ nhóm')).toBeInTheDocument();
+  expect(within(screen.getByLabelText('Dịch vụ đã thiết lập')).getByText('Công cụ nhóm')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Mô tả công việc với Công cụ nhóm'}));
   expect(screen.getByRole('textbox')).toHaveValue('Mô tả công việc với Công cụ nhóm');
 });
@@ -74,7 +74,7 @@ it('preview contains actual intended text and grounded destination without inven
 it('clarification uses its single main textarea with no second free-text form', () => {
   useChatStore.setState({activeClarification:{question:'Chọn kho nào?',options:['Kho A','Kho B']}}); renderCockpit();
   expect(screen.getAllByRole('textbox')).toHaveLength(1); expect(screen.getByRole('textbox',{name:'Nhập câu trả lời làm rõ yêu cầu'})).toBeInTheDocument();
-  expect(screen.getByRole('button',{name:'Kho A'})).toBeInTheDocument();
+  expect(screen.getByRole('radio',{name:'Kho A'})).toBeInTheDocument();
 });
 it('receipt uses actual elapsed timestamps and only http(s) outcome links', () => {
   useChatStore.setState({planStatus:'completed',executionSnapshot:{plan:{...plan,convId:'c1',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded',startedAt:'2026-10-05T10:00:00.000Z',completedAt:'2026-10-05T10:00:02.500Z',durationMs:2500,output:{url:'https://github.com/ati/test/issues/42',html_url:'javascript:alert(1)',number:42}}]}}); renderCockpit();

@@ -23,7 +23,8 @@ it('preserves the current conversation and messages when creating a conversation
   useChatStore.setState({conversationId:'valid-c1',messages:[{id:'m1',role:'user',content:'Keep this conversation'}]});
   vi.spyOn(apiClient,'createConversation').mockRejectedValue(new TypeError('Failed to fetch'));
   await openApp();
-  fireEvent.click(screen.getAllByRole('button',{name:/Cuộc hội thoại mới/})[0]);
+  fireEvent.click(screen.getByRole('button',{name:'Mở danh sách hội thoại'}));
+  fireEvent.click(screen.getByRole('button',{name:/Cuộc hội thoại mới/}));
   await screen.findByText(/Không thể kết nối máy chủ/);
   expect(useChatStore.getState().conversationId).toBe('valid-c1');
   expect(await transcriptText('Keep this conversation')).toBeInTheDocument();

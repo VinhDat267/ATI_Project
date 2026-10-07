@@ -135,5 +135,8 @@ html.dark {
 :root:not([data-proto-page]) button { min-width: 40px; }
 :root:not([data-proto-page]) button:is(.bg-primary, .bg-success, .bg-warning).text-white { font-weight: 600; }
 :root:not([data-proto-page]) :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.app-shell:has(.workspace) { height: 100dvh; overflow: hidden; }
+/* app-stage scrolls the document; unconverted routes keep their FE-04 shell. */
+:root[data-proto-page="app-stage"] .workspace, :root[data-proto-page="app-stage"] .workspace > div { display: contents; }
+:root[data-proto-page="app-stage"] :is(button, a, textarea, input, summary):focus-visible { outline: 2px solid #FF5701; outline-offset: 2px; }
+:root[data-proto-page="app-stage"] button:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

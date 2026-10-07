@@ -31,7 +31,7 @@ describe('AUTH-01 App logout', () => {
     finish();
     await waitFor(() => expect(authStorage.getStoredTokens().accessToken).toBeNull());
     expect(authStorage.getStoredTokens().refreshToken).toBeNull();
-    expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeNull();
   });
   it('loads public flags and keeps unsupported sign-up/Google actions hidden', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ signupEnabled: false, googleEnabled: false })));

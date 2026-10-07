@@ -10,7 +10,7 @@ async function login(page: Page) {
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByLabel('Mật khẩu').fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
 async function owner(db: pg.Pool) { return (await db.query('SELECT id FROM users WHERE email=$1', [email])).rows[0].id; }
 
@@ -36,7 +36,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await expect(page.getByText('FE02 pending preview', {exact:true})).toBeVisible();
     await expect(page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('FE02-direct-reload.png'), fullPage: true });
-    await page.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
+    await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
     await expect(page).not.toHaveURL(new RegExp(`/c/${id}$`));
     await page.goBack(); await expect(page.getByText('FE02 saved request')).toBeVisible();
     const foreignUser = (await db.query("INSERT INTO users(email,password,name) VALUES($1,'fixture-hash','Foreign fixture') RETURNING id", [`foreign-fe02-${Date.now()}@example.test`])).rows[0].id;
@@ -46,7 +46,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await expect(page.getByText('Không tìm thấy hội thoại.')).toBeVisible();
     await expect(page.getByText('Foreign private message')).toHaveCount(0);
     await expect(page.getByText('Foreign private title')).toHaveCount(0);
-    await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toHaveCount(0);
   } finally { await db.end(); }
 });
 
@@ -77,7 +77,15 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
 
 test('FE-02: empty chat starts at top', async ({ page }, testInfo) => {
   await login(page);
-  await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click();
+  const db = pool();
+  try {
+    // The source hides chat at moment 1; an empty saved preview exposes the drawer.
+    const id=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[await owner(db),'Empty transcript preview'])).rows[0].id;
+    const text=JSON.stringify({kind:'plan',summary:'Empty transcript',steps:[{id:'step_1',tool:'slack.send_message',description:'Saved preview',args:{channel:'#general',text:'Empty transcript fixture'}}],warnings:[]});
+    await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes')",[id,text,text,createHash('sha256').update(text).digest('hex')]);
+    await page.goto(`/c/${id}`);
+  } finally {await db.end();}
+  await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click();
   const empty = page.getByRole('log',{name:'Hội thoại'});
   await expect(empty).toBeVisible();
   await expect.poll(() => empty.evaluate(area => area.scrollTop)).toBe(0);
@@ -90,17 +98,21 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
     await login(page);
     const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [await owner(db), 'FE02 scrolling'])).rows[0].id;
     for (let index = 0; index < 25; index++) await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [id, `Saved message ${index}: ${'Long scroll content. '.repeat(50)}`]);
-    await page.goto(`/c/${id}`); await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
+    await page.goto(`/c/${id}`);
+    await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).fill('Tạo công việc Trello và thông báo Slack');
+    await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).press('Enter');
+    await expect(page.getByRole('button',{name:'Duyệt kế hoạch',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
     await expect(page.getByText(/Saved message 24:/)).toBeAttached();
     await area.evaluate(element => { element.scrollTop = element.scrollHeight; });
-    const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await composer.fill('FE02 scroll at bottom'); await page.locator('form').filter({ has: composer }).getByRole('button', { name: 'Gửi', exact: true }).click();
     await expect.poll(() => area.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThan(120);
-    await expect(page.getByText('FE02 scroll at bottom', { exact: true })).toBeAttached();
+    await expect(area.getByText('FE02 scroll at bottom', { exact: true })).toBeAttached();
     await area.evaluate(element => { element.scrollTop = 80; });
     await expect.poll(() => area.evaluate(element => element.scrollTop)).toBe(80);
     await composer.fill('FE02 while reading above'); await page.locator('form').filter({ has: composer }).getByRole('button', { name: 'Gửi', exact: true }).click();
-    await expect(page.getByText('FE02 while reading above', { exact: true })).toBeAttached();
+    await expect(area.getByText('FE02 while reading above', { exact: true })).toBeAttached();
     await expect.poll(() => area.evaluate(element => element.scrollTop)).toBe(80);
     await page.screenshot({ path: testInfo.outputPath('FE02-reading-scroll-preserved.png'), fullPage: true });
   } finally { await db.end(); }

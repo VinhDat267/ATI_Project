@@ -5,6 +5,7 @@ import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
+import { meta as cockpitMeta } from '../src/pages/Cockpit/meta';
 
 vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = { id: 'u1', email: 'owner@example.test', name: 'Owner' };
@@ -53,8 +54,8 @@ it('FE-04b: a signed-in unknown path shows the 404 without the app shell; Back r
   expect(screen.queryByRole('button', { name: /Menu người dùng/ })).not.toBeInTheDocument();
 
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về không gian làm việc chính' }));
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
-  expect(pageScope()).toEqual({ page: undefined, body: APP_BODY, theme: 0, css: 0 });
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
+  expect(pageScope()).toEqual({ page: 'app-stage', body: cockpitMeta.bodyClass, theme: 1, css: 1 });
 
   act(() => window.history.back());
   await heading();

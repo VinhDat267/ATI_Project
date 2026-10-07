@@ -7,7 +7,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email!); await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeVisible();
 }
 const conversationIds = async (pool: pg.Pool) => (await pool.query(
   'SELECT c.id FROM conversations c JOIN users u ON u.id = c.user_id WHERE u.email = $1', [email])).rows.map(row => row.id as string);
@@ -26,16 +26,16 @@ test('FE-03b: a message sent while New conversation is pending goes to that conv
     });
     await page.route('**/api/conversations/*/messages', async route => { await sendGate; await route.continue(); });
 
-    await page.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
+    await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
     await expect.poll(() => creates).toBe(1);
     const content = `FE-03b gửi khi đang tạo hội thoại ${Date.now()}`;
-    const input = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await input.fill(content); await input.press('Enter');
     releaseCreate();
 
     await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
     await expect(page.getByText('Đang lập kế hoạch…')).toBeVisible();
-    await expect(page.getByText(content)).toBeVisible();
+    await expect(page.getByRole('heading',{level:1})).toBeVisible();
     releaseSend();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
 

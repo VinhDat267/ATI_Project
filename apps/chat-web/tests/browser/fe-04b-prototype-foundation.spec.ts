@@ -5,7 +5,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
 const notFound = (page: Page) => page.getByRole('heading', { level: 1, name: 'Không tìm thấy trang' });
 const prototypeStyles = (page: Page) => page.locator('style[data-proto-theme], style[data-proto-page-css]');
@@ -60,10 +60,10 @@ test('FE-04b: signed-in 404 has no app shell, and Back/Forward keep each screen 
   await expect(prototypeStyles(page)).toHaveCount(2);
 
   await page.getByRole('main').getByRole('link', { name: 'Về không gian làm việc chính' }).click();
-  const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+  const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await expect(composer).toBeVisible();
-  expect(await page.locator('html').getAttribute('data-proto-page')).toBeNull();
-  await expect(prototypeStyles(page)).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('data-proto-page','app-stage');
+  await expect(prototypeStyles(page)).toHaveCount(2);
   await composer.focus();
   expect(await composer.evaluate(el => ({ width: getComputedStyle(el).outlineWidth, style: getComputedStyle(el).outlineStyle }))).toEqual({ width: '2px', style: 'solid' });
 
@@ -72,5 +72,5 @@ test('FE-04b: signed-in 404 has no app shell, and Back/Forward keep each screen 
   await expect(page.locator('html')).toHaveAttribute('data-proto-page', '404');
   await page.goForward();
   await expect(composer).toBeVisible();
-  expect(await page.locator('html').getAttribute('data-proto-page')).toBeNull();
+  await expect(page.locator('html')).toHaveAttribute('data-proto-page','app-stage');
 });

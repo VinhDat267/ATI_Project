@@ -7,9 +7,9 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email!); await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeVisible();
 }
-const composer = (page: Page) => page.locator('form').filter({ has: page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...') });
+const composer = (page: Page) => page.locator('form').filter({ has: page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }) });
 test('FE-03: grounded display names survive preview reload and approved result links are safe', async ({ page }, info) => {
   const pool = new pg.Pool({ connectionString });
   try {
@@ -26,8 +26,8 @@ test('FE-03: grounded display names survive preview reload and approved result l
       channel: [{ id: '#general', name: 'general' }],
     } } })]);
     await page.goto(`/c/${convId}`);
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill('Tạo công việc Trello và thông báo Slack');
-    await composer(page).getByRole('button', { name: 'Gửi', exact: true }).click();
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill('Tạo công việc Trello và thông báo Slack');
+    await composer(page).getByRole('button', { name: /^(Gửi|Gửi yêu cầu)$/ }).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     await expect(page.getByRole('list').getByText('Cần làm (board Frontend)', { exact: true })).toBeVisible();
     await page.getByText('Chi tiết kỹ thuật', { exact: true }).click();
@@ -44,7 +44,7 @@ test('FE-03: grounded display names survive preview reload and approved result l
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(page.getByText(/^Kế hoạch đã duyệt:/)).toBeVisible();
     await expect(page.getByRole('main')).toHaveCount(1); await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-    await page.getByRole('button',{name:'Nhật ký hội thoại',exact:true}).click();
+    await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click();
     await expect(page.getByRole('log')).toHaveAttribute('aria-live', 'polite');
     await page.keyboard.press('Escape');
     await page.screenshot({ path: info.outputPath('fe03-readable-result.png'), fullPage: true });
@@ -52,9 +52,9 @@ test('FE-03: grounded display names survive preview reload and approved result l
 });
 test('FE-03: Shift Enter creates a newline and planning disables a second send', async ({ page }) => {
   await login(page);
-  await page.getByRole('button', { name: /Cuộc hội thoại mới/ }).click();
+  await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
   await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
-  const input = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+  const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await input.fill('Tạo công việc Trello'); await input.press('Shift+Enter'); await page.keyboard.insertText('Thông báo Slack');
   await expect(input).toHaveValue('Tạo công việc Trello\nThông báo Slack');
   let release!: () => void;
@@ -62,7 +62,7 @@ test('FE-03: Shift Enter creates a newline and planning disables a second send',
   let sent = 0;
   await page.route('**/api/conversations/*/messages', async route => { sent++; await gate; await route.continue(); });
   await input.press('Enter');
-  await expect(composer(page).getByRole('button', { name: 'Gửi', exact: true })).toBeDisabled();
+  await expect(composer(page).getByRole('button', { name: /^(Gửi|Gửi yêu cầu)$/ })).toBeDisabled();
   await expect(page.getByText('Đang lập kế hoạch…')).toBeVisible();
   await input.fill('Tin nhắn trùng'); await input.press('Enter');
   await expect.poll(() => sent).toBe(1); release();

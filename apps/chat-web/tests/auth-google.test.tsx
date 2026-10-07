@@ -90,7 +90,7 @@ it('scrubs callback secrets before any HTTP request and consumes the state once 
   expect(calls.every(call => call.browserSearch === '')).toBe(true);
   expect(calls.filter(call => call.path === '/api/auth/google/callback').map(call => call.body)).toEqual([{ code: 'private-code', state: 'private-state' }]);
   await complete({ accessToken: 'access-google', refreshToken: 'refresh-google', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   expect(window.location.pathname).toBe('/');
   expect(authStorage.getStoredTokens()).toEqual({ accessToken: 'access-google', refreshToken: 'refresh-google', user });
   expect(JSON.stringify(localStorage)).not.toMatch(/private-code|private-state/);
@@ -99,7 +99,7 @@ it('shows pending approval without storing a session or opening chat', async () 
   openCallback(); await complete({ code: 'ACCOUNT_PENDING', error: 'pending' }, 403);
   expect(await screen.findByRole('status')).toHaveTextContent('chờ quản trị viên duyệt');
   expect(authStorage.getStoredTokens().accessToken).toBeNull();
-  expect(screen.queryByPlaceholderText('Mô tả công việc bạn muốn thực hiện...')).toBeNull();
+  expect(screen.queryByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeNull();
 });
 it.each(['ACCOUNT_DISABLED', 'INVALID_OAUTH_STATE', 'UNKNOWN_PRIVATE_ERROR'])('renders safe accessible error for %s without exposing provider text', async code => {
   openCallback(); await complete({ code, error: 'private-code private-state private-client-secret' }, 403);
@@ -150,7 +150,7 @@ it('does not let an older session hydration replace the Google principal', async
   authStorage.setStoredTokens({ accessToken: 'old-access', refreshToken: 'old-refresh', user: oldUser });
   holdMe = true; openCallback(); await waitCallback(); await waitFor(() => expect(meResponses.length).toBeGreaterThan(0));
   await complete({ accessToken: 'google-access', refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => {
     for (const response of meResponses) reply(response, { user: oldUser });
     await nativeFetch(`${base}/round-trip`);
@@ -162,7 +162,7 @@ it('preserves Google login when an older session hydration returns unauthorized'
   authStorage.setStoredTokens({ accessToken: 'old-access', refreshToken: 'old-refresh', user: oldUser });
   holdMe = true; openCallback(); await waitCallback(); await waitFor(() => expect(meResponses.length).toBeGreaterThan(0));
   await complete({ accessToken: 'google-access', refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => {
     for (const response of meResponses) reply(response, { error: 'old session expired' }, 401);
     await nativeFetch(`${base}/round-trip`);
@@ -179,7 +179,7 @@ it.each([200, 401])('preserves Google principal when an older in-flight refresh 
   await act(async () => { for (const response of meResponses) reply(response, { error: 'expired' }, 401); });
   await waitFor(() => expect(refreshResponses).toHaveLength(1));
   await complete({ accessToken: 'google-access', refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => {
     reply(refreshResponses[0], status === 200 ? { accessToken: 'rotated-old-access', refreshToken: 'rotated-old-refresh' } : { error: 'expired' }, status);
     await nativeFetch(`${base}/round-trip`);
@@ -196,7 +196,7 @@ it.each(['different-user', 'same-user-new-session'])('does not replay an old POS
   const outcome = oldAction.then(() => 'replayed', () => 'cancelled');
   await waitFor(() => expect(refreshResponses).toHaveLength(1));
   openCallback(); await complete({ accessToken: googleAccess, refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => { reply(refreshResponses[0], { code: 'REFRESH_ROTATED' }, 409); });
   expect(await outcome).toBe('cancelled');
   expect(protectedWrites).toEqual([{ authorization: `Bearer ${oldAccess}`, body: { message: 'old session draft' } }]);
@@ -224,7 +224,7 @@ it('discards hydration from a prior session even when Google signs in the same u
   authStorage.setStoredTokens({ accessToken: oldAccess, refreshToken: 'old-refresh', user: oldUser });
   holdMe = true; openCallback(); await waitCallback(); await waitFor(() => expect(meResponses.length).toBeGreaterThan(0));
   await complete({ accessToken: googleAccess, refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => {
     for (const response of meResponses) reply(response, { user: oldUser });
     await nativeFetch(`${base}/round-trip`);
@@ -254,7 +254,7 @@ it('discards an old hydration body after headers arrived before same-user Google
   for (const response of meResponses) { response.writeHead(200, { 'content-type': 'application/json' }); response.write('{"user":'); }
   await waitFor(() => expect(meHeadersArrived).toBe(meResponses.length));
   await complete({ accessToken: googleAccess, refreshToken: 'google-refresh', user });
-  await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+  await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await act(async () => {
     for (const response of meResponses) response.end(`${JSON.stringify(oldUser)}}`);
     await nativeFetch(`${base}/round-trip`);

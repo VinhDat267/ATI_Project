@@ -47,9 +47,9 @@ describe('App message sending', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.c' } });
     fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'entered-secret' } });
     fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-    const input = await screen.findByPlaceholderText('Mô tả công việc bạn muốn thực hiện...');
+    const input = await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     fireEvent.change(input, { target: { value: 'Tạo card' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Gửi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }));
 
     await waitFor(() => {
       const message = useChatStore.getState().messages.find((m) => m.content === 'Tạo card');
@@ -75,7 +75,7 @@ describe('App message sending', () => {
 
     // Verify empty state text and prompt chips
     expect(
-      await screen.findByText(/kiểm tra kế hoạch trước khi ATI ghi/i)
+      await screen.findByText(/Mô tả bằng lời thường điều bạn cần/i)
     ).toBeInTheDocument();
     expect(
       await screen.findByText(/Tạo công việc mới trên Trello/i)

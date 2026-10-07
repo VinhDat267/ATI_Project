@@ -3,9 +3,7 @@ import pg from 'pg';
 import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
-const composerSend = (page: import('@playwright/test').Page) => page.locator('form')
-  .filter({ has: page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...') })
-  .getByRole('button', { name: 'Gửi', exact: true });
+const composerSend = (page: import('@playwright/test').Page) => page.getByRole('button', { name: /^(Gửi|Gửi yêu cầu|Xác nhận và tiếp tục)$/ });
 
 const email = process.env.CHAT_ADMIN_EMAIL;
 const password = process.env.CHAT_ADMIN_PASSWORD;
@@ -79,7 +77,7 @@ async function login(page: import('@playwright/test').Page) {
   await page.getByRole('textbox', { name: 'Email' }).fill(email!);
   await page.getByLabel('Mật khẩu').fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Bạn muốn nhờ ATI việc gì?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeVisible();
 }
 
 test('real browser and PostgreSQL: login, chat, approval and execution Continue safe pending after reload', async ({ page }, testInfo) => {
@@ -130,7 +128,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution', async (
     await login(page);
     const prompt = `Tạo task sửa giao diện cho Minh trên Trello và thông báo Slack E2E ${Date.now()}`;
     const created = page.waitForResponse((response) => response.url().endsWith('/api/conversations') && response.request().method() === 'POST');
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     const response = await created;
     expect(response.status()).toBe(201);
@@ -161,7 +159,7 @@ test('real browser and PostgreSQL: cancel a pending plan', async ({ page }) => {
   try {
     await login(page);
     const prompt = `Tạo task Trello và báo Slack E2E cancel ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -179,7 +177,7 @@ test('real browser and PostgreSQL: edit a pending plan through chat', async ({ p
   try {
     await login(page);
     const prompt = `Tạo task Trello và báo Slack E2E edit ${Date.now()}`;
-    const composer = page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...');
+    const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await composer.fill(prompt);
     await composerSend(page).click();
     const approve = page.getByRole('button', { name: /Duyệt kế hoạch/ });
@@ -217,12 +215,12 @@ test('real browser and PostgreSQL: clarification before plan', async ({ page }) 
   try {
     await login(page);
     const prompt = `Tạo task trên board Frontend, gán Minh và thông báo Slack E2E ambiguous ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByText('Bạn muốn chọn member nào?')).toBeVisible();
     const clarification = await pool.query("SELECT m.id FROM messages m WHERE m.content = $1 AND m.metadata->>'type' = 'clarification' AND m.conv_id IN (SELECT conv_id FROM messages WHERE content = $2)", ['Bạn muốn chọn member nào?', prompt]);
     expect(clarification.rowCount).toBeGreaterThan(0);
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill('Minh Nguyễn');
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill('Minh Nguyễn');
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     await page.getByRole('button', { name: 'Hủy', exact: true }).click();
@@ -239,7 +237,7 @@ for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQ
     const disabledSample = page.getByRole('button', { name: /Cần kết nối/ }).first();
     await expect(disabledSample).toHaveCount(0); // Suggestions only use configured services.
     const prompt = `Tạo task Trello rồi báo Slack E2E partial failure ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -284,7 +282,7 @@ test('real browser and PostgreSQL: approved three-service workflow resolves prio
   try {
     await login(page);
     const prompt = `Tạo issue GitHub, thẻ Trello và thông báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -316,7 +314,7 @@ test('real browser and PostgreSQL: approved Sheets workflow carries updatedRange
   try {
     await login(page);
     const prompt = `Đọc Google Sheets, thêm dòng và báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -341,7 +339,7 @@ test('real browser and PostgreSQL: approved Calendar workflow carries event url 
   try {
     await login(page);
     const prompt = `Đặt lịch họp Google Calendar và báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -366,7 +364,7 @@ test('real browser and PostgreSQL: approved Telegram workflow carries messageId 
   try {
     await login(page);
     const prompt = `Gửi Telegram và báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
@@ -391,7 +389,7 @@ test('real browser and PostgreSQL: approved Jira workflow carries key and url to
   try {
     await login(page);
     const prompt = `Tạo ticket Jira lỗi đăng nhập và báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt); await composerSend(page).click();
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt); await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
     expect(planId).toBeTruthy(); const preview = (await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId])).rows[0].plan_json;
@@ -413,7 +411,7 @@ test('real browser and PostgreSQL: approved Notion workflow carries page url to 
   try {
     await login(page);
     const prompt = `Tạo page Notion biên bản và báo Slack E2E ${Date.now()}`;
-    await page.getByPlaceholder('Mô tả công việc bạn muốn thực hiện...').fill(prompt);
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
     await composerSend(page).click();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
