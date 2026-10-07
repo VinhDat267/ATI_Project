@@ -1,0 +1,295 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [],
+  "set": "services",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases-services.json",
+    "commit": "795229e24c64a38902e7efdce0680c729f37348a",
+    "sha256": "6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372",
+    "version": 1,
+    "cases": 44,
+    "selectedCases": 44
+  },
+  "sourceCommit": "e8b06c96a1ffc6ae64d5a7dbb54aa32040096890",
+  "sourceTrees": {
+    "packages/planner": "d0b46a57fb7dbafb622a0e2fc64fb711d07edb77",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 2,
+  "plannedCaseRuns": 132,
+  "concurrency": 2,
+  "runAt": "2026-10-07T16:02:42.617Z",
+  "stopped": true,
+  "pendingIds": [
+    "sh03",
+    "sh04",
+    "sh05",
+    "sh06",
+    "sh07",
+    "sh08",
+    "ca01",
+    "ca02",
+    "ca03",
+    "ca04",
+    "ca05",
+    "ca06",
+    "ca07",
+    "ca08",
+    "no01",
+    "no02",
+    "no03",
+    "no04",
+    "no05",
+    "no06",
+    "no07",
+    "no08",
+    "tg01",
+    "tg02",
+    "tg03",
+    "tg04",
+    "tg05",
+    "tg06",
+    "tg07",
+    "tg08",
+    "ji01",
+    "ji02",
+    "ji03",
+    "ji04",
+    "ji05",
+    "ji06",
+    "ji07",
+    "ji08",
+    "wf01",
+    "wf02",
+    "wf03",
+    "wf04"
+  ],
+  "stopReason": "Evaluation stopped after provider failure",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only requests are labelled as immediate clarification with no searches under the 05/10 product policy.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": false
+  },
+  "serviceGate": {
+    "sheets": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0,
+      "toolSelectionAccuracy": 0,
+      "argumentQuality": null,
+      "argumentMatcherRate": 0,
+      "strictPassRate": 0
+    },
+    "byCategory": {
+      "read_only": {
+        "cases": 1,
+        "strictPassRate": 0
+      },
+      "single_step": {
+        "cases": 1,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {
+      "sheets": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 1,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 4544,
+          "p95": 4588
+        }
+      }
+    },
+    "stability": {
+      "sh01": "0/1",
+      "sh02": "0/1"
+    },
+    "latencyMs": {
+      "p50": 4544,
+      "p95": 4588,
+      "max": 4588
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 2,
+    "attempts": 2,
+    "timeouts": 0,
+    "attemptDistribution": {
+      "1": 2
+    },
+    "retryReasons": {},
+    "timeMs": {
+      "total": 9132,
+      "model": 9075.0622,
+      "prefetch": 0,
+      "search": 0,
+      "other": 56.9377999999997
+    },
+    "timeShare": {
+      "model": 0.9937650240911082,
+      "prefetch": 0,
+      "search": 0,
+      "other": 0.0062349759088917754
+    },
+    "under15Seconds": {
+      "count": 2,
+      "total": 2,
+      "rate": 1
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "sh01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 4588,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 4550.6559,
+              "attempts": [
+                {
+                  "startedAtMs": 0.008800000000064756,
+                  "durationMs": 4550.2397,
+                  "outcome": "cancelled"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 37.938699999999926
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sh02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 4544,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Gateway served an unexpected model",
+          "providerError": "Gateway served an unexpected model",
+          "searches": [],
+          "modelCalls": [
+            {
+              "durationMs": 4524.406300000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0018999999999778083,
+                  "durationMs": 4524.3112,
+                  "outcome": "error"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4392,
+                "completionTokens": 32,
+                "reasoningTokens": 92
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 19.31619999999998
+            }
+          ],
+          "phases": []
+        }
+      ]
+    }
+  ]
+}
