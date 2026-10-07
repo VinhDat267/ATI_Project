@@ -5,6 +5,26 @@ import { loadEvalFile, parseEvalOptions, runCase, runPool, safeGateway } from '.
 import * as runner from './run.js';
 
 describe('service evaluation runner', () => {
+  it('redacts a full case prompt copied into a model response only in exported evidence', () => {
+    const prompt = 'Send the status report to the team channel.';
+    const response = { kind: 'plan' as const, summary: prompt, steps: [{ id: 's1', tool: 'slack.send_message', args: { text: `Echo: ${prompt}`, channel: 'team' } }] };
+    expect(runner.publicEvidenceResponse).toBeTypeOf('function');
+    const exported = runner.publicEvidenceResponse(response as any, prompt);
+    expect(JSON.stringify(exported)).not.toContain(prompt);
+    expect(exported).toMatchObject({ kind: 'plan', summary: '[redacted case prompt]', steps: [{ args: { text: 'Echo: [redacted case prompt]', channel: 'team' } }] });
+    expect(response.summary).toBe(prompt);
+    expect(response.steps[0]!.args.text).toBe(`Echo: ${prompt}`);
+  });
+
+  it('classifies invalid gateway JSON without exposing the response text', async () => {
+    const { file } = loadEvalFile('services');
+    const provider = new OpenAICompatibleProvider({ baseUrl: 'http://unused.test/v1', model: 'test-model',
+      fetch: (async () => new Response('secret invalid JSON')) as typeof fetch });
+    const row = await runCase(file.cases[0]!, file, false, 'llm', { provider });
+    expect(row.providerError).toBe('Gateway returned invalid JSON');
+    expect(row.error).not.toContain('secret');
+  });
+
   it('summarizes retry counts and non-overlapping phase time rather than adding parallel search calls', () => {
     expect(runner.summarizeTiming).toBeTypeOf('function');
     const summary = runner.summarizeTiming([{ latencyMs: 1000,

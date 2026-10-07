@@ -47,11 +47,19 @@ function safeError(err: unknown): string {
   // Error bodies may echo entire prompts or credentials: publish only classifications.
   const status = (err as { status?: unknown })?.status;
   if (typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599) return `LLM gateway returned HTTP ${status}`;
+  if (err instanceof SyntaxError) return 'Gateway returned invalid JSON';
   const text = String((err as Error)?.message ?? '');
   if (text === 'Evaluation stopped after provider failure') return text;
   if (/request timed out after \d+ms$/.test(text)) return 'Model request timed out';
   if (/Completion was served by/.test(text)) return 'Gateway served an unexpected model';
   return 'Request failed (details omitted from public evidence)';
+}
+
+/** A model can echo the entire request in its summary; redact only the public copy after scoring. */
+export function publicEvidenceResponse(response: PlannerResponse | undefined, prompt: string): PlannerResponse | undefined {
+  if (!response) return response;
+  return JSON.parse(JSON.stringify(response, (_key, value: unknown) =>
+    typeof value === 'string' && prompt ? value.split(prompt).join('[redacted case prompt]') : value)) as PlannerResponse;
 }
 
 export function summarizeTiming(rows: ObservedRun[]) {
@@ -218,7 +226,7 @@ export async function main() {
       qualityGate: 'incomplete', aggregate, comparison, timing,
       results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => ({ id: r.case.id, category: r.case.category, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
-        response: r.response, searches: r.searches, modelCalls: r.modelCalls, phases: r.phases })) })),
+        response: publicEvidenceResponse(r.response, r.case.prompt), searches: r.searches, modelCalls: r.modelCalls, phases: r.phases })) })),
     };
     writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     const m = aggregate.mean;
