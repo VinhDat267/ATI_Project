@@ -53,17 +53,18 @@ it('integrates Sheets through HTTP, encrypted real SQL, connection check, factor
     const seen: any[] = [];
     const planner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm',
       gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }),
-      provider: { name: 'contract-scripted', async generatePlan(input) { seen.push(input); return JSON.stringify({ kind: 'plan', thinking: 'Use observed tab', summary: 'Append', warnings: [], steps: [
+      provider: { name: 'contract-scripted', async generatePlan(input) { seen.push(input);
+        if (seen.length === 1) return JSON.stringify({ kind: 'search', calls: [{ tool: catalog.find(t => t.listable && t.sideEffect === 'read')!.name, args: { query: '' } }] }); return JSON.stringify({ kind: 'plan', thinking: 'Use observed tab', summary: 'Append', warnings: [], steps: [
         { id: 'append', tool: 'sheets.append_rows', description: 'Append row', args: { spreadsheetId: id, sheet: 'Tasks', rows: [['Task']] }, dependsOn: [] },
       ] }); } },
     });
     const memory = new WorkingMemory();
     expect((await planner.processMessage({ userMessage: 'Append a row in Google Sheets', memory })).kind).toBe('plan');
-    expect(seen[0].workingMemory.__observed.spreadsheet).toEqual([{ id, title: 'ATI Test Tracker', url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit' }]);
-    expect(seen[0].workingMemory.__observed.sheet).toEqual([{ id: 0, title: 'Tasks' }]);
+    expect(seen.at(-1).workingMemory.__observed.spreadsheet).toEqual([{ id, title: 'ATI Test Tracker', url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit' }]);
+    expect(seen.at(-1).workingMemory.__observed.sheet).toEqual([{ id: 0, title: 'Tasks' }]);
     // A fabricated spreadsheet/tab cannot pass the real grounding validator.
     const plan = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: [{ id: 'x', tool: 'sheets.append_rows', description: '', args: { spreadsheetId: 'fabricated_spreadsheet_id', sheet: 'Missing', rows: [['x']] }, dependsOn: [] }] };
-    expect(validatePlan(JSON.stringify(plan), catalog, { grounding: { memory: seen[0].workingMemory, userTexts: [] } }).valid).toBe(false);
+    expect(validatePlan(JSON.stringify(plan), catalog, { grounding: { memory: seen.at(-1).workingMemory, userTexts: [] } }).valid).toBe(false);
     await expect(adapter.execute('sheets.append_rows', { spreadsheetId: 'outside_spreadsheet_123456', sheet: 'Tasks', rows: [['x']] })).rejects.toMatchObject({ category: 'AUTH_ERROR' });
   } finally {
     vi.unstubAllGlobals(); await pool.end();

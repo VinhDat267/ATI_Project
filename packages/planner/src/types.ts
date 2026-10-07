@@ -15,5 +15,26 @@ export interface LLMGeneratePlanInput {
 
 export interface LLMProvider {
   readonly name: string;
+  /** Diagnostic side channel; never includes request/response text or headers. */
+  readonly lastCallMetrics?: ModelCallMetrics;
   generatePlan(input: LLMGeneratePlanInput): Promise<string>;
+}
+
+export interface ModelAttemptMetrics {
+  startedAtMs: number;
+  durationMs: number;
+  outcome: 'success' | 'timeout' | 'transient' | 'cancelled' | 'error';
+  status?: number;
+  retryReason?: 'timeout' | `http_${number}`;
+}
+export interface ModelCallMetrics {
+  durationMs: number;
+  attempts: ModelAttemptMetrics[];
+  servedModel?: string;
+  usage: { promptTokens: number | null; completionTokens: number | null; reasoningTokens: number | null };
+}
+export interface PlanningPhaseMetrics {
+  phase: 'prefetch' | 'search' | 'gather';
+  startedAtMs: number;
+  durationMs: number;
 }

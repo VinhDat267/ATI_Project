@@ -2,8 +2,82 @@ import { describe, expect, it } from 'vitest';
 import { createServer } from 'node:http';
 import { MockLLMProvider, OpenAICompatibleProvider, type LLMProvider } from '@wap/planner';
 import { loadEvalFile, parseEvalOptions, runCase, runPool, safeGateway } from './run.js';
+import * as runner from './run.js';
 
 describe('service evaluation runner', () => {
+  it('summarizes retry counts and non-overlapping phase time rather than adding parallel search calls', () => {
+    expect(runner.summarizeTiming).toBeTypeOf('function');
+    const summary = runner.summarizeTiming([{ latencyMs: 1000,
+      modelCalls: [{ startedAtMs: 100, durationMs: 600, usage: { promptTokens: 1, completionTokens: 2, reasoningTokens: null },
+        attempts: [{ startedAtMs: 0, durationMs: 300, outcome: 'timeout', retryReason: 'timeout' }, { startedAtMs: 300, durationMs: 300, outcome: 'success' }] }],
+      phases: [{ phase: 'prefetch', startedAtMs: 0, durationMs: 100 }, { phase: 'search', startedAtMs: 700, durationMs: 200 }],
+    }] as any);
+    expect(summary).toMatchObject({ calls: 1, attempts: 2, timeouts: 1, attemptDistribution: { '2': 1 },
+      retryReasons: { timeout: 1 }, timeMs: { total: 1000, model: 600, prefetch: 100, search: 200, other: 100 },
+      timeShare: { model: 0.6, prefetch: 0.1, search: 0.2, other: 0.1 }, under15Seconds: { count: 1, total: 1, rate: 1 } });
+  });
+  it('never copies provider error bodies, prompts or headers into public error evidence', async () => {
+    const { file } = loadEvalFile('services');
+    const provider: LLMProvider = { name: 'synthetic', async generatePlan() {
+      throw Object.assign(new Error(`authorization Bearer secret ${file.cases[0]!.prompt}`), { status: 503 });
+    } };
+    const row = await runCase(file.cases[0]!, file, false, 'llm', { provider });
+    expect(row.providerError).toBe('LLM gateway returned HTTP 503');
+    expect(row.error).not.toContain(file.cases[0]!.prompt);
+    expect(row.providerError).not.toMatch(/secret|authorization/);
+  });
+  it('records the real deadline abort, retry and usage without recording prompts or headers', async () => {
+    const { file } = loadEvalFile('services');
+    let requests = 0;
+    let expiredSignal: AbortSignal | undefined;
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'http://unused.test/v1', model: 'test-model', apiKey: 'secret-test-key', timeoutMs: 30,
+      fetch: (async (_url, init) => {
+        requests++;
+        if (requests === 1) {
+          expiredSignal = init!.signal!;
+          return new Promise<Response>((_, reject) => expiredSignal!.addEventListener('abort', () => reject(expiredSignal!.reason), { once: true }));
+        }
+        return new Response(JSON.stringify({ model: 'test-model', usage: { prompt_tokens: 123, completion_tokens: 17,
+          completion_tokens_details: { reasoning_tokens: 9 } },
+          choices: [{ message: { content: '{"kind":"clarification","question":"Bạn muốn ghi dữ liệu ở đâu?"}' } }] }));
+      }) as typeof fetch,
+    });
+    const row = await runCase(file.cases[0]!, file, false, 'llm', { provider });
+    expect(expiredSignal?.aborted).toBe(true);
+    expect(row.llmCalls).toBe(1);
+    expect(row.modelCalls).toHaveLength(1);
+    expect(row.modelCalls[0]).toMatchObject({ servedModel: 'test-model', usage: { promptTokens: 123, completionTokens: 17, reasoningTokens: 9 },
+      attempts: [{ outcome: 'timeout', retryReason: 'timeout' }, { outcome: 'success' }] });
+    expect(row.modelCalls[0]!.durationMs).toBeGreaterThanOrEqual(25);
+    expect(row.modelCalls[0]!.attempts[0]!.durationMs).toBeGreaterThanOrEqual(25);
+    expect(row.modelCalls[0]!.startedAtMs).toBeGreaterThanOrEqual(0);
+    const metrics = JSON.stringify(row.modelCalls);
+    expect(metrics).not.toContain('secret-test-key');
+    expect(metrics).not.toContain(file.cases[0]!.prompt);
+    expect(metrics).not.toMatch(/authorization|systemPrompt|conversationHistory/);
+    expect(row.phases).toEqual([]);
+  });
+  it('records transient attempts and individual search rounds', async () => {
+    const { file } = loadEvalFile('services');
+    let requests = 0;
+    const provider = new OpenAICompatibleProvider({ baseUrl: 'http://unused.test', model: 'test-model', retryDelayMs: 1,
+      fetch: (async () => {
+        requests++;
+        if (requests === 1) return new Response('{}', { status: 429 });
+        const content = requests === 2 ? JSON.stringify({ kind: 'search', calls: [{ tool: 'sheets.search_spreadsheets', args: { query: 'Frontend' } }] })
+          : '{"kind":"clarification","question":"Chọn trang tính nào?"}';
+        return new Response(JSON.stringify({ model: 'test-model', choices: [{ message: { content } }] }));
+      }) as typeof fetch });
+    const row = await runCase(file.cases.find(c => c.id === 'sh02')!, file, false, 'llm', { provider });
+    expect(row.modelCalls).toHaveLength(2);
+    expect(row.modelCalls[0]!.attempts).toMatchObject([{ outcome: 'transient', status: 429, retryReason: 'http_429' }, { outcome: 'success' }]);
+    expect(row.modelCalls[1]!.attempts).toHaveLength(1);
+    expect(row.modelCalls[1]!.usage).toEqual({ promptTokens: null, completionTokens: null, reasoningTokens: null });
+    expect(row.phases.filter(p => p.phase === 'search')).toHaveLength(1);
+    expect(row.phases.filter(p => p.phase === 'prefetch')).toHaveLength(1);
+    expect(row.phases.every(p => p.durationMs >= 0 && p.startedAtMs >= 0)).toBe(true);
+  });
   it('accepts services and the production PLANNER_SEARCH_MODE alias with bounded run settings', () => {
     expect(parseEvalOptions({ EVAL_SET: 'services', PLANNER_SEARCH_MODE: 'llm', EVAL_RUNS: '3', EVAL_CONCURRENCY: '2' }))
       .toMatchObject({ set: 'services', searchMode: 'llm', runsCount: 3, concurrency: 2 });

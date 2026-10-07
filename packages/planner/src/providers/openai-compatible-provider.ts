@@ -1,4 +1,4 @@
-import type { LLMProvider, LLMGeneratePlanInput } from '../types.js';
+import type { LLMProvider, LLMGeneratePlanInput, ModelCallMetrics } from '../types.js';
 import { callWithRetry } from './transport.js';
 
 export interface OpenAICompatibleProviderConfig {
@@ -44,6 +44,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   public readonly model: string;
   /** Model name reported by the gateway for the latest completion. */
   public lastServedModel?: string;
+  public lastCallMetrics?: ModelCallMetrics;
   private endpoint: string;
   private apiKey?: string;
   private fetchFn: typeof fetch;
@@ -66,6 +67,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
+    const started = performance.now();
+    const metrics: ModelCallMetrics = { durationMs: 0, attempts: [], usage: { promptTokens: null, completionTokens: null, reasoningTokens: null } };
+    this.lastCallMetrics = metrics;
+    this.lastServedModel = undefined;
     const system = `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`;
     const body = JSON.stringify({
       model: this.model,
@@ -79,7 +84,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (this.apiKey) headers.authorization = `Bearer ${this.apiKey}`;
 
-    return callWithRetry(async (signal) => {
+    try { return await callWithRetry(async (signal) => {
       const response = await this.fetchFn(this.endpoint, { method: 'POST', headers, body, signal });
       const text = await response.text();
       if (!response.ok) {
@@ -88,9 +93,14 @@ export class OpenAICompatibleProvider implements LLMProvider {
         if (this.apiKey) detail = detail.split(this.apiKey).join('[redacted]');
         throw new OpenAICompatibleError(`LLM gateway returned ${response.status}: ${detail}`, response.status);
       }
-      const json = JSON.parse(text) as { model?: unknown; choices?: Array<{ message?: { content?: unknown } }> };
+      const json = JSON.parse(text) as { model?: unknown; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown;
+        completion_tokens_details?: { reasoning_tokens?: unknown }; prompt_tokens_details?: { reasoning_tokens?: unknown } }; choices?: Array<{ message?: { content?: unknown } }> };
       const served = typeof json.model === 'string' ? json.model : undefined;
       this.lastServedModel = served;
+      metrics.servedModel = served;
+      const count = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+      metrics.usage = { promptTokens: count(json.usage?.prompt_tokens), completionTokens: count(json.usage?.completion_tokens),
+        reasoningTokens: count(json.usage?.completion_tokens_details?.reasoning_tokens ?? json.usage?.prompt_tokens_details?.reasoning_tokens) };
       if (served && baseModel(served) !== baseModel(this.model)) {
         throw new Error(`Completion was served by ${served}, not the configured ${this.model}; disable gateway fallback for this model`);
       }
@@ -98,6 +108,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }, {
       label: 'LLM gateway', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries, timeoutRetries: this.timeoutRetries,
       retryDelayMs: this.retryDelayMs, signal: input.signal,
-    });
+      onAttempt: attempt => metrics.attempts.push(attempt),
+    }); } finally { metrics.durationMs = performance.now() - started; }
   }
 }
