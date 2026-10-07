@@ -7,7 +7,7 @@
 
 FE-05 làm đúng hành vi của cockpit nhưng hình thức khác bản mẫu khá xa. Ngày 06/10/2026 người dùng chốt: **bản mẫu là chuẩn về hình thức**, app phải giống bản mẫu, chỉ được khác ở các điểm trong đặc tả mục 1.1. FE-06 dựng khoảnh khắc 7–9 trên cùng khung này, nên FE-05b phải xong trước.
 
-**Đổi cách làm 07/10/2026:** người dùng chốt đưa thẳng bản React của bản mẫu vào app (đặc tả mục 1, bản 07/10). Cockpit của app trở thành trang `AppStage` của bản React với dữ liệu thật: giữ nguyên markup, class và cỡ chữ/màu của bản mẫu, không đổi sang token hay nâng chữ lên 14px như bản 06/10 của task này.
+**Đổi cách làm 07/10/2026:** người dùng chốt đưa thẳng bản React của bản mẫu vào app (đặc tả mục 1, bản 07/10). Cockpit của app trở thành trang `AppStage` của bản React với dữ liệu thật: giữ nguyên markup, class và cỡ chữ/màu của bản mẫu (Agentic như bản mẫu thể hiện), không đổi sang token suy ra của FE-04 hay nâng chữ lên 14px như bản 06/10 của task này.
 
 Claude Code so bản mẫu với `main` `d5fcc46` ở sandbox, 1440×900 và 375×812, chế độ tối (06/10). Khác biệt lớn nhất:
 
@@ -119,7 +119,7 @@ Chỉ được khác bản React ở các điểm trong đặc tả mục 1.1 (b
 - [ ] Test: ô nhập hiển thị đúng một cái ở mọi khoảnh khắc, kể cả khi mở "Sửa qua Chat", chọn "Để tôi gõ…" và mở/đóng ngăn hội thoại.
 - [ ] Test: thanh tiến độ khoảnh khắc 5 bằng số bước xong / tổng; mũi tên nối ở khoảnh khắc 6 chỉ có khi plan có tham chiếu giữa hai bước; không có số issue/dòng trước khi bước chạy xong.
 - [ ] Test và browser cho mục 10: cuộn xuống ở khoảnh khắc 4, bấm Duyệt → ở khoảnh khắc 5 và 6, `h1` nằm trọn trong vùng nhìn thấy và nhận focus; đang gõ trong ô nhập khi khoảnh khắc đổi thì focus vẫn ở ô nhập. Kiểm ở 1440px và 375px.
-- [ ] Cỡ chữ, màu và khoảng cách giống bản React (không nâng lên 14px, không đổi sang token). Test tương phản token của FE-04 cho cockpit được bỏ, ghi rõ trong PR (đặc tả 1.2 điểm 6).
+- [ ] Cỡ chữ, màu và khoảng cách giống bản React (không nâng lên 14px, không đổi sang token suy ra của FE-04). Test tương phản token của FE-04 cho cockpit được bỏ, ghi rõ trong PR (đặc tả 1.2 điểm 6).
 - [ ] Các test FE-02, FE-03, FE-03b, W2-04, AUTH-05 và toàn bộ test FE-05 vẫn xanh: đổi cách tìm phần tử nếu cần, không bỏ ca.
 - [ ] `npm run check` và `npm run test:browser:v3` exit 0.
 

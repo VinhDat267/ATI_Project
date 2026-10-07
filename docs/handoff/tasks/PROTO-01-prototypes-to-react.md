@@ -38,7 +38,7 @@ Người dùng muốn có bản React của 12 bản mẫu trong `docs/design/pr
 
 Người dùng đã nói muốn giữ design system của bản mẫu; cần sửa đặc tả trước khi tích hợp.
 
-**Đã chốt 07/10/2026:** người dùng chọn đưa thẳng bản React vào app, dùng design system của bản mẫu. Đặc tả giao diện mục 1, 1.1, 1.2 đã viết lại; việc đưa vào app làm ở [FE-04b](FE-04b-prototype-foundation.md) (lớp nền) và FE-05b → FE-10.
+**Đã chốt 07/10/2026:** người dùng chọn đưa thẳng bản React vào app: app theo Agentic đúng như 12 bản mẫu, bỏ các điều chỉnh riêng cho app của đặc tả (chữ tối thiểu 14px, nền `#F6F6F1`, token suy ra). Đặc tả giao diện mục 1, 1.1, 1.2 đã viết lại; việc đưa vào app làm ở [FE-04b](FE-04b-prototype-foundation.md) (lớp nền) và FE-05b → FE-10.
 
 ## Kết quả bước 1 (Claude Code, 06/10/2026)
 

@@ -13,7 +13,8 @@
 - **Giữ nguyên hành vi backend**, trừ ba thay đổi nhỏ ở UI-API-01 (mục 9). Không đổi planner, executor, adapter, catalog.
 - **Đưa thẳng bản React của bản mẫu vào app** (người dùng chốt 07/10/2026, thay cách làm của bản 06/10 "chuyển markup HTML sang JSX, đổi màu sang token, nâng chữ lên 14px").
   - Nguồn là bản React trong `docs/design/prototypes/react/src/pages/<Trang>/` (PROTO-01, đã khớp bản HTML gốc từng phần tử và từng pixel theo `npm run verify`), không phải file HTML.
-  - App dùng **design system của bản mẫu**: nguyên markup, class, CSS của trang và lớp tương thích Tailwind v3 của bản React. Thay cho design system Agentic ở mục 3: chữ 10–12px và tiêu đề 42–52px như bản mẫu, màu và nền `#F8F8F6` của bản mẫu, chế độ tối theo `theme.css` của bản mẫu. Màu cam `#FF5701` và ba font giữ nguyên vì bản mẫu cũng dùng.
+  - App dùng **design system Agentic đúng như 12 bản mẫu thể hiện**: nguyên markup, class, CSS của trang và lớp tương thích Tailwind v3 của bản React, gồm cả chữ 10–12px, tiêu đề 42–52px, nền `#F8F8F6`, chế độ tối theo `theme.css` của bản mẫu.
+  - Không áp các điều chỉnh riêng cho app mà mục 3 thêm vào ngày 05/10: chữ tối thiểu 14px (3.2 điểm 3), nền `#F6F6F1` (3.2 điểm 4), bộ token suy ra (3.3). Chữ trắng trên nút cam (3.2 điểm 1) và cách dùng ba font (3.2 điểm 2) trùng với bản mẫu nên vẫn đúng.
   - Thay dữ liệu mẫu và JS demo bằng store/API, giữ mọi bảo đảm hành vi đã có (mục 1.2).
   - Chỉ được khác bản React ở các điểm trong mục 1.1.
   - Mọi thứ trong bản mẫu ghi "demo", "Kịch bản demo", "Xem như", "Máy chủ: Thử nghiệm/Thật" là công cụ trình diễn, **không đưa vào app**.
@@ -84,7 +85,7 @@ Bỏ so với bản 06/10: điểm 4 cũ (chữ tối thiểu 14px, tiêu đề 
 
 ## 3. Design system Agentic và các điểm lệch đã chốt
 
-> **Từ 07/10/2026 app dùng design system của bản mẫu (mục 1 và 1.2), không dùng token ở mục này.** Mục 3 giữ để đọc lại lịch sử FE-04/FE-05 và các test tương phản đang có; màu cam `#FF5701`, Be Vietnam Pro, Playfair Display, JetBrains Mono trùng với bản mẫu nên không đổi.
+> **Từ 07/10/2026 app theo Agentic đúng như 12 bản mẫu thể hiện (mục 1 và 1.2).** Bảng token gốc 3.1 vẫn là nguồn của bản mẫu; chỗ bản mẫu khác bảng (chữ 10–12px, tiêu đề 42–52px, nền `#F8F8F6`) thì theo bản mẫu. Không còn áp 3.2 điểm 3–4 và bộ token suy ra 3.3 (FE-04); hai mục này giữ để đọc lại lịch sử FE-04/FE-05 và các test tương phản đang có. 3.2 điểm 1–2 trùng với bản mẫu.
 
 Nguồn: design system "Agentic" (Themed & Unique) do nhóm cung cấp ngày 05/10/2026.
 
@@ -239,7 +240,7 @@ Hành vi "yêu cầu chỉ để xem thì hỏi lại ngay" thuộc **W3-10**, k
 
 - (07/10) Lớp tương thích v3 áp cho cả app (bảng màu hex, line-height của `text-*`, `hover:` mọi thiết bị, preflight v3). Trong lúc chuyển dần, các màn chưa chuyển sẽ lệch nhẹ so với hiện tại (màu, chiều cao dòng); chấp nhận vì sẽ được thay. Browser test của màn chưa chuyển vẫn phải xanh.
 - (07/10) Trang của bản React rất lớn (`LandingPage.tsx` 2.576 dòng, `AppStagePage.tsx` 2.731 dòng, phần lớn là markup). Tách theo đoạn và nạp theo route (`lazy`) để không phình gói đầu.
-- (07/10) Chữ nhỏ màu xám của bản mẫu không đạt tương phản 4,5:1; người dùng chấp nhận (mục 1.1 điểm 4). Báo cáo môn học nên ghi giới hạn này.
+- (07/10) Một số chữ nhỏ màu xám trong bản mẫu không đạt tương phản 4,5:1; người dùng chấp nhận (mục 1.1 điểm 4). Báo cáo môn học nên ghi giới hạn này.
 
 - Viết lại `Workspace`/`ChatContainer` dễ phá các bảo đảm bất đồng bộ đã sửa ở FE-02/FE-03b/W2-04/AUTH-05. Task FE-05 bắt buộc giữ các test đó xanh và thêm ca mới cho chuyển khoảnh khắc.
 - Đổi chữ trên giao diện làm hỏng hàng loạt browser test; ước lượng thời gian sửa test vào mỗi task.

@@ -15,7 +15,7 @@
 - **Kết luận đưa người dùng:**
   - thứ tự và phạm vi hợp lý;
   - hai quyết định chỉ người dùng chốt được:
-    - design system của app: đặc tả 1.1 hay design system của bản mẫu (PROTO-01 ghi người dùng muốn giữ design system bản mẫu);
+    - app theo đặc tả 1.1 (Agentic cộng các điều chỉnh riêng cho app: chữ ≥ 14px, nền `#F6F6F1`, token suy ra) hay theo đúng bản mẫu (PROTO-01 ghi người dùng muốn giữ design system của bản mẫu);
     - hai PR "Planora";
   - năm chỗ nên chỉnh:
     1. FE lấy JSX từ bản React thay vì HTML;
@@ -27,6 +27,8 @@
   - **đưa thẳng bản React vào app**;
   - Planora: người dùng tự xử lý;
   - chỉ làm phần "sửa kế hoạch (PR tài liệu)". Không làm task card tuần 5 và script chụp ảnh trong đợt này.
+
+- **Người dùng chỉnh cách diễn đạt** (sau khi mở PR): "đâu, design system dùng Agentic như bản 12 HTML đã convert sang React mà". 12 bản mẫu được làm theo Agentic, nên bản đầu của PR ghi sai là "dùng design system của bản mẫu thay cho token Agentic". Đã sửa ở mọi chỗ thành: app theo Agentic đúng như 12 bản mẫu thể hiện; thứ bị bỏ là các điều chỉnh riêng cho app của đặc tả (3.2 điểm 3–4: chữ tối thiểu 14px, nền `#F6F6F1`; bộ token suy ra 3.3 của FE-04).
 
 ## Thay đổi kế hoạch (PR này)
 
