@@ -17,7 +17,7 @@ describe('05/10 read-only policy', () => {
       const response = historical.results.find((r: any) => r.run === run).cases.find((c: any) => c.id === id).response;
       const provider = new MockLLMProvider(); provider.setPlanResponses([response]);
       const planner = new AIPlanner({ provider, toolCatalog: ALL_TOOLS, searchMode, requireGroundedResources: false });
-      const result = await planner.processMessage({ userMessage: searchMode === 'llm' ? cases.find((c: any) => c.id === id).prompt : '??c Google Sheets v? Google Calendar', memory: new WorkingMemory() });
+      const result = await planner.processMessage({ userMessage: searchMode === 'llm' ? cases.find((c: any) => c.id === id).prompt : 'Read Google Sheets and Google Calendar', memory: new WorkingMemory() });
       expect(result.kind).toBe('clarification');
       if (result.kind === 'clarification') expect(result.question).toMatch(/Bạn muốn.*dữ liệu/);
       expect(provider.getCallCount()).toBe(1);
