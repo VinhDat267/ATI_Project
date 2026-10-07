@@ -32,7 +32,8 @@ npm run verify     # so với bản HTML gốc, cần mạng (Tailwind CDN, Goog
 | `settings.html` | `/settings` (`#notion` mở thẳng ngăn của dịch vụ) | khớp bản gốc ở lúc mở và 26 trạng thái thao tác |
 | `history.html` | `/history` | khớp bản gốc ở lúc mở và 23 trạng thái thao tác |
 | `guide.html` | `/guide` (`?tab=`, `?service=`) | khớp bản gốc ở lúc mở và 12 trạng thái thao tác |
-| `index.html`, `app-stage.html` | | chưa chuyển (bước 4) |
+| `index.html` | `/` | khớp bản gốc ở lúc mở và 23 trạng thái thao tác (6 trạng thái của sân khấu tương tác chỉ ở 1440) |
+| `app-stage.html` | `/app-stage` | khớp bản gốc ở lúc mở và 34 trạng thái thao tác |
 
 ## Cách chuyển một trang
 
@@ -45,6 +46,8 @@ npm run verify     # so với bản HTML gốc, cần mạng (Tailwind CDN, Goog
 
 Bộ chuyển (`scripts/lib/html-jsx.mjs`, dùng chung cho hai công cụ trên) xử lý: `class` → `className`, thuộc tính SVG, `style` → object, `value`/`checked`/`selected` → `defaultValue`/`defaultChecked`, link `x.html#y` → `/x#y`, khoảng trắng giữa các phần tử theo đúng cách HTML hiển thị.
 
+Handler chỉ thành `actions.f(...)` khi là đúng một lời gọi hàm; còn lại (ví dụ `if(event.key==='Enter') f()`) để `todo()` cho chuyển tay. `href="javascript:void(0)"` (`app-stage`) phải sửa tay thành `href="#"` kèm `preventDefault`, vì React chặn URL `javascript:` và báo lỗi console.
+
 Bản mẫu thường chỉ vẽ lại một phần DOM ở một số thao tác (`renderServiceLists()`, `renderRequestsList()`…); giữa các lần đó phần còn lại giữ nội dung cũ, kể cả khi đang ẩn. Bản React giữ đúng điều này: dữ liệu nằm trong `useRef` như biến toàn cục của bản mẫu, còn giao diện là ảnh chụp trong state, chỉ cập nhật đúng lúc bản mẫu gọi hàm vẽ lại. Ví dụ ngăn chi tiết của `settings` vẫn giữ dịch vụ vừa đóng, danh sách của `history` dựng lại thẻ (như `innerHTML` mới) mỗi lần vẽ.
 
 ## Giữ đúng giao diện khi đổi Tailwind v3 (bản mẫu) sang v4 (app)
@@ -56,17 +59,19 @@ Bản mẫu thường chỉ vẽ lại một phần DOM ở một số thao tác
 | `shadow-sm`, `blur-sm`, `rounded-sm`, `drop-shadow-sm` đổi giá trị | Khai lại giá trị v3 | `src/styles/v3-compat.css` |
 | `line-height` của `text-*` thành tỉ lệ | Khai lại giá trị tuyệt đối của v3 | `src/styles/v3-compat.css` |
 | `leading-*` luôn thắng `text-*` nhờ `--tw-leading` | Vô hiệu `--tw-leading` để theo thứ tự CSS như v3 | `src/styles/v3-base.css` |
-| `space-x/y`, `divide-y` đặt margin/viền ở phần tử trước | Đổi tên thành `v3-space-*`, `v3-divide-y` và tự khai theo cách tính v3 | `src/styles/v3-compat.css`, bộ chuyển |
+| `space-x/y`, `divide-y` đặt margin/viền ở phần tử trước | Đổi tên thành `v3-space-*`, `v3-divide-y` và tự khai theo cách tính v3. Khoảng cách âm (`-space-x-1.5`) đổi thành `-v3-space-*`, khai riêng vì v4 cần utility âm riêng | `src/styles/v3-compat.css`, bộ chuyển |
 | Gradient (`bg-gradient-to-*`, `from-/via-/to-*`) và màu `divide-*`: chế độ tối của bản mẫu (`theme.css`) ghi đè các class này theo tên và theo biến của v3 (`--tw-gradient-from`…). v4 đặt hướng trong `--tw-gradient-position` và khai `@property` kiểu `<color>` cho biến gradient, nên ghi đè của `theme.css` làm mất hướng và màu | Giữ tên class gốc, viết lại bằng CSS thường theo cách tính v3; loại các class này khỏi v4 bằng `@source not inline(...)`. Thêm class mới loại này thì thêm ở cả hai chỗ | `src/styles/v3-theme-targets.css`, `src/styles/tailwind.css` |
 | `hover:` chỉ áp trên thiết bị có chuột | `@custom-variant hover (&:hover)` | `src/styles/v3-compat.css` |
 | `outline-none` bỏ hẳn viền; v3 dùng viền trong suốt 2px, vẫn hiện ở chế độ tương phản cao | Đổi tên thành `v3-outline-none`, khai như v3 | `src/styles/v3-compat.css`, bộ chuyển |
-| Hai class cùng thuộc tính trên một phần tử (ví dụ `border-transparent` và `border-[#FF5701]`, hay `hidden` và `inline-flex`): v3 CDN xếp theo thứ tự xuất hiện trong trang hoặc theo bảng giá trị của từng plugin, v4 xếp theo tên class | Chỉ gặp ở class do JS thêm vào. Đánh dấu `!` cho class phải thắng, ghi chú ngay tại chỗ. `hidden` thêm vào phần tử `flex`/`grid` không cần, vì v4 cũng cho `hidden` thắng | `ErrorsPage.tsx` (toast), `AuthActionPage.tsx` (tab), `AccountPage.tsx` (nút đăng xuất các phiên khác) |
+| Class `transform`: v3 luôn đặt thuộc tính `transform` (ma trận đơn vị khi chưa có translate/rotate/scale) nên phần tử có lớp vẽ riêng; v4 không đặt gì. Lộ ra ở `index`: chữ của nút "Quay lại đăng nhập" (ngay sau nút có `transform`) được khử răng cưa khác, 594 pixel | Đổi tên thành `v3-transform`, khai `transform: translate(0, 0)`. `translate-*`, `rotate-*`, `scale-*` của v4 là thuộc tính riêng nên vẫn cộng dồn đúng | `src/styles/v3-compat.css`, bộ chuyển, 20 chỗ trong 9 trang |
+| Hai class cùng thuộc tính trên một phần tử (ví dụ `border-transparent` và `border-[#FF5701]`, hay `hidden` và `inline-flex`): v3 CDN xếp theo thứ tự xuất hiện trong trang hoặc theo bảng giá trị của từng plugin, v4 xếp theo tên class | Gặp ở class do JS thêm vào, và một chỗ có sẵn trong HTML (`app-stage`: nút "Xem hội thoại" có cả `hidden` lẫn `inline-flex`). Đánh dấu `!` cho class phải thắng, ghi chú ngay tại chỗ. `hidden` cùng `flex`/`grid` không cần, vì v4 cũng cho `hidden` thắng | `ErrorsPage.tsx` (toast), `AuthActionPage.tsx` (tab), `AccountPage.tsx` (nút đăng xuất các phiên khác), `AppStagePage.tsx` (nút xem hội thoại) |
+| Biến CSS riêng của trang trùng tên biến theme mà v4 khai trên `:root` (`--font-body`, `--font-display`, `--font-mono`), nằm sau CSS của trang nên đè biến của trang. `index` và `app-stage` dùng `var(--font-body)` cho `body` nên đổi font | Đổi tên thành `--page-font-*` ở cả chỗ khai lẫn chỗ dùng, trong `page.css` của mọi trang | bộ chuyển (`scripts/html-to-jsx.mjs`), `src/pages/*/page.css` |
 | Màu viền mặc định, placeholder, con trỏ trên nút | Quy tắc preflight của v3 | `src/styles/v3-base.css` |
 | CSS v4 nằm trong cascade layer | Nạp preflight/utilities không qua layer; `theme.css` và CSS của trang chèn trước Tailwind như thứ tự trong bản mẫu | `src/styles/tailwind.css`, `src/main.tsx`, `src/app/usePrototypePage.ts` |
 
 Các phần chung:
 
-- `src/app/ThemeToggle.tsx`, `src/app/theme.ts`: nút Sáng/Tối gắn vào đúng chỗ như `theme.js`, cùng khoá `localStorage` `ati-theme`.
+- `src/app/ThemeToggle.tsx`, `src/app/theme.ts`: nút Sáng/Tối gắn vào đúng chỗ như `theme.js`, cùng khoá `localStorage` `ati-theme`. `app-stage.html` không nạp `theme.js` mà có nút riêng trên thanh trên, nên `App.tsx` không gắn nút dùng chung cho `/app-stage`; nút của trang dùng chung `theme.ts`. Khác một chút: bản mẫu còn đọc khoá cũ `theme` khi chưa có `ati-theme`, bản React thì không.
 - `src/app/usePrototypePage.ts`: mỗi trang tự đặt title, class của `<html>`/`<body>` và CSS riêng khi vào, gỡ khi rời trang.
 - `src/app/router.ts`: điều hướng bằng History API, không thư viện router, giống `apps/chat-web`.
 
@@ -77,6 +82,7 @@ Script mở bản HTML gốc (server tĩnh, cổng 5190) và bản React (Vite, 
 - **cấu trúc:** từng phần tử theo thứ tự DOM (thẻ và class);
 - **vị trí:** sai số 1px;
 - **khoảng 60 thuộc tính computed style:** màu chuẩn hoá về RGBA;
+- **transform thực tế:** gộp `transform`, `translate`, `rotate`, `scale` thành một ma trận, vì v3 dồn cả vào `transform` còn v4 tách riêng. Không có cái nào thì ghi `none`, khác ma trận đơn vị (có transform thì phần tử có lớp vẽ riêng). Bỏ qua phần tử không có hộp (`display: none`), vì Chromium trả `transform: none` cho chúng. `translate` theo phần trăm tính theo kích thước phần tử; SVG không có `offsetWidth/offsetHeight` nên lấy từ `getBoundingClientRect`;
 - **chữ;**
 - **ảnh chụp cả trang:** so từng pixel.
 
@@ -93,6 +99,10 @@ Ngoài lúc mở trang (đủ 4 tổ hợp), mỗi trang có các trạng thái 
 - Sau các bước, script chờ font tải xong rồi mới chụp, vì thao tác có thể làm hiện chữ ở độ đậm chưa dùng.
 - Ngay trước khi chụp, script ép vẽ lại cả trang bằng cách đổi bề rộng khung nhìn thêm 1px rồi trả lại, làm y hệt cho cả hai bản. Bản React dựng trang bằng JS sau lần vẽ đầu, nên Chromium giữ lại mảnh header đã vẽ ở lượt trước: mép avatar tròn lệch tới 67 mức màu ở 9 pixel, dù DOM, style và vị trí giống hệt. Trang cao hơn khung nhìn thì Playwright đã giãn khung để chụp cả trang nên tự vẽ lại; trang vừa khít khung nhìn (1440×900) thì không, nên lệch chỉ lộ ở đó.
 - Chạy một trạng thái: `node scripts/verify-parity.mjs errors --state=loi-may-chu`.
+- Bấm xong mà nút bị đẩy khỏi chỗ con trỏ (ví dụ danh sách xuống dòng) thì Chromium chỉ bỏ `:hover` ở lần di chuột kế tiếp; thêm bước `['move', 0, 0]` để hai bản cùng hết hover (`settings-them-noi-dung`).
+- Trạng thái chỉ có ở một khổ màn hình khai `only: 1440` (ví dụ sân khấu tương tác của `index` chỉ hiện từ khổ `lg`).
+- Mặc định script bật chế độ giảm chuyển động để hiệu ứng JS xong ngay. Trạng thái khai `motion: true` thì tắt chế độ này: `index` ẩn hẳn sân khấu tương tác khi giảm chuyển động, nên các trạng thái bấm chấm khoảnh khắc và cuộn tới khoảnh khắc cần nó. Hiệu ứng CSS vẫn bị tắt khi chụp.
+- Trạng thái có hẹn giờ thì chọn mốc chờ cách xa các mốc đổi giao diện. Bản React chạy dev chậm hơn vài trăm ms, nên chụp sát mốc thì hai bản rơi vào hai phía (`app-stage-bo-qua-viec-3-xong`: toast ẩn ở 2,6 giây, chờ 2 giây thì bản React đã ẩn; nay chờ 3,2 giây). Tương tự, `index` gõ chữ ở khoảnh khắc 1 chậm hơn khi chạy dev (mỗi ký tự dựng lại cả trang; bản build thì ngang bản gốc), nên các trạng thái `motion` chờ lần gõ xong ở cả hai bản rồi mới thao tác.
 - Khi so tên class, script bỏ tiền tố `v3-` và dấu `!`.
 - Bóng đổ không vẽ gì (trong suốt, hoặc mọi kích thước bằng 0) được bỏ qua.
 - Không so giá trị margin theo chiều có `auto` (`mx-auto`, `ml-auto`…), vì Chrome đôi khi trả 0px dù phần tử đã được căn đúng. Vị trí của phần tử vẫn được so nên kết quả margin auto vẫn được kiểm.
@@ -106,7 +116,6 @@ Bản React chép đúng hành vi bản mẫu, kể cả các chỗ dưới đâ
 
 - `responses.html`: dòng phụ của tình huống 4 ("Kênh bạn cần chưa có trong danh sách?") chỉ được vẽ sau khi đổi vai trò trong menu demo. Lúc mới mở, ô này trống.
 - `auth-action.html`: nhánh JS báo "Mật khẩu mới phải có ít nhất 12 ký tự!" không bao giờ chạy, vì thuộc tính `minlength` của ô nhập chặn form trước và Chrome hiện bong bóng của trình duyệt.
-- `errors.html`, `auth-action.html`, `history.html` ("Mở lại trên sân khấu"): nhiều thao tác chuyển về `app-stage.html` sau 0,5–2 giây. Trang này chưa chuyển sang React nên tạm hiện trang 404.
 - `users.html`: sau khi vẽ danh sách thành viên, khung bảng desktop bị gỡ class `hidden` (vốn đi cùng `sm:block`), nên ở màn hẹp bảng hiện cùng danh sách thẻ.
 - `history.html`: vai trò quản trị ghi `style.display = 'inline-flex'` cho link "Người dùng", đè class `hidden lg:inline-flex`, nên link hiện cả ở màn hẹp.
 - `account.html`:

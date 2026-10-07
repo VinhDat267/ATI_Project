@@ -1,6 +1,6 @@
 # PROTO-01 · Chuyển 12 bản mẫu HTML sang React, giữ nguyên design system
 
-**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 xong (#94 tại `852342c`), bước 3 thi công xong (chờ review/merge), bước 4 chờ · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2), `feat/proto-react-03` (bước 3) · **Phụ thuộc:** không
+**Trạng thái:** bước 1 xong (#93 tại `00e9c5f`), bước 2 xong (#94 tại `852342c`), bước 3 xong (#95 tại `458c5ad`), bước 4 thi công xong (chờ review/merge) · **Nhánh:** `feat/proto-react-01` (bước 1), `feat/proto-react-02` (bước 2), `feat/proto-react-03` (bước 3), `feat/proto-react-04` (bước 4, tách từ bước 3) · **Phụ thuộc:** không
 **Người yêu cầu:** chủ dự án, 06/10/2026 · **Thi công bước 1:** Claude Code (theo yêu cầu trực tiếp của người dùng)
 
 ## Vì sao
@@ -183,3 +183,56 @@ Giới hạn phát hiện sau lần chạy này (khi làm bước 4): script ch�
 - `users`: bảng desktop hiện cả ở màn hẹp sau khi vẽ danh sách;
 - `history`: link "Người dùng" hiện ở màn hẹp khi là quản trị viên; "Mở lại trên sân khấu" tạm ra trang 404;
 - `account`: đổi mật khẩu xong thanh độ mạnh giữ màu cũ; đặt lại dữ liệu có thể đổi thứ tự thẻ phiên.
+
+## Kết quả bước 4 (Claude Code, 07/10/2026)
+
+**Đã làm:** hai trang sinh bằng bộ chuyển, rồi viết lại toàn bộ JS bằng state React, không còn lời gọi `todo()` ở cả 12 trang.
+
+| Trang | JS của bản mẫu | Hành vi viết lại |
+|---|---|---|
+| `index` (route `/`) | 750 dòng | hộp đăng nhập/đăng ký/quên mật khẩu (ẩn/hiện mật khẩu, tài khoản bị chặn, gửi email, Google), hộp email mô phỏng, Esc và bấm nền để đóng, bẫy focus; sân khấu kể chuyện: cuộn tới khoảnh khắc (`IntersectionObserver`), bấm chấm khoảnh khắc, chữ gõ dần, khoảnh khắc 2 "tìm thấy" |
+| `app-stage` | 1.109 dòng | 9 khoảnh khắc (phím 1–9, chấm), gửi yêu cầu và gợi ý, chọn bảng tính, xem trước từng việc, chi tiết kỹ thuật, sửa qua chat, duyệt và chạy theo 4 chế độ (bình thường, thử lại việc 3, bỏ qua việc 3, làm tiếp từ việc 3), ngăn hội thoại và ngăn lịch sử có bẫy focus, menu người dùng, menu demo (thành viên, máy chủ thật, giải thích chế độ thử nghiệm), nút Sáng/Tối riêng |
+
+Dòng việc ở khoảnh khắc 5 của `app-stage` giữ theo từng trường (class, nhãn, mô tả, thời gian), vì bản mẫu không đặt lại khi vào lại khoảnh khắc 5 mà chỉ ghi đè từng phần.
+
+**RED → GREEN** (`node scripts/verify-parity.mjs index app-stage`):
+
+| Trang | Lệch | Nguyên nhân | Sửa |
+|---|---|---|---|
+| `index`, `app-stage` | font của `body` sai, `index` lệch 777 phần tử | biến `--font-body/--font-display/--font-mono` của trang trùng tên biến theme Tailwind v4 khai trên `:root`, bị đè | đổi thành `--page-font-*` trong `page.css` của 7 trang có biến này, bộ chuyển đổi tự động |
+| `index` | nút "Vào không gian làm việc" hiện cả khi chưa đăng nhập (2 phần tử lệch ở lúc mở) | nút có sẵn cả `hidden` lẫn `inline-flex` trong HTML, v4 cho `inline-flex` thắng | `hidden!`, có ghi chú. Làm tương tự cho nút "Xem mô phỏng email" (JS thêm `hidden` khi đăng nhập thành công) và nút "Xem hội thoại" của `app-stage` (có sẵn trong HTML) |
+| `index` | bấm chấm khoảnh khắc: bản gốc quá giờ 5 giây | CSS giảm chuyển động của bản mẫu ẩn hẳn sân khấu tương tác | tuỳ chọn `motion: true` cho trạng thái, viết lại các trạng thái cuộn/bấm chấm |
+| `index` | `bam-nen-dong` 375: viền focus của ô email khác | đua với hẹn giờ focus 100 ms của bản mẫu | chờ 300 ms sau khi mở |
+| `index` | `quen-mat-khau`: 594 pixel (1440), 9 pixel (375), 0 phần tử lệch | chữ nút "Quay lại đăng nhập" được khử răng cưa xám thay vì điểm ảnh con. Computed style của nút giống hệt; khác ở cây lớp vẽ (CDP `LayerTree`): nút gửi ngay trước có class `transform`, v3 đặt ma trận đơn vị nên nút có lớp riêng, v4 không | class `transform` → `v3-transform` (`transform: translate(0, 0)`) ở bộ chuyển và 20 chỗ trong 9 trang; script so thêm transform thực tế (RED: 6 phần tử lệch ở trạng thái này) |
+| `app-stage` | khoảng cách âm `-space-x-1.5` mất tác dụng | v4 cần utility âm khai riêng | `-v3-space-*` |
+| `app-stage` | `bo-qua-viec-3-xong`: toast còn hiện ở bản gốc, đã ẩn ở bản React (14.554 pixel) | hai bản ẩn toast đúng 2,6 giây sau khi bấm; chờ 2 giây cộng thời gian chụp thì bản React (dev, chậm hơn vài trăm ms) đã qua mốc | chờ 3,2 giây; toast lúc đang hiện đã có trạng thái `bo-qua-viec-3` |
+| `index` | `cham-khoanh-khac-2`: chữ gõ dần ở khoảnh khắc 1 khác nhau (gốc đang gõ tới "…ghi vào", React đã đủ câu), 3 phần tử, lặp lại khi chạy lại | bấm chấm thì trang cuộn mượt qua đoạn của khoảnh khắc 1 nên chữ gõ lại, nhưng chỉ khi lần gõ trước đã xong. Đo: bản gốc gõ ~38 ms/ký tự (xong sau ~4,3 giây), bản React dev ~55 ms/ký tự (~6 giây, mỗi ký tự dựng lại cả trang); bản build production ngang bản gốc (~4,3 giây, 2/2 lượt). Lúc bấm (giây thứ 4) bản gốc đã gõ xong nên gõ lại, bản React dev chưa xong nên không | không sửa trang (logic giống bản mẫu, chậm chỉ ở dev); trạng thái `motion` chờ 7 giây trước khi thao tác và 8 giây sau mỗi lần bấm chấm. 4 trạng thái chạy lại đạt ngay lần đầu |
+| bộ chuyển | handler `if(...) f()` bị hiểu là lời gọi hàm `if` | regex nhận mọi `tên(` | chỉ nhận handler là đúng một lời gọi hàm, bỏ từ khoá; kết quả trên `privacy`, `errors`, `settings`, `history` giống hệt trước |
+
+Hai lỗi console chỉ có ở bản React đã sửa: React chặn `href="javascript:void(0)"` của `app-stage` (đổi thành `href="#"` kèm `preventDefault`); `flushSync` gọi trong `useLayoutEffect` lúc mở `app-stage`.
+
+Script so có thêm: bước `move` (đưa chuột tới toạ độ); transform thực tế (lần chạy 12 trang đầu tiên báo sai ở biểu tượng SVG `-translate-y-1/2` của `users`, vì SVG không có `offsetHeight`; sửa script rồi chạy lại từ đầu); tuỳ chọn `only` (một khổ màn hình) và `motion`; cổng qua `PARITY_ORIGINAL_PORT`/`PARITY_REACT_PORT`; mặc định chạy cả 12 trang.
+
+**Kết quả cuối:** lần so toàn bộ 12 trang (07/10, `node scripts/verify-parity.mjs`, mọi thay đổi bước 4 trên nền `4dc4a39`) khớp **462/464** trường hợp, exit 1:
+
+| Trang | Đạt |
+|---|---|
+| `index` | 44/44 |
+| `app-stage` | 72/72 |
+| `404`, `privacy`, `errors`, `responses`, `auth-action`, `users`, `history`, `guide` | 4/4, 4/4, 32/32, 20/20, 50/50, 44/44, 50/50, 28/28 |
+| `account` | 59/60 |
+| `settings` | 55/56 |
+
+8 trường hợp đạt ở lần chạy lại (6 ở `account`/`auth-action`, 2 ở `settings`). Hai trường hợp lệch ở cả lần chạy lại:
+- `account-thu-hoi-roi-dat-lai-375-dark`: 88 pixel ở dấu ngã chữ "Nguyễn" (tiêu đề Playfair), 0 phần tử lệch. Đây là dao động nét chữ Playfair đã ghi ở bước 3. Chạy riêng 3/3 đạt ngay lần đầu; hai lần so toàn bộ trước cũng đạt.
+- `settings-them-noi-dung-375-dark`: màu hover của nút "Thêm". Ở 375px, mục mới làm danh sách xuống dòng nên nút bị đẩy khỏi con trỏ; Chromium chỉ bỏ `:hover` ở lần di chuột kế tiếp, nên còn hover hay không tuỳ thời điểm, ở cả hai bản. Chạy riêng 3/3 đạt (1 lần cần chạy lại). Sửa trạng thái: thêm bước `move` đưa chuột ra góc sau khi bấm; sau đó 6/6 đạt ngay lần đầu.
+
+Sau khi sửa: chạy lại đủ hai trang `node scripts/verify-parity.mjs account settings` khớp **116/116**, exit 0 (7 trường hợp đạt ở lần chạy lại). Tính theo trường hợp: 464/464 khớp ở lần so toàn bộ hoặc lần chạy lại hai trang này; chưa có một lần so toàn bộ 12 trang nào exit 0 sau bước `move`.
+
+`npm run typecheck` exit 0, `npm run build` exit 0. Từ `history` và `index` bấm sang `/app-stage` đều tới đúng trang, 0 lỗi console (thử trên bản build).
+
+Hai lần so toàn bộ trước đó bị dừng giữa chừng: lần đầu vì script báo sai ở SVG (xem trên); lần hai vì người dùng tắt máy (372/464, 0 lệch).
+
+**Không so được hoặc chỉ so một phần:**
+- `index`: sân khấu tương tác chỉ có từ khổ `lg`, nên 6 trạng thái của nó chỉ so ở 1440. Chữ gõ dần và hiệu ứng chuyển cảnh chỉ so ở trạng thái cuối.
+- `app-stage`: các bước chạy có hẹn giờ được so ở lúc bắt đầu và lúc xong, không so từng khung giữa chừng.

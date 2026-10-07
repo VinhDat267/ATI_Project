@@ -8,7 +8,7 @@ const VIEWS = ['verify-success', 'verify-expired', 'verify-used', 'reset-passwor
 type Mode = typeof VIEWS[number];
 type Toast = { id: number; message: string; phase: 'enter' | 'shown' | 'leaving' };
 const TAB_BASE = 'scenario-tab px-3 py-1.5 rounded-full border border-transparent whitespace-nowrap transition-colors';
-const TOAST_BASE = 'px-4 py-2.5 rounded-xl bg-[#111827] text-white text-xs sm:text-sm font-medium shadow-lg flex items-center gap-2 transform transition-all duration-200';
+const TOAST_BASE = 'px-4 py-2.5 rounded-xl bg-[#111827] text-white text-xs sm:text-sm font-medium shadow-lg flex items-center gap-2 v3-transform transition-all duration-200';
 const TOAST_PHASE = { enter: 'translate-y-2 opacity-0', shown: 'translate-y-0 opacity-100', leaving: '-translate-y-2 opacity-0' };
 const BAR_EMPTY = 'h-full flex-1 rounded-full bg-[#E5E7EB] transition-colors';
 const BAR = (color: string) => `h-full flex-1 rounded-full transition-colors ${color}`;

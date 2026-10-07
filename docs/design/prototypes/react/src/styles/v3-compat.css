@@ -32,6 +32,21 @@
     margin-left: calc(calc(var(--spacing) * --value(number)) * calc(1 - var(--tw-space-x-reverse)));
   }
 }
+/* Khoảng cách âm (-space-x-1.5, app-stage): v4 cần utility âm khai riêng. */
+@utility -v3-space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 0;
+    margin-right: calc(calc(var(--spacing) * --value(number) * -1) * var(--tw-space-x-reverse));
+    margin-left: calc(calc(var(--spacing) * --value(number) * -1) * calc(1 - var(--tw-space-x-reverse)));
+  }
+}
+@utility -v3-space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(calc(var(--spacing) * --value(number) * -1) * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(calc(var(--spacing) * --value(number) * -1) * var(--tw-space-y-reverse));
+  }
+}
 @utility v3-divide-y {
   & > :not([hidden]) ~ :not([hidden]) {
     --tw-divide-y-reverse: 0;
@@ -44,6 +59,13 @@
 @utility v3-outline-none {
   outline: 2px solid transparent;
   outline-offset: 2px;
+}
+
+/* Class transform của v3 luôn đặt transform (ma trận đơn vị khi chưa có translate/rotate/scale), nên phần tử có lớp vẽ
+   riêng: chữ trong đó được khử răng cưa khác (index, nút "Quay lại đăng nhập") và phần tử thành khối xếp chồng riêng.
+   v4 không đặt gì; translate/rotate/scale của v4 là thuộc tính riêng nên cộng dồn được với ma trận đơn vị này. */
+@utility v3-transform {
+  transform: translate(0, 0);
 }
 
 /* v4 chỉ áp hover trên thiết bị có chuột; v3 áp mọi nơi. */

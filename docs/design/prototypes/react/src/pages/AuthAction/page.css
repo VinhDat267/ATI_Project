@@ -1,4 +1,4 @@
-/* <style> của auth-action.html, giữ nguyên thứ tự. */
+/* <style> của auth-action.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
     :root {
       --bg: #F8F8F6;
       --surface: #FFFFFF;
@@ -9,9 +9,9 @@
       --success: #16A34A;
       --warn: #D97706;
       --danger: #DC2626;
-      --font-display: 'Playfair Display', Georgia, serif;
-      --font-body: 'Be Vietnam Pro', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --page-font-display: 'Playfair Display', Georgia, serif;
+      --page-font-body: 'Be Vietnam Pro', sans-serif;
+      --page-font-mono: 'JetBrains Mono', monospace;
     }
 
     body {
