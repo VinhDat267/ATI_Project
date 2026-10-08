@@ -1,7 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { hashPassword, UserRepo } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { AdminUserRepo } from '../../../chat-api/src/db/repositories/admin-user-repo.js';
+import { createApp } from '../../../chat-api/src/app.js';
 
 const password = 'Fe09Browser!password';
 async function session(page: Page, email: string, secret = password) {
@@ -88,6 +90,48 @@ test('FE-09: unverified approval is disabled and own admin row has no member act
     const own = page.locator('#table-members-body tr').filter({ hasText: process.env.CHAT_ADMIN_EMAIL! });
     await expect(own).toContainText('Bạn'); await expect(own.locator('button')).toHaveCount(0);
   } finally { if (id) await db.query('DELETE FROM users WHERE id=$1', [id]); await db.end(); }
+});
+
+test('FE-09: actual approval HTTP 503 remains visible and preserves the pending account', async ({ page }, info) => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const email = `fe09-no-email-${randomUUID()}@example.test`;
+  const app = createApp({ jwtSecret: process.env.JWT_SECRET!, userRepo: new UserRepo(db), adminUserRepo: new AdminUserRepo(db), adminAuditLogger: { info() {} } });
+  // This native backend deliberately has no email sender. Forward its response,
+  // rather than constructing a nominal error body in the browser fixture.
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing HTTP fixture address');
+  let id: string | undefined;
+  try {
+    id = (await db.query("INSERT INTO users(email,password,name,status,email_verified) VALUES($1,$2,'FE09 Email Unavailable','pending',true) RETURNING id", [email, hashPassword(password)])).rows[0].id;
+    await session(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
+    let responses = 0;
+    await page.route(`**/api/admin/users/${id}/approve`, async route => {
+      const response = await route.fetch({ url: `http://127.0.0.1:${address.port}/api/admin/users/${id}/approve` });
+      expect(response.status()).toBe(503);
+      expect((await response.json()).code).toBe('APPROVAL_EMAIL_UNAVAILABLE');
+      responses++;
+      await route.fulfill({ response });
+    });
+    await page.goto('/admin/users');
+    await page.getByRole('searchbox').fill(email);
+    const candidate = page.locator('#pending-list-container > div').filter({ hasText: email });
+    await candidate.getByRole('button', { name: /Duyệt & kích hoạt/ }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toHaveText('Chưa cấu hình email thông báo duyệt tài khoản.');
+    await expect(dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true }).click();
+    await expect.poll(() => responses).toBe(2);
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    expect((await db.query('SELECT status FROM users WHERE id=$1', [id])).rows[0].status).toBe('pending');
+    await page.screenshot({ path: info.outputPath('FE09-actual-503.png') });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    if (id) await db.query('DELETE FROM users WHERE id=$1', [id]);
+    await db.end();
+  }
 });
 
 test('FE-09: Account Users History retain prototype layouts in light/dark at desktop and mobile without horizontal scrolling', async ({ page }) => {
