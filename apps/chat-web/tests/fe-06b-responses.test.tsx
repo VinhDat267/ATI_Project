@@ -6,7 +6,7 @@ import { useChatStore } from '../src/store/chat-store';
 import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 import { loadConversationHistory } from '../src/hooks/use-conversation-history';
 import { apiClient } from '../src/services/api-client';
-import type { User } from '../src/types';
+import type { ExecutionSnapshot, User } from '../src/types';
 
 vi.mock('../src/services/api-client', () => ({ apiClient: {
   getRuntime: async () => ({ runtimeMode: 'sandbox' }),
@@ -32,7 +32,11 @@ function refusal(unavailableServices?: Array<{ id: string; name: string }>) {
   store.addMessage({ id: 'u', role: 'user', content: prompt });
   handleSSEEvent('refusal', JSON.stringify({ reason: 'Chưa được kết nối hoặc chưa có tài nguyên được phép.', suggestion: 'Nhờ quản trị viên kết nối dịch vụ.', unavailableServices }), undefined, 'A');
 }
-beforeEach(() => { useChatStore.getState().reset(); resetSSEState(); });
+beforeEach(() => {
+  useChatStore.getState().reset(); resetSSEState();
+  vi.mocked(apiClient.getActivePlan).mockResolvedValue(null);
+  vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue(null);
+});
 afterEach(() => { cleanup(); useChatStore.getState().reset(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 it('SSE refusal retains server metadata for service-specific admin navigation', async () => {
@@ -71,6 +75,45 @@ it('durable clarification restores question and choices after reload', async () 
   expect(screen.getByRole('radio', { name: 'Gửi vào #ati-test' })).toBeInTheDocument();
   expect(screen.getByText(/Hãy báo quản trị viên thêm vào/)).toBeInTheDocument();
 });
+const completedSnapshot: ExecutionSnapshot = {
+  plan: { id: 'old-plan', convId: 'A', status: 'completed', summary: 'Công việc trước', steps: [{ id: 's1', tool: 'slack.send_message', description: 'Gửi thông báo cũ', args: {} }] },
+  execution: { status: 'completed' }, recoveryActions: [],
+  steps: [{ stepId: 's1', tool: 'slack.send_message', status: 'succeeded', output: { messageId: 'old-message' } }],
+};
+it.each([
+  ['clarification', 'Tôi không thấy kênh #marketing', '3'],
+  ['refusal', 'Dịch vụ chưa được kết nối.', 'refusal'],
+  ['planning_error', 'Lỗi: upstream failed', '1'],
+] as const)('reopening a conversation keeps the latest %s above an older completed receipt', async (type, content, moment) => {
+  useChatStore.getState().setConversationId('A');
+  vi.mocked(apiClient.getConversation).mockResolvedValue({ conversation: { id: 'A' }, messages: [
+    { id: 'old-response', role: 'assistant', content: 'Kế hoạch cũ', metadata: { type: 'plan', planId: 'old-plan' } },
+    { id: 'new-request', role: 'user', content: prompt },
+    { id: 'new-response', role: type === 'planning_error' ? 'system' : 'assistant', content,
+      metadata: { type, options: ['Gửi vào #ati-test'], unavailableServices: [{ id: 'notion', name: 'Notion' }] } },
+  ] } as never);
+  vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue(completedSnapshot);
+  await loadConversationHistory('A', () => true); const { container } = view();
+  expect(container.querySelector('[data-moment]')).toHaveAttribute('data-moment', moment);
+  if (type === 'clarification') expect(await screen.findByRole('radio', { name: 'Gửi vào #ati-test' })).toBeInTheDocument();
+  if (type === 'refusal') expect(await screen.findByRole('link', { name: 'Kết nối Notion' })).toBeInTheDocument();
+  if (type === 'planning_error') expect(await screen.findByText('Không thể lập kế hoạch lúc này. Hãy thử lại.')).toBeInTheDocument();
+  expect(useChatStore.getState().executionSnapshot).toEqual(completedSnapshot);
+  expect(useChatStore.getState().activePlan).toBeNull();
+});
+it.each([['unknown', '8'], ['failed', '7']] as const)('restored clarification cannot hide saved %s execution evidence', async (status, moment) => {
+  useChatStore.getState().setConversationId('A');
+  vi.mocked(apiClient.getConversation).mockResolvedValue({ conversation: { id: 'A' }, messages: [
+    { id: 'u', role: 'user', content: prompt },
+    { id: 'q', role: 'assistant', content: 'Tôi không thấy kênh #marketing', metadata: { type: 'clarification', options: ['Gửi vào #ati-test'] } },
+  ] } as never);
+  vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue({ ...completedSnapshot,
+    steps: [{ stepId: 's1', tool: 'slack.send_message', status }],
+  });
+  await loadConversationHistory('A', () => true); const { container } = view();
+  expect(container.querySelector('[data-moment]')).toHaveAttribute('data-moment', moment);
+  expect(screen.queryByRole('radio', { name: 'Gửi vào #ati-test' })).toBeNull();
+});
 it.each(['admin', 'member'] as const)('missing destination shows real planner options and scope help for %s', async role => {
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: 'Báo kênh #marketing là bản build mới đã lên' }],
     activeClarification: { question: 'Tôi không thấy kênh #marketing', context: 'Trong các kênh Slack nhóm cho phép, tôi chỉ thấy #ati-test.', options: ['Gửi vào #ati-test'] } });
@@ -79,6 +122,21 @@ it.each(['admin', 'member'] as const)('missing destination shows real planner op
   else expect(await screen.findByText(/Hãy báo quản trị viên thêm vào/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('radio', { name: 'Gửi vào #ati-test' })); expect(send).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Xác nhận và tiếp tục' })); expect(send).toHaveBeenCalledWith('Gửi vào #ati-test');
+});
+it('multiple destinations visibly identify the selected answer after focus moves to confirmation', async () => {
+  useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: prompt }], activeClarification: {
+    question: 'Tôi không thấy nơi cần ghi', options: ['Gửi vào #ati-test', 'Gửi vào #review'],
+  } });
+  const { send } = view();
+  const first = await screen.findByRole('radio', { name: 'Gửi vào #ati-test' });
+  const second = screen.getByRole('radio', { name: 'Gửi vào #review' });
+  fireEvent.click(first); expect(within(first).getByText('Đã chọn')).toBeVisible();
+  fireEvent.click(second); screen.getByRole('button', { name: 'Xác nhận và tiếp tục' }).focus();
+  expect(within(first).queryByText('Đã chọn')).toBeNull();
+  expect(within(second).getByText('Đã chọn')).toBeVisible();
+  expect(second).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận và tiếp tục' }));
+  expect(send).toHaveBeenCalledWith('Gửi vào #review');
 });
 it('read-only clarification uses planner choices without inventing destinations or write results', async () => {
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: 'Liệt kê các issue đang mở trong ati-test' }],
