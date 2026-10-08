@@ -6,6 +6,7 @@ import { useChatStore } from '../src/store/chat-store';
 import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 import { loadConversationHistory } from '../src/hooks/use-conversation-history';
 import { apiClient } from '../src/services/api-client';
+import { refreshExecutionSnapshot } from '../src/services/execution-snapshot';
 import type { ExecutionSnapshot, User } from '../src/types';
 
 vi.mock('../src/services/api-client', () => ({ apiClient: {
@@ -80,20 +81,25 @@ const completedSnapshot: ExecutionSnapshot = {
   execution: { status: 'completed' }, recoveryActions: [],
   steps: [{ stepId: 's1', tool: 'slack.send_message', status: 'succeeded', output: { messageId: 'old-message' } }],
 };
-it.each([
+const responseCases = [
   ['clarification', 'Tôi không thấy kênh #marketing', '3'],
   ['refusal', 'Dịch vụ chưa được kết nối.', 'refusal'],
   ['planning_error', 'Lỗi: upstream failed', '1'],
-] as const)('reopening a conversation keeps the latest %s above an older completed receipt', async (type, content, moment) => {
+] as const;
+it.each(responseCases.flatMap(([type, content, moment]) => [false, true].map(snapshotFirst => ({ type, content, moment, snapshotFirst }))))('reopening keeps the latest $type above an older receipt (snapshotFirst=$snapshotFirst)', async ({ type, content, moment, snapshotFirst }) => {
   useChatStore.getState().setConversationId('A');
-  vi.mocked(apiClient.getConversation).mockResolvedValue({ conversation: { id: 'A' }, messages: [
+  const history = { conversation: { id: 'A' }, messages: [
     { id: 'old-response', role: 'assistant', content: 'Kế hoạch cũ', metadata: { type: 'plan', planId: 'old-plan' } },
     { id: 'new-request', role: 'user', content: prompt },
     { id: 'new-response', role: type === 'planning_error' ? 'system' : 'assistant', content,
       metadata: { type, options: ['Gửi vào #ati-test'], unavailableServices: [{ id: 'notion', name: 'Notion' }] } },
-  ] } as never);
+  ] };
+  let finishHistory!: (value: Awaited<ReturnType<typeof apiClient.getConversation>>) => void;
+  vi.mocked(apiClient.getConversation).mockImplementation(() => new Promise(resolve => { finishHistory = resolve; }));
   vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue(completedSnapshot);
-  await loadConversationHistory('A', () => true); const { container } = view();
+  const loading = loadConversationHistory('A', () => true);
+  if (snapshotFirst) await refreshExecutionSnapshot('A');
+  finishHistory(history as never); await loading; const { container } = view();
   expect(container.querySelector('[data-moment]')).toHaveAttribute('data-moment', moment);
   if (type === 'clarification') expect(await screen.findByRole('radio', { name: 'Gửi vào #ati-test' })).toBeInTheDocument();
   if (type === 'refusal') expect(await screen.findByRole('link', { name: 'Kết nối Notion' })).toBeInTheDocument();
@@ -101,17 +107,21 @@ it.each([
   expect(useChatStore.getState().executionSnapshot).toEqual(completedSnapshot);
   expect(useChatStore.getState().activePlan).toBeNull();
 });
-it.each([['unknown', '8'], ['failed', '7']] as const)('restored clarification cannot hide saved %s execution evidence', async (status, moment) => {
+it.each((['unknown', 'failed'] as const).flatMap(status => [false, true].map(snapshotFirst => ({ status, snapshotFirst }))))('restored clarification cannot hide saved $status evidence (snapshotFirst=$snapshotFirst)', async ({ status, snapshotFirst }) => {
   useChatStore.getState().setConversationId('A');
-  vi.mocked(apiClient.getConversation).mockResolvedValue({ conversation: { id: 'A' }, messages: [
+  const history = { conversation: { id: 'A' }, messages: [
     { id: 'u', role: 'user', content: prompt },
     { id: 'q', role: 'assistant', content: 'Tôi không thấy kênh #marketing', metadata: { type: 'clarification', options: ['Gửi vào #ati-test'] } },
-  ] } as never);
+  ] };
+  let finishHistory!: (value: Awaited<ReturnType<typeof apiClient.getConversation>>) => void;
+  vi.mocked(apiClient.getConversation).mockImplementation(() => new Promise(resolve => { finishHistory = resolve; }));
   vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue({ ...completedSnapshot,
     steps: [{ stepId: 's1', tool: 'slack.send_message', status }],
   });
-  await loadConversationHistory('A', () => true); const { container } = view();
-  expect(container.querySelector('[data-moment]')).toHaveAttribute('data-moment', moment);
+  const loading = loadConversationHistory('A', () => true);
+  if (snapshotFirst) await refreshExecutionSnapshot('A');
+  finishHistory(history as never); await loading; const { container } = view();
+  expect(container.querySelector('[data-moment]')).toHaveAttribute('data-moment', status === 'unknown' ? '8' : '7');
   expect(screen.queryByRole('radio', { name: 'Gửi vào #ati-test' })).toBeNull();
 });
 it.each(['admin', 'member'] as const)('missing destination shows real planner options and scope help for %s', async role => {
