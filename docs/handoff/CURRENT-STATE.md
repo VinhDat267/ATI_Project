@@ -1,6 +1,9 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 08/10/2026, sau merge #110 tại `c21afc0` (5 P3 còn lại của FE-07) và #111 tại `06fdd09` (review độc lập và sửa phần sửa FE-06A của Claude Code). **FE-07 và FE-06 phần (a) xong cả phần dọn; FE-06 còn phần (b).** Trước đó:
+**Cập nhật lần cuối:** 08/10/2026, sau merge #113 tại `6f65b0c`: planner chấp nhận tên `gemini-3.8-flash-n` mà 9router trả cho `ag/gemini-3.8-flash`, nên chế độ live lập kế hoạch được trở lại. Trước đó:
+- #112 (`4afa2c2`): ghi #110, #111 vào CURRENT-STATE và ROADMAP;
+- #111 (`06fdd09`): review độc lập và sửa phần sửa FE-06A của Claude Code;
+- #110 (`c21afc0`): 5 P3 còn lại của FE-07. **FE-07 và FE-06 phần (a) xong cả phần dọn; FE-06 còn phần (b)**;
 - #109 (`c37e2e9`): ghi #104 → #108 vào CURRENT-STATE và ROADMAP;
 - #108 (`d5e7a9e`): FE-07, trang Kết nối dịch vụ theo bản React;
 - #107 (`f796467`): FE-06 phần (a), khoảnh khắc 7–9 và màn kết thúc không thành công;
@@ -20,7 +23,7 @@
 - FE-04 #88 (`89d1999`) và UI-API-01 #86 (`210d3b6`): token/theme/shell và API cho giao diện mới;
 - #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01).
 
-Agent cập nhật: Claude Code (sau merge #110 và #111).
+Agent cập nhật: Claude Code (sau merge #113).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -81,6 +84,8 @@ Mã và tài liệu v1/v2 (`apps/api`, `apps/web`, `apps/mcp-task-hub`, `package
 
 ## 3. Số liệu mới nhất
 
+Sau #113 (08/10/2026): Claude Code chạy trên head `ae98ea3` (cây merge `6f65b0c` bằng đúng head), PostgreSQL tmpfs riêng ở 55539, sandbox. `npm run check` exit 0 (**1.532 v3 + 165 eval**; planner 196 → 200); canonical browser exit 0 (**73/73 qua 11 nhóm**). CI PR #113 SUCCESS trên `ae98ea3`.
+
 Sau #110 và #111 (08/10/2026): Claude Code chạy trên `main` `06fdd09` (bản gộp cả hai PR; #111 merge sau #110 mà không cập nhật nhánh vì hai PR không chung file), PostgreSQL tmpfs riêng ở 55539, sandbox. `npm run check` exit 0 (**1.528 v3 + 165 eval**); canonical browser exit 0 (**73/73 qua 11 nhóm**). [CI main sau #110](https://github.com/VinhDat267/ATI_Project/actions/runs/37793337759) SUCCESS đúng `c21afc0`; [CI main sau #111](https://github.com/VinhDat267/ATI_Project/actions/runs/37793391321) SUCCESS đúng `06fdd09`. Trước merge, reviewer chạy từng PR: #110 head `0761c0e` 1.508 + 165, browser 73/73; #111 head `4edcd96` 1.518 + 165, browser 73/73.
 
 Sau #108 và #107 (08/10/2026): reviewer Claude Code chạy trên bản gộp `c39cf42` (nhánh FE-06A đã gộp `main` sau #108; cây merge `f796467` bằng đúng `c39cf42`), PostgreSQL tmpfs riêng ở 55538, sandbox. `npm run check` exit 0 (**1.498 v3 + 165 eval**); canonical browser exit 0 (**73/73 qua 11 nhóm**). [CI PR #107](https://github.com/VinhDat267/ATI_Project/actions/runs/37777503190) SUCCESS trên `c39cf42`; [CI main sau #108](https://github.com/VinhDat267/ATI_Project/actions/runs/37776824417) SUCCESS đúng `d5e7a9e`; [CI main sau #107](https://github.com/VinhDat267/ATI_Project/actions/runs/37778031151) SUCCESS đúng `f796467`. Trước khi gộp, từng PR riêng: FE-07 head `003719c` 1.454 + 165 và browser 69/69 (lần đầu 51/52, ca AUTH-01 chập chờn, mục 5); FE-06A head `0ab2506` 1.474 + 165 và browser 69/69 (lần đầu 51/52, ca FE-06A chập chờn, mục 5).
@@ -97,9 +102,9 @@ Mỗi số liệu ghi kèm ngày đo và commit. Số liệu lịch sử trướ
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 1.528/1.528 = 47 schema + 340 adapters + 196 planner + 25 executor + 353 API + 567 web | 08/10, `main` `06fdd09` sau #110 và #111, Claude Code chạy local trên PostgreSQL tmpfs riêng; CI main xanh. Trước đó 1.498 ở `f796467` (08/10, #107) | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 1.532/1.532 = 47 schema + 340 adapters + 200 planner + 25 executor + 353 API + 567 web | 08/10, #113 head `ae98ea3` (= merge `6f65b0c`), Claude Code chạy local trên PostgreSQL tmpfs riêng; CI PR xanh. Trước đó 1.528 ở `06fdd09` (08/10, #110/#111) | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 165/165 | như trên | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 73/73 ca, 11 nhóm, gồm ma trận sáng/tối × 1440/375 của FE-05, FE-05b, FE-06A và FE-07 | như trên (`06fdd09`); auth04 gồm Google login và bốn ca AUTH-05 Google, dùng OIDC giả | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 73/73 ca, 11 nhóm, gồm ma trận sáng/tối × 1440/375 của FE-05, FE-05b, FE-06A và FE-07 | như trên (`ae98ea3`); auth04 gồm Google login và bốn ca AUTH-05 Google, dùng OIDC giả | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Gmail SMTP và Google OAuth thật | Email xác minh/duyệt/reset, login mật khẩu mới, link một lần; Google mới pending/approve/login và tài khoản mật khẩu unlink/link/relogin đạt; SMTP535 và Google redirect mismatch đạt | 04–05/10, mã sản phẩm `198fe6d`, handoff merge #75 `bfd824f` | Native Gmail/Google/ATI UI + DB/API và xác nhận người dùng; [task AUTH-06](tasks/AUTH-06-auth-live-setup.md) |
 | Golden 50 câu, model thật, 3 lần | 150/150; p50/p95 5,454/13,105 s; 49 câu không đổi147/147, rf06 mới3/3 | 03/10, runtime `7ba60ef` | xem `evaluations/README.md` |
@@ -126,6 +131,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **#113 chấp nhận tên model `gemini-3.8-flash-n`** (`6f65b0c`), merge 08/10 lúc 22:35:40 Việt Nam. Claude Code thi công theo yêu cầu người dùng, **tự review**.
+  - Trên `main`, provider từ chối mọi phản hồi có tên model khác cấu hình, nên live không lập được kế hoạch nào. Audit 9router 0.5.95 ngày 08/10 (báo cáo ở máy người dùng, ngoài repo): trường `model` của response lấy từ `modelVersion` của upstream Antigravity; alias `ag/gemini-3.8-flash` trỏ tới `gemini-3.8-flash-medium`; không có combo nên không có fallback sang model khác; nghĩa của `-n` chưa xác minh.
+  - Người dùng đã duyệt cặp tên này ngày 07/10 (W3-10, commit `845701c` của #102). #113 đưa riêng phần đó vào `main`: chỉ chấp nhận đúng cặp `ag/gemini-3.8-flash` → `gemini-3.8-flash-n`, vẫn từ chối hậu tố, model và route khác; `lastServedModel` vẫn ghi tên thật. Không đổi prompt hay cách lập kế hoạch.
+  - Test RED commit riêng (1 fail / 18 đạt), GREEN 19/19, 2/2 đột biến bị bắt. Chưa gọi model thật sau sửa. Xem [log](log/2026-10-08-claude-code-planner-flash-n-alias.md).
+- **#112** (`4afa2c2`): ghi #110, #111 vào CURRENT-STATE và ROADMAP.
 - **#111 dọn FE-06A** (`06fdd09`), merge 08/10 lúc 21:33:02 Việt Nam. Codex thi công; Claude Code review độc lập: **Đạt**.
   - Codex review độc lập commit `2e4e6c7` (phần Claude Code tự sửa sau review #107) và bắt các P2: ô Sheets có dấu phẩy/gạch chéo bị gộp lẫn với ô khác; chuỗi người dùng dạng `${…}` bị đổi thành tham chiếu kế hoạch; tham chiếu `.id`/`.url`/`.fullName` mất nghĩa trường; dịch vụ có schema không mô tả hiện tên trường kỹ thuật (`spreadsheetId`, `chatId`…); template không đổi giá trị theo đúng cách executor làm. Sửa trong `recovery-request.ts` và nhãn ở `recovery-labels.json`.
   - Ca browser FE-06A có thêm ghi chẩn đoán khi fail (DOM, ảnh, request, lỗi console). Chụp lại 8 ảnh màn kết thúc. Chạy planner thật với câu sửa: gateway trả `gemini-3.8-flash-n` nên provider từ chối (mục 5).
@@ -295,7 +305,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Chưa đo hành vi của model khi lịch sử có plan cũ (sau PR #13) | planner | Đo lại ở tuần 4 |
 | Hai bộ câu đánh giá do một người viết; prompt đã được chỉnh trên bộ 50 câu | evaluations | Tuần 4: bộ câu do thành viên khác viết |
 | Các bản mẫu ngoài `app-stage.html` chưa kiểm bằng ảnh ở khổ desktop | `docs/design/prototypes/` | `app-stage.html` đã chụp ở 1440 và 375 (chế độ tối) ngày 06/10 khi so với FE-05; các trang khác đã kiểm ở 375–411px, sáng và tối, không lỗi console. Màn kết thúc không thành công không có bản mẫu; #107 dựng theo bố cục khoảnh khắc 6 |
-| **Gateway 9router trả model `gemini-3.8-flash-n` khi gọi `ag/gemini-3.8-flash`** (Codex quan sát 08/10 khi chạy planner thật ở #111); `OpenAICompatibleProvider` từ chối mọi phản hồi có tên model khác cấu hình | `packages/planner/src/providers/openai-compatible-provider.ts:92–95`, 9router ở máy nhóm trưởng | Nếu còn đúng thì mọi lần lập kế hoạch ở live và phép đo W3-10 (#102, bắt buộc đúng `ag/gemini-3.8-flash`) đều bị chặn. Cần người dùng kiểm cấu hình 9router; nếu `-n` là tên nội bộ của cùng model thì phải chốt có chấp nhận không. Chưa sửa |
+| Gateway 9router trả model `gemini-3.8-flash-n` khi gọi `ag/gemini-3.8-flash` (tên lấy từ `modelVersion` của Antigravity) | `packages/planner/src/providers/openai-compatible-provider.ts`, 9router ở máy nhóm trưởng | Đã chấp nhận đúng cặp tên này ở #113; live lập kế hoạch được trở lại nhưng **chưa chạy thử live sau sửa**. Upstream có thể đổi tên tiếp; khi đó live lại bị chặn cho tới khi cập nhật cặp tên (có thể đưa danh sách tên ra biến môi trường). Số đo trước 07/10 (tên `gemini-3.8-flash`) và sau đó cần đối chứng cùng ngày. Khi #102 cập nhật theo `main` sẽ xung đột ở dòng này: giữ bản #102 |
 | API kiểm tra kết nối vẫn gọi dịch vụ thật ở sandbox, trong khi dải thử nghiệm ghi "không gọi dịch vụ thật"; browser test FE-07 gọi Notion thật bằng token giả | `apps/chat-api/src/routes/services-routes.ts`, `tests/browser/fe-07-settings.spec.ts` | Không lộ khoá thật; CI phụ thuộc mạng ra ngoài. Người dùng chưa chốt sandbox nên hiện gì khi kiểm tra kết nối |
 | FE-06A "Sửa rồi thử lại": chưa nghiệm thu với đúng model `ag/gemini-3.8-flash` (gateway trả `-n`, xem dòng trên; ba phản hồi của gateway giữ đúng giá trị sửa và không làm lại việc đã xong); template lấy output là object hiện `[object Object]` (đúng như executor gửi, hiếm gặp) | `apps/chat-web/src/pages/Cockpit/recovery-request.ts` | Kế hoạch mới luôn phải duyệt lại nên không có lệnh ghi tự chạy. Đo lại khi gateway đúng model (W3-11 hoặc W4-02) |
 | Test browser chập chờn (07–08/10), mỗi ca fail một lần rồi chạy lại đạt: `FE-04: retained landing comparison copy … light` (hết 30 giây chờ trang giới thiệu); `AUTH-01: logout-all …` (refresh token chưa bị xoá); `FE-06A … 375` (trang trắng, `#root` rỗng, 1/80 lần khi chạy lặp); `FE-02` giữ vị trí cuộn (80 so với 16268); `FE-05b 1440 dark` không thấy `#moment-6` | `tests/browser/*.spec.ts`, Vite dev server | Nhiều ca khác nhau cùng fail khi máy tải nặng (nhiều agent chạy song song); nghi Vite dev server (có thể "504 Outdated Optimize Dep"), chưa có bằng chứng. Ca FE-06A đã ghi chẩn đoán khi fail (#111). Nên lập task chạy browser trên bản build hoặc ghi request mạng khi lỗi. Ba ca unit/`chat-api` chập chờn trước đây đã sửa ở #106 |
