@@ -30,6 +30,16 @@ it('ports the Account page without the shell or demo controls and requires curre
   fireEvent.click(within(modal).getByRole('button', { name: /Xác nhận gỡ/ }));
   await waitFor(() => expect(unlink).toHaveBeenCalledWith('Current!password'));
 });
+it('preserves a nonempty legacy whitespace password when confirming Google unlink', async () => {
+  window.history.replaceState({}, '', '/account');
+  const password = ' '.repeat(12);
+  const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết Google' }));
+  fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(/Mật khẩu hiện tại/), { target: { value: password } });
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xác nhận gỡ' }));
+  await waitFor(() => expect(unlink).toHaveBeenCalledWith(password));
+});
 it('uses the source avatar classes and styled keyboard menu on the Account page', async () => {
   window.history.replaceState({}, '', '/account');
   render(<App />);

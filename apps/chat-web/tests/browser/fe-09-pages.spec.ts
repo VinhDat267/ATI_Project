@@ -94,6 +94,48 @@ test('FE-09: unverified approval is disabled and own admin row has no member act
   } finally { if (id) await db.query('DELETE FROM users WHERE id=$1', [id]); await db.end(); }
 });
 
+test('FE-09: exact legacy whitespace password reaches real Google unlink verification', async ({ page }) => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const email = `fe09-legacy-password-${randomUUID()}@example.test`, legacyPassword = ' '.repeat(12);
+  const backendModule = '../../../chat-api/src/app.js';
+  const { createApp } = await import(backendModule);
+  const app = createApp({ jwtSecret: process.env.JWT_SECRET!, userRepo: new UserRepo(db), googleOAuth: {
+    clientId: 'local-fixture', clientSecret: 'local-fixture-secret', redirectUri: 'http://127.0.0.1/auth/google/callback',
+    authorizationUrl: 'http://127.0.0.1/authorize', tokenUrl: 'http://127.0.0.1/token', jwksUrl: 'http://127.0.0.1/jwks',
+  } });
+  const server: Server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing HTTP fixture address');
+  let id: string | undefined;
+  try {
+    id = (await db.query("INSERT INTO users(email,password,name,status,email_verified,google_sub,google_email) VALUES($1,$2,'Legacy Password','active',true,$3,'linked@example.test') RETURNING id", [email, hashPassword(legacyPassword), randomUUID()])).rows[0].id;
+    await page.route('**/api/auth/config', async route => {
+      const response = await route.fetch({ url: `http://127.0.0.1:${address.port}/api/auth/config` });
+      expect((await response.json()).googleEnabled).toBe(true); await route.fulfill({ response });
+    });
+    let requests = 0;
+    await page.route('**/api/auth/google/unlink', async route => {
+      expect(route.request().postDataJSON()).toEqual({ currentPassword: legacyPassword });
+      const response = await route.fetch({ url: `http://127.0.0.1:${address.port}/api/auth/google/unlink` });
+      expect(response.status()).toBe(200); requests++; await route.fulfill({ response });
+    });
+    const { headers } = await session(page, email, legacyPassword);
+    await page.goto('/account');
+    await page.getByRole('button', { name: 'Gỡ liên kết Google', exact: true }).click();
+    const input = page.locator('#input-unlink-current-pass');
+    await expect(input).toHaveAttribute('type', 'password'); await input.fill(legacyPassword);
+    await page.getByRole('button', { name: 'Xác nhận gỡ', exact: true }).click();
+    await expect(page.getByRole('main').getByRole('status')).toContainText('Đã gỡ liên kết Google.');
+    expect(requests).toBe(1);
+    expect((await db.query('SELECT google_sub,google_email FROM users WHERE id=$1', [id])).rows[0]).toEqual({ google_sub: null, google_email: null });
+    expect((await page.request.get('/api/auth/me', { headers })).status()).toBe(200);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    if (id) await db.query('DELETE FROM users WHERE id=$1', [id]); await db.end();
+  }
+});
+
 test('FE-09: actual approval HTTP 503 remains visible and preserves the pending account', async ({ page }, info) => {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const email = `fe09-no-email-${randomUUID()}@example.test`;

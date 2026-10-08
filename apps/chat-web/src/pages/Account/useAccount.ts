@@ -72,7 +72,7 @@ export function useAccount(user: User | null) {
     promptUnlinkGoogleModal() { if (account?.hasPassword) setModal('modal-unlink-google'); },
     confirmUnlinkGoogle() {
       const password = unlinkPassRef.current?.value ?? '';
-      if (!password.trim()) { setNotice(null); setError('Vui lòng nhập mật khẩu hiện tại để xác nhận gỡ liên kết.'); unlinkPassRef.current?.focus(); return; }
+      if (!password) { setNotice(null); setError('Vui lòng nhập mật khẩu hiện tại để xác nhận gỡ liên kết.'); unlinkPassRef.current?.focus(); return; }
       void run('unlink', async owner => {
         await apiClient.unlinkGoogle(password);
         if (owner !== generation.current) return;
