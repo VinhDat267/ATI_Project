@@ -76,7 +76,7 @@ describe('service evaluation runner', () => {
     expect(metrics).not.toContain('secret-test-key');
     expect(metrics).not.toContain(file.cases[0]!.prompt);
     expect(metrics).not.toMatch(/authorization|systemPrompt|conversationHistory/);
-    expect(row.phases).toEqual([]);
+    expect(row.phases.map(p => p.phase)).toEqual(['prefetch']);
   });
   it('records transient attempts and individual search rounds', async () => {
     const { file } = loadEvalFile('services');
@@ -105,7 +105,7 @@ describe('service evaluation runner', () => {
     for (const env of [{ EVAL_SET: 'oops' }, { EVAL_RUNS: '0' }, { EVAL_RUNS: 'NaN' }, { EVAL_CONCURRENCY: '-1' },
       { EVAL_SEARCH_MODE: 'regex', PLANNER_SEARCH_MODE: 'llm' }, { PLANNER_SEARCH_MODE: 'bad' }]) expect(() => parseEvalOptions(env)).toThrow();
   });
-  it('scores successful searches observed at the real planner/fixture boundary', async () => {
+  it('rejects read-only clarification following a model-opened search round', async () => {
     const { file } = loadEvalFile('services');
     const c = file.cases.find(c => c.id === 'sh01')!;
     const provider = new MockLLMProvider();
@@ -114,10 +114,25 @@ describe('service evaluation runner', () => {
       { kind: 'clarification', question: 'Which write action follows?', context: 'Read completed' },
     ]);
     const result = await runCase(c, file, false, 'llm', { provider });
-    expect(result.score.passed).toBe(true);
+    expect(result.score.passed).toBe(false);
+    expect(result.searchRounds).toBe(1);
+    expect(result.prefetches.every(s => s.phase === 'prefetch')).toBe(true);
+    expect(result.prefetches.length).toBeGreaterThan(0);
+    expect(result.searches.every(s => s.phase === 'search')).toBe(true);
     expect(result.llmCalls).toBe(2);
     expect(result.searches.find(s => s.tool === 'sheets.read_range')?.result)
       .toEqual({ range: 'Tasks!A1:B2', values: [['Task', 'Status'], ['Fix footer', 'To Do']] });
+  });
+  it('scores read-only clarification with one model call and platform prefetch separately', async () => {
+    const { file } = loadEvalFile('services');
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{ kind: 'clarification', question: 'Which write action follows?' }]);
+    const result = await runCase(file.cases.find(c => c.id === 'sh01')!, file, false, 'llm', { provider });
+    expect(result.score.passed).toBe(true);
+    expect(result.llmCalls).toBe(1);
+    expect(result.searchRounds).toBe(0);
+    expect(result.searches).toEqual([]);
+    expect(result.prefetches).toContainEqual(expect.objectContaining({ tool: 'sheets.list_sheets', phase: 'prefetch' }));
   });
   it('stops scheduling after a provider fault and preserves unfinished cases instead of scoring fictitious results', async () => {
     const { file } = loadEvalFile('services');

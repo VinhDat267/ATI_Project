@@ -12,7 +12,7 @@ import { buildMemory, fixtureSearch } from './fixtures.js';
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
 export type EvalSet = 'core' | 'freeform' | 'services';
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
-export interface ObservedRun extends CaseRun { searches: SearchTrace[]; servedModels: string[]; providerError?: string;
+export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
   modelCalls: Array<ModelCallMetrics & { startedAtMs: number }>; phases: PlanningPhaseMetrics[] }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -73,11 +73,14 @@ export function summarizeTiming(rows: ObservedRun[]) {
   const total = rows.reduce((sum, r) => sum + r.latencyMs, 0);
   const model = calls.reduce((sum, c) => sum + c.durationMs, 0);
   const prefetch = sumPhase('prefetch');
-  const search = sumPhase('search') + sumPhase('gather');
-  const other = Math.max(0, total - model - prefetch - search);
+  const search = sumPhase('search');
+  const gather = sumPhase('gather');
+  const other = Math.max(0, total - model - prefetch - search - gather);
   return { calls: calls.length, attempts: attempts.length, timeouts: attempts.filter(a => a.outcome === 'timeout').length,
-    attemptDistribution, retryReasons, timeMs: { total, model, prefetch, search, other },
-    timeShare: { model: total ? model / total : 0, prefetch: total ? prefetch / total : 0, search: total ? search / total : 0, other: total ? other / total : 0 },
+    searchRounds: rows.reduce((sum, r) => sum + (r.searchRounds ?? 0), 0),
+    directoryCalls: rows.reduce((sum, r) => sum + (r.prefetches?.length ?? 0), 0),
+    attemptDistribution, retryReasons, timeMs: { total, model, prefetch, search, gather, other },
+    timeShare: { model: total ? model / total : 0, prefetch: total ? prefetch / total : 0, search: total ? search / total : 0, gather: total ? gather / total : 0, other: total ? other / total : 0 },
     under15Seconds: { count: rows.filter(r => r.latencyMs < 15000).length, total: rows.length,
       rate: rows.length ? rows.filter(r => r.latencyMs < 15000).length / rows.length : null } };
 }
@@ -116,13 +119,13 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   const turnStarted = performance.now();
   const provider = new CountingProvider(options.provider ?? makeProvider(dryRun), turnStarted);
   const phases: PlanningPhaseMetrics[] = [];
-  const searches: SearchTrace[] = [];
+  const traces: SearchTrace[] = [];
   const planner = new AIPlanner({
     provider, toolCatalog: ALL_TOOLS, searchMode,
     now: () => new Date(file.clock), timeZone: file.timeZone,
     gatherSearch: async request => {
       const trace: SearchTrace = { tool: request.tool, args: structuredClone(request.args) };
-      searches.push(trace);
+      traces.push(trace);
       try { trace.result = await fixtureSearch(request); return trace.result; }
       catch (err) { trace.error = safeError(err); throw err; }
     },
@@ -131,11 +134,19 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   memory.fromJSON(buildMemory(golden.memory));
   const started = Date.now();
   let response: PlannerResponse | undefined, error: string | undefined;
-  try { response = await planner.processMessage({ userMessage: golden.prompt, memory, signal: options.signal, onTiming: metrics => phases.push(metrics) }); }
+  try { response = await planner.processMessage({ userMessage: golden.prompt, memory, signal: options.signal, onTiming: metrics => {
+    phases.push(metrics);
+    // Planner phases are sequential; each callback closes the current batch,
+    // including parallel directory calls. Tool names alone cannot identify origin.
+    for (const trace of traces) if (trace.phase === undefined) trace.phase = metrics.phase;
+  } }); }
   catch (err) { error = safeError(err); }
-  return { case: golden, response, error, searches, latencyMs: Date.now() - started, llmCalls: provider.calls,
+  const searches = traces.filter(trace => trace.phase !== 'prefetch');
+  const prefetches = traces.filter(trace => trace.phase === 'prefetch');
+  const searchRounds = phases.filter(phase => phase.phase === 'search').length;
+  return { case: golden, response, error, searches, prefetches, searchRounds, latencyMs: Date.now() - started, llmCalls: provider.calls,
     servedModels: provider.servedModels, providerError: provider.providerError, modelCalls: provider.modelCalls, phases,
-    score: scoreCase(golden, response, ALL_TOOLS, searches) };
+    score: scoreCase(golden, response, ALL_TOOLS, searches, { llmCalls: provider.calls, searchRounds }) };
 }
 /** Cancel in-flight work and stop dispatching after a provider failure. No automatic campaign retry. */
 export async function runPool(items: GoldenCase[], limit: number, worker: (item: GoldenCase, signal: AbortSignal) => Promise<ObservedRun>) {
@@ -182,7 +193,8 @@ export async function main() {
   const configured = makeProvider(dryRun);
   const sourceCommit = git('rev-parse', 'HEAD');
   const sourceTrees = Object.fromEntries(['packages/planner', 'packages/tool-schemas'].map(path => [path, git('rev-parse', `HEAD:${path}`)]));
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const startedAt = new Date().toISOString();
+  const stamp = startedAt.replace(/[:.]/g, '-');
   const dir = join(process.env.EVAL_OUTPUT_DIR ?? join('docs', 'ai-evidence', 'V3-GOLDEN-V2'), `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${only.length ? 'subset-' : ''}${stamp}`);
   mkdirSync(dir, { recursive: true });
   const runs: ObservedRun[][] = [];
@@ -218,15 +230,15 @@ export async function main() {
       sourceCommit, sourceTrees, fixtureSha256: hash(readFileSync('evaluations/golden-v2/fixtures.ts', 'utf8')),
       catalogSha256: hash(JSON.stringify(ALL_TOOLS)), catalog: { tools: ALL_TOOLS.length, services: [...new Set(ALL_TOOLS.map(t => t.service))] },
       clock: file.clock, timeZone: file.timeZone, requestedRuns: runsCount, completedRuns: runs.filter(run => run.length === file.cases.length).length,
-      attemptedCaseRuns: runs.flat().length, plannedCaseRuns: runsCount * file.cases.length, concurrency, runAt: new Date().toISOString(),
+      attemptedCaseRuns: runs.flat().length, plannedCaseRuns: runsCount * file.cases.length, concurrency, startedAt, runAt: new Date().toISOString(),
       stopped, pendingIds, stopReason: runs.flat().find(r => r.providerError)?.providerError,
-      scope: 'Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only requests are labelled as immediate clarification with no searches under the 05/10 product policy.',
+      scope: 'Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.',
       thresholds: THRESHOLDS, gate: { toolSelectionAccuracy: (aggregate.mean.toolSelectionAccuracy ?? 0) >= THRESHOLDS.toolSelectionAccuracy,
         argumentQuality: (aggregate.mean.argumentQuality ?? 0) >= THRESHOLDS.argumentQuality }, serviceGate,
       qualityGate: 'incomplete', aggregate, comparison, timing,
       results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => ({ id: r.case.id, category: r.case.category, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
-        response: publicEvidenceResponse(r.response, r.case.prompt), searches: r.searches, modelCalls: r.modelCalls, phases: r.phases })) })),
+        response: publicEvidenceResponse(r.response, r.case.prompt), searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases })) })),
     };
     writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     const m = aggregate.mean;
@@ -236,6 +248,7 @@ export async function main() {
 - Source: \`${sourceCommit}\`; labels \`${labelCommit}\`, SHA-256 \`${report.labels.sha256}\`.
 - Provider: \`${report.provider}\`; requested model \`${report.model}\`; served: ${servedModels.join(', ') || 'unverified'}.
 - ${file.cases.length} selected cases × ${runsCount} requested runs; ${report.attemptedCaseRuns}/${report.plannedCaseRuns} attempted; complete: ${complete}.
+- Started ${startedAt}; checkpoint/end ${report.runAt} (UTC).
 - Clock: ${file.clock}, ${file.timeZone}. ${report.scope}
 - Usable plan rate is unmeasured; product quality gate remains incomplete. Provider transport retains its bounded production retries; campaign never retries after a provider failure.
 
@@ -248,8 +261,9 @@ export async function main() {
 | Latency p50 / p95 / max | ${aggregate.latencyMs.p50} / ${aggregate.latencyMs.p95} / ${aggregate.latencyMs.max} ms | <15000 ms |
 
 Model calls: ${timing.calls}; transport attempts: ${timing.attempts}; timeouts: ${timing.timeouts}.
+Model-opened search rounds (phase search): ${timing.searchRounds}; platform directory calls (phase prefetch): ${timing.directoryCalls}. searches excludes directory traces; prefetches records them separately. One search round can contain several parallel tool calls. Regex gather is not a model-opened search round.
 Attempts per call (0 means provider does not expose diagnostics): ${JSON.stringify(timing.attemptDistribution)}. Retry reasons: ${JSON.stringify(timing.retryReasons)}.
-Time share: model ${pct(timing.timeShare.model)}, directory ${pct(timing.timeShare.prefetch)}, search rounds ${pct(timing.timeShare.search)}, other ${pct(timing.timeShare.other)}.
+Time share: model ${pct(timing.timeShare.model)}, directory ${pct(timing.timeShare.prefetch)}, search rounds ${pct(timing.timeShare.search)}, regex gather ${pct(timing.timeShare.gather)}, other ${pct(timing.timeShare.other)}.
 Under 15 seconds: ${timing.under15Seconds.count}/${timing.under15Seconds.total} (${pct(timing.under15Seconds.rate)}).
 Per-call timing includes retry backoff; attempts measure each actual transport attempt, including reading the response body. Missing token counts are null, never fabricated. Reasoning may be included in prompt_tokens by the gateway; do not add it to prompt/completion totals.
 

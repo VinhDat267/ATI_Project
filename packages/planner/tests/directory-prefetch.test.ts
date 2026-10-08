@@ -63,13 +63,23 @@ const make = (provider: LLMProvider, gatherSearch: any, extra: Record<string, un
   new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', ...extra });
 
 describe('workspace directory prefetch', () => {
-  it('looks up the directory after the first search request so the next call can plan', async () => {
-    const { provider, inputs } = scripted(lookup, plan);
+  it('grounds a write plan on the first model call using the prefetched directory', async () => {
+    const { provider, inputs } = scripted(plan);
+    const w = workspace();
+    const response = await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
+    expect(response).toEqual(plan);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.workingMemory.__observed.list).toContainEqual({ id: 'list_todo', name: 'To Do', boardId: 'b0' });
+    expect(inputs[0]!.workingMemory.__observed.channel).toContainEqual({ id: 'C_FE', name: 'frontend' });
+    expect(inputs[0]!.workingMemory.__observed.member).toContainEqual({ id: 'm_minh', fullName: 'Minh', boardId: 'b0' });
+  });
+  it('makes the complete directory available before the first model call', async () => {
+    const { provider, inputs } = scripted(plan);
     const w = workspace();
     const response = await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
     expect(response.kind).toBe('plan');
-    expect(inputs).toHaveLength(2);
-    const observed = inputs[1]!.workingMemory.__observed;
+    expect(inputs).toHaveLength(1);
+    const observed = inputs[0]!.workingMemory.__observed;
     expect(observed.board.map((b: any) => b.id)).toEqual(['b0', 'b1']);
     expect(observed.list.map((l: any) => l.id).sort()).toEqual(['list_other', 'list_todo']);
     expect(observed.channel.map((c: any) => c.id)).toEqual(['C_FE']);

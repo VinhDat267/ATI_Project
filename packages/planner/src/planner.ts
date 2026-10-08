@@ -32,7 +32,7 @@ export interface AIPlannerOptions {
   searchMode?: 'regex' | 'llm';
   /** Model-driven search rounds allowed per turn (default 4). */
   maxSearchRounds?: number;
-  /** In 'llm' mode, list the workspace on the first model search request (default true). */
+  /** In 'llm' mode, list the workspace before the first model call (default true). */
   prefetchDirectory?: boolean;
   /** Time allowed for that listing before planning continues without the rest (default 2500 ms). */
   directoryBudgetMs?: number;
@@ -334,7 +334,10 @@ export class AIPlanner {
     const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch) });
     let searchRounds = 0;
     let rejectedPlans = 0;
-    let directoryListed = false;
+    if (this.prefetchDirectory && this.gatherSearch) {
+      await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
+      if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
+    }
     // Search rounds, one final answer, and one correction of a rejected plan.
     for (let call = 0; call < this.maxSearchRounds + 2; call++) {
       const output = await this.provider.generatePlan({
@@ -349,13 +352,6 @@ export class AIPlanner {
         } else if (searchRounds >= this.maxSearchRounds) {
           conversation.push({ role: 'user', content: 'The search limit was reached, so no more searches are allowed. Answer now with a plan, or ask the user for what is still missing.' });
         } else {
-          // Let the model decide whether any data is needed before doing I/O.
-          // Clarification/refusal and already-grounded plans need no directory.
-          if (!directoryListed && this.prefetchDirectory && this.gatherSearch) {
-            directoryListed = true;
-            await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
-            if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
-          }
           searchRounds++;
           conversation.push({ role: 'user', content: formatSearchResults(await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input))) });
         }

@@ -23,13 +23,17 @@ describe('05/10 read-only policy', () => {
       expect(provider.getCallCount()).toBe(1);
     });
   }
-  it('does no directory lookup for an immediate clarification', async () => {
+  it('clarifies in one model call without model-opened search rounds, allowing directory prefetch', async () => {
     const provider = new MockLLMProvider(); provider.setPlanResponses([{ kind: 'clarification', question: 'Bạn muốn ghi dữ liệu ở đâu?' }]);
     const searches: string[] = [];
+    const phases: string[] = [];
     const result = await new AIPlanner({ provider, toolCatalog: ALL_TOOLS, searchMode: 'llm',
       gatherSearch: async request => { searches.push(request.tool); return []; } })
-      .processMessage({ userMessage: 'Xem các sự kiện trên Google Calendar', memory: new WorkingMemory() });
-    expect(result.kind).toBe('clarification'); expect(searches).toEqual([]); expect(provider.getCallCount()).toBe(1);
+      .processMessage({ userMessage: 'Xem các sự kiện trên Google Calendar', memory: new WorkingMemory(), onTiming: timing => phases.push(timing.phase) });
+    expect(result.kind).toBe('clarification'); expect(provider.getCallCount()).toBe(1);
+    expect(phases.filter(phase => phase === 'search')).toEqual([]);
+    expect(phases).toContain('prefetch');
+    expect(searches).toContain('calendar.list_calendars');
   });
   it('keeps a mixed read/write plan valid and does not spend a repair call', async () => {
     const response = { kind: 'plan', thinking: 'Read and send', summary: 'Send rows', warnings: [], steps: [
