@@ -10,7 +10,7 @@ import { AdminUserRepo } from '../../src/db/repositories/admin-user-repo.js';
 import { OutboxEmailSender } from '../../src/services/email/index.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const password = 'Auth03Fixture!password';
 const storedPassword = hashPassword(password);
 const secret = 'auth03_fixture_secret_at_least_32_chars';

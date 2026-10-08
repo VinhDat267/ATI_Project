@@ -6,7 +6,7 @@ import { UserRepo, verifyPassword } from '../../src/db/repositories/user-repo.js
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const connectionString = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 
 describe('real PostgreSQL plan invariants', () => {
   it('keeps the previous credential if replacement insertion fails', async () => {

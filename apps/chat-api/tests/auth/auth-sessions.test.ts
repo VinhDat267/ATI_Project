@@ -13,7 +13,7 @@ import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { decryptCredentials } from '@wap/tool-adapters';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const secret = 'auth01_http_test_secret_at_least_32_chars';
 const password = 'Auth01Fixture!password';
 const storedPassword = hashPassword(password);
@@ -252,7 +252,8 @@ describe('AUTH-01 server sessions with real PostgreSQL and HTTP', () => {
     const updated = await users.findByEmail(cliEmail);
     expect(updated).toMatchObject({ id: created!.id, role: 'admin', status: 'active', email_verified: true });
     expect(verifyPassword(password, updated!.password)).toBe(true);
-  });
+  // Two CLI processes start with tsx; the 5 s default timed out on a loaded machine (08/10).
+  }, 30_000);
 });
 
 describe('AUTH-01 memory compatibility', () => {

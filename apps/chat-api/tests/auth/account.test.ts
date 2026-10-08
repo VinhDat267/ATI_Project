@@ -8,7 +8,7 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken, generateTokens, verifyAccessToken } from '../../src/auth/jwt.js';
 import { UserRepo, hashPassword, toAuthUser } from '../../src/db/repositories/user-repo.js';
 
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const directory = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 const secret = 'auth05_account_fixture_secret_at_least_32_chars';
 const password = 'Auth05Fixture!password';

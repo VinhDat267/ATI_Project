@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { UserRepo } from '../../src/db/repositories/user-repo.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const schema = `auth_disable_race_${randomUUID().replaceAll('-', '')}`;
 const scopedUrl = new URL(databaseUrl);
 scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
