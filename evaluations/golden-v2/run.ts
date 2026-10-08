@@ -57,8 +57,13 @@ function safeError(err: unknown): string {
 
 /** Model output, search arguments and score diagnostics can echo the request. */
 function publicEvidenceValue<T>(value: T, prompt: string): T {
-  return JSON.parse(JSON.stringify(value, (_key, nested: unknown) =>
-    typeof nested === 'string' && prompt ? nested.split(prompt).join('[redacted case prompt]') : nested)) as T;
+  const redact = (text: string) => prompt ? text.split(prompt).join('[redacted case prompt]') : text;
+  return JSON.parse(JSON.stringify(value), (_key, nested: unknown) => {
+    if (typeof nested === 'string') return redact(nested);
+    if (nested && typeof nested === 'object' && !Array.isArray(nested))
+      return Object.fromEntries(Object.entries(nested).map(([key, entry]) => [redact(key), entry]));
+    return nested;
+  }) as T;
 }
 /** Redact only the public copy after scoring; keep the response interface for callers. */
 export function publicEvidenceResponse(response: PlannerResponse | undefined, prompt: string): PlannerResponse | undefined {

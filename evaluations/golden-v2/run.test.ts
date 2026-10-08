@@ -55,13 +55,17 @@ describe('service evaluation runner', () => {
 
   it('redacts a full case prompt copied into a model response only in exported evidence', () => {
     const prompt = 'Send the status report to the team channel.';
-    const response = { kind: 'plan' as const, summary: prompt, steps: [{ id: 's1', tool: 'slack.send_message', args: { text: `Echo: ${prompt}`, channel: 'team' } }] };
+    const response = { kind: 'plan' as const, summary: prompt, steps: [{ id: 's1', tool: 'slack.send_message', args: { text: `Echo: ${prompt}`, channel: 'team', properties: { [prompt]: { count: 7 } } } }] };
     expect(runner.publicEvidenceResponse).toBeTypeOf('function');
     const exported = runner.publicEvidenceResponse(response as any, prompt);
     expect(JSON.stringify(exported)).not.toContain(prompt);
     expect(exported).toMatchObject({ kind: 'plan', summary: '[redacted case prompt]', steps: [{ args: { text: 'Echo: [redacted case prompt]', channel: 'team' } }] });
     expect(response.summary).toBe(prompt);
     expect(response.steps[0]!.args.text).toBe(`Echo: ${prompt}`);
+    expect(response.steps[0]!.args.properties[prompt]).toEqual({ count: 7 });
+    expect((exported as any).steps[0].args.properties).toEqual({ '[redacted case prompt]': { count: 7 } });
+    expect(runner.publicEvidenceResponse({ kind: 'plan', summary: '1', steps: [], metrics: { '1': [1, 11, '1'] } } as any, '1'))
+      .toEqual({ kind: 'plan', summary: '[redacted case prompt]', steps: [], metrics: { '[redacted case prompt]': [1, 11, '[redacted case prompt]'] } });
   });
 
   it('classifies invalid gateway JSON without exposing the response text', async () => {
