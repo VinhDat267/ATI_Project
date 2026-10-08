@@ -582,7 +582,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             <span>
               ·
             </span>
-            
+
             <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#FF5701] hover:underline font-medium transition-colors">
               Chính sách an toàn
             </a>

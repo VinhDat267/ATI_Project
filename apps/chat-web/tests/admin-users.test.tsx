@@ -67,7 +67,7 @@ it('searches within the pending tab and keeps server rejection visible without o
   await screen.findByText('candidate@example.test');
   fireEvent.click(screen.getByRole('tab', { name: /Chờ duyệt/ }));
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Candidate' } });
-  
+
   await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(expect.stringContaining('status=pending&search=Candidate')));
   vi.mocked(apiClient.request).mockRejectedValueOnce(Object.assign(new Error('Tài khoản chưa được xác minh email.'), { status: 409 }));
   fireEvent.click(screen.getByRole('button', { name: /Duyệt & kích hoạt/ }));
