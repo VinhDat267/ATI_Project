@@ -10,7 +10,7 @@ const storedPassword = () => {
 };
 async function login(page: Page, email: string) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }

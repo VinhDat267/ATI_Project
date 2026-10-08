@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 import pg from 'pg';
 import { hashPassword, UserRepo } from '../../../chat-api/src/db/repositories/user-repo.js';
 import { AdminUserRepo } from '../../../chat-api/src/db/repositories/admin-user-repo.js';
-import { createApp } from '../../../chat-api/src/app.js';
 
 const password = 'Fe09Browser!password';
 async function session(page: Page, email: string, secret = password) {
@@ -95,10 +95,14 @@ test('FE-09: unverified approval is disabled and own admin row has no member act
 test('FE-09: actual approval HTTP 503 remains visible and preserves the pending account', async ({ page }, info) => {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const email = `fe09-no-email-${randomUUID()}@example.test`;
+  // Load the native API at runtime so frontend tsc does not impose its different
+  // compiler settings on backend packages, which have their own typecheck gate.
+  const backendModule = '../../../chat-api/src/app.js';
+  const { createApp } = await import(backendModule);
   const app = createApp({ jwtSecret: process.env.JWT_SECRET!, userRepo: new UserRepo(db), adminUserRepo: new AdminUserRepo(db), adminAuditLogger: { info() {} } });
   // This native backend deliberately has no email sender. Forward its response,
   // rather than constructing a nominal error body in the browser fixture.
-  const server = app.listen(0, '127.0.0.1');
+  const server: Server = app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing HTTP fixture address');
