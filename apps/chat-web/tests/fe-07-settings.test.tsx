@@ -19,6 +19,9 @@ let testMessage: string;
 let holdTest: boolean;
 let flushTestHeaders: boolean;
 let requestSignal: AbortSignal | undefined;
+let holdCatalogue: boolean;
+let catalogueStatus: number;
+let releaseCatalogue: () => void;
 const service = (id: string, configured = false): ServiceInfo => ({
   id, name: id === 'github' ? 'GitHub' : id === 'notion' ? 'Notion' : id,
   connected: false, configured, connectionStatus: configured ? 'unchecked' : 'unconfigured', lastCheckedAt: null,
@@ -29,12 +32,18 @@ beforeEach(async () => {
   window.history.replaceState({}, '', '/settings'); localStorage.clear();
   services = [service('github'), service('notion', true)]; calls = [];
   holdSave = false; holdTest = false; flushTestHeaders = false; requestSignal = undefined; saveStatus = 200; testStatus = 'healthy'; testMessage = 'Sandbox verified';
+  holdCatalogue = false; catalogueStatus = 200;
   const gate = new Promise<void>(resolve => { releaseSave = resolve; });
+  const catalogueGate = new Promise<void>(resolve => { releaseCatalogue = resolve; });
   server = createServer(async (req, res) => {
     let body = ''; for await (const chunk of req) body += chunk;
     calls.push({ url: req.url!, method: req.method!, body: body ? JSON.parse(body) : null });
     res.setHeader('Content-Type', 'application/json');
-    if (req.url === '/api/services') { res.end(JSON.stringify({ services })); return; }
+    if (req.url === '/api/services') {
+      if (holdCatalogue) await catalogueGate;
+      res.statusCode = catalogueStatus;
+      res.end(JSON.stringify(catalogueStatus === 200 ? { services } : { error: 'offline' })); return;
+    }
     const found = services.find(s => req.url?.startsWith(`/api/services/${s.id}/`));
     if (!found) { res.statusCode = 404; res.end('{}'); return; }
     if (req.url?.endsWith('/test')) {
@@ -58,10 +67,31 @@ beforeEach(async () => {
     return nativeFetch(typeof input === 'string' && input.startsWith('/') ? `${origin}${input}` : input, init);
   });
 });
-afterEach(async () => { releaseSave(); cleanup(); vi.unstubAllGlobals(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+afterEach(async () => { releaseSave(); releaseCatalogue(); cleanup(); vi.unstubAllGlobals(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
 const mount = (user = admin) => render(<SettingsPage user={user} navigate={() => {}} onLogout={() => {}} />);
 const open = async (name = 'GitHub') => { fireEvent.click(await screen.findByRole('button', { name: new RegExp(`${name} —`) })); return screen.findByRole('dialog', { name }); };
 const addScope = (value = 'owner/repo') => { fireEvent.change(screen.getByLabelText('Thêm Repository'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
+
+it('does not claim catalogue counts or empty groups while the first catalogue request is loading', async () => {
+  holdCatalogue = true; mount();
+  expect(await screen.findByRole('status')).toHaveTextContent('Đang tải dịch vụ...');
+  await waitFor(() => expect(calls.some(call => call.url === '/api/services')).toBe(true));
+  expect(screen.queryByText('Tất cả 8 dịch vụ đều đã được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+ \/ 8 dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  releaseCatalogue();
+  expect(await screen.findByText('1 / 8 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+});
+it('does not claim catalogue counts or empty groups after the first catalogue request fails, and recovers on retry', async () => {
+  catalogueStatus = 503; mount();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.');
+  expect(screen.queryByText('Tất cả 8 dịch vụ đều đã được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+ \/ 8 dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  catalogueStatus = 200; fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+  expect(await screen.findByText('1 / 8 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
 
 it('groups by configured, summarizes eight services and presents four textual states and checked time', async () => {
   services = [service('github', true), service('notion', true), service('slack', true), service('trello')];

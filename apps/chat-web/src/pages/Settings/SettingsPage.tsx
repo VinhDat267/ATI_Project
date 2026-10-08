@@ -114,6 +114,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   }, [active?.id]);
   const role = canEdit ? 'admin' : 'member', drawer = active ? { service: active } : null, badge = active;
   const configured = list.filter(s => s.configured), unconfigured = list.filter(s => !s.configured), okCount = configured.filter(s => s.statusType === 'ok').length;
+  const hasCatalogue = list.length > 0;
   const isMemberDrawer = !canEdit, scopeLabel = active?.scopeLabel;
   const scope = draft ? { items: draft.scopes, isMember: isMemberDrawer, scopeLabel: scopeLabel ?? 'tài nguyên' } : null;
   const savedPlaceholder = !!active?.configured, hint = { visible: !!active?.hint, text: active?.hint };
@@ -196,12 +197,12 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
               Kết nối dịch vụ
             </h1>
-            <div className="inline-flex items-center gap-2">
+            {hasCatalogue && <div className="inline-flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
               <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
                 {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
               </span>
-            </div>
+            </div>}
           </div>
           {/* Khung nguyên tắc an toàn dữ liệu */}
           <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E7E7E2] shadow-sm flex items-start gap-3">
@@ -221,7 +222,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
-        <div className="v3-space-y-8 sm:v3-space-y-10">
+        {hasCatalogue && <div className="v3-space-y-8 sm:v3-space-y-10">
           {/* Nhóm 1: Đã thiết lập */}
           <section aria-labelledby="heading-connected-services">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
@@ -264,7 +265,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 : unconfigured.map(s => <ServiceRow key={s.id} service={s} onOpen={actions.openServiceDrawer} />)}
             </div>
           </section>
-        </div>
+        </div>}
         {/* Chú thích chân trang */}
         <div className="mt-12 pt-6 border-t border-[#E7E7E2] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
           <div>
