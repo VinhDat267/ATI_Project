@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../../src/app.js';
 import { UserRepo, hashPassword } from '../../src/db/repositories/user-repo.js';
 
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const directory = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 const SMTP_DELAY_MS = 500;
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;

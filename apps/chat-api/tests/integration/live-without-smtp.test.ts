@@ -8,7 +8,7 @@ import { createServer, type AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const schema = `auth02b_live_${randomUUID().replaceAll('-', '')}`;
 const scopedUrl = new URL(databaseUrl);
 scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
