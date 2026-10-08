@@ -29,7 +29,8 @@ beforeEach(async () => {
     let raw = ''; for await (const chunk of request) raw += chunk;
     const call = { path: request.url!, body: raw ? JSON.parse(raw) : undefined, authorization: request.headers.authorization };
     calls.push(call);
-    if (call.path === '/api/auth/config') return reply(response, { signupEnabled: true, googleEnabled: true });
+    // Config arrives after the account, as it did on CI: the Google section appears only once both have loaded.
+    if (call.path === '/api/auth/config') { await new Promise(resolve => setTimeout(resolve, 50)); return reply(response, { signupEnabled: true, googleEnabled: true }); }
     if (call.path === '/api/account') return reply(response, { account: { ...member, ...profile, createdAt: '2026-10-01T00:00:00Z', hasPassword: true, googleEmail: profile.hasGoogle ? 'google@example.test' : null } });
     if (call.path === '/api/account/sessions') return reply(response, { sessions: [] });
     if (call.path === '/api/account/profile') { nameResponses.push(response); return; }
@@ -60,6 +61,8 @@ afterEach(async () => {
 async function openAccount() {
   render(<AccountView user={member} navigate={() => {}} onLogout={() => {}} />);
   await screen.findByDisplayValue('Member');
+  // The sign-in methods section depends on a separate config request; wait for it too.
+  await screen.findByRole('heading', { name: 'Phương thức đăng nhập' });
 }
 async function saveName(value: string) {
   fireEvent.change(screen.getByLabelText('Tên hiển thị'), { target: { value } });

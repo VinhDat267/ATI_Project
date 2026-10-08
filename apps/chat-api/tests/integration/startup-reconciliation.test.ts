@@ -14,7 +14,7 @@ import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 const schema = `w2_reconcile_${randomUUID().replaceAll('-', '')}`;
 const scopedUrl = new URL(databaseUrl);
 scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
@@ -22,7 +22,11 @@ const secret = 'startup-reconciliation-test-secret-at-least-32-bytes';
 const privateMarker = 'PRIVATE_RECONCILIATION_ARGUMENT';
 const children = new Set<ChildProcess>();
 
-async function waitUntil(check: () => Promise<boolean>, timeoutMs = 10_000) {
+// Each case spawns the API with tsx; on a loaded machine startup alone can take well over 10 s.
+const PROCESS_START_MS = 30_000;
+const API_TEST_TIMEOUT_MS = 45_000;
+
+async function waitUntil(check: () => Promise<boolean>, timeoutMs = PROCESS_START_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await check()) return;
@@ -166,7 +170,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     const lines = api.output().split('\n').filter(line => line.includes('[execution-reconciliation]'));
     expect(lines.some(line => line.includes(plan.id) && line.includes('unknown_steps=1'))).toBe(true);
     expect(lines.join('\n')).not.toContain(privateMarker);
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it.each(['completed', 'rejected', 'pending', 'expired', 'superseded', 'stopped', 'failed'])
     ('does not change a %s plan or any of its steps', async status => {
@@ -177,7 +181,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
       await api.waitForHealth();
       expect(await planRepo.getPlan(plan.id)).toEqual(beforePlan);
       expect(await stepRepo.listSteps(plan.id)).toEqual(beforeSteps);
-    }, 15_000);
+    }, API_TEST_TIMEOUT_MS);
 
   it.each([{ states: [] }, { states: ['pending', 'pending'] }])('quarantines an approved plan with unstarted steps $states without inventing UNKNOWN steps', async ({ states }) => {
     const plan = await fixture('approved', states);
@@ -187,7 +191,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     expect((await planRepo.getPlan(plan.id))!.status).toBe('reconciliation_required');
     expect(await stepRepo.listSteps(plan.id)).toEqual(before);
     expect(await executionStatus(api, plan.id)).toEqual({ status: 'reconciliation_required' });
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('keeps a known failed partial plan partial and reports its failed step over HTTP', async () => {
     const plan = await fixture('partial', ['succeeded', 'failed', 'pending']);
@@ -197,7 +201,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     expect((await planRepo.getPlan(plan.id))!.status).toBe('partial');
     expect(await stepRepo.listSteps(plan.id)).toEqual(before);
     expect(await executionStatus(api, plan.id)).toEqual({ status: 'partial', pausedStepId: 'step_2' });
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('quarantines an interrupted read without automatically re-running it', async () => {
     const plan = await fixture('executing', ['running', 'pending'], ['trello.search_boards', 'trello.create_card']);
@@ -206,7 +210,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     expect((await planRepo.getPlan(plan.id))!.status).toBe('reconciliation_required');
     expect((await stepRepo.listSteps(plan.id)).map(step => step.status)).toEqual(['unknown', 'pending']);
     expect(api.output()).not.toContain('[Sandbox Execution]');
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('returns the first unknown step in plan order, ahead of known failures', async () => {
     const states = ['failed', 'unknown', ...Array<string>(7).fill('succeeded'), 'unknown'];
@@ -214,7 +218,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     const api = await launchApi();
     await api.waitForHealth();
     expect(await executionStatus(api, plan.id)).toEqual({ status: 'reconciliation_required', pausedStepId: 'step_2' });
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('is idempotent across a second server start, including timestamps and sanitized logs', async () => {
     const plan = await fixture('approved', ['running', 'pending']);
@@ -228,7 +232,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     expect(await stepRepo.listSteps(plan.id)).toEqual(before);
     expect((await planRepo.getPlan(plan.id))!.status).toBe('reconciliation_required');
     expect(second.output()).not.toContain('[execution-reconciliation]');
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('rolls back step changes and refuses to listen if reconciliation fails', async () => {
     const plan = await fixture('approved', ['running']);
@@ -236,7 +240,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     await pool.query(`ALTER TABLE plans ADD CONSTRAINT reject_reconciliation CHECK (id <> '${plan.id}'::uuid OR status <> 'reconciliation_required')`);
     try {
       const api = await launchApi();
-      await waitUntil(async () => api.child.exitCode !== null || api.child.signalCode !== null, 5_000);
+      await waitUntil(async () => api.child.exitCode !== null || api.child.signalCode !== null, PROCESS_START_MS);
       expect(api.child.exitCode).toBe(1);
       expect((await planRepo.getPlan(plan.id))!.status).toBe('approved');
       expect(await stepRepo.listSteps(plan.id)).toEqual(before);
@@ -245,7 +249,7 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     } finally {
       await pool.query('ALTER TABLE plans DROP CONSTRAINT reject_reconciliation');
     }
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 
   it('reconciles persisted progress after killing the actual execution process mid-write', async () => {
     const plan = await fixture('pending', []);
@@ -272,5 +276,5 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     expect(steps[0]!.output_json.id).toBe('completed-before-crash');
     expect((await planRepo.getPlan(plan.id))!.status).toBe('reconciliation_required');
     expect(api.output()).not.toContain('[Sandbox Execution]');
-  }, 15_000);
+  }, API_TEST_TIMEOUT_MS);
 });

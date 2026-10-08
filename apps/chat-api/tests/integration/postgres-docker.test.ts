@@ -5,7 +5,7 @@ import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { StepRepo } from '../../src/db/repositories/step-repo.js';
 
-const PG_URL = process.env.DATABASE_URL || 'postgresql://wap:wap@127.0.0.1:55532/ati_v3';
+const PG_URL = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 
 describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
   let pool: pg.Pool;
