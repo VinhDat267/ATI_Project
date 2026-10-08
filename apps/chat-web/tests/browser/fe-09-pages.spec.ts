@@ -143,12 +143,12 @@ test('FE-09: password length meter follows cleared fields and preserves a newer 
   try {
     id = (await db.query("INSERT INTO users(email,password,name,status,email_verified) VALUES($1,$2,'Password Meter','active',true) RETURNING id", [email, hashPassword(password)])).rows[0].id;
     await session(page, email); await page.goto('/account');
-    const current = page.getByLabel('Mật khẩu hiện tại', { exact: true }), next = page.getByLabel('Mật khẩu mới', { exact: true }), repeat = page.getByLabel('Xác nhận mật khẩu mới', { exact: true });
+    const current = page.getByLabel(/^Mật khẩu hiện tại/), next = page.getByLabel(/^Mật khẩu mới/), repeat = page.getByLabel(/^Xác nhận mật khẩu mới/);
     const first = 'FirstChanged!password', second = 'SecondChanged!password';
     await current.fill(password); await next.fill(first); await repeat.fill(first);
     await page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true }).click();
     await expect(page.getByRole('main').getByRole('status')).toContainText('Đã đổi mật khẩu.');
-    await expect(next).toHaveValue(''); await expect(page.locator('#pass-strength-label')).toHaveText('Ít nhất 12 ký tự');
+    await expect(next).toHaveValue(''); await expect(page.locator('#pass-strength-indicator')).toHaveText('Ít nhất 12 ký tự');
     expect(await page.locator('#pass-strength-bar').evaluate(element => parseFloat(element.style.width))).toBe(0);
     expect((await page.request.post('/api/auth/login', { data: { email, password: first } })).status()).toBe(200);
     let release!: () => void, ready!: () => void;
@@ -161,7 +161,7 @@ test('FE-09: password length meter follows cleared fields and preserves a newer 
       await page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true }).click(); await started;
       await next.fill('Draft'); release();
       await expect(page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true })).toBeEnabled();
-      await expect(next).toHaveValue('Draft'); await expect(page.locator('#pass-strength-label')).toHaveText('5/12 ký tự tối thiểu');
+      await expect(next).toHaveValue('Draft'); await expect(page.locator('#pass-strength-indicator')).toHaveText('5/12 ký tự tối thiểu');
       expect(await page.locator('#pass-strength-bar').evaluate(element => parseFloat(element.style.width))).toBeCloseTo(5 / 12 * 100);
       expect((await page.request.post('/api/auth/login', { data: { email, password: second } })).status()).toBe(200);
     } finally { release(); }
