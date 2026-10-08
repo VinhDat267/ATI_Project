@@ -86,8 +86,15 @@ test('FE-08: pending and disabled email accounts show safe real account states',
     await page.getByLabel('Mật khẩu', { exact: true }).fill('Fe08Valid!password');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Tài khoản đang chờ duyệt' })).toBeVisible();
-    await expect(page.getByText('Cần xác minh', { exact: true })).toBeVisible();
+    await expect(page.getByText('Nếu chưa hoàn tất', { exact: true })).toBeVisible();
     await expect(page.getByText(process.env.CHAT_ADMIN_EMAIL!, { exact: false })).toHaveCount(0);
+    await db.query('UPDATE users SET email_verified=true WHERE email=$1', [email]);
+    await page.getByRole('link', { name: 'Thử đăng nhập lại', exact: true }).click();
+    await page.getByLabel('Mật khẩu', { exact: true }).fill('Fe08Valid!password');
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Tài khoản đang chờ duyệt' })).toBeVisible();
+    await expect(page.getByText('Nếu chưa hoàn tất', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cần xác minh', { exact: true })).toHaveCount(0);
     await db.query("UPDATE users SET status='disabled' WHERE email=$1", [email]);
     await page.getByRole('link', { name: 'Thử đăng nhập lại', exact: true }).click();
     await page.getByLabel('Mật khẩu', { exact: true }).fill('Fe08Valid!password');
@@ -96,4 +103,47 @@ test('FE-08: pending and disabled email accounts show safe real account states',
     await expect(page.getByText('Hãy liên hệ quản trị viên của nhóm để được mở khoá.')).toBeVisible();
     await expect(page.getByRole('button', { name: /gửi yêu cầu/i })).toHaveCount(0);
   } finally { await db.query('DELETE FROM users WHERE email=$1', [email]); await db.end(); }
+});
+
+test('FE-08: closing routed auth modals restores each real opener and the active primary heading', async ({ page }) => {
+  for (const [id, close] of [['btn-header-login', 'Escape'], ['btn-hero-signup', 'button'], ['btn-footer-cta-signup', 'forgot']]) {
+    await page.goto('/'); const opener = page.locator(`[data-od-id="${id}"]`);
+    await opener.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    if (close === 'forgot') {
+      await page.getByRole('tab', { name: 'Đăng nhập', exact: true }).click();
+      await page.getByRole('button', { name: 'Quên mật khẩu?' }).click();
+      await expect(page).toHaveURL(/\/forgot-password$/);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    }
+    if (close === 'button') await page.getByRole('button', { name: 'Đóng cửa sổ', exact: true }).click();
+    else await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(opener).toBeFocused();
+  }
+});
+
+test('FE-08: AUTH-04: root Google transfer is visible and a real late start cannot navigate after close', async ({ page }) => {
+  test.skip(!process.env.GOOGLE_OAUTH_CLIENT_ID, 'Runs in the canonical local signed OIDC fixture scenario');
+  let release!: () => void, received!: () => void;
+  const pending = new Promise<void>(resolve => { received = resolve; });
+  const delivered = new Promise<void>(resolve => { release = resolve; });
+  let starts = 0, providerNavigations = 0;
+  page.on('request', request => { if (new URL(request.url()).pathname === '/authorize') providerNavigations++; });
+  await page.route('**/api/auth/google/start', async route => {
+    starts++; const response = await route.fetch(); expect(response.status()).toBe(200);
+    received(); await delivered; await route.fulfill({ response });
+  });
+  await page.goto('/'); const opener = page.locator('[data-od-id="btn-hero-google"]');
+  await opener.click(); await pending;
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Đang chuyển sang trang đăng nhập của Google…' })).toBeVisible();
+  await page.keyboard.press('Escape'); await expect(opener).toBeFocused();
+  const lateResponse = page.waitForResponse(response => response.url().endsWith('/api/auth/google/start'));
+  release(); await lateResponse;
+  await expect(page).toHaveURL(/\/$/); await page.waitForTimeout(150);
+  expect(starts).toBe(1); expect(providerNavigations).toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
 });

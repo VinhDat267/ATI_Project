@@ -96,3 +96,81 @@ it('keeps reset success visible and reports that other sessions ended', async ()
   expect(await screen.findByText(/Các thiết bị khác|thiết bị.*đăng xuất/)).toBeVisible();
   expect(container.querySelector('#view-reset-success')).not.toBeNull();
 });
+
+it.each([
+  ['btn-header-login', 'Escape'],
+  ['btn-hero-signup', 'close'],
+  ['btn-footer-cta-signup', 'forgot'],
+])('returns focus to the actual %s opener after %s closes its routed modal', async (id, method) => {
+  const { container } = open('/');
+  const opener = container.querySelector<HTMLAnchorElement>(`[data-od-id="${id}"]`)!;
+  opener.focus(); fireEvent.click(opener);
+  await waitFor(() => expect(screen.getByLabelText(id.includes('signup') ? 'Họ tên' : 'Email', { exact: true })).toHaveFocus());
+  if (method === 'forgot') {
+    fireEvent.click(screen.getByRole('tab', { name: 'Đăng nhập', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quên mật khẩu?' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/forgot-password'));
+  }
+  if (method === 'close') fireEvent.click(screen.getByRole('button', { name: 'Đóng cửa sổ', exact: true }));
+  else fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(window.location.pathname).toBe('/'));
+  expect(container.querySelector(`[data-od-id="${id}"]`)).toHaveFocus();
+});
+
+it('shows the root Google transfer modal for a real pending HTTP response and discards it after close', async () => {
+  let finish!: (response: Response) => void;
+  const transport = vi.fn((url: string) => url.endsWith('/config')
+    ? Promise.resolve(new Response(JSON.stringify({ signupEnabled: true, googleEnabled: true })))
+    : new Promise<Response>(resolve => { finish = resolve; }));
+  vi.stubGlobal('fetch', transport);
+  const { container } = open('/');
+  await waitFor(() => expect(transport).toHaveBeenCalledWith('/api/auth/config'));
+  const opener = container.querySelector<HTMLAnchorElement>('[data-od-id="btn-hero-google"]')!;
+  opener.focus(); fireEvent.click(opener);
+  expect(container.querySelector('#auth-modal')).toHaveClass('opacity-100');
+  expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
+  expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(container.querySelector('#auth-modal')).toBeNull();
+  expect(opener).toHaveFocus();
+  await act(async () => { finish(new Response(JSON.stringify({ url: 'https://accounts.google.com/authorize' }))); });
+  expect(window.location.pathname).toBe('/');
+  expect(transport.mock.calls.filter(([url]) => url.endsWith('/google/start'))).toHaveLength(1);
+});
+
+it.each(['/login', '/signup', '/forgot-password'])('has one accessible primary heading on %s', async path => {
+  open(path);
+  await waitFor(() => expect(calls).toContain('/api/auth/config'));
+  expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+});
+
+it('does not restore a modal opener on an unrelated route change', async () => {
+  const { container } = open('/');
+  fireEvent.click(container.querySelector('[data-od-id="btn-header-login"]')!);
+  await waitFor(() => expect(screen.getByLabelText('Email', { exact: true })).toHaveFocus());
+  window.history.replaceState({}, '', '/guide'); fireEvent.popState(window);
+  expect(await screen.findByRole('heading', { name: 'Cẩm nang', level: 1 })).toBeVisible();
+  window.history.replaceState({}, '', '/'); fireEvent.popState(window);
+  expect(container.querySelector('[data-od-id="btn-header-login"]')).not.toHaveFocus();
+});
+
+it('does not invent the email-verification status for a pending email account', async () => {
+  loginStatus = 403;
+  const { container } = open('/login');
+  fireEvent.change(screen.getByLabelText('Email', { exact: true }), { target: { value: 'user@example.test' } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'password' } });
+  fireEvent.submit(container.querySelector('form')!);
+  expect(await screen.findByText('Nếu chưa hoàn tất')).toBeVisible();
+  expect(document.body).not.toHaveTextContent('Cần xác minh');
+});
+
+it('keeps one accessible primary heading after signup succeeds', async () => {
+  const { container } = open('/signup');
+  await waitFor(() => expect(calls).toContain('/api/auth/config'));
+  fireEvent.change(screen.getByLabelText('Họ tên', { exact: true }), { target: { value: 'User' } });
+  fireEvent.change(screen.getByLabelText('Email', { exact: true }), { target: { value: 'user@example.test' } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'NewUser!password' } });
+  fireEvent.submit(container.querySelector('form')!);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Đã gửi yêu cầu đăng ký!' })).toBeVisible();
+  expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+});

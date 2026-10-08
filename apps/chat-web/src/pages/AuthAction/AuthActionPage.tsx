@@ -743,7 +743,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       </span>
                     </div>
                     <span className="text-[11px] font-semibold text-[#16A34A]">
-                      Cần xác minh
+                      Nếu chưa hoàn tất
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[#D97706] bg-[#FFFBEB] p-2.5 rounded-xl border border-[#FDE68A]">

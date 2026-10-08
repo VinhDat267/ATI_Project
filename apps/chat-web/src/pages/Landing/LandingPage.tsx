@@ -1,5 +1,5 @@
 // Markup/classes copied from the approved React Landing prototype; auth handlers use the live API.
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { LoginViewProps } from '../../components/LoginView';
@@ -34,6 +34,26 @@ const EYE_SHOW = <>
 </>;
 const EYE_HIDE = <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />;
 const FOCUSABLE = 'button:not([disabled]), [href]:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+// Route changes recreate the landing DOM. Keep the real opener's source identity
+// until an explicit modal close asks its replacement node to receive focus.
+const modalOpeners = new WeakMap<Document, { element: HTMLElement | null; id: string; returnRequested: boolean }>();
+function rememberModalOpener(element: HTMLElement) {
+  const id = element.dataset.odId;
+  if (id) modalOpeners.set(element.ownerDocument, { element, id, returnRequested: false });
+}
+function requestModalFocusReturn() {
+  const opener = modalOpeners.get(document);
+  modalOpeners.set(document, opener ? { ...opener, returnRequested: true }
+    : { element: null, id: 'btn-header-login', returnRequested: true });
+}
+function restoreRequestedModalFocus() {
+  const opener = modalOpeners.get(document);
+  modalOpeners.delete(document);
+  if (!opener?.returnRequested) return;
+  const element = opener.element?.isConnected ? opener.element
+    : [...document.querySelectorAll<HTMLElement>('[data-od-id]')].find(node => node.dataset.odId === opener.id);
+  element?.focus();
+}
 
 // Nhãn trạng thái của một dịch vụ ở khoảnh khắc 2 (setSearching / markFound).
 function K2Badge({ found }: { found: boolean }) {
@@ -72,9 +92,11 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
   const [moment, setMoment] = useState(1), [switched, setSwitched] = useState(false);
   const [k2Found, setK2Found] = useState([false, false, false, false]);
   const [typed, setTyped] = useState(SAMPLE_SENTENCE);
-  const authOverlay = initialMode ? OPEN : CLOSED;
   const authModeView = initialMode === 'signup' ? 'signup' : 'login';
   const [authView, setAuthView] = useState<AuthView>(initialMode === 'forgot' ? 'forgot' : 'form');
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+  const authOpen = Boolean(initialMode) || googleModalOpen;
+  const authOverlay = authOpen ? OPEN : CLOSED;
   const [forgotSent, setForgotSent] = useState(false), [success, setSuccess] = useState<Success | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [loginPwdShown, setLoginPwdShown] = useState(false), [signupPwdShown, setSignupPwdShown] = useState(false);
@@ -89,10 +111,18 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
   };
   useEffect(() => {
     const owner = ++generation.current;
-    lockScroll(Boolean(initialMode));
-    if (initialMode) later(100, () => (initialMode === 'signup' ? signupNameRef.current : initialMode === 'forgot' ? forgotEmailRef.current : loginEmailRef.current)?.focus());
     return () => { if (generation.current === owner) generation.current++; timers.current.forEach(window.clearTimeout); k2Timers.current.forEach(window.clearTimeout); lockScroll(false); };
   }, [initialMode]);
+  useLayoutEffect(() => { if (!authOpen) restoreRequestedModalFocus(); }, [authOpen]);
+  useEffect(() => {
+    lockScroll(authOpen);
+    const focusTimer = authOpen ? window.setTimeout(() => {
+      if (authView === 'google') authCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+      else if (authView === 'success') successCloseRef.current?.focus();
+      else (authView === 'forgot' ? forgotEmailRef.current : initialMode === 'signup' ? signupNameRef.current : loginEmailRef.current)?.focus();
+    }, 100) : undefined;
+    return () => { window.clearTimeout(focusTimer); lockScroll(false); };
+  }, [authOpen, initialMode, authView]);
   const clearK2Timers = () => {
     k2Timers.current.forEach(window.clearTimeout);
     k2Timers.current = [];
@@ -161,10 +191,14 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
 
 
   const changeMode = (mode: AuthMode) => { navigate(mode === 'signup' ? '/signup' : '/login'); };
-  const closeAuthModal = () => navigate('/');
+  const closeAuthModal = () => {
+    generation.current++; requestModalFocusReturn();
+    setGoogleModalOpen(false); setAuthView('form'); setBusy(false); navigate('/');
+  };
   const triggerGoogleAuthFlow = async () => {
     if (pending.current || !authConfig?.googleEnabled) return;
     pending.current = true; const owner = generation.current; setBusy(true); setAuthView('google'); setError(null);
+    if (!initialMode) setGoogleModalOpen(true);
     try { const { url } = await apiClient.startGoogleAuth(); if (generation.current === owner) window.location.assign(url); }
     catch { if (generation.current === owner) { setAuthView('form'); setError('Không thể bắt đầu đăng nhập Google. Hãy thử lại.'); } }
     finally { pending.current = false; if (generation.current === owner) setBusy(false); }
@@ -191,10 +225,14 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
       finally { pending.current = false; if (generation.current === owner) setBusy(false); }
     },
   };
-  const authLink = (mode: AuthMode | 'google') => (event: ReactMouseEvent) => { event.preventDefault(); if (mode === 'google') void triggerGoogleAuthFlow(); else changeMode(mode); };
+  const authLink = (mode: AuthMode | 'google') => (event: ReactMouseEvent) => {
+    event.preventDefault();
+    if (!authOpen && event.currentTarget instanceof HTMLElement) rememberModalOpener(event.currentTarget);
+    if (mode === 'google') void triggerGoogleAuthFlow(); else changeMode(mode);
+  };
   const backdrop = (ref: React.RefObject<HTMLDivElement | null>, close: () => void) => (event: ReactMouseEvent) => { if (event.target === ref.current) close(); };
   useEffect(() => {
-    if (!initialMode) return;
+    if (!authOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { closeAuthModal(); return; }
       if (event.key !== 'Tab') return;
@@ -209,7 +247,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
   const triggerOpacity = (n: number) => (!switched ? (n === 1 ? '' : ' opacity-40') : n === moment ? ' opacity-100' : ' opacity-40');
   return (
     <>
-      <div className="contents" inert={Boolean(initialMode)} aria-hidden={Boolean(initialMode)}>
+      <div className="contents" inert={authOpen} aria-hidden={authOpen}>
       {' '}
       {/* ========================================== */}
       {' '}
@@ -1732,9 +1770,9 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
           </div>
           {/* VIEW 1: FORM CHÍNH (Đăng nhập / Đăng ký) */}
           {authView === 'form' && <div id="auth-form-view" className={authView === 'form' ? undefined : 'hidden'}>
-            <h2 id="auth-modal-title" className="font-display font-medium text-2xl sm:text-[26px] text-[#111827] tracking-tight mb-1.5">
+            <h1 id="auth-modal-title" className="font-display font-medium text-2xl sm:text-[26px] text-[#111827] tracking-tight mb-1.5">
               {isLoginView ? 'Chào mừng bạn quay lại' : 'Bắt đầu với ATI'}
-            </h2>
+            </h1>
             <p id="auth-modal-subtitle" className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-5">
               {isLoginView ? 'Đăng nhập để vào không gian điều phối công việc của nhóm.' : 'Điều phối tự động trên nhiều công cụ sau khi bạn duyệt.'}
             </p>
@@ -1885,7 +1923,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
             {!isLoginView && !authConfig?.signupEnabled && <p role="status">Đăng ký bằng email hiện đang đóng.</p>}
           </div>}
           {/* VIEW 2: MÔ PHỎNG TIẾP TỤC VỚI GOOGLE */}
-          <div id="auth-google-view" className={`${authView === 'google' ? '' : 'hidden '}text-center py-6`}>
+          {authView === 'google' && <div id="auth-google-view" className={`${authView === 'google' ? '' : 'hidden '}text-center py-6`}>
             <div className="w-12 h-12 rounded-full bg-[#FAFAF8] border border-[#E7E7E2] flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 animate-spin text-[#FF5701]" fill="none" viewBox="0 0 24 24">
                 {' '}
@@ -1895,9 +1933,9 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 {' '}
               </svg>
             </div>
-            <h2 id="auth-google-title" className="font-display font-medium text-xl sm:text-2xl text-[#111827] tracking-tight mb-2">
+            <h1 id="auth-google-title" className="font-display font-medium text-xl sm:text-2xl text-[#111827] tracking-tight mb-2">
               Đang chuyển sang trang đăng nhập của Google…
-            </h2>
+            </h1>
             <p className="text-xs sm:text-sm text-[#6B7280] max-w-sm mx-auto mb-3">
               Hệ thống đang kết nối an toàn với Google Identity. Vui lòng chờ trong giây lát.
             </p>
@@ -1907,12 +1945,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 Chính sách dữ liệu tài khoản Google
               </a>
             </p>
-          </div>
+          </div>}
           {/* VIEW 4: QUÊN MẬT KHẨU */}
           {authView === 'forgot' && <div id="auth-forgot-view" className={authView === 'forgot' ? undefined : 'hidden'}>
-            <h2 id="auth-forgot-title" className="font-display font-medium text-2xl text-[#111827] tracking-tight mb-1.5">
+            <h1 id="auth-forgot-title" className="font-display font-medium text-2xl text-[#111827] tracking-tight mb-1.5">
               Đặt lại mật khẩu
-            </h2>
+            </h1>
             <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-5">
               Nhập email của bạn để nhận hướng dẫn đặt lại mật khẩu.
             </p>
@@ -1947,9 +1985,9 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 {' '}
               </svg>
             </div>
-            <h2 id="success-title" className="font-display font-medium text-2xl text-[#111827] tracking-tight mb-2">
+            <h1 id="success-title" className="font-display font-medium text-2xl text-[#111827] tracking-tight mb-2">
               {success ? success.title : 'Đã gửi yêu cầu đăng ký!'}
-            </h2>
+            </h1>
             <p id="success-desc" role="status" className="text-xs sm:text-sm text-[#4B5563] leading-relaxed max-w-sm mx-auto mb-6">
               {success ? success.desc : 'Hệ thống đã ghi nhận email của bạn. Quản trị viên nhóm sẽ phê duyệt quyền truy cập và bạn sẽ nhận được email thông báo ngay khi tài khoản sẵn sàng.'}
             </p>
