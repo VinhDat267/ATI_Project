@@ -447,9 +447,9 @@ export class ApiClient {
     });
   }
 
-  async testConnection(service: string): Promise<any> {
+  async testConnection(service: string, signal?: AbortSignal): Promise<any> {
     const res = await this.requestRaw(`/api/services/${service}/test`, {
-      method: 'POST',
+      method: 'POST', signal,
     });
     const data = await res.json().catch(() => ({}));
     const success = res.ok && data.status === 'healthy';
