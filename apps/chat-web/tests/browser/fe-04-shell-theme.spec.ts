@@ -62,11 +62,11 @@ for (const theme of ['light', 'dark'] as const) {
     const save = page.getByRole('button', { name: 'Lưu thay đổi', exact: true });
     await expect(save).toBeVisible(); expect(await save.evaluate(el => getComputedStyle(el).fontWeight)).toBe('600');
   });
-  test(`FE-04: retained landing comparison copy is readable on its rendered ${theme} backgrounds`, async ({ page }, info) => {
+  test(`FE-04: copied landing principles are readable on their rendered ${theme} backgrounds`, async ({ page }, info) => {
     await page.emulateMedia({ colorScheme: theme }); await page.goto('/');
-    const paragraph = page.getByText('Hệ quả: Thao tác lặp lại và khó theo dõi công việc giữa các ứng dụng.', { exact: true });
+    const paragraph = page.getByText('Sản phẩm được thiết kế với sự cẩn trọng tối đa để bạn hoàn toàn an tâm khi giao việc.', { exact: true });
     await paragraph.scrollIntoViewIfNeeded();
-    for (const target of [paragraph, page.getByText('Quy trình truyền thống', { exact: true }), page.getByText('Chuyển tab và nhập liệu nhiều lần', { exact: true })]) {
+    for (const target of [paragraph, page.getByText('Bạn luôn là người quyết định', { exact: true }), page.getByText('Không ghi gì khi chưa được duyệt', { exact: true })]) {
       const values = await target.evaluate(el => {
         let background: Element = el;
         while (background.parentElement && getComputedStyle(background).backgroundColor === 'rgba(0, 0, 0, 0)') background = background.parentElement;
@@ -79,9 +79,8 @@ for (const theme of ['light', 'dark'] as const) {
       const x = luminance(values.color), y = luminance(values.background);
       expect((Math.max(x, y) + .05) / (Math.min(x, y) + .05), JSON.stringify(values)).toBeGreaterThanOrEqual(4.5);
     }
-    const gradient = await page.getByText('Đột phá', { exact: true }).locator('..').evaluate(el => getComputedStyle(el).backgroundImage);
-    if (theme === 'dark') expect(gradient).not.toContain('rgb(255, 255, 255)');
-    await page.screenshot({ path: info.outputPath(`FE04-comparison-${theme}.png`), animations: 'disabled' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.screenshot({ path: info.outputPath(`FE04-principles-${theme}.png`), animations: 'disabled' });
   });
 }
 

@@ -71,7 +71,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/');
-  const landingLoginBtn = page.getByRole('button', { name: 'Đăng nhập vào hệ thống' });
+  const landingLoginBtn = page.locator('[data-od-id="btn-header-login"]');
   if (await landingLoginBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await landingLoginBtn.click();
   }

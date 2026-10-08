@@ -18,8 +18,8 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
   const db = pool();
   try {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Đăng nhập vào hệ thống' }).click(); await expect(page).toHaveURL(/\/login$/);
-    await page.goBack(); await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeVisible();
+    await page.locator('[data-od-id="btn-header-login"]').click(); await expect(page).toHaveURL(/\/login$/);
+    await page.goBack(); await expect(page.locator('[data-od-id="btn-header-login"]')).toBeVisible();
     await page.goForward(); await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
     await login(page); await expect(page).toHaveURL(/\/$/);
     const userId = await owner(db);
