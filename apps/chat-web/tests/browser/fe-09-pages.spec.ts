@@ -44,6 +44,7 @@ test('FE-09: own title history uses a cursor, Enter/Esc and guarded late PATCH, 
     await page.getByRole('textbox', { name: 'Tiêu đề hội thoại' }).fill('Cancelled');
     await page.getByRole('textbox', { name: 'Tiêu đề hội thoại' }).press('Escape');
     await expect(page.getByRole('heading', { name: 'FE09 title 0', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Đổi tên FE09 title 0', exact: true })).toBeFocused();
     let release!: () => void, ready!: () => void;
     const held = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => ready = resolve);
     await page.route(`**/api/conversations/${ids[0]}`, async route => {
@@ -59,6 +60,7 @@ test('FE-09: own title history uses a cursor, Enter/Esc and guarded late PATCH, 
       await expect(input).toHaveValue('Unsaved draft B');
       expect((await page.request.get(`/api/conversations/${ids[0]}`, { headers }).then(response => response.json())).conversation.title).toBe('Sent title A');
       await input.press('Escape');
+      await expect(page.getByRole('button', { name: 'Đổi tên Sent title A', exact: true })).toBeFocused();
       await page.getByRole('link', { name: 'Mở hội thoại', exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/c/${ids[0]}$`)); await page.reload();
       await expect(page.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toBeVisible();

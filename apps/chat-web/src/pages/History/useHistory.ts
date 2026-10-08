@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import { useChatStore } from '../../store/chat-store';
@@ -10,6 +10,12 @@ export function useHistory(user: User | null) {
   const [editing, setEditing] = useState<string | null>(null), [title, setTitle] = useState(''), [saving, setSaving] = useState(false);
   const generation = useRef(0), busy = useRef(false), renameBusy = useRef(false), draftRevision = useRef(0);
   const mounted = useRef(true);
+  const returnFocus = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (editing !== null || !returnFocus.current) return;
+    document.getElementById(`rename-button-${returnFocus.current}`)?.focus();
+    returnFocus.current = null;
+  }, [editing]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const load = async (nextCursor: string | undefined, owner = generation.current) => {
     busy.current = true; setLoading(true); setError(null);
@@ -28,7 +34,7 @@ export function useHistory(user: User | null) {
     return () => { generation.current++; };
   }, [search, user?.id]);
   const edit = (id: string) => { draftRevision.current++; setEditing(id); setTitle(rows.find(row => row.id === id)?.title ?? ''); setError(null); setNotice(null); };
-  const cancel = () => { draftRevision.current++; setEditing(null); setError(null); document.getElementById(`rename-button-${editing}`)?.focus(); };
+  const cancel = () => { draftRevision.current++; returnFocus.current = editing; setEditing(null); setError(null); };
   const rename = async (id: string) => {
     if (renameBusy.current) return;
     const trimmed = title.trim();
@@ -41,7 +47,7 @@ export function useHistory(user: User | null) {
       setRows(current => current.map(row => row.id === id ? conversation : row));
       const store = useChatStore.getState(); store.setConversations(store.conversations.map(row => row.id === id ? conversation : row));
       // An edit, Escape, or a new rename session invalidates ownership of the old input.
-      if (draftRevision.current === revision) { setEditing(null); document.getElementById(`rename-button-${id}`)?.focus(); }
+      if (draftRevision.current === revision) { returnFocus.current = id; setEditing(null); }
       setNotice('Đã đổi tên hội thoại.');
     } catch (reason) { if (owner === generation.current) setError(userErrorMessage(reason)); }
     finally { renameBusy.current = false; if (mounted.current) setSaving(false); }

@@ -90,9 +90,11 @@ it('loads own history by title and cursor, opens the saved route, and preserves 
   fireEvent.change(input, { target: { value: 'Draft B' } });
   await act(async () => resolveRename({ conversation: { ...conversation, title: 'Tên gửi A' } }));
   expect(screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' })).toHaveValue('Draft B');
+  input.focus();
   fireEvent.keyDown(input, { key: 'Escape' });
   expect(screen.queryByRole('textbox', { name: 'Tiêu đề hội thoại' })).toBeNull();
   expect(screen.getByRole('heading', { name: 'Tên gửi A' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Đổi tên Tên gửi A' })).toHaveFocus();
   expect(screen.getByRole('link', { name: 'Mở hội thoại' })).toHaveAttribute('href', '/c/c1');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Tiêu đề' } });
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Tiêu đề', cursor: undefined })));
@@ -128,8 +130,14 @@ it('releases saving after a search changes while an older rename response is pen
 it('shows the supported fallback for a conversation whose title is not yet set', async () => {
   window.history.replaceState({}, '', '/history');
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [{ ...conversation, title: null }] });
+  vi.spyOn(apiClient, 'renameConversation').mockResolvedValue({ conversation });
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Hội thoại mới' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Đổi tên Hội thoại mới' }));
+  const input = screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' });
+  input.focus(); fireEvent.change(input, { target: { value: conversation.title } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  await waitFor(() => expect(screen.getByRole('button', { name: `Đổi tên ${conversation.title}` })).toHaveFocus());
 });
 it('releases the account action lock after a user change while an older name save is pending', async () => {
   let finish!: (value: any) => void;
