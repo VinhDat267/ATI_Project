@@ -22,3 +22,19 @@ it('Escape cancels destructive confirmation while retaining the editor',()=>{con
 it.each(['{ invalid JSON','{}','"not an array"'])('blocks invalid schema array %s before stopping',value=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} tool="sheets.append_rows" stepArgs={{spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['a']]}} onSubmit={onSubmit}/>);const inputs=screen.getAllByRole('textbox');fireEvent.change(inputs.find(input=>input.getAttribute('aria-label')?.includes('rows') || (input as HTMLTextAreaElement).value==='[["a"]]')!,{target:{value}});fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(screen.getByRole('alert')).toBeInTheDocument();expect(screen.queryByRole('button',{name:'Dừng và gửi yêu cầu sửa'})).toBeNull();expect(onSubmit).not.toHaveBeenCalled();});
 
 it('parses a valid schema array and preserves other saved fields before confirmation',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} tool="sheets.append_rows" stepArgs={{spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['a']]}} onSubmit={onSubmit}/>);const input=screen.getAllByRole('textbox').find(input=>(input as HTMLTextAreaElement).value==='[["a"]]')!;fireEvent.change(input,{target:{value:'[["corrected"]]'}});submit();expect(onSubmit).toHaveBeenCalledWith({spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['corrected']]},undefined);});
+
+it.each([
+  ['sheets.append_rows', { spreadsheetId: 'sheet-1', sheet: 'Tracker', rows: [['Task']] }, 'ID bảng tính'],
+  ['calendar.create_event', { calendarId: 'calendar-1', summary: 'Họp', start: '2026-10-08T09:00:00Z', end: '2026-10-08T10:00:00Z' }, 'ID lịch'],
+  ['notion.create_page', { databaseId: 'database-1', title: 'Task' }, 'ID cơ sở dữ liệu Notion'],
+  ['telegram.send_message', { chatId: 'chat-1', text: 'Task' }, 'ID cuộc trò chuyện Telegram'],
+  ['jira.create_issue', { projectKey: 'ATI', summary: 'Task' }, 'Mã dự án Jira'],
+] as const)('shows editable human-labelled fields for %s', (tool, stepArgs, label) => {
+  const onSubmit = vi.fn();
+  render(<RecoveryEditor {...defaults} tool={tool} stepArgs={stepArgs} onSubmit={onSubmit}/>);
+  const input = screen.getByRole('textbox', { name: label });
+  fireEvent.change(input, { target: { value: 'corrected-resource' } });
+  submit();
+  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ [Object.keys(stepArgs)[0]]: 'corrected-resource' }), undefined);
+  expect(screen.queryByRole('textbox', { name: Object.keys(stepArgs)[0] })).toBeNull();
+});

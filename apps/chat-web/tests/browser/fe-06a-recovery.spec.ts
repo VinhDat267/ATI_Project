@@ -1,6 +1,28 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
 import { createHash } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+
+const diagnostics = new WeakMap<object, string[]>();
+test.beforeEach(async ({ page }) => {
+  const events: string[] = []; diagnostics.set(page, events);
+  page.on('console', message => { if (message.type() === 'error') events.push(`console: ${message.text()}`); });
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) events.push(`navigation: ${Date.now()} ${frame.url()}`); });
+  page.on('request', request => { if (['script', 'stylesheet', 'document'].includes(request.resourceType())) events.push(`start: ${Date.now()} ${request.url()}`); });
+  page.on('requestfinished', request => { if (['script', 'stylesheet', 'document'].includes(request.resourceType())) events.push(`finish: ${Date.now()} ${request.url()}`); });
+  page.on('pageerror', error => events.push(`pageerror: ${error.message}`));
+  page.on('requestfailed', request => events.push(`requestfailed: ${request.url()} ${request.failure()?.errorText}`));
+  page.on('response', response => { if (response.status() >= 400) events.push(`response: ${response.status()} ${response.url()}`); });
+});
+
+test.afterEach(async ({page},info)=>{
+  if(info.status===info.expectedStatus) return;
+  const state={events:diagnostics.get(page),url:page.url(),readyState:await page.evaluate(()=>document.readyState),headings:await page.locator('h1').allTextContents(),moments:await page.locator('[data-moment]:visible').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-moment')))};
+  await writeFile(info.outputPath('failure-state.json'),JSON.stringify(state,null,2));
+  await writeFile(info.outputPath('failure-dom.html'),await page.content());
+  await page.screenshot({path:info.outputPath('failure-page.png'),fullPage:true,animations:'disabled'});
+  await info.attach('failure-state',{body:JSON.stringify(state),contentType:'application/json'});
+});
 
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
   test(`FE-06A: saved recovery moments 7-9 and terminal receipt ${width} ${theme}`,async({page},info)=>{

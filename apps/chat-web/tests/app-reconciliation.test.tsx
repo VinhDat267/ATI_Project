@@ -63,6 +63,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     request.mockImplementation((url:string,options?:RequestInit)=>url==='/api/conversations/c1/messages' ? Promise.resolve({userMessageId:'edited-message'}) : originalRequest(url,options));
     render(<App/>);await openCockpitHistory();fireEvent.click(await screen.findByText('Đối soát đã lưu'));
     fireEvent.click(await screen.findByRole('button',{name:'Sửa rồi thử lại'}));fireEvent.change(screen.getByDisplayValue('minh'),{target:{value:'corrected-member'}});
+    fireEvent.change(screen.getByLabelText('Ghi chú thêm (không bắt buộc)'),{target:{value:'Gán cho người trực tuần này'}});
     fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(request.mock.calls.filter(([,options]:[string,RequestInit?])=>options?.method==='POST')).toHaveLength(0);
     fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));
     await waitFor(()=>expect(request).toHaveBeenCalledWith('/api/conversations/c1/messages',expect.objectContaining({method:'POST',body:expect.stringContaining('corrected-member')})));
@@ -73,7 +74,29 @@ describe('saved execution recovery in the actual App/history flow', () => {
     expect(content.split('\n')[0]).toBe('Làm lại việc 2 (Gán Minh vào thẻ) của kế hoạch đã dừng, với nội dung đã sửa:');
     expect(content).toContain('ID của thành viên Trello cần gán: corrected-member');
     expect(content).toContain('Việc 3 (Thông báo Slack)');
+    expect(content.split('\n').at(-1)).toBe('Ghi chú: Gán cho người trực tuần này');
     expect(content).not.toMatch(/step_\d|[{}]|\$ref|\$template|Yêu cầu: |Tham số sửa/);
+  });
+  it('ignores a late edit Stop after navigating to another conversation', async () => {
+    snapshot.execution = { status: 'partial', pausedStepId: 'step_2' };
+    snapshot.plan.status = 'partial'; snapshot.steps[1].status = 'failed';
+    snapshot.recoveryActions = ['retry', 'skip', 'stop'];
+    let release!: () => void;
+    post = () => new Promise(resolve => { release = () => resolve({ status: 'stopped' }); });
+    render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sửa rồi thử lại' }));
+    fireEvent.change(screen.getByLabelText('Ghi chú thêm (không bắt buộc)'), { target: { value: 'Ghi chú riêng của A' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Xem lại nội dung sửa' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dừng và gửi yêu cầu sửa' }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/api/executions/p1/stop', { method: 'POST' }));
+    await openCockpitHistory(); fireEvent.click(await screen.findByText('Hội thoại khác'));
+    await waitFor(() => expect(useChatStore.getState().conversationId).toBe('c2'));
+    await waitFor(() => expect(useChatStore.getState().messages.at(-1)?.content).toBe('Hội thoại B'));
+    await act(async () => release());
+    expect(useChatStore.getState().conversationId).toBe('c2');
+    expect(useChatStore.getState().messages.at(-1)?.content).toBe('Hội thoại B');
+    expect(request.mock.calls.filter(([, options]: [string, RequestInit?]) => options?.method === 'POST').map(([url]: [string, RequestInit?]) => url)).toEqual(['/api/executions/p1/stop']);
+    expect(screen.queryByText('Quy trình đã dừng.')).toBeNull();
   });
   it('a failed Stop cannot send edited parameters or report completion',async()=>{
     snapshot.execution={status:'partial',pausedStepId:'step_2'};snapshot.plan.status='partial';snapshot.steps[1].status='failed';snapshot.recoveryActions=['retry','skip','stop'];post=async()=>{throw new Error('Stop conflict');};
