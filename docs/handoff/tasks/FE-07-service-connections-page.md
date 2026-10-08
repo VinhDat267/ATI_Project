@@ -49,4 +49,13 @@ Gỡ khoá dịch vụ, lưu tên tài nguyên kèm ID, kiểm tra kết nối b
 
 ## Kết quả
 
-_(agent thi công điền)_
+**Thi công xong, chờ Claude Code review độc lập; chưa merge.** Nhánh `feat/fe-07-service-connections`, worktree riêng trên `eb48f0b` (main mới hơn `564b6cb`). Commit mã: f4ea1283a82328f67fa5298a22fcc82532877d19.
+
+- Chép markup/class của trang React Settings và `page.css` nguyên byte; `usePrototypePage(meta)`, route ngoài AppShell, header dùng user thật và UserNavMenu prototype. Xoá SettingsModal; không sửa prototype/theme, Cockpit, planner/evaluations, CURRENT-STATE hay ROADMAP.
+- API thật cho danh sách, lưu đủ khoá, PUT scope riêng và kiểm tra kết nối; nhãn 4 trạng thái + giờ kiểm tra, nhóm theo configured, xoá draft theo đúng dịch vụ và giá trị đã gửi. Giữ toàn bộ 4 ca HTTP W3-00b và các ca hành vi Settings cũ, gồm metadata tải lại sau lưu.
+- Ngăn phải desktop/toàn màn hình mobile, focus trap, Esc/backdrop, trả focus bằng id hàng hiện tại; hash hợp lệ mở đúng dịch vụ. Thành viên chỉ đọc cấu hình và vẫn kiểm tra được dịch vụ đã thiết lập. Hướng dẫn lấy khoá dùng nguồn AUTH-06/W3-07/evaluations và link chính thức.
+- TDD: RED 15/15 trên UI cũ; RED bổ sung token refresh, AbortSignal thật, câu phản hồi tiếng Việt, hướng dẫn scope rỗng và HTTP trả headers nhưng treo body. GREEN: `npm run check` exit 0 (1.454 unit/integration + 165 eval + build/typecheck + 11 launcher/fixture); `npm run test:browser:v3` exit 0 (69 ca/11 scenario) trên PostgreSQL tmpfs riêng DB55536/API3006/web5186.
+- Visual: 160 ảnh source/app (2 viewport × 2 theme × 2 vai trò × 10 trạng thái × 2 nguồn), 80 ảnh ghép + 16 contact sheets; đã xem 16 bảng đối chiếu. Không cuộn ngang; mobile panel 375×812; desktop panel 576×900. SHA256 đầy đủ trong [log FE-07](../log/2026-10-08-codex-FE-07.md); ảnh nằm ngoài repo, không commit.
+- Khác biệt có lý do: bỏ demo, thêm menu user thật (1.1); tool/field/scope/giờ và trạng thái thật (1.1.2/6); logo theo cockpit-services.json theo yêu cầu; sửa gợi ý Notion/Google/Telegram và placeholder để không bịa hoặc trình bày giá trị khoá mẫu; ghi chú scope-only theo UI-API-01 đã merge; aria-live/focus/100dvh không đổi kiểu mẫu (1.1.4). Khoá giả bị provider từ chối, nên không dựng trạng thái healthy cho ảnh.
+- FE-04: bỏ đúng assertion 40×40 cho nút xoá chip settings (1.1.4/1.2.6); giữ test thêm/xoá chip và các assertion khác.
+- NOT_RUN: provider healthy bằng khoá thật/ghi dịch vụ thật, screen reader, nghiệm thu sản phẩm và review độc lập. Timeout/healthy UI được kiểm bằng HTTP loopback thật; browser dùng API/PostgreSQL thật và nhận thất bại thật từ provider với khoá giả. Không tuyên bố nghiệm thu toàn nền tảng.
