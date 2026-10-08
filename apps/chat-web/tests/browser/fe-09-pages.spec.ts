@@ -119,10 +119,10 @@ test('FE-09: actual approval HTTP 503 remains visible and preserves the pending 
     const candidate = page.locator('#pending-list-container > div').filter({ hasText: email });
     await candidate.getByRole('button', { name: /Duyệt & kích hoạt/ }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true }).click();
+    await dialog.getByRole('button', { name: /Xác nhận duyệt/ }).click();
     await expect(dialog.getByRole('alert')).toHaveText('Chưa cấu hình email thông báo duyệt tài khoản.');
-    await expect(dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Xác nhận duyệt', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: /Xác nhận duyệt/ })).toBeEnabled();
+    await dialog.getByRole('button', { name: /Xác nhận duyệt/ }).click();
     await expect.poll(() => responses).toBe(2);
     await expect(dialog.getByRole('alert')).toBeVisible();
     expect((await db.query('SELECT status FROM users WHERE id=$1', [id])).rows[0].status).toBe('pending');
@@ -146,6 +146,16 @@ test('FE-09: Account Users History retain prototype layouts in light/dark at des
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         expect(await page.evaluate(() => document.documentElement.dataset.protoPage)).toBe(path === '/admin/users' ? 'users' : path.slice(1));
         expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(theme === 'dark');
+        const avatar = page.getByRole('button', { name: /Menu người dùng/ });
+        expect(await avatar.evaluate(element => getComputedStyle(element).width)).toBe('32px');
+        await avatar.press('ArrowDown');
+        const menu = page.getByRole('menu');
+        await expect(page.getByRole('menuitem', { name: 'Nhật ký điều phối', exact: true })).toBeFocused();
+        const box = await menu.boundingBox();
+        expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+        expect(await page.getByRole('menuitem').first().evaluate(element => getComputedStyle(element).display)).toBe('flex');
+        await page.getByRole('menuitem').first().press('Escape');
+        await expect(menu).toHaveCount(0); await expect(avatar).toBeFocused();
       }
     }
   }

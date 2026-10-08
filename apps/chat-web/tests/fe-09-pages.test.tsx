@@ -30,6 +30,20 @@ it('ports the Account page without the shell or demo controls and requires curre
   fireEvent.click(within(modal).getByRole('button', { name: /Xác nhận gỡ/ }));
   await waitFor(() => expect(unlink).toHaveBeenCalledWith('Current!password'));
 });
+it('uses the source avatar classes and styled keyboard menu on the Account page', async () => {
+  window.history.replaceState({}, '', '/account');
+  render(<App />);
+  const avatar = await screen.findByRole('button', { name: 'Menu người dùng: Lan Nguyễn' });
+  expect(avatar).toHaveClass('w-8', 'h-8', 'rounded-full', 'bg-[#FF5701]', 'text-white', 'text-xs', 'font-bold');
+  fireEvent.keyDown(avatar, { key: 'ArrowDown' });
+  const first = screen.getByRole('menuitem', { name: 'Nhật ký điều phối' });
+  expect(first).toHaveClass('w-full', 'text-left', 'px-4', 'py-2', 'text-xs');
+  expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: 'End' });
+  expect(screen.getByRole('menuitem', { name: 'Đăng xuất' })).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Đăng xuất' }), { key: 'Escape' });
+  expect(screen.queryByRole('menu')).toBeNull(); expect(avatar).toHaveFocus();
+});
 it('disables approval for an unverified account without reject or invite actions', async () => {
   window.history.replaceState({}, '', '/admin/users');
   vi.spyOn(apiClient, 'getAdminUsers').mockResolvedValue({ users: [{ ...user, id: 'p1', name: 'Chờ xác minh', email: 'pending@example.test', role: 'member', status: 'pending', emailVerified: false, hasPassword: true, hasGoogle: false, createdAt: '2026-10-01', openSessions: 0 }], total: 1, pendingCount: 1, page: 1, limit: 20 });
