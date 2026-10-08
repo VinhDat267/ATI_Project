@@ -46,17 +46,18 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     expect((await listed.json()).conversations[0].id).toBe(convId);
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
-    const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
+    const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice).toBeVisible();
+    await notice.getByText('Chi tiết để đối chiếu').click();
     await expect(notice.getByText('trello.add_member')).toBeVisible();
     await expect(notice.getByText(/saved-browser-card/)).toBeVisible();
     await expect(page.getByRole('button', { name: /thử lại|retry|Duyệt kế hoạch/i })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('reconciliation-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await notice.scrollIntoViewIfNeeded();
-    await expect(notice.getByRole('button', { name: 'Dừng plan' })).toBeVisible();
+    await expect(notice.getByRole('button', { name: 'Dừng kế hoạch' })).toBeVisible();
     await notice.screenshot({ path: testInfo.outputPath('reconciliation-mobile.png') });
-    await notice.getByRole('button', { name: 'Skip step này rồi chạy tiếp' }).click();
+    await notice.getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' }).click();
     await expect(page.getByText('Quy trình đã hoàn thành.')).toBeVisible();
     await expect(notice).toHaveCount(0);
     expect((await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0].status).toBe('completed');
@@ -106,11 +107,11 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     await page.reload();
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
     await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
-    const notice = page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
+    const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
     await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('continue-pending.png'), fullPage: true });
-    await notice.getByRole('button', { name: 'Chạy tiếp các bước còn lại' }).click();
+    await notice.getByRole('button', { name: 'Làm tiếp các việc còn lại' }).click();
     await expect(page.getByText('Quy trình đã hoàn thành.')).toBeVisible();
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0].status).toBe('completed');
     const rows = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
@@ -243,20 +244,23 @@ for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQ
     const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
     expect(planId).toBeTruthy();
     await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
-    await expect(page.getByText(/Tạm dừng quy trình tại bước: step_3/)).toBeVisible();
+    await expect(page.locator('#moment-7')).toBeVisible();
     await expect.poll(async () => (await pool.query('SELECT status FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_3'])).rows[0]?.status).toBe('failed');
     await expect(page.getByText('Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật')).toBeVisible();
     const writes: string[] = [];
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
+    await page.getByRole('button',{name:'Sửa rồi thử lại'}).click();
+    await expect(page.getByRole('dialog',{name:'Sửa rồi thử lại'})).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByRole('dialog',{name:'Sửa rồi thử lại'})).toHaveCount(0);
     expect((await pool.query('SELECT status FROM plans WHERE id=$1',[planId])).rows[0].status).toBe('partial');
     expect(writes).toEqual([]);
     await page.screenshot({path:testInfo.outputPath('paused-dismissed-desktop.png'),fullPage:true});
-    await page.getByRole('button',{name:'Mở lại xử lý lỗi'}).click();
-    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.getByRole('button',{name:'Sửa rồi thử lại'}).click();
+    await expect(page.getByRole('dialog',{name:'Sửa rồi thử lại'})).toBeVisible();
+    await page.keyboard.press('Escape');
     if(action === 'stop') {
-      await page.getByRole('button',{name:/Dừng lại toàn bộ/}).click();
+      await page.getByRole('button',{name:'Dừng kế hoạch'}).click();
       await expect(page.getByText(/Không thể chạy tiếp sau khi dừng/)).toBeVisible();
       expect(writes).toEqual([]);
       expect((await pool.query('SELECT status FROM plans WHERE id=$1',[planId])).rows[0].status).toBe('partial');
@@ -266,11 +270,11 @@ for (const action of ['skip', 'stop'] as const) test(`real browser and PostgreSQ
       return;
     }
     await page.setViewportSize({width:390,height:844});
-    await page.getByRole('alertdialog').screenshot({path:testInfo.outputPath('paused-reopened-mobile.png')});
-    await page.getByRole('button', { name: /Bỏ qua bước này/ }).click();
+    await page.locator('#moment-7').screenshot({path:testInfo.outputPath('paused-reopened-mobile.png')});
+    await page.getByRole('button', { name: 'Bỏ qua việc này' }).click();
     await expect.poll(async () => (await pool.query('SELECT status FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_3'])).rows[0]?.status).toBe('skipped');
     await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
-    await expect(page.getByText(/Tạm dừng quy trình tại bước: step_3/)).toHaveCount(0);
+    await expect(page.locator('#moment-7')).toHaveCount(0);
   } finally {
     await pool.end();
   }

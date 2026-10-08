@@ -85,21 +85,22 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({steps,planSteps,services,labels,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
+export function ReceiptMoment({terminalStatus,steps,planSteps,services,labels,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
  const cardProps={services,planSteps,labels,destination};
- return (<section id="moment-6" className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment="6" aria-labelledby="heading-moment-6">
+ return (<section id={terminalStatus?"moment-unsuccessful":"moment-6"} className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment={terminalStatus?"unsuccessful":"6"} aria-labelledby="heading-moment-6">
           <div className="v3-space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-sm">
+            <div className={`w-14 h-14 rounded-2xl ${terminalStatus?'bg-neutral-100 border-neutral-300 text-neutral-600':'bg-emerald-50 border-emerald-200 text-emerald-600'} flex items-center justify-center shadow-sm`}>
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path className="animate-draw-check" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                <path className="animate-draw-check" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={terminalStatus?'M6 6l12 12M6 18L18 6':'M5 13l4 4L19 7'} />
               </svg>
             </div>
             <div>
               <h1 id="heading-moment-6" className="font-display text-3xl sm:text-4xl lg:text-[42px] text-brand-text font-normal tracking-tight" tabIndex={-1}>
-                Đã xong {steps.filter(step=>step.status==='succeeded').length} việc trên {new Set(steps.map(step=>serviceId(step.tool))).size} công cụ
+                {terminalStatus ? terminalStatus==='stopped'?'Kế hoạch đã dừng':terminalStatus==='rejected'?'Kế hoạch đã hủy':'Kế hoạch chưa hoàn thành' : <>Đã xong {steps.filter(step=>step.status==='succeeded').length} việc trên {new Set(steps.filter(step=>step.status==='succeeded').map(step=>serviceId(step.tool))).size} công cụ</>}
               </h1>
+              {terminalStatus && <><p role="status" className="sr-only">{terminalStatus==='stopped'?'Quy trình đã dừng.':terminalStatus==='rejected'?'Kế hoạch đã hủy; chưa thực thi.':'Quy trình không hoàn thành.'}</p><p className="text-sm text-brand-muted mt-1.5">Đã làm {steps.filter(step=>step.status==='succeeded').length} việc; {steps.filter(step=>step.status!=='succeeded').length} việc chưa hoàn thành.</p></>}
               <div className="mt-1.5 flex items-center gap-2">
                 {totalDuration && <span id="moment-6-duration-tag" className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold font-body">
                   Trong {totalDuration}

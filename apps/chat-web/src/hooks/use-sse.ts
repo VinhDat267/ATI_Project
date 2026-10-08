@@ -92,6 +92,7 @@ export function handleSSEEvent(
         warnings: planObj.warnings,
         resourceLabels: data.resourceLabels ?? planObj.resourceLabels,
       });
+      if (planId && !store.messages.some(message=>message.metadata?.type==='plan' && message.metadata.planId===planId)) store.addMessage({id:`plan-display:${planId}`,role:'assistant',content:`Kế hoạch “${planObj.summary || 'Công việc'}” sẵn sàng`,metadata:{type:'plan',planId,plan:{id:planId,summary:planObj.summary || 'Công việc',steps:Array.isArray(planObj.steps)?planObj.steps:[]}}});
       store.setPlanStatus('preview');
       store.setClarification(null);
       store.setGatherState((prev) =>

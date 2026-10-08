@@ -99,7 +99,7 @@ it('late plan for A cannot change B cockpit moment', async () => {
   useChatStore.setState({conversationId:'B'}); renderCockpit();
   const {handleSSEEvent}=await import('../src/hooks/use-sse');
   act(()=>handleSSEEvent('plan_preview',JSON.stringify({planId:'plan-A',summary:'Late A',steps:plan.steps}),undefined,'A'));
-  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','1'); expect(screen.queryByText('Late A')).toBeNull();
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong|Chưa rõ kết quả|chưa hoàn thành việc này|Hệ thống vừa khởi động lại/})).toHaveAttribute('data-moment','1'); expect(screen.queryByText('Late A')).toBeNull();
 });
 it('late cancellation for A cannot clear the selected B plan', async () => {
   let finish!:()=>void; vi.mocked(apiClient.rejectPlan).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve(undefined); }));
@@ -130,20 +130,20 @@ it.each(['preview','completed'] as const)('beginPlanning retires the previous %s
   useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:status});
   expect(useChatStore.getState().beginPlanning('A','new-request')).toBe(true);
   renderCockpit();
-  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','2');
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong|Chưa rõ kết quả|chưa hoàn thành việc này|Hệ thống vừa khởi động lại/})).toHaveAttribute('data-moment','2');
   expect(useChatStore.getState().activePlan).toBeNull();
 });
 it('a read-only old completed snapshot cannot reacquire the stage while a new request is planning',()=>{
   const store=useChatStore.getState(); store.setConversationId('A');
   store.beginPlanning('A','new-request');
   store.setExecutionSnapshot({plan:{...plan,convId:'A',status:'completed'},execution:{status:'completed'},recoveryActions:[],steps:[{stepId:'s1',tool:'github.create_issue',status:'succeeded'}]});
-  renderCockpit(); expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','2');
+  renderCockpit(); expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong|Chưa rõ kết quả|chưa hoàn thành việc này|Hệ thống vừa khởi động lại/})).toHaveAttribute('data-moment','2');
   expect(useChatStore.getState().executionSnapshot?.plan.id).toBe('p1');
 });
 it.each(['unknown','failed'] as const)('a new planning request preserves unsafe %s evidence',status=>{
   useChatStore.setState({conversationId:'A',activePlan:plan,planStatus:'partial',stepStatuses:{s1:status}});
   useChatStore.getState().beginPlanning('A','new-request'); renderCockpit();
-  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment',status==='unknown'?'8':'7');
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong|Chưa rõ kết quả|chưa hoàn thành việc này|Hệ thống vừa khởi động lại/})).toHaveAttribute('data-moment',status==='unknown'?'8':'7');
   expect(useChatStore.getState().activePlan?.id).toBe('p1');
 });
 it('current progress rejects old snapshot output even when the plans reuse a step ID, then follows actual SSE',async()=>{
@@ -161,7 +161,7 @@ it('current progress rejects old snapshot output even when the plans reuse a ste
   expect(screen.getByText('NEW operation',{exact:true})).toBeInTheDocument();
   act(()=>handleSSEEvent('exec_step',JSON.stringify({planId:'new-plan',stepId:'s1',status:'succeeded'}),undefined,'A'));
   act(()=>handleSSEEvent('exec_done',JSON.stringify({planId:'new-plan',status:'completed'}),undefined,'A'));
-  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment','6');
+  expect(screen.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong|Chưa rõ kết quả|chưa hoàn thành việc này|Hệ thống vừa khởi động lại/})).toHaveAttribute('data-moment','6');
   expect(screen.queryByRole('link',{name:'Mở issue'})).toBeNull();
 });
 it.each([

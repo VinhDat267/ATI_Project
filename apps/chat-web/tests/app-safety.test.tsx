@@ -59,11 +59,13 @@ it('shows sandbox mode from the backend and hides it in live mode', async () => 
 it.each(['Escape','backdrop','close'])('dismisses a paused failure with %s and allows reopening without a Stop request',async mode=>{
   useChatStore.setState({conversationId:'c1',activePlan:{id:'p1',summary:'Paused',steps:[{id:'s1',tool:'slack.send_message',args:{},description:'Notify'}]} as any,planStatus:'partial',stepStatuses:{s1:'failed'},stepErrors:{s1:'Fixture failure'}});
   const stop=vi.spyOn(apiClient,'stopExecution');
-  await openApp(); const dialog=await screen.findByRole('alertdialog');
-  if(mode==='Escape') fireEvent.keyDown(window,{key:'Escape'});
-  else fireEvent.click(mode==='backdrop'?dialog:screen.getByRole('button',{name:'Đóng hộp thoại'}));
-  await waitFor(()=>expect(screen.queryByRole('alertdialog')).toBeNull());
+  useChatStore.getState().setExecutionSnapshot({plan:{id:'p1',convId:'c1',status:'partial',summary:'Paused',steps:[{id:'s1',tool:'slack.send_message',args:{},description:'Notify'}]},execution:{status:'partial',pausedStepId:'s1'},steps:[{stepId:'s1',tool:'slack.send_message',status:'failed',error:'Fixture failure'}],recoveryActions:['retry','skip','stop']});
+  await openApp(); fireEvent.click(screen.getByRole('button',{name:'Sửa rồi thử lại'}));const dialog=await screen.findByRole('dialog',{name:'Sửa rồi thử lại'});
+  if(mode==='Escape') fireEvent.keyDown(document,{key:'Escape'});
+  else if(mode==='backdrop') fireEvent.mouseDown(dialog.parentElement!);
+  else fireEvent.click(screen.getByRole('button',{name:'Đóng Sửa rồi thử lại'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
   expect(useChatStore.getState().planStatus).toBe('partial'); expect(stop).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button',{name:'Mở lại xử lý lỗi'}));
-  expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Sửa rồi thử lại'}));
+  expect(await screen.findByRole('dialog',{name:'Sửa rồi thử lại'})).toBeInTheDocument();
 });
