@@ -1,0 +1,66 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { App } from '../src/App';
+import { apiClient } from '../src/services/api-client';
+import { authStorage } from '../src/services/auth-storage';
+
+const user = { id: 'u1', name: 'Lan Nguyễn', email: 'lan@example.test', role: 'admin' as const, emailVerified: true };
+const conversation = { id: 'c1', title: 'Hội thoại đã lưu', updatedAt: '2026-10-09T00:00:00Z' };
+beforeEach(() => {
+  authStorage.setStoredTokens({ accessToken: 'access', refreshToken: 'refresh', user });
+  vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
+  vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: false, googleEnabled: true });
+  vi.spyOn(apiClient, 'getAccount').mockResolvedValue({ account: { ...user, createdAt: '2026-10-01', hasPassword: true, hasGoogle: true, googleEmail: user.email } });
+  vi.spyOn(apiClient, 'getAccountSessions').mockResolvedValue({ sessions: [] });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); });
+it('ports the Account page without the shell or demo controls and requires current password in the Google modal', async () => {
+  window.history.replaceState({}, '', '/account');
+  const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Cài đặt tài khoản' })).toBeInTheDocument();
+  expect(document.documentElement.dataset.protoPage).toBe('account');
+  expect(screen.queryByText(/Kịch bản demo/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
+  const modal = screen.getByRole('dialog');
+  fireEvent.click(within(modal).getByRole('button', { name: /Xác nhận gỡ/ }));
+  expect(unlink).not.toHaveBeenCalled();
+  fireEvent.change(within(modal).getByLabelText(/Mật khẩu hiện tại/), { target: { value: 'Current!password' } });
+  fireEvent.click(within(modal).getByRole('button', { name: /Xác nhận gỡ/ }));
+  await waitFor(() => expect(unlink).toHaveBeenCalledWith('Current!password'));
+});
+it('disables approval for an unverified account without reject or invite actions', async () => {
+  window.history.replaceState({}, '', '/admin/users');
+  vi.spyOn(apiClient, 'getAdminUsers').mockResolvedValue({ users: [{ ...user, id: 'p1', name: 'Chờ xác minh', email: 'pending@example.test', role: 'member', status: 'pending', emailVerified: false, hasPassword: true, hasGoogle: false, createdAt: '2026-10-01', openSessions: 0 }], total: 1, pendingCount: 1, page: 1, limit: 20 });
+  render(<App />);
+  expect(await screen.findByRole('button', { name: /Duyệt & kích hoạt/ })).toBeDisabled();
+  expect(screen.getByText('Người này cần bấm link xác minh trong email trước.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Từ chối|Mời/ })).toBeNull();
+  expect(document.documentElement.dataset.protoPage).toBe('users');
+});
+it('loads own history by title and cursor, opens the saved route, and preserves a newer rename draft after a late save', async () => {
+  window.history.replaceState({}, '', '/history');
+  const list = vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [conversation], nextCursor: 'cursor-1' });
+  let resolveRename!: (value: any) => void;
+  const rename = vi.spyOn(apiClient, 'renameConversation').mockImplementation(() => new Promise(resolve => { resolveRename = resolve; }));
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: conversation.title })).toBeInTheDocument();
+  expect(document.documentElement.dataset.protoPage).toBe('history');
+  expect(screen.queryByText(/Toàn bộ nhóm|Xem biên nhận|Lọc theo trạng thái/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Tải thêm' }));
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'cursor-1' })));
+  fireEvent.click(screen.getByRole('button', { name: /Đổi tên/ }));
+  let input = screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' });
+  fireEvent.change(input, { target: { value: 'Tên gửi A' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  await waitFor(() => expect(rename).toHaveBeenCalledWith('c1', 'Tên gửi A'));
+  fireEvent.change(input, { target: { value: 'Draft B' } });
+  await act(async () => resolveRename({ conversation: { ...conversation, title: 'Tên gửi A' } }));
+  expect(screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' })).toHaveValue('Draft B');
+  fireEvent.keyDown(input, { key: 'Escape' });
+  expect(screen.queryByRole('textbox', { name: 'Tiêu đề hội thoại' })).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Tên gửi A' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Mở hội thoại' })).toHaveAttribute('href', '/c/c1');
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Tiêu đề' } });
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Tiêu đề', cursor: undefined })));
+});
