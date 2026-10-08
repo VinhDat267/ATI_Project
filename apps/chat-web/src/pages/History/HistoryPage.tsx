@@ -8,7 +8,7 @@ import type { Conversation } from '../../types';
 import { formatConversationTime } from '../../services/conversation-time';
 import { useHistory } from './useHistory';
 function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryRow; isEditing: boolean; actions: CardActions; title: string; saving: boolean }) {
-  const rawTitle = req.title || '';
+  const rawTitle = req.title || 'Hội thoại mới';
   const displayTitle = rawTitle.length > 60 ? rawTitle.slice(0, 60) + '…' : rawTitle;
   return <article className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft hover:border-[#FF5701]/60 transition-all group">
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">

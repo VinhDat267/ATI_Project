@@ -52,7 +52,12 @@ export function useUsers(user: User | null) {
       setModal(null); setSelected(null);
       setNotice(action === 'approve' ? 'Đã duyệt. Hệ thống gửi email báo cho người dùng.' : 'Đã cập nhật tài khoản.');
       await load();
-    } catch (reason) { if (owner === generation.current) setError(userErrorMessage(reason, 'Không cập nhật được tài khoản.')); }
+    } catch (reason) {
+      if (owner === generation.current) {
+        const response = reason as { status?: number; data?: { error?: string } };
+        setError(response.status === 503 && typeof response.data?.error === 'string' ? response.data.error : userErrorMessage(reason, 'Không cập nhật được tài khoản.'));
+      }
+    }
     finally { active.current = false; setBusy(false); }
   };
   const isAdmin = user?.role === 'admin';

@@ -13,6 +13,8 @@ export function useAccount(user: User | null) {
   const [modal, setModal] = useState<ModalId | null>(null), [shownPasswords, setShownPasswords] = useState<string[]>([]);
   const fullNameRef = useRef<HTMLInputElement>(null), currentPassRef = useRef<HTMLInputElement>(null), newPassRef = useRef<HTMLInputElement>(null), confirmPassRef = useRef<HTMLInputElement>(null), unlinkPassRef = useRef<HTMLInputElement>(null);
   const generation = useRef(0), active = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const load = useCallback(async (owner = generation.current) => {
     const [profile, list] = await Promise.all([apiClient.getAccount(), apiClient.getAccountSessions()]);
     if (owner !== generation.current) return;
@@ -30,7 +32,7 @@ export function useAccount(user: User | null) {
     const owner = generation.current;
     try { const message = await action(owner); if (owner === generation.current && message) setNotice(message); }
     catch (reason) { if (owner === generation.current) setError(userErrorMessage(reason, 'Không thực hiện được thao tác. Hãy thử lại.')); }
-    finally { active.current = false; if (owner === generation.current) setBusy(null); }
+    finally { active.current = false; if (mounted.current) setBusy(null); }
   };
   const closeModal = (_id?: string) => { if (!active.current) { setModal(null); if (unlinkPassRef.current) unlinkPassRef.current.value = ''; } };
   usePageDialog(modal, closeModal, busy !== null);

@@ -9,6 +9,8 @@ export function useHistory(user: User | null) {
   const [loading, setLoading] = useState(false), [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null), [title, setTitle] = useState(''), [saving, setSaving] = useState(false);
   const generation = useRef(0), busy = useRef(false), renameBusy = useRef(false), draftRevision = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const load = async (nextCursor: string | undefined, owner = generation.current) => {
     busy.current = true; setLoading(true); setError(null);
     try {
@@ -42,7 +44,7 @@ export function useHistory(user: User | null) {
       if (draftRevision.current === revision) { setEditing(null); document.getElementById(`rename-button-${id}`)?.focus(); }
       setNotice('Đã đổi tên hội thoại.');
     } catch (reason) { if (owner === generation.current) setError(userErrorMessage(reason)); }
-    finally { renameBusy.current = false; if (owner === generation.current) setSaving(false); }
+    finally { renameBusy.current = false; if (mounted.current) setSaving(false); }
   };
   return { rows, search, setSearch, cursor, loading, error, notice, editing, title, setTitle(value: string) { draftRevision.current++; setTitle(value); }, saving, edit, cancel, rename, loadMore() { if (cursor && !busy.current) void load(cursor); } };
 }

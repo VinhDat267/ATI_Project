@@ -51,10 +51,10 @@ it('shows the profile, sign-in methods, open sessions and that deletion goes thr
   expect(screen.getByLabelText(/Họ và tên/)).toHaveValue('Member');
   expect(screen.getAllByText('Thành viên')[0]).toBeInTheDocument();
   expect(screen.getByText(/personal@gmail\.test/)).toBeInTheDocument();
-  const current = screen.getByText('Chrome trên Windows').closest('[role="listitem"]')!;
+  const current = screen.getByText('Chrome trên Windows').closest<HTMLElement>('[role="listitem"]')!;
   expect(within(current).getByText('Phiên hiện tại')).toBeInTheDocument();
   expect(within(current).queryByRole('button')).toBeNull();
-  expect(within(screen.getByText('Safari trên iOS').closest('[role="listitem"]')!).getByRole('button', { name: 'Đăng xuất phiên này' })).toBeEnabled();
+  expect(within(screen.getByText('Safari trên iOS').closest<HTMLElement>('[role="listitem"]')!).getByRole('button', { name: 'Đăng xuất phiên này' })).toBeEnabled();
   expect(screen.getByText(/nhờ quản trị viên khóa tài khoản/)).toBeInTheDocument();
 });
 

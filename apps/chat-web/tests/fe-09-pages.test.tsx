@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../src/App';
+import { AccountPage } from '../src/pages/Account/AccountPage';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 
@@ -63,4 +64,52 @@ it('loads own history by title and cursor, opens the saved route, and preserves 
   expect(screen.getByRole('link', { name: 'Mở hội thoại' })).toHaveAttribute('href', '/c/c1');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Tiêu đề' } });
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Tiêu đề', cursor: undefined })));
+});
+it('shows the API email-configuration 503 and leaves the candidate pending without a success notice', async () => {
+  window.history.replaceState({}, '', '/admin/users');
+  const candidate = { ...user, id: 'p1', name: 'Candidate', email: 'candidate@example.test', role: 'member' as const, status: 'pending' as const, emailVerified: true, hasPassword: true, hasGoogle: false, createdAt: '2026-10-01', openSessions: 0 };
+  vi.spyOn(apiClient, 'getAdminUsers').mockResolvedValue({ users: [candidate], total: 1, pendingCount: 1, page: 1, limit: 20 });
+  vi.spyOn(apiClient, 'changeAdminUser').mockRejectedValue(Object.assign(new Error('Chưa cấu hình email thông báo duyệt tài khoản.'), { status: 503, data: { code: 'APPROVAL_EMAIL_UNAVAILABLE', error: 'Chưa cấu hình email thông báo duyệt tài khoản.' } }));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: /Duyệt & kích hoạt/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Xác nhận duyệt/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Chưa cấu hình email thông báo duyệt tài khoản.');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(document.querySelector('#pending-list-container')).toHaveTextContent(candidate.email);
+  expect(screen.queryByText('Đã duyệt. Hệ thống gửi email báo cho người dùng.')).toBeNull();
+});
+it('releases saving after a search changes while an older rename response is pending', async () => {
+  window.history.replaceState({}, '', '/history');
+  vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [conversation] });
+  let finish!: (value: any) => void;
+  vi.spyOn(apiClient, 'renameConversation').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: /Đổi tên/ }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' }), { target: { value: 'Old request' } });
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' }), { key: 'Enter' });
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Changed search' } });
+  fireEvent.click(await screen.findByRole('button', { name: /Đổi tên/ }));
+  await act(async () => finish({ conversation: { ...conversation, title: 'Old request' } }));
+  expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled();
+  expect(screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' })).toHaveValue(conversation.title);
+});
+it('shows the supported fallback for a conversation whose title is not yet set', async () => {
+  window.history.replaceState({}, '', '/history');
+  vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [{ ...conversation, title: null }] });
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Hội thoại mới' })).toBeInTheDocument();
+});
+it('releases the account action lock after a user change while an older name save is pending', async () => {
+  let finish!: (value: any) => void;
+  vi.spyOn(apiClient, 'updateAccountName').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const props = { navigate: vi.fn(), onLogout: vi.fn() };
+  const view = render(<AccountPage {...props} user={user} />);
+  fireEvent.change(await screen.findByLabelText(/Họ và tên/), { target: { value: 'Old name request' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi họ tên' }));
+  const next = { ...user, id: 'u2', name: 'Other User' };
+  authStorage.setStoredTokens({ accessToken: 'next', refreshToken: 'next', user: next });
+  view.rerender(<AccountPage {...props} user={next} />);
+  await act(async () => finish({ user: { ...user, name: 'Old name request' } }));
+  expect(screen.getByRole('button', { name: 'Lưu thay đổi họ tên' })).toBeEnabled();
+  expect(authStorage.getStoredTokens().user?.id).toBe('u2');
 });
