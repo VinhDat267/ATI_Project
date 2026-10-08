@@ -53,15 +53,24 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await page.locator('html').getAttribute('data-proto-page')).toBe('settings');
   });
 }
-test('FE-07: member sees locked keys and chips but can check a configured service', async ({ browser }) => {
+test('FE-07: member sees locked keys and chips but can check a configured service', async ({ browser, request }) => {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL }); const id = randomUUID(), email = `fe07-${id}@localhost.test`, password = 'FE07-member-sandbox-only';
   const context = await browser.newContext(); const page = await context.newPage();
   try {
+    // Seed this case through the real API so --grep needs no earlier admin test.
+    const auth = await request.post('/api/auth/login', { data: { email: process.env.CHAT_ADMIN_EMAIL!, password: process.env.CHAT_ADMIN_PASSWORD! } });
+    expect(auth.status()).toBe(200);
+    const seeded = await request.post('/api/services/notion/credentials', {
+      headers: { Authorization: `Bearer ${(await auth.json()).accessToken}` },
+      data: { credentials: { token: 'synthetic-fe07-notion-token' }, allowedScope: ['11111111111141118111111111111111'] },
+    });
+    expect(seeded.status()).toBe(200);
     await db.query("INSERT INTO users(id,email,password,name,status,role,email_verified) VALUES($1,$2,$3,'FE07 Member','active','member',true)", [id, email, hashPassword(password)]);
     await login(page, email, password); await page.goto('/settings#notion'); const dialog = page.getByRole('dialog', { name: 'Notion' }); await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel('Internal integration token', { exact: true })).toBeDisabled(); await expect(dialog.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
     await expect(dialog.locator('#drawer-member-warning')).toContainText('Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm.');
     await expect(dialog.getByRole('button', { name: /^Xoá mục/ })).toHaveCount(0); await expect(dialog.locator('#new-scope-input')).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Kiểm tra kết nối', exact: true })).toBeEnabled();
     await dialog.getByRole('button', { name: 'Kiểm tra kết nối', exact: true }).click(); await expect(dialog.locator('#test-result-box')).toContainText(/bị từ chối|Không thể xác nhận|Kiểm tra kết nối thất bại|10 giây/);
     await expect(dialog.locator('#drawer-header-status-badge')).toContainText('Không kết nối được');
   } finally { await context.close(); await db.query('DELETE FROM users WHERE id=$1', [id]); await db.end(); }

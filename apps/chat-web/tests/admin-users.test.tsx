@@ -79,7 +79,7 @@ it('searches within the pending tab and keeps server rejection visible without o
 it('shows the login page when a subsequent API request revokes the authenticated session', async () => {
   window.history.replaceState({}, '', '/');
   vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
-  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [] });
+  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [], canConfigure: false });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [] });
   render(<App />);
   await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });

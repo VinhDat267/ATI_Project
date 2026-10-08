@@ -36,7 +36,7 @@ beforeEach(async () => {
           { key: 'token', label: 'Token', type: 'password' },
         ],
       };
-      res.end(JSON.stringify({ services: [service] }));
+      res.end(JSON.stringify({ services: [service], canConfigure: true }));
       return;
     }
     if (req.method === 'POST' && req.url === '/api/services/demo/credentials') {

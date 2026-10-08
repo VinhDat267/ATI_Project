@@ -8,6 +8,7 @@ type Draft = { credentials: Record<string, string>; scopes: string[]; newScope: 
 type Feedback = { kind: 'saved' | 'success' | 'rejected' | 'timeout'; message: string; time: string };
 export function useSettings(user: User | null) {
   const [services, setServices] = useState<ServiceInfo[]>([]);
+  const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -18,7 +19,6 @@ export function useSettings(user: User | null) {
   const [keyHelpOpen, setKeyHelpOpen] = useState(false);
   const epoch = useRef(0), read = useRef(0), pending = useRef(new Set<string>());
   const controllers = useRef(new Set<AbortController>());
-  const canEdit = user?.role === 'admin';
   const list = services.map(serviceView);
   const active = list.find(s => s.id === selected);
   const draft = active ? drafts[active.id] ?? { credentials: {}, scopes: active.allowedScope ?? [], newScope: '' } : null;
@@ -28,13 +28,13 @@ export function useSettings(user: User | null) {
     try {
       const data = await apiClient.getServices();
       if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
-      if (owner === epoch.current && request === read.current) { setServices(data.services); setLoadError(null); }
+      if (owner === epoch.current && request === read.current) { setServices(data.services); setCanEdit(data.canConfigure === true); setLoadError(null); }
     } catch (error) {
       if (owner === epoch.current && request === read.current) setLoadError(userErrorMessage(error));
     } finally { if (owner === epoch.current && request === read.current) setLoading(false); }
   }, []);
   useEffect(() => {
-    epoch.current++; setServices([]); setDrafts({}); setErrors({}); setResults({}); setBusy({}); pending.current.clear(); setLoading(true); void refresh();
+    epoch.current++; setServices([]); setCanEdit(false); setDrafts({}); setErrors({}); setResults({}); setBusy({}); pending.current.clear(); setLoading(true); void refresh();
     return () => { epoch.current++; read.current++; for (const controller of controllers.current) controller.abort(); controllers.current.clear(); };
   }, [user?.id, refresh]);
   const openServiceDrawer = useCallback((id: string) => { setSelected(id); setKeyHelpOpen(false); }, []);

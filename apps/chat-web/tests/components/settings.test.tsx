@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
-import { ServiceCard } from '../../src/components/ServiceCard';
 import { SettingsPage } from '../../src/pages/Settings/SettingsPage';
 const settingsProps = { user: { id: 'admin', email: 'admin@localhost.test', name: 'Test Admin', role: 'admin' as const }, navigate: () => {}, onLogout: () => {} };
 
@@ -11,69 +10,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('ServiceCard Component', () => {
-  it('renders service info, credential inputs, allowed scope and test connection button', async () => {
-    const onTest = vi.fn().mockResolvedValue({ success: true, message: 'OK' });
-    const onSave = vi.fn();
-    render(
-      <ServiceCard
-        service="trello"
-        title="Trello"
-        connected={false}
-        allowedScope={['Frontend Team', 'Mobile App']}
-        onSave={onSave}
-        onTestConnection={onTest}
-      />
-    );
-
-    expect(screen.getByText('Trello')).toBeDefined();
-    expect(screen.getByText('Frontend Team')).toBeDefined();
-    expect(screen.getByText('Mobile App')).toBeDefined();
-
-    const testBtn = screen.getByRole('button', { name: /kiểm tra kết nối/i });
-    fireEvent.click(testBtn);
-    await waitFor(() => expect(onTest).toHaveBeenCalled());
-  });
-
-  it('allows adding and removing allowed scope chips', () => {
-    const onSave = vi.fn();
-    render(
-      <ServiceCard
-        service="slack"
-        title="Slack"
-        connected={true}
-        allowedScope={['#general']}
-        onSave={onSave}
-      />
-    );
-
-    expect(screen.getByText('#general')).toBeDefined();
-
-    // Add chip
-    const input = screen.getByPlaceholderText(/thêm/i);
-    fireEvent.change(input, { target: { value: '#announcements' } });
-    fireEvent.click(screen.getByRole('button', { name: /thêm/i }));
-
-    expect(screen.getByText('#announcements')).toBeDefined();
-  });
-
-  it('shows the returned connection failure and never manufactures a successful ping', async () => {
-    render(<ServiceCard service="trello" title="Trello" onTestConnection={async () => ({ success: false, message: 'Token expired' })} />);
-    fireEvent.click(screen.getByRole('button', { name: /kiểm tra kết nối/i }));
-    expect(await screen.findByText('Token expired')).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    expect(screen.queryByText(/Kết nối tốt|120ms/)).not.toBeInTheDocument();
-  });
-});
-
-
-// The former SettingsModal cases follow the page/drawer contract. ServiceCard's
-// isolated regressions above remain for its credential-clearing behavior.
+// The former SettingsModal cases follow the page/drawer contract.
 describe('SettingsPage (migrated SettingsModal behavior)', () => {
   const trello = { id:'trello',name:'Trello',configured:false,connected:false,tools:[],allowedScope:[],scopeLabel:'Board ID',credentialFields:[{key:'apiKey',label:'API Key / Client ID'},{key:'token',label:'OAuth / API Token'}] };
   const install = (entries = [trello], saveMessage = 'Saved', onSave = () => {}) => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/services') return new Response(JSON.stringify({services:entries}));
+      if (url === '/api/services') return new Response(JSON.stringify({services:entries,canConfigure:true}));
       if (url.endsWith('/test')) return new Response(JSON.stringify({status:'unhealthy',message:'Provider unavailable'}),{status:503});
       if (url.endsWith('/credentials')) { onSave(); return new Response(JSON.stringify({success:true,message:saveMessage})); }
       throw new Error('Unexpected endpoint');

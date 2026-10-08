@@ -37,7 +37,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   const checks = new Map<string, { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }>();
 
   // GET /api/services
-  router.get('/', async (_req: Request, res: Response): Promise<void> => {
+  router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
       const services = await Promise.all(getRegisteredServices().map(async definition => {
         const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
@@ -58,7 +58,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           allowedScope: Array.isArray(entries) ? entries : [],
         };
       }));
-      res.status(200).json({ services });
+      res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds) });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });
     }

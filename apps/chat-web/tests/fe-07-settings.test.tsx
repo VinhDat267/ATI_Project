@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
+import { apiClient } from '../src/services/api-client';
 import type { ServiceInfo, User } from '../src/types';
 import { readFileSync } from 'node:fs';
 
@@ -21,6 +22,7 @@ let flushTestHeaders: boolean;
 let requestSignal: AbortSignal | undefined;
 let holdCatalogue: boolean;
 let catalogueStatus: number;
+let canConfigure: boolean | undefined;
 let releaseCatalogue: () => void;
 const service = (id: string, configured = false): ServiceInfo => ({
   id, name: id === 'github' ? 'GitHub' : id === 'notion' ? 'Notion' : id,
@@ -32,7 +34,7 @@ beforeEach(async () => {
   window.history.replaceState({}, '', '/settings'); localStorage.clear();
   services = [service('github'), service('notion', true)]; calls = [];
   holdSave = false; holdTest = false; flushTestHeaders = false; requestSignal = undefined; saveStatus = 200; testStatus = 'healthy'; testMessage = 'Sandbox verified';
-  holdCatalogue = false; catalogueStatus = 200;
+  holdCatalogue = false; catalogueStatus = 200; canConfigure = true;
   const gate = new Promise<void>(resolve => { releaseSave = resolve; });
   const catalogueGate = new Promise<void>(resolve => { releaseCatalogue = resolve; });
   server = createServer(async (req, res) => {
@@ -42,7 +44,7 @@ beforeEach(async () => {
     if (req.url === '/api/services') {
       if (holdCatalogue) await catalogueGate;
       res.statusCode = catalogueStatus;
-      res.end(JSON.stringify(catalogueStatus === 200 ? { services } : { error: 'offline' })); return;
+      res.end(JSON.stringify(catalogueStatus === 200 ? { services, canConfigure } : { error: 'offline' })); return;
     }
     const found = services.find(s => req.url?.startsWith(`/api/services/${s.id}/`));
     if (!found) { res.statusCode = 404; res.end('{}'); return; }
@@ -67,10 +69,36 @@ beforeEach(async () => {
     return nativeFetch(typeof input === 'string' && input.startsWith('/') ? `${origin}${input}` : input, init);
   });
 });
-afterEach(async () => { releaseSave(); releaseCatalogue(); cleanup(); vi.unstubAllGlobals(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+afterEach(async () => { releaseSave(); releaseCatalogue(); cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
 const mount = (user = admin) => render(<SettingsPage user={user} navigate={() => {}} onLogout={() => {}} />);
 const open = async (name = 'GitHub') => { fireEvent.click(await screen.findByRole('button', { name: new RegExp(`${name} —`) })); return screen.findByRole('dialog', { name }); };
 const addScope = (value = 'owner/repo') => { fireEvent.change(screen.getByLabelText('Thêm Repository'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
+
+it('uses field placeholders for Jira site and email without suggesting a secret', async () => {
+  services = [{ ...service('jira'), name: 'Jira', credentialFields: [
+    { key: 'siteUrl', label: 'Site URL', type: 'text' },
+    { key: 'email', label: 'Email Atlassian', type: 'text' },
+    { key: 'apiToken', label: 'API token', type: 'password' },
+  ] }];
+  mount(); await open('Jira');
+  expect(screen.getByLabelText('Site URL')).toHaveAttribute('placeholder', 'https://ten-site.atlassian.net');
+  expect(screen.getByLabelText('Email Atlassian')).toHaveAttribute('placeholder', 'user@company.com');
+  expect(screen.getByLabelText('API token')).toHaveAttribute('placeholder', 'Nhập khoá truy cập');
+});
+it.each(['sheets', 'calendar'])('uses field placeholders for %s service account email and PEM', async id => {
+  services = [{ ...service(id), credentialFields: [
+    { key: 'clientEmail', label: 'Email service account', type: 'text' },
+    { key: 'privateKey', label: 'Private key (PEM)', type: 'multiline' },
+  ] }];
+  mount(); await open(id);
+  expect(screen.getByLabelText('Email service account')).toHaveAttribute('placeholder', 'ati@ten-project.iam.gserviceaccount.com');
+  expect(screen.getByLabelText('Private key (PEM)')).toHaveAttribute('placeholder', 'Nhập khoá truy cập');
+});
+it.each(['password', 'multiline'] as const)('keeps field placeholders secret-neutral for %s even with a text hint', async type => {
+  services = [{ ...service('sheets'), credentialFields: [{ key: 'clientEmail', label: 'Secret', type }] }];
+  mount(); await open('sheets');
+  expect(screen.getByLabelText('Secret')).toHaveAttribute('placeholder', 'Nhập khoá truy cập');
+});
 
 it('does not claim catalogue counts or empty groups while the first catalogue request is loading', async () => {
   holdCatalogue = true; mount();
@@ -101,6 +129,23 @@ it('groups by configured, summarizes eight services and presents four textual st
   expect(screen.getByText('Không kết nối được')).toBeInTheDocument(); expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
   expect(within(document.getElementById('list-connected-services')!).getAllByRole('button')).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/Allowed Scope|Write Safety|Least Privilege|AES|Kịch bản demo|320 ms/);
+});
+it('places service buttons inside direct listitems in both configured groups without changing row classes', async () => {
+  mount(); await screen.findByRole('button', { name: /GitHub —/ });
+  for (const id of ['list-connected-services', 'list-unconnected-services']) {
+    const list = document.getElementById(id)!;
+    expect(list).toHaveAttribute('role', 'list');
+    expect(list).toHaveClass('v3-space-y-3');
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    for (const item of items) {
+      expect(item.parentElement).toBe(list);
+      expect(item).not.toHaveAttribute('class');
+      const button = within(item).getByRole('button');
+      expect(button.parentElement).toBe(item);
+      expect(button).toHaveClass('group', 'flex', 'flex-col', 'sm:flex-row', 'sm:items-center');
+    }
+  }
 });
 it.each(['admin', 'member'] as const)('blocks checks for unconfigured services for %s', async role => {
   mount({ ...admin, role }); const dialog = await open();
@@ -140,12 +185,44 @@ it('rejects a Jira site outside https atlassian.net', async () => {
   expect(document.getElementById('jira-siteUrl-format-hint')).toBeVisible(); expect(calls.filter(c => c.method !== 'GET')).toHaveLength(0);
 });
 it('locks member credentials and scopes but allows configured checks with live results', async () => {
+  canConfigure = false;
   mount({ ...admin, role: 'member' }); const dialog = await open('Notion');
   expect(within(dialog).getByLabelText('Token')).toBeDisabled(); expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   expect(within(dialog).queryByRole('button', { name: /^Xoá mục/ })).not.toBeInTheDocument();
   expect(within(dialog).getByText(/Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm/)).toBeVisible();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' }));
   expect(await screen.findByText(/Sandbox verified.*12 ms/)).toBeInTheDocument(); expect(document.getElementById('test-result-box')).toHaveAttribute('aria-live', 'polite');
+});
+
+it('allows an allowlisted member to configure using the API capability while retaining the member role label', async () => {
+  canConfigure = true; mount({ ...admin, role: 'member' }); const dialog = await open();
+  expect(within(screen.getByRole('banner', { hidden: true })).getByText('Thành viên')).toBeVisible();
+  expect(within(dialog).getByLabelText('Token')).toBeEnabled();
+  expect(within(dialog).getByLabelText('Thêm Repository')).toBeEnabled();
+  fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'synthetic-allowlisted-token' } }); addScope();
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
+  expect(calls.find(c => c.url.endsWith('/credentials'))?.body).toEqual({ credentials: { token: 'synthetic-allowlisted-token' }, allowedScope: ['owner/repo'] });
+  expect(screen.queryByText('Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm.')).not.toBeInTheDocument();
+});
+it.each([false, undefined])('uses the API capability instead of the admin role and fails closed when it is %s', async capability => {
+  canConfigure = capability; mount(); const dialog = await open('Notion');
+  expect(within(dialog).getByLabelText('Token')).toBeDisabled();
+  expect(within(dialog).getByLabelText('Thêm Repository')).toBeDisabled();
+  expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
+  expect(within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' })).toBeEnabled();
+  expect(within(screen.getByRole('banner', { hidden: true })).getByText('Quản trị viên')).toBeVisible();
+});
+it('ignores a previous user catalogue capability arriving after switching to an ordinary member', async () => {
+  let release!: (data: { services: ServiceInfo[]; canConfigure: boolean }) => void;
+  const held = new Promise<{ services: ServiceInfo[]; canConfigure: boolean }>(resolve => { release = resolve; });
+  const reads = vi.spyOn(apiClient, 'getServices').mockReturnValueOnce(held).mockResolvedValueOnce({ services, canConfigure: false });
+  const page = mount(); await waitFor(() => expect(reads).toHaveBeenCalledTimes(1));
+  page.rerender(<SettingsPage user={{ ...admin, id: 'ordinary-member', role: 'member' }} navigate={() => {}} onLogout={() => {}} />);
+  const dialog = await open('Notion');
+  await act(async () => { release({ services, canConfigure: true }); await held; });
+  expect(within(dialog).getByLabelText('Token')).toBeDisabled();
+  expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
 });
 it.each(['Token rejected', 'Không nhận được phản hồi sau 10 giây'])('announces real provider failure: %s', async message => {
   testStatus = 'unhealthy'; testMessage = message; mount(); const dialog = await open('Notion'); fireEvent.click(within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' }));
