@@ -135,7 +135,8 @@ test('FE-08: AUTH-04: root Google transfer is visible and a real late start cann
     starts++; const response = await route.fetch(); expect(response.status()).toBe(200);
     received(); await delivered; await route.fulfill({ response });
   });
-  await page.goto('/'); const opener = page.locator('[data-od-id="btn-hero-google"]');
+  const configuration = page.waitForResponse(response => response.url().endsWith('/api/auth/config'));
+  await page.goto('/'); await configuration; const opener = page.locator('[data-od-id="btn-hero-google"]');
   await opener.click(); await pending;
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);

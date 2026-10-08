@@ -107,11 +107,11 @@ it.each([
   opener.focus(); fireEvent.click(opener);
   await waitFor(() => expect(screen.getByLabelText(id.includes('signup') ? 'Họ tên' : 'Email', { exact: true })).toHaveFocus());
   if (method === 'forgot') {
-    fireEvent.click(screen.getByRole('tab', { name: 'Đăng nhập', exact: true }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Đăng nhập' }));
     fireEvent.click(screen.getByRole('button', { name: 'Quên mật khẩu?' }));
     await waitFor(() => expect(window.location.pathname).toBe('/forgot-password'));
   }
-  if (method === 'close') fireEvent.click(screen.getByRole('button', { name: 'Đóng cửa sổ', exact: true }));
+  if (method === 'close') fireEvent.click(screen.getByRole('button', { name: 'Đóng cửa sổ' }));
   else fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(window.location.pathname).toBe('/'));
   expect(container.querySelector(`[data-od-id="${id}"]`)).toHaveFocus();
