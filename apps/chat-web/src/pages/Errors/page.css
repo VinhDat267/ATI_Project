@@ -1,0 +1,33 @@
+/* <style> của errors.html, giữ nguyên thứ tự. */
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --fg: #111827;
+      --border: #E7E7E2;
+      --accent: #FF5701;
+      --muted: #6B7280;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-display {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }

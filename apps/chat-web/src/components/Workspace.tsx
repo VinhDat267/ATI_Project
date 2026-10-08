@@ -11,6 +11,8 @@ import { useExecutionRecovery } from '../hooks/use-execution-recovery';
 import { useConversationHistory } from '../hooks/use-conversation-history';
 import { conversationPath, type AppRoute } from '../routes';
 import { NotFoundView } from '../views/NotFoundView';
+import { useNetworkStatus } from '../hooks/use-network-status';
+import { OfflineBanner } from '../pages/Errors/PlanningErrors';
 
 interface WorkspaceProps {
   authToken: string; user: User | null; authError: string | null;
@@ -36,6 +38,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [servicesError, setServicesError] = useState<string | null>(null);
   const [servicesLoading, setServicesLoading] = useState(false);
+  const [canConfigureServices, setCanConfigureServices] = useState(false);
   const currentRoute = useRef(route);
   currentRoute.current = route;
   const workspaceMounted = useRef(true);
@@ -57,9 +60,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     try {
       const data = await apiClient.getServices();
       if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
-      if (request === serviceRequest.current) { setServices(data.services); setServicesError(null); }
+      if (request === serviceRequest.current) { setServices(data.services); setCanConfigureServices(data.canConfigure === true); setServicesError(null); }
     } catch (error) {
-      if (request === serviceRequest.current) { setServices([]); setServicesError(userErrorMessage(error)); }
+      if (request === serviceRequest.current) { setServices([]); setCanConfigureServices(false); setServicesError(userErrorMessage(error)); }
     } finally { if (request === serviceRequest.current) setServicesLoading(false); }
   }, []);
 
@@ -74,7 +77,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
 
 
   // Activate SSE connection for current conversation
-  const { disconnected } = useSSE(conversationId, authToken);
+  const { disconnected, reconnect } = useSSE(conversationId, authToken);
+  const network = useNetworkStatus();
 
   // A message sent before "Cuộc hội thoại mới" gets its ID belongs to that conversation (FE-03b).
   const newConversation = useRef<Promise<string | null> | null>(null);
@@ -177,6 +181,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
       store.addMessage({
         id: `err-${Date.now()}`,
         role: 'system',
+        metadata: { type: 'planning_error' },
         content: `[Lỗi gửi tin nhắn]: ${userErrorMessage(err, 'Máy chủ từ chối yêu cầu')}`,
       });
     }
@@ -237,10 +242,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     <div className="workspace w-full min-w-0">
       <div className="min-w-0">
         {authError && <div role="alert" className="bg-warning-tint px-4 py-2 flex justify-between"><span>{authError}</span><button type="button" onClick={onClearAuthError} aria-label="Đóng thông báo đăng nhập">✕</button></div>}
-        {disconnected && <p role="status" className="bg-warning-tint px-4 py-2 text-warning-text">Mất kết nối, đang thử lại…</p>}
+        {(disconnected || network.offline) && <OfflineBanner busy={network.busy} onRetry={() => { void network.retry(); reconnect?.(); }} />}
         {actionError && <p role="alert" className="px-4 py-2 text-danger-text">{actionError}</p>}
         <div className="contents">
-          <Cockpit user={user} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError}
+          <Cockpit user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError}
             contentOverride={history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6">Đang tải hội thoại...</p> : undefined}
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
             onSelectConversation={id => navigate(conversationPath(id))} onSettings={() => navigate('/settings')}

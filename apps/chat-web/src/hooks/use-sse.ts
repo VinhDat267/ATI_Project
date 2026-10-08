@@ -237,7 +237,11 @@ export function handleSSEEvent(
       store.addMessage({
         id: `refusal_${Date.now()}`,
         role: 'assistant',
-          metadata: { type: 'refusal' },
+        metadata: { type: 'refusal',
+          reason: typeof data.reason === 'string' ? data.reason : undefined,
+          suggestion: typeof data.suggestion === 'string' ? data.suggestion : undefined,
+          unavailableServices: Array.isArray(data.unavailableServices) ? data.unavailableServices.filter((row: any) => row && typeof row.id === 'string' && row.id.trim() && typeof row.name === 'string' && row.name.trim()) : undefined,
+          requestId: data.requestId, replyToMessageId: data.replyToMessageId },
         content: `Từ chối yêu cầu: ${data.reason || 'Yêu cầu không được hỗ trợ'}${
           data.suggestion ? `\nGợi ý: ${data.suggestion}` : ''
         }`,
@@ -287,6 +291,7 @@ class StreamClientError extends Error {}
 
 export function useSSE(conversationId: string | null, token: string | null) {
   const [disconnected, setDisconnected] = useState(false);
+  const [retry, setRetry] = useState(0);
   const authRetry = useRef({ conversationId, refreshed: false });
   useEffect(() => {
     setDisconnected(false);
@@ -361,6 +366,6 @@ export function useSSE(conversationId: string | null, token: string | null) {
       },
     }).catch(() => { if (!ctrl.signal.aborted) markDisconnected(); });
     return () => { ctrl.abort(); if (timer) clearTimeout(timer); };
-  }, [conversationId, token]);
-  return { disconnected };
+  }, [conversationId, token, retry]);
+  return { disconnected, reconnect: () => setRetry(value => value + 1) };
 }

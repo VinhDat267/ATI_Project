@@ -3,6 +3,7 @@
 import type { KeyboardEvent, RefObject } from 'react';
 import { SERVICE_REGISTRY } from '@wap/tool-schemas';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { NoWritesNotice } from '../Responses/ResponseMoment';
 interface Props {
   question: string;
   context?: string;
@@ -230,6 +231,7 @@ export function ClarificationMoment({
           </button>
         </div>
       </form>
+      <NoWritesNotice />
     </section>
   );
 }
