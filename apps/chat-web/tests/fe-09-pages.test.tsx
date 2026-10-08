@@ -40,6 +40,23 @@ it('preserves a nonempty legacy whitespace password when confirming Google unlin
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xác nhận gỡ' }));
   await waitFor(() => expect(unlink).toHaveBeenCalledWith(password));
 });
+it.each([false, true])('keeps the password length meter consistent after success (new draft: %s)', async changedDraft => {
+  window.history.replaceState({}, '', '/account');
+  let finish!: (value: { message: string }) => void;
+  vi.spyOn(apiClient, 'changePassword').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  render(<App />);
+  fireEvent.change(await screen.findByLabelText(/^Mật khẩu hiện tại/), { target: { value: 'Current!password' } });
+  const input = screen.getByLabelText(/^Mật khẩu mới/);
+  const sent = 'Submitted!password-1';
+  fireEvent.change(input, { target: { value: sent } });
+  fireEvent.change(screen.getByLabelText(/Xác nhận mật khẩu mới/), { target: { value: sent } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cập nhật mật khẩu mới' }));
+  if (changedDraft) fireEvent.change(input, { target: { value: 'Draft' } });
+  await act(async () => finish({ message: 'ok' }));
+  expect(input).toHaveValue(changedDraft ? 'Draft' : '');
+  expect(screen.getByText(changedDraft ? '5/12 ký tự tối thiểu' : 'Ít nhất 12 ký tự')).toBeInTheDocument();
+  expect(parseFloat(document.getElementById('pass-strength-bar')!.style.width)).toBeCloseTo(changedDraft ? 5 / 12 * 100 : 0);
+});
 it('uses the source avatar classes and styled keyboard menu on the Account page', async () => {
   window.history.replaceState({}, '', '/account');
   render(<App />);

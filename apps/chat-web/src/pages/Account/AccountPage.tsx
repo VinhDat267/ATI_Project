@@ -3,7 +3,6 @@ import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { UserNavMenu, avatarInitials } from '../../components/layout/UserNavMenu';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import { useState } from 'react';
 import type { AccountSession } from '../../types';
 import { useAccount } from './useAccount';
 const UNLINK_ON = 'px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-red-200 rounded-xl transition-colors flex-shrink-0 self-start sm:self-center';
@@ -49,8 +48,7 @@ export const meta: PageMeta = {
 export interface AccountPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void }
 export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
   usePrototypePage(meta);
-  const { account, sessions, googleEnabled, name, setName, busy, error, notice, modal, shownPasswords, fullNameRef, currentPassRef, newPassRef, confirmPassRef, unlinkPassRef, actions } = useAccount(user);
-  const [passwordLength, setPasswordLength] = useState(0);
+  const { account, sessions, googleEnabled, name, setName, passwordLength, setPasswordLength, busy, error, notice, modal, shownPasswords, fullNameRef, currentPassRef, newPassRef, confirmPassRef, unlinkPassRef, actions } = useAccount(user);
   const strength = { label: passwordLength ? `${passwordLength}/12 ký tự tối thiểu` : 'Ít nhất 12 ký tự', labelClass: 'text-xs font-medium text-[#6B7280]', width: `${Math.min(passwordLength / 12, 1) * 100}%`, barClass: 'h-full bg-neutral-400 transition-all duration-300' };
   const view = { fullName: account?.name ?? '', email: account?.email ?? '', role: account?.role, googleLinked: account?.hasGoogle, hasPassword: account?.hasPassword, googleEmail: account?.googleEmail };
   const cards = sessions.filter(session => !session.current), currentSession = sessions.find(session => session.current), sessionCount = cards.length;

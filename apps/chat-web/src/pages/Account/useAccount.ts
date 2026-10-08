@@ -9,6 +9,7 @@ type ModalId = 'modal-revoke-all' | 'modal-unlink-google';
 export function useAccount(user: User | null) {
   const [account, setAccount] = useState<AccountProfile | null>(null), [sessions, setSessions] = useState<AccountSession[]>([]);
   const [googleEnabled, setGoogleEnabled] = useState(false), [name, setName] = useState('');
+  const [passwordLength, setPasswordLength] = useState(0);
   const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalId | null>(null), [shownPasswords, setShownPasswords] = useState<string[]>([]);
   const fullNameRef = useRef<HTMLInputElement>(null), currentPassRef = useRef<HTMLInputElement>(null), newPassRef = useRef<HTMLInputElement>(null), confirmPassRef = useRef<HTMLInputElement>(null), unlinkPassRef = useRef<HTMLInputElement>(null);
@@ -58,6 +59,7 @@ export function useAccount(user: User | null) {
         await apiClient.changePassword(current, next);
         if (owner !== generation.current) return;
         for (const [ref, submitted] of [[currentPassRef, current], [newPassRef, next], [confirmPassRef, repeat]] as const) if (ref.current?.value === submitted) ref.current.value = '';
+        setPasswordLength(newPassRef.current?.value.length ?? 0);
         await load(owner); return 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.';
       });
     },
@@ -87,5 +89,5 @@ export function useAccount(user: User | null) {
     }); },
     closeModal,
   };
-  return { account, sessions, googleEnabled, name, setName, busy, error, notice, modal, shownPasswords, fullNameRef, currentPassRef, newPassRef, confirmPassRef, unlinkPassRef, actions };
+  return { account, sessions, googleEnabled, name, setName, passwordLength, setPasswordLength, busy, error, notice, modal, shownPasswords, fullNameRef, currentPassRef, newPassRef, confirmPassRef, unlinkPassRef, actions };
 }

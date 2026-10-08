@@ -136,6 +136,38 @@ test('FE-09: exact legacy whitespace password reaches real Google unlink verific
   }
 });
 
+test('FE-09: password length meter follows cleared fields and preserves a newer draft after real success', async ({ page }) => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const email = `fe09-password-meter-${randomUUID()}@example.test`;
+  let id: string | undefined;
+  try {
+    id = (await db.query("INSERT INTO users(email,password,name,status,email_verified) VALUES($1,$2,'Password Meter','active',true) RETURNING id", [email, hashPassword(password)])).rows[0].id;
+    await session(page, email); await page.goto('/account');
+    const current = page.getByLabel('Mật khẩu hiện tại', { exact: true }), next = page.getByLabel('Mật khẩu mới', { exact: true }), repeat = page.getByLabel('Xác nhận mật khẩu mới', { exact: true });
+    const first = 'FirstChanged!password', second = 'SecondChanged!password';
+    await current.fill(password); await next.fill(first); await repeat.fill(first);
+    await page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true }).click();
+    await expect(page.getByRole('main').getByRole('status')).toContainText('Đã đổi mật khẩu.');
+    await expect(next).toHaveValue(''); await expect(page.locator('#pass-strength-label')).toHaveText('Ít nhất 12 ký tự');
+    expect(await page.locator('#pass-strength-bar').evaluate(element => parseFloat(element.style.width))).toBe(0);
+    expect((await page.request.post('/api/auth/login', { data: { email, password: first } })).status()).toBe(200);
+    let release!: () => void, ready!: () => void;
+    const held = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => ready = resolve);
+    await page.route('**/api/account/change-password', async route => {
+      const response = await route.fetch(); expect(response.status()).toBe(200); ready(); await held; await route.fulfill({ response });
+    });
+    try {
+      await current.fill(first); await next.fill(second); await repeat.fill(second);
+      await page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true }).click(); await started;
+      await next.fill('Draft'); release();
+      await expect(page.getByRole('button', { name: 'Cập nhật mật khẩu mới', exact: true })).toBeEnabled();
+      await expect(next).toHaveValue('Draft'); await expect(page.locator('#pass-strength-label')).toHaveText('5/12 ký tự tối thiểu');
+      expect(await page.locator('#pass-strength-bar').evaluate(element => parseFloat(element.style.width))).toBeCloseTo(5 / 12 * 100);
+      expect((await page.request.post('/api/auth/login', { data: { email, password: second } })).status()).toBe(200);
+    } finally { release(); }
+  } finally { if (id) await db.query('DELETE FROM users WHERE id=$1', [id]); await db.end(); }
+});
+
 test('FE-09: actual approval HTTP 503 remains visible and preserves the pending account', async ({ page }, info) => {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const email = `fe09-no-email-${randomUUID()}@example.test`;
