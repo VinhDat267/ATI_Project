@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 for (const theme of ['light','dark'] as const) for (const width of [1440,375]) {
   test(`FE-05: real sandbox request approval receipt and accessible dialogs ${theme} ${width}`, async ({page},info) => {
     await page.setViewportSize({width,height:900}); await page.emulateMedia({colorScheme:theme});
-    await page.goto('/login'); await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!); await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!); await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+    await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!); await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!); await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
     const input=page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await expect(input).toBeVisible(); await expect(page.locator('textarea:visible')).toHaveCount(1); await expect(page.getByText('Yêu cầu hiện tại',{exact:true})).toBeHidden();
     const overflow = async () => { const measured=await page.evaluate(()=>{const main=document.querySelector<HTMLElement>('#stage-container')!; return {scroll:document.documentElement.scrollWidth,viewport:window.innerWidth,mainScroll:main.scrollWidth,mainClient:main.clientWidth}; }); expect(measured.scroll).toBeLessThanOrEqual(measured.viewport); expect(measured.mainScroll).toBeLessThanOrEqual(measured.mainClient); return measured; };

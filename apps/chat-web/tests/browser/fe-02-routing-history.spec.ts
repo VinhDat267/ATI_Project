@@ -8,7 +8,7 @@ const pool = () => new pg.Pool({ connectionString: process.env.DATABASE_URL });
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
-  await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -20,7 +20,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await page.goto('/');
     await page.getByRole('button', { name: 'Đăng nhập vào hệ thống' }).click(); await expect(page).toHaveURL(/\/login$/);
     await page.goBack(); await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeVisible();
-    await page.goForward(); await expect(page.getByLabel('Email')).toBeVisible();
+    await page.goForward(); await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
     await login(page); await expect(page).toHaveURL(/\/$/);
     const userId = await owner(db);
     const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [userId, 'FE02 direct saved'])).rows[0].id;

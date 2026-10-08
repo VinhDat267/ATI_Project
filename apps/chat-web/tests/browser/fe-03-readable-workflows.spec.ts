@@ -5,7 +5,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!email || !password || !connectionString) throw new Error('FE-03 browser requires provisioned local test account and database');
 async function login(page: Page) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email!); await page.getByLabel('Mật khẩu').fill(password!);
+  await page.getByLabel('Email', { exact: true }).fill(email!); await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeVisible();
 }

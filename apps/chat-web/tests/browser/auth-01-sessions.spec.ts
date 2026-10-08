@@ -6,8 +6,8 @@ const password = process.env.CHAT_ADMIN_PASSWORD!;
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Đăng nhập vào hệ thống' }).click();
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
   return page.evaluate(() => ({ access: localStorage.getItem('wap_access_token')!, refresh: localStorage.getItem('wap_refresh_token')! }));
