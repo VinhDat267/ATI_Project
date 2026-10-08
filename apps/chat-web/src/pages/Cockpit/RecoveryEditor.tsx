@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getToolDefinition } from '@wap/tool-schemas';
 import { CockpitDialog } from '../../components/CockpitDialog';
+import { recoveryFieldLabel } from './recovery-labels';
 
 export function RecoveryEditor({tool,stepArgs,prompt,busy,onClose,onSubmit}:{tool:string;stepArgs?:Record<string,unknown>;prompt?:string;busy:boolean;onClose:()=>void;onSubmit:(args:Record<string,unknown>,prompt?:string)=>void}) {
   const schema=getToolDefinition(tool)?.inputSchema as { properties?: Record<string,{description?:string;type?:string}>;required?:string[] } | undefined;
@@ -31,7 +32,7 @@ if(!result || typeof result!=='object' || Array.isArray(result))throw new Error(
   return <CockpitDialog title="Sửa rồi thử lại" returnFocusId="btn-recovery-edit" onClose={()=>{if(!busy){if(confirm)setConfirm(false);else onClose();}}}>
     <form className="p-5 v3-space-y-4 text-sm" onSubmit={event=>{event.preventDefault();const result=parse();if(!result)return;if(!confirm)setConfirm(true);else onSubmit(result,promptText || undefined);}}>
       <p>Để sửa tham số, cần dừng kế hoạch cũ và lập kế hoạch mới. Chưa có lệnh ghi nào chạy cho tới khi bạn duyệt lại.</p>
-      {schema ? Object.entries(schema.properties ?? {}).map(([key,property])=><label key={key} className="block v3-space-y-1"><span>{property.description || key}</span><textarea aria-label={property.description || key} required={schema.required?.includes(key)} disabled={busy || confirm} className="block w-full rounded-xl border border-brand-border p-3 bg-white text-brand-text" value={fieldText[key] ?? (typeof args[key]==='string'?args[key] as string:JSON.stringify(args[key] ?? ''))} onChange={event=>{
+      {schema ? Object.entries(schema.properties ?? {}).map(([key,property])=><label key={key} className="block v3-space-y-1"><span>{recoveryFieldLabel(tool,key,property.description)}</span><textarea aria-label={recoveryFieldLabel(tool,key,property.description)} required={schema.required?.includes(key)} disabled={busy || confirm} className="block w-full rounded-xl border border-brand-border p-3 bg-white text-brand-text" value={fieldText[key] ?? (typeof args[key]==='string'?args[key] as string:JSON.stringify(args[key] ?? ''))} onChange={event=>{
         setFieldText(current=>({...current,[key]:event.target.value}));
       }}/></label>) : <label className="block v3-space-y-1"><span>Tham số thực thi (JSON)</span><textarea aria-label="Tham số thực thi" value={json} disabled={busy || confirm} onChange={event=>setJson(event.target.value)} className="block w-full rounded-xl border border-brand-border p-3 font-mono bg-white text-brand-text"/></label>}
       <label className="block v3-space-y-1"><span>Ghi chú thêm (không bắt buộc)</span><textarea value={promptText} disabled={busy || confirm} onChange={event=>setPrompt(event.target.value)} className="block w-full rounded-xl border border-brand-border p-3 bg-white text-brand-text"/></label>

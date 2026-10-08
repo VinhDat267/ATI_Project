@@ -1,0 +1,28 @@
+{
+  "common": {
+    "query": "Từ khóa tìm kiếm", "limit": "Số kết quả tối đa", "title": "Tiêu đề",
+    "description": "Mô tả", "content": "Nội dung", "text": "Nội dung tin nhắn",
+    "properties": "Các thuộc tính", "url": "Liên kết", "id": "Mã định danh",
+    "name": "Tên", "fullName": "Tên đầy đủ", "number": "Số thứ tự"
+  },
+  "services": {
+    "sheets": { "spreadsheetId": "ID bảng tính", "sheet": "Tên trang tính", "rows": "Các dòng cần thêm", "range": "Vùng ô" },
+    "calendar": { "calendarId": "ID lịch", "summary": "Tiêu đề sự kiện", "start": "Thời gian bắt đầu", "end": "Thời gian kết thúc", "location": "Địa điểm", "timeMin": "Thời gian bắt đầu tìm kiếm", "timeMax": "Thời gian kết thúc tìm kiếm" },
+    "notion": { "databaseId": "ID cơ sở dữ liệu Notion", "pageId": "ID trang Notion" },
+    "telegram": { "chatId": "ID cuộc trò chuyện Telegram" },
+    "jira": { "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "issueType": "Loại công việc", "body": "Nội dung bình luận" },
+    "github": { "repo": "Kho mã nguồn GitHub", "issueNumber": "Số công việc GitHub", "body": "Nội dung công việc", "labels": "Các nhãn", "label": "Nhãn" }
+  },
+  "outputs": {
+    "html_url": "liên kết", "webUrl": "liên kết", "key": "mã công việc",
+    "ts": "mốc thời gian tin nhắn", "timestamp": "mốc thời gian", "channel": "kênh nhận tin",
+    "start": "thời gian bắt đầu", "end": "thời gian kết thúc", "timeZone": "múi giờ",
+    "spreadsheetId": "ID bảng tính", "updatedRange": "vùng ô đã cập nhật", "updatedRows": "số dòng đã cập nhật",
+    "pageId": "ID trang Notion", "blockIds": "các ID khối nội dung", "messageId": "ID tin nhắn",
+    "chatId": "ID cuộc trò chuyện", "date": "thời gian gửi", "issueKey": "mã công việc Jira",
+    "boardId": "ID bảng Trello", "listId": "ID danh sách Trello", "cardId": "ID thẻ Trello",
+    "memberId": "ID thành viên", "username": "tên người dùng", "email": "địa chỉ email",
+    "items": "các mục", "pages": "các trang", "events": "các sự kiện", "issues": "các công việc",
+    "labels": "các nhãn", "repo": "kho mã nguồn", "status": "trạng thái", "type": "loại"
+  }
+}
