@@ -1,0 +1,84 @@
+{
+  "startedAt": "2026-10-08T16:32:33.216Z",
+  "requestedModel": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "concurrency": 2,
+  "campaigns": [
+    {
+      "group": "control",
+      "set": "core",
+      "runs": 1,
+      "startedAt": "2026-10-08T16:32:33.218Z",
+      "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+      "exitCode": 0,
+      "endedAt": "2026-10-08T16:36:06.857Z"
+    },
+    {
+      "group": "control",
+      "set": "services",
+      "runs": 1,
+      "startedAt": "2026-10-08T16:36:06.862Z",
+      "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+      "exitCode": 2,
+      "endedAt": "2026-10-08T16:38:50.248Z"
+    },
+    {
+      "group": "diagnostic",
+      "set": "services",
+      "runs": 1,
+      "concurrency": 1,
+      "subset": [
+        "ca04"
+      ],
+      "sourceCommit": "5afc0a7f7a0168abb3776400394ea6edcedd2b3a",
+      "startedAt": "2026-10-08T16:40:05.029Z",
+      "endedAt": "2026-10-08T16:40:21.534Z",
+      "exitCode": 0,
+      "note": "One-case diagnostic after interrupted control; excluded from acceptance and all arm comparisons."
+    },
+    {
+      "group": "after",
+      "set": "core",
+      "runs": 3,
+      "startedAt": "2026-10-08T16:44:41.561Z",
+      "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+      "exitCode": 0,
+      "endedAt": "2026-10-08T16:55:18.342Z"
+    },
+    {
+      "group": "after",
+      "set": "freeform",
+      "runs": 3,
+      "startedAt": "2026-10-08T16:55:18.357Z",
+      "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+      "exitCode": 0,
+      "endedAt": "2026-10-08T17:00:52.259Z"
+    },
+    {
+      "group": "after",
+      "set": "services",
+      "runs": 3,
+      "startedAt": "2026-10-08T17:00:52.267Z",
+      "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+      "exitCode": 0,
+      "endedAt": "2026-10-08T17:12:19.521Z"
+    },
+    {
+      "group": "control",
+      "set": "services",
+      "runs": 1,
+      "startedAt": "2026-10-08T17:13:19.919Z",
+      "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+      "exitCode": 0,
+      "endedAt": "2026-10-08T17:18:52.947Z"
+    }
+  ],
+  "resumeReason": "ca04 diagnostic received a completion at concurrency1 after control timeout; corrected campaigns each attempted once at concurrency2",
+  "resumeReasons": [
+    "ca04 diagnostic received a completion at concurrency1 after control timeout; corrected campaigns each attempted once at concurrency2",
+    "Fresh independent services control after completed corrected campaigns demonstrate provider completions; retain prior interrupted17/44 separately, no pooled samples"
+  ],
+  "endedAt": "2026-10-08T17:18:52.947Z",
+  "scope": "Planning only on synthetic fixtures. Sequential campaigns, concurrency2 except ca04 diagnostic1; unchanged model/deadline/retry and local9router configuration. UTC08/10 spans evening08/10 and early09/10 Asia/Saigon.",
+  "selection": "Latest independently complete core/services controls compared with three complete corrected runs. Earlier17/44 control and diagnostic kept separate, never pooled."
+}

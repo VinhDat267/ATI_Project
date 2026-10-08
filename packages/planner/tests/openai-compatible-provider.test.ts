@@ -86,13 +86,15 @@ describe('OpenAICompatibleProvider', () => {
     expect(provider.lastServedModel).toBe('gemini-3.8-flash');
   });
 
-  it('accepts the user-confirmed 9router flash-n alias without changing the request', async () => {
+  it('accepts the user-confirmed 9router flash-n alias without changing the request or metrics', async () => {
     const { fetchFn, calls } = scriptedFetch([completion('{}', 'gemini-3.8-flash-n')]);
     const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
     await expect(provider.generatePlan(input)).resolves.toBe('{}');
     expect(calls).toHaveLength(1);
     expect(calls[0]!.body.model).toBe('ag/gemini-3.8-flash');
     expect(provider.lastServedModel).toBe('gemini-3.8-flash-n');
+    expect(provider.lastCallMetrics?.servedModel).toBe('gemini-3.8-flash-n');
+    expect(provider.lastCallMetrics?.attempts[0]?.outcome).toBe('success');
   });
 
   it.each(['gemini-3.8-flash-other', 'gemini-3.8-pro-n'])('still rejects unconfirmed alias %s', async served => {

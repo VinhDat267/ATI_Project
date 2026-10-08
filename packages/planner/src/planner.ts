@@ -1,5 +1,5 @@
 import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule } from '@wap/tool-schemas';
-import type { LLMProvider, ChatMessage } from './types.js';
+import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
 import { validatePlan } from './validator.js';
@@ -56,6 +56,10 @@ export interface ProcessMessageInput {
   memory: WorkingMemory;
   signal?: AbortSignal;
   onGatherEvent?: (event: GatherEvent) => void;
+  /** Optional diagnostics, independent of product/SSE events. */
+  onTiming?: (metrics: PlanningPhaseMetrics) => void;
+  /** Internal turn clock forwarded through all phases. */
+  timingStarted?: number;
 }
 
 interface GatherCandidate { id: string; name: string; [key: string]: unknown }
@@ -95,7 +99,20 @@ function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
     ...(unavailable.length > 0 ? { unavailableServices: unavailable } : {}) };
 }
 
+function readOnlyQuestion(): PlannerResponse {
+  return { kind: 'clarification', question: 'Bạn muốn làm gì với dữ liệu này, chẳng hạn gửi thông báo, ghi vào bảng tính hoặc tạo công việc?',
+    context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.' };
+}
+
 export class AIPlanner {
+  private async measure<T>(phase: PlanningPhaseMetrics['phase'], input: ProcessMessageInput, work: () => Promise<T>): Promise<T> {
+    const started = performance.now();
+    try { return await work(); }
+    finally {
+      try { input.onTiming?.({ phase, startedAtMs: started - (input.timingStarted ?? started), durationMs: performance.now() - started }); }
+      catch { /* Diagnostics cannot change the planning result. */ }
+    }
+  }
   private provider: LLMProvider;
   private toolCatalog: ToolDefinition[];
   private gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
@@ -312,12 +329,15 @@ export class AIPlanner {
     const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
     if (activeTools.length === 0) return unroutable(route.unavailable);
 
-    if (this.prefetchDirectory && this.gatherSearch) await this.listDirectory(activeTools, input);
     if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
 
     const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch) });
     let searchRounds = 0;
     let rejectedPlans = 0;
+    if (this.prefetchDirectory && this.gatherSearch) {
+      await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
+      if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
+    }
     // Search rounds, one final answer, and one correction of a rejected plan.
     for (let call = 0; call < this.maxSearchRounds + 2; call++) {
       const output = await this.provider.generatePlan({
@@ -333,7 +353,7 @@ export class AIPlanner {
           conversation.push({ role: 'user', content: 'The search limit was reached, so no more searches are allowed. Answer now with a plan, or ask the user for what is still missing.' });
         } else {
           searchRounds++;
-          conversation.push({ role: 'user', content: formatSearchResults(await this.runSearches(request.calls, activeTools, input)) });
+          conversation.push({ role: 'user', content: formatSearchResults(await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input))) });
         }
         continue;
       }
@@ -342,6 +362,7 @@ export class AIPlanner {
         memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts,
       } } : {});
       if (validation.valid) return validation.parsed;
+      if (validation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
 
       if (++rejectedPlans > 1) {
         if (validation.layer === 'grounding' && validation.ungrounded) {
@@ -370,13 +391,14 @@ export class AIPlanner {
   }
 
   async processMessage(input: ProcessMessageInput): Promise<PlannerResponse> {
+    input = { ...input, timingStarted: performance.now() };
     if (this.searchMode === 'llm') return this.planWithSearch(input);
     const { userMessage, history = [], memory, signal } = input;
 
     // Gather may clear this key after resolving the answer; keep the original
     // workflow for both service routing and the final provider turn.
     const originalIntent = memory.getEntity<string>('__gatherIntent');
-    const gathered = await this.gather(input);
+    const gathered = await this.measure('gather', input, () => this.gather(input));
     if (gathered) return gathered;
     // This planning turn consumes a pending intent even when gather had nothing to resolve.
     memory.deleteEntity('__gatherIntent');
@@ -414,6 +436,7 @@ export class AIPlanner {
     if (firstValidation.valid) {
       return firstValidation.parsed;
     }
+    if (firstValidation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
 
     // 4. Attempt 2: Retry exactly 1x with feedback
     const feedbackTurn: ChatMessage[] = [
@@ -437,6 +460,7 @@ export class AIPlanner {
     if (retryValidation.valid) {
       return retryValidation.parsed;
     }
+    if (retryValidation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
 
     // Never preview a plan built on invented IDs; ask for the resources and
     // keep the original request so the answer resumes the same workflow.

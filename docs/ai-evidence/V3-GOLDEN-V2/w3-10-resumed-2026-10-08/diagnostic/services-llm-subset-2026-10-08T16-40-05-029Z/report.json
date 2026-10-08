@@ -1,0 +1,248 @@
+{
+  "evidence": "provider_observed",
+  "complete": true,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "services",
+  "searchMode": "llm",
+  "subset": [
+    "ca04"
+  ],
+  "labels": {
+    "file": "cases-services.json",
+    "commit": "795229e24c64a38902e7efdce0680c729f37348a",
+    "sha256": "6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372",
+    "version": 1,
+    "cases": 44,
+    "selectedCases": 1
+  },
+  "sourceCommit": "5afc0a7f7a0168abb3776400394ea6edcedd2b3a",
+  "sourceTrees": {
+    "packages/planner": "e1569288b07e8b2e56c10600008db192c6e33091",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 1,
+  "completedRuns": 1,
+  "attemptedCaseRuns": 1,
+  "plannedCaseRuns": 1,
+  "concurrency": 1,
+  "startedAt": "2026-10-08T16:40:05.029Z",
+  "runAt": "2026-10-08T16:40:21.534Z",
+  "stopped": false,
+  "pendingIds": [],
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": false
+  },
+  "serviceGate": {
+    "calendar": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0,
+        "toolSelectionAccuracy": null,
+        "argumentQuality": null,
+        "argumentMatcherRate": null,
+        "strictPassRate": 0
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0,
+      "toolSelectionAccuracy": null,
+      "argumentQuality": null,
+      "argumentMatcherRate": null,
+      "strictPassRate": 0
+    },
+    "byCategory": {
+      "clarification": {
+        "cases": 1,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {
+      "calendar": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 0,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 16500,
+          "p95": 16500
+        }
+      }
+    },
+    "stability": {
+      "ca04": "0/1"
+    },
+    "latencyMs": {
+      "p50": 16500,
+      "p95": 16500,
+      "max": 16500
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 1,
+    "attempts": 1,
+    "timeouts": 0,
+    "searchRounds": 0,
+    "directoryCalls": 1,
+    "attemptDistribution": {
+      "1": 1
+    },
+    "retryReasons": {},
+    "timeMs": {
+      "total": 16500,
+      "model": 16462.751399999997,
+      "prefetch": 1.6573999999999387,
+      "search": 0,
+      "gather": 0,
+      "other": 35.59120000000269
+    },
+    "timeShare": {
+      "model": 0.9977425090909089,
+      "prefetch": 0.00010044848484848113,
+      "search": 0,
+      "gather": 0,
+      "other": 0.002157042424242587
+    },
+    "under15Seconds": {
+      "count": 0,
+      "total": 1,
+      "rate": 0
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ca04",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 16500,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen because inviting attendees is unsupported by the calendar integration.",
+            "reason": "Google Calendar integration cannot invite participants or send invitations.",
+            "suggestion": "Schedule the meeting on the calendar and add attendees directly in Google Calendar."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 16462.751399999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0029999999999290594,
+                  "durationMs": 16462.5507,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6195,
+                "completionTokens": 52,
+                "reasoningTokens": 1654
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 36.82950000000005
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 34.682300000000055,
+              "durationMs": 1.6573999999999387
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

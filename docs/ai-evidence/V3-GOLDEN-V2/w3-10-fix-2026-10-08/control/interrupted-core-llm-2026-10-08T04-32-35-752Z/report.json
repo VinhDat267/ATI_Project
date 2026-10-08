@@ -1,0 +1,533 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [],
+  "set": "core",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases.json",
+    "commit": "1ab7f08d88546419048e0466f3214bb018c26592",
+    "sha256": "7edeac39d6531cdc8bcc4340b1e64f02684eff61ea3bd1f39ab2f5b5ad00aa5a",
+    "version": 2,
+    "cases": 50,
+    "selectedCases": 50
+  },
+  "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+  "sourceTrees": {
+    "packages/planner": "12d9cbb5085d4f06a854a6b7505d3eab3348543c",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T03:00:00Z",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 1,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 2,
+  "plannedCaseRuns": 50,
+  "concurrency": 2,
+  "runAt": "2026-10-08T04:33:35.901Z",
+  "stopped": true,
+  "pendingIds": [
+    "ss03",
+    "ss04",
+    "ss05",
+    "ss06",
+    "ss07",
+    "ss08",
+    "ss09",
+    "ss10",
+    "ms01",
+    "ms02",
+    "ms03",
+    "ms04",
+    "ms05",
+    "ms06",
+    "ms07",
+    "ms08",
+    "ms09",
+    "ms10",
+    "cs01",
+    "cs02",
+    "cs03",
+    "cs04",
+    "cs05",
+    "cs06",
+    "cs07",
+    "cs08",
+    "cs09",
+    "cs10",
+    "cs11",
+    "cs12",
+    "cs13",
+    "cs14",
+    "cs15",
+    "cl01",
+    "cl02",
+    "cl03",
+    "cl04",
+    "cl05",
+    "cl06",
+    "cl07",
+    "cl08",
+    "rf01",
+    "rf02",
+    "rf03",
+    "rf04",
+    "rf05",
+    "rf06",
+    "rf07"
+  ],
+  "stopReason": "Model request timed out",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only protocol has no answer response kind: clarification is labelled, and successful read calls are scored separately.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": false
+  },
+  "serviceGate": {},
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0,
+      "toolSelectionAccuracy": 0,
+      "argumentQuality": null,
+      "argumentMatcherRate": 0,
+      "strictPassRate": 0
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 2,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {},
+    "stability": {
+      "ss01": "0/1",
+      "ss02": "0/1"
+    },
+    "latencyMs": {
+      "p50": 60071,
+      "p95": 60143,
+      "max": 60143
+    },
+    "usablePlanRate": null
+  },
+  "comparison": {
+    "baselineDate": "2026-10-01",
+    "baselineRuns": 1,
+    "baselineStrictPassRate": 1,
+    "unchangedCases": 49,
+    "measuredCases": 2,
+    "aggregate": {
+      "runs": [
+        {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        }
+      ],
+      "mean": {
+        "kindAccuracy": 0,
+        "toolSelectionAccuracy": 0,
+        "argumentQuality": null,
+        "argumentMatcherRate": 0,
+        "strictPassRate": 0
+      },
+      "byCategory": {
+        "single_step": {
+          "cases": 2,
+          "strictPassRate": 0
+        }
+      },
+      "byService": {},
+      "stability": {
+        "ss01": "0/1",
+        "ss02": "0/1"
+      },
+      "latencyMs": {
+        "p50": 60071,
+        "p95": 60143,
+        "max": 60143
+      },
+      "usablePlanRate": null
+    },
+    "changedLabels": {
+      "runs": [
+        {
+          "kindAccuracy": null,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": null
+        }
+      ],
+      "mean": {
+        "kindAccuracy": null,
+        "toolSelectionAccuracy": null,
+        "argumentQuality": null,
+        "argumentMatcherRate": null,
+        "strictPassRate": null
+      },
+      "byCategory": {},
+      "byService": {},
+      "stability": {},
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "usablePlanRate": null
+    },
+    "limitation": "One historical run versus three current runs; expanded fixture/catalog context differs; no statistical parity claim."
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "ss01",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60143,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ss02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60071,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

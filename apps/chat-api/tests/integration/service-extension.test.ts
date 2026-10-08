@@ -68,13 +68,14 @@ it('extends registry + transport data without core changes, through real SQL cre
       gatherSearch: async ({ tool, args, signal }) => (await factory.getAdapterForService(tool.split('.')[0]!)).execute(tool, args, { signal }),
       provider: { name: 'contract-scripted', async generatePlan(input) {
         inputs.push(input);
+        if (inputs.length === 1) return JSON.stringify({ kind: 'search', calls: [{ tool: catalog.find(t => t.listable && t.sideEffect === 'read')!.name, args: { query: '' } }] });
         return JSON.stringify({ kind: 'plan', thinking: 'Use observed thing', summary: 'Create', warnings: [],
           steps: [{ id: 'create', tool: 'demo.create_thing', description: 'Create', args: { thingId: 'T1' }, dependsOn: [] }] });
       } },
     });
     expect((await planner.processMessage({ userMessage: 'Create with Demo', memory: new WorkingMemory() })).kind).toBe('plan');
-    expect(inputs[0]!.workingMemory.__observed.thing).toEqual([{ id: 'T1', name: 'Allowed thing' }]);
-    expect(inputs[0]!.systemPrompt).toContain('demo.create_thing');
+    expect(inputs.at(-1)!.workingMemory.__observed.thing).toEqual([{ id: 'T1', name: 'Allowed thing' }]);
+    expect(inputs.at(-1)!.systemPrompt).toContain('demo.create_thing');
     await expect(adapter.execute('demo.create_thing', { thingId: 'T1' })).resolves.toEqual({ id: 'T1' });
     // Old JSON shapes inserted directly in SQL stay readable, with no rewrite/migration.
     const old = [

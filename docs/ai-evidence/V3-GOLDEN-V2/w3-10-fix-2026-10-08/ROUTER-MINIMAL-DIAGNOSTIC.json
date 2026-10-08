@@ -1,0 +1,25 @@
+{
+  "kind": "minimal_diagnostic_only_not_benchmark",
+  "startedAt": "2026-10-08T04:54:25.914Z",
+  "endedAt": "2026-10-08T04:54:36.665Z",
+  "durationMs": 10750.098399999999,
+  "success": true,
+  "servedModel": "gemini-3.8-flash-n",
+  "attempts": [
+    {
+      "startedAt": "2026-10-08T04:54:25.916Z",
+      "headersMs": 10746.817500000001,
+      "status": 200,
+      "fetchPhaseMs": 10746.855500000001,
+      "bodyMs": 10749.240000000002,
+      "usage": {
+        "prompt_tokens": 2128,
+        "completion_tokens": 5,
+        "total_tokens": 2133,
+        "completion_tokens_details": {
+          "reasoning_tokens": 111
+        }
+      }
+    }
+  ]
+}

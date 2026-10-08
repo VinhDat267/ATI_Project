@@ -1,0 +1,5183 @@
+{
+  "evidence": "provider_observed",
+  "complete": true,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "services",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases-services.json",
+    "commit": "20fa6f03c8696d769303f759602d1c0748cb9b26",
+    "sha256": "369efaea2023344540f731dae7730d33aa4ad9a542b3d222d2aca6d463bf896f",
+    "version": 1,
+    "cases": 44,
+    "selectedCases": 44
+  },
+  "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+  "sourceTrees": {
+    "packages/planner": "12d9cbb5085d4f06a854a6b7505d3eab3348543c",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 1,
+  "completedRuns": 1,
+  "attemptedCaseRuns": 44,
+  "plannedCaseRuns": 44,
+  "concurrency": 2,
+  "runAt": "2026-10-08T17:18:52.921Z",
+  "stopped": false,
+  "pendingIds": [],
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only protocol has no answer response kind: clarification is labelled, and successful read calls are scored separately.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "sheets": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "jira": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "calendar": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "notion": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "telegram": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "github": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "trello": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.8409090909090909,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 0.9705882352941176,
+        "argumentMatcherRate": 0.9927007299270073,
+        "strictPassRate": 0.8409090909090909
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.8409090909090909,
+      "toolSelectionAccuracy": 1,
+      "argumentQuality": 0.9705882352941176,
+      "argumentMatcherRate": 0.9927007299270073,
+      "strictPassRate": 0.8409090909090909
+    },
+    "byCategory": {
+      "read_only": {
+        "cases": 6,
+        "strictPassRate": 0
+      },
+      "single_step": {
+        "cases": 19,
+        "strictPassRate": 1
+      },
+      "cross_service": {
+        "cases": 9,
+        "strictPassRate": 1
+      },
+      "clarification": {
+        "cases": 5,
+        "strictPassRate": 0.8
+      },
+      "refusal": {
+        "cases": 5,
+        "strictPassRate": 1
+      }
+    },
+    "byService": {
+      "sheets": {
+        "cases": 10,
+        "attempts": 10,
+        "scoredAttempts": 8,
+        "argumentAttempts": 8,
+        "runs": [
+          {
+            "kindAccuracy": 0.8,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.8
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.8,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.8
+        },
+        "latencyMs": {
+          "p50": 12212,
+          "p95": 69262
+        }
+      },
+      "jira": {
+        "cases": 12,
+        "attempts": 12,
+        "scoredAttempts": 10,
+        "argumentAttempts": 10,
+        "runs": [
+          {
+            "kindAccuracy": 0.9166666666666666,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9166666666666666
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.9166666666666666,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.9166666666666666
+        },
+        "latencyMs": {
+          "p50": 12212,
+          "p95": 44594
+        }
+      },
+      "calendar": {
+        "cases": 10,
+        "attempts": 10,
+        "scoredAttempts": 8,
+        "argumentAttempts": 8,
+        "runs": [
+          {
+            "kindAccuracy": 0.8,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 0.875,
+            "argumentMatcherRate": 0.96875,
+            "strictPassRate": 0.8
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.8,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 0.875,
+          "argumentMatcherRate": 0.96875,
+          "strictPassRate": 0.8
+        },
+        "latencyMs": {
+          "p50": 10153,
+          "p95": 44465
+        }
+      },
+      "slack": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 2,
+        "argumentAttempts": 2,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 14559,
+          "p95": 18170
+        }
+      },
+      "notion": {
+        "cases": 11,
+        "attempts": 11,
+        "scoredAttempts": 9,
+        "argumentAttempts": 9,
+        "runs": [
+          {
+            "kindAccuracy": 0.9090909090909091,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9090909090909091
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.9090909090909091,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.9090909090909091
+        },
+        "latencyMs": {
+          "p50": 9939,
+          "p95": 33433
+        }
+      },
+      "telegram": {
+        "cases": 12,
+        "attempts": 12,
+        "scoredAttempts": 10,
+        "argumentAttempts": 10,
+        "runs": [
+          {
+            "kindAccuracy": 0.9166666666666666,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9166666666666666
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.9166666666666666,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.9166666666666666
+        },
+        "latencyMs": {
+          "p50": 7600,
+          "p95": 37973
+        }
+      },
+      "github": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 2,
+        "argumentAttempts": 2,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 6059,
+          "p95": 12391
+        }
+      },
+      "trello": {
+        "cases": 3,
+        "attempts": 3,
+        "scoredAttempts": 3,
+        "argumentAttempts": 3,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 15514,
+          "p95": 18170
+        }
+      }
+    },
+    "stability": {
+      "sh01": "0/1",
+      "sh02": "1/1",
+      "sh03": "1/1",
+      "sh04": "1/1",
+      "sh05": "1/1",
+      "sh06": "1/1",
+      "sh07": "0/1",
+      "sh08": "1/1",
+      "ca01": "0/1",
+      "ca02": "1/1",
+      "ca03": "1/1",
+      "ca04": "0/1",
+      "ca05": "1/1",
+      "ca06": "1/1",
+      "ca07": "1/1",
+      "ca08": "1/1",
+      "no01": "0/1",
+      "no02": "1/1",
+      "no03": "1/1",
+      "no04": "1/1",
+      "no05": "1/1",
+      "no06": "1/1",
+      "no07": "1/1",
+      "no08": "1/1",
+      "tg01": "0/1",
+      "tg02": "1/1",
+      "tg03": "1/1",
+      "tg04": "1/1",
+      "tg05": "1/1",
+      "tg06": "1/1",
+      "tg07": "1/1",
+      "tg08": "1/1",
+      "ji01": "0/1",
+      "ji02": "1/1",
+      "ji03": "1/1",
+      "ji04": "1/1",
+      "ji05": "1/1",
+      "ji06": "1/1",
+      "ji07": "1/1",
+      "ji08": "1/1",
+      "wf01": "1/1",
+      "wf02": "1/1",
+      "wf03": "1/1",
+      "wf04": "1/1"
+    },
+    "latencyMs": {
+      "p50": 7600,
+      "p95": 44465,
+      "max": 69262
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "sh01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 41010,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen.",
+            "reason": "Read-only requests cannot be executed as workflow plans. Data found: Tasks!A1:B2 contains [Task, Status], [Fix footer, To Do].",
+            "suggestion": "Specify an automated write action to perform with the retrieved data."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.read_range",
+              "args": {
+                "range": "Tasks!A1:B2",
+                "spreadsheetId": "spreadsheet_frontend_2026",
+                "limit": 10
+              },
+              "result": {
+                "range": "Tasks!A1:B2",
+                "values": [
+                  [
+                    "Task",
+                    "Status"
+                  ],
+                  [
+                    "Fix footer",
+                    "To Do"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "sh02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 7130,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append a new task row using sheets.append_rows.",
+            "summary": "Thêm dòng ['Fix footer', 'To Do'] vào tab Tasks của bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào tab Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Fix footer",
+                      "To Do"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 12212,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create Jira issue and append to Sheets using jira.create_issue and sheets.append_rows.",
+            "summary": "Create Jira issue Audit forms and record its URL and summary in Google Sheets.",
+            "steps": [
+              {
+                "id": "create_jira_issue",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue Audit forms",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Audit forms"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "append_sheet_row",
+                "tool": "sheets.append_rows",
+                "description": "Append issue URL and title to Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      {
+                        "$ref": "create_jira_issue.output.url"
+                      },
+                      "Audit forms"
+                    ]
+                  ]
+                },
+                "dependsOn": [
+                  "create_jira_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 39613,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarifying spreadsheet and sheet before using sheets.append_rows.",
+            "question": "Bạn muốn thêm dòng \"Kiểm thử\" vào bảng tính và tab nào?",
+            "options": [
+              "Frontend",
+              "Backend"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6309,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tool available to delete spreadsheets.",
+            "reason": "Deleting spreadsheets is not supported by the connected tools.",
+            "suggestion": "You can delete the spreadsheet directly in Google Drive."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6822,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append a new row to Tasks sheet using sheets.append_rows.",
+            "summary": "Thêm một dòng dữ liệu vào tab Tasks trong bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào tab Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Review board",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh07",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got plan"
+            ]
+          },
+          "latencyMs": 69262,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use sheets.read_range to fetch the requested cell range.",
+            "summary": "Đọc dải ô Tasks!A1:B2 từ bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.read_range",
+                "description": "Đọc dải ô Tasks!A1:B2",
+                "args": {
+                  "range": "Tasks!A1:B2",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.read_range",
+              "args": {
+                "spreadsheetId": "spreadsheet_frontend_2026",
+                "range": "Tasks!A1:B2",
+                "limit": 10
+              },
+              "result": {
+                "range": "Tasks!A1:B2",
+                "values": [
+                  [
+                    "Task",
+                    "Status"
+                  ],
+                  [
+                    "Fix footer",
+                    "To Do"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "sh08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 7273,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use sheets.append_rows to add release history.",
+            "summary": "Ghi một dòng lịch sử triển khai vào tab History của bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Ghi lịch sử vào tab History",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "History",
+                  "rows": [
+                    [
+                      "Release 1",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected clarification, got refusal",
+              "args: calendar.list_events timeMax"
+            ]
+          },
+          "latencyMs": 44465,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen.",
+            "reason": "Yêu cầu chỉ đọc thông tin lịch mà không có thao tác ghi nào cần thực hiện.",
+            "suggestion": "Bạn có thể yêu cầu tạo sự kiện mới nếu cần."
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_events",
+              "args": {
+                "calendarId": "team@example.test",
+                "timeMax": "2026-09-30T23:59:59+07:00",
+                "timeMin": "2026-09-30T00:00:00+07:00",
+                "limit": 10
+              },
+              "result": {
+                "events": [
+                  {
+                    "id": "event_standup",
+                    "title": "Standup",
+                    "start": "2026-09-30T09:00:00+07:00",
+                    "end": "2026-09-30T09:30:00+07:00",
+                    "url": "https://calendar.google.com/calendar/event?eid=fixture_standup"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "ca02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7214,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create event using calendar.create_event.",
+            "summary": "Tạo sự kiện Demo trên lịch Team vào ngày mai lúc 15:00-16:00.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Demo trên lịch Team",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Demo",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 14559,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create event with calendar.create_event and notify Slack via slack.send_message.",
+            "summary": "Create the 'Release review' event in Team calendar and post its URL to Slack #release.",
+            "steps": [
+              {
+                "id": "create_event",
+                "tool": "calendar.create_event",
+                "description": "Create Release review event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Release review",
+                  "start": "2026-09-30T10:00:00+07:00",
+                  "end": "2026-09-30T11:00:00+07:00"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "send_slack",
+                "tool": "slack.send_message",
+                "description": "Post event link to release channel",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": {
+                    "$template": "${create_event.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_event"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca04",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 21474,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "reason": "Inviting attendees to calendar events is not supported by the available tools.",
+            "suggestion": "You can create the event directly in Google Calendar to invite attendees."
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 7498,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools available to delete calendar events.",
+            "reason": "Hệ thống hiện chưa hỗ trợ thao tác xóa sự kiện trên Google Calendar.",
+            "suggestion": "Bạn vui lòng thao tác xóa sự kiện trực tiếp trên giao diện Google Calendar."
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 10153,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a calendar event using calendar.create_event.",
+            "summary": "Create 'Board review' event on the Team calendar for this Friday from 2pm to 3pm.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Board review event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Board review",
+                  "start": "2026-10-02T14:00:00+07:00",
+                  "end": "2026-10-02T15:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6593,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to schedule the release event.",
+            "summary": "Tạo sự kiện Release vào thứ Năm, 01/10/2026 từ 09:00 đến 10:00 trên lịch Release.",
+            "steps": [
+              {
+                "id": "create_release_event",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Release trên lịch Release",
+                "args": {
+                  "calendarId": "release@example.test",
+                  "summary": "Release",
+                  "start": "2026-10-01T09:00:00+07:00",
+                  "end": "2026-10-01T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7411,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use calendar.create_event to schedule the retro.",
+            "summary": "Schedule Retro on the Team calendar next Monday from 9:00 AM to 10:00 AM.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Retro event on Team calendar",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Retro",
+                  "start": "2026-10-05T09:00:00+07:00",
+                  "end": "2026-10-05T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 33433,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen.",
+            "reason": "Workflow plans only support write actions, and no modifications were requested.",
+            "suggestion": "Specify a write action to perform on the retrieved page, such as appending text."
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.query_database",
+              "args": {
+                "databaseId": "11111111-1111-4111-8111-111111111111",
+                "query": "Release",
+                "limit": 10
+              },
+              "result": {
+                "pages": [
+                  {
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "title": "Release notes",
+                    "url": "https://www.notion.so/aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa",
+                    "properties": {
+                      "Name": "Release notes",
+                      "Status": "Draft"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "no02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6011,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page to create a new page in the Frontend database.",
+            "summary": "Tạo trang 'Sprint notes' trong database Notion Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Sprint notes",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Sprint notes",
+                  "content": "Demo completed"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 9939,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page and telegram.send_message.",
+            "summary": "Create 'Demo notes' in Notion and send its link to Telegram.",
+            "steps": [
+              {
+                "id": "create_page",
+                "tool": "notion.create_page",
+                "description": "Create Notion page Demo notes",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Demo notes"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "send_message",
+                "tool": "telegram.send_message",
+                "description": "Send page URL to Telegram",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "${create_page.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_page"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6689,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Ask user to select a database for the new page.",
+            "question": "Bạn muốn tạo trang \"Báo cáo\" trong database nào?",
+            "options": [
+              "Frontend",
+              "Backend"
+            ],
+            "context": "Cần chọn database đích để tạo trang trong Notion."
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6071,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tool is available to delete Notion pages.",
+            "reason": "Deleting Notion pages is not supported by the available Notion tools.",
+            "suggestion": "You can manually delete or archive the page directly within Notion."
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 9037,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page to create the page in the Frontend database.",
+            "summary": "Tạo trang 'Board review' trong database Notion Frontend",
+            "steps": [
+              {
+                "id": "step_create_page",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Board review trong Notion",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Board review",
+                  "content": "Review ready"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 12969,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append text to Notion page using notion.append_text.",
+            "summary": "Append \"QA passed\" to the Release notes page in Notion.",
+            "steps": [
+              {
+                "id": "step1",
+                "tool": "notion.append_text",
+                "description": "Append QA passed to Release notes",
+                "args": {
+                  "pageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  "text": "QA passed"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.query_database",
+              "args": {
+                "databaseId": "11111111-1111-4111-8111-111111111111",
+                "query": "Release notes",
+                "limit": 10
+              },
+              "result": {
+                "pages": [
+                  {
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "title": "Release notes",
+                    "url": "https://www.notion.so/aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa",
+                    "properties": {
+                      "Name": "Release notes",
+                      "Status": "Draft"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "no08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6081,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use notion.create_page to create a new page in the Frontend database.",
+            "summary": "Tạo trang 'Lịch sử triển khai' trong database Frontend trên Notion.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "notion.create_page",
+                "description": "Create deployment history page",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Lịch sử triển khai",
+                  "content": "Release 1 complete"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 1,
+              "total": 1
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 37973,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen as read-only requests have no executable write actions.",
+            "reason": "Hệ thống không hỗ trợ tạo quy trình chỉ đọc thông tin mà không có thao tác ghi nào. Các chat tìm thấy gồm: 'frontend' (-1001234567890) và 'release' (-1009876543210).",
+            "suggestion": "Bạn có thể yêu cầu gửi tin nhắn đến một trong các chat này."
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 9127,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "telegram.send_message sends the message to the frontend chat.",
+            "summary": "Send 'Build green' to Telegram chat frontend",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Send message to frontend chat",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "Build green"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6059,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use github.create_issue and telegram.send_message to create issue and notify chat.",
+            "summary": "Tạo issue 'Fix navbar' trên GitHub acme/web và gửi liên kết tới chat Telegram frontend.",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue Fix navbar trên GitHub",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Fix navbar"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify_telegram",
+                "tool": "telegram.send_message",
+                "description": "Gửi link issue tới chat Telegram",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "Issue mới đã được tạo: ${create_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6230,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Which Telegram chat should the message be sent to?",
+            "options": [
+              "frontend",
+              "release"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6811,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "reason": "Hệ thống không hỗ trợ công cụ xóa tin nhắn trên Telegram.",
+            "suggestion": "Bạn vui lòng thao tác xóa tin nhắn trực tiếp trên ứng dụng Telegram."
+          },
+          "searches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 6222,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message using telegram.send_message.",
+            "summary": "Gửi tin nhắn \"Frontend done\" vào nhóm Telegram frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Gửi tin nhắn vào chat frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "Frontend done"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 4620,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message using telegram.send_message to frontend chat.",
+            "summary": "Gửi tin nhắn thông báo vào chat Telegram frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Gửi tin nhắn vào chat frontend",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": "lịch sử triển khai đã cập nhật"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tg08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 7600,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use telegram.send_message to send the notification to the release chat.",
+            "summary": "Send 'Release ready' to the release Telegram chat.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "telegram.send_message",
+                "description": "Send message to release chat",
+                "args": {
+                  "chatId": "-1009876543210",
+                  "text": "Release ready"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 44594,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen.",
+            "reason": "Read-only workflows cannot be planned as plans require write actions.",
+            "suggestion": "Specify an action to perform on issue FE-42, such as adding a comment."
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_issues",
+              "args": {
+                "projectKey": "FE",
+                "query": "Footer",
+                "limit": 10
+              },
+              "result": {
+                "issues": [
+                  {
+                    "id": "10142",
+                    "key": "FE-42",
+                    "title": "Footer overlaps on small screens",
+                    "status": "To Do",
+                    "url": "https://fixture.atlassian.net/browse/FE-42"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "ji02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5897,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create an issue in Jira project FE using jira.create_issue.",
+            "summary": "Tạo issue Jira 'Fix modal' trong project FE.",
+            "steps": [
+              {
+                "id": "create_jira_issue",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue in FE",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Fix modal",
+                  "description": "Escape closes dialog"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 13040,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using jira.create_issue and trello.create_card to create the issue and card.",
+            "summary": "Create a Jira issue in project FE and a matching Trello card linking to it.",
+            "steps": [
+              {
+                "id": "create_jira_issue",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue for contrast fix",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Fix contrast"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "create_trello_card",
+                "tool": "trello.create_card",
+                "description": "Create Trello card with Jira link",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Fix contrast",
+                  "desc": {
+                    "$template": "${create_jira_issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_jira_issue"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9260,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Planning jira.create_issue after selecting a project.",
+            "question": "Bạn muốn tạo issue trong project Jira nào?",
+            "options": [
+              "Frontend (FE)",
+              "Backend (API)"
+            ],
+            "context": "Cần chọn project trước khi tạo issue."
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 7362,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools available to delete Jira issues.",
+            "reason": "Deleting Jira issues is not supported by the available tools.",
+            "suggestion": "You can manually delete or close the issue directly in Jira."
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 13732,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use jira.add_comment to post a comment to Jira issue.",
+            "summary": "[redacted]",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "jira.add_comment",
+                "description": "Add comment to issue FE-42",
+                "args": {
+                  "issueKey": "FE-42",
+                  "body": "QA passed"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 6655,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create Jira issue using jira.create_issue.",
+            "summary": "Create ticket Review issue routing in project FE.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "jira.create_issue",
+                "description": "Create Jira ticket",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Review issue routing"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ji08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6850,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a Jira issue using jira.create_issue.",
+            "summary": "Create a Jira issue 'Review sprint board' in the FE project.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue in project FE",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Review sprint board",
+                  "description": "Check task flow"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wf01",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 10,
+              "total": 10
+            },
+            "failures": []
+          },
+          "latencyMs": 12391,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use github.create_issue, jira.create_issue, notion.create_page, and telegram.send_message sequentially.",
+            "summary": "Create a GitHub issue, link it in a new Jira issue, link that in a Notion page, and send the link to Telegram.",
+            "steps": [
+              {
+                "id": "create_gh",
+                "tool": "github.create_issue",
+                "description": "Create GitHub issue in acme/web",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Keyboard fix"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "create_jira",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue in FE",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Keyboard fix",
+                  "description": {
+                    "$template": "${create_gh.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_gh"
+                ]
+              },
+              {
+                "id": "create_notion",
+                "tool": "notion.create_page",
+                "description": "Create Notion page in Frontend",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Keyboard fix",
+                  "content": {
+                    "$template": "${create_jira.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_jira"
+                ]
+              },
+              {
+                "id": "notify_telegram",
+                "tool": "telegram.send_message",
+                "description": "Send Notion link to Telegram",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "${create_notion.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_notion"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wf02",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 12,
+              "total": 12
+            },
+            "failures": []
+          },
+          "latencyMs": 18170,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event, sheets.append_rows, trello.create_card, and slack.send_message.",
+            "summary": "Create calendar event, log in sheet, create card, and post to Slack",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create calendar event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Release demo",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "sheets.append_rows",
+                "description": "Log event to Tasks sheet",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Release demo",
+                      {
+                        "$ref": "step_1.output.url"
+                      }
+                    ]
+                  ]
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              },
+              {
+                "id": "step_3",
+                "tool": "trello.create_card",
+                "description": "Create Trello card",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Release demo",
+                  "desc": {
+                    "$ref": "step_2.output.url"
+                  }
+                },
+                "dependsOn": [
+                  "step_2"
+                ]
+              },
+              {
+                "id": "step_4",
+                "tool": "slack.send_message",
+                "description": "Notify Slack release channel",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": {
+                    "$ref": "step_3.output.url"
+                  }
+                },
+                "dependsOn": [
+                  "step_3"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wf03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 10,
+              "total": 10
+            },
+            "failures": []
+          },
+          "latencyMs": 15514,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use notion.create_page, jira.create_issue, trello.create_card, and telegram.send_message.",
+            "summary": "Create QA checklist across Notion, Jira, and Trello, then send Trello link to Telegram.",
+            "steps": [
+              {
+                "id": "step_notion",
+                "tool": "notion.create_page",
+                "description": "Create Notion QA checklist page",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "QA checklist"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_jira",
+                "tool": "jira.create_issue",
+                "description": "Create Jira QA checklist issue",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "QA checklist",
+                  "description": {
+                    "$template": "${step_notion.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_notion"
+                ]
+              },
+              {
+                "id": "step_trello",
+                "tool": "trello.create_card",
+                "description": "Create Trello QA checklist card",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "QA checklist",
+                  "desc": {
+                    "$template": "${step_jira.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_jira"
+                ]
+              },
+              {
+                "id": "step_telegram",
+                "tool": "telegram.send_message",
+                "description": "Send card URL to Telegram",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "${step_trello.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_trello"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wf04",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 15,
+              "total": 15
+            },
+            "failures": []
+          },
+          "latencyMs": 15149,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using jira.create_issue, calendar.create_event, notion.create_page, sheets.append_rows, and telegram.send_message.",
+            "summary": "Tạo issue Jira, đặt lịch Calendar, tạo trang Notion, ghi vào Google Sheets và thông báo qua Telegram.",
+            "steps": [
+              {
+                "id": "jira_issue",
+                "tool": "jira.create_issue",
+                "description": "Tạo issue Release pipeline trong FE",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Release pipeline"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "cal_event",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện lịch kèm link Jira",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Release pipeline",
+                  "description": {
+                    "$template": "${jira_issue.output.url}"
+                  },
+                  "start": "2026-09-30T09:00:00+07:00",
+                  "end": "2026-09-30T10:00:00+07:00"
+                },
+                "dependsOn": [
+                  "jira_issue"
+                ]
+              },
+              {
+                "id": "notion_page",
+                "tool": "notion.create_page",
+                "description": "Tạo trang Notion kèm link sự kiện",
+                "args": {
+                  "databaseId": "11111111-1111-4111-8111-111111111111",
+                  "title": "Release pipeline",
+                  "content": {
+                    "$template": "${cal_event.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "cal_event"
+                ]
+              },
+              {
+                "id": "sheets_append",
+                "tool": "sheets.append_rows",
+                "description": "Thêm trang Notion vào Google Sheets",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Release pipeline",
+                      {
+                        "$template": "${notion_page.output.url}"
+                      }
+                    ]
+                  ]
+                },
+                "dependsOn": [
+                  "notion_page"
+                ]
+              },
+              {
+                "id": "telegram_msg",
+                "tool": "telegram.send_message",
+                "description": "Gửi URL bảng tính vào Telegram",
+                "args": {
+                  "chatId": "-1001234567890",
+                  "text": {
+                    "$template": "${sheets_append.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "sheets_append"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
