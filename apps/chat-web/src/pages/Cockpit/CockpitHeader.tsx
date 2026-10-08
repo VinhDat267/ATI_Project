@@ -1,12 +1,12 @@
 // Markup/classes copied from AppStagePage.tsx:712-917, PROTO-01 #96.
 // Demo user/menu/runtime are replaced with existing authenticated app behavior.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { UserNavMenu } from '../../components/layout/UserNavMenu';
 import { useTheme } from '../../hooks/use-theme';
-import { apiClient } from '../../services/api-client';
 import type { User } from '../../types';
 interface Props {
   moment: number | string;
+  runtimeMode: 'sandbox' | 'live' | null;
   request: string;
   messageCount: number;
   historyOpen: boolean;
@@ -22,6 +22,7 @@ interface Props {
 }
 export function CockpitHeader({
   moment,
+  runtimeMode,
   request,
   messageCount: chatCount,
   historyOpen,
@@ -38,24 +39,6 @@ export function CockpitHeader({
   const { theme, toggleTheme } = useTheme();
   const dark = theme === 'dark';
   const [testExplainOpen, setTestExplainOpen] = useState(false);
-  const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(
-    null,
-  );
-  useEffect(() => {
-    let current = true;
-    Promise.resolve(apiClient.getRuntime?.())
-      .then((data) => {
-        if (
-          current &&
-          (data?.runtimeMode === 'sandbox' || data?.runtimeMode === 'live')
-        )
-          setRuntimeMode(data.runtimeMode);
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, []);
   return (
     <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-brand-border transition-all">
       <div className="max-w-5xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5">

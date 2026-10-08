@@ -7,6 +7,7 @@ interface Palette { icon:string; name:string; logo?:string; badge?:string; previ
 interface Operation { action:string; done:string; receipt:string; kind:string; link:string; titleField?:string; titlePrefix?:string; previewStyle?:string }
 const palettes:Record<string,Palette>=Object.fromEntries(Object.entries(assets.services).map(([id,value])=>[id,{...value.suggestion,...value}]));
 const operations:Record<string,Operation>=assets.operations;
+export function serviceRecoveryLink(id:string):{url:string;argument:string;query:string}|undefined {return (assets.services as Record<string,{recoveryLink?:{url:string;argument:string;query:string}}>)[id]?.recoveryLink;}
 export const serviceId=(tool:string)=>getToolDefinition(tool)?.service ?? tool.split('.')[0];
 export const serviceName=(id:string,services:ServiceInfo[])=>services.find(service=>service.id===id)?.name ?? getServiceDefinition(id)?.name ?? id;
 export function servicePalette(id:string) { const palette=palettes[id] ?? {icon:'bg-neutral-100 border-neutral-200',name:'text-neutral-800'}; return {...palette,badge:palette.badge ?? `${palette.icon.split(' ').filter(cls=>cls.startsWith('bg-')).join(' ')} ${palette.name}`,receiptHover:palette.receiptHover ?? 'hover:border-neutral-300'}; }

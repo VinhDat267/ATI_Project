@@ -11,7 +11,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
-  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|AUTH-05:' },
+  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|FE-06A:|FE-07:|AUTH-05:' },
   { name: 'auth02', grep: 'AUTH-02:' },
   { name: 'auth04', grep: 'AUTH-04:|AUTH-05 Google:' },
   { name: 'clarification', grep: 'clarification before plan' },

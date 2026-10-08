@@ -3,8 +3,7 @@ import { useChatStore } from '../store/chat-store';
 import { useSSE } from '../hooks/use-sse';
 import { apiClient } from '../services/api-client';
 import { Cockpit } from './Cockpit';
-import { PartialFailureModal } from '../components/PartialFailureModal';
-import { ReconciliationNotice } from '../components/ReconciliationNotice';
+import { recoveryEditRequest } from '../pages/Cockpit/recovery-request';
 import { userErrorMessage } from '../services/user-error';
 import type { ServiceInfo, User } from '../types';
 
@@ -23,8 +22,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     conversationId,
     activePlan,
     planStatus,
-    stepStatuses,
-    stepErrors,
     executionSnapshot,
     setConversationId,
     addOptimisticMessage,
@@ -35,7 +32,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
 
 
   const [actionError, setActionError] = useState<string | null>(null);
-  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
 
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [servicesError, setServicesError] = useState<string | null>(null);
@@ -227,17 +223,15 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
 
 
 
-  const executionStatus = executionSnapshot?.execution.status || planStatus;
-  const pausedStep = executionSnapshot?.steps.find(step => step.stepId === executionSnapshot.execution.pausedStepId);
-  const needsReconciliation = executionStatus === 'reconciliation_required' ||
-    (executionStatus === 'partial' && pausedStep?.status === 'unknown');
-  const failedStepId = executionStatus === 'partial' ? Object.entries(stepStatuses).find(
-    ([_, st]) => st === 'failed'
-  )?.[0] : undefined;
-  const progressPlan = executionSnapshot?.plan || activePlan;
-  const failureId = pausedStep?.status === 'failed' ? pausedStep.stepId : failedStepId;
-  const failureKey = `${conversationId}:${progressPlan?.id}:${failureId}`;
-  const failureStep = progressPlan?.steps?.find(step => step.id === failureId);
+  const handleEditRecovery = async (stepId: string, args: Record<string, unknown>, prompt?: string) => {
+    const owner = useChatStore.getState().conversationId;
+    const planId = executionSnapshot?.plan.id;
+    if (!owner || !planId || !executionSnapshot?.recoveryActions.includes('retry')) return;
+    const stopped = await recover('stop');
+    const current = useChatStore.getState();
+    if (!stopped || !workspaceMounted.current || current.conversationId !== owner || current.executionSnapshot?.plan.id !== planId || current.executionSnapshot.execution.status !== 'stopped') return;
+    handleSendMessage(recoveryEditRequest(executionSnapshot, stepId, args, prompt));
+  };
 
   return (
     <div className="workspace w-full min-w-0">
@@ -251,16 +245,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
             onSelectConversation={id => navigate(conversationPath(id))} onSettings={() => navigate('/settings')}
             onApprove={handleApprovePlan} onCancel={handleRejectPlan}
-            recovery={<>
-              {failureId && !needsReconciliation && dismissedFailure === failureKey && <div role="status" className="my-3 p-3 bg-warning-tint border border-border rounded-xl"><p>Quy trình vẫn đang tạm dừng tại bước {failureId}.</p><button type="button" onClick={() => setDismissedFailure(null)}>Mở lại xử lý lỗi</button></div>}
-              {executionSnapshot && needsReconciliation && <ReconciliationNotice snapshot={executionSnapshot} services={services} busy={recoveryBusy} error={recoveryError} onSkip={handleSkip} onStop={handleStop} onContinue={() => recover('continue')} />}
-              {recoveryError && !needsReconciliation && <p role="alert" className="text-danger-text">{recoveryError}</p>}
-              {failureId && !needsReconciliation && dismissedFailure !== failureKey && <PartialFailureModal busy={recoveryBusy}
-                allowedActions={executionSnapshot?.recoveryActions.filter((action): action is 'retry' | 'skip' | 'stop' => action !== 'continue')} allowEdit={false}
-                stepId={failureId} tool={failureStep?.tool || pausedStep?.tool || 'unknown'} errorMessage={stepErrors[failureId] || 'Lỗi thực thi bước'} stepArgs={failureStep?.args}
-                prompt={(typeof failureStep?.args?.prompt === 'string' ? failureStep.args.prompt : undefined) || failureStep?.description}
-                onRetry={() => handleRetry(failureId)} onEditAndRetry={() => handleRetry(failureId)} onSkip={() => handleSkip(failureId)} onStop={handleStop} onClose={() => setDismissedFailure(failureKey)} />}
-            </>} />
+            recovery={{busy:recoveryBusy,error:recoveryError,onRetry:handleRetry,onSkip:handleSkip,onStop:handleStop,onContinue:()=>recover('continue'),onEdit:handleEditRecovery}} />
         </div>
       </div>
     </div>

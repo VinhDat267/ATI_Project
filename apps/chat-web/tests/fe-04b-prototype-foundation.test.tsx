@@ -26,7 +26,7 @@ beforeEach(() => {
   document.documentElement.classList.remove('dark');
   authStorage.clearStoredTokens(); useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
   vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
-  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [] });
+  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [], canConfigure: false });
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [] });
 });

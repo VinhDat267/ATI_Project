@@ -147,4 +147,8 @@ html.dark {
 :root[data-proto-page="app-stage"] #history-drawer > div:last-child { display: flex; flex-direction: column; min-height: 0; }
 :root[data-proto-page="app-stage"] #history-drawer [aria-label="Danh sách hội thoại"] > * { flex-shrink: 0; }
 :root[data-proto-page="app-stage"] #preview-modal-content :is(p, td) { white-space: pre-wrap; overflow-wrap: anywhere; }
+:root[data-proto-page="settings"] #drawer-panel { height: 100dvh; }
+:root[data-proto-page="settings"] #drawer-body { min-height: 0; }
+:root[data-proto-page="settings"] .settings-result-empty { padding: 0; border: 0; }
+:root[data-proto-page="settings"] button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

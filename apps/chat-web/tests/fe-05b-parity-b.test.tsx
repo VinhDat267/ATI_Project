@@ -20,7 +20,7 @@ it('moment 4 copies plan cards and sticky actions, with no bottom composer', asy
   expect(document.querySelectorAll('#plan-cards-container article')).toHaveLength(2);
   expect(document.getElementById('moment-4-sticky-bar')).toHaveClass('sticky','bottom-0');
   expect(screen.queryAllByRole('textbox')).toHaveLength(0);
-  expect(screen.getByText(/ghi thật vào công cụ/)).toBeInTheDocument();
+  expect(screen.getByText(/chỉ chạy trong chế độ thử nghiệm/)).toBeInTheDocument();
 });
 it('inline edit and chat drawer share one draft, Shift+Enter and Enter keep their behavior',async()=>{
   useChatStore.setState({activePlan:plan,planStatus:'preview'}); const send=view();

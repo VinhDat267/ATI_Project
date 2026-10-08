@@ -1,0 +1,40 @@
+/** @vitest-environment jsdom */
+// The eleven PartialFailureModal scenarios migrate to the inline incident + editor.
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { RecoveryEditor } from '../../src/pages/Cockpit/RecoveryEditor';
+import { RecoveryMoment } from '../../src/pages/Cockpit/RecoveryMoment';
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
+const defaults={tool:'future.create',stepArgs:{name:'Initial Card',listId:'list_123'},busy:false,onClose:vi.fn(),onSubmit:vi.fn()};
+function submit(){fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));}
+it('renders editable saved arguments with a data safety/approval explanation',()=>{render(<RecoveryEditor {...defaults}/>);expect(screen.getByRole('dialog')).toBeInTheDocument();expect(screen.getByRole('textbox',{name:'Tham số thực thi'})).toHaveValue(JSON.stringify(defaults.stepArgs,null,2));expect(screen.getByText(/Chưa có lệnh ghi nào chạy/)).toBeInTheDocument();});
+it('dismisses on Escape and never submits or stops the execution',()=>{const onClose=vi.fn(),onSubmit=vi.fn();render(<RecoveryEditor {...defaults} onClose={onClose} onSubmit={onSubmit}/>);fireEvent.keyDown(document,{key:'Escape'});expect(onClose).toHaveBeenCalledTimes(1);expect(onSubmit).not.toHaveBeenCalled();});
+it('closes on backdrop press but not inside the editor',()=>{const onClose=vi.fn();render(<RecoveryEditor {...defaults} onClose={onClose}/>);fireEvent.mouseDown(screen.getByRole('dialog'));expect(onClose).not.toHaveBeenCalled();fireEvent.mouseDown(screen.getByRole('dialog').parentElement!);expect(onClose).toHaveBeenCalledTimes(1);});
+it('retry calls the persisted step id without changing its arguments',()=>{const onRetry=vi.fn();render(<RecoveryMoment moment={7} services={[]} steps={[{id:'s1',tool:'future.create',description:'Create',status:'failed',error:'Card title cannot be empty'}]} snapshot={{plan:{id:'p',convId:'c',status:'partial'},execution:{status:'partial',pausedStepId:'s1'},steps:[],recoveryActions:['retry','skip','stop']}} controls={{busy:false,error:null,onRetry,onSkip:vi.fn(),onStop:vi.fn(),onContinue:vi.fn(),onEdit:vi.fn()}}/>);fireEvent.click(screen.getByRole('button',{name:'Thử lại việc 1'}));expect(onRetry).toHaveBeenCalledWith('s1');});
+it('submits default saved arguments only after review and confirmation',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} onSubmit={onSubmit}/>);fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(onSubmit).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));expect(onSubmit).toHaveBeenCalledWith(defaults.stepArgs,undefined);});
+it('allows inspect/edit JSON for an unknown schema and submits modified arguments',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} onSubmit={onSubmit}/>);fireEvent.change(screen.getByRole('textbox',{name:'Tham số thực thi'}),{target:{value:'{"name":"Updated Card","listId":"list_999"}'}});submit();expect(onSubmit).toHaveBeenCalledWith({name:'Updated Card',listId:'list_999'},undefined);});
+it.each(['{ invalid json','[]','null','42'])('blocks malformed/non-object arguments %s before confirming',json=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} onSubmit={onSubmit}/>);fireEvent.change(screen.getByRole('textbox',{name:'Tham số thực thi'}),{target:{value:json}});fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(screen.getByRole('alert')).toHaveTextContent('Định dạng JSON không hợp lệ');expect(onSubmit).not.toHaveBeenCalled();expect(screen.queryByRole('button',{name:'Dừng và gửi yêu cầu sửa'})).toBeNull();});
+it('skip calls the paused failed step without retrying',()=>{const onSkip=vi.fn(),onRetry=vi.fn();render(<RecoveryMoment moment={7} services={[]} steps={[{id:'s1',tool:'future.create',description:'Create',status:'failed'}]} snapshot={{plan:{id:'p',convId:'c',status:'partial'},execution:{status:'partial',pausedStepId:'s1'},steps:[],recoveryActions:['skip','stop']}} controls={{busy:false,error:null,onRetry,onSkip,onStop:vi.fn(),onContinue:vi.fn(),onEdit:vi.fn()}}/>);fireEvent.click(screen.getByRole('button',{name:'Bỏ qua việc này'}));expect(onSkip).toHaveBeenCalledWith('s1');expect(onRetry).not.toHaveBeenCalled();});
+it('edits the original prompt and submits it together with corrected arguments',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} prompt="Initial prompt text" onSubmit={onSubmit}/>);fireEvent.change(screen.getByRole('textbox',{name:'Ghi chú thêm (không bắt buộc)'}),{target:{value:'Updated prompt text'}});submit();expect(onSubmit).toHaveBeenCalledWith(defaults.stepArgs,'Updated prompt text');});
+it('handles missing arguments as an empty object',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} stepArgs={undefined} onSubmit={onSubmit}/>);submit();expect(onSubmit).toHaveBeenCalledWith({},undefined);});
+it('Escape cancels destructive confirmation while retaining the editor',()=>{const onClose=vi.fn(),onSubmit=vi.fn();render(<RecoveryEditor {...defaults} onClose={onClose} onSubmit={onSubmit}/>);fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));fireEvent.keyDown(document,{key:'Escape'});expect(screen.queryByRole('button',{name:'Dừng và gửi yêu cầu sửa'})).toBeNull();expect(screen.getByRole('textbox',{name:'Tham số thực thi'})).toBeEnabled();expect(onSubmit).not.toHaveBeenCalled();expect(onClose).not.toHaveBeenCalled();});
+
+it.each(['{ invalid JSON','{}','"not an array"'])('blocks invalid schema array %s before stopping',value=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} tool="sheets.append_rows" stepArgs={{spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['a']]}} onSubmit={onSubmit}/>);const inputs=screen.getAllByRole('textbox');fireEvent.change(inputs.find(input=>input.getAttribute('aria-label')?.includes('rows') || (input as HTMLTextAreaElement).value==='[["a"]]')!,{target:{value}});fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(screen.getByRole('alert')).toBeInTheDocument();expect(screen.queryByRole('button',{name:'Dừng và gửi yêu cầu sửa'})).toBeNull();expect(onSubmit).not.toHaveBeenCalled();});
+
+it('parses a valid schema array and preserves other saved fields before confirmation',()=>{const onSubmit=vi.fn();render(<RecoveryEditor {...defaults} tool="sheets.append_rows" stepArgs={{spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['a']]}} onSubmit={onSubmit}/>);const input=screen.getAllByRole('textbox').find(input=>(input as HTMLTextAreaElement).value==='[["a"]]')!;fireEvent.change(input,{target:{value:'[["corrected"]]'}});submit();expect(onSubmit).toHaveBeenCalledWith({spreadsheetId:'sheet-id',sheet:'Sheet1',rows:[['corrected']]},undefined);});
+
+it.each([
+  ['sheets.append_rows', { spreadsheetId: 'sheet-1', sheet: 'Tracker', rows: [['Task']] }, 'ID bảng tính'],
+  ['calendar.create_event', { calendarId: 'calendar-1', summary: 'Họp', start: '2026-10-08T09:00:00Z', end: '2026-10-08T10:00:00Z' }, 'ID lịch'],
+  ['notion.create_page', { databaseId: 'database-1', title: 'Task' }, 'ID cơ sở dữ liệu Notion'],
+  ['telegram.send_message', { chatId: 'chat-1', text: 'Task' }, 'ID cuộc trò chuyện Telegram'],
+  ['jira.create_issue', { projectKey: 'ATI', summary: 'Task' }, 'Mã dự án Jira'],
+] as const)('shows editable human-labelled fields for %s', (tool, stepArgs, label) => {
+  const onSubmit = vi.fn();
+  render(<RecoveryEditor {...defaults} tool={tool} stepArgs={stepArgs} onSubmit={onSubmit}/>);
+  const input = screen.getByRole('textbox', { name: label });
+  fireEvent.change(input, { target: { value: 'corrected-resource' } });
+  submit();
+  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ [Object.keys(stepArgs)[0]]: 'corrected-resource' }), undefined);
+  expect(screen.queryByRole('textbox', { name: Object.keys(stepArgs)[0] })).toBeNull();
+});
