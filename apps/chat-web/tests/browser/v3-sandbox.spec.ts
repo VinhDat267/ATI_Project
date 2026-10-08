@@ -3,7 +3,7 @@ import pg from 'pg';
 import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
-const composerSend = (page: import('@playwright/test').Page) => page.getByRole('button', { name: /^(Gửi|Gửi yêu cầu|Xác nhận và tiếp tục)$/ });
+const composerSend = (page: import('@playwright/test').Page) => page.getByRole('button', { name: /^(Gửi|Gửi tin nhắn|Gửi yêu cầu|Xác nhận và tiếp tục)$/ });
 
 const email = process.env.CHAT_ADMIN_EMAIL;
 const password = process.env.CHAT_ADMIN_PASSWORD;
@@ -147,7 +147,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution', async (
     }).toBe('completed');
     const steps = await pool.query('SELECT tool, status FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [plan.rows[0].id]);
     expect(steps.rows.map((row) => row.status)).toEqual(['succeeded', 'succeeded', 'succeeded']);
-    await expect(page.getByText('3/3 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 3 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('approved-plan.png'), fullPage: true });
   } finally {
     await pool.end();
@@ -182,17 +182,17 @@ test('real browser and PostgreSQL: edit a pending plan through chat', async ({ p
     await composerSend(page).click();
     const approve = page.getByRole('button', { name: /Duyệt kế hoạch/ });
     await expect(approve).toBeVisible();
-    // The whole preview, approve button included, must be reachable above the composer.
+    // Source moment 4 has sticky actions and no editor until Edit opens the inline textarea.
+    await expect(composer).toHaveCount(0);
     await approve.scrollIntoViewIfNeeded();
     const approveBox = (await approve.boundingBox())!;
-    const composerBox = (await composer.boundingBox())!;
-    expect(approveBox.y + approveBox.height).toBeLessThanOrEqual(composerBox.y);
+    expect(approveBox.y + approveBox.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     await page.screenshot({ path: testInfo.outputPath('plan-preview.png') });
     const convId = (await pool.query('SELECT conv_id FROM messages WHERE content = $1', [prompt])).rows[0]?.conv_id;
     const first = (await pool.query("SELECT id FROM plans WHERE conv_id = $1 AND status = 'pending'", [convId])).rows[0]?.id;
     expect(first).toBeTruthy();
 
-    await page.getByRole('button', { name: 'Sửa qua chat' }).click();
+    await page.getByRole('button', { name: 'Sửa qua Chat' }).click();
     await expect(composer).toHaveValue(/^Điều chỉnh kế hoạch: /);
     await composer.pressSequentially('đổi tiêu đề thành Sửa CSS trang chủ');
     await composerSend(page).click();
@@ -301,7 +301,7 @@ test('real browser and PostgreSQL: approved three-service workflow resolves prio
     expect(steps[1]?.output_json?.desc).toContain(issueUrl);
     expect(steps[2]?.output_json?.text).toContain(issueUrl);
     expect(steps[2]?.output_json?.text).toContain(cardUrl);
-    await expect(page.getByText('3/3 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 3 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('three-service-approved.png'), fullPage: true });
   } finally {
     await pool.end();
@@ -328,7 +328,7 @@ test('real browser and PostgreSQL: approved Sheets workflow carries updatedRange
     expect(steps[0].output_json.values).toEqual([['Task', 'Status'], ['Sandbox task', 'To Do']]);
     expect(steps[1].output_json.updatedRange).toBe('Tasks!A4:A4');
     expect(steps[2].output_json.text).toContain(steps[1].output_json.updatedRange);
-    await expect(page.getByText('3/3 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 3 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('sheets-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
@@ -354,7 +354,7 @@ test('real browser and PostgreSQL: approved Calendar workflow carries event url 
     expect(steps[0].output_json.start).toBe(preview.steps[0].args.start);
     expect(steps[1].output_json.text).toContain(steps[0].output_json.url);
     expect(steps[1].output_json.text).toContain(steps[0].output_json.start);
-    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 2 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('calendar-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
@@ -378,7 +378,7 @@ test('real browser and PostgreSQL: approved Telegram workflow carries messageId 
     expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded']);
     expect(steps[0].output_json).toEqual({ messageId: 42, chatId: '-1001234567890', date: 1791014400 });
     expect(steps[1].output_json.text).toBe('Telegram message: ' + steps[0].output_json.messageId);
-    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 2 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('telegram-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
@@ -400,7 +400,7 @@ test('real browser and PostgreSQL: approved Jira workflow carries key and url to
     expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded']);
     expect(steps[0].output_json).toEqual({ id: '10042', key: 'ATI-42', url: 'https://ati-test.atlassian.net/browse/ATI-42' });
     expect(steps[1].output_json.text).toBe('Jira: ' + steps[0].output_json.key + '; ' + steps[0].output_json.url);
-    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 2 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('jira-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
@@ -424,7 +424,7 @@ test('real browser and PostgreSQL: approved Notion workflow carries page url to 
     expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded']);
     expect(steps[0].output_json.url).toBe('https://www.notion.so/22222222333344445555666666666666');
     expect(steps[1].output_json.text).toContain(steps[0].output_json.url);
-    await expect(page.getByText('2/2 hoàn thành')).toBeVisible();
+    await expect(page.getByRole('heading',{level:1,name:/^Đã xong 2 việc trên/})).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('notion-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });

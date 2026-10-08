@@ -7,9 +7,9 @@ const fakeOidc = resolve(fileURLToPath(new URL('.', import.meta.url)), 'fake-oid
 // Starts the local OIDC provider used by the AUTH-04 browser scenario and resolves
 // with its origin once the child reports readiness on its first stdout line.
 // Port 0 lets the OS pick a free port: a fixed one can be taken by any outgoing socket.
-export async function startGoogleFixture() {
+export async function startGoogleFixture({ redirectUri } = {}) {
   const child = spawn(process.execPath, [fakeOidc], {
-    env: { ...process.env, FAKE_OIDC_PORT: '0' }, stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, FAKE_OIDC_PORT: '0', ...(redirectUri ? { FAKE_OIDC_REDIRECT_URI: redirectUri } : {}) }, stdio: ['ignore', 'pipe', 'inherit'],
   });
   const stopped = new Promise(resolve => child.once('close', resolve));
   let port;

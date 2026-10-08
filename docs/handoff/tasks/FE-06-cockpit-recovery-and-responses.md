@@ -1,7 +1,11 @@
 # FE-06 · Cockpit: lỗi, chưa rõ kết quả, khôi phục; màn từ chối và hỏi lại; lỗi chung
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-06-cockpit-recovery` · **Phụ thuộc:** FE-05b đã merge (khoảnh khắc 7–9 dựng trên khung mới); UI-API-01 phần 1 cho nút "Kết nối <dịch vụ>" · **Mốc:** 20/10/2026
+**Trạng thái:** giao được (FE-05b xong #100, #103) · **Nhánh gợi ý:** `feat/fe-06-cockpit-recovery-a`, `feat/fe-06-cockpit-responses-b` · **Phụ thuộc:** FE-05b đã merge (khoảnh khắc 7–9 dựng trên khung mới); UI-API-01 phần 1 cho nút "Kết nối <dịch vụ>" · **Mốc:** 20/10/2026
 **Đặc tả:** mục 1.1, 5, 6, 9 · **Bản mẫu:** `app-stage.html` khoảnh khắc 7–9, `responses.html` (4 tình huống), `errors.html`
+
+**Tách 2 PR (08/10/2026, như FE-05b):**
+- **(a)** mục 1–4, 8 và 10: khoảnh khắc 7–9 (`AppStagePage.tsx` dòng 2153–2404), kết thúc không thành công, bỏ `PartialFailureModal`/`ReconciliationNotice`, các P3 chuyển từ review #103;
+- **(b)** mục 5–7: màn từ chối, hỏi lại mở rộng (`ResponsesPage.tsx`), lỗi chung (`ErrorsPage.tsx`). Mục 6 "yêu cầu chỉ để xem" hiển thị theo W3-10 (#102) nếu đã merge.
 
 ## Vì sao quan trọng
 
@@ -31,6 +35,12 @@
    - lỗi máy chủ: câu của hệ thống "Không thể lập kế hoạch lúc này. Hãy thử lại."; không mã lỗi tự đặt.
 8. Bỏ `PartialFailureModal` và `ReconciliationNotice` khi đã có thay thế; giữ nguyên lời gọi API khôi phục.
 9. *(Chuyển sang [FE-05b](FE-05b-cockpit-visual-parity.md) mục 9–11 ngày 06/10/2026, vì FE-05b dựng lại vùng cuộn, thanh trên và ngăn hội thoại: hai P3 vị trí cuộn và focus khi đổi khoảnh khắc, định dạng thời lượng, thu gọn phần đầu trang ở 375px, dòng tóm tắt trong ngăn hội thoại.)*
+10. **P3 chuyển từ review #103 (08/10/2026)**, làm trong PR (a):
+    - khoảnh khắc 4 (`PlanMoment.tsx`) luôn ghi "Các thao tác này ghi thật vào công cụ của nhóm…", kể cả ở sandbox; đổi câu theo `runtimeMode` để không mâu thuẫn với dải thử nghiệm;
+    - "Đã xong N việc trên M công cụ" (`ReceiptMoment.tsx`): M chỉ đếm dịch vụ của bước đã thành công; thêm test có bước bị bỏ qua;
+    - test cho thẻ biên nhận của bước `skipped` có output: không link, không tiêu đề lấy từ output (`outcomeURL`, `resultTitle`);
+    - test đóng ô "Sửa qua Chat" khi `activePlan.id` hoặc hội thoại đổi;
+    - ngăn hội thoại trong phiên đang chạy: có dòng tóm tắt "Kế hoạch … sẵn sàng" mà không cần tải lại (SSE `plan`/`plan_preview` hiện không thêm tin vào store). Chỉ thêm tin hiển thị, không đổi cách lưu ở backend.
 
 ## Tiêu chí nghiệm thu
 

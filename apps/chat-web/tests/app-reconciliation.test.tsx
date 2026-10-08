@@ -110,7 +110,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     expect(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeEnabled();
     expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeEnabled();
     expect(useChatStore.getState().messages[0].timestamp).toBe('2026-09-30T01:07:00.000Z');
-    expect(screen.getByText('0.25s')).toBeInTheDocument();
+    expect(screen.getByText('0,3 giây')).toBeInTheDocument();
   });
 
   it('skips exactly the paused UNKNOWN through the API and refreshes completion', async () => {

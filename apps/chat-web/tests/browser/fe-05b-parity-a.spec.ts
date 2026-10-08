@@ -46,7 +46,7 @@ for (const width of [1440, 375])
         exact: true,
       });
       await expect(approve).toBeVisible();
-      await expect(page.locator('textarea:visible')).toHaveCount(1);
+      await expect(page.locator('textarea:visible')).toHaveCount(0);
       let releaseApproval!: () => void;
       const approvalGate = new Promise<void>(resolve => { releaseApproval = resolve; });
       await page.route('**/api/plans/*/approve', async (route) => {
@@ -61,7 +61,7 @@ for (const width of [1440, 375])
         .toBeGreaterThan(0);
       await approve.click();
       const heading = page.getByRole('heading', { level: 1 });
-      await expect(heading).toHaveText('ATI đang làm');
+      await expect(heading).toHaveText('Đang thực hiện công việc');
       await expect(heading).toBeFocused();
       expect(
         await page.evaluate(() => document.scrollingElement!.scrollTop),
@@ -78,7 +78,7 @@ for (const width of [1440, 375])
       } finally {
         releaseApproval();
       }
-      await expect(heading).toHaveText('Việc đã xong');
+      await expect(heading).toHaveText(/^Đã xong \d+ việc trên \d+ công cụ$/);
       await expect(heading).toBeFocused();
       expect(
         await page.evaluate(() => document.scrollingElement!.scrollTop),
