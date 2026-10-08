@@ -3,7 +3,7 @@ import type { ServiceInfo } from '../../types';
 // Service help/format hints are presentation metadata; generic behavior follows
 // the catalogue's credential field patterns and these declarative scope rules.
 import settingsMetadata from '../../assets/settings-services.json';
-interface SettingsMetadata { text: string; url: string; hint?: string; scopePattern?: string; scopeError?: string; fieldHints?: Record<string, { pattern?: string; message: string }> }
+interface SettingsMetadata { text: string; url: string; hint?: string; scopePattern?: string; scopeError?: string; fieldHints?: Record<string, { pattern?: string; message?: string; placeholder?: string }> }
 const guides = settingsMetadata as Record<string, SettingsMetadata>;
 const toolLabels: Record<string, string> = {
   search_boards: 'Tìm bảng', list_boards: 'Tìm bảng', list_lists: 'Xem danh sách', get_board: 'Xem bảng',
@@ -25,7 +25,7 @@ export function serviceView(service: ServiceInfo) {
     keyHelp: guide?.text ?? 'Xem hướng dẫn chính thức của dịch vụ để lấy khoá.',
     guideUrl: guide?.url, hint: guide?.hint ?? null, scopePattern: guide?.scopePattern, scopeError: guide?.scopeError,
     scopeLabel: service.scopeLabel ?? 'tài nguyên',
-    keyInputs: (service.credentialFields ?? []).map(field => ({ id: `${service.id}-${field.key}`, key: field.key, label: field.label, pattern: field.pattern ?? guide?.fieldHints?.[field.key]?.pattern, formatHint: guide?.fieldHints?.[field.key]?.message ?? 'Định dạng không hợp lệ.', type: field.type === 'multiline' ? 'textarea' : field.type ?? 'password', placeholder: 'Nhập khoá truy cập' })),
+    keyInputs: (service.credentialFields ?? []).map(field => ({ id: `${service.id}-${field.key}`, key: field.key, label: field.label, pattern: field.pattern ?? guide?.fieldHints?.[field.key]?.pattern, formatHint: guide?.fieldHints?.[field.key]?.message ?? 'Định dạng không hợp lệ.', type: field.type === 'multiline' ? 'textarea' : field.type ?? 'password', placeholder: field.type === 'text' ? guide?.fieldHints?.[field.key]?.placeholder ?? 'Nhập khoá truy cập' : 'Nhập khoá truy cập' })),
   };
 }
 export type Service = ReturnType<typeof serviceView>;

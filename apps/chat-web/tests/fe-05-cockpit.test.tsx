@@ -10,7 +10,7 @@ import { apiClient } from '../src/services/api-client';
 import type { ChatStoreState } from '../src/store/chat-store';
 vi.mock('../src/hooks/use-sse', async importOriginal => ({ ...await importOriginal<typeof import('../src/hooks/use-sse')>(), useSSE: () => ({ disconnected: false }) }));
 vi.mock('../src/hooks/use-conversation-history', () => ({ useConversationHistory: () => ({ loading: false, error: null }) }));
-vi.mock('../src/services/api-client', () => ({ apiClient: { getRuntime: async () => ({ runtimeMode: 'sandbox' }), getServices: async () => ({ services: [] }), getConversations: async () => ({ conversations: [] }), rejectPlan:vi.fn(), approvePlan:vi.fn() } }));
+vi.mock('../src/services/api-client', () => ({ apiClient: { getRuntime: async () => ({ runtimeMode: 'sandbox' }), getServices: async () => ({ services: [], canConfigure: false }), getConversations: async () => ({ conversations: [] }), rejectPlan:vi.fn(), approvePlan:vi.fn() } }));
 afterEach(() => { cleanup(); useChatStore.getState().reset(); });
 it('FE-05 exposes exactly one chat composer on the empty cockpit', () => {
   useChatStore.getState().reset();

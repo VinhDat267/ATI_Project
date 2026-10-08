@@ -112,7 +112,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       document.getElementById(`service-row-${id}`)?.focus();
     };
   }, [active?.id]);
-  const role = canEdit ? 'admin' : 'member', drawer = active ? { service: active } : null, badge = active;
+  const role = user?.role ?? 'member', drawer = active ? { service: active } : null, badge = active;
   const configured = list.filter(s => s.configured), unconfigured = list.filter(s => !s.configured), okCount = configured.filter(s => s.statusType === 'ok').length;
   const hasCatalogue = list.length > 0;
   const isMemberDrawer = !canEdit, scopeLabel = active?.scopeLabel;
@@ -240,8 +240,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             </div>
             <div id="list-connected-services" className="v3-space-y-3" role="list">
               {configured.length === 0
-                ? <div className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Chưa có dịch vụ nào được thiết lập.</div>
-                : configured.map(s => <ServiceRow key={s.id} service={s} onOpen={actions.openServiceDrawer} />)}
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Chưa có dịch vụ nào được thiết lập.</div>
+                : configured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>
           {/* Nhóm 2: Chưa thiết lập */}
@@ -261,8 +261,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             </div>
             <div id="list-unconnected-services" className="v3-space-y-3" role="list">
               {unconfigured.length === 0
-                ? <div className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Tất cả 8 dịch vụ đều đã được thiết lập.</div>
-                : unconfigured.map(s => <ServiceRow key={s.id} service={s} onOpen={actions.openServiceDrawer} />)}
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Tất cả 8 dịch vụ đều đã được thiết lập.</div>
+                : unconfigured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>
         </div>}

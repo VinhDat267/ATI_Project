@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { SettingsPage } from '../../src/pages/Settings/SettingsPage';
 const props = { user: { id: 'admin', email: 'admin@localhost.test', name: 'Test Admin', role: 'admin' as const }, navigate: vi.fn(), onLogout: vi.fn() };
 const slack = { id: 'slack', name: 'Slack', configured: true, allowedScope: ['C01'], credentialFields: [{ key: 'botToken', label: 'Bot Token' }] };
-beforeEach(() => { window.history.replaceState({}, '', '/settings'); vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ services: [slack] })))); });
+beforeEach(() => { window.history.replaceState({}, '', '/settings'); vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ services: [slack], canConfigure: true })))); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const open = async () => { fireEvent.click(await screen.findByRole('button', { name: /Slack —/ })); return screen.findByRole('dialog'); };
 describe('Settings page and drawer semantics (former page/modal cases)', () => {
@@ -11,7 +11,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
     let finish!: (response: Response) => void;
     const response = new Promise<Response>(resolve => { finish = resolve; });
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/services') return new Response(JSON.stringify({ services: [slack] }));
+      if (url === '/api/services') return new Response(JSON.stringify({ services: [slack], canConfigure: true }));
       expect(url).toBe('/api/services/slack/credentials'); expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual({ credentials: { botToken: 'submitted' }, allowedScope: ['C01'] }); return response;
     });
@@ -43,7 +43,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
   it('returns focus to the current service row after saving replaces its original node across groups', async () => {
     let configured = false;
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/services') return new Response(JSON.stringify({ services: [{ ...slack, configured }] }));
+      if (url === '/api/services') return new Response(JSON.stringify({ services: [{ ...slack, configured }], canConfigure: true }));
       configured = true; return new Response(JSON.stringify({ success: true, message: 'Saved' }));
     }));
     render(<SettingsPage {...props} />); const old = await screen.findByRole('button', { name: /Slack —/ }); fireEvent.click(old);

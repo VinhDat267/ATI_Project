@@ -11,7 +11,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/'); authStorage.clearStoredTokens();
   vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: false, googleEnabled: false });
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
-  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [] });
+  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [], canConfigure: false });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [] });
   vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
 });
