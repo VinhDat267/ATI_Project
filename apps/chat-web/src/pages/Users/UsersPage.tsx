@@ -170,7 +170,7 @@ export const meta: PageMeta = {
 export interface UsersPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void }
 export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
   usePrototypePage(meta);
-  const { tab, search, setSearch, roleFilter, setRoleFilter, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal } = useUsers(user);
+  const { tab, search, setSearch, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal } = useUsers(user);
   const role = user?.role ?? 'member', membersEmpty = membersView.rows.length === 0;
   const approveUser = modal === 'modal-approve' ? selected : null, lockUser = selected ? { name: selected.name, locked: selected.status === 'disabled' } : null, roleUserName = selected?.name;
   const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm';
@@ -392,20 +392,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              {/* Lọc vai trò (chỉ hiện ở tab Thành viên) */}
-              <select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} id="select-filter-role" className={`${tab === 'members' ? '' : 'hidden '}text-xs sm:text-sm px-2.5 py-2 rounded-lg border border-[#E7E7E2] bg-white text-[#4B5563] focus:border-[#FF5701] transition-colors`} aria-label="Lọc theo vai trò">
-                <option value="all">
-                  Tất cả vai trò
-                </option>
-                {' '}
-                <option value="admin">
-                  Quản trị viên
-                </option>
-                {' '}
-                <option value="member">
-                  Thành viên
-                </option>
-              </select>
+
             </div>
           </div>
           {/* CẢNH BÁO KHI XEM VỚI VAI TRÒ THÀNH VIÊN */}
@@ -483,7 +470,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                 Không tìm thấy thành viên phù hợp
               </p>
               <p className="text-xs text-[#6B7280]">
-                Hãy thử thay đổi từ khóa tìm kiếm hoặc bỏ bộ lọc vai trò.
+                Hãy thử thay đổi từ khóa tìm kiếm.
               </p>
             </div>
           </div>

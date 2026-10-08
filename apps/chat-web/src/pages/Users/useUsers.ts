@@ -8,7 +8,7 @@ import { usePageDialog } from '../usePageDialog';
 export type Tab = 'pending' | 'members';
 type ModalId = 'modal-approve' | 'modal-toggle-lock' | 'modal-change-role';
 export function useUsers(user: User | null) {
-  const [tab, setTab] = useState<Tab>('pending'), [search, setSearch] = useState(''), [roleFilter, setRoleFilter] = useState('all'), [page, setPage] = useState(1);
+  const [tab, setTab] = useState<Tab>('pending'), [search, setSearch] = useState(''), [page, setPage] = useState(1);
   const [rows, setRows] = useState<AdminUser[]>([]), [total, setTotal] = useState(0), [pendingCount, setPendingCount] = useState(0);
   const [counts, setCounts] = useState({ active: 0, locked: 0 }), [loading, setLoading] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function useUsers(user: User | null) {
   };
   const isAdmin = user?.role === 'admin';
   const pendingView = { isAdmin, users: rows.filter(row => row.status === 'pending').map(row => ({ ...row, requestedAt: new Date(row.createdAt).toLocaleString('vi-VN'), avatarInitials: avatarInitials(row), provider: row.hasGoogle && row.hasPassword ? 'Email và Google' : row.hasGoogle ? 'Google' : 'Email' })) };
-  const membersView = { isAdmin, rows: rows.filter(row => row.status !== 'pending' && (roleFilter === 'all' || row.role === roleFilter)).map(row => ({ ...row, status: row.status === 'disabled' ? 'locked' as const : 'active' as const, joinedDate: new Date(row.createdAt).toLocaleDateString('vi-VN'), sessionsCount: row.openSessions, avatarInitials: avatarInitials(row), isSelf: row.id === user?.id })) };
+  const membersView = { isAdmin, rows: rows.filter(row => row.status !== 'pending').map(row => ({ ...row, status: row.status === 'disabled' ? 'locked' as const : 'active' as const, joinedDate: new Date(row.createdAt).toLocaleDateString('vi-VN'), sessionsCount: row.openSessions, avatarInitials: avatarInitials(row), isSelf: row.id === user?.id })) };
   const stats = { pending: pendingCount, active: counts.active, locked: counts.locked, total: counts.active + counts.locked };
   const actions = {
     switchTab(next: Tab) { setTab(next); setPage(1); },
@@ -74,5 +74,5 @@ export function useUsers(user: User | null) {
     confirmToggleLock() { void apply(selected?.status === 'disabled' ? 'enable' : 'disable'); },
     confirmChangeRole() { void apply('role'); },
   };
-  return { tab, search, setSearch: actions.onSearch, roleFilter, setRoleFilter, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal };
+  return { tab, search, setSearch: actions.onSearch, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal };
 }

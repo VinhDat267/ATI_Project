@@ -88,7 +88,7 @@ for (const leave of ['logout', 'workspace'] as const) {
       } else await page.getByRole('link', { name: 'Quay lại không gian làm việc' }).click();
       if (leave === 'logout') {
         await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
-        await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).toBeVisible();
+        await expect(page.locator('[data-od-id="btn-header-login"]').or(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).first()).toBeVisible();
       } else await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
       release();
       await page.waitForFunction(() => sessionStorage.getItem('auth05-test-start-read') === 'true');

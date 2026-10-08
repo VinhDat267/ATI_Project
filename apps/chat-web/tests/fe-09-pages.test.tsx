@@ -53,6 +53,24 @@ it('disables approval for an unverified account without reject or invite actions
   expect(screen.queryByRole('button', { name: /Từ chối|Mời/ })).toBeNull();
   expect(document.documentElement.dataset.protoPage).toBe('users');
 });
+it('omits unsupported role filtering and pages actual active/disabled rows without claiming a fixed row count', async () => {
+  window.history.replaceState({}, '', '/admin/users');
+  vi.spyOn(apiClient, 'getAdminUsers').mockImplementation(async options => {
+    const status = options?.status ?? 'active', page = options?.page ?? 1, limit = options?.limit ?? 20;
+    const total = status === 'pending' ? 0 : 21;
+    const count = status === 'pending' ? 0 : Math.min(limit, page === 1 ? 20 : 1);
+    return { users: Array.from({ length: count }, (_, index) => ({ ...user, id: `${status}-${page}-${index}`, name: `${status} ${page}-${index}`, role: 'member' as const, status, emailVerified: true, hasPassword: true, hasGoogle: false, createdAt: '2026-10-01', openSessions: 0 })), total, pendingCount: 0, page, limit };
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('tab', { name: /Thành viên/ }));
+  await waitFor(() => expect(document.querySelector('#table-members-body')?.children).toHaveLength(40));
+  expect(screen.queryByLabelText('Lọc theo vai trò')).toBeNull();
+  expect(screen.getByText('42', { selector: '#stat-total-members' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+  await waitFor(() => expect(document.querySelector('#table-members-body')?.children).toHaveLength(2));
+  expect(screen.getByText('Trang 2')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Trang sau' })).toBeDisabled();
+});
 it('loads own history by title and cursor, opens the saved route, and preserves a newer rename draft after a late save', async () => {
   window.history.replaceState({}, '', '/history');
   const list = vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [conversation], nextCursor: 'cursor-1' });
