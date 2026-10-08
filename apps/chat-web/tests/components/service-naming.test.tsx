@@ -1,7 +1,9 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { SettingsModal } from '../../src/components/SettingsModal';
+import { SettingsPage } from '../../src/pages/Settings/SettingsPage';
+const settingsProps = { user: { id: 'admin', email: 'admin@localhost.test', name: 'Test Admin', role: 'admin' as const }, navigate: () => {}, onLogout: () => {} };
+
 import { ServiceCard } from '../../src/components/ServiceCard';
 import { ReconciliationNotice } from '../../src/components/ReconciliationNotice';
 import { MissionControlLaunchpad } from '../../src/components/MissionControlLaunchpad';
@@ -17,9 +19,12 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it('labels the allowlist from the API scopeLabel, with a neutral fallback instead of a per-service table', async () => {
   vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [demo, unlabelled] });
-  render(<SettingsModal isOpen onClose={() => {}} />);
-  expect(await screen.findByText('Giới hạn không gian Demo mà AI được phép đọc và ghi.')).toBeInTheDocument();
-  expect(screen.getByText('Giới hạn tài nguyên mà AI được phép đọc và ghi.')).toBeInTheDocument();
+  render(<SettingsPage {...settingsProps} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Demo Hub —/ }));
+  expect(screen.getByText('ATI chỉ đọc và ghi ở những không gian Demo trong danh sách này.')).toBeInTheDocument();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent.click(screen.getByRole('button', { name: /Boardlike —/ }));
+  expect(screen.getByText('ATI chỉ đọc và ghi ở những tài nguyên trong danh sách này.')).toBeInTheDocument();
 });
 
 it('uses a textarea for a multiline credential and clears the typed secret once saved', async () => {
