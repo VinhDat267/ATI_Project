@@ -24,6 +24,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
   const hadSession = useRef(Boolean(authStorage.getStoredTokens().accessToken));
+  const loggingOut = useRef(false);
   useEffect(() => {
     let current = true;
     apiClient.getAuthConfig().then(data => { if (current) setAuthConfig(data); }).catch(() => {});
@@ -37,7 +38,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     else if (!tokens.accessToken) setUser(null);
     if (lostSession) {
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
-      navigate('/login', true);
+      if (!loggingOut.current) { setAuthError('Phiên đăng nhập đã hết hạn'); navigate('/login', true); }
     }
   }), [navigate]);
   useEffect(() => {
@@ -78,11 +79,13 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     finally { setIsLoggingIn(false); }
   };
   const onLogout = async () => {
+    loggingOut.current = true;
     try { await apiClient.logout(); } catch { /* Local logout still succeeds if the server cannot be reached. */ }
     finally {
       authStorage.clearStoredTokens(); setAuthToken(null); setUser(null);
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
       navigate('/');
+      loggingOut.current = false;
     }
   };
   const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password', 'google-callback'].includes(route.kind);

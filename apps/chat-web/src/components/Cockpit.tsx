@@ -21,6 +21,13 @@ import { HistoryDrawer } from '../pages/Cockpit/HistoryDrawer';
 import { PreviewModal } from '../pages/Cockpit/PreviewModal';
 import { DrawerBackdrop } from '../pages/Cockpit/DrawerBackdrop';
 import { formatDuration } from '../pages/Cockpit/presentation';
+import { RefusalMoment, ExpandedClarificationMoment, clarificationVariant } from '../pages/Responses/ResponseMoment';
+import { SlowPlanningMoment, PlanningErrorMoment, latePlanNotice } from '../pages/Errors/PlanningErrors';
+import { usePlanningWait } from '../hooks/use-planning-wait';
+import responseCss from '../pages/Responses/page.css?inline';
+import errorCss from '../pages/Errors/page.css?inline';
+const responseMeta = { ...meta, id: 'responses', css: meta.css + responseCss };
+const errorMeta = { ...meta, id: 'errors', css: meta.css + errorCss };
 
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
@@ -28,7 +35,7 @@ interface Props {
   onSendMessage: (text: string) => void; onNewConversation: () => void;
   onSelectConversation: (id: string) => void; onSettings: () => void;
   onApprove: () => void; onCancel: () => void; recovery: RecoveryControls | null;
-  contentOverride?: ReactNode;
+  contentOverride?: ReactNode; canConfigureServices?: boolean;
 }
 const prompts: Record<string,string> = Object.fromEntries(Object.entries(presentation.services).map(([id, asset]) => [id, asset.prompt]));
 export function resourceDestination(step: PlanStep, labels: Record<string, string> = {}): string {
@@ -46,11 +53,16 @@ export function resourceDestination(step: PlanStep, labels: Record<string, strin
 }
 function servicePrompt(service: ServiceInfo): string { return (prompts[service.id] ?? 'Mô tả công việc với {service}').replace('{service}',service.name); }
 export function Cockpit(props: Props) {
-  usePrototypePage(meta);
   const state = useChatStore();
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
   useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(current && (data?.runtimeMode==='sandbox' || data?.runtimeMode==='live'))setRuntimeMode(data.runtimeMode);}).catch(()=>{});return()=>{current=false;}; }, []);
-  const moment = selectMoment(state, state.executionSnapshot);
+  const actualMoment = selectMoment(state, state.executionSnapshot);
+  const pending = state.planningByConversation[state.conversationId ?? '__draft__'];
+  const waitingKey = pending ? `${state.conversationId}:${pending.requestId ?? pending.startedAt}` : null;
+  const [dismissedWait, setDismissedWait] = useState<string | null>(null);
+  const [editingResponse, setEditingResponse] = useState<string | null>(null);
+  const milliseconds = usePlanningWait(pending?.startedAt, state.isPlanning);
+  const moment = actualMoment === 2 && waitingKey && dismissedWait === waitingKey ? 1 : actualMoment;
   const [drawer, setDrawer] = useState<'history' | 'conversation' | null>(null);
   const [preview, setPreview] = useState<PlanStep | null>(null);
   const [draft, setDraft] = useState('');
@@ -84,7 +96,7 @@ export function Cockpit(props: Props) {
   useEffect(() => { setPreview(null); }, [state.conversationId, state.activePlan?.id]);
   const send = (text: string) => {
     if (!text.trim() || state.isPlanning) return;
-    props.onSendMessage(text.trim()); setDraft('');
+    setEditingResponse(null); props.onSendMessage(text.trim()); setDraft('');
     if (state.activeClarification) state.setClarification(null);
   };
   const onKeyDown = (event: import('react').KeyboardEvent<HTMLTextAreaElement>, text = draft) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(text); } };
@@ -112,14 +124,31 @@ export function Cockpit(props: Props) {
   const latestMessage = state.messages.at(-1);
   const terminalError = latestMessage?.metadata?.type === 'planning_error' ||
     (latestMessage?.role === 'system' && /^(\[Lỗi|Lỗi:)/.test(latestMessage.content)) ? latestMessage : null;
+  const responseKey = `${state.conversationId}:${latestMessage?.id}:${state.activeClarification?.question}`;
+  const responseEditing = editingResponse === responseKey;
+  const variant = clarificationVariant(state.activeClarification, request ?? '');
+  const expanded = moment === 3 && variant !== null;
+  const slow = moment === 2 && milliseconds > 15_000;
+  const planningError = moment === 1 && terminalError?.metadata?.type === 'planning_error' && !responseEditing;
+  const canConfigure = props.canConfigureServices ?? props.user?.role === 'admin';
+  usePrototypePage(planningError || slow ? errorMeta : moment === 'refusal' || expanded ? responseMeta : meta);
+  const editRequest = (text: string) => {
+    setDraft(text); setSelected(null); setDrawer(null); setEditingResponse(responseKey);
+    queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
+  };
+  const response = moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest}/>
+    : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
+    : slow ? <SlowPlanningMoment seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
+    : planningError ? <PlanningErrorMoment request={request ?? ''} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>
+    : null;
   const title = moment === 1 ? 'Bạn muốn nhờ ATI việc gì?' : moment === 2 ? 'Đang tìm đúng chỗ' : moment === 3 ? 'ATI cần bạn chọn thêm' : moment === 4 ? 'Kiểm tra trước khi làm' : moment === 5 ? 'ATI đang làm' : moment === 6 ? 'Việc đã xong' : moment === 'refusal' ? 'Chưa thể làm yêu cầu này' : moment === 'unsuccessful' ? 'Yêu cầu đã kết thúc' : 'Cần xử lý trước khi tiếp tục';
   return <>
     <div data-cockpit-background className="contents" onFocusCapture={event => { editing.current = (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) && !drawer && !preview; }} onBlurCapture={event => { if (!(event.relatedTarget instanceof HTMLTextAreaElement || event.relatedTarget instanceof HTMLInputElement) && (event.relatedTarget !== null || (event.target as HTMLElement).isConnected)) editing.current = false; }}>
       <CockpitHeader runtimeMode={runtimeMode} historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} request={request ?? ''} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
-      <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center min-w-0`}>
+      <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 ${moment === 'refusal' || expanded || slow || planningError ? 'sm:py-8' : 'sm:py-10'} flex flex-col ${moment === 'refusal' || expanded ? '' : 'justify-center'} min-w-0`}>
         {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
         {moment === 6 && <span role="status" className="sr-only">Quy trình đã hoàn thành.</span>}
-        {props.contentOverride ?? (moment === 1 ? <RequestMoment feedback={terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment runtimeMode={runtimeMode} key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 || moment === 'unsuccessful' ? <ReceiptMoment terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : [7,8,9].includes(moment as number) ? <RecoveryMoment key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`} moment={moment as 7|8|9} snapshot={snapshot} steps={executionSteps} services={props.services} controls={props.recovery}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
+        {props.contentOverride ?? response ?? (moment === 1 ? <RequestMoment feedback={dismissedWait === waitingKey && waitingKey ? <p role="status" className="text-sm text-brand-muted">{latePlanNotice}</p> : terminalError?.metadata?.type !== 'planning_error' && terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment runtimeMode={runtimeMode} key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 || moment === 'unsuccessful' ? <ReceiptMoment terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : [7,8,9].includes(moment as number) ? <RecoveryMoment key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`} moment={moment as 7|8|9} snapshot={snapshot} steps={executionSteps} services={props.services} controls={props.recovery}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
           <p className="text-sm uppercase tracking-widest text-text-secondary mb-3">ATI · Điều phối công việc</p>
           <h1 id={`heading-moment-${String(moment)}`} tabIndex={-1} className="text-3xl sm:text-4xl mb-6">{title}</h1>
           {terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>}
@@ -132,7 +161,7 @@ export function Cockpit(props: Props) {
         {state.executionSnapshot && state.activePlan && state.activePlan.id !== state.executionSnapshot.plan.id && moment!==6 && <details className="mt-5 text-xs text-brand-muted"><summary>Kế hoạch đang chờ: <span>{state.activePlan?.summary}</span></summary>{state.executionSnapshot.execution.status==='stopped' && <p role="status">Quy trình đã dừng.</p>}{state.executionSnapshot.execution.status==='completed' && <p role="status">Quy trình đã hoàn thành.</p>}</details>}
         {[4,5,6,7,8,9,'unsuccessful'].includes(moment as number) && state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
       </main>
-      {!props.contentOverride && ![1,3,4].includes(moment as number) && drawer !== 'conversation' && <ChatComposer variant="bottom" {...composerProps}/>}
+      {!props.contentOverride && (![1,3,4].includes(moment as number) || expanded || planningError) && drawer !== 'conversation' && <ChatComposer variant={moment === 'refusal' || expanded ? 'response' : 'bottom'} {...composerProps}/>}
     </div>
     {drawer && <DrawerBackdrop onClose={()=>setDrawer(null)}/>}
     {drawer === 'history' && <HistoryDrawer conversationId={state.conversationId} onClose={()=>setDrawer(null)} onNewConversation={props.onNewConversation} onSelectConversation={props.onSelectConversation}/>}

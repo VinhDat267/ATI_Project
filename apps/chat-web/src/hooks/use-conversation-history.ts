@@ -8,6 +8,8 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   const store = useChatStore.getState();
   const data = await apiClient.getConversation(id);
   if (!isCurrent()) return;
+  const hydrateResponse = useChatStore.getState().messages === store.messages &&
+    useChatStore.getState().planRevision === store.planRevision;
   const pending = useChatStore.getState().planningByConversation[id];
   if (pending) {
     const acceptedId = pending.messageId ?? data.messages?.find(message => message.role === 'user' &&
@@ -19,6 +21,19 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   for (const message of data.messages || []) {
     if (message.metadata?.type === 'working_memory' && !message.content) continue;
     store.addMessage({ ...message, role: message.role || 'user', content: message.content || '', timestamp: message.created_at || message.timestamp });
+  }
+  const latest = data.messages?.filter(message => message.metadata?.type !== 'working_memory').at(-1);
+  if (hydrateResponse && !useChatStore.getState().isPlanning) {
+    const refusal = latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:');
+    if (refusal || ['clarification', 'planning_error'].includes(latest?.metadata?.type ?? '')) {
+      // A snapshot started by SSE onopen may arrive before history. Restore the
+      // latest response's owner too; the saved snapshot still governs unsafe work.
+      store.setActivePlan(null); store.setPlanStatus(refusal ? 'rejected' : 'idle');
+      store.setClarification(null);
+    }
+    if (latest?.metadata?.type === 'clarification') {
+      store.setClarification({ question: latest.content, options: Array.isArray(latest.metadata.options) ? latest.metadata.options.filter(option => typeof option === 'string' && option.trim()) : [], context: typeof latest.metadata.context === 'string' ? latest.metadata.context : undefined });
+    }
   }
   try {
     const revision = useChatStore.getState().planRevision;

@@ -170,5 +170,5 @@ it.each([
   {content:'[Lỗi gửi tin nhắn]: Transport failure'},
 ])('terminal error feedback remains visible outside the conversation drawer: $content',message=>{
   useChatStore.setState({messages:[{id:'error',role:'system',...message}]}); renderCockpit();
-  expect(screen.getByRole('alert')).toHaveTextContent(message.content);
+  expect(screen.getByRole('alert')).toHaveTextContent(message.metadata?.type === 'planning_error' ? 'Không thể lập kế hoạch lúc này. Hãy thử lại.' : message.content);
 });

@@ -9,7 +9,9 @@ export interface ChatMessage {
   status?: MessageStatus;
   timestamp?: string;
   created_at?: string;
-  metadata?: { type?: string; planId?: string; plan?: ActivePlan; resourceLabels?: Record<string, string>; requestId?: string; replyToMessageId?: string };
+  metadata?: { type?: string; planId?: string; plan?: ActivePlan; resourceLabels?: Record<string, string>; requestId?: string; replyToMessageId?: string;
+    reason?: string; suggestion?: string; unavailableServices?: Array<{ id: string; name: string }>;
+    options?: string[]; context?: string };
 }
 
 export type StepState = 'pending' | 'running' | 'succeeded' | 'failed' | 'paused' | 'skipped' | 'unknown';

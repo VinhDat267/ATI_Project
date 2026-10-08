@@ -104,12 +104,14 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
     await expect(page.getByRole('button',{name:'Duyệt kế hoạch',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
     await expect(page.getByText(/Saved message 24:/)).toBeAttached();
-    await area.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    // Programmatic positioning must deliver the scroll input before a planner
+    // response can append another message; native event delivery is asynchronous.
+    await area.evaluate(element => { element.scrollTop = element.scrollHeight; element.dispatchEvent(new Event('scroll')); });
     const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
     await composer.fill('FE02 scroll at bottom'); await page.locator('form').filter({ has: composer }).getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
     await expect.poll(() => area.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThan(120);
     await expect(area.getByText('FE02 scroll at bottom', { exact: true })).toBeAttached();
-    await area.evaluate(element => { element.scrollTop = 80; });
+    await area.evaluate(element => { element.scrollTop = 80; element.dispatchEvent(new Event('scroll')); });
     await expect.poll(() => area.evaluate(element => element.scrollTop)).toBe(80);
     await composer.fill('FE02 while reading above'); await page.locator('form').filter({ has: composer }).getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
     await expect(area.getByText('FE02 while reading above', { exact: true })).toBeAttached();

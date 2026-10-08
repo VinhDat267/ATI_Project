@@ -91,10 +91,10 @@ test('FE-05: native terminal SSE planner error remains visible in the cockpit',a
     await expect(page.getByRole('log').getByText(`Lỗi: ${message}`,{exact:true}).first()).toBeVisible();
     await page.screenshot({path:info.outputPath('terminal-error-in-log.png'),animations:'disabled'});
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/}).getByRole('alert')).toHaveText(`Lỗi: ${message}`);
+    await expect(page.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/}).getByRole('alert')).toHaveText('Không thể lập kế hoạch lúc này. Hãy thử lại.');
     await expect(page.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/}).getByRole('alert')).toBeInViewport();
     const text=await page.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/}).innerText();
-    const errorVisible=text.includes(message);
+    const errorVisible=text.includes('Không thể lập kế hoạch lúc này. Hãy thử lại.');
     await save(info,page,'terminal-error-hidden',{errorVisible,text,expected:'A visible error fallback after planning ended; frontend SSE boundary proof only'});
     expect(errorVisible).toBe(true);
     await input.fill('A subsequent request after the terminal error');
@@ -146,7 +146,7 @@ for (const event of ['clarification','error']) for (const readPhase of ['during 
       await expect(cockpit.getByText('NEW request needs a destination',{exact:true})).toBeVisible();
       await expect(cockpit.getByRole('radio',{name:'NEW destination A',exact:true})).toBeEnabled();
     } else {
-      await expect(cockpit.getByRole('alert')).toHaveText('Lỗi: NEW request failed before planning finished');
+      await expect(cockpit.getByRole('alert')).toHaveText('Không thể lập kế hoạch lúc này. Hãy thử lại.');
       await expect(cockpit.getByRole('alert')).toBeInViewport();
     }
   } finally {releaseTerminal();releaseSnapshot();}

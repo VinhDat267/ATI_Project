@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createServer, type Server } from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSSE } from '../src/hooks/use-sse';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
@@ -17,6 +17,7 @@ let streamHeaders: string[] = [];
 let refreshCount = 0;
 const nativeFetch = globalThis.fetch;
 function Client() { const state = useSSE('c1', 'expired'); return state?.disconnected ? <p>Mất kết nối, đang thử lại…</p> : null; }
+function RetryClient() { const state = useSSE('c1', 'expired'); return <button onClick={state.reconnect}>Thử lại luồng</button>; }
 function SubscribedClient() {
   const [token, setToken] = useState(authStorage.getStoredTokens().accessToken);
   useEffect(() => authStorage.subscribeAuthTokens(tokens => setToken(tokens.accessToken)), []);
@@ -48,6 +49,16 @@ it('real HTTP 401 refreshes once and sends the new header while hidden-tab SSE s
   await waitFor(() => expect(useChatStore.getState().activeClarification?.question).toBe('Kết nối đã khôi phục'));
   expect(streamHeaders).toEqual(['Bearer expired', 'Bearer fresh']);
   expect(authStorage.getStoredTokens().accessToken).toBe('fresh');
+});
+it('manual reconnection aborts the previous real stream and opens a read-only stream with fresh authentication', async () => {
+  const signals: AbortSignal[] = [];
+  vi.stubGlobal('fetch', (url: string, init: RequestInit) => { if (String(url).endsWith('/stream') && init.signal) signals.push(init.signal); return nativeFetch(new URL(url, base), init); });
+  render(<RetryClient />);
+  await waitFor(() => expect(streamHeaders).toEqual(['Bearer expired', 'Bearer fresh']));
+  const previous = signals.at(-1)!;
+  fireEvent.click(screen.getByRole('button', { name: 'Thử lại luồng' }));
+  await waitFor(() => expect(streamHeaders).toHaveLength(3));
+  expect(previous.aborted).toBe(true); expect(streamHeaders[2]).toBe('Bearer fresh'); expect(refreshCount).toBe(1);
 });
 it('real refresh 401 clears authentication so AuthGate can show sign in', async () => {
   refreshStatus = 401; render(<Client />);
