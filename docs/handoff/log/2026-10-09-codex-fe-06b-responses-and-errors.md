@@ -108,6 +108,14 @@ Khác biệt có chủ đích với demo:
 
 Model/provider live, external write live, JWT hết hạn theo thời gian thực trong production, screen reader, reviewer repository và nghiệm thu sản phẩm. CI đúng head phải được kiểm trên PR sau commit này. Không tự merge; CURRENT-STATE/ROADMAP chỉ reviewer cập nhật sau merge.
 
+## Bổ sung sau CI đầu
+
+[Run 37815491094](https://github.com/VinhDat267/ATI_Project/actions/runs/37815491094), head `c57b10e`, check đạt nhưng default browser **60 pass/1 fail** ở `fe-02-routing-history.spec.ts:113` (expected scrollTop80, received16268). FE-06B **5/5 pass**. RED là lỗi thật trên CI; focused trước sửa trên Windows vẫn 10/10 nên chưa tái hiện được ở local.
+
+Source/log và review độc lập chỉ ra race của fixture: gán scrollTop bằng evaluate nhưng native scroll event xử lý bất đồng bộ; test chỉ chờ tin optimistic, planner response có thể append trước khi onScroll cập nhật nearBottom. Sửa duy nhất fixture FE-02: phát `new Event('scroll')` cùng callback gán vị trí, ở cả đáy và phía trên. Giữ nguyên exact80, near-bottom threshold và append-while-reading assertions; không sleep, không sửa state nội bộ hoặc production scrolling.
+
+Sau sửa: `ci-scroll-green.log` **10/10, exit 0**; `typecheck-ci-scroll.log` **exit 0**; `git diff --check` sạch. Reviewer xác nhận đây là fixture synchronization hợp lệ; không coi là chứng minh mọi interleaving cuộn vật lý đều không có race. CI đúng head sau sửa phải kiểm lại trên PR. Lần bổ sung này không đổi code sản phẩm hoặc bộ 64 ảnh đã băm ở trên.
+
 ## SHA-256
 
 | File | SHA256 |
