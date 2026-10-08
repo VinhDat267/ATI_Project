@@ -145,6 +145,21 @@ describe('AUTH-07 current password for Google unlink with real HTTP and PostgreS
     } finally { await blocker.query('ROLLBACK'); blocker.release(); await pending; }
   });
 
+  it.each(['users', 'auth_sessions'] as const)('rejects natural session expiry while waiting on the %s row without changing its expiry', async table => {
+    const blocker = await pool.connect(); await blocker.query('BEGIN');
+    await blocker.query(`SELECT id FROM ${table} WHERE id=$1 FOR UPDATE`, [table === 'users' ? userId : current.sessionId]);
+    const pending = post({ currentPassword: password }).then(response => response);
+    try {
+      await waitingOn(table);
+      now += 7 * 24 * 60 * 60_000;
+      await blocker.query('COMMIT');
+      const response = await pending;
+      expect(response.status).toBe(401); expect(response.body.code).toBe('INVALID_SESSION');
+      expect(await profile()).toEqual({ google_sub: subject, google_email: 'linked@example.test' });
+      expect((await pool.query('SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL', [userId])).rows[0].n).toBe(2);
+    } finally { await blocker.query('ROLLBACK'); blocker.release(); await pending; }
+  });
+
   it('rechecks the user status after another connection disables the account under the user lock', async () => {
     const blocker = await pool.connect(); await blocker.query('BEGIN');
     await blocker.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);

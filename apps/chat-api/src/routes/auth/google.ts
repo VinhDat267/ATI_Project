@@ -116,7 +116,7 @@ export function createGoogleRoutes(options: AuthRoutesOptions): Router {
           failures.record(key);
           res.status(400).json({ error: 'Mật khẩu hiện tại không đúng.', code: 'INVALID_CURRENT_PASSWORD' }); return;
         }
-        await repo!.unlink(user.id, user.sid!, account.password!, clock());
+        await repo!.unlink(user.id, user.sid!, account.password!, clock);
         failures.clear(key);
         res.json({ success: true });
       });

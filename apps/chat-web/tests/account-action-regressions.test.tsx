@@ -107,8 +107,9 @@ it('refreshes an expired access token once before starting authenticated Google 
 });
 it('refreshes expired Google unlink and reloads the actual account method state', async () => {
   await openAccount(); authStorage.setStoredTokens({ accessToken: expired });
-  vi.spyOn(window, 'prompt').mockReturnValue('Current!fixture-password');
   fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
+  fireEvent.change(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google'), { target: { value: 'Current!fixture-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ liên kết' }));
   expect(await screen.findByRole('status')).toHaveTextContent('Đã gỡ liên kết Google');
   expect(screen.getByRole('button', { name: 'Liên kết Google' })).toBeEnabled();
   expect(calls.filter(call => call.path.includes('/google/') || call.path.endsWith('/refresh')).map(call => call.path)).toEqual([

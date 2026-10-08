@@ -203,7 +203,7 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
   it('does not create a Google-authenticated session if unlink wins after account resolution', async () => {
     const u = await user(); await pool.query('UPDATE users SET google_sub=$2 WHERE id=$1', [u.id, subject]);
     const original = await users.sessions.create(u.id, undefined, now);
-    await users.googleAuth.unlink(u.id, original.sessionId, u.password!, now);
+    await users.googleAuth.unlink(u.id, original.sessionId, u.password!, () => now);
     await expect(users.sessions.create(u.id, undefined, now, undefined, subject)).rejects.toThrow();
     expect((await pool.query('SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1', [u.id])).rows[0].n).toBe(1);
   });

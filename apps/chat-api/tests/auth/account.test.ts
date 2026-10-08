@@ -133,7 +133,7 @@ describe('AUTH-05 account management with real PostgreSQL and HTTP', () => {
     const link = { state_hash: 'a'.repeat(64), browser_binding_hash: 'b'.repeat(64), code_verifier: 'v', nonce: 'n', mode: 'link' as const, user_id: userId, session_id: sid };
     await users.googleAuth.resolveAccount({ sub: `google-${userId}`, email: 'personal@gmail.test', name: 'Personal' }, link, false, now);
     expect((await as(current.accessToken).get('/api/account')).body.account).toMatchObject({ hasGoogle: true, googleEmail: 'personal@gmail.test' });
-    await users.googleAuth.unlink(userId, sid, storedPassword, now);
+    await users.googleAuth.unlink(userId, sid, storedPassword, () => now);
     expect((await as(current.accessToken).get('/api/account')).body.account).toMatchObject({ hasGoogle: false, googleEmail: null });
   });
 
