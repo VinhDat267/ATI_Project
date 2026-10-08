@@ -1,0 +1,25 @@
+# 2026-10-08 · Claude Code · Merge FE-07 (#108) và FE-06 phần (a) (#107)
+
+- **Đã làm:**
+  - Người dùng cho merge cả hai PR sau review.
+  - **#108 merge** lúc 19:26:04 Việt Nam tại `d5e7a9e`, khoá theo head `b5e53e9`, CI xanh.
+  - **#107: gộp `main` vào nhánh** (`c39cf42`). Xung đột duy nhất ở bộ lọc `default` của `scripts/test-v3-browser.mjs`, vì #108 thêm `FE-07:` và #107 thêm `FE-06A:` trên cùng dòng; giữ cả hai. `service-naming.test.tsx` tự gộp được: import `SettingsPage` của #108, `RecoveryMoment` của #107. Không còn import tới `SettingsModal`, `ReconciliationNotice` hay `PartialFailureModal`.
+  - **#107 merge** lúc 19:36:03 Việt Nam tại `f796467`, khoá theo head `c39cf42`. `git diff c39cf42 f796467` rỗng.
+  - Đã xoá hai nhánh trên GitHub. Nhánh local và worktree `fe-06-cockpit-recovery-a`, `fe-07-service-connections` nằm trong thư mục của Codex, để Codex dọn. Worktree FE-06A của Codex chậm hơn nhánh đã merge; phần (b) nên làm trên nhánh mới từ `main`.
+  - Cập nhật CURRENT-STATE (đầu trang, mục 3, 4, 5) và ROADMAP (FE-06, FE-07). Ghi luôn #104, #105, #106 vào CURRENT-STATE, vì trước đó chưa có.
+- **PR / commit:** nhánh `docs/state-after-107-108`.
+- **Kiểm tra đã chạy (lệnh và kết quả):** trên bản gộp `c39cf42`, PostgreSQL 16 tmpfs riêng ở 55538, sandbox:
+  - `npm run check` exit 0: 47 + 340 + 196 + 25 + 349 + 541 = **1.498 v3**, cộng **165 eval**;
+  - `npm run test:browser:v3` exit 0: 56 + 2 + 5 + 2 + 2 + 6 = **73/73 qua 11 nhóm**;
+  - [CI PR #107](https://github.com/VinhDat267/ATI_Project/actions/runs/37777503190) SUCCESS trên `c39cf42`;
+  - [CI main sau #108](https://github.com/VinhDat267/ATI_Project/actions/runs/37776824417) SUCCESS đúng `d5e7a9e`;
+  - [CI main sau #107](https://github.com/VinhDat267/ATI_Project/actions/runs/37778031151) SUCCESS đúng `f796467`.
+- **Chưa làm / vấn đề phát hiện:**
+  - Phần sửa FE-06A sau review (`2e4e6c7`) chỉ Claude Code tự kiểm.
+  - Câu "Sửa rồi thử lại" mới chưa chạy với model thật.
+  - 5 P3 của FE-07 và 3 ca browser chập chờn ghi ở CURRENT-STATE mục 5.
+- **Việc tiếp theo đề xuất:**
+  - FE-06 phần (b), mốc 20/10;
+  - FE-08, FE-09 giao song song được;
+  - W3-10 (#102) vẫn chờ đo bằng model thật;
+  - nhờ Codex xem lại `2e4e6c7`.
