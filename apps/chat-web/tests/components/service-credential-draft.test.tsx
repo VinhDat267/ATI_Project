@@ -2,7 +2,9 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { SettingsModal } from '../../src/components/SettingsModal';
+import { SettingsPage } from '../../src/pages/Settings/SettingsPage';
+const settingsProps = { user: { id: 'admin', email: 'admin@localhost.test', name: 'Test Admin', role: 'admin' as const }, navigate: () => {}, onLogout: () => {} };
+
 import type { ServiceInfo } from '../../src/types';
 
 const nativeFetch = globalThis.fetch;
@@ -66,10 +68,11 @@ afterEach(async () => {
 });
 
 const submit = async (secret = submittedSecret) => {
-  render(<SettingsModal isOpen onClose={() => {}} />);
+  render(<SettingsPage {...settingsProps} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Demo —/ }));
   fireEvent.change(await screen.findByLabelText('Secret'), { target: { value: secret } });
   fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'synthetic submitted token' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
   await waitFor(() => expect(requests).toHaveLength(1));
 };
 
@@ -81,14 +84,14 @@ it.each([
     credentialType = type;
     await submit(submitted);
     fireEvent.change(screen.getByLabelText('Secret'), { target: { value: draft } });
-    fireEvent.change(screen.getByPlaceholderText('Thêm Demo Space...'), { target: { value: 'S2 draft' } });
+    fireEvent.change(screen.getByLabelText('Thêm Demo Space'), { target: { value: 'S2 draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Thêm' }));
     releaseSave();
-    expect(await screen.findByText('Saved via HTTP')).toBeInTheDocument();
+    expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
     expect(requests).toEqual([{
       credentials: { secret: submitted, token: 'synthetic submitted token' }, allowedScope: ['S1'],
     }]);
-    expect(serviceReads).toBe(2);
+    await waitFor(() => expect(serviceReads).toBe(2));
     expect(screen.getByLabelText('Secret')).toHaveValue(draft);
     expect(screen.getByLabelText('Token')).toHaveValue('');
     expect(screen.getByText('S2 draft')).toBeInTheDocument();
@@ -98,7 +101,7 @@ it.each([
 it('clears credentials that still match the successful submission', async () => {
   await submit();
   releaseSave();
-  expect(await screen.findByText('Saved via HTTP')).toBeInTheDocument();
+  expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
   expect(screen.getByLabelText('Secret')).toHaveValue('');
   expect(screen.getByLabelText('Token')).toHaveValue('');
 });

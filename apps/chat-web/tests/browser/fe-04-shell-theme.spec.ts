@@ -31,8 +31,8 @@ test('FE-04: shell menu, protected routes, cross-tab theme and mobile sandbox wa
   await expect(page.getByRole('menuitem', { name: 'Nhật ký điều phối' })).toBeFocused();
   await page.getByRole('menuitem', { name: 'Nhật ký điều phối' }).press('Escape'); await expect(avatar).toBeFocused();
   await avatar.click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
-  await expect(page).toHaveURL(/\/settings$/); await expect(page.getByRole('heading', { name: /Cài đặt & Tích hợp/, level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'Nhật ký điều phối', exact: true }).click();
+  await expect(page).toHaveURL(/\/settings$/); await expect(page.getByRole('heading', { name: 'Kết nối dịch vụ', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
   await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký điều phối', level: 1 })).toBeVisible();
   const other = await context.newPage(); await other.goto('/guide');
   await page.getByRole('button', { name: 'Chuyển sang giao diện Tối' }).click();
@@ -58,7 +58,8 @@ for (const theme of ['light', 'dark'] as const) {
     // Cockpit uses prototype typography under spec 1.2. Other pages retain FE-04.
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: /Menu người dùng/ }).click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
-    const save = page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).first();
+    await page.getByRole('button', { name: /Trello —/ }).click();
+    const save = page.getByRole('button', { name: 'Lưu thay đổi', exact: true });
     await expect(save).toBeVisible(); expect(await save.evaluate(el => getComputedStyle(el).fontWeight)).toBe('600');
   });
   test(`FE-04: retained landing comparison copy is readable on its rendered ${theme} backgrounds`, async ({ page }, info) => {
@@ -84,23 +85,21 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('FE-04: mobile prototype drawer works and settings retain 40 by 40 touch targets', async ({ page }, info) => {
+test('FE-04: mobile prototype drawers preserve scope editing with source-sized touch targets', async ({ page }, info) => {
   await login(page); await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
   await expect(page).toHaveURL(/\/c\//);
   await page.setViewportSize({ width: 375, height: 812 });
   const open = page.getByRole('button', { name: 'Mở danh sách hội thoại' });
-  const assertTarget = async (control: ReturnType<Page['getByRole']>) => {
-    await expect(control).toBeVisible(); const box = await control.boundingBox();
-    expect(box!.width).toBeGreaterThanOrEqual(40); expect(box!.height).toBeGreaterThanOrEqual(40);
-  };
   await expect(open).toBeVisible(); await info.attach('cockpit-prototype-history-target',{body:JSON.stringify(await open.boundingBox()),contentType:'application/json'}); await open.click();
   const close = page.getByRole('button', { name: 'Đóng Lịch sử yêu cầu' });
   await expect(close).toBeVisible(); await expect(page.getByRole('button', { name: /^Đổi tên / }).first()).toBeVisible();
   await page.screenshot({ path: info.outputPath('FE04-mobile-drawer-targets.png'), animations: 'disabled' });
   await close.click();
   await page.getByRole('button', { name: /Menu người dùng/ }).click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
-  const card = page.getByRole('heading', { name: 'Trello Workspace', exact: true }).locator('..').locator('..').locator('..');
-  await card.getByPlaceholder(/^Thêm /).fill('fe04-touch-target'); await card.getByRole('button', { name: 'Thêm', exact: true }).click();
-  const remove = card.getByRole('button', { name: 'Xóa phạm vi fe04-touch-target', exact: true });
-  await assertTarget(remove); await remove.click(); await expect(remove).toHaveCount(0);
+  // Spec 1.1.4/1.2.6: Settings now uses the React prototype's sizes;
+  // retire only the 40x40 dimension assertion, retain scope add/remove behavior.
+  await page.getByRole('button', { name: /Trello —/ }).click();
+  await page.getByLabel('Thêm Board ID').fill('fe04-touch-target'); await page.getByRole('button', { name: 'Thêm', exact: true }).click();
+  const remove = page.getByRole('button', { name: 'Xoá mục fe04-touch-target', exact: true });
+  await expect(remove).toBeVisible(); await remove.click(); await expect(remove).toHaveCount(0);
 });
