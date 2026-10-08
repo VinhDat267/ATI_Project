@@ -59,4 +59,15 @@ Thay đổi hành vi planner (W3-10), thay đổi chính sách khôi phục củ
 
 ## Kết quả
 
-_(agent thi công điền)_
+Phần A đã triển khai trên `feat/fe-06-cockpit-recovery-a`, base `eb48f0b`. Chờ CI đúng head và reviewer repository nghiệm thu; chưa merge. Chỉ mục 1–4, 8, 10; phần B (5–7) chưa làm.
+
+- Khoảnh khắc 7–9 dùng cấu trúc/class từ React AppStage; dữ liệu, lỗi, thời lượng, link và hành động lấy từ snapshot. Unknown không có retry/edit/continue kể cả snapshot trả actions sai. Dừng có xác nhận, Escape/hủy không gửi lệnh.
+- Form sửa có trường nhãn theo schema, kiểm JSON/kiểu trước xác nhận, giữ tham số/đầu ra thành công đã lưu và resolve `$ref`/`$template`. API retry không nhận args: xác nhận dừng kế hoạch cũ → đọc snapshot stopped → gửi yêu cầu sửa mới, chờ duyệt mới; stop lỗi/conflict không gửi yêu cầu sửa. Không đổi API/policy executor.
+- Stopped/rejected/failed có biên nhận việc đã làm/chưa hoàn thành và Nhờ việc khác, giữ unknown làm bằng chứng. Snapshot terminal đã retired không chiếm lại màn planning/clarification mới. Phản hồi recovery muộn, rời/quay lại hội thoại, đổi plan và SSE stopped trước HTTP đều có test.
+- Đã bỏ PartialFailureModal/ReconciliationNotice, chuyển đủ 11 ca modal cũ sang incident/editor và giữ các ca W2-04/W2-05/reconciliation/safety. Frontend từ 475 lên 510 test.
+- Cả 5 P3 #103: copy runtime trung thực; M chỉ đếm succeeded; skipped có output không link/title giả; đóng Sửa qua Chat khi owner đổi; SSE plan/plan_preview thêm tin hiển thị có dedup, không đổi lưu backend.
+- `npm run check`: exit 0; v3 1.467 test + eval 165; `npm run test:browser:v3`: exit 0, 69/69 test qua 11 scenarios. Review agent độc lập 142/142 test liên quan, không còn P1/P2 phát hiện; chưa thay nghiệm thu reviewer repository.
+- 32 ảnh app/React ở 1440×900 và 375×812, light/dark, và SHA256: [log FE-06A](../log/2026-10-08-codex-fe-06a-cockpit-recovery.md). Ảnh không commit, trang so sánh tại worktree `node_modules/.cache/fe06a/screenshots/comparison.html`.
+- Khác mẫu có chủ đích: copy/nhãn dịch vụ tổng quát theo dữ liệu; moment7 liệt kê mỗi việc thành công thay gộp hai việc demo; thêm link thật và chi tiết đối chiếu thu gọn; nút sửa/xác nhận theo task; moment8 dùng nguyên lựa chọn/cảnh báo FE-06 nên nút dài hơn demo; restart hiển thị thời lượng đã lưu; terminal dùng bố cục6 với trạng thái đúng và connector chỉ khi có reference thật. Demo pill không đưa vào app. Các lớp khung, typography, màu, card và buttons lấy từ mẫu; các thay đổi min-width/wrap giữ không cuộn ngang ở 375px.
+- Durable GET có thể trả execution reconciliation_required cho plan partial+unknown dù chưa restart; UI hiển thị8 khi plan vẫn partial, chỉ9 khi plan đã reconciliation_required. Unknown trong9 vẫn không Continue. Đây là nối dữ liệu thật, không sửa backend.
+- NOT_RUN: provider live, nghiệm thu screen reader, phần B responses/errors, reviewer repository và nghiệm thu sản phẩm.

@@ -53,10 +53,27 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens
 async function openHistory() {
   render(<App />);
   await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
-  return screen.findByRole('region', { name: 'Cần đối soát trước khi tiếp tục' });
+  return screen.findByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
 }
 
 describe('saved execution recovery in the actual App/history flow', () => {
+  it('stops the old execution before sending edited arguments for a newly approved plan',async()=>{
+    snapshot.execution={status:'partial',pausedStepId:'step_2'};snapshot.plan.status='partial';snapshot.steps[1].status='failed';snapshot.recoveryActions=['retry','skip','stop'];
+    const originalRequest=request.getMockImplementation()!;
+    request.mockImplementation((url:string,options?:RequestInit)=>url==='/api/conversations/c1/messages' ? Promise.resolve({userMessageId:'edited-message'}) : originalRequest(url,options));
+    render(<App/>);await openCockpitHistory();fireEvent.click(await screen.findByText('Đối soát đã lưu'));
+    fireEvent.click(await screen.findByRole('button',{name:'Sửa rồi thử lại'}));fireEvent.change(screen.getByDisplayValue('minh'),{target:{value:'corrected-member'}});
+    fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(request.mock.calls.filter(([,options]:[string,RequestInit?])=>options?.method==='POST')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));
+    await waitFor(()=>expect(request).toHaveBeenCalledWith('/api/conversations/c1/messages',expect.objectContaining({method:'POST',body:expect.stringContaining('corrected-member')})));
+    expect(request.mock.calls.filter(([,options]:[string,RequestInit?])=>options?.method==='POST').map(([url]:[string,RequestInit?])=>url)).toEqual(['/api/executions/p1/stop','/api/conversations/c1/messages']);
+    const body=String(request.mock.calls.find(([url]:[string,RequestInit?])=>url==='/api/conversations/c1/messages')?.[1]?.body);expect(body).toContain('saved-card-123');expect(body).not.toContain('step_1.output');expect(screen.queryByRole('button',{name:'Duyệt kế hoạch'})).toBeNull();
+  });
+  it('a failed Stop cannot send edited parameters or report completion',async()=>{
+    snapshot.execution={status:'partial',pausedStepId:'step_2'};snapshot.plan.status='partial';snapshot.steps[1].status='failed';snapshot.recoveryActions=['retry','skip','stop'];post=async()=>{throw new Error('Stop conflict');};
+    render(<App/>);await openCockpitHistory();fireEvent.click(await screen.findByText('Đối soát đã lưu'));fireEvent.click(await screen.findByRole('button',{name:'Sửa rồi thử lại'}));fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Stop conflict');expect(request.mock.calls.filter(([,options]:[string,RequestInit?])=>options?.method==='POST').map(([url]:[string,RequestInit?])=>url)).toEqual(['/api/executions/p1/stop']);expect(useChatStore.getState().planStatus).toBe('partial');
+  });
   it('offers Continue only for safe pending snapshot and posts to its execution', async () => {
     snapshot.execution = { status: 'reconciliation_required' };
     snapshot.steps[1].status = 'pending';
@@ -64,7 +81,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     const notice = await openHistory();
     expect(within(notice).getByText(/chưa từng được gửi/)).toBeInTheDocument();
     expect(within(notice).queryByText(/tự kiểm tra trên/)).toBeNull();
-    const button = within(notice).getByRole('button', { name: 'Chạy tiếp các bước còn lại' });
+    const button = within(notice).getByRole('button', { name: 'Làm tiếp các việc còn lại' });
     let release!: () => void;
     post = async () => {
       await new Promise<void>(resolve => { release = resolve; });
@@ -75,7 +92,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     fireEvent.click(button);
     await waitFor(() => expect(button).toBeDisabled());
     fireEvent.click(button);
-    expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeDisabled();
+    expect(within(notice).getByRole('button', { name: 'Dừng kế hoạch' })).toBeDisabled();
     expect(request.mock.calls.filter((call: any[]) => call[1]?.method === 'POST').map((call: any[]) => call[0])).toEqual(['/api/executions/p1/continue']);
     expect(screen.queryByText('Quy trình đã hoàn thành.')).toBeNull();
     await act(async () => { release(); });
@@ -85,8 +102,8 @@ describe('saved execution recovery in the actual App/history flow', () => {
   it('never offers Continue for UNKNOWN even when server actions are inconsistent', async () => {
     snapshot.recoveryActions = ['continue', 'skip', 'stop'];
     const notice = await openHistory();
-    expect(within(notice).queryByRole('button', { name: 'Chạy tiếp các bước còn lại' })).toBeNull();
-    expect(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeEnabled();
+    expect(within(notice).queryByRole('button', { name: 'Làm tiếp các việc còn lại' })).toBeNull();
+    expect(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeEnabled();
   });
 
   it('keeps safe pending snapshot after Continue returns conflict', async () => {
@@ -94,7 +111,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     snapshot.recoveryActions = ['continue', 'stop'];
     post = async () => { throw new Error('Execution changed'); };
     const notice = await openHistory();
-    fireEvent.click(within(notice).getByRole('button', { name: 'Chạy tiếp các bước còn lại' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Làm tiếp các việc còn lại' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Execution changed');
     expect(screen.queryByText('Quy trình đã hoàn thành.')).toBeNull();
     expect(useChatStore.getState().executionSnapshot?.execution.status).toBe('reconciliation_required');
@@ -107,8 +124,8 @@ describe('saved execution recovery in the actual App/history flow', () => {
     expect(within(notice).getByText(/saved-card-123/)).toBeInTheDocument();
     expect(within(notice).getByText(/kiểm tra.*Trello/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /thử lại|retry|Duyệt kế hoạch/i })).toBeNull();
-    expect(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeEnabled();
-    expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeEnabled();
+    expect(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeEnabled();
+    expect(within(notice).getByRole('button', { name: 'Dừng kế hoạch' })).toBeEnabled();
     expect(useChatStore.getState().messages[0].timestamp).toBe('2026-09-30T01:07:00.000Z');
     expect(screen.getByText('0,3 giây')).toBeInTheDocument();
   });
@@ -118,13 +135,13 @@ describe('saved execution recovery in the actual App/history flow', () => {
     let finish!: () => void;
     const pending = new Promise(resolve => { finish = () => { snapshot = structuredClone(original); snapshot.execution = { status: 'completed' }; snapshot.plan.status = 'completed'; snapshot.steps[1].status = 'skipped'; snapshot.steps[2].status = 'succeeded'; snapshot.recoveryActions = []; resolve({ status: 'completed' }); }; });
     post = async () => pending;
-    const skip = within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' });
+    const skip = within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' });
     fireEvent.click(skip); fireEvent.click(skip);
     expect(skip).toBeDisabled();
-    expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeDisabled();
+    expect(within(notice).getByRole('button', { name: 'Dừng kế hoạch' })).toBeDisabled();
     await act(async () => finish());
     expect(await screen.findByText('Quy trình đã hoàn thành.')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Cần đối soát trước khi tiếp tục' })).toBeNull();
+    expect(screen.queryByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ })).toBeNull();
     const writes = request.mock.calls.filter(([, options]: [string, RequestInit?]) => options?.method === 'POST');
     expect(writes).toEqual([['/api/executions/p1/steps/step_2/skip', { method: 'POST' }]]);
     expect(useChatStore.getState().stepStatuses).toMatchObject({ step_1: 'succeeded', step_2: 'skipped', step_3: 'succeeded' });
@@ -133,28 +150,29 @@ describe('saved execution recovery in the actual App/history flow', () => {
   it('keeps UNKNOWN and exposes API conflict instead of optimistic success', async () => {
     post = async () => { throw Object.assign(new Error('Execution changed; reload required'), { status: 409 }); };
     const notice = await openHistory();
-    fireEvent.click(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' }));
     expect(await within(notice).findByRole('alert')).toHaveTextContent('Execution changed; reload required');
     expect(useChatStore.getState().stepStatuses.step_2).toBe('unknown');
     expect(screen.queryByText('Quy trình đã hoàn thành.')).toBeNull();
-    expect(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeEnabled();
+    expect(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeEnabled();
   });
 
   it('stops using the saved plan ID and retains UNKNOWN evidence without recovery controls', async () => {
     const notice = await openHistory();
-    fireEvent.click(within(notice).getByRole('button', { name: 'Dừng plan' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Dừng kế hoạch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dừng hẳn quy trình' }));
     expect(await screen.findByText('Quy trình đã dừng.')).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith('/api/executions/p1/stop', { method: 'POST' });
     expect(useChatStore.getState().stepStatuses.step_2).toBe('unknown');
-    expect(screen.queryByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeNull();
   });
 
   it('obeys Stop-only even when saved step evidence contains UNKNOWN', async () => {
     snapshot.plan = { id: 'p1', convId: 'c1', status: 'reconciliation_required' }; snapshot.recoveryActions = ['stop'];
     const notice = await openHistory();
     expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
-    expect(within(notice).queryByRole('button', { name: 'Skip step này rồi chạy tiếp' })).toBeNull();
-    expect(within(notice).getByRole('button', { name: 'Dừng plan' })).toBeEnabled();
+    expect(within(notice).queryByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeNull();
+    expect(within(notice).getByRole('button', { name: 'Dừng kế hoạch' })).toBeEnabled();
   });
 
   it('does not let an older conversation response replace the newer selection', async () => {
@@ -177,7 +195,8 @@ describe('saved execution recovery in the actual App/history flow', () => {
       ? Promise.resolve({ id: 'new-plan', summary: 'Kế hoạch tiếp theo', steps: [] }) : originalRequest(url, options));
     const notice = await openHistory();
     expect(screen.getByText('Kế hoạch tiếp theo')).toBeInTheDocument();
-    fireEvent.click(within(notice).getByRole('button', { name: 'Dừng plan' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Dừng kế hoạch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dừng hẳn quy trình' }));
     await screen.findByText('Quy trình đã dừng.');
     expect(request).toHaveBeenCalledWith('/api/executions/p1/stop', { method: 'POST' });
     expect(useChatStore.getState().activePlan?.id).toBe('new-plan');
@@ -187,14 +206,14 @@ describe('saved execution recovery in the actual App/history flow', () => {
     snapshot.execution = { status: 'partial', pausedStepId: 'step_2' }; snapshot.plan.status = 'partial';
     snapshot.steps[1].status = 'failed'; snapshot.recoveryActions = ['stop'];
     render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
-    const modal = await screen.findByRole('alertdialog');
+    const modal = await screen.findByRole('region', {name:/chưa hoàn thành việc này/});
     expect(within(modal).queryByRole('button', { name: /Thử lại|Sửa & tiếp tục|Bỏ qua/ })).toBeNull();
     let finish!: () => void;
     post = () => new Promise(resolve => { finish = () => resolve({ status: 'stopped' }); });
-    fireEvent.click(within(modal).getByRole('button', { name: /Dừng lại toàn bộ/ }));
+    fireEvent.click(within(modal).getByRole('button', { name: 'Dừng kế hoạch' }));
     expect(request.mock.calls.filter(([, options]: [string, RequestInit?]) => options?.method === 'POST')).toEqual([]);
-    fireEvent.click(within(modal).getByRole('button', { name: 'Dừng hẳn quy trình' }));
-    expect(within(modal).getByRole('button', { name: /Dừng lại toàn bộ/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Dừng hẳn quy trình' }));
+    expect(within(modal).getByRole('button', { name: 'Dừng kế hoạch' })).toBeDisabled();
     await act(async () => finish());
   });
 
@@ -217,12 +236,12 @@ describe('saved execution recovery in the actual App/history flow', () => {
       ? Promise.resolve({ id: 'new-plan', summary: 'New pending', steps: [{ id: 'step_2', tool: 'slack.send_message', description: 'NEW operation', args: { text: 'NEW arguments' } }] })
       : originalRequest(url, options));
     render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
-    const modal = await screen.findByRole('alertdialog');
+    const modal = await screen.findByRole('region', {name:/chưa hoàn thành việc này/});
     expect(within(modal).getByText('trello.add_member')).toBeInTheDocument();
-    expect(within(modal).getByText('Gán Minh vào thẻ')).toBeInTheDocument();
-    expect(within(modal).getByTestId('step-args-preview')).toHaveTextContent('minh');
+    expect(within(modal).getAllByText('Gán Minh vào thẻ').length).toBeGreaterThan(0);
+    expect(modal.querySelector('pre')).toHaveTextContent('minh');
     expect(within(modal).queryByText('NEW operation')).toBeNull();
-    fireEvent.click(within(modal).getByRole('button', { name: /Thử lại bước này/ }));
+    fireEvent.click(within(modal).getByRole('button', { name: /Thử lại việc 2/ }));
     await screen.findByText('Quy trình đã hoàn thành.');
     expect(request).toHaveBeenCalledWith('/api/executions/p1/steps/step_2/retry', { method: 'POST' });
     expect(useChatStore.getState().activePlan?.id).toBe('new-plan');
@@ -233,7 +252,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
     const notice = await openHistory();
     expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Thử lại|retry/i })).toBeNull();
-    fireEvent.click(within(notice).getByRole('button', { name: 'Skip step này rồi chạy tiếp' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' }));
     await screen.findByText('Quy trình đã hoàn thành.');
     expect(request).toHaveBeenCalledWith('/api/executions/p1/steps/step_2/skip', { method: 'POST' });
   });

@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { operation, serviceId, servicePalette, serviceName } from './presentation';
-export function PlanMoment({plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
+export function PlanMoment({runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
  const [techOpen,setTechOpen]=useState(false);
  return (<section id="moment-4" className="stage-section is-active v3-space-y-6 relative" aria-label="Cockpit" data-moment="4" aria-labelledby="heading-moment-4">
           <div className="v3-space-y-2">
@@ -61,7 +61,7 @@ export function PlanMoment({plan,services,destination,onPreview,onApprove,onCanc
             </svg>
             <div className="text-xs sm:text-sm text-neutral-800 v3-space-y-0.5">
               <div className="font-semibold text-neutral-900">
-                Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.
+                {runtimeMode==='sandbox' ? 'Các thao tác này chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật.' : runtimeMode==='live' ? 'Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.' : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.'}
               </div>
               <div className="text-neutral-600">
                 Kế hoạch được giữ trong 30 phút. Bạn có thể sửa đổi bằng chat hoặc bấm duyệt để bắt đầu ngay.

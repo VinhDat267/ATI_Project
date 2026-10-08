@@ -34,7 +34,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await page.goto(`/c/${id}`); await page.reload();
     await expect(page.getByText('FE02 saved request')).toBeVisible();
     await expect(page.getByText('FE02 pending preview', {exact:true})).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Cần đối soát trước khi tiếp tục' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('FE02-direct-reload.png'), fullPage: true });
     await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
     await expect(page).not.toHaveURL(new RegExp(`/c/${id}$`));

@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SettingsModal } from '../../src/components/SettingsModal';
 import { ServiceCard } from '../../src/components/ServiceCard';
-import { ReconciliationNotice } from '../../src/components/ReconciliationNotice';
+import { RecoveryMoment } from '../../src/pages/Cockpit/RecoveryMoment';
 import { MissionControlLaunchpad } from '../../src/components/MissionControlLaunchpad';
 import { apiClient } from '../../src/services/api-client';
 import type { ExecutionSnapshot, ServiceInfo } from '../../src/types';
@@ -48,8 +48,8 @@ it('names the service to check by its API display name', () => {
   const snapshot = { execution: { status: 'reconciliation_required', pausedStepId: 's1' }, recoveryActions: ['skip', 'stop'],
     plan: { steps: [{ id: 's1', tool: 'demo.create_thing', description: 'Tạo thứ', args: {} }] },
     steps: [{ stepId: 's1', tool: 'demo.create_thing', status: 'unknown' }] } as unknown as ExecutionSnapshot;
-  render(<ReconciliationNotice snapshot={snapshot} services={[demo]} busy={false} error={null} onSkip={() => {}} onStop={() => {}} onContinue={() => {}} />);
-  expect(screen.getByText(/Hãy tự kiểm tra trên Demo Hub trước khi tiếp tục/)).toBeInTheDocument();
+  render(<RecoveryMoment moment={9} snapshot={snapshot} services={[demo]} steps={[{id:"s1",tool:"demo.create_thing",description:"Tạo thứ",status:"unknown"}]} controls={null} />);
+  expect(screen.getByText(/Tôi không chắc lệnh đã tới Demo Hub/)).toBeInTheDocument();
 });
 
 it('builds the command placeholder from the configured services', () => {

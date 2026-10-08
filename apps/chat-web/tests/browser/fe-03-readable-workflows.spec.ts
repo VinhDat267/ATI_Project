@@ -33,7 +33,8 @@ test('FE-03: grounded display names survive preview reload and approved result l
     await page.getByText('Chi tiết kỹ thuật', { exact: true }).click();
     await expect(page.locator('#tech-details-panel pre')).toContainText('list_frontend_todo');
     for(const tool of ['trello.create_card','trello.add_member','slack.send_message']) await expect(page.locator('#tech-details-panel pre')).toContainText(tool);
-    await expect(page.getByText(/ghi thật vào công cụ/)).toBeVisible();
+    await expect(page.getByText(/chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật/)).toBeVisible();
+    await expect(page.getByText(/Các thao tác này ghi thật vào công cụ/)).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
     await page.getByText('Chi tiết kỹ thuật', { exact: true }).click();

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { PartialFailureModal } from '../../src/components/PartialFailureModal';
+import { RecoveryMoment } from '../../src/pages/Cockpit/RecoveryMoment';
 import { ExecutionProgress } from '../../src/components/ExecutionProgress';
 
 afterEach(() => {
@@ -16,19 +16,12 @@ describe('Partial Failure Modal', () => {
     const onStop = vi.fn();
 
     render(
-      <PartialFailureModal
-        stepId="step_2"
-        tool="trello.add_member"
-        errorMessage="Member not found"
-        onRetry={onRetry}
-        onEditAndRetry={onEdit}
-        onSkip={onSkip}
-        onStop={onStop}
-      />
+      <RecoveryMoment moment={7} services={[]} snapshot={{plan:{id:'p',convId:'c',status:'partial'},execution:{status:'partial',pausedStepId:'step_2'},steps:[{stepId:'step_2',tool:'trello.add_member',status:'failed'}],recoveryActions:['retry','skip','stop']}} steps={[{id:'step_2',tool:'trello.add_member',description:'Assign',status:'failed',error:'Member not found'}]} controls={{busy:false,error:null,onRetry,onSkip,onEdit,onStop,onContinue:()=>{}}}/>
+
     );
 
     expect(screen.getByText(/Member not found/i)).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: /thử lại/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^thử lại việc/i }));
     expect(onRetry).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /bỏ qua/i }));
