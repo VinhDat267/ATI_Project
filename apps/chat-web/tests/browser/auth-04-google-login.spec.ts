@@ -22,7 +22,7 @@ test('AUTH-04: Google signup waits for approval, approved Google login enters ch
     expect(pending).toMatchObject({ status: 'pending', email_verified: true, password: null, google_sub: 'fixture-google-user' });
     await page.screenshot({ path: testInfo.outputPath('AUTH04-google-pending.png'), fullPage: true });
     await db.query("UPDATE users SET status='active', updated_at=now() WHERE id=$1 AND status='pending'", [userId]);
-    await page.getByRole('button', { name: 'Quay lại đăng nhập' }).click();
+    await page.getByRole('link', { name: 'Thử đăng nhập lại' }).click();
     await page.getByRole('button', { name: 'Tiếp tục với Google' }).click();
     await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
     await expect(page).toHaveURL(/\/$/);

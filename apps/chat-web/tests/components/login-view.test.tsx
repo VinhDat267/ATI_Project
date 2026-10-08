@@ -69,7 +69,7 @@ describe('LoginView Component', () => {
     expect(onLogin).toHaveBeenCalled();
   });
 
-  it('triggers quick fill demo credentials when clicked', () => {
+  it('omits quick fill even when a callback was provided', () => {
     vi.stubEnv('DEV', true);
     vi.stubEnv('VITE_SHOW_DEMO_LOGIN', 'true');
     vi.stubEnv('VITE_DEMO_EMAIL', 'demo@localhost.test');
@@ -89,11 +89,11 @@ describe('LoginView Component', () => {
       />
     );
 
-    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản demo/i });
-    expect(quickFillBtn).toBeDefined();
+    const quickFillBtn = screen.queryByRole('button', { name: /Điền nhanh tài khoản demo/i });
+    expect(quickFillBtn).toBeNull();
 
-    fireEvent.click(quickFillBtn);
-    expect(onQuickFillDemo).toHaveBeenCalled();
+    expect(quickFillBtn).toBeNull();
+    expect(onQuickFillDemo).not.toHaveBeenCalled();
   });
 
   it('displays auth error alert when authError is present', () => {
@@ -146,14 +146,14 @@ describe('LoginView Component', () => {
       />
     );
 
-    const backBtn = screen.getByRole('button', { name: /Quay lại trang giới thiệu/i });
+    const backBtn = screen.getByRole('button', { name: /Đóng cửa sổ/i });
     expect(backBtn).toBeDefined();
 
     fireEvent.click(backBtn);
     expect(onBackToLanding).toHaveBeenCalledTimes(1);
   });
 
-  it('uses dedicated opt-in sandbox demo credentials when quick-fill button is clicked without onQuickFillDemo prop', () => {
+  it('does not expose opted-in sandbox credentials in the public modal', () => {
     vi.stubEnv('DEV', true);
     vi.stubEnv('VITE_SHOW_DEMO_LOGIN', 'true');
     vi.stubEnv('VITE_DEMO_EMAIL', 'demo@localhost.test');
@@ -173,11 +173,11 @@ describe('LoginView Component', () => {
       />
     );
 
-    const quickFillBtn = screen.getByRole('button', { name: /Điền nhanh tài khoản demo/i });
-    fireEvent.click(quickFillBtn);
+    const quickFillBtn = screen.queryByRole('button', { name: /Điền nhanh tài khoản demo/i });
+    expect(quickFillBtn).toBeNull();
 
-    expect(setEmail).toHaveBeenCalledWith('demo@localhost.test');
-    expect(setPassword).toHaveBeenCalledWith('demo-test-only');
+    expect(setEmail).not.toHaveBeenCalled();
+    expect(setPassword).not.toHaveBeenCalled();
   });
 
   it('translates generic Invalid email or password error into helpful Vietnamese guidance', () => {

@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { apiClient, sharesAuthSession } from '../services/api-client';
 import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import type { GoogleCallbackInput } from '../routes';
-import { AuthFeedback, AuthFormFrame, type AuthViewProps } from './AuthFormFrame';
+import { type AuthViewProps } from './AuthFormFrame';
+import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
 
 export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps & { googleCallback?: GoogleCallbackInput }) {
   const [busy, setBusy] = useState(true), [message, setMessage] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
   const [linked, setLinked] = useState(false);
+  const [mode, setMode] = useState<AuthActionMode>('loading');
   const completion = useRef<ReturnType<typeof apiClient.completeGoogleAuth> | null>(null);
   const input = useRef(googleCallback), invalidated = useRef(false);
   const initialSession = useRef(authStorage.getStoredTokens());
@@ -33,14 +35,14 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
     const canComplete = () => mounted && !invalidated.current && ownsLiveSession();
     const callback = input.current;
     if (callback?.error || !callback?.code || !callback?.state) {
-      setBusy(false); setError(callback?.error ? 'Đăng nhập Google đã bị hủy. Bạn có thể thử lại.' : 'Link đăng nhập Google không hợp lệ hoặc đã được mở. Hãy đăng nhập lại.');
+      setBusy(false); setMode('google-error'); setError(callback?.error ? 'Đăng nhập Google đã bị hủy. Bạn có thể thử lại.' : 'Link đăng nhập Google không hợp lệ hoặc đã được mở. Hãy đăng nhập lại.');
       return unsubscribe;
     }
     completion.current ??= apiClient.completeGoogleAuth(callback.code, callback.state);
     completion.current.then(data => {
       if (!canComplete()) return;
       if ('success' in data && data.success === true) {
-        setMessage('Đã liên kết tài khoản Google.'); setLinked(true); return;
+        setMode('google-ready'); setMessage('Đã liên kết tài khoản Google.'); setLinked(true); return;
       }
       if (!('accessToken' in data) || !data.accessToken || !data.refreshToken || !data.user?.id) {
         setError('Không thể hoàn tất đăng nhập Google. Hãy đăng nhập lại.'); return;
@@ -52,15 +54,11 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
     }).catch(reason => {
       if (!canComplete()) return;
       const code = reason?.data?.code;
-      if (code === 'ACCOUNT_PENDING') setMessage('Tài khoản đang chờ quản trị viên duyệt. Bạn có thể đăng nhập sau khi được duyệt.');
-      else if (code === 'ACCOUNT_DISABLED') setError('Tài khoản đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.');
-      else setError('Không thể hoàn tất đăng nhập Google. Link có thể đã hết hạn hoặc đã được mở. Hãy đăng nhập lại.');
+      if (code === 'ACCOUNT_PENDING') { setMode('google-pending'); setMessage('Tài khoản đang chờ quản trị viên duyệt. Bạn có thể đăng nhập sau khi được duyệt.'); }
+      else if (code === 'ACCOUNT_DISABLED') { setMode('blocked-locked'); setError('Tài khoản đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.'); }
+      else { setMode('google-error'); setError('Không thể hoàn tất đăng nhập Google. Link có thể đã hết hạn hoặc đã được mở. Hãy đăng nhập lại.'); }
     }).finally(() => { if (mounted) setBusy(false); });
     return () => { mounted = false; unsubscribe(); };
   }, [navigate]);
-  return <AuthFormFrame title="Đăng nhập Google" description="Xác thực tài khoản Google để sử dụng hệ thống." navigate={navigate}>
-    {busy && <p role="status" className="text-sm text-text-secondary">Đang xử lý đăng nhập Google...</p>}
-    <AuthFeedback error={error} message={message} />
-    {linked && <button type="button" onClick={() => navigate('/account')} className="mt-4 rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-raised">Về trang tài khoản</button>}
-  </AuthFormFrame>;
+  return <AuthActionPage mode={mode} navigate={navigate} busy={busy} error={error} message={message} onAccount={linked ? () => navigate('/account') : undefined} />;
 }

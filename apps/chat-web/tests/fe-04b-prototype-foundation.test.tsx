@@ -42,8 +42,8 @@ it('FE-04b: a signed-out unknown path shows the prototype 404 inside its page sc
 
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về trang chủ' }));
   expect(window.location.pathname).toBe('/');
-  await screen.findByRole('button', { name: 'Đăng nhập vào hệ thống' });
-  expect(pageScope()).toEqual({ page: undefined, body: APP_BODY, theme: 0, css: 0 });
+  await screen.findAllByRole('link', { name: 'Đăng nhập' });
+  expect(pageScope()).toEqual({ page: 'index', body: 'selection:bg-[#FF5701]/20 selection:text-[#111827]', theme: 1, css: 1 });
 });
 
 it('FE-04b: a signed-in unknown path shows the 404 without the app shell; Back returns to it with its scope', async () => {

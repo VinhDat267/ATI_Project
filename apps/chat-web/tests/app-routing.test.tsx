@@ -22,11 +22,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); });
 it('changes public views on browser Back and Forward', async () => {
   render(<App initialView="landing" />);
-  fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập vào hệ thống' }));
+  fireEvent.click(screen.getAllByRole('link', { name: 'Đăng nhập' })[0]);
   expect(window.location.pathname).toBe('/login');
   expect(screen.getByLabelText('Email')).toBeInTheDocument();
   act(() => window.history.back());
-  expect(await screen.findByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeInTheDocument();
+  expect((await screen.findAllByRole('link', { name: 'Đăng nhập' }))[0]).toBeInTheDocument();
   act(() => window.history.forward());
   expect(await screen.findByLabelText('Email')).toBeInTheDocument();
 });
