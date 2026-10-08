@@ -1,0 +1,32 @@
+# 2026-10-08 · Claude Code · Chấp nhận tên model `gemini-3.8-flash-n` của 9router
+
+- **Đã làm:**
+  - **Vì sao làm:** người dùng giao ("làm PR alias"). Không có task card riêng: đây là hàng "Gateway 9router trả model `gemini-3.8-flash-n`…" ở CURRENT-STATE mục 5.
+  - **Lỗi:** trên `main`, `OpenAICompatibleProvider` từ chối mọi phản hồi có tên model khác cấu hình. 9router hiện trả `gemini-3.8-flash-n` khi gọi `ag/gemini-3.8-flash`, nên chế độ live không lập được kế hoạch nào. Codex gặp lỗi này khi chạy planner thật ở #111.
+  - **Căn cứ** (báo cáo audit 9router ngày 08/10, lưu ở máy người dùng, ngoài repo):
+    - 9router 0.5.95 lấy trường `model` của response từ `modelVersion` của upstream Antigravity, cả response thường lẫn streaming;
+    - alias `ag/gemini-3.8-flash` trỏ tới `gemini-3.8-flash-medium` (mức suy luận medium);
+    - máy không có combo, nên không có fallback sang model khác; round-robin chỉ đổi tài khoản Antigravity;
+    - ý nghĩa của hậu tố `-n` chưa được xác minh.
+  - **Quyết định:** người dùng đã xác nhận chấp nhận cặp tên này ngày 07/10, trong lúc làm W3-10. Commit `845701c` của PR #102 (W3-10, chưa merge) đã có sửa đổi này. PR này đưa riêng sửa đổi đó vào `main` để live chạy được mà không chờ W3-10.
+  - **Thay đổi:** `packages/planner/src/providers/openai-compatible-provider.ts` chỉ chấp nhận đúng cặp yêu cầu `ag/gemini-3.8-flash` / phản hồi `gemini-3.8-flash-n`. Hậu tố khác, model khác và route khác vẫn bị từ chối; `lastServedModel` vẫn ghi tên thật. Không đổi prompt, catalog hay hành vi lập kế hoạch.
+  - **Test:** chép 3 test từ `845701c` vào `packages/planner/tests/openai-compatible-provider.test.ts`, bỏ phần kiểm `lastCallMetrics` vì `main` chưa có (thuộc W3-10).
+- **PR / commit:** nhánh `fix/planner-flash-n-alias`, worktree riêng từ `main` `4afa2c2`.
+  - test RED: `40d894d`;
+  - sửa: `8b6b203`.
+- **Kiểm tra đã chạy (lệnh và kết quả):**
+  - RED, trước khi sửa: `vitest run tests/openai-compatible-provider.test.ts` → 1 fail / 18 đạt. Ca alias bị từ chối với đúng thông báo `Completion was served by gemini-3.8-flash-n, not the configured ag/gemini-3.8-flash`. Ba ca "vẫn từ chối" đạt sẵn trên `main`.
+  - GREEN: 19/19.
+  - Đột biến, 2/2 bị bắt:
+    - chấp nhận mọi tên `gemini-3.8-…`: 2 fail;
+    - áp alias cho mọi route: 1 fail.
+  - `npm run check` và `npm run test:browser:v3`: xem mô tả PR.
+- **Chưa làm / vấn đề phát hiện:**
+  - Không gọi model thật trong PR này. Audit đã có 2 phản hồi HTTP 200 mang tên `gemini-3.8-flash-n`; lần chạy planner thật của Codex ở #111 bị từ chối đúng tại chốt này.
+  - **Tự review**, nên có review độc lập.
+  - Upstream có thể đổi tên tiếp. Khi đó live lại bị chặn cho tới khi cập nhật cặp tên. Có thể đưa danh sách tên được chấp nhận ra biến môi trường trong một task riêng.
+  - Khi #102 cập nhật theo `main` sẽ có xung đột ở dòng kiểm tên model, vì #102 có thêm phần metrics quanh đó. Giữ bản của #102 (bản đó gồm cả sửa đổi này).
+- **Việc tiếp theo đề xuất:**
+  - merge;
+  - chạy thử một yêu cầu live qua app;
+  - cập nhật hàng gateway trong CURRENT-STATE mục 5 sau merge.
