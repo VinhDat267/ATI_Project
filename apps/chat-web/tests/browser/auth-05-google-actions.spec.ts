@@ -44,6 +44,7 @@ test('AUTH-05 Google: link and unlink refresh expired access while preserving th
   await expect(page.getByText('Đã liên kết (auth04-google@example.test)')).toBeVisible();
   expect((await db.query('SELECT google_sub FROM users WHERE id=$1', [userId])).rows[0].google_sub).toBe('fixture-google-user');
   expect(await expireAccess(page)).toBe(originalSid);
+  page.once('dialog', dialog => dialog.accept(password));
   await page.getByRole('button', { name: 'Gỡ liên kết', exact: true }).click();
   await expect(page.getByRole('main').getByRole('status')).toContainText('Đã gỡ liên kết Google');
   expect(paths.filter(path => path === '/api/auth/refresh')).toHaveLength(2);

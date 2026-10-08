@@ -142,8 +142,8 @@ it('does not retry a rejected one-use callback or erase a newer principal', asyn
 });
 it('sends authenticated unlink without client identity input', async () => {
   authStorage.setStoredTokens({ accessToken: 'existing', user });
-  await expect(apiClient.unlinkGoogle()).resolves.toEqual({ success: true });
-  expect(calls.find(call => call.path === '/api/auth/google/unlink')).toMatchObject({ authorization: 'Bearer existing', body: {} });
+  await expect(apiClient.unlinkGoogle('Current!fixture-password')).resolves.toEqual({ success: true });
+  expect(calls.find(call => call.path === '/api/auth/google/unlink')).toMatchObject({ authorization: 'Bearer existing', body: { currentPassword: 'Current!fixture-password' } });
 });
 it('does not let an older session hydration replace the Google principal', async () => {
   const oldUser = { ...user, id: 'old-user', name: 'Old user' };

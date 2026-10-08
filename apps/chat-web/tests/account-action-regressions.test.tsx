@@ -107,23 +107,26 @@ it('refreshes an expired access token once before starting authenticated Google 
 });
 it('refreshes expired Google unlink and reloads the actual account method state', async () => {
   await openAccount(); authStorage.setStoredTokens({ accessToken: expired });
+  vi.spyOn(window, 'prompt').mockReturnValue('Current!fixture-password');
   fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
   expect(await screen.findByRole('status')).toHaveTextContent('Đã gỡ liên kết Google');
   expect(screen.getByRole('button', { name: 'Liên kết Google' })).toBeEnabled();
   expect(calls.filter(call => call.path.includes('/google/') || call.path.endsWith('/refresh')).map(call => call.path)).toEqual([
     '/api/auth/google/unlink', '/api/auth/refresh', '/api/auth/google/unlink',
   ]);
-  expect(calls.filter(call => call.path.endsWith('/unlink')).map(call => call.body)).toEqual([{}, {}]);
+  expect(calls.filter(call => call.path.endsWith('/unlink')).map(call => call.body)).toEqual([
+    { currentPassword: 'Current!fixture-password' }, { currentPassword: 'Current!fixture-password' },
+  ]);
 });
 it('clears the still-owned session when Google unlink cannot refresh a revoked session', async () => {
   refreshSucceeds = false; authStorage.setStoredTokens({ accessToken: expired });
-  await expect(apiClient.unlinkGoogle()).rejects.toMatchObject({ status: 401 });
+  await expect(apiClient.unlinkGoogle('Current!fixture-password')).rejects.toMatchObject({ status: 401 });
   expect(authStorage.getStoredTokens()).toEqual({ accessToken: null, refreshToken: null, user: null });
   expect(calls.map(call => call.path)).toEqual(['/api/auth/google/unlink', '/api/auth/refresh']);
 });
 it.each(['server', 'disconnect'] as const)('does not retry a Google mutation with an uncertain %s response', async failure => {
   googleFailure = failure;
-  await expect(apiClient.unlinkGoogle()).rejects.toBeInstanceOf(Error);
+  await expect(apiClient.unlinkGoogle('Current!fixture-password')).rejects.toBeInstanceOf(Error);
   expect(calls.map(call => call.path)).toEqual(['/api/auth/google/unlink']);
   expect(authStorage.getStoredTokens().accessToken).toBe(access);
 });

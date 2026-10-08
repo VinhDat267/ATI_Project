@@ -130,7 +130,11 @@ export function AccountView({ user, navigate, onLogout }: Props) {
               <span><span className="text-text-muted">Google:</span> {account.hasGoogle ? `Đã liên kết${account.googleEmail ? ` (${account.googleEmail})` : ''}` : 'Chưa liên kết'}</span>
               {account.hasGoogle
                 ? <button type="button" disabled={busy !== null || !account.hasPassword} aria-describedby={account.hasPassword ? undefined : 'account-unlink-rule'} className={buttonStyle}
-                    onClick={() => void run('unlink', async () => { await apiClient.unlinkGoogle(); await load(); return 'Đã gỡ liên kết Google.'; })}>Gỡ liên kết</button>
+                    onClick={() => {
+                      const password = window.prompt('Nhập mật khẩu hiện tại để gỡ liên kết Google.');
+                      if (password === null) return;
+                      void run('unlink', async () => { await apiClient.unlinkGoogle(password); await load(); return 'Đã gỡ liên kết Google.'; });
+                    }}>Gỡ liên kết</button>
                 : <button type="button" disabled={busy !== null} className={buttonStyle}
                     onClick={linkGoogle}>Liên kết Google</button>}
             </li>

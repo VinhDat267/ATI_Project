@@ -70,10 +70,11 @@ it('shows a Google-only account the recovery guidance instead of a current-passw
 it('lets an account with a password unlink Google and offers linking when not linked', async () => {
   serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  vi.spyOn(window, 'prompt').mockReturnValue('Current!fixture-password');
   render(<App />);
   expect(await screen.findByLabelText('Mật khẩu hiện tại')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
-  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledWith('Current!fixture-password'));
   cleanup(); vi.restoreAllMocks();
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: member });
   vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: true, googleEnabled: true });
@@ -82,6 +83,16 @@ it('lets an account with a password unlink Google and offers linking when not li
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Liên kết Google' }));
   expect(start).toHaveBeenCalledWith('link');
+});
+
+it('keeps the Google link when current-password entry is cancelled', async () => {
+  serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
+  const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  vi.spyOn(window, 'prompt').mockReturnValue(null);
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết' }));
+  expect(unlink).not.toHaveBeenCalled();
+  expect(screen.getByText(/personal@gmail\.test/)).toBeInTheDocument();
 });
 
 it('hides the Google section when Google sign-in is not configured', async () => {
