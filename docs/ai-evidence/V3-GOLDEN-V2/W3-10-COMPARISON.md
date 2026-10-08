@@ -1,107 +1,76 @@
-# W3-10 — đối chiếu phép đo hoàn chỉnh
+# W3-10 — đối chứng cùng ngày sau sửa review ngày 08/10
 
-Source `50761b16ff3f87d7160b533cbc77e387eea3e972`; request `ag/gemini-3.8-flash`, served `gemini-3.8-flash-n` theo xác nhận người dùng; llm, concurrency2, ba lần mỗi bộ. Các sample gián đoạn được giữ riêng và không tính ở đây. Chỉ planning với search fixtures, không thực thi plan/dịch vụ thật. Token reasoning có thể nằm trong prompt token; không cộng chúng thêm vào tổng token.
+**Chưa đủ nghiệm thu P2.** Bốn campaign đối chứng đều dừng theo chính sách bảo toàn provider fault; chưa chạy campaign sau sửa. Không ghép các sample để đủ số câu, không dùng số liệu phương án đã bỏ để nhận xét bản sửa. Chưa đánh giá được strict parity, read_only 18/18, số lượt tăng/giảm model calls hoặc p95 services sau sửa.
 
-| Bộ | Strict W3-06 → W3-10 | p50 / p95 trước → sau (s) | Dưới 15s trước → sau | Model call trước → sau |
+Model request `ag/gemini-3.8-flash`, served alias `gemini-3.8-flash-n` được chủ dự án chấp nhận. Mọi lượt đối chứng dùng llm / concurrency 2, cùng deadline/retry mặc định. Không đổi model/cx hoặc cấu hình 9router. Nhánh đối chứng local-only từ `8155c03`, chỉ cherry-pick `845701c` thành `7898aa7`; conflict bỏ context timing chưa có, test bỏ hai assertion metrics; diff đúng 2 file provider/test,26 insertions/1 deletion. Npmci riêng, provider 19/19 exit 0, không push nhánh này.
+
+Chủ dự án xác nhận ngày 08/10: read_only phải clarification, đúng 1 lời gọi model, 0 vòng do model mở (phase `search`); directory prefetch của nền tảng (phase `prefetch`) được phép. `searchRounds` đếm phase `search`, một vòng có thể nhiều tool calls. `searches` loại directory; `prefetches` chứa directory, mỗi trace có phase. Regex gather đo riêng, không tính model search. Các report cũ gộp thư mục vào searches; không dùng độ dài trường đó cho tiêu chí mới. Scorer/aggregate service kiểm số call/vòng của read_only; label `795229e` không đổi.
+
+## Ba cột kết quả
+
+Mỗi ô hoàn chỉnh: strict; p50/p95; số lượt và phần trăm dưới15s; tổng model calls. W3-06 có3 runs, đối chứng yêu cầu ít nhất1 run core/services, sau sửa yêu cầu3 runs cả3 bộ. Mẫu số không bằng nhau; không nhân số liệu một run thành ba run hoặc tuyên bố hiệu ứng nhân quả chắc chắn.
+
+| Bộ | W3-06 lịch sử, model flash | Đối chứng cùng ngày, mã cũ, model -n | W3-10 sau sửa, model -n |
+|---|---|---|---|
+| core | 150/150 strict; 5.454/13.105s; 144/150 (96.0%) <15s; 171 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| freeform | 51/54 strict; 5.942/13.092s; 52/54 (96.3%) <15s; 63 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| services | 111/132 strict; 6.105/31.097s; 107/132 (81.1%) <15s; 172 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+
+### core: theo nhóm câu
+
+| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
+|---|---|---|---|
+| single_step | 30/30 strict; 4.387/9.084s; 30/30 (100.0%) <15s; 30 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| multi_step | 30/30 strict; 4.863/7.890s; 30/30 (100.0%) <15s; 30 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| cross_service | 45/45 strict; 6.660/12.359s; 45/45 (100.0%) <15s; 48 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| clarification | 27/27 strict; 7.958/19.011s; 21/27 (77.8%) <15s; 45 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| refusal | 18/18 strict; 4.720/8.300s; 18/18 (100.0%) <15s; 18 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+
+### freeform: theo nhóm câu
+
+| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
+|---|---|---|---|
+| free_form | 36/36 strict; 6.041/15.103s; 34/36 (94.4%) <15s; 45 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| free_form_heldout | 15/18 strict; 5.294/12.840s; 18/18 (100.0%) <15s; 18 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+
+### services: theo nhóm câu
+
+| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
+|---|---|---|---|
+| read_only | 0/18 strict; 25.354/53.021s; 0/18 (0.0%) <15s; 54 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| single_step | 57/57 strict; 4.608/20.188s; 53/57 (93.0%) <15s; 60 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| cross_service | 27/27 strict; 7.653/10.921s; 27/27 (100.0%) <15s; 27 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| clarification | 12/15 strict; 7.150/41.108s; 13/15 (86.7%) <15s; 16 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| refusal | 15/15 strict; 4.621/18.139s; 14/15 (93.3%) <15s; 15 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+
+## Phân rã thời gian
+
+| Thành phần | W3-06 lịch sử | Đối chứng mã cũ cùng ngày | Sau sửa |
+|---|---|---|---|
+| Model/call/attempt/token | Không có telemetry từng call | Không có telemetry từng call | NOT_RUN |
+| Prefetch/search/gather/other | Không đo riêng | Không đo riêng | NOT_RUN |
+
+Không suy attempt/time share từ latency mã cũ. Instrumentation phầnA giữ nguyên và đã qua test AbortSignal thật. Chưa có dữ liệu model sau sửa để điền phân rã hoặc xác nhận mục tiêu p95.
+
+## Từng câu và số lời gọi
+
+Chưa có cặp campaign hoàn chỉnh nên chưa tính được số lượt tăng/bằng/giảm theo từng câu. Trong core sample 25/50, 23 câu hoàn tất đều 1 call ở mã cũ; test P1 mới kiểm bản sửa lập plan ghi ngay call1 với thư mục trong memory call 1. Đây là bằng chứng test, chưa thay thế phép so model thật. Khi đo lại sẽ so từng run sau sửa với số call quan sát ở một run đối chứng, nêu rõ biến thiên model và lý do search/validation của từng lượt tăng.
+
+## Các sample gián đoạn — không gộp
+
+| Campaign đối chứng | UTC bắt đầu → kết thúc | Đã thử / dự kiến | Strict của sample | Fault / hủy theo sibling |
 |---|---|---|---|---|
-| core | 150/150 → 150/150 | 5.454 / 13.105 → 15.067 / 25.285 | 144/150 (96.0%) → 73/150 (48.7%) | 171 → 258 |
-| freeform | 51/54 → 52/54 | 5.942 / 13.092 → 15.804 / 26.668 | 52/54 (96.3%) → 21/54 (38.9%) | 63 → 111 |
-| services | 111/132 → 129/132 | 6.105 / 31.097 → 13.090 / 27.042 | 107/132 (81.1%) → 79/132 (59.8%) | 172 → 225 |
+| core 04:32:33 | 2026-10-08T04:32:33.902Z → 2026-10-08T04:33:35.920Z | 2/50 | 0/2 | ss01: Model request timed out, 60143ms, 1 calls; ss02: Evaluation stopped after provider failure, 60071ms, 1 calls |
+| core 04:35:46 | 2026-10-08T04:35:46.975Z → 2026-10-08T04:36:47.927Z | 2/50 | 0/2 | ss01: Model request timed out, 60100ms, 1 calls; ss02: Evaluation stopped after provider failure, 60060ms, 1 calls |
+| core 04:46:19 | 2026-10-08T04:46:19.809Z → 2026-10-08T04:51:34.563Z | 25/50 | 23/25 | cs02: Model request timed out, 60036ms, 1 calls; cs05: Evaluation stopped after provider failure, 4538ms, 1 calls |
+| services 04:55:59 | 2026-10-08T04:55:59.107Z → 2026-10-08T05:00:09.534Z | 12/44 | 8/12 | ca01: Model request timed out, 103323ms, 3 calls; ca04: Evaluation stopped after provider failure, 49620ms, 1 calls |
 
-## core
+Mỗi sample có report/summary/CONTEXT trong [campaign](w3-10-fix-2026-10-08/CAMPAIGN.json). Runner exit 2; fault và cancellation được giữ riêng. Core/service sample không dùng để tính p95 toàn bộ hoặc strict parity.
 
-[Báo cáo gốc](core-llm-2026-10-07T16-34-09-538Z/summary.md); labels `1ab7f08d88546419048e0466f3214bb018c26592`, SHA-256 `7edeac39d6531cdc8bcc4340b1e64f02684eff61ea3bd1f39ab2f5b5ad00aa5a`; fixture `fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e`, catalog `8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce`.
+## Chẩn đoán cổng
 
-| Nhóm | Lượt | Strict trước → sau | p50 / p95 trước → sau (s) | Dưới15s trước → sau | Calls trước → sau |
-|---|---|---|---|---|---|
-| single_step | 30 | 30/30 → 30/30 | 4.387 / 9.084 → 11.658 / 22.011 | 30/30 (100.0%) → 23/30 (76.7%) | 30 → 45 |
-| multi_step | 30 | 30/30 → 30/30 | 4.863 / 7.890 → 14.071 / 18.519 | 30/30 (100.0%) → 18/30 (60.0%) | 30 → 51 |
-| cross_service | 45 | 45/45 → 45/45 | 6.660 / 12.359 → 18.406 / 29.653 | 45/45 (100.0%) → 6/45 (13.3%) | 48 → 90 |
-| clarification | 27 | 27/27 → 27/27 | 7.958 / 19.011 → 18.235 / 25.174 | 21/27 (77.8%) → 8/27 (29.6%) | 45 → 54 |
-| refusal | 18 | 18/18 → 18/18 | 4.720 / 8.300 → 7.634 / 10.852 | 18/18 (100.0%) → 18/18 (100.0%) | 18 → 18 |
+GET models 200 và tiến trình9router có hoạt động. Đọc SQLite 9router bằng mode=ro&immutable=1 chỉ xuất metadata; usage có phản hồi ok nhưng không có requestDetails đủ để gắn từng record cho request của task. Probe cùng planner/model xác minh headers chậm: attempt đầu bị deadline 30 s hủy trước headers, retryHTTP 200 sau 23.885 s, body thêm 2.149 ms, tổng 53.952 s. Probe tối giản 10.750 s, headers 10.747 s / body 2.423 ms. Probe là chẩn đoán riêng, không benchmark. Không có bằng chứng lỗi đọc JSON; không tách được queue/mạng/suy luận hoặc gán 429/account switch. Completion chưa đủ ổn định với deadline hiện hữu để hoàn tất đối chứng. Đã dừng đo, cần trạng thái upstream thay đổi trước khi đo lại cùng cấu hình. [Bằng chứng](w3-10-fix-2026-10-08/ROUTER-DIAGNOSTIC.md).
 
-258 calls / 261 attempt; 3 timeout; phân bố attempt/call `{"1":255,"2":3}`, retry `{"timeout":3}`.
+## Phương án đã thử và bỏ
 
-| Thành phần | Thời gian cộng lượt (ms) | Tỉ lệ |
-|---|---|---|
-| model | 2306764.743 | 99.9784% |
-| prefetch | 54.978 | 0.0024% |
-| search | 11.068 | 0.0005% |
-| other | 431.211 | 0.0187% |
-
-Tổng 2307262 ms cộng thời gian lượt; không phải wall time campaign ở concurrency2.
-
-Case giảm strict so với W3-06: không có.
-
-## freeform
-
-[Báo cáo gốc](freeform-llm-2026-10-07T16-53-33-903Z/summary.md); labels `695ad8758d9d658bd3606d15d679845dce30f7e4`, SHA-256 `79812f905a3d51752d7f245f3f258b6f2f2673b42a9ecadf2404d706293f0f80`; fixture `fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e`, catalog `8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce`.
-
-| Nhóm | Lượt | Strict trước → sau | p50 / p95 trước → sau (s) | Dưới15s trước → sau | Calls trước → sau |
-|---|---|---|---|---|---|
-| free_form | 36 | 36/36 → 36/36 | 6.041 / 15.103 → 15.722 / 26.733 | 34/36 (94.4%) → 15/36 (41.7%) | 45 → 75 |
-| free_form_heldout | 18 | 15/18 → 16/18 | 5.294 / 12.840 → 16.881 / 25.880 | 18/18 (100.0%) → 6/18 (33.3%) | 18 → 36 |
-
-111 calls / 111 attempt; 0 timeout; phân bố attempt/call `{"1":111}`, retry `{}`.
-
-| Thành phần | Thời gian cộng lượt (ms) | Tỉ lệ |
-|---|---|---|
-| model | 899672.500 | 99.9683% |
-| prefetch | 36.307 | 0.0040% |
-| search | 5.148 | 0.0006% |
-| other | 244.045 | 0.0271% |
-
-Tổng 899958 ms cộng thời gian lượt; không phải wall time campaign ở concurrency2.
-
-Case giảm strict so với W3-06: không có.
-- ff15, lần 1: kind: expected plan, got clarification; 2 model call, 18 search, 18453 ms.
-- ff15, lần 2: kind: expected plan, got clarification; 2 model call, 18 search, 17583 ms.
-
-## services
-
-[Báo cáo gốc](services-llm-2026-10-07T17-01-10-381Z/summary.md); labels `795229e24c64a38902e7efdce0680c729f37348a`, SHA-256 `6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372`; fixture `fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e`, catalog `8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce`.
-
-| Nhóm | Lượt | Strict trước → sau | p50 / p95 trước → sau (s) | Dưới15s trước → sau | Calls trước → sau |
-|---|---|---|---|---|---|
-| read_only | 18 | 0/18 → 18/18 | 25.354 / 53.021 → 7.447 / 19.104 | 0/18 (0.0%) → 17/18 (94.4%) | 54 → 18 |
-| single_step | 57 | 57/57 → 57/57 | 4.608 / 20.188 → 13.228 / 25.800 | 53/57 (93.0%) → 36/57 (63.2%) | 60 → 111 |
-| cross_service | 27 | 27/27 → 27/27 | 7.653 / 10.921 → 21.452 / 33.204 | 27/27 (100.0%) → 2/27 (7.4%) | 27 → 54 |
-| clarification | 15 | 12/15 → 12/15 | 7.150 / 41.108 → 13.090 / 18.841 | 13/15 (86.7%) → 11/15 (73.3%) | 16 → 27 |
-| refusal | 15 | 15/15 → 15/15 | 4.621 / 18.139 → 7.491 / 24.034 | 14/15 (93.3%) → 13/15 (86.7%) | 15 → 15 |
-
-225 calls / 228 attempt; 3 timeout; phân bố attempt/call `{"1":222,"2":3}`, retry `{"timeout":3}`.
-
-| Thành phần | Thời gian cộng lượt (ms) | Tỉ lệ |
-|---|---|---|
-| model | 1982514.173 | 99.9732% |
-| prefetch | 56.763 | 0.0029% |
-| search | 12.450 | 0.0006% |
-| other | 461.614 | 0.0233% |
-
-Tổng 1983045 ms cộng thời gian lượt; không phải wall time campaign ở concurrency2.
-
-Case giảm strict so với W3-06: không có.
-- ca04, lần 1: kind: expected clarification, got refusal; 1 model call, 0 search, 18841 ms.
-- ca04, lần 2: kind: expected clarification, got refusal; 1 model call, 0 search, 15189 ms.
-- ca04, lần 3: kind: expected clarification, got refusal; 1 model call, 0 search, 14441 ms.
-
-Read-only: 18/18 clarification/1call/0search/0prefetch.
-
-| Case / run | Latency (ms) | Model calls | Attempts | Reasoning token từng call |
-|---|---|---|---|---|
-| ji03 / 2 | 58253 | 2 | 3 | 372, 789 |
-| ji07 / 1 | 58180 | 2 | 3 | 2563, 253 |
-| ca02 / 2 | 46920 | 2 | 3 | 334, 595 |
-| wf02 / 1 | 33204 | 2 | 2 | 485, 2155 |
-| ca03 / 2 | 32590 | 2 | 2 | 227, 600 |
-| ca03 / 3 | 31720 | 2 | 2 | 255, 572 |
-| wf04 / 3 | 27042 | 2 | 2 | 465, 1456 |
-| wf04 / 2 | 26978 | 2 | 2 | 665, 1249 |
-| ji08 / 2 | 25800 | 1 | 1 | 2632 |
-| wf01 / 2 | 25251 | 2 | 2 | 967, 810 |
-| ji08 / 3 | 25215 | 1 | 1 | 2447 |
-| wf04 / 1 | 24342 | 2 | 2 | 456, 1755 |
-
-## Kiểm tra concurrency1
-
-[Một lượt services 44 case](services-llm-2026-10-07T17-18-22-282Z/summary.md), cùng source/model/labels; strict 43/44, p50/p95 13.312 / 29.845s, dưới15s 29/44 (65.9%); 75 call/76 attempt/1 timeout. So sánh concurrency theo các thời điểm khác nhau và 1 run với 3 run; không phải thí nghiệm ngẫu nhiên hoặc bằng chứng nhân quả của tranh chấp/tài khoản cổng.
+Source50761b1 dời thư mục sau model search là phương án đã bỏ vì reviewP1. Giữ nguyên mọi campaign ngày 07–08/10, gồm core 150/150, freeform 52/54, services 129/132 và concurrency 1; **không dùng nghiệm thu bản sửa này**. Services khi đó p95 27.042s,79/132 dưới 15 s, single_step 60→111 calls, cross_service 27→54 so W3-06. So sánh lịch sử còn có confound flash→flash-n. [Comparison lưu trữ](W3-10-COMPARISON-DEFERRED-DIRECTORY.md), [verification lưu trữ](W3-10-VERIFICATION-DEFERRED-DIRECTORY.md), [log cũ giữ nguyên](../../handoff/log/2026-10-08-codex-W3-10.md).

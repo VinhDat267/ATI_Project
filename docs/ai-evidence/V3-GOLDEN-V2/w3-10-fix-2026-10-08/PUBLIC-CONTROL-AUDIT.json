@@ -1,0 +1,33 @@
+{
+  "policy": "Public copy redacts full corpus phrases, private values and provider error text after scoring; original control runner/source unchanged. This verifies stored score projections, not a rescore of masked response text.",
+  "audits": [
+    {
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-32-35-752Z",
+      "rawSha256": "024c7d64cafd7ad5ce7071838c4f94840d8a199d81421423a6f6b07c6100f304",
+      "publicSha256": "f9cc890e9338854577828e4775938e63dfb8fd3f77e398d36de0c5e57533dfde",
+      "caseRuns": 2,
+      "storedScoresCallsAndLatenciesUnchanged": true
+    },
+    {
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-35-47-805Z",
+      "rawSha256": "a8c4d4c602e9507e6a48dcd15dcb6dbb0dd98ecaccad7f10c0dfa1f4fbfbcb18",
+      "publicSha256": "29a4ab32659c091f2f76b8e7404fa1585bde706ed2f4f0e7847c9258d2d9d411",
+      "caseRuns": 2,
+      "storedScoresCallsAndLatenciesUnchanged": true
+    },
+    {
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-46-20-422Z",
+      "rawSha256": "316563c423b5d78fb2b6ee9a9a4b30d625e867e1b32702f4638dd0d75e8b8c96",
+      "publicSha256": "41c22f35c58166acc5dfc0b5f3fa7d23a5b639738037c973650039c6986c44d0",
+      "caseRuns": 25,
+      "storedScoresCallsAndLatenciesUnchanged": true
+    },
+    {
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-services-llm-2026-10-08T04-56-00-872Z",
+      "rawSha256": "0c8448f24a8914fb14ada7e5920358cb8ca0a80b85aa740442620ea316545f59",
+      "publicSha256": "59aa8fef798e364dbac6db86aa8a8b2914eb71d2ace1024d4fb2a60a4c9e84a2",
+      "caseRuns": 12,
+      "storedScoresCallsAndLatenciesUnchanged": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "diagnostic_only_not_benchmark",
+  "sourceCommit": "7898aa7",
+  "model": "ag/gemini-3.8-flash",
+  "startedAt": "2026-10-08T04:44:45.278Z",
+  "endedAt": "2026-10-08T04:45:39.232Z",
+  "latencyMs": 53952,
+  "llmCalls": 1,
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "failed": false,
+  "timeout": false,
+  "fetchPhases": [
+    {
+      "startedAt": "2026-10-08T04:44:45.336Z",
+      "fetchError": "Error",
+      "fetchPhaseMs": 30005.7623
+    },
+    {
+      "startedAt": "2026-10-08T04:45:15.342Z",
+      "headersMs": 23885.482599999996,
+      "status": 200,
+      "fetchPhaseMs": 23885.5087,
+      "bodyMs": 23887.631799999996
+    }
+  ]
+}
