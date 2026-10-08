@@ -3,7 +3,7 @@ import pg from 'pg';
 import { createHash } from 'node:crypto';
 
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
-  test(`real browser and PostgreSQL: login, chat, approval and execution FE-06A recovery ${width} ${theme}`,async({page},info)=>{
+  test(`FE-06A: saved recovery moments 7-9 and terminal receipt ${width} ${theme}`,async({page},info)=>{
     test.setTimeout(60_000);
     await page.setViewportSize({width,height:width===375?812:900});await page.emulateMedia({colorScheme:theme});
     await page.goto('/login');await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
@@ -15,6 +15,8 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
       for(const moment of [7,8,9,'unsuccessful'] as const) {
         const id=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[owner,`FE06 ${moment} ${theme} ${width}`])).rows[0].id;
         await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)",[id,'Tạo thẻ, tạo issue, ghi bảng tính rồi báo nhóm']);
+        // A long unbroken value (as an edited recovery request can carry) must wrap inside the conversation drawer.
+        if(moment===7) await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)",[id,`Làm lại việc 3 với nội dung: ${'https://docs.google.com/spreadsheets/d/'+'x'.repeat(160)}`]);
         const plan={kind:'plan',summary:'Theo dõi công việc của nhóm',steps:[
           {id:'step_1',tool:'trello.create_card',description:'Tạo card Trello',args:{listId:'list_1',name:'Sửa lỗi đăng nhập'}},
           {id:'step_2',tool:'github.create_issue',description:'Tạo issue kho ati-test',args:{repo:'org/ati-test',title:'Sửa lỗi đăng nhập'}},
@@ -28,6 +30,7 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
         await page.goto(`/c/${id}`);const stage=page.locator(`#moment-${moment}`);await expect(stage).toBeVisible();
         await expect(page.locator('textarea:visible')).toHaveCount(1);
         const overflow=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));expect(overflow.scroll).toBeLessThanOrEqual(overflow.viewport);
+        if(moment===7){await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click();const log=page.locator('#chat-messages-container');await expect(log).toContainText('Làm lại việc 3');const box=await log.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth}));expect(box.scroll).toBeLessThanOrEqual(box.client);await page.keyboard.press('Escape');await expect(log).toHaveCount(0);}
         if(moment===8){await expect(stage.getByRole('button',{name:/Thử lại|Sửa rồi|Làm tiếp/})).toHaveCount(0);await expect(stage.getByRole('link',{name:'Kiểm tra trên Slack'})).toHaveAttribute('rel','noopener noreferrer');}
         if(moment===9) await expect(stage.getByRole('button',{name:'Làm tiếp các việc còn lại'})).toBeVisible();
         if(moment==='unsuccessful'){await expect(stage.getByRole('button',{name:'Nhờ việc khác'})).toBeVisible();await expect(stage.getByRole('button',{name:/Thử lại|Dừng kế hoạch|Bỏ qua/})).toHaveCount(0);}

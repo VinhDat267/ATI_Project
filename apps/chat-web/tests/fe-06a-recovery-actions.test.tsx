@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { Cockpit } from '../src/components/Cockpit';
 import { useExecutionRecovery } from '../src/hooks/use-execution-recovery';
+import { recoveryDestination } from '../src/pages/Cockpit/RecoveryMoment';
 import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
 import { handleSSEEvent } from '../src/hooks/use-sse';
@@ -12,7 +13,8 @@ const saved:ExecutionSnapshot={plan:{id:'p1',convId:'c1',status:'partial',summar
 function stage(){useChatStore.getState().setConversationId('c1');useChatStore.getState().setExecutionSnapshot(saved);const controls={busy:false,error:null,onRetry:vi.fn(),onSkip:vi.fn(),onStop:vi.fn(),onContinue:vi.fn(),onEdit:vi.fn()};render(<Cockpit services={[]} servicesLoading={false} servicesError={null} onSendMessage={vi.fn()} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={controls}/>);return controls;}
 it('known failure retry and skip target the persisted paused step',()=>{const controls=stage();fireEvent.click(screen.getByRole('button',{name:'Thử lại việc 1'}));fireEvent.click(screen.getByRole('button',{name:'Bỏ qua việc này'}));expect(controls.onRetry).toHaveBeenCalledWith('s1');expect(controls.onSkip).toHaveBeenCalledWith('s1');});
 it('stop requires confirmation and Escape never stops the plan',()=>{const controls=stage();fireEvent.click(screen.getByRole('button',{name:'Dừng kế hoạch'}));expect(controls.onStop).not.toHaveBeenCalled();fireEvent.keyDown(document,{key:'Escape'});expect(screen.queryByRole('dialog')).toBeNull();expect(controls.onStop).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Dừng kế hoạch'}));fireEvent.click(screen.getByRole('button',{name:'Dừng hẳn quy trình'}));expect(controls.onStop).toHaveBeenCalledTimes(1);});
-it('edit shows labelled schema fields and submits edited arguments only after confirmation',()=>{const controls=stage();fireEvent.click(screen.getByRole('button',{name:'Sửa rồi thử lại'}));expect(screen.queryByRole('textbox',{name:'Tham số thực thi'})).toBeNull();const title=screen.getByDisplayValue('Original');fireEvent.change(title,{target:{value:'Corrected'}});fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(controls.onEdit).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));expect(controls.onEdit).toHaveBeenCalledWith('s1',expect.objectContaining({title:'Corrected'}),'Create');});
+it('edit shows labelled schema fields and submits edited arguments only after confirmation',()=>{const controls=stage();fireEvent.click(screen.getByRole('button',{name:'Sửa rồi thử lại'}));expect(screen.queryByRole('textbox',{name:'Tham số thực thi'})).toBeNull();const title=screen.getByDisplayValue('Original');fireEvent.change(title,{target:{value:'Corrected'}});fireEvent.click(screen.getByRole('button',{name:'Xem lại nội dung sửa'}));expect(controls.onEdit).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Dừng và gửi yêu cầu sửa'}));expect(controls.onEdit).toHaveBeenCalledWith('s1',expect.objectContaining({title:'Corrected'}),undefined);});
+it('the optional note starts empty so it cannot contradict the corrected arguments',()=>{stage();fireEvent.click(screen.getByRole('button',{name:'Sửa rồi thử lại'}));expect(screen.getByRole('textbox',{name:'Ghi chú thêm (không bắt buộc)'})).toHaveValue('');expect(screen.queryByDisplayValue('Create')).toBeNull();});
 it('late recovery error after leaving and returning to the same conversation cannot surface in the new owner',async()=>{
   useChatStore.getState().setConversationId('c1');useChatStore.getState().setExecutionSnapshot(saved);
   let reject!:(error:Error)=>void;vi.spyOn(apiClient,'retryStep').mockImplementation(()=>new Promise((_resolve,fail)=>{reject=fail;}));
@@ -40,4 +42,19 @@ it('an authoritative own stopped SSE arriving before HTTP still permits the edit
   const hook=renderHook(()=>useExecutionRecovery());let task!:Promise<boolean>;act(()=>{task=hook.result.current.recover('stop');});
   act(()=>handleSSEEvent('exec_done',JSON.stringify({planId:'p1',status:'stopped'}),undefined,'c1'));
   let accepted=false;await act(async()=>{release();accepted=await task;});expect(accepted).toBe(true);expect(useChatStore.getState().executionSnapshot?.execution.status).toBe('stopped');
+});
+
+it('retry and skip only target the persisted paused step',async()=>{
+  useChatStore.getState().setConversationId('c1');useChatStore.getState().setExecutionSnapshot(saved);
+  const retry=vi.spyOn(apiClient,'retryStep').mockResolvedValue({});const skip=vi.spyOn(apiClient,'skipStep').mockResolvedValue({});
+  const hook=renderHook(()=>useExecutionRecovery());
+  let results:boolean[]=[];await act(async()=>{results=[await hook.result.current.recover('retry','other-step'),await hook.result.current.recover('skip','other-step'),await hook.result.current.recover('skip')];});
+  expect(results).toEqual([false,false,false]);expect(retry).not.toHaveBeenCalled();expect(skip).not.toHaveBeenCalled();
+});
+it('recovery destinations accept only https links without embedded credentials',()=>{
+  const step=(url:string)=>({id:'s',tool:'slack.send_message',description:'Gửi',args:{url}});
+  expect(recoveryDestination(step('https://example.test/page'))).toBe('https://example.test/page');
+  expect(recoveryDestination(step('http://example.test/page'))).toBeUndefined();
+  expect(recoveryDestination(step('https://user:secret@example.test/page'))).toBeUndefined();
+  expect(recoveryDestination(step('javascript:alert(1)'))).toBeUndefined();
 });

@@ -52,11 +52,16 @@ it.each(['stopped','failed','rejected'] as const)('terminal %s with old unknown/
   expect(screen.getByRole('link',{name:'Mở card'})).toBeInTheDocument();
   expect(screen.queryByRole('button',{name:/Thử lại|Bỏ qua|Dừng kế hoạch/})).toBeNull();
 });
+it('terminal receipt keeps the status announcement without repeating the heading visibly',()=>{stage(snapshot('stopped','unknown',[]));expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Kế hoạch đã dừng');expect(screen.getByText('Quy trình đã dừng.')).toHaveClass('sr-only');});
 it('receipt counts only tools with succeeded steps and never uses skipped output as a result',()=>{
   const saved=snapshot('completed','skipped',[]); saved.steps[1].output={url:'https://slack.com/fake',text:'FAKE OUTPUT'};
   stage(saved);
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Đã xong 1 việc trên 1 công cụ');
-  expect(screen.queryByRole('link',{name:'Mở tin nhắn'})).toBeNull();
+  // Slack's receipt link is labelled "Xem tin"; the skipped card must have no link at all.
+  const skippedCard=screen.getByText('Báo nhóm').closest('[class*="receipt-stagger-"]') as HTMLElement;
+  expect(within(skippedCard).queryByRole('link')).toBeNull();
+  expect(screen.queryByRole('link',{name:'Xem tin'})).toBeNull();
+  expect(screen.getAllByRole('link').map(link=>link.getAttribute('href'))).not.toContain('https://slack.com/fake');
   expect(screen.queryByText('FAKE OUTPUT')).toBeNull();
 });
 it('sandbox plan warning agrees with sandbox runtime',async()=>{

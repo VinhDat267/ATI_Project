@@ -68,6 +68,12 @@ describe('saved execution recovery in the actual App/history flow', () => {
     await waitFor(()=>expect(request).toHaveBeenCalledWith('/api/conversations/c1/messages',expect.objectContaining({method:'POST',body:expect.stringContaining('corrected-member')})));
     expect(request.mock.calls.filter(([,options]:[string,RequestInit?])=>options?.method==='POST').map(([url]:[string,RequestInit?])=>url)).toEqual(['/api/executions/p1/stop','/api/conversations/c1/messages']);
     const body=String(request.mock.calls.find(([url]:[string,RequestInit?])=>url==='/api/conversations/c1/messages')?.[1]?.body);expect(body).toContain('saved-card-123');expect(body).not.toContain('step_1.output');expect(screen.queryByRole('button',{name:'Duyệt kế hoạch'})).toBeNull();
+    // The request is shown as the user's own message and as the current request: plain Vietnamese only.
+    const content=JSON.parse(body).content as string;
+    expect(content.split('\n')[0]).toBe('Làm lại việc 2 (Gán Minh vào thẻ) của kế hoạch đã dừng, với nội dung đã sửa:');
+    expect(content).toContain('ID của thành viên Trello cần gán: corrected-member');
+    expect(content).toContain('Việc 3 (Thông báo Slack)');
+    expect(content).not.toMatch(/step_\d|[{}]|\$ref|\$template|Yêu cầu: |Tham số sửa/);
   });
   it('a failed Stop cannot send edited parameters or report completion',async()=>{
     snapshot.execution={status:'partial',pausedStepId:'step_2'};snapshot.plan.status='partial';snapshot.steps[1].status='failed';snapshot.recoveryActions=['retry','skip','stop'];post=async()=>{throw new Error('Stop conflict');};

@@ -3,7 +3,7 @@ import { useChatStore } from '../store/chat-store';
 import { useSSE } from '../hooks/use-sse';
 import { apiClient } from '../services/api-client';
 import { Cockpit } from './Cockpit';
-import { savedArguments } from '../pages/Cockpit/RecoveryMoment';
+import { recoveryEditRequest } from '../pages/Cockpit/recovery-request';
 import { userErrorMessage } from '../services/user-error';
 import type { ServiceInfo, User } from '../types';
 
@@ -230,8 +230,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     const stopped = await recover('stop');
     const current = useChatStore.getState();
     if (!stopped || !workspaceMounted.current || current.conversationId !== owner || current.executionSnapshot?.plan.id !== planId || current.executionSnapshot.execution.status !== 'stopped') return;
-    const remaining = executionSnapshot.plan.steps?.filter(step => executionSnapshot.steps.find(row=>row.stepId===step.id)?.status==='pending').map(step=>({...step,args:savedArguments(step.args,executionSnapshot)}));
-    handleSendMessage(`Sửa việc ${stepId} của kế hoạch đã dừng. Chỉ lập kế hoạch cho việc lỗi và các việc chưa làm; không chạy lại việc đã xong. Yêu cầu: ${prompt || ''}. Tham số sửa: ${JSON.stringify(args)}. Các việc chưa làm: ${JSON.stringify(remaining ?? [])}`);
+    handleSendMessage(recoveryEditRequest(executionSnapshot, stepId, args, prompt));
   };
 
   return (
