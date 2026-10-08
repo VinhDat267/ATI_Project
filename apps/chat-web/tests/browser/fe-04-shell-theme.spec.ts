@@ -3,7 +3,7 @@ const email = process.env.CHAT_ADMIN_EMAIL || 'admin@example.com';
 const password = process.env.CHAT_ADMIN_PASSWORD || 'admin123';
 async function login(page: Page) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -33,10 +33,13 @@ test('FE-04: shell menu, protected routes, cross-tab theme and mobile sandbox wa
   await avatar.click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
   await expect(page).toHaveURL(/\/settings$/); await expect(page.getByRole('heading', { name: 'Kết nối dịch vụ', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
-  await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký điều phối', level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký điều phối & Lịch sử yêu cầu', level: 1, exact: true })).toBeVisible();
   const other = await context.newPage(); await other.goto('/guide');
   await page.getByRole('button', { name: 'Chuyển sang giao diện Tối' }).click();
   await expect(other.locator('html')).toHaveClass(/dark/);
+  // History owns its source page. Keep the runtime-warning regression on
+  // Cockpit, where the sandbox badge is part of the actual workspace header.
+  await page.goto('/'); await expect(composer).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText('Thử nghiệm · không gọi dịch vụ thật', { exact: true })).toBeVisible();
   await expect(page.getByText('Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật', { exact: true })).toBeHidden();
@@ -51,7 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: theme }); await page.goto('/login');
     const loginButton = page.getByRole('button', { name: 'Đăng nhập', exact: true });
     expect(await loginButton.evaluate(el => ({ weight: getComputedStyle(el).fontWeight, size: getComputedStyle(el).fontSize }))).toEqual({ weight: '600', size: '14px' });
-    await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password); await loginButton.click();
+    await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password); await loginButton.click();
     await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click();
     const newConversation = page.getByRole('button', { name: /Cuộc hội thoại mới/ });
     await expect(newConversation).toBeVisible();
