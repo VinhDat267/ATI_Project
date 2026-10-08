@@ -146,7 +146,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
                   {"Địa chỉ "}
                   <strong className="text-[#111827] font-semibold user-email-placeholder">
-                    {email || "địa chỉ email của bạn"}
+                    {email || "email của bạn"}
                   </strong>
                   {" đã được xác thực thành công. Yêu cầu của bạn đã sẵn sàng cho bước tiếp theo."}
                 </p>
