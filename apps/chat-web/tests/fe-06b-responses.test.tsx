@@ -88,6 +88,11 @@ it('read-only clarification uses planner choices without inventing destinations 
   expect(screen.queryByText('Tạo một card Trello tổng hợp')).toBeNull();
   expect(screen.getAllByRole('textbox')).toHaveLength(1);
 });
+it('a Vietnamese read-only request selects the expanded view even with a generic planner question', async () => {
+  useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: 'Liệt kê các issue đang mở' }],
+    activeClarification: { question: 'Bạn muốn thực hiện hành động nào với kết quả này?', options: ['Gửi lên Slack'] } });
+  view(); expect(await screen.findByRole('button', { name: 'Sửa yêu cầu' })).toBeInTheDocument();
+});
 it('server planning failure uses the system copy and retries only the original planning request', async () => {
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: prompt }, { id: 'e', role: 'system', content: 'Lỗi: upstream failed', metadata: { type: 'planning_error' } }] });
   const { send } = view();

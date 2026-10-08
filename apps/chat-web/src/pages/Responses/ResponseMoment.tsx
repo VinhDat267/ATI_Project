@@ -13,7 +13,7 @@ export function clarificationVariant(clarification: ClarificationState | null, r
   // These hints choose presentation only; every displayed answer remains the planner's.
   const text = `${clarification.question} ${clarification.context ?? ''}`;
   if (/không (?:tìm )?thấy|không tìm được|ngoài phạm vi|chưa (?:được )?cấp phép/i.test(text)) return 'destination';
-  if (/^(?:liệt kê|xem|đọc|tìm|cho (?:tôi|mình) xem)\b/i.test(request.trim()) || /chỉ (?:để )?(?:xem|đọc)|làm gì với danh sách/i.test(text)) return 'read-only';
+  if (/^(?:liệt kê|xem|đọc|tìm|cho (?:tôi|mình) xem)(?:\s|$)/i.test(request.trim()) || /chỉ (?:để )?(?:xem|đọc)|làm gì với danh sách/i.test(text)) return 'read-only';
   return null;
 }
 export function NoWritesNotice() {
