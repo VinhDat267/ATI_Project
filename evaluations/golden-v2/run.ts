@@ -55,11 +55,14 @@ function safeError(err: unknown): string {
   return 'Request failed (details omitted from public evidence)';
 }
 
-/** A model can echo the entire request in its summary; redact only the public copy after scoring. */
+/** Model output, search arguments and score diagnostics can echo the request. */
+function publicEvidenceValue<T>(value: T, prompt: string): T {
+  return JSON.parse(JSON.stringify(value, (_key, nested: unknown) =>
+    typeof nested === 'string' && prompt ? nested.split(prompt).join('[redacted case prompt]') : nested)) as T;
+}
+/** Redact only the public copy after scoring; keep the response interface for callers. */
 export function publicEvidenceResponse(response: PlannerResponse | undefined, prompt: string): PlannerResponse | undefined {
-  if (!response) return response;
-  return JSON.parse(JSON.stringify(response, (_key, value: unknown) =>
-    typeof value === 'string' && prompt ? value.split(prompt).join('[redacted case prompt]') : value)) as PlannerResponse;
+  return response ? publicEvidenceValue(response, prompt) : response;
 }
 
 export function summarizeTiming(rows: ObservedRun[]) {
@@ -236,9 +239,9 @@ export async function main() {
       thresholds: THRESHOLDS, gate: { toolSelectionAccuracy: (aggregate.mean.toolSelectionAccuracy ?? 0) >= THRESHOLDS.toolSelectionAccuracy,
         argumentQuality: (aggregate.mean.argumentQuality ?? 0) >= THRESHOLDS.argumentQuality }, serviceGate,
       qualityGate: 'incomplete', aggregate, comparison, timing,
-      results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => ({ id: r.case.id, category: r.case.category, passed: r.score.passed,
+      results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => publicEvidenceValue({ id: r.case.id, category: r.case.category, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
-        response: publicEvidenceResponse(r.response, r.case.prompt), searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases })) })),
+        response: r.response, searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases }, r.case.prompt)) })),
     };
     writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     const m = aggregate.mean;

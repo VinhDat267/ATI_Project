@@ -1,10 +1,58 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { MockLLMProvider, OpenAICompatibleProvider, type LLMProvider } from '@wap/planner';
 import { loadEvalFile, parseEvalOptions, runCase, runPool, safeGateway } from './run.js';
 import * as runner from './run.js';
 
 describe('service evaluation runner', () => {
+  it('exports scored search traces without a full prompt echoed by the model', async () => {
+    const { file } = loadEvalFile('services');
+    const golden = file.cases.find(c => c.id === 'sh02')!;
+    const output = mkdtempSync(join(tmpdir(), 'ati-w3-10-export-test-'));
+    const responses = [
+      { kind: 'search', calls: [{ tool: 'sheets.list_spreadsheets', args: { query: golden.prompt } }] },
+      { kind: 'clarification', question: 'Choose a spreadsheet.' },
+    ];
+    const generate = vi.spyOn(MockLLMProvider.prototype, 'generatePlan').mockImplementation(async () => JSON.stringify(responses.shift()));
+    const casePrompts: string[] = [];
+    vi.stubEnv('EVAL_DRY_RUN', '1');
+    vi.stubEnv('EVAL_SET', 'services');
+    vi.stubEnv('EVAL_RUNS', '1');
+    vi.stubEnv('EVAL_ONLY', golden.id);
+    vi.stubEnv('EVAL_CONCURRENCY', '1');
+    vi.stubEnv('EVAL_SEARCH_MODE', 'llm');
+    vi.stubEnv('PLANNER_SEARCH_MODE', 'llm');
+    vi.stubEnv('EVAL_OUTPUT_DIR', output);
+    try {
+      await runner.main();
+      expect(generate).toHaveBeenCalledTimes(2);
+      const report = JSON.parse(readFileSync(join(output, readdirSync(output)[0]!, 'report.json'), 'utf8'));
+      const row = report.results[0].cases[0];
+      expect(row.searches).toContainEqual(expect.objectContaining({ tool: 'sheets.list_spreadsheets', phase: 'search' }));
+      expect(row.score).toMatchObject({ kindOk: false, passed: false });
+      expect(row.llmCalls).toBe(2);
+      expect(row.searchRounds).toBe(1);
+      const inspect = (value: unknown): void => {
+        if (typeof value === 'string' && value.includes(golden.prompt)) casePrompts.push(value);
+        else if (Array.isArray(value)) value.forEach(inspect);
+        else if (value && typeof value === 'object') Object.values(value).forEach(inspect);
+      };
+      inspect(report);
+      expect(casePrompts).toEqual([]);
+      expect(row.searches[0].args.query).toBe('[redacted case prompt]');
+      expect(generate.mock.calls[1]![0].workingMemory).toBeDefined();
+    } finally {
+      generate.mockRestore();
+      vi.unstubAllEnvs();
+      if (dirname(realpathSync(output)) === realpathSync(tmpdir()) && basename(output).startsWith('ati-w3-10-export-test-')) {
+        rmSync(output, { recursive: true });
+      }
+    }
+  });
+
   it('redacts a full case prompt copied into a model response only in exported evidence', () => {
     const prompt = 'Send the status report to the team channel.';
     const response = { kind: 'plan' as const, summary: prompt, steps: [{ id: 's1', tool: 'slack.send_message', args: { text: `Echo: ${prompt}`, channel: 'team' } }] };
@@ -85,7 +133,7 @@ describe('service evaluation runner', () => {
       fetch: (async () => {
         requests++;
         if (requests === 1) return new Response('{}', { status: 429 });
-        const content = requests === 2 ? JSON.stringify({ kind: 'search', calls: [{ tool: 'sheets.search_spreadsheets', args: { query: 'Frontend' } }] })
+        const content = requests === 2 ? JSON.stringify({ kind: 'search', calls: [{ tool: 'sheets.list_spreadsheets', args: { query: 'Frontend' } }] })
           : '{"kind":"clarification","question":"Chọn trang tính nào?"}';
         return new Response(JSON.stringify({ model: 'test-model', choices: [{ message: { content } }] }));
       }) as typeof fetch });
@@ -96,6 +144,10 @@ describe('service evaluation runner', () => {
     expect(row.modelCalls[1]!.usage).toEqual({ promptTokens: null, completionTokens: null, reasoningTokens: null });
     expect(row.phases.filter(p => p.phase === 'search')).toHaveLength(1);
     expect(row.phases.filter(p => p.phase === 'prefetch')).toHaveLength(1);
+    expect(row.searches).toHaveLength(1);
+    expect(row.searches[0]).toMatchObject({ tool: 'sheets.list_spreadsheets', phase: 'search' });
+    expect(row.searches[0]!.result).toBeDefined();
+    expect(row.searches[0]!.error).toBeUndefined();
     expect(row.phases.every(p => p.durationMs >= 0 && p.startedAtMs >= 0)).toBe(true);
   });
   it('accepts services and the production PLANNER_SEARCH_MODE alias with bounded run settings', () => {
