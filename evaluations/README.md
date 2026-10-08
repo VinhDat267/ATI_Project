@@ -178,67 +178,35 @@ Local verification: `npm run check` exit 0 (874 v3 + 151 evaluation tests),
 test passed. Browser/live-service runs were not repeated for this evaluation
 change. See the [verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
 
-### W3-10 — restored eager directory, read-only clarification, same-day control
+### W3-10 — eager directory, read-only clarification, live remeasurement
 
-The owner clarified on 08/10 that "no lookup" means zero search rounds opened by the model. Platform directory prefetch is allowed before the first model call. After the independent review of PR #102, `a9f1030` restores that ordering through `measure('prefetch')`; the first Working Memory already contains directory resources under `__observed`. Rule0 still requires immediate clarification for a read-only request. `READ_ONLY_PLAN` still becomes a fixed Vietnamese question without a repair call. Mixed read/write plans remain valid; the catalog and production API are unchanged.
+**Phép đo mới ngày 08/10 UTC, source 58d4fcd.** Đủ đối chứng core/services 1 run và đủ ba bộ sau sửa 3 runs. Read-only 18/18 theo policy; strict parity đạt; services p95 20.138s (chưa đạt mục tiêu <15s).
 
-**The earlier deferred-directory campaign (source `50761b1`, 07–08/10) was tried and abandoned. It is not used to accept the corrected implementation.** Its original core/freeform/services/concurrency1 reports remain intact. See [archived comparison](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON-DEFERRED-DIRECTORY.md) and [archived verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION-DEFERRED-DIRECTORY.md). That option added a model turn to many write requests (services single-step calls 60→111, cross-service 27→54); it also compared historical flash with served flash-n, which confounded the timing difference.
+User-authorized remeasurement resumed after main's successful live smoke (#115). Merge main e269743 at 5afc0a7 retains #102's exact served-model check and metrics when resolving the conflict with #113. Corrected campaigns use 58d4fcd; local control 7898aa7 is 8155c03 plus only the confirmed flash-n alias. Both use requested ag/gemini-3.8-flash, served gemini-3.8-flash-n, llm/concurrency 2 and unchanged production deadlines/retries. Campaigns are sequential, planning only on fixtures.
 
-Corrected acceptance counts **clarification + exactly one model call + zero model-opened search rounds**, allowing directory I/O. `searchRounds` counts phase `search`, not the number of tool calls. `searches` now excludes directory traces; `prefetches` records phase `prefetch` separately. Each trace includes its phase, so identical tool names can still have different origins. Regex gather is recorded separately and is not a model-opened round. The scorer and service aggregates apply these counts to read-only cases. Older reports have directory traces mixed into `searches`; its historical length is not the new read-only criterion.
+The restored directory prefetch runs before call 1 under phase prefetch. Read-only requires clarification, exactly 1 model call and zero model-opened phase search; platform directory listing is allowed under the owner's 08/10 clarification. searches excludes directory; prefetches holds it separately. READ_ONLY_PLAN becomes the fixed Vietnamese question without a repair call; mixed read/write remains valid. Catalog is unchanged.
 
-Label `795229e` remains unchanged: only the search requirements of sh01/sh07/ca01/no01/tg01/ji01 were removed under the 05/10 policy, before the first task model report `66896ca`. All prompts remain unchanged. Their clarification contributes to kind/strict scores with no tool/argument denominator. For three runs, labelled tool attempts are Sheets18 (historically24), Calendar21 (24), Notion24 (27), Telegram27 (30), Jira27 (30). Argument denominators also depend on correct tool selection. The old-code control retains its old labels, including the historical read requirement; its read-only strict score uses a different rubric.
+Label795229e predates first report66896ca (git ancestry exit0), and no prompt or label was changed during remeasurement. Control retains its previous read-only search labels; that strict read-only rubric differs. Tool/argument denominators are recorded per service in the comparison. Historical W3-06 served base flash; use same-window control for comparison rather than attributing cross-day changes entirely to code. One control run is not three replicated runs.
 
-The local-only control is `8155c03` plus only the alias cherry-pick `845701c`, resolved as `7898aa7` (provider/test only). No W3-10 policy, labels or instrumentation is introduced into that branch. Historical W3-06 served `gemini-3.8-flash`; control and corrected runs request `ag/gemini-3.8-flash` and accept only the owner-confirmed `gemini-3.8-flash-n` alias. Both current arms use llm/concurrency2. The control has one run per set; corrected measurement requests three. Individual post-fix runs are compared to the same observed control call count, not to three fabricated control runs.
-
-| Bộ | W3-06 lịch sử, model flash | Đối chứng cùng ngày, mã cũ, model -n | W3-10 sau sửa, model -n |
+| Bộ | W3-06 lịch sử, flash | Đối chứng cùng ngày, -n | Sau sửa, -n |
 |---|---|---|---|
-| core | 150/150 strict; 5.454/13.105s; 144/150 (96.0%) <15s; 171 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| freeform | 51/54 strict; 5.942/13.092s; 52/54 (96.3%) <15s; 63 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| services | 111/132 strict; 6.105/31.097s; 107/132 (81.1%) <15s; 172 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+| core | 150/150 strict; p50/p95 5.454/13.105s; 144/150 (96.0%) <15s; 171 calls | 50/50 strict; p50/p95 7.527/18.995s; 46/50 (92.0%) <15s; 57 calls | 150/150 strict; p50/p95 7.229/18.021s; 136/150 (90.7%) <15s; 168 calls |
+| freeform | 51/54 strict; p50/p95 5.942/13.092s; 52/54 (96.3%) <15s; 63 calls | NOT_RUN — không yêu cầu control freeform | 52/54 strict; p50/p95 10.108/24.738s; 42/54 (77.8%) <15s; 63 calls |
+| services | 111/132 strict; p50/p95 6.105/31.097s; 107/132 (81.1%) <15s; 172 calls | 37/44 strict; p50/p95 7.600/44.465s; 33/44 (75.0%) <15s; 57 calls | 129/132 strict; p50/p95 8.242/20.138s; 117/132 (88.6%) <15s; 135 calls |
 
-core groups (strict; p50/p95; under15s; model calls):
+| Bộ | Calls / attempts / timeout | Model | Prefetch | Search | Other |
+|---|---|---|---|---|---|
+| core | 168/168/0 | 99.9649% | 0.0061% | 0.0002% | 0.0288% |
+| freeform | 63/64/1 | 99.9475% | 0.0089% | 0.0002% | 0.0433% |
+| services | 135/137/2 | 99.9623% | 0.0099% | 0.0001% | 0.0278% |
 
-| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
-|---|---|---|---|
-| single_step | 30/30 strict; 4.387/9.084s; 30/30 (100.0%) <15s; 30 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| multi_step | 30/30 strict; 4.863/7.890s; 30/30 (100.0%) <15s; 30 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| cross_service | 45/45 strict; 6.660/12.359s; 45/45 (100.0%) <15s; 48 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| clarification | 27/27 strict; 7.958/19.011s; 21/27 (77.8%) <15s; 45 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| refusal | 18/18 strict; 4.720/8.300s; 18/18 (100.0%) <15s; 18 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+[Comparison by category and case](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON.md) includes the three groups, under15s proportions, phase time, attempt/retry distribution, read-only18-run audit, service denominators, changed call counts and strict failures. [Fresh campaign manifest](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-resumed-2026-10-08/CAMPAIGN.json) records UTC/source/exit codes; [analysis](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-resumed-2026-10-08/ANALYSIS.json) records sanitization hashes and scored-identity preservation. Directory/search results are fixtures, not production adapter timing. Attempt durations include response body; per-call durations include backoff. Missing usage stays null; reasoning may already be included in prompt_tokens, so do not add it twice. Client timing cannot split upstream queue/network/reasoning or prove an account switch.
 
-freeform groups (strict; p50/p95; under15s; model calls):
+A new independent-review P2 showed a model can echo a full prompt inside search.args.query. Native writer now redacts the whole case projection after scoring, including traces and diagnostics, preserving raw scoring input. Actual main regression test: RED 1 failed/12 passed, exit 1; focused GREEN 362/362, exit 0. Independent mutation removing writer sanitization fails that test. Export-only follow-up 9e887d2 also redacts JSON object keys: RED 1 failed/12 passed, then GREEN 362/362; numeric metrics and original inputs remain intact. It does not change the measured planner/provider/prompt/labels/fixtures from 58d4fcd, so model campaigns remain valid without extra calls. The old control exporter is unchanged; public control copies are recursively sanitized outside its branch after scoring. Root .env is loaded with --env-file and never printed/copied; public evidence is scanned for corpus prompts/private secrets in both keys and values.
 
-| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
-|---|---|---|---|
-| free_form | 36/36 strict; 6.041/15.103s; 34/36 (94.4%) <15s; 45 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| free_form_heldout | 15/18 strict; 5.294/12.840s; 18/18 (100.0%) <15s; 18 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
+The interrupted controls earlier on08/10 and the new incomplete campaigns retain separate folders; none is stitched into a complete run. Earlier deferred-directory source 50761b1 was abandoned after P1 review; its [archived comparison](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON-DEFERRED-DIRECTORY.md) and [verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION-DEFERRED-DIRECTORY.md) remain historical, excluded from corrected acceptance. Hedging and thinking variants previously showed no reliable benefit and are not reintroduced.
 
-services groups (strict; p50/p95; under15s; model calls):
-
-| Nhóm | W3-06 lịch sử, flash | Đối chứng cùng ngày, mã cũ, -n | Sau sửa, -n |
-|---|---|---|---|
-| read_only | 0/18 strict; 25.354/53.021s; 0/18 (0.0%) <15s; 54 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| single_step | 57/57 strict; 4.608/20.188s; 53/57 (93.0%) <15s; 60 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| cross_service | 27/27 strict; 7.653/10.921s; 27/27 (100.0%) <15s; 27 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| clarification | 12/15 strict; 7.150/41.108s; 13/15 (86.7%) <15s; 16 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-| refusal | 15/15 strict; 4.621/18.139s; 14/15 (93.3%) <15s; 15 calls | Chưa có campaign hoàn chỉnh | NOT_RUN |
-
-| Time component | Historical W3-06, flash | Same-day old code, -n | Corrected W3-10, -n |
-|---|---|---|---|
-| core: model/retry | Per-call diagnostics N/A | Per-call diagnostics N/A | NOT_RUN |
-| core: directory / search / other | N/A | N/A | NOT_RUN |
-| freeform: model/retry | Per-call diagnostics N/A | Per-call diagnostics N/A | NOT_RUN |
-| freeform: directory / search / other | N/A | N/A | NOT_RUN |
-| services: model/retry | Per-call diagnostics N/A | Per-call diagnostics N/A | NOT_RUN |
-| services: directory / search / other | N/A | N/A | NOT_RUN |
-
-Read-only acceptance after correction: **NOT_RUN / not yet measured across three complete runs**. Platform directory results do not count as model-opened searches.
-
-**No complete corrected services campaign yet; latency and strict acceptance remain unverified.** Call/attempt timing includes retry backoff and body reading; missing usage remains null. Phase timings are wall time for parallel fixture I/O, not sums of lookups, and do not establish production adapter latency. Reasoning may be included in prompt_tokens by the gateway; do not add it to token totals. Per-case call comparisons and corrected tail analysis remain pending; [the three-way comparison](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON.md) records the missing measurements and preserved interruptions.
-
-[Verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md) records RED/GREEN, check and browser outputs and commit hashes. [Campaign manifest](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/CAMPAIGN.json) records start/end times. Each corrected set was scheduled immediately after its control, but four provider faults stopped the queue before any corrected campaign began. Interrupted samples are preserved separately, excluded from all complete-campaign tables. Owner-authorized [read-only router diagnosis](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/ROUTER-DIAGNOSTIC.md) confirmed slow response headers, followed by a successful retry. Gateway usage "ok" does not prove that a deadline-limited client received the completion. Client timing cannot separate upstream queueing, network and reasoning. No attributable HTTP429/account-switch evidence was found.
-
-Before measurement GET /v1/models must succeed; load the original user .env via --env-file without printing/copying/committing it. This task never starts or reconfigures 9router or uses cx/. Public evidence filters prompt echoes only after scoring; errors publish classifications instead of provider text, and no request headers/API keys are recorded. The old control exporter is unchanged; its public copy is redacted outside the branch after scoring. Keep existing transport deadlines/retries. Request hedging and thinking variants previously showed no reliable benefit (Planning latency) and are not reintroduced.
+Final code verification at 9e887d2: npm run check, 1544 v3 + 173 eval, exit 0; npm run test:browser:v3, 73/73 across 11 scenarios, exit 0 on its first run. The earlier FE-02 scroll failure at 58d4fcd is retained with DOM/output; its root cause is unresolved. [Verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md). Usable-plan rate, live service writes, production adapter latency and frontend live timing remain NOT_RUN within W3-10.
 
 ### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
 

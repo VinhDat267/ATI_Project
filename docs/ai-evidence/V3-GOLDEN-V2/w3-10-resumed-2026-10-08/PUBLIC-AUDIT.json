@@ -1,0 +1,78 @@
+{
+  "scannedFiles": 17,
+  "decodedStrings": 76615,
+  "includesObjectKeys": true,
+  "corpusPrompts": 112,
+  "environmentSecretValues": 23,
+  "violations": 0,
+  "files": [
+    {
+      "path": "after/core-llm-2026-10-08T16-44-42-359Z/report.json",
+      "sha256": "86dd64cab2d3468a422d291ee77c0dcc4bba16253defad4c7dde10ea160bf6c8"
+    },
+    {
+      "path": "after/core-llm-2026-10-08T16-44-42-359Z/summary.md",
+      "sha256": "3f72d8b56a583c12cc8f32886139640d3db3181f587aa17bb86d15e76742ca12"
+    },
+    {
+      "path": "after/freeform-llm-2026-10-08T16-55-19-162Z/report.json",
+      "sha256": "5967f26ad9d461a837f5a18f2bd09d061c0e792e1cec9d10096ef95330cc8a15"
+    },
+    {
+      "path": "after/freeform-llm-2026-10-08T16-55-19-162Z/summary.md",
+      "sha256": "5d3e7ba2b8fdf591eb9b85076a8ffc24f827f63b5b4b5385bac972bc5f1f2353"
+    },
+    {
+      "path": "after/services-llm-2026-10-08T17-00-53-683Z/report.json",
+      "sha256": "4caf3407cb5e204ea2073935f30465870e99b450a0089366f60e1eb479ea2337"
+    },
+    {
+      "path": "after/services-llm-2026-10-08T17-00-53-683Z/summary.md",
+      "sha256": "fc69d02081bb147c715118040903d6f0f1c73405ebd14c9c638fb657af0b6df1"
+    },
+    {
+      "path": "ANALYSIS.json",
+      "sha256": "2f7ad028b318a3b6e0a30525868d9c90d1a8b77098bf76f0fe2ff4b6133f5ca9"
+    },
+    {
+      "path": "CAMPAIGN.json",
+      "sha256": "7694393c53430124c40ae2eb235a51121a99e03a2dbcf9002d03abf640eb55bf"
+    },
+    {
+      "path": "control/core-llm-2026-10-08T16-32-35-221Z/report.json",
+      "sha256": "f71d69592cc65e457fa28af0283ab0f0002e15fa1c32a7b6f47dbd407916fed3"
+    },
+    {
+      "path": "control/core-llm-2026-10-08T16-32-35-221Z/summary.md",
+      "sha256": "6759e44a851d417fffc34ad3af1d26fdda9644253f09a596c59f1d0d099efbf8"
+    },
+    {
+      "path": "control/interrupted-services-llm-2026-10-08T16-36-07-860Z/report.json",
+      "sha256": "9776b5f50a2485d0759df1353830b5dcdb7ef7b662d32393dbd4db07595035a7"
+    },
+    {
+      "path": "control/interrupted-services-llm-2026-10-08T16-36-07-860Z/summary.md",
+      "sha256": "8c1f881576defc8270b70bb8d84b727fccd279ac8afc433c4f7df94004833c13"
+    },
+    {
+      "path": "control/services-llm-2026-10-08T17-13-22-397Z/report.json",
+      "sha256": "a60faaa8e686b0e7acd77a97e809a9ea5beb267d1ccbd4e276323d425cfd9b2d"
+    },
+    {
+      "path": "control/services-llm-2026-10-08T17-13-22-397Z/summary.md",
+      "sha256": "5fb395815bb7db532308ecdefc7a810ccf7060799190afb2651737b1cb95042c"
+    },
+    {
+      "path": "diagnostic/services-llm-subset-2026-10-08T16-40-05-029Z/report.json",
+      "sha256": "e23c0a6c9ffad64e91bdf7462d1ca279035dd20a017741a091b503c02f34ff41"
+    },
+    {
+      "path": "diagnostic/services-llm-subset-2026-10-08T16-40-05-029Z/summary.md",
+      "sha256": "52831f450eecddc7a5395f18921acea9f167ea5e609dd3166460ed4b618c2911"
+    },
+    {
+      "path": "READ-ONLY-POLICY.json",
+      "sha256": "35be3edb8d8f80f0aca7a0f57213cf7661f20b9a06508b78a14b720ea9f023d6"
+    }
+  ]
+}

@@ -1,0 +1,2013 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "services",
+  "searchMode": "llm",
+  "labels": {
+    "file": "cases-services.json",
+    "commit": "20fa6f03c8696d769303f759602d1c0748cb9b26",
+    "sha256": "369efaea2023344540f731dae7730d33aa4ad9a542b3d222d2aca6d463bf896f",
+    "version": 1,
+    "cases": 44,
+    "selectedCases": 44
+  },
+  "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+  "sourceTrees": {
+    "packages/planner": "12d9cbb5085d4f06a854a6b7505d3eab3348543c",
+    "packages/tool-schemas": "60744fbc018c272d685a4697ec6cfb712d256648"
+  },
+  "fixtureSha256": "fe490f012ebf4c638c8ce6b33844efc615cf71d4d2d8d6b2135cb9f73b64af4e",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 1,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 17,
+  "plannedCaseRuns": 44,
+  "concurrency": 2,
+  "runAt": "2026-10-08T16:38:50.226Z",
+  "stopped": true,
+  "pendingIds": [
+    "no02",
+    "no03",
+    "no04",
+    "no05",
+    "no06",
+    "no07",
+    "no08",
+    "tg01",
+    "tg02",
+    "tg03",
+    "tg04",
+    "tg05",
+    "tg06",
+    "tg07",
+    "tg08",
+    "ji01",
+    "ji02",
+    "ji03",
+    "ji04",
+    "ji05",
+    "ji06",
+    "ji07",
+    "ji08",
+    "wf01",
+    "wf02",
+    "wf03",
+    "wf04"
+  ],
+  "stopReason": "LLM gateway request timed out after 30000ms",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only protocol has no answer response kind: clarification is labelled, and successful read calls are scored separately.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "sheets": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "jira": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "calendar": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "notion": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.7058823529411765,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 0.9230769230769231,
+        "argumentMatcherRate": 0.9777777777777777,
+        "strictPassRate": 0.7058823529411765
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.7058823529411765,
+      "toolSelectionAccuracy": 1,
+      "argumentQuality": 0.9230769230769231,
+      "argumentMatcherRate": 0.9777777777777777,
+      "strictPassRate": 0.7058823529411765
+    },
+    "byCategory": {
+      "read_only": {
+        "cases": 4,
+        "strictPassRate": 0
+      },
+      "single_step": {
+        "cases": 7,
+        "strictPassRate": 1
+      },
+      "cross_service": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "clarification": {
+        "cases": 2,
+        "strictPassRate": 0.5
+      },
+      "refusal": {
+        "cases": 2,
+        "strictPassRate": 1
+      }
+    },
+    "byService": {
+      "sheets": {
+        "cases": 8,
+        "attempts": 8,
+        "scoredAttempts": 6,
+        "argumentAttempts": 6,
+        "runs": [
+          {
+            "kindAccuracy": 0.75,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.75
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.75,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.75
+        },
+        "latencyMs": {
+          "p50": 6669,
+          "p95": 72705
+        }
+      },
+      "jira": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 13916,
+          "p95": 13916
+        }
+      },
+      "calendar": {
+        "cases": 8,
+        "attempts": 8,
+        "scoredAttempts": 6,
+        "argumentAttempts": 6,
+        "runs": [
+          {
+            "kindAccuracy": 0.75,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 0.8333333333333334,
+            "argumentMatcherRate": 0.9565217391304348,
+            "strictPassRate": 0.75
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.75,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 0.8333333333333334,
+          "argumentMatcherRate": 0.9565217391304348,
+          "strictPassRate": 0.75
+        },
+        "latencyMs": {
+          "p50": 6851,
+          "p95": 60026
+        }
+      },
+      "slack": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 11316,
+          "p95": 11316
+        }
+      },
+      "notion": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 28994,
+          "p95": 28994
+        }
+      }
+    },
+    "stability": {
+      "sh01": "0/1",
+      "sh02": "1/1",
+      "sh03": "1/1",
+      "sh04": "1/1",
+      "sh05": "1/1",
+      "sh06": "1/1",
+      "sh07": "0/1",
+      "sh08": "1/1",
+      "ca01": "0/1",
+      "ca02": "1/1",
+      "ca03": "1/1",
+      "ca04": "0/1",
+      "ca05": "1/1",
+      "ca06": "1/1",
+      "ca07": "1/1",
+      "ca08": "1/1",
+      "no01": "0/1"
+    },
+    "latencyMs": {
+      "p50": 7312,
+      "p95": 72705,
+      "max": 72705
+    },
+    "usablePlanRate": null
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "sh01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got refusal"
+            ]
+          },
+          "latencyMs": 34900,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen.",
+            "reason": "Workflows require at least one action, but the request specified not to change data.",
+            "suggestion": "Specify an action to perform with the retrieved data."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.read_range",
+              "args": {
+                "range": "Tasks!A1:B2",
+                "spreadsheetId": "spreadsheet_frontend_2026",
+                "limit": 10
+              },
+              "result": {
+                "range": "Tasks!A1:B2",
+                "values": [
+                  [
+                    "Task",
+                    "Status"
+                  ],
+                  [
+                    "Fix footer",
+                    "To Do"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "sh02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8012,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use sheets.append_rows to add the task row to Tasks sheet.",
+            "summary": "Thêm dòng Fix footer vào tab Tasks của bảng tính Frontend",
+            "steps": [
+              {
+                "id": "append_row",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào bảng tính Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Fix footer",
+                      "To Do"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 13916,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Plan using jira.create_issue and sheets.append_rows.",
+            "summary": "Create the Jira issue in project FE and record its URL and title in Google Sheets.",
+            "steps": [
+              {
+                "id": "create_jira",
+                "tool": "jira.create_issue",
+                "description": "Create Jira issue for audit forms",
+                "args": {
+                  "projectKey": "FE",
+                  "summary": "Audit forms"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "append_sheet",
+                "tool": "sheets.append_rows",
+                "description": "Append URL and title to Tasks",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      {
+                        "$ref": "create_jira.output.url"
+                      },
+                      "Audit forms"
+                    ]
+                  ]
+                },
+                "dependsOn": [
+                  "create_jira"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 5749,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn thêm dòng vào bảng tính và tab nào?",
+            "options": [
+              "Frontend",
+              "Backend"
+            ],
+            "context": "Vui lòng chọn bảng tính và chỉ định tên tab cần thêm dữ liệu."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 3809,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "reason": "Deleting a Google Sheets spreadsheet is not supported by the available tools.",
+            "suggestion": "Please delete the spreadsheet directly in Google Drive."
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6669,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append a row to the Tasks sheet using sheets.append_rows.",
+            "summary": "Thêm dòng \"Review board\", \"Done\" vào tab Tasks trong bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Thêm dòng vào bảng tính Frontend",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "Tasks",
+                  "rows": [
+                    [
+                      "Review board",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sh07",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got plan"
+            ]
+          },
+          "latencyMs": 72705,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use sheets.read_range to read Tasks!A1:B2 from Frontend.",
+            "summary": "Đọc dữ liệu dải ô Tasks!A1:B2 trong bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "read_tasks_range",
+                "tool": "sheets.read_range",
+                "description": "Đọc dải ô Tasks!A1:B2",
+                "args": {
+                  "range": "Tasks!A1:B2",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.read_range",
+              "args": {
+                "range": "Tasks!A1:B2",
+                "spreadsheetId": "spreadsheet_frontend_2026",
+                "limit": 10
+              },
+              "result": {
+                "range": "Tasks!A1:B2",
+                "values": [
+                  [
+                    "Task",
+                    "Status"
+                  ],
+                  [
+                    "Fix footer",
+                    "To Do"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "sh08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5069,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Append rows to the sheet using sheets.append_rows.",
+            "summary": "Ghi lịch sử 'Release 1', 'Done' vào tab History của bảng tính Frontend.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "sheets.append_rows",
+                "description": "Ghi lịch sử vào tab History",
+                "args": {
+                  "spreadsheetId": "spreadsheet_frontend_2026",
+                  "sheet": "History",
+                  "rows": [
+                    [
+                      "Release 1",
+                      "Done"
+                    ]
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ]
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected clarification, got refusal",
+              "args: calendar.list_events timeMax"
+            ]
+          },
+          "latencyMs": 40914,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tools chosen for unsupported read-only workflow.",
+            "reason": "Hệ thống tự động hóa chỉ hỗ trợ lập kế hoạch cho các tác vụ thay đổi dữ liệu, không hỗ trợ quy trình chỉ đọc.",
+            "suggestion": "Bạn có thể yêu cầu tạo sự kiện mới trên lịch Team."
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_events",
+              "args": {
+                "calendarId": "team@example.test",
+                "timeMin": "2026-09-30T00:00:00+07:00",
+                "timeMax": "2026-09-30T23:59:59+07:00",
+                "limit": 10
+              },
+              "result": {
+                "events": [
+                  {
+                    "id": "event_standup",
+                    "title": "Standup",
+                    "start": "2026-09-30T09:00:00+07:00",
+                    "end": "2026-09-30T09:30:00+07:00",
+                    "url": "https://calendar.google.com/calendar/event?eid=fixture_standup"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "ca02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6851,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to schedule the Demo event.",
+            "summary": "Tạo sự kiện Demo trên Google Calendar Team vào ngày mai từ 15:00 đến 16:00.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Demo trên lịch Team",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Demo",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca03",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 11316,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event and slack.send_message to create and share event.",
+            "summary": "Create 'Release review' event in Team calendar and post its link to Slack #release.",
+            "steps": [
+              {
+                "id": "create_event",
+                "tool": "calendar.create_event",
+                "description": "Create Release review event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Release review",
+                  "start": "2026-09-30T10:00:00+07:00",
+                  "end": "2026-09-30T11:00:00+07:00"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "send_slack_message",
+                "tool": "slack.send_message",
+                "description": "Post event URL to #release",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": {
+                    "$template": "${create_event.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "create_event"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca04",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 60026,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "LLM gateway request timed out after 30000ms",
+          "providerError": "LLM gateway request timed out after 30000ms",
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca05",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 6391,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "refusal",
+            "thinking": "No tool is available to delete calendar events.",
+            "reason": "Hệ thống không hỗ trợ công cụ xóa sự kiện trên Google Calendar.",
+            "suggestion": "Bạn có thể xóa trực tiếp các sự kiện trên Google Calendar."
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca06",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 5820,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create a calendar event using calendar.create_event tool.",
+            "summary": "Create 'Board review' event in Team calendar for this Friday from 2pm to 3pm.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Board review event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Board review",
+                  "start": "2026-10-02T14:00:00+07:00",
+                  "end": "2026-10-02T15:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ]
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ]
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7312,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create calendar event using calendar.create_event.",
+            "summary": "Tạo sự kiện Release vào thứ Năm, 01/10/2026 từ 09:00 đến 10:00 trên lịch Release.",
+            "steps": [
+              {
+                "id": "create_event_1",
+                "tool": "calendar.create_event",
+                "description": "Create Release event in calendar",
+                "args": {
+                  "calendarId": "release@example.test",
+                  "summary": "Release",
+                  "start": "2026-10-01T09:00:00+07:00",
+                  "end": "2026-10-01T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ca08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6239,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create event in team calendar using calendar.create_event.",
+            "summary": "Schedule Retro on the Team calendar for next Monday, 9:00 AM to 10:00 AM.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Retro event on Team calendar",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Retro",
+                  "start": "2026-10-05T09:00:00+07:00",
+                  "end": "2026-10-05T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "no01",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": false,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 28994,
+          "llmCalls": 3,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [
+            {
+              "tool": "notion.search_databases",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "title": "Frontend",
+                  "url": "https://www.notion.so/11111111111141118111111111111111"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "title": "Backend",
+                  "url": "https://www.notion.so/22222222222242228222222222222222"
+                }
+              ]
+            },
+            {
+              "tool": "notion.query_database",
+              "args": {
+                "databaseId": "11111111-1111-4111-8111-111111111111",
+                "query": "Release",
+                "limit": 10
+              },
+              "result": {
+                "pages": [
+                  {
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "title": "Release notes",
+                    "url": "https://www.notion.so/aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa",
+                    "properties": {
+                      "Name": "Release notes",
+                      "Status": "Draft"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
