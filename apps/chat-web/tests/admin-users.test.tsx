@@ -22,13 +22,13 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); authSt
 it('loads a direct admin route and requires service-access confirmation before approving', async () => {
   render(<App />);
   expect(await screen.findByText('candidate@example.test')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Duyệt' }));
+  fireEvent.click(screen.getByRole('button', { name: /Duyệt & kích hoạt/ }));
   expect(screen.getByRole('dialog')).toHaveTextContent('Người này sẽ dùng được các service đã kết nối của nhóm');
   expect(vi.mocked(apiClient.request).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
   expect(screen.queryByRole('dialog')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Duyệt' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận duyệt' }));
+  fireEvent.click(screen.getByRole('button', { name: /Duyệt & kích hoạt/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Xác nhận duyệt/ }));
   await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith('/api/admin/users/u1/approve', expect.objectContaining({ method: 'POST' })));
 });
 
@@ -54,10 +54,10 @@ it('shows the admin navigation entry only with the current admin role', () => {
 it('keeps pending accounts in the approval flow without lock or unlock actions', async () => {
   render(<App />);
   await screen.findByText('candidate@example.test');
-  expect(screen.getByText('Chờ duyệt')).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /Chờ duyệt/ })).toHaveAttribute('aria-selected', 'true');
   expect(screen.queryByRole('button', { name: 'Khóa' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Mở khóa' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Duyệt' }));
+  fireEvent.click(screen.getByRole('button', { name: /Duyệt & kích hoạt/ }));
   expect(screen.getByRole('dialog')).toHaveTextContent('Người này sẽ dùng được các service đã kết nối của nhóm');
   expect(vi.mocked(apiClient.request).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
 });
@@ -67,13 +67,13 @@ it('searches within the pending tab and keeps server rejection visible without o
   await screen.findByText('candidate@example.test');
   fireEvent.click(screen.getByRole('tab', { name: /Chờ duyệt/ }));
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Candidate' } });
-  fireEvent.submit(screen.getByRole('search'));
+
   await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(expect.stringContaining('status=pending&search=Candidate')));
   vi.mocked(apiClient.request).mockRejectedValueOnce(Object.assign(new Error('Tài khoản chưa được xác minh email.'), { status: 409 }));
-  fireEvent.click(screen.getByRole('button', { name: 'Duyệt' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận duyệt' }));
+  fireEvent.click(screen.getByRole('button', { name: /Duyệt & kích hoạt/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Xác nhận duyệt/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('chưa được xác minh');
-  expect(screen.getByText('candidate@example.test')).toBeInTheDocument();
+  expect(document.querySelector('#pending-list-container')).toHaveTextContent('candidate@example.test');
 });
 
 it('shows the login page when a subsequent API request revokes the authenticated session', async () => {
@@ -91,16 +91,20 @@ it('shows the login page when a subsequent API request revokes the authenticated
 });
 
 it.each([
-  { action: 'disable', button: 'Khóa', confirm: 'Xác nhận khóa', status: 'active', explanation: 'Mọi phiên đăng nhập' },
+  { action: 'disable', button: 'Khóa', confirm: 'Xác nhận khóa', status: 'active', explanation: 'bị đăng xuất khỏi mọi thiết bị' },
   { action: 'enable', button: 'Mở khóa', confirm: 'Xác nhận mở khóa', status: 'disabled', explanation: 'có thể đăng nhập lại' },
   { action: 'role', button: 'Đổi vai trò', confirm: 'Xác nhận đổi vai trò', status: 'active', explanation: 'quản lý cấu hình dịch vụ chung' },
 ])('requires confirmation before $action and sends only the confirmed change', async ({ action, button, confirm, status, explanation }) => {
   vi.mocked(apiClient.request).mockResolvedValue({ users: [{ ...candidate, status }], total: 1, pendingCount: 0, page: 1, limit: 20 });
   render(<App />);
-  await screen.findByText('candidate@example.test');
-  fireEvent.click(screen.getByRole('button', { name: button }));
+  await screen.findByRole('tab', { name: /Thành viên/ });
+  fireEvent.click(screen.getByRole('tab', { name: /Thành viên/ }));
+  await waitFor(() => expect(document.querySelector('#table-members-body')).toHaveTextContent('candidate@example.test'));
+  const actionButton = Array.from(document.querySelectorAll<HTMLButtonElement>('#table-members-body button')).find(item => item.textContent?.trim() === button)!;
+  fireEvent.click(actionButton);
   expect(screen.getByRole('dialog')).toHaveTextContent(explanation);
   expect(vi.mocked(apiClient.request).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
+  if (action === 'role') fireEvent.change(screen.getByLabelText('Vai trò mới:'), { target: { value: 'admin' } });
   fireEvent.click(screen.getByRole('button', { name: confirm }));
   await waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(`/api/admin/users/u1/${action}`, expect.objectContaining({ method: 'POST', ...(action === 'role' ? { body: '{"role":"admin"}' } : {}) })));
 });

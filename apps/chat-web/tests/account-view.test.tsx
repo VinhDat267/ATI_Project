@@ -48,39 +48,39 @@ it('shows the profile, sign-in methods, open sessions and that deletion goes thr
   serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   render(<App />);
   expect(await screen.findByText('member@example.test')).toBeInTheDocument();
-  expect(screen.getByLabelText('Tên hiển thị')).toHaveValue('Member');
-  expect(screen.getByText('Thành viên')).toBeInTheDocument();
+  expect(screen.getByLabelText(/Họ và tên/)).toHaveValue('Member');
+  expect(screen.getAllByText('Thành viên')[0]).toBeInTheDocument();
   expect(screen.getByText(/personal@gmail\.test/)).toBeInTheDocument();
-  const current = screen.getByText('Chrome trên Windows').closest('li')!;
-  expect(within(current).getByText('Phiên này')).toBeInTheDocument();
+  const current = screen.getByText('Chrome trên Windows').closest<HTMLElement>('[role="listitem"]')!;
+  expect(within(current).getByText('Phiên hiện tại')).toBeInTheDocument();
   expect(within(current).queryByRole('button')).toBeNull();
-  expect(within(screen.getByText('Safari trên iOS').closest('li')!).getByRole('button', { name: 'Đăng xuất phiên này' })).toBeEnabled();
+  expect(within(screen.getByText('Safari trên iOS').closest<HTMLElement>('[role="listitem"]')!).getByRole('button', { name: 'Đăng xuất phiên này' })).toBeEnabled();
   expect(screen.getByText(/nhờ quản trị viên khóa tài khoản/)).toBeInTheDocument();
 });
 
 it('shows a Google-only account the recovery guidance instead of a current-password field, with unlink locked', async () => {
   serve(profile({ hasPassword: false, hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   render(<App />);
-  expect(await screen.findByText(/chưa có mật khẩu/)).toBeInTheDocument();
-  expect(screen.queryByLabelText('Mật khẩu hiện tại')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Đặt mật khẩu qua email' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Gỡ liên kết' })).toBeDisabled();
+  expect(await screen.findByRole('heading', { name: 'Tài khoản này chưa có mật khẩu' })).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Mật khẩu hiện tại/)).toBeNull();
+  expect(screen.getByRole('link', { name: /Đến trang đăng nhập để dùng/ })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Gỡ liên kết Google' })).toBeDisabled();
 });
 
 it('lets an account with a password unlink Google and offers linking when not linked', async () => {
   serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
   render(<App />);
-  expect(await screen.findByLabelText('Mật khẩu hiện tại')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
-  const input = screen.getByLabelText('Mật khẩu hiện tại để gỡ Google');
-  expect(input).toHaveAttribute('type', 'password');
-  fireEvent.change(input, { target: { value: 'Current!fixture-password' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ liên kết' }));
-  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledWith('Current!fixture-password'));
-  await waitFor(() => expect(screen.queryByLabelText('Mật khẩu hiện tại để gỡ Google')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
-  expect(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google')).toHaveValue('');
+  expect(await screen.findByLabelText(/Mật khẩu hiện tại/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
+  const passwordInput = screen.getByRole('dialog').querySelector('input')!;
+  expect(passwordInput).toHaveAttribute('type', 'password');
+  fireEvent.change(passwordInput, { target: { value: 'Current!password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ' }));
+  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledWith('Current!password'));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
+  expect(screen.getByRole('dialog').querySelector('input')).toHaveValue('');
   cleanup(); vi.restoreAllMocks();
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: member });
   vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: true, googleEnabled: true });
@@ -95,24 +95,23 @@ it('keeps the Google link when current-password entry is cancelled', async () =>
   serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
   render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết' }));
-  fireEvent.change(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google'), { target: { value: 'Current!fixture-password' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Hủy gỡ liên kết' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết Google' }));
+  fireEvent.change(screen.getByRole('dialog').querySelector('input')!, { target: { value: 'Current!password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Giữ liên kết' }));
   expect(unlink).not.toHaveBeenCalled();
   expect(screen.getByText(/personal@gmail\.test/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
-  expect(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google')).toHaveValue('');
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
+  expect(screen.getByRole('dialog').querySelector('input')).toHaveValue('');
 });
 
 it('requires a current password before confirming Google unlink', async () => {
   serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
   const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
   render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết' }));
-  expect(screen.getByRole('button', { name: 'Xác nhận gỡ liên kết' })).toBeDisabled();
-  fireEvent.submit(screen.getByRole('form', { name: 'Xác nhận gỡ Google' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết Google' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ' }));
   expect(unlink).not.toHaveBeenCalled();
-  expect(screen.getByRole('alert')).toHaveTextContent('Vui lòng nhập mật khẩu hiện tại.');
+  expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('Vui lòng nhập mật khẩu hiện tại');
 });
 
 it('hides the Google section when Google sign-in is not configured', async () => {
@@ -120,16 +119,16 @@ it('hides the Google section when Google sign-in is not configured', async () =>
   serve(profile());
   render(<App />);
   await screen.findByText('Chrome trên Windows');
-  expect(screen.queryByRole('heading', { name: 'Phương thức đăng nhập' })).toBeNull();
+  expect(screen.queryByRole('heading', { name: '4. Liên kết tài khoản Google' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Liên kết Google' })).toBeNull();
 });
 
 it('saves a new name and hands it to the signed-in user for the navigation menu', async () => {
   serve(profile());
   render(<App />);
-  const input = await screen.findByLabelText('Tên hiển thị');
+  const input = await screen.findByLabelText(/Họ và tên/);
   fireEvent.change(input, { target: { value: 'Tên mới' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Lưu tên' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi họ tên' }));
   await waitFor(() => expect(authStorage.getStoredTokens().user?.name).toBe('Tên mới'));
   expect(posts()).toEqual([['/api/account/profile', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: 'Tên mới' }) })]]);
 });
@@ -138,18 +137,18 @@ it('changes the password only with a matching new password of at least 12 charac
   serve(profile(), url => url === '/api/account/change-password'
     ? Object.assign(new Error('Mật khẩu hiện tại không đúng.'), { status: 400, data: { code: 'INVALID_CURRENT_PASSWORD' } }) : undefined);
   render(<App />);
-  fireEvent.change(await screen.findByLabelText('Mật khẩu hiện tại'), { target: { value: 'Wrong!password-123' } });
-  fireEvent.change(screen.getByLabelText('Mật khẩu mới'), { target: { value: 'short' } });
-  fireEvent.change(screen.getByLabelText('Nhập lại mật khẩu mới'), { target: { value: 'short' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
+  fireEvent.change(await screen.findByLabelText(/Mật khẩu hiện tại/), { target: { value: 'Wrong!password-123' } });
+  fireEvent.change(screen.getByLabelText(/^Mật khẩu mới/), { target: { value: 'short' } });
+  fireEvent.change(screen.getByLabelText(/Xác nhận mật khẩu mới/), { target: { value: 'short' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cập nhật mật khẩu mới' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('12 đến 128');
-  fireEvent.change(screen.getByLabelText('Mật khẩu mới'), { target: { value: 'Auth05Changed!password' } });
-  fireEvent.change(screen.getByLabelText('Nhập lại mật khẩu mới'), { target: { value: 'Auth05Other!password' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
+  fireEvent.change(screen.getByLabelText(/^Mật khẩu mới/), { target: { value: 'Auth05Changed!password' } });
+  fireEvent.change(screen.getByLabelText(/Xác nhận mật khẩu mới/), { target: { value: 'Auth05Other!password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cập nhật mật khẩu mới' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('không khớp');
   expect(posts()).toEqual([]);
-  fireEvent.change(screen.getByLabelText('Nhập lại mật khẩu mới'), { target: { value: 'Auth05Changed!password' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
+  fireEvent.change(screen.getByLabelText(/Xác nhận mật khẩu mới/), { target: { value: 'Auth05Changed!password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cập nhật mật khẩu mới' }));
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Mật khẩu hiện tại không đúng.'));
   expect(posts()).toEqual([['/api/account/change-password', expect.objectContaining({ method: 'POST',
     body: JSON.stringify({ currentPassword: 'Wrong!password-123', newPassword: 'Auth05Changed!password' }) })]]);
@@ -162,6 +161,7 @@ it('logs out one other session or every other device', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất phiên này' }));
   await waitFor(() => expect(posts().map(([url]) => url)).toEqual(['/api/account/sessions/s2/revoke']));
   fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất khỏi mọi thiết bị khác' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận thu hồi' }));
   await waitFor(() => expect(posts().map(([url]) => url)).toEqual(['/api/account/sessions/s2/revoke', '/api/account/sessions/revoke-others']));
 });
 
