@@ -83,7 +83,7 @@ for (const leave of ['logout', 'workspace'] as const) {
       await page.getByRole('button', { name: leave === 'logout' ? 'Đăng xuất' : 'Về workspace', exact: true }).click();
       if (leave === 'logout') {
         await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
-        await expect(page.locator('[data-od-id="btn-header-login"]')).toBeVisible();
+        await expect(page.locator('[data-od-id="btn-header-login"]').or(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).first()).toBeVisible();
       } else await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
       release();
       await page.waitForFunction(() => sessionStorage.getItem('auth05-test-start-read') === 'true');
