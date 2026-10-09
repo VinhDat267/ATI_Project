@@ -3,7 +3,7 @@ const email = process.env.CHAT_ADMIN_EMAIL || 'admin@example.com';
 const password = process.env.CHAT_ADMIN_PASSWORD || 'admin123';
 async function login(page: Page) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
+  await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -54,7 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: theme }); await page.goto('/login');
     const loginButton = page.getByRole('button', { name: 'Đăng nhập', exact: true });
     expect(await loginButton.evaluate(el => ({ weight: getComputedStyle(el).fontWeight, size: getComputedStyle(el).fontSize }))).toEqual({ weight: '600', size: '14px' });
-    await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password); await loginButton.click();
+    await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password); await loginButton.click();
     await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click();
     const newConversation = page.getByRole('button', { name: /Cuộc hội thoại mới/ });
     await expect(newConversation).toBeVisible();
