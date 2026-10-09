@@ -71,12 +71,12 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/');
-  const landingLoginBtn = page.getByRole('button', { name: 'Đăng nhập vào hệ thống' });
+  const landingLoginBtn = page.locator('[data-od-id="btn-header-login"]');
   if (await landingLoginBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await landingLoginBtn.click();
   }
   await page.getByRole('textbox', { name: 'Email' }).fill(email!);
-  await page.getByLabel('Mật khẩu').fill(password!);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeVisible();
 }

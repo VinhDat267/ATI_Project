@@ -4,8 +4,8 @@ import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
 async function login(page: Page) {
-  await page.goto('/login'); await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);
-  await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);
+  await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!);
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Hôm nay bạn muốn nhờ việc gì?'})).toBeVisible();
 }

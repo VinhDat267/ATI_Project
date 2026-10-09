@@ -6,6 +6,7 @@ import { useChatStore } from '../store/chat-store';
 import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { routes, type AppRoute } from '../routes';
 import type { User } from '../types';
+import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
 
 interface Session {
   authToken: string; user: User | null; authError: string | null;
@@ -23,6 +24,8 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
+  const [blocked, setBlocked] = useState<{ mode: AuthActionMode; deadline?: number | null; message: string } | null>(null);
+  const loginPending = useRef(false);
   const hadSession = useRef(Boolean(authStorage.getStoredTokens().accessToken));
   const loggingOut = useRef(false);
   useEffect(() => {
@@ -38,9 +41,9 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     else if (!tokens.accessToken) setUser(null);
     if (lostSession) {
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
-      if (!loggingOut.current) { setAuthError('Phiên đăng nhập đã hết hạn'); navigate('/login', true); }
+      if (!loggingOut.current && route.kind !== 'reset-password') { setAuthError('Phiên đăng nhập đã hết hạn'); navigate('/login', true); }
     }
-  }), [navigate]);
+  }), [navigate, route.kind]);
   useEffect(() => {
     let current = true;
     const { accessToken, refreshToken, user: storedUser } = authStorage.getStoredTokens();
@@ -70,13 +73,25 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   }, []);
   useEffect(() => { if (authToken && route.kind === 'login') navigate('/', true); }, [authToken, route.kind, navigate]);
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setAuthError(null); setIsLoggingIn(true);
+    event.preventDefault(); if (loginPending.current) return;
+    loginPending.current = true; setBlocked(null); setAuthError(null); setIsLoggingIn(true);
     try {
       const data = await apiClient.login(email, password);
       setAuthToken(data.accessToken); setUser(data.user); setPassword('');
       if (route.kind !== 'conversation') navigate('/', true);
-    } catch (reason) { setAuthError(userErrorMessage(reason, 'Không thể xác thực với API backend')); }
-    finally { setIsLoggingIn(false); }
+    } catch (reason) {
+      const failure = reason as { status?: number; data?: { code?: string }; response?: Response };
+      if (failure.status === 429) {
+        const header = failure.response?.headers.get('Retry-After');
+        const seconds = header && /^\d+(?:\.\d+)?$/.test(header.trim()) ? Number(header) : null;
+        const timestamp = header && seconds === null ? Date.parse(header) : NaN;
+        const deadline = seconds !== null ? Date.now() + Math.max(0, seconds) * 1000 : Number.isFinite(timestamp) ? Math.max(Date.now(), timestamp) : null;
+        setBlocked({ mode: 'blocked-attempts', deadline, message: 'Sai mật khẩu quá nhiều lần. Hãy chờ hết thời gian trước khi thử lại.' });
+      } else if (failure.data?.code === 'ACCOUNT_PENDING') setBlocked({ mode: 'blocked-pending', message: 'Tài khoản đang chờ quản trị viên duyệt.' });
+      else if (failure.data?.code === 'ACCOUNT_DISABLED') setBlocked({ mode: 'blocked-locked', message: 'Tài khoản đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.' });
+      else setAuthError(userErrorMessage(reason, 'Không thể xác thực với API backend'));
+    }
+    finally { loginPending.current = false; setIsLoggingIn(false); }
   };
   const onLogout = async () => {
     loggingOut.current = true;
@@ -92,6 +107,9 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   if (authToken && !isAccountFlow) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
   if (route.kind === 'not-found') return <NotFoundPage signedIn={false} navigate={navigate} />;
   const definition = routes.find(entry => entry.kind === route.kind);
+  const showsLogin = route.kind === 'login' || !definition || !('publicView' in definition);
+  if (showsLogin && blocked) return <AuthActionPage mode={blocked.mode} email={email} deadline={blocked.deadline} error={blocked.message}
+    navigate={(path, replace) => { setBlocked(null); setAuthError(null); navigate(path, replace); }} />;
   const PublicView = definition && 'publicView' in definition ? definition.publicView : routes[1].publicView;
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}
     isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')}

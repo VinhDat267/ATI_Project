@@ -3,7 +3,7 @@ const email = process.env.CHAT_ADMIN_EMAIL || 'admin@example.com';
 const password = process.env.CHAT_ADMIN_PASSWORD || 'admin123';
 async function login(page: Page) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -15,7 +15,7 @@ const gradientPropertyRules = (page: Page) => page.evaluate(() => [...document.s
   .flatMap(sheet => { try { return [...sheet.cssRules]; } catch { return []; } })
   .filter(rule => rule instanceof CSSPropertyRule && rule.name.startsWith('--tw-gradient')).map(rule => (rule as CSSPropertyRule).name));
 
-test('FE-04b: signed-out 404 uses the prototype layer and theme, and leaving restores the FE-04 rules', async ({ page }) => {
+test('FE-04b: signed-out 404 uses the prototype layer and leaving installs the copied landing scope', async ({ page }) => {
   await page.goto('/khong-co-trang?x=1');
   await expect(notFound(page)).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-proto-page', '404');
@@ -43,12 +43,14 @@ test('FE-04b: signed-out 404 uses the prototype layer and theme, and leaving res
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
   await page.getByRole('main').getByRole('link', { name: 'Về trang chủ' }).click();
-  await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống' })).toBeVisible();
-  expect(await page.locator('html').getAttribute('data-proto-page')).toBeNull();
-  await expect(prototypeStyles(page)).toHaveCount(0);
+  await expect(page.locator('[data-od-id="btn-header-login"]')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-proto-page', 'index');
+  await expect(prototypeStyles(page)).toHaveCount(2);
+  await expect(page.locator('style[data-proto-page-css="404"]')).toHaveCount(0);
   await page.goto('/login');
   const loginButton = page.getByRole('button', { name: 'Đăng nhập', exact: true });
-  expect(await loginButton.evaluate(el => ({ size: getComputedStyle(el).fontSize, minHeight: getComputedStyle(el).minHeight }))).toEqual({ size: '14px', minHeight: '40px' });
+  expect(await loginButton.evaluate(el => ({ size: getComputedStyle(el).fontSize, minHeight: getComputedStyle(el).minHeight }))).toEqual({ size: '14px', minHeight: '0px' });
+  expect((await loginButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await gradientPropertyRules(page)).toEqual([]);
 });
 

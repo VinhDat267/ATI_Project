@@ -25,11 +25,11 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
   const adminEmail = process.env.CHAT_ADMIN_EMAIL!;
   try {
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click();
+    await page.getByRole('tab', { name: 'Đăng ký', exact: true }).click();
     await page.getByLabel('Họ tên', { exact: true }).fill('AUTH02 Browser');
     await page.getByLabel('Email', { exact: true }).fill(email);
     await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click();
+    await page.getByRole('button', { name: 'Gửi yêu cầu đăng ký', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Kiểm tra email để xác minh');
     const user = (await db.query('SELECT * FROM users WHERE email=$1', [email])).rows[0];
     expect(user).toMatchObject({ status: 'pending', email_verified: false });
@@ -69,7 +69,7 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     await page.getByRole('button', { name: 'Quên mật khẩu?' }).click();
     await page.getByLabel('Email', { exact: true }).fill(email);
     await page.getByRole('button', { name: 'Gửi link đặt lại mật khẩu' }).click();
-    await expect(page.getByRole('status')).toContainText('Nếu email có trong hệ thống');
+    await expect(page.getByRole('status')).toContainText('Nếu email này có tài khoản');
     const resetLink = await mailLink(db, email, 'reset-password');
     await page.goto(resetLink);
     await expect(page.getByLabel('Mật khẩu mới', { exact: true })).toBeVisible();
@@ -77,6 +77,8 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     await page.getByLabel('Mật khẩu mới', { exact: true }).fill(newPassword);
     await page.getByLabel('Nhập lại mật khẩu', { exact: true }).fill(newPassword);
     await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Mật khẩu đã được thay đổi' })).toBeVisible();
+    await page.getByRole('link', { name: 'Đăng nhập ngay' }).click();
     await expect(page.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeVisible();
     for (const tokens of [{ accessToken: oldTokens.access, refreshToken: oldTokens.refresh }, secondTokens]) {
       expect((await page.request.get('/api/auth/me', { headers: { Authorization: `Bearer ${tokens.accessToken}` } })).status()).toBe(401);
