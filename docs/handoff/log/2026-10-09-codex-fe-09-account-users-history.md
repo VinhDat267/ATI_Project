@@ -52,6 +52,25 @@ Artifacts ngoài repo: `C:/Users/VinhDat/orca/artifacts/fe-09/`.
 
 Lỗi setup giữ riêng: baseline sai config/root trước khi sửa workspace command; browser fixture ban đầu mong creation nhận title dù API tạo untitled và cleanup vướng FK; đã seed bằng PATCH thật và xóa conversations trước users. Native static createApp import ban đầu khiến frontend noUnusedLocals kiểm các file backend chưa đổi; runtime loading tách compiler scope, hai tsconfig vẫn chạy trong full gate. `check-final-static-import-failure.log` không được tính là PASS. Capture lặp đã chạm rate limit signup; restart runtime sandbox rồi mới capture thành công, không bỏ qua 429. Các packet trước fix được giữ nguyên.
 
+## Follow-up CI của PR #122: chia sẻ JWT trong browser harness
+
+CI run `37863845654` tại `d7d5a008f32fe82e646150b0861ef5771bd7440c` thất bại: default 64 pass / 3 fail, exit 1; các group sau NOT_RUN. Receipt ngoài repo `ci-37863845654-failed.log`, SHA256 `91d54f412304ac8a4663beb7354e7397df3f401aea2d7759ca3810cf96367627`. Hai native HTTP cases nhận 401 thay vì unlink 200/approval 503. Workflow không đặt JWT_SECRET; `config/env.ts` tạo key riêng trong API child, trong khi createApp sibling đọc process.env không có key. Local bootstrap trước đó có key chung nên che mất thiếu sót của harness.
+
+Fix chỉ ở `scripts/test-v3-browser.mjs`, code head `e732af132875049ae16755b4a308e64bf89d0dca`: trước mỗi Playwright spawn, giữ JWT được cung cấp hoặc sinh random 32-byte hex và truyền qua env cho browser/API/native fixtures. Bỏ assignment auth04 dư thừa, giữ nguyên semantics. Không hardcode key, không thay Authorization header, backend/product hay assertion real HTTP/PostgreSQL; temporary distinct-key controls đã khôi phục byte-for-byte.
+
+| Control/gate | Kết quả | Receipt |
+|---|---|---|
+| Native fixtures dùng key khác main API | 2 fail nhận 401, exit 1 | `red-distinct-jwt-browser.log` |
+| Bỏ JWT_SECRET từ synthetic env, hai native cases gốc | 2 fail nhận 401, exit 1 | `red-unset-jwt-browser.log` |
+| `node --check scripts/test-v3-browser.mjs` | exit 0 | runner code head trên |
+| Env/fake-OIDC/Google-fixture regressions | 10/10, exit 0 | `green-shared-jwt-runner-regressions.log` |
+| `npm run test:browser:v3` với JWT_SECRET unset tại `e732af132875049ae16755b4a308e64bf89d0dca` | 84/84 trong 11 groups, exit 0, lần đầu sau fix (67 + 2 + 5 + 2 + 2 + 6×1) | `browser-unset-jwt-final.log`, `browser-unset-jwt-final.exit` |
+| Reviewer độc lập syntax/env-OIDC | 10/10, exit 0, không finding trong runner delta | `independent-runner-syntax-e732af1.log`/`.exit`, `independent-runner-regressions-e732af1.log`/`.exit` |
+
+CI failure thứ ba là screenshot timeout tại FE-05 `fe-05-regressions.spec.ts:92`, sau visible SSE log assertion đã pass. Calllog cho biết fonts đã loaded; chưa có bằng chứng nguyên nhân timeout hoặc quan hệ với JWT. Giữ nguyên test/SSE/store/Cockpit/screenshot/timeout/retry; regression đã pass trong default 67/67 của canonical unset-JWT mới. Reviewer độc lập đã kiểm runner delta: scoped, không auth bypass hay assertion weakening. Parent xác nhận exact-head CI mới trước merge. App source, 40 ảnh và manifest visual bên dưới giữ nguyên trong follow-up harness này (manifest source head `5726cd27`, app hashes không đổi).
+
+SHA256 canonical unset-JWT log: `d269f68b2cbf480e01a0457f96e829dbf61a0aae7d7372298ebd5c05e1e3aadf`. Durable exit receipt `browser-unset-jwt-final.exit`: 0. Product source không đổi từ fullcheck 1.599 v3 + 173 eval; không chạy lại fullcheck local cho runner-only delta. Exact-head CI mới vẫn pending, không tính CI cũ là PASS hoặc PR đã merge.
+
 ## Visual và bootstrap review
 
 `visual/comparison.html` đặt app/source cạnh nhau. `visual/manifest.json`, `visual/SHA256SUMS.txt` có 40 PNG: 12 cặp bắt buộc cho ba trang ở 1440×900 và 375×812 sáng/tối, bốn cặp Users members bổ sung và tám ảnh menu mở. App và menu không vượt viewport. Đã xem các cặp desktop/mobile và menu; không tuyên bố pixel-equal với dataset demo.
