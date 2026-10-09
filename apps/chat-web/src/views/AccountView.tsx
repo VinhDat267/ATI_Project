@@ -19,6 +19,8 @@ export function AccountView({ user, navigate, onLogout }: Props) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [unlinkPassword, setUnlinkPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -75,6 +77,15 @@ export function AccountView({ user, navigate, onLogout }: Props) {
     if (!mounted.current || !latest.accessToken || !latest.refreshToken || latest.user?.id !== initial.user?.id || !sameSession) return;
     window.location.assign(url);
   });
+  const unlinkGoogle = (event: FormEvent) => {
+    event.preventDefault();
+    if (!unlinkPassword || unlinkPassword.length > 128) { setNotice(null); setError('Vui lòng nhập mật khẩu hiện tại.'); return; }
+    void run('unlink', async () => {
+      await apiClient.unlinkGoogle(unlinkPassword);
+      if (mounted.current) { setUnlinkPassword(''); setConfirmUnlink(false); }
+      await load(); return 'Đã gỡ liên kết Google.';
+    });
+  };
   const others = sessions.filter(session => !session.current);
   if (!user) return <p role="status" className="p-6">Đang tải tài khoản...</p>;
   return <main className="min-h-screen bg-surface-inset text-text">
@@ -130,12 +141,24 @@ export function AccountView({ user, navigate, onLogout }: Props) {
               <span><span className="text-text-muted">Google:</span> {account.hasGoogle ? `Đã liên kết${account.googleEmail ? ` (${account.googleEmail})` : ''}` : 'Chưa liên kết'}</span>
               {account.hasGoogle
                 ? <button type="button" disabled={busy !== null || !account.hasPassword} aria-describedby={account.hasPassword ? undefined : 'account-unlink-rule'} className={buttonStyle}
-                    onClick={() => void run('unlink', async () => { await apiClient.unlinkGoogle(); await load(); return 'Đã gỡ liên kết Google.'; })}>Gỡ liên kết</button>
+                    onClick={() => {
+                      setUnlinkPassword(''); setConfirmUnlink(true);
+                    }}>Gỡ liên kết</button>
                 : <button type="button" disabled={busy !== null} className={buttonStyle}
                     onClick={linkGoogle}>Liên kết Google</button>}
             </li>
             {account.hasGoogle && !account.hasPassword && <li id="account-unlink-rule" className="text-xs text-text-muted">Cần đặt mật khẩu trước khi gỡ liên kết Google, nếu không bạn sẽ không còn cách đăng nhập.</li>}
           </ul>
+          {confirmUnlink && account.hasGoogle && account.hasPassword && <form aria-label="Xác nhận gỡ Google" onSubmit={unlinkGoogle} className="mt-3 flex flex-col gap-3">
+            <label className="text-sm">Mật khẩu hiện tại để gỡ Google
+              <input type="password" value={unlinkPassword} onChange={event => setUnlinkPassword(event.target.value)} required maxLength={128}
+                autoComplete="current-password" autoFocus disabled={busy !== null} className={fieldStyle} />
+            </label>
+            <div className="flex gap-2">
+              <button type="submit" disabled={busy !== null || !unlinkPassword} className={buttonStyle}>Xác nhận gỡ liên kết</button>
+              <button type="button" disabled={busy !== null} className={buttonStyle} onClick={() => { setUnlinkPassword(''); setConfirmUnlink(false); }}>Hủy gỡ liên kết</button>
+            </div>
+          </form>}
         </section>}
 
         <section aria-labelledby="account-sessions" className={sectionStyle}>
