@@ -73,7 +73,14 @@ it('lets an account with a password unlink Google and offers linking when not li
   render(<App />);
   expect(await screen.findByLabelText('Mật khẩu hiện tại')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
-  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledTimes(1));
+  const input = screen.getByLabelText('Mật khẩu hiện tại để gỡ Google');
+  expect(input).toHaveAttribute('type', 'password');
+  fireEvent.change(input, { target: { value: 'Current!fixture-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ liên kết' }));
+  await waitFor(() => expect(apiClient.unlinkGoogle).toHaveBeenCalledWith('Current!fixture-password'));
+  await waitFor(() => expect(screen.queryByLabelText('Mật khẩu hiện tại để gỡ Google')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
+  expect(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google')).toHaveValue('');
   cleanup(); vi.restoreAllMocks();
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: member });
   vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: true, googleEnabled: true });
@@ -82,6 +89,30 @@ it('lets an account with a password unlink Google and offers linking when not li
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Liên kết Google' }));
   expect(start).toHaveBeenCalledWith('link');
+});
+
+it('keeps the Google link when current-password entry is cancelled', async () => {
+  serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
+  const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết' }));
+  fireEvent.change(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google'), { target: { value: 'Current!fixture-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Hủy gỡ liên kết' }));
+  expect(unlink).not.toHaveBeenCalled();
+  expect(screen.getByText(/personal@gmail\.test/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
+  expect(screen.getByLabelText('Mật khẩu hiện tại để gỡ Google')).toHaveValue('');
+});
+
+it('requires a current password before confirming Google unlink', async () => {
+  serve(profile({ hasGoogle: true, googleEmail: 'personal@gmail.test' }));
+  const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Gỡ liên kết' }));
+  expect(screen.getByRole('button', { name: 'Xác nhận gỡ liên kết' })).toBeDisabled();
+  fireEvent.submit(screen.getByRole('form', { name: 'Xác nhận gỡ Google' }));
+  expect(unlink).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toHaveTextContent('Vui lòng nhập mật khẩu hiện tại.');
 });
 
 it('hides the Google section when Google sign-in is not configured', async () => {

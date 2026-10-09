@@ -176,9 +176,9 @@ export class ApiClient {
   completeGoogleAuth(code: string, state: string) {
     return this.googleAuthAction<{ accessToken: string; refreshToken: string; user: User } | { success: true }>('callback', { code, state });
   }
-  unlinkGoogle() {
+  unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
-      method: 'POST', credentials: 'include', body: JSON.stringify({}),
+      method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
     });
   }
 
