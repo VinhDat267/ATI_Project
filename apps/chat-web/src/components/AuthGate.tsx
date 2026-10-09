@@ -106,9 +106,10 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const isAccountFlow = ['signup', 'verify-email', 'resend-verification', 'forgot-password', 'reset-password', 'google-callback'].includes(route.kind);
   if (authToken && !isAccountFlow) return children({ authToken, user, authError, onClearAuthError: () => setAuthError(null), onLogout });
   if (route.kind === 'not-found') return <NotFoundPage signedIn={false} navigate={navigate} />;
-  if (route.kind === 'login' && blocked) return <AuthActionPage mode={blocked.mode} email={email} deadline={blocked.deadline} error={blocked.message}
-    navigate={(path, replace) => { setBlocked(null); setAuthError(null); navigate(path, replace); }} />;
   const definition = routes.find(entry => entry.kind === route.kind);
+  const showsLogin = route.kind === 'login' || !definition || !('publicView' in definition);
+  if (showsLogin && blocked) return <AuthActionPage mode={blocked.mode} email={email} deadline={blocked.deadline} error={blocked.message}
+    navigate={(path, replace) => { setBlocked(null); setAuthError(null); navigate(path, replace); }} />;
   const PublicView = definition && 'publicView' in definition ? definition.publicView : routes[1].publicView;
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}
     isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')}
