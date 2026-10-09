@@ -245,3 +245,31 @@ Tên ảnh tương đối với `visual/`; thứ tự app/prototype luôn như b
 ## Chưa nghiệm thu ngoài phạm vi
 
 Live SMTP/Google, ghi model/dịch vụ và backend token-state chi tiết chưa chạy trong FE-08. OIDC ký cục bộ xác nhận HTTP/PKCE/callback/UI, không thay live acceptance. API capability/transport contracts được giữ. FE-09 ở PR riêng; không suy ra account/admin/history parity từ FE-08. Parent kiểm tra CI đúng head, review tài liệu cuối và tạo PR; chỉ reviewer cập nhật CURRENT-STATE/ROADMAP sau merge.
+
+## Tự review bổ sung ngày 09/10/2026
+
+Theo yêu cầu chủ dự án, chính agent triển khai tự đọc lại ba diff FE-08, FE-09 và AUTH-07. Phát hiện **P2** trong FE-08: `AuthGate` chỉ render `blocked` khi route là `login`, nhưng route được bảo vệ vẫn hiển thị form đăng nhập tại URL gốc. Vì vậy đăng nhập tại `/c/:id`, `/account`, `/admin/users`, `/settings`, `/history` nhận pending/disabled/429 mà không có phản hồi hiển thị.
+
+Sửa tại **6bf51de4d70401fd3e95046860e8047e8f9abb8c**: chọn màn blocked theo chính điều kiện route cần form login. Giữ URL gốc, copy trung tính, `Retry-After`, và ưu tiên phiên đã xác thực. Chỉ sửa AuthGate, thêm unit và browser regression; không đổi page markup/CSS, backend hay FE-09.
+
+- RED: **15/15 fail**, exit 1 trên code trước sửa, đủ 3 phản hồi × 5 đường dẫn. GREEN focused: **81/81**, exit 0.
+- `npm run check` trên nội dung source `6bf51de`: **1.605 v3** (47+340+212+25+353 API+628 web), **173 eval**, toàn bộ typecheck/build/security/launcher/env/OIDC đạt, exit 0.
+- Canonical browser local tại `6bf51de`: **72 pass / 1 fail / 1 skip**, exit 1 ở default; các scenario sau **NOT_RUN**. Ba browser regression mới đều pass qua API/PostgreSQL thật (pending tại /history, disabled tại /account, 429 tại /c/private-deep-link).
+- Failure duy nhất là FE-05 dark/375: thiếu receipt link, DOM báo “Không tải được trạng thái thực thi: Failed to fetch”. Giữ log, DOM và ảnh trong `self-review-fe05-receipt-failure/`. **Chưa chứng minh nguyên nhân**; không quy thành lỗi AuthGate hoặc khẳng định lỗi môi trường.
+- Đối chứng giữ nguyên FE-05 test/source/timeout, `--repeat-each 3 --trace on`: **3/3 pass**, exit 0. Không sửa hay bỏ assertion để qua gate. CI của head bàn giao mới phải chạy đầy đủ check/browser; kết quả exact-head cập nhật trong PR, không lấy 72 pass làm canonical đạt.
+- Tự review FE-09 tại `6c3e269`: **607/607 frontend**, exit 0. AUTH-07 tại `1792f12`: **368/368 API**, exit 0 trên PostgreSQL thật. Các lần chạy API trước bootstrap thất bại vì sandbox tmpfs thiếu role/schema sau restart, được giữ riêng và không tính gate.
+- Năm CSS Landing/AuthAction/Account/Users/History khớp prototype từng byte. Hai page source FE-08 không đổi từ `1cbb056`; giữ bộ ảnh/manifest trước đó với provenance gốc. Không chụp lại bộ parity cho thay đổi route-only này.
+- `git merge-tree --write-tree 6bf51de 6c3e269`: exit 0, tree `b50b6ccb0080051b747ac810df1d7f79bd7091e3`, không conflict; không tạo working merge.
+- Đây là self review, reviewer repository vẫn duyệt trước merge. Không sửa CURRENT-STATE/ROADMAP hoặc các file đang sửa ở root.
+
+Artifacts FE-08 dưới `C:/Users/VinhDat/AppData/Local/Temp/ati-fe08-2026-10-09/`:
+
+| Log | SHA256 |
+|---|---|
+| `self-review-deep-links-red.log` | `B6220371301A843773B9B9298AD8793D407C343790F3992391CCDF09866EB5ED` |
+| `self-review-deep-links-green.log` | `38657F46D8077AB15172B471B1E2EC56D9666B1BCFAB25D4DA2D165ABBDA5B94` |
+| `self-review-check.log` | `2A3E2B01374DE813145C754C720B20F89449E19B30387DCD51905B52443D9114` |
+| `self-review-browser.log` | `EB179999E04D711E80AC897147B6CA65445F6440A27F5BFCB27861B51B27F6EE` |
+| `self-review-fe05-control.log` | `9802C4D747E80F4A62073F92C530A9EE622598118FA52D4EE9BBA7E3C6008D69` |
+
+Các receipt `.exit` giữ mã thoát cho check/browser/control. FE-09: `C:/Users/VinhDat/orca/artifacts/fe-09/self-review-frontend.log`, SHA256 `44762A6DD0F2B997919419C9CE9888778DF2BFD8C518E49CEBDE1A7E5D2499B9`. AUTH-07: `C:/Users/VinhDat/AppData/Local/Temp/ati-auth07-2026-10-09/self-review-api-migrated.log`, SHA256 `70972951D30324E830CC6501BAED33C22AE4A4EA61F0DD97744CBF8BA38DC101`.
