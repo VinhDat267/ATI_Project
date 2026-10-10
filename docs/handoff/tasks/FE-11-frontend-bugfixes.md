@@ -86,4 +86,9 @@ Không đổi prompt; không cần đo lại golden (chỉ thêm trường vào 
 
 ## Kết quả
 
-_(agent thi công điền)_
+- Hoàn thành phần A, B và C trên nhánh `fix/fe-11-frontend-bugfixes`; không làm phần D tùy chọn để giữ phạm vi nhỏ. Luồng đăng nhập lại lưu `pathname + search + hash` trong `sessionStorage`, chỉ dùng một lần, khóa theo người dùng khi biết phiên cũ, hỗ trợ cả mật khẩu và Google, và không lưu khi đăng xuất chủ động. Đăng xuất từ tab khác dùng thông báo trung tính dựa trên `storage` event thật.
+- API từ chối UUID sai định dạng trước PostgreSQL. Test HTTP thật bao phủ 14 endpoint có conversation/plan ID và đều trả 404, không còn 500 hay rò lỗi database. Frontend mã hóa mọi conversation ID trong HTTP/SSE, phân biệt 500 với lỗi mạng/502–504, thêm đúng một `h1` cho lỗi tải hội thoại và phân biệt lỗi lập kế hoạch do mất mạng với lỗi máy chủ.
+- `ClarificationResponse.reason` được truyền xuyên suốt interface → planner → API → frontend bằng bốn commit riêng; dữ liệu cũ vẫn dùng regex fallback. Hai mutant của `hydrateResponse` và mutant `openWhenHidden` đều bị test mới bắt. Back sau lỗi tạo hội thoại mới bỏ qua route nháp. Test Google chờ đúng request config và đạt 20/20 lượt (41 test/lượt).
+- TDD RED thật đã được ghi cho từng mục: auth/storage; UUID repository; thông báo lỗi/h1/path encoding; planner/API/frontend reason; hai nhánh hydrate; history Back; SSE hidden; Google config. Bằng chứng chi tiết, lệnh test và 16 SHA256 ảnh trước/sau nằm trong [log FE-11](../log/2026-10-10-codex-fe-11-frontend-bugfixes.md). Ảnh được lưu ngoài repository tại `D:\ATI_Project\fe11-screenshots` và không commit.
+- Gate cuối: `npm run check` exit 0 (1.658 test v3 + 173 eval, build/security/launcher/env đều đạt); `npm run test:browser:v3` exit 0 (98 pass, 1 skip trong 11 scenario) sau khi chạy lệnh provision chuẩn để khôi phục role admin của fixture cục bộ. Test browser FE-11 dùng PostgreSQL thật, thu hồi cả access/refresh session bằng `logout-all`, đăng nhập lại về đúng `/c/<id>` và hiện đúng hội thoại.
+- Bundle production vẫn cảnh báo 781,33 kB > 500 kB; đây là D1 tùy chọn và chưa thay đổi trong task này.
