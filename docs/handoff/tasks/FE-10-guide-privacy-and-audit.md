@@ -1,6 +1,6 @@
 # FE-10 · Cẩm nang, Chính sách an toàn, 404 và rà soát toàn app
 
-**Trạng thái:** đã triển khai, chờ review, giao `longnguyen005` (thi công bằng Codex) ngày 10/10/2026 · **Nhánh:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
+**Trạng thái:** xong #128 tại `e08e623` (10/10/2026, `longnguyen005` thi công bằng Codex), trừ tiêu chí "Rà soát cuối" chưa làm, chờ người dùng quyết · **Nhánh:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
 **Đặc tả:** mục 6, 7, 8 · **Bản mẫu:** `guide.html`, `privacy.html`, `404.html`
 
 ## Vì sao quan trọng
