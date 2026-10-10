@@ -86,3 +86,9 @@ Phần A đã triển khai trên `feat/fe-06-cockpit-recovery-a`, base `eb48f0b`
 - Khác mẫu có chủ đích: dùng header/sandbox thật, bỏ controls demo; option API chỉ có chuỗi nên icon trung tính, dữ liệu không bịa; lựa chọn/xác nhận/Đã chọn giữ hành vi hiện hữu; footer Responses có nút cam và textarea chung. Không dựng accordion khả năng Trello từ dữ liệu demo; không có lời hứa tự đồng bộ/lưu nháp/an toàn tuyệt đối, tiến trình giả hay mã lỗi tự đặt. Expiry đi tới login thật. Thêm wrap/min-width cho 375px; CSS Responses/Errors bằng mẫu sau chuẩn hóa EOL.
 - W3-10 #102 vẫn mở khi kiểm tra 09/10: chỉ trình bày clarification planner đã trả, không đổi policy read-only/backend/executor. NOT_RUN: model/provider live, hết hạn JWT theo thời gian thực trong production, screen reader, reviewer repository và nghiệm thu sản phẩm. Phần A không thuộc PR B.
 - CI đầu tại `c57b10e` có 60 pass/1 fail trong default: fixture cuộn FE-02 gán scrollTop trước khi native scroll event được xử lý, planner có thể append tin trong khoảng đó. FE-06B đủ 5/5 pass. Sửa fixture bằng phát sự kiện scroll trong cùng callback gán vị trí, giữ nguyên ngưỡng gần đáy, assertion 80 và ca gửi khi đang đọc phía trên. Browser focused sau sửa 10/10, typecheck exit 0; reviewer đánh giá đồng bộ fixture hợp lệ. Code sản phẩm và 64 ảnh/SHA không thay đổi; CI head mới phải kiểm lại.
+
+### P3 thứ nhất của #116 · bổ sung test 09/10/2026
+
+- Thêm một regression test: SSE `plan_preview` đến trong lúc tải history; history kết thúc bằng refusal cũ vẫn được nạp nhưng không xóa kế hoạch mới hoặc đổi trạng thái `preview`. Code sản phẩm giữ nguyên.
+- Bỏ riêng điều kiện `hydrateResponse`: test mới fail với `activePlan === null` (exit 1); khôi phục nguyên byte: file 24/24, frontend 594/594, eval 165/165 và typecheck exit 0.
+- Bằng chứng, base và phạm vi kiểm tra: [log test chốt history](../log/2026-10-09-codex-fe-06b-history-hydration-guard-test.md). Chờ CI đúng head và reviewer repository; chưa merge.
