@@ -9,8 +9,10 @@ const labels = { healthy: 'Kết nối tốt', unhealthy: 'Không kết nối đ
 
 export function clarificationVariant(clarification: ClarificationState | null, request: string): 'read-only' | 'destination' | null {
   if (!clarification) return null;
-  // The API supplies question/context/options, without a scenario discriminator.
-  // These hints choose presentation only; every displayed answer remains the planner's.
+  if (clarification.reason === 'read_only') return 'read-only';
+  if (clarification.reason === 'destination') return 'destination';
+  // Legacy saved messages predate the structured reason. These hints choose
+  // presentation only; every displayed answer remains the planner's.
   const text = `${clarification.question} ${clarification.context ?? ''}`;
   if (/không (?:tìm )?thấy|không tìm được|ngoài phạm vi|chưa (?:được )?cấp phép/i.test(text)) return 'destination';
   if (/^(?:liệt kê|xem|đọc|tìm|cho (?:tôi|mình) xem)(?:\s|$)/i.test(request.trim()) || /chỉ (?:để )?(?:xem|đọc)|làm gì với danh sách/i.test(text)) return 'read-only';

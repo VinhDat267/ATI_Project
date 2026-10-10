@@ -177,6 +177,7 @@ export function handleSSEEvent(
         question: typeof data.question === 'string' && data.question.trim() ? data.question : 'Vui lòng làm rõ yêu cầu:',
         options: Array.isArray(data.options) ? data.options.filter((option: unknown): option is string => typeof option === 'string' && option.trim() !== '') : [],
         context: typeof data.context === 'string' && data.context.trim() ? data.context : undefined,
+        reason: data.reason === 'read_only' || data.reason === 'destination' ? data.reason : undefined,
       });
       break;
     }

@@ -32,7 +32,8 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       store.setClarification(null);
     }
     if (latest?.metadata?.type === 'clarification') {
-      store.setClarification({ question: latest.content, options: Array.isArray(latest.metadata.options) ? latest.metadata.options.filter(option => typeof option === 'string' && option.trim()) : [], context: typeof latest.metadata.context === 'string' ? latest.metadata.context : undefined });
+      store.setClarification({ question: latest.content, options: Array.isArray(latest.metadata.options) ? latest.metadata.options.filter(option => typeof option === 'string' && option.trim()) : [], context: typeof latest.metadata.context === 'string' ? latest.metadata.context : undefined,
+        reason: latest.metadata.reason === 'read_only' || latest.metadata.reason === 'destination' ? latest.metadata.reason : undefined });
     }
   }
   try {

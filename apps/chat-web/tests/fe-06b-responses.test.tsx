@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { Cockpit } from '../src/components/Cockpit';
 import { useChatStore } from '../src/store/chat-store';
@@ -182,6 +183,24 @@ it('a Vietnamese read-only request selects the expanded view even with a generic
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: 'Liệt kê các issue đang mở' }],
     activeClarification: { question: 'Bạn muốn thực hiện hành động nào với kết quả này?', options: ['Gửi lên Slack'] } });
   view(); expect(await screen.findByRole('button', { name: 'Sửa yêu cầu' })).toBeInTheDocument();
+});
+it('prefers a structured read-only reason over legacy request and question heuristics', async () => {
+  useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: 'Hãy giúp tôi xử lý kết quả' }],
+    activeClarification: { question: 'Bạn muốn làm gì với dữ liệu này?', options: ['Gửi lên Slack'], reason: 'read_only' } });
+  view();
+  expect(await screen.findByRole('button', { name: 'Sửa yêu cầu' })).toBeInTheDocument();
+});
+it('retains a structured clarification reason from SSE and durable history', async () => {
+  useChatStore.getState().setConversationId('A');
+  act(() => handleSSEEvent('clarification', JSON.stringify({ question: 'Bạn muốn làm gì?', options: [], reason: 'read_only' }), undefined, 'A'));
+  expect(useChatStore.getState().activeClarification?.reason).toBe('read_only');
+  useChatStore.getState().setClarification(null);
+  vi.mocked(apiClient.getConversation).mockResolvedValue({ conversation: { id: 'A' }, messages: [
+    { id: 'u2', role: 'user', content: 'Yêu cầu cũ' },
+    { id: 'q2', role: 'assistant', content: 'Bạn muốn làm gì?', metadata: { type: 'clarification', reason: 'destination' } },
+  ] } as never);
+  await loadConversationHistory('A', () => true);
+  expect(useChatStore.getState().activeClarification?.reason).toBe('destination');
 });
 it('server planning failure uses the system copy and retries only the original planning request', async () => {
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: prompt }, { id: 'e', role: 'system', content: 'Lỗi: upstream failed', metadata: { type: 'planning_error' } }] });
