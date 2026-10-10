@@ -65,13 +65,15 @@ function openCallback(query = 'code=private-code&state=private-state') {
   return render(<StrictMode><App /></StrictMode>);
 }
 async function waitCallback() { await waitFor(() => expect(callbacks).toHaveLength(1)); }
+async function waitAuthConfig() { await waitFor(() => expect(calls.some(call => call.path === '/api/auth/config')).toBe(true)); }
 async function complete(body: unknown, status = 200) {
   await waitCallback(); await act(async () => { reply(callbacks[0], body, status); await nativeFetch(`${base}/round-trip`); });
 }
 
 it.each(['/login', '/signup'])('shows enabled Google action and submits login mode on %s', async path => {
   window.history.replaceState({}, '', path); render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }, { timeout: 5_000 }));
+  await waitAuthConfig();
+  fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Google' }));
   expect(await screen.findByRole('alert')).toBeVisible();
   expect(calls.filter(call => call.path === '/api/auth/google/start').map(call => call.body)).toEqual([{ mode: 'login' }]);
 });
@@ -82,7 +84,8 @@ it.each(['/login', '/signup'])('hides Google when server config disables it on %
 });
 it('keeps Google signup available when only email signup is disabled', async () => {
   signupEnabled = false; window.history.replaceState({}, '', '/signup'); render(<App />);
-  expect(await screen.findByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
+  await waitAuthConfig();
+  expect(screen.getByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
   expect(screen.queryByLabelText('Mật khẩu')).toBeNull();
 });
 it('scrubs callback secrets before any HTTP request and consumes the state once in StrictMode', async () => {

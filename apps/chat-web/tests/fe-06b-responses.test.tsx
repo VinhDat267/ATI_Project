@@ -109,6 +109,29 @@ it('keeps a newer SSE plan preview when delayed history ends in an old refusal',
   expect(useChatStore.getState().activePlan).toMatchObject(newPlan);
   expect(useChatStore.getState().planStatus).toBe('preview');
 });
+it('does not hydrate an old terminal response when only messages changed during the read', async () => {
+  useChatStore.getState().setConversationId('A');
+  let finish!: (value: Awaited<ReturnType<typeof apiClient.getConversation>>) => void;
+  vi.mocked(apiClient.getConversation).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const loading = loadConversationHistory('A', () => true);
+  useChatStore.getState().setClarification({ question: 'Câu hỏi mới', options: [] });
+  useChatStore.getState().addMessage({ id: 'new-message', role: 'assistant', content: 'Câu hỏi mới' });
+  finish({ conversation: { id: 'A' }, messages: [{ id: 'old', role: 'assistant', content: 'Từ chối yêu cầu: cũ', metadata: { type: 'refusal' } }] });
+  await loading;
+  expect(useChatStore.getState().activeClarification?.question).toBe('Câu hỏi mới');
+});
+it('does not hydrate an old terminal response when only planRevision changed during the read', async () => {
+  useChatStore.getState().setConversationId('A');
+  let finish!: (value: Awaited<ReturnType<typeof apiClient.getConversation>>) => void;
+  vi.mocked(apiClient.getConversation).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const messages = useChatStore.getState().messages;
+  const loading = loadConversationHistory('A', () => true);
+  useChatStore.setState(state => ({ activeClarification: { question: 'Câu hỏi mới', options: [] }, planRevision: state.planRevision + 1 }));
+  expect(useChatStore.getState().messages).toBe(messages);
+  finish({ conversation: { id: 'A' }, messages: [{ id: 'old', role: 'assistant', content: 'Từ chối yêu cầu: cũ', metadata: { type: 'refusal' } }] });
+  await loading;
+  expect(useChatStore.getState().activeClarification?.question).toBe('Câu hỏi mới');
+});
 it.each(responseCases.flatMap(([type, content, moment]) => [false, true].map(snapshotFirst => ({ type, content, moment, snapshotFirst }))))('reopening keeps the latest $type above an older receipt (snapshotFirst=$snapshotFirst)', async ({ type, content, moment, snapshotFirst }) => {
   useChatStore.getState().setConversationId('A');
   const history = { conversation: { id: 'A' }, messages: [
