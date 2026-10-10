@@ -14,7 +14,7 @@ const fixtures = [
   { key: 'server', prompt: 'Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack', content: 'Không thể lập kế hoạch lúc này. Hãy thử lại.', metadata: { type: 'planning_error' } },
 ];
 async function login(page: Page, email = process.env.CHAT_ADMIN_EMAIL!, password = process.env.CHAT_ADMIN_PASSWORD!) {
-  await page.goto('/login'); await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
 async function capture(page: Page, key: string, width: number, theme: string) {

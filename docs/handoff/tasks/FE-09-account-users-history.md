@@ -26,13 +26,13 @@ Ba trang này đã có chức năng (AUTH-03, AUTH-05, FE-02) nhưng giao diện
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Test: không có thao tác Từ chối/Mời; Duyệt bị khoá khi chưa xác minh email.
-- [ ] Test: gỡ Google bắt buộc mật khẩu; tài khoản chưa có mật khẩu không gỡ được.
-- [ ] Test: đổi tên hội thoại lưu bằng Enter, huỷ bằng Esc, phản hồi muộn không ghi đè tên vừa gõ lại.
-- [ ] Các test `account-view`, `account-action-regressions`, `admin-users`, `app-routing`, browser AUTH-03/AUTH-05/FE-02 vẫn xanh.
-- [ ] Không cuộn ngang ở 375px; chế độ tối giống bản React.
-- [ ] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app và ảnh bản React của `account.html`, `users.html`, `history.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
-- [ ] `npm run check` và `npm run test:browser:v3` exit 0.
+- [x] Test: không có thao tác Từ chối/Mời; Duyệt bị khoá khi chưa xác minh email.
+- [x] Test: gỡ Google bắt buộc mật khẩu; tài khoản chưa có mật khẩu không gỡ được.
+- [x] Test: đổi tên hội thoại lưu bằng Enter, huỷ bằng Esc, phản hồi muộn không ghi đè tên vừa gõ lại.
+- [x] Các test `account-view`, `account-action-regressions`, `admin-users`, `app-routing`, browser AUTH-03/AUTH-05/FE-02 vẫn xanh.
+- [x] Không cuộn ngang ở 375px; chế độ tối giống bản React.
+- [x] **Giống bản mẫu** (đặc tả mục 1, 1.1, 1.2 bản 07/10; chép trang của bản React rồi nối dữ liệu thật): ảnh app và ảnh bản React của `account.html`, `users.html`, `history.html` đặt cạnh nhau ở 1440×900 và 375×812, sáng và tối. Danh sách ảnh và SHA256 ghi trong log; ảnh không commit. Mọi khác biệt còn lại nằm trong đặc tả 1.1 hoặc ghi ở phần "Kết quả" kèm lý do.
+- [x] `npm run check` và `npm run test:browser:v3` exit 0.
 
 ## Ngoài phạm vi
 
@@ -40,4 +40,18 @@ Từ chối tài khoản, mời thành viên, lịch sử cả nhóm, lọc lị
 
 ## Kết quả
 
-_(agent thi công điền)_
+Đã port ba trang từ source React vào `apps/chat-web/src/pages/{Account,Users,History}`, giữ CSS byte-for-byte, nối API/store thực tế và chuyển route riêng trong App.tsx. Giữ AccountView/AdminUsersView wrappers và các regression AUTH-03/AUTH-05/#73. Tên/draft mới không bị response cũ ghi đè; đổi search/user không làm busy kẹt; Enter/Esc trả focus sau khi editor đóng. Không sửa backend/schema trong diff FE-09.
+
+Nhánh `feat/fe-09-account-users-history`, worktree `C:/Users/VinhDat/orca/workspaces/ATI_Project/fe-09-account-users-history`. Phụ thuộc [AUTH-07 / PR #120](https://github.com/VinhDat267/ATI_Project/pull/120), base `1792f120ed02842cb57688d182867d8462333705` trên `fix/auth-google-unlink-password`, để mật khẩu khi gỡ Google được kiểm thật. Merge backend trước rồi retarget FE-09 về main; không tự merge.
+
+Ngoại lệ theo hợp đồng dữ liệu/đặc tả 1.1: bỏ demo nav, vị trí/điểm bảo mật giả, stats/filter nhóm/trạng thái/công cụ/receipts/prompt/tool chips của History, role selection khi approve và role-filter selector của Users (API không có role filter). Giữ đổi vai trò thật. Tab thành viên ghép hai stream active/disabled phân trang độc lập, có thể 40 dòng/trang, không khẳng định 20 dòng; stats lấy tổng thật của server. Email verification lấy authenticated user vì AccountProfile chưa trả trường đó; thiếu trường thì không tự gắn badge đã xác minh. Native no-email backend trả HTTP 503 thật, UI giữ lỗi/retry và SQL account vẫn pending. UserNavMenu chỉ thêm hai props class tùy chọn, mặc định giữ nguyên, để dùng avatar/menu source ngoài CSS Cockpit.
+
+Gate tại `b63d586ea945b4e26f5f219f403de0dc6b2b367c` (production `1b2ac12e11a1853e17142ee63284fae0e5d7e8cd`): `npm run check` exit 0, 1.599 v3 (368 API + 607 web trong sáu workspace), 173 eval, typecheck/build/security/launcher/env/OIDC. Hai phát hiện review đã sửa bằng RED→GREEN: mật khẩu hiện tại gồm 12 dấu cách vẫn được gửi nguyên giá trị để API xác minh; thanh độ dài mật khẩu về 0 khi input được xoá sau thành công, giữ đúng độ dài draft mới gõ trong lúc chờ response. Focused account/FE-09 32/32; browser FE-09 cuối tại `4ca2b700` 6/6, exit 0, gồm literal unlink và meter clear/newer draft với HTTP/PostgreSQL thật. FE-04 private flow 1/1 sau khi chuyển runtime-warning assertion về Cockpit, giữ theme/keyboard/badge behavior. Final `npm run test:browser:v3` tại `5726cd27b43c1919ada03073eaaa6299fdeb54e9`: 84/84 trong 11 groups, exit 0, lần final đầu tiên. Canonical cũ 82/82 được giữ riêng trước hai fix.
+
+Visual: `C:/Users/VinhDat/orca/artifacts/fe-09/visual/comparison.html`, `manifest.json`, `SHA256SUMS.txt`: 40 PNG (12 cặp bắt buộc, 4 cặp Users members bổ sung, 8 menu). Đủ 1440×900 / 375×812 sáng/tối, app/menu không cuộn ngang; CSS cả ba trang SHA256 bằng source. Data/session/count/date/status và unsupported omissions được ghi rõ trong manifest/log; không tuyên bố pixel-equal với dataset demo. Ảnh ngoài repo. [Log và toàn bộ SHA256](../log/2026-10-09-codex-fe-09-account-users-history.md), [kế hoạch](../../superpowers/plans/2026-10-09-fe-09-account-users-history.md).
+
+Whitespace-only head `4ca2b700216edfb30ad8f9f4e19cd67906f93506` xoá ba lỗi spacing, giữ CRLF/CSS; gate `diff --check` với `cr-at-eol` exit 0. Test-only head `5726cd27b43c1919ada03073eaaa6299fdeb54e9` khôi phục LF gốc của AUTH-05 browser specs, thống nhất login Email `exact:true` với FE-08 để tránh conflict giữa hai PR. Manifest nguồn cuối tại head này; không đổi hành vi ứng dụng so với fullcheck.
+
+Review source độc lập ĐẠT qua `4ca2b700`: whole-frontend 607/607 tại `b63d586`, probe cuối 14/14, mutants name/history/session-owner và meter bỏ đồng bộ/reset 0 đều bắt lỗi. Receipt `C:/Users/VinhDat/orca/artifacts/fe-09/independent-review-4ca2b70.json`; ba whitespace edits được kiểm riêng, không đổi semantic/CSS. Parent readonly merge-tree với FE-08 `219a0b790e7c3f544e59c726e0816dd5fe88188e`: exit 0, không conflict app/test/docs; chưa working merge. Local gates đã đạt; exact-head CI/PR/merge do parent phụ trách. Chỉ có bằng chứng local sandbox, không suy rộng sang SMTP/Google/model/dịch vụ live.
+
+Follow-up PR #122: CI `37863845654` tại `d7d5a00` fail (64 pass / 3 fail trong default; các group sau NOT_RUN). Hai native HTTP cases nhận 401 vì CI không có JWT_SECRET, API child tạo key riêng còn sibling createApp không nhận key. Đã sửa runner `e732af132875049ae16755b4a308e64bf89d0dca`: cấp key random hợp lệ cho mỗi scenario trước Playwright spawn, giữ key được cung cấp và bearer gốc của browser, không đổi backend/product/assertions. Distinct-key và unset-key controls đều RED 2 fail / exit 1; syntax check và env/OIDC 10/10 exit 0, reviewer độc lập cũng 10/10. Canonical unset-JWT tại head này GREEN 84/84 trong 11 groups, exit 0; `browser-unset-jwt-final.log` và `.exit` lưu receipt. Failure còn lại ở CI cũ là screenshot timeout của FE-05 sau SSE assertion đã pass; regression nguyên trạng đã pass trong canonical mới, không đổi test/timeout/retry hoặc suy đoán nguyên nhân. Visual manifest/40 ảnh giữ nguyên vì runner-only delta, app source hashes không đổi. Exact-head CI mới phải đạt trước merge.

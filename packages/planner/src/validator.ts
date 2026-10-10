@@ -16,6 +16,7 @@ export interface ValidationFailure {
   valid: false;
   layer: 'json' | 'schema' | 'semantic' | 'security' | 'grounding';
   error: string;
+  code?: 'READ_ONLY_PLAN';
   ungrounded?: UngroundedArgument[];
 }
 
@@ -448,6 +449,11 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         };
       }
     }
+  }
+
+  // A workflow must perform an action. Mixed read/write plans keep their existing contract.
+  if (!steps.some(step => catalogMap.get(step.tool)?.sideEffect === 'write')) {
+    return { valid: false, layer: 'semantic', code: 'READ_ONLY_PLAN', error: 'Plan must contain at least one write step' };
   }
 
   // Layer 5: Grounding — resource IDs must come from lookups, the user or earlier steps

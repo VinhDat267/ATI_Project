@@ -163,9 +163,10 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
   it('requires password and authenticated session to unlink', async () => {
     const u = await user(); await pool.query('UPDATE users SET google_sub=$2 WHERE id=$1', [u.id, subject]);
     const s = await users.sessions.create(u.id, undefined, now); const access = generateAccessToken(u, secret, s.sessionId, now).accessToken;
-    expect((await post('unlink', {})).status).toBe(401); expect((await post('unlink', {}, undefined, access)).body.success).toBe(true);
+    expect((await post('unlink', { currentPassword: 'Old!password123456' })).status).toBe(401);
+    expect((await post('unlink', { currentPassword: 'Old!password123456' }, undefined, access)).body.success).toBe(true);
     await pool.query('UPDATE users SET google_sub=$2,password=NULL WHERE id=$1', [u.id, subject]);
-    expect((await post('unlink', {}, undefined, access)).status).toBe(409); expect((await users.findById(u.id))!.google_sub).toBe(subject);
+    expect((await post('unlink', { currentPassword: 'Old!password123456' }, undefined, access)).status).toBe(409); expect((await users.findById(u.id))!.google_sub).toBe(subject);
   });
   it('rechecks the original link session after the token endpoint returns, so logout during exchange cannot link', async () => {
     const u = await user(); const session = await users.sessions.create(u.id, undefined, now);
@@ -202,7 +203,7 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
   it('does not create a Google-authenticated session if unlink wins after account resolution', async () => {
     const u = await user(); await pool.query('UPDATE users SET google_sub=$2 WHERE id=$1', [u.id, subject]);
     const original = await users.sessions.create(u.id, undefined, now);
-    await users.googleAuth.unlink(u.id, original.sessionId, now);
+    await users.googleAuth.unlink(u.id, original.sessionId, u.password!, () => now);
     await expect(users.sessions.create(u.id, undefined, now, undefined, subject)).rejects.toThrow();
     expect((await pool.query('SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1', [u.id])).rows[0].n).toBe(1);
   });

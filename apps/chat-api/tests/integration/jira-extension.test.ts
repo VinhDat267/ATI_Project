@@ -51,10 +51,11 @@ it('integrates Jira SQL encryption, HTTP SSRF gates, conditional catalog, factor
     vi.stubGlobal('fetch', fetchFn); const factory = new AdapterFactory({ credentialRepo: repo, encryptionKey: key }); const adapter = await factory.getAdapterForService('jira');
     const seen: any[] = [];
     const plan = { kind: 'plan', thinking: 'Use observed project key', summary: 'Create ticket', warnings: [], steps: [{ id: 'create', tool: 'jira.create_issue', description: 'Create', args: { projectKey: 'ATI', summary: 'Login bug' }, dependsOn: [] }] };
-    const planner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm', gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }), provider: { name: 'scripted-contract', async generatePlan(input) { seen.push(input); return JSON.stringify(plan); } } });
+    const planner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm', gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }), provider: { name: 'scripted-contract', async generatePlan(input) { seen.push(input);
+        if (seen.length === 1) return JSON.stringify({ kind: 'search', calls: [{ tool: catalog.find(t => t.listable && t.sideEffect === 'read')!.name, args: { query: '' } }] }); return JSON.stringify(plan); } } });
     expect((await planner.processMessage({ userMessage: 'Tạo ticket Jira cho lỗi đăng nhập', memory: new WorkingMemory() })).kind).toBe('plan');
-    expect(seen[0].workingMemory.__observed.project).toEqual([project]);
-    const grounding = { memory: { project: seen[0].workingMemory.__observed.project }, userTexts: [] }; const validated = validatePlan(JSON.stringify(plan), catalog, { grounding }); expect(validated.valid, JSON.stringify(validated)).toBe(true);
+    expect(seen.at(-1).workingMemory.__observed.project).toEqual([project]);
+    const grounding = { memory: { project: seen.at(-1).workingMemory.__observed.project }, userTexts: [] }; const validated = validatePlan(JSON.stringify(plan), catalog, { grounding }); expect(validated.valid, JSON.stringify(validated)).toBe(true);
     const forged = structuredClone(plan); forged.steps[0]!.args.projectKey = 'OTHER'; expect(validatePlan(JSON.stringify(forged), catalog, { grounding }).valid).toBe(false);
     const before = calls.length; await expect(adapter.execute('jira.create_issue', forged.steps[0]!.args)).rejects.toMatchObject({ category: 'AUTH_ERROR' }); expect(calls).toHaveLength(before);
     const comment = { kind: 'plan', thinking: 'Use observed issue key', summary: 'Comment', warnings: [], steps: [{ id: 'comment', tool: 'jira.add_comment', description: 'Comment', args: { issueKey: 'ATI-42', body: 'Plain' }, dependsOn: [] }] };

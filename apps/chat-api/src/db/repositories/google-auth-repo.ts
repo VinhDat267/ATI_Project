@@ -8,8 +8,8 @@ export interface OAuthState {
   mode: 'login' | 'link'; user_id: string | null; session_id: string | null;
 }
 export class GoogleAccountError extends Error {
-  constructor(readonly code: 'GOOGLE_LINK_CONFLICT' | 'SIGNUP_DISABLED' | 'INVALID_SESSION' | 'PASSWORD_REQUIRED') {
-    super('Không thể cập nhật liên kết Google.');
+  constructor(readonly code: 'GOOGLE_LINK_CONFLICT' | 'SIGNUP_DISABLED' | 'INVALID_SESSION' | 'PASSWORD_REQUIRED' | 'PASSWORD_CHANGED_ELSEWHERE') {
+    super(code === 'PASSWORD_CHANGED_ELSEWHERE' ? 'Mật khẩu vừa được thay đổi ở nơi khác. Hãy thử lại với mật khẩu hiện tại.' : 'Không thể cập nhật liên kết Google.');
   }
 }
 export class GoogleAuthRepo {
@@ -95,13 +95,22 @@ export class GoogleAuthRepo {
       AND revoked_at IS NULL AND expires_at>$3 FOR UPDATE`, [sessionId, userId, new Date(now)]);
     return Boolean(result.rows.length);
   }
-  async unlink(userId: string, sessionId: string, now: number): Promise<void> {
+  async unlink(userId: string, sessionId: string, expectedPasswordHash: string, clock: () => number): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       const user = (await client.query<UserRow>('SELECT * FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
-      if (!user || user.status !== 'active' || !await this.lockActiveSession(client, sessionId, userId, now)) throw new GoogleAccountError('INVALID_SESSION');
+      if (!user || user.status !== 'active') throw new GoogleAccountError('INVALID_SESSION');
+      const session = (await client.query<{ expires_at: Date }>(`SELECT expires_at FROM auth_sessions WHERE id=$1 AND user_id=$2
+        AND revoked_at IS NULL FOR UPDATE`, [sessionId, userId])).rows[0];
+      // Either row lock can wait past expiry. Sample time only after both locks,
+      // then keep the user/password and session stable until the write commits.
+      const now = clock();
+      if (!session || session.expires_at.getTime() <= now) throw new GoogleAccountError('INVALID_SESSION');
       if (!user.password) throw new GoogleAccountError('PASSWORD_REQUIRED');
+      // Recheck the exact hash proved by the caller after acquiring the user lock.
+      // Reset/password change cannot replace it before this transaction commits.
+      if (user.password !== expectedPasswordHash) throw new GoogleAccountError('PASSWORD_CHANGED_ELSEWHERE');
       await client.query('UPDATE users SET google_sub=NULL,google_email=NULL,updated_at=$2 WHERE id=$1', [userId, new Date(now)]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }

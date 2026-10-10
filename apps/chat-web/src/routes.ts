@@ -13,7 +13,7 @@ type PublicViewProps = ComponentProps<typeof LoginPage> & { navigate: (path: str
 
 // Path routes preserve direct conversation links and native browser history without a router dependency.
 export const routes = [
-  { kind: 'home', pattern: /^\/$/, publicView: (props: PublicViewProps) => createElement(LandingView, { onGoToLogin: () => props.navigate('/login') }) },
+  { kind: 'home', pattern: /^\/$/, publicView: (props: PublicViewProps) => createElement(LandingView, props) },
   { kind: 'login', pattern: /^\/login\/?$/, publicView: (props: PublicViewProps) => createElement(LoginPage, props) },
   { kind: 'signup', pattern: /^\/signup\/?$/, publicView: (props: PublicViewProps) => createElement(SignupView, props) },
   { kind: 'verify-email', pattern: /^\/verify-email\/?$/, publicView: (props: PublicViewProps) => createElement(VerifyEmailView, props) },

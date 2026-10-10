@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
   test(`FE-05: FE-05b real approval wait, saved receipt references and single composer ${width} ${theme}`,async({page},info)=>{
     await page.setViewportSize({width,height:width===375?812:900});await page.emulateMedia({colorScheme:theme});
-    await page.goto('/login');await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+    await page.goto('/login');await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!);await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
     await expect(page.getByRole('heading',{level:1})).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
     const db=new pg.Pool({connectionString:process.env.DATABASE_URL});
     try {

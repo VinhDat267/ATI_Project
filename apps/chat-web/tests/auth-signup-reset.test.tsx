@@ -24,22 +24,22 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(
 describe('AUTH-02 public account flows', () => {
   it('shows signup only when enabled and submits the Vietnamese signup form', async () => {
     window.history.replaceState(null, '', '/login'); render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Tạo tài khoản' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Đăng ký' }));
     fireEvent.change(screen.getByLabelText('Họ tên'), { target: { value: 'Người dùng' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } });
     fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'Auth02!new-password' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đăng ký' }));
     expect(await screen.findByText('Kiểm tra email để xác minh tài khoản.')).toBeDefined();
     expect(calls).toContainEqual({ url: '/api/auth/signup', data: { name: 'Người dùng', email: 'user@example.test', password: 'Auth02!new-password' } });
   });
   it('keeps signup hidden when the server has closed registration and still opens forgotten password', async () => {
     signupEnabled = false; window.history.replaceState(null, '', '/login'); render(<App />);
     await waitFor(() => expect(calls.some(call => call.url === '/api/auth/config')).toBe(true));
-    expect(screen.queryByRole('button', { name: 'Tạo tài khoản' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Đăng ký' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Quên mật khẩu?' }));
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'unknown@example.test' } });
     fireEvent.click(screen.getByRole('button', { name: 'Gửi link đặt lại mật khẩu' }));
-    expect(await screen.findByText('Nếu email có trong hệ thống, bạn sẽ nhận được link.')).toBeDefined();
+    expect(await screen.findByText('Nếu email này có tài khoản, bạn sẽ nhận được link đặt lại mật khẩu.')).toBeDefined();
     expect(calls).toContainEqual({ url: '/api/auth/forgot-password', data: { email: 'unknown@example.test' } });
   });
   it('removes a verification token immediately and sends it once even with React StrictMode', async () => {
@@ -60,6 +60,8 @@ describe('AUTH-02 public account flows', () => {
     expect(calls.some(call => call.url === '/api/auth/reset-password')).toBe(false);
     fireEvent.change(screen.getByLabelText('Nhập lại mật khẩu'), { target: { value: 'Auth02!new-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+    expect(await screen.findByText('Mật khẩu đã được thay đổi')).toBeVisible();
+    fireEvent.click(screen.getByText('Đăng nhập ngay'));
     await waitFor(() => expect(window.location.pathname).toBe('/login'));
     expect(calls).toContainEqual({ url: '/api/auth/reset-password', data: { token: 'private-reset-token', password: 'Auth02!new-password' } });
     expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeDefined();
@@ -68,7 +70,7 @@ describe('AUTH-02 public account flows', () => {
     window.history.replaceState(null, '', '/login'); render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Gửi lại email xác minh' }));
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'pending@example.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Gửi lại email xác minh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi lại link xác minh mới' }));
     expect(await screen.findByText('Nếu email có trong hệ thống, bạn sẽ nhận được link.')).toBeDefined();
     expect(calls).toContainEqual({ url: '/api/auth/resend-verification', data: { email: 'pending@example.test' } });
     cleanup(); window.history.replaceState(null, '', '/verify-email'); render(<App />);

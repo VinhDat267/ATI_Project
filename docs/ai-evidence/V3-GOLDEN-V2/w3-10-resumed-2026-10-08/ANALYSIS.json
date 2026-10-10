@@ -1,0 +1,3512 @@
+{
+  "manifest": {
+    "startedAt": "2026-10-08T16:32:33.216Z",
+    "requestedModel": "ag/gemini-3.8-flash",
+    "gateway": "http://localhost:20128/v1",
+    "concurrency": 2,
+    "campaigns": [
+      {
+        "group": "control",
+        "set": "core",
+        "runs": 1,
+        "startedAt": "2026-10-08T16:32:33.218Z",
+        "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+        "exitCode": 0,
+        "endedAt": "2026-10-08T16:36:06.857Z"
+      },
+      {
+        "group": "control",
+        "set": "services",
+        "runs": 1,
+        "startedAt": "2026-10-08T16:36:06.862Z",
+        "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+        "exitCode": 2,
+        "endedAt": "2026-10-08T16:38:50.248Z"
+      },
+      {
+        "group": "diagnostic",
+        "set": "services",
+        "runs": 1,
+        "concurrency": 1,
+        "subset": [
+          "ca04"
+        ],
+        "sourceCommit": "5afc0a7f7a0168abb3776400394ea6edcedd2b3a",
+        "startedAt": "2026-10-08T16:40:05.029Z",
+        "endedAt": "2026-10-08T16:40:21.534Z",
+        "exitCode": 0,
+        "note": "One-case diagnostic after interrupted control; excluded from acceptance and all arm comparisons."
+      },
+      {
+        "group": "after",
+        "set": "core",
+        "runs": 3,
+        "startedAt": "2026-10-08T16:44:41.561Z",
+        "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+        "exitCode": 0,
+        "endedAt": "2026-10-08T16:55:18.342Z"
+      },
+      {
+        "group": "after",
+        "set": "freeform",
+        "runs": 3,
+        "startedAt": "2026-10-08T16:55:18.357Z",
+        "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+        "exitCode": 0,
+        "endedAt": "2026-10-08T17:00:52.259Z"
+      },
+      {
+        "group": "after",
+        "set": "services",
+        "runs": 3,
+        "startedAt": "2026-10-08T17:00:52.267Z",
+        "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+        "exitCode": 0,
+        "endedAt": "2026-10-08T17:12:19.521Z"
+      },
+      {
+        "group": "control",
+        "set": "services",
+        "runs": 1,
+        "startedAt": "2026-10-08T17:13:19.919Z",
+        "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+        "exitCode": 0,
+        "endedAt": "2026-10-08T17:18:52.947Z"
+      }
+    ],
+    "resumeReason": "ca04 diagnostic received a completion at concurrency1 after control timeout; corrected campaigns each attempted once at concurrency2",
+    "resumeReasons": [
+      "ca04 diagnostic received a completion at concurrency1 after control timeout; corrected campaigns each attempted once at concurrency2",
+      "Fresh independent services control after completed corrected campaigns demonstrate provider completions; retain prior interrupted17/44 separately, no pooled samples"
+    ],
+    "endedAt": "2026-10-08T17:18:52.947Z",
+    "scope": "Planning only on synthetic fixtures. Sequential campaigns, concurrency2 except ca04 diagnostic1; unchanged model/deadline/retry and local9router configuration. UTC08/10 spans evening08/10 and early09/10 Asia/Saigon.",
+    "selection": "Latest independently complete core/services controls compared with three complete corrected runs. Earlier17/44 control and diagnostic kept separate, never pooled."
+  },
+  "groups": {
+    "control": {
+      "core": {
+        "path": "control/core-llm-2026-10-08T16-32-35-221Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+          "labels": {
+            "file": "cases.json",
+            "commit": "1ab7f08d88546419048e0466f3214bb018c26592",
+            "sha256": "7edeac39d6531cdc8bcc4340b1e64f02684eff61ea3bd1f39ab2f5b5ad00aa5a",
+            "version": 2,
+            "cases": 50,
+            "selectedCases": 50
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 50,
+            "strict": 50,
+            "p50": 7527,
+            "p95": 18995,
+            "max": 20217,
+            "under15": 46,
+            "calls": 57
+          },
+          "byCategory": {
+            "single_step": {
+              "total": 10,
+              "strict": 10,
+              "p50": 5620,
+              "p95": 9021,
+              "max": 9021,
+              "under15": 10,
+              "calls": 10
+            },
+            "multi_step": {
+              "total": 10,
+              "strict": 10,
+              "p50": 5853,
+              "p95": 9570,
+              "max": 9570,
+              "under15": 10,
+              "calls": 10
+            },
+            "cross_service": {
+              "total": 15,
+              "strict": 15,
+              "p50": 8906,
+              "p95": 15633,
+              "max": 15633,
+              "under15": 14,
+              "calls": 16
+            },
+            "clarification": {
+              "total": 9,
+              "strict": 9,
+              "p50": 8086,
+              "p95": 20217,
+              "max": 20217,
+              "under15": 6,
+              "calls": 15
+            },
+            "refusal": {
+              "total": 6,
+              "strict": 6,
+              "p50": 7527,
+              "p95": 10732,
+              "max": 10732,
+              "under15": 6,
+              "calls": 6
+            }
+          },
+          "failed": [],
+          "usage": null,
+          "byService": {}
+        }
+      },
+      "services": {
+        "path": "control/services-llm-2026-10-08T17-13-22-397Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "7898aa72c7b4414d8c8d2861e0a7ae166326ce5c",
+          "labels": {
+            "file": "cases-services.json",
+            "commit": "20fa6f03c8696d769303f759602d1c0748cb9b26",
+            "sha256": "369efaea2023344540f731dae7730d33aa4ad9a542b3d222d2aca6d463bf896f",
+            "version": 1,
+            "cases": 44,
+            "selectedCases": 44
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 44,
+            "strict": 37,
+            "p50": 7600,
+            "p95": 44465,
+            "max": 69262,
+            "under15": 33,
+            "calls": 57
+          },
+          "byCategory": {
+            "read_only": {
+              "total": 6,
+              "strict": 0,
+              "p50": 41010,
+              "p95": 69262,
+              "max": 69262,
+              "under15": 0,
+              "calls": 18
+            },
+            "single_step": {
+              "total": 19,
+              "strict": 19,
+              "p50": 7130,
+              "p95": 13732,
+              "max": 13732,
+              "under15": 19,
+              "calls": 20
+            },
+            "cross_service": {
+              "total": 9,
+              "strict": 9,
+              "p50": 13040,
+              "p95": 18170,
+              "max": 18170,
+              "under15": 6,
+              "calls": 9
+            },
+            "clarification": {
+              "total": 5,
+              "strict": 4,
+              "p50": 9260,
+              "p95": 39613,
+              "max": 39613,
+              "under15": 3,
+              "calls": 5
+            },
+            "refusal": {
+              "total": 5,
+              "strict": 5,
+              "p50": 6811,
+              "p95": 7498,
+              "max": 7498,
+              "under15": 5,
+              "calls": 5
+            }
+          },
+          "failed": [
+            {
+              "id": "sh01",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 3
+            },
+            {
+              "id": "sh07",
+              "run": 1,
+              "kind": "plan",
+              "failures": [
+                "kind: expected clarification, got plan"
+              ],
+              "calls": 3
+            },
+            {
+              "id": "ca01",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal",
+                "args: calendar.list_events timeMax"
+              ],
+              "calls": 3
+            },
+            {
+              "id": "ca04",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 1
+            },
+            {
+              "id": "no01",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 3
+            },
+            {
+              "id": "tg01",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 3
+            },
+            {
+              "id": "ji01",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 3
+            }
+          ],
+          "usage": null,
+          "byService": {
+            "sheets": {
+              "cases": 10,
+              "attempts": 10,
+              "scoredAttempts": 8,
+              "argumentAttempts": 8,
+              "runs": [
+                {
+                  "kindAccuracy": 0.8,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.8
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.8,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 0.8
+              },
+              "latencyMs": {
+                "p50": 12212,
+                "p95": 69262
+              }
+            },
+            "jira": {
+              "cases": 12,
+              "attempts": 12,
+              "scoredAttempts": 10,
+              "argumentAttempts": 10,
+              "runs": [
+                {
+                  "kindAccuracy": 0.9166666666666666,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9166666666666666
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.9166666666666666,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 0.9166666666666666
+              },
+              "latencyMs": {
+                "p50": 12212,
+                "p95": 44594
+              }
+            },
+            "calendar": {
+              "cases": 10,
+              "attempts": 10,
+              "scoredAttempts": 8,
+              "argumentAttempts": 8,
+              "runs": [
+                {
+                  "kindAccuracy": 0.8,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 0.875,
+                  "argumentMatcherRate": 0.96875,
+                  "strictPassRate": 0.8
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.8,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 0.875,
+                "argumentMatcherRate": 0.96875,
+                "strictPassRate": 0.8
+              },
+              "latencyMs": {
+                "p50": 10153,
+                "p95": 44465
+              }
+            },
+            "slack": {
+              "cases": 2,
+              "attempts": 2,
+              "scoredAttempts": 2,
+              "argumentAttempts": 2,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 14559,
+                "p95": 18170
+              }
+            },
+            "notion": {
+              "cases": 11,
+              "attempts": 11,
+              "scoredAttempts": 9,
+              "argumentAttempts": 9,
+              "runs": [
+                {
+                  "kindAccuracy": 0.9090909090909091,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9090909090909091
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.9090909090909091,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 0.9090909090909091
+              },
+              "latencyMs": {
+                "p50": 9939,
+                "p95": 33433
+              }
+            },
+            "telegram": {
+              "cases": 12,
+              "attempts": 12,
+              "scoredAttempts": 10,
+              "argumentAttempts": 10,
+              "runs": [
+                {
+                  "kindAccuracy": 0.9166666666666666,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9166666666666666
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.9166666666666666,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 0.9166666666666666
+              },
+              "latencyMs": {
+                "p50": 7600,
+                "p95": 37973
+              }
+            },
+            "github": {
+              "cases": 2,
+              "attempts": 2,
+              "scoredAttempts": 2,
+              "argumentAttempts": 2,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 6059,
+                "p95": 12391
+              }
+            },
+            "trello": {
+              "cases": 3,
+              "attempts": 3,
+              "scoredAttempts": 3,
+              "argumentAttempts": 3,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 15514,
+                "p95": 18170
+              }
+            }
+          }
+        }
+      }
+    },
+    "after": {
+      "core": {
+        "path": "after/core-llm-2026-10-08T16-44-42-359Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+          "labels": {
+            "file": "cases.json",
+            "commit": "1ab7f08d88546419048e0466f3214bb018c26592",
+            "sha256": "7edeac39d6531cdc8bcc4340b1e64f02684eff61ea3bd1f39ab2f5b5ad00aa5a",
+            "version": 2,
+            "cases": 50,
+            "selectedCases": 50
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 150,
+            "strict": 150,
+            "p50": 7229,
+            "p95": 18021,
+            "max": 25085,
+            "under15": 136,
+            "calls": 168
+          },
+          "byCategory": {
+            "single_step": {
+              "total": 30,
+              "strict": 30,
+              "p50": 5002,
+              "p95": 9589,
+              "max": 10172,
+              "under15": 30,
+              "calls": 30
+            },
+            "multi_step": {
+              "total": 30,
+              "strict": 30,
+              "p50": 6591,
+              "p95": 19152,
+              "max": 21963,
+              "under15": 27,
+              "calls": 30
+            },
+            "cross_service": {
+              "total": 45,
+              "strict": 45,
+              "p50": 8922,
+              "p95": 16129,
+              "max": 16839,
+              "under15": 42,
+              "calls": 48
+            },
+            "clarification": {
+              "total": 27,
+              "strict": 27,
+              "p50": 10206,
+              "p95": 21311,
+              "max": 25085,
+              "under15": 19,
+              "calls": 42
+            },
+            "refusal": {
+              "total": 18,
+              "strict": 18,
+              "p50": 5915,
+              "p95": 9370,
+              "max": 9370,
+              "under15": 18,
+              "calls": 18
+            }
+          },
+          "failed": [],
+          "timing": {
+            "calls": 168,
+            "attempts": 168,
+            "timeouts": 0,
+            "searchRounds": 18,
+            "directoryCalls": 867,
+            "attemptDistribution": {
+              "1": 168
+            },
+            "retryReasons": {},
+            "timeMs": {
+              "total": 1245865,
+              "model": 1245427.4779999997,
+              "prefetch": 76.02409999998804,
+              "search": 2.8321999999316176,
+              "gather": 0,
+              "other": 358.6657000004268
+            },
+            "timeShare": {
+              "model": 0.9996488206988716,
+              "prefetch": 0.00006102113792424383,
+              "search": 0.000002273280010219099,
+              "gather": 0,
+              "other": 0.00028788488319394704
+            },
+            "under15Seconds": {
+              "count": 136,
+              "total": 150,
+              "rate": 0.9066666666666666
+            }
+          },
+          "usage": {
+            "promptTokens": {
+              "reportedTotal": 1053453,
+              "reportedCalls": 168,
+              "totalCalls": 168
+            },
+            "completionTokens": {
+              "reportedTotal": 20021,
+              "reportedCalls": 168,
+              "totalCalls": 168
+            },
+            "reasoningTokens": {
+              "reportedTotal": 78584,
+              "reportedCalls": 168,
+              "totalCalls": 168
+            }
+          },
+          "byService": {}
+        }
+      },
+      "freeform": {
+        "path": "after/freeform-llm-2026-10-08T16-55-19-162Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+          "labels": {
+            "file": "cases-freeform.json",
+            "commit": "695ad8758d9d658bd3606d15d679845dce30f7e4",
+            "sha256": "79812f905a3d51752d7f245f3f258b6f2f2673b42a9ecadf2404d706293f0f80",
+            "version": 2,
+            "cases": 18,
+            "selectedCases": 18
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 54,
+            "strict": 52,
+            "p50": 10108,
+            "p95": 24738,
+            "max": 41728,
+            "under15": 42,
+            "calls": 63
+          },
+          "byCategory": {
+            "free_form": {
+              "total": 36,
+              "strict": 36,
+              "p50": 10412,
+              "p95": 19429,
+              "max": 21665,
+              "under15": 29,
+              "calls": 45
+            },
+            "free_form_heldout": {
+              "total": 18,
+              "strict": 16,
+              "p50": 9235,
+              "p95": 41728,
+              "max": 41728,
+              "under15": 13,
+              "calls": 18
+            }
+          },
+          "failed": [
+            {
+              "id": "ff15",
+              "run": 1,
+              "kind": "clarification",
+              "failures": [
+                "kind: expected plan, got clarification"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            },
+            {
+              "id": "ff15",
+              "run": 3,
+              "kind": "clarification",
+              "failures": [
+                "kind: expected plan, got clarification"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            }
+          ],
+          "timing": {
+            "calls": 63,
+            "attempts": 64,
+            "timeouts": 1,
+            "searchRounds": 9,
+            "directoryCalls": 336,
+            "attemptDistribution": {
+              "1": 62,
+              "2": 1
+            },
+            "retryReasons": {
+              "timeout": 1
+            },
+            "timeMs": {
+              "total": 662071,
+              "model": 661723.4382000001,
+              "prefetch": 59.148299999896835,
+              "search": 1.6360000000349828,
+              "gather": 0,
+              "other": 286.7774999999767
+            },
+            "timeShare": {
+              "model": 0.9994750384777464,
+              "prefetch": 0.00008933830359568209,
+              "search": 0.000002471034073437717,
+              "gather": 0,
+              "other": 0.00043315218458439764
+            },
+            "under15Seconds": {
+              "count": 42,
+              "total": 54,
+              "rate": 0.7777777777777778
+            }
+          },
+          "usage": {
+            "promptTokens": {
+              "reportedTotal": 408631,
+              "reportedCalls": 63,
+              "totalCalls": 63
+            },
+            "completionTokens": {
+              "reportedTotal": 6428,
+              "reportedCalls": 63,
+              "totalCalls": 63
+            },
+            "reasoningTokens": {
+              "reportedTotal": 32739,
+              "reportedCalls": 63,
+              "totalCalls": 63
+            }
+          },
+          "byService": {}
+        }
+      },
+      "services": {
+        "path": "after/services-llm-2026-10-08T17-00-53-683Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "58d4fcdec284767c35f69e5d5c581046fb12f9ae",
+          "labels": {
+            "file": "cases-services.json",
+            "commit": "795229e24c64a38902e7efdce0680c729f37348a",
+            "sha256": "6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372",
+            "version": 1,
+            "cases": 44,
+            "selectedCases": 44
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 132,
+            "strict": 129,
+            "p50": 8242,
+            "p95": 20138,
+            "max": 45991,
+            "under15": 117,
+            "calls": 135
+          },
+          "byCategory": {
+            "read_only": {
+              "total": 18,
+              "strict": 18,
+              "p50": 8708,
+              "p95": 26458,
+              "max": 26458,
+              "under15": 17,
+              "calls": 18
+            },
+            "single_step": {
+              "total": 57,
+              "strict": 57,
+              "p50": 7134,
+              "p95": 13341,
+              "max": 15248,
+              "under15": 56,
+              "calls": 60
+            },
+            "cross_service": {
+              "total": 27,
+              "strict": 27,
+              "p50": 11965,
+              "p95": 19579,
+              "max": 45991,
+              "under15": 20,
+              "calls": 27
+            },
+            "clarification": {
+              "total": 15,
+              "strict": 12,
+              "p50": 10036,
+              "p95": 45826,
+              "max": 45826,
+              "under15": 9,
+              "calls": 15
+            },
+            "refusal": {
+              "total": 15,
+              "strict": 15,
+              "p50": 6099,
+              "p95": 9918,
+              "max": 9918,
+              "under15": 15,
+              "calls": 15
+            }
+          },
+          "failed": [
+            {
+              "id": "ca04",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            },
+            {
+              "id": "ca04",
+              "run": 2,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            },
+            {
+              "id": "ca04",
+              "run": 3,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            }
+          ],
+          "timing": {
+            "calls": 135,
+            "attempts": 137,
+            "timeouts": 2,
+            "searchRounds": 3,
+            "directoryCalls": 420,
+            "attemptDistribution": {
+              "1": 133,
+              "2": 2
+            },
+            "retryReasons": {
+              "timeout": 2
+            },
+            "timeMs": {
+              "total": 1318770,
+              "model": 1318272.6808999993,
+              "prefetch": 130.0762000000434,
+              "search": 0.9595999999437481,
+              "gather": 0,
+              "other": 366.2833000006756
+            },
+            "timeShare": {
+              "model": 0.9996228917096986,
+              "prefetch": 0.00009863448516423895,
+              "search": 7.276477323140108e-7,
+              "gather": 0,
+              "other": 0.00027774615740476017
+            },
+            "under15Seconds": {
+              "count": 117,
+              "total": 132,
+              "rate": 0.8863636363636364
+            }
+          },
+          "usage": {
+            "promptTokens": {
+              "reportedTotal": 794825,
+              "reportedCalls": 135,
+              "totalCalls": 135
+            },
+            "completionTokens": {
+              "reportedTotal": 16610,
+              "reportedCalls": 135,
+              "totalCalls": 135
+            },
+            "reasoningTokens": {
+              "reportedTotal": 79278,
+              "reportedCalls": 135,
+              "totalCalls": 135
+            }
+          },
+          "byService": {
+            "sheets": {
+              "cases": 10,
+              "attempts": 30,
+              "scoredAttempts": 18,
+              "argumentAttempts": 18,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 10569,
+                "p95": 20322
+              }
+            },
+            "jira": {
+              "cases": 12,
+              "attempts": 36,
+              "scoredAttempts": 27,
+              "argumentAttempts": 27,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 10036,
+                "p95": 18308
+              }
+            },
+            "calendar": {
+              "cases": 10,
+              "attempts": 30,
+              "scoredAttempts": 21,
+              "argumentAttempts": 21,
+              "runs": [
+                {
+                  "kindAccuracy": 0.9,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9
+                },
+                {
+                  "kindAccuracy": 0.9,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9
+                },
+                {
+                  "kindAccuracy": 0.9,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 0.9
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0.9,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 0.9
+              },
+              "latencyMs": {
+                "p50": 9460,
+                "p95": 22627
+              }
+            },
+            "slack": {
+              "cases": 2,
+              "attempts": 6,
+              "scoredAttempts": 6,
+              "argumentAttempts": 6,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 11129,
+                "p95": 19579
+              }
+            },
+            "notion": {
+              "cases": 11,
+              "attempts": 33,
+              "scoredAttempts": 24,
+              "argumentAttempts": 24,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 9523,
+                "p95": 20138
+              }
+            },
+            "telegram": {
+              "cases": 12,
+              "attempts": 36,
+              "scoredAttempts": 27,
+              "argumentAttempts": 27,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 7085,
+                "p95": 18308
+              }
+            },
+            "github": {
+              "cases": 2,
+              "attempts": 6,
+              "scoredAttempts": 6,
+              "argumentAttempts": 6,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 11448,
+                "p95": 13694
+              }
+            },
+            "trello": {
+              "cases": 3,
+              "attempts": 9,
+              "scoredAttempts": 9,
+              "argumentAttempts": 9,
+              "runs": [
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                },
+                {
+                  "kindAccuracy": 1,
+                  "toolSelectionAccuracy": 1,
+                  "argumentQuality": 1,
+                  "argumentMatcherRate": 1,
+                  "strictPassRate": 1
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 1,
+                "toolSelectionAccuracy": 1,
+                "argumentQuality": 1,
+                "argumentMatcherRate": 1,
+                "strictPassRate": 1
+              },
+              "latencyMs": {
+                "p50": 14952,
+                "p95": 45991
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "services": {
+        "path": "diagnostic/services-llm-subset-2026-10-08T16-40-05-029Z",
+        "summary": {
+          "complete": true,
+          "sourceCommit": "5afc0a7f7a0168abb3776400394ea6edcedd2b3a",
+          "labels": {
+            "file": "cases-services.json",
+            "commit": "795229e24c64a38902e7efdce0680c729f37348a",
+            "sha256": "6281f0869a6ca781a1ceb4650578a3cc095397ef28a87339029f0819b0fe9372",
+            "version": 1,
+            "cases": 44,
+            "selectedCases": 1
+          },
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "overall": {
+            "total": 1,
+            "strict": 0,
+            "p50": 16500,
+            "p95": 16500,
+            "max": 16500,
+            "under15": 0,
+            "calls": 1
+          },
+          "byCategory": {
+            "clarification": {
+              "total": 1,
+              "strict": 0,
+              "p50": 16500,
+              "p95": 16500,
+              "max": 16500,
+              "under15": 0,
+              "calls": 1
+            }
+          },
+          "failed": [
+            {
+              "id": "ca04",
+              "run": 1,
+              "kind": "refusal",
+              "failures": [
+                "kind: expected clarification, got refusal"
+              ],
+              "calls": 1,
+              "searchRounds": 0
+            }
+          ],
+          "timing": {
+            "calls": 1,
+            "attempts": 1,
+            "timeouts": 0,
+            "searchRounds": 0,
+            "directoryCalls": 1,
+            "attemptDistribution": {
+              "1": 1
+            },
+            "retryReasons": {},
+            "timeMs": {
+              "total": 16500,
+              "model": 16462.751399999997,
+              "prefetch": 1.6573999999999387,
+              "search": 0,
+              "gather": 0,
+              "other": 35.59120000000269
+            },
+            "timeShare": {
+              "model": 0.9977425090909089,
+              "prefetch": 0.00010044848484848113,
+              "search": 0,
+              "gather": 0,
+              "other": 0.002157042424242587
+            },
+            "under15Seconds": {
+              "count": 0,
+              "total": 1,
+              "rate": 0
+            }
+          },
+          "usage": {
+            "promptTokens": {
+              "reportedTotal": 6195,
+              "reportedCalls": 1,
+              "totalCalls": 1
+            },
+            "completionTokens": {
+              "reportedTotal": 52,
+              "reportedCalls": 1,
+              "totalCalls": 1
+            },
+            "reasoningTokens": {
+              "reportedTotal": 1654,
+              "reportedCalls": 1,
+              "totalCalls": 1
+            }
+          },
+          "byService": {
+            "calendar": {
+              "cases": 1,
+              "attempts": 1,
+              "scoredAttempts": 0,
+              "argumentAttempts": 0,
+              "runs": [
+                {
+                  "kindAccuracy": 0,
+                  "toolSelectionAccuracy": null,
+                  "argumentQuality": null,
+                  "argumentMatcherRate": null,
+                  "strictPassRate": 0
+                }
+              ],
+              "mean": {
+                "kindAccuracy": 0,
+                "toolSelectionAccuracy": null,
+                "argumentQuality": null,
+                "argumentMatcherRate": null,
+                "strictPassRate": 0
+              },
+              "latencyMs": {
+                "p50": 16500,
+                "p95": 16500
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "audit": [
+    {
+      "path": "control/core-llm-2026-10-08T16-32-35-221Z/report.json",
+      "caseRuns": 50,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "f71d69592cc65e457fa28af0283ab0f0002e15fa1c32a7b6f47dbd407916fed3",
+      "publicSha256": "f71d69592cc65e457fa28af0283ab0f0002e15fa1c32a7b6f47dbd407916fed3"
+    },
+    {
+      "path": "control/interrupted-services-llm-2026-10-08T16-36-07-860Z/report.json",
+      "caseRuns": 17,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "9776b5f50a2485d0759df1353830b5dcdb7ef7b662d32393dbd4db07595035a7",
+      "publicSha256": "9776b5f50a2485d0759df1353830b5dcdb7ef7b662d32393dbd4db07595035a7"
+    },
+    {
+      "path": "control/services-llm-2026-10-08T17-13-22-397Z/report.json",
+      "caseRuns": 44,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "1c3b7b9578da8ff2be12c506172401e40187bb395f79853879e279e4069564c1",
+      "publicSha256": "a60faaa8e686b0e7acd77a97e809a9ea5beb267d1ccbd4e276323d425cfd9b2d"
+    },
+    {
+      "path": "after/core-llm-2026-10-08T16-44-42-359Z/report.json",
+      "caseRuns": 150,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "86dd64cab2d3468a422d291ee77c0dcc4bba16253defad4c7dde10ea160bf6c8",
+      "publicSha256": "86dd64cab2d3468a422d291ee77c0dcc4bba16253defad4c7dde10ea160bf6c8"
+    },
+    {
+      "path": "after/freeform-llm-2026-10-08T16-55-19-162Z/report.json",
+      "caseRuns": 54,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "5967f26ad9d461a837f5a18f2bd09d061c0e792e1cec9d10096ef95330cc8a15",
+      "publicSha256": "5967f26ad9d461a837f5a18f2bd09d061c0e792e1cec9d10096ef95330cc8a15"
+    },
+    {
+      "path": "after/services-llm-2026-10-08T17-00-53-683Z/report.json",
+      "caseRuns": 132,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "4caf3407cb5e204ea2073935f30465870e99b450a0089366f60e1eb479ea2337",
+      "publicSha256": "4caf3407cb5e204ea2073935f30465870e99b450a0089366f60e1eb479ea2337"
+    },
+    {
+      "path": "diagnostic/services-llm-subset-2026-10-08T16-40-05-029Z/report.json",
+      "caseRuns": 1,
+      "scoredIdentityPreserved": true,
+      "rawSha256": "e23c0a6c9ffad64e91bdf7462d1ca279035dd20a017741a091b503c02f34ff41",
+      "publicSha256": "e23c0a6c9ffad64e91bdf7462d1ca279035dd20a017741a091b503c02f34ff41"
+    }
+  ],
+  "history": {
+    "core": {
+      "complete": true,
+      "sourceCommit": "7ba60efa8a7bc90dc42a309076e846d5af5a1cad",
+      "labels": {
+        "file": "cases.json",
+        "commit": "1ab7f08d88546419048e0466f3214bb018c26592",
+        "sha256": "7edeac39d6531cdc8bcc4340b1e64f02684eff61ea3bd1f39ab2f5b5ad00aa5a",
+        "version": 2,
+        "cases": 50,
+        "selectedCases": 50
+      },
+      "servedModels": [
+        "gemini-3.8-flash"
+      ],
+      "overall": {
+        "total": 150,
+        "strict": 150,
+        "p50": 5454,
+        "p95": 13105,
+        "max": 19163,
+        "under15": 144,
+        "calls": 171
+      },
+      "byCategory": {
+        "single_step": {
+          "total": 30,
+          "strict": 30,
+          "p50": 4387,
+          "p95": 9084,
+          "max": 10832,
+          "under15": 30,
+          "calls": 30
+        },
+        "multi_step": {
+          "total": 30,
+          "strict": 30,
+          "p50": 4863,
+          "p95": 7890,
+          "max": 10131,
+          "under15": 30,
+          "calls": 30
+        },
+        "cross_service": {
+          "total": 45,
+          "strict": 45,
+          "p50": 6660,
+          "p95": 12359,
+          "max": 12627,
+          "under15": 45,
+          "calls": 48
+        },
+        "clarification": {
+          "total": 27,
+          "strict": 27,
+          "p50": 7958,
+          "p95": 19011,
+          "max": 19163,
+          "under15": 21,
+          "calls": 45
+        },
+        "refusal": {
+          "total": 18,
+          "strict": 18,
+          "p50": 4720,
+          "p95": 8300,
+          "max": 8300,
+          "under15": 18,
+          "calls": 18
+        }
+      },
+      "failed": [],
+      "usage": null,
+      "byService": {}
+    },
+    "freeform": {
+      "complete": true,
+      "sourceCommit": "7ba60efa8a7bc90dc42a309076e846d5af5a1cad",
+      "labels": {
+        "file": "cases-freeform.json",
+        "commit": "695ad8758d9d658bd3606d15d679845dce30f7e4",
+        "sha256": "79812f905a3d51752d7f245f3f258b6f2f2673b42a9ecadf2404d706293f0f80",
+        "version": 2,
+        "cases": 18,
+        "selectedCases": 18
+      },
+      "servedModels": [
+        "gemini-3.8-flash"
+      ],
+      "overall": {
+        "total": 54,
+        "strict": 51,
+        "p50": 5942,
+        "p95": 13092,
+        "max": 18425,
+        "under15": 52,
+        "calls": 63
+      },
+      "byCategory": {
+        "free_form": {
+          "total": 36,
+          "strict": 36,
+          "p50": 6041,
+          "p95": 15103,
+          "max": 18425,
+          "under15": 34,
+          "calls": 45
+        },
+        "free_form_heldout": {
+          "total": 18,
+          "strict": 15,
+          "p50": 5294,
+          "p95": 12840,
+          "max": 12840,
+          "under15": 18,
+          "calls": 18
+        }
+      },
+      "failed": [
+        {
+          "id": "ff15",
+          "run": 1,
+          "kind": "clarification",
+          "failures": [
+            "kind: expected plan, got clarification"
+          ],
+          "calls": 1
+        },
+        {
+          "id": "ff15",
+          "run": 2,
+          "kind": "clarification",
+          "failures": [
+            "kind: expected plan, got clarification"
+          ],
+          "calls": 1
+        },
+        {
+          "id": "ff15",
+          "run": 3,
+          "kind": "clarification",
+          "failures": [
+            "kind: expected plan, got clarification"
+          ],
+          "calls": 1
+        }
+      ],
+      "usage": null,
+      "byService": {}
+    },
+    "services": {
+      "complete": true,
+      "sourceCommit": "7ba60efa8a7bc90dc42a309076e846d5af5a1cad",
+      "labels": {
+        "file": "cases-services.json",
+        "commit": "20fa6f03c8696d769303f759602d1c0748cb9b26",
+        "sha256": "369efaea2023344540f731dae7730d33aa4ad9a542b3d222d2aca6d463bf896f",
+        "version": 1,
+        "cases": 44,
+        "selectedCases": 44
+      },
+      "servedModels": [
+        "gemini-3.8-flash"
+      ],
+      "overall": {
+        "total": 132,
+        "strict": 111,
+        "p50": 6105,
+        "p95": 31097,
+        "max": 53021,
+        "under15": 107,
+        "calls": 172
+      },
+      "byCategory": {
+        "read_only": {
+          "total": 18,
+          "strict": 0,
+          "p50": 25354,
+          "p95": 53021,
+          "max": 53021,
+          "under15": 0,
+          "calls": 54
+        },
+        "single_step": {
+          "total": 57,
+          "strict": 57,
+          "p50": 4608,
+          "p95": 20188,
+          "max": 44709,
+          "under15": 53,
+          "calls": 60
+        },
+        "cross_service": {
+          "total": 27,
+          "strict": 27,
+          "p50": 7653,
+          "p95": 10921,
+          "max": 11714,
+          "under15": 27,
+          "calls": 27
+        },
+        "clarification": {
+          "total": 15,
+          "strict": 12,
+          "p50": 7150,
+          "p95": 41108,
+          "max": 41108,
+          "under15": 13,
+          "calls": 16
+        },
+        "refusal": {
+          "total": 15,
+          "strict": 15,
+          "p50": 4621,
+          "p95": 18139,
+          "max": 18139,
+          "under15": 14,
+          "calls": 15
+        }
+      },
+      "failed": [
+        {
+          "id": "sh01",
+          "run": 1,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "sh07",
+          "run": 1,
+          "kind": "plan",
+          "failures": [
+            "kind: expected clarification, got plan"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca01",
+          "run": 1,
+          "kind": "plan",
+          "failures": [
+            "kind: expected clarification, got plan",
+            "args: calendar.list_events timeMax"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca04",
+          "run": 1,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 2
+        },
+        {
+          "id": "no01",
+          "run": 1,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "tg01",
+          "run": 1,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ji01",
+          "run": 1,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "sh01",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "sh07",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca01",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal",
+            "args: calendar.list_events timeMax"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca04",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 1
+        },
+        {
+          "id": "no01",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "tg01",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ji01",
+          "run": 2,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "sh01",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "sh07",
+          "run": 3,
+          "kind": "plan",
+          "failures": [
+            "kind: expected clarification, got plan"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca01",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal",
+            "args: calendar.list_events timeMax"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ca04",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 1
+        },
+        {
+          "id": "no01",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "tg01",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        },
+        {
+          "id": "ji01",
+          "run": 3,
+          "kind": "refusal",
+          "failures": [
+            "kind: expected clarification, got refusal"
+          ],
+          "calls": 3
+        }
+      ],
+      "usage": null,
+      "byService": {
+        "sheets": {
+          "cases": 10,
+          "attempts": 30,
+          "scoredAttempts": 24,
+          "argumentAttempts": 24,
+          "runs": [
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.8
+            },
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.8
+            },
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.8
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 0.8000000000000002,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.8000000000000002
+          },
+          "latencyMs": {
+            "p50": 7037,
+            "p95": 29239
+          }
+        },
+        "jira": {
+          "cases": 12,
+          "attempts": 36,
+          "scoredAttempts": 30,
+          "argumentAttempts": 30,
+          "runs": [
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            },
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            },
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 0.9166666666666666,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9166666666666666
+          },
+          "latencyMs": {
+            "p50": 7325,
+            "p95": 24818
+          }
+        },
+        "calendar": {
+          "cases": 10,
+          "attempts": 30,
+          "scoredAttempts": 24,
+          "argumentAttempts": 24,
+          "runs": [
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 0.875,
+              "argumentMatcherRate": 0.96875,
+              "strictPassRate": 0.8
+            },
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 0.875,
+              "argumentMatcherRate": 0.96875,
+              "strictPassRate": 0.8
+            },
+            {
+              "kindAccuracy": 0.8,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 0.875,
+              "argumentMatcherRate": 0.96875,
+              "strictPassRate": 0.8
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 0.8000000000000002,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 0.875,
+            "argumentMatcherRate": 0.96875,
+            "strictPassRate": 0.8000000000000002
+          },
+          "latencyMs": {
+            "p50": 7653,
+            "p95": 32040
+          }
+        },
+        "slack": {
+          "cases": 2,
+          "attempts": 6,
+          "scoredAttempts": 6,
+          "argumentAttempts": 6,
+          "runs": [
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          "latencyMs": {
+            "p50": 6893,
+            "p95": 10921
+          }
+        },
+        "notion": {
+          "cases": 11,
+          "attempts": 33,
+          "scoredAttempts": 27,
+          "argumentAttempts": 27,
+          "runs": [
+            {
+              "kindAccuracy": 0.9090909090909091,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9090909090909091
+            },
+            {
+              "kindAccuracy": 0.9090909090909091,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9090909090909091
+            },
+            {
+              "kindAccuracy": 0.9090909090909091,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9090909090909091
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 0.9090909090909091,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9090909090909091
+          },
+          "latencyMs": {
+            "p50": 7515,
+            "p95": 25306
+          }
+        },
+        "telegram": {
+          "cases": 12,
+          "attempts": 36,
+          "scoredAttempts": 30,
+          "argumentAttempts": 30,
+          "runs": [
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            },
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            },
+            {
+              "kindAccuracy": 0.9166666666666666,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 0.9166666666666666
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 0.9166666666666666,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9166666666666666
+          },
+          "latencyMs": {
+            "p50": 5185,
+            "p95": 33187
+          }
+        },
+        "github": {
+          "cases": 2,
+          "attempts": 6,
+          "scoredAttempts": 6,
+          "argumentAttempts": 6,
+          "runs": [
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          "latencyMs": {
+            "p50": 7515,
+            "p95": 11714
+          }
+        },
+        "trello": {
+          "cases": 3,
+          "attempts": 9,
+          "scoredAttempts": 9,
+          "argumentAttempts": 9,
+          "runs": [
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            },
+            {
+              "kindAccuracy": 1,
+              "toolSelectionAccuracy": 1,
+              "argumentQuality": 1,
+              "argumentMatcherRate": 1,
+              "strictPassRate": 1
+            }
+          ],
+          "mean": {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          "latencyMs": {
+            "p50": 7946,
+            "p95": 10921
+          }
+        }
+      }
+    }
+  },
+  "callComparison": {
+    "core": {
+      "less": 3,
+      "equal": 147,
+      "more": 0,
+      "missing": 0,
+      "changed": [
+        {
+          "id": "rf06",
+          "run": 1,
+          "before": 3,
+          "after": 2,
+          "delta": -1,
+          "searchRounds": 1,
+          "kind": "clarification"
+        },
+        {
+          "id": "cl03",
+          "run": 3,
+          "before": 3,
+          "after": 2,
+          "delta": -1,
+          "searchRounds": 1,
+          "kind": "clarification"
+        },
+        {
+          "id": "rf06",
+          "run": 3,
+          "before": 3,
+          "after": 2,
+          "delta": -1,
+          "searchRounds": 1,
+          "kind": "clarification"
+        }
+      ]
+    },
+    "services": {
+      "less": 18,
+      "equal": 114,
+      "more": 0,
+      "missing": 0,
+      "changed": [
+        {
+          "id": "sh01",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "sh07",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ca01",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "no01",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "tg01",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ji01",
+          "run": 1,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "sh01",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "sh07",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ca01",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "no01",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "tg01",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ji01",
+          "run": 2,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "sh01",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "sh07",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ca01",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "no01",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "tg01",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        },
+        {
+          "id": "ji01",
+          "run": 3,
+          "before": 3,
+          "after": 1,
+          "delta": -2,
+          "searchRounds": 0,
+          "kind": "clarification"
+        }
+      ]
+    }
+  },
+  "tail": {
+    "core": [
+      {
+        "id": "rf06",
+        "run": 3,
+        "latencyMs": 25085,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 25084.04070000013,
+        "attempts": [
+          [
+            {
+              "durationMs": 10768.900999999954,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 14315.01919999998,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 4900,
+            "completionTokens": 36,
+            "reasoningTokens": 363
+          },
+          {
+            "promptTokens": 5301,
+            "completionTokens": 68,
+            "reasoningTokens": 616
+          }
+        ]
+      },
+      {
+        "id": "ms10",
+        "run": 3,
+        "latencyMs": 21963,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 21962.186800000025,
+        "attempts": [
+          [
+            {
+              "durationMs": 21962.114899999986,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 5017,
+            "completionTokens": 149,
+            "reasoningTokens": 487
+          }
+        ]
+      },
+      {
+        "id": "cl03",
+        "run": 2,
+        "latencyMs": 21311,
+        "llmCalls": 3,
+        "searchRounds": 2,
+        "modelMs": 21309.20180000004,
+        "attempts": [
+          [
+            {
+              "durationMs": 12330.792599999986,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 3978.0849999999627,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 5000.039299999946,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6668,
+            "completionTokens": 51,
+            "reasoningTokens": 888
+          },
+          {
+            "promptTokens": 6061,
+            "completionTokens": 42,
+            "reasoningTokens": 97
+          },
+          {
+            "promptTokens": 6292,
+            "completionTokens": 61,
+            "reasoningTokens": 171
+          }
+        ]
+      },
+      {
+        "id": "cl04",
+        "run": 3,
+        "latencyMs": 20032,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 20030.631799999974,
+        "attempts": [
+          [
+            {
+              "durationMs": 4231.566699999967,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 15798.881499999901,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 5915,
+            "completionTokens": 34,
+            "reasoningTokens": 143
+          },
+          {
+            "promptTokens": 6609,
+            "completionTokens": 44,
+            "reasoningTokens": 691
+          }
+        ]
+      },
+      {
+        "id": "cl02",
+        "run": 3,
+        "latencyMs": 19160,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 19158.371599999955,
+        "attempts": [
+          [
+            {
+              "durationMs": 5788.1554999999935,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 13370.042800000054,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6054,
+            "completionTokens": 40,
+            "reasoningTokens": 281
+          },
+          {
+            "promptTokens": 6750,
+            "completionTokens": 79,
+            "reasoningTokens": 818
+          }
+        ]
+      },
+      {
+        "id": "ms06",
+        "run": 3,
+        "latencyMs": 19152,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 19150.594099999988,
+        "attempts": [
+          [
+            {
+              "durationMs": 19150.50760000001,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 4828,
+            "completionTokens": 141,
+            "reasoningTokens": 313
+          }
+        ]
+      },
+      {
+        "id": "rf06",
+        "run": 2,
+        "latencyMs": 19087,
+        "llmCalls": 3,
+        "searchRounds": 2,
+        "modelMs": 19086.257300000056,
+        "attempts": [
+          [
+            {
+              "durationMs": 8729.269099999976,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 5249.51059999998,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 5107.241500000004,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 5173,
+            "completionTokens": 35,
+            "reasoningTokens": 636
+          },
+          {
+            "promptTokens": 4904,
+            "completionTokens": 39,
+            "reasoningTokens": 220
+          },
+          {
+            "promptTokens": 5233,
+            "completionTokens": 38,
+            "reasoningTokens": 313
+          }
+        ]
+      },
+      {
+        "id": "cl03",
+        "run": 1,
+        "latencyMs": 18021,
+        "llmCalls": 3,
+        "searchRounds": 2,
+        "modelMs": 18018.972499999945,
+        "attempts": [
+          [
+            {
+              "durationMs": 10219.329700000002,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 4268.217000000004,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 3531.1282000000065,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6552,
+            "completionTokens": 52,
+            "reasoningTokens": 772
+          },
+          {
+            "promptTokens": 6201,
+            "completionTokens": 38,
+            "reasoningTokens": 236
+          },
+          {
+            "promptTokens": 6293,
+            "completionTokens": 60,
+            "reasoningTokens": 177
+          }
+        ]
+      },
+      {
+        "id": "cl01",
+        "run": 1,
+        "latencyMs": 17289,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 17288.041700000016,
+        "attempts": [
+          [
+            {
+              "durationMs": 17287.934400000013,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 8249,
+            "completionTokens": 84,
+            "reasoningTokens": 1785
+          }
+        ]
+      },
+      {
+        "id": "cs11",
+        "run": 3,
+        "latencyMs": 16839,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 16837.507099999988,
+        "attempts": [
+          [
+            {
+              "durationMs": 7828.1488000000245,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 9009.070799999987,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7949,
+            "completionTokens": 52,
+            "reasoningTokens": 504
+          },
+          {
+            "promptTokens": 8301,
+            "completionTokens": 209,
+            "reasoningTokens": 587
+          }
+        ]
+      },
+      {
+        "id": "cs03",
+        "run": 3,
+        "latencyMs": 16763,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 16761.340099999972,
+        "attempts": [
+          [
+            {
+              "durationMs": 16761.161000000022,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 8887,
+            "completionTokens": 238,
+            "reasoningTokens": 1438
+          }
+        ]
+      },
+      {
+        "id": "cs11",
+        "run": 1,
+        "latencyMs": 16129,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 16125.885600000009,
+        "attempts": [
+          [
+            {
+              "durationMs": 6844.484300000011,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 9281.119099999996,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7967,
+            "completionTokens": 48,
+            "reasoningTokens": 522
+          },
+          {
+            "promptTokens": 8427,
+            "completionTokens": 220,
+            "reasoningTokens": 718
+          }
+        ]
+      },
+      {
+        "id": "ms04",
+        "run": 3,
+        "latencyMs": 15480,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 15479.155900000012,
+        "attempts": [
+          [
+            {
+              "durationMs": 15479.08269999997,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6398,
+            "completionTokens": 167,
+            "reasoningTokens": 536
+          }
+        ]
+      },
+      {
+        "id": "cl03",
+        "run": 3,
+        "latencyMs": 15131,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 15129.890699999989,
+        "attempts": [
+          [
+            {
+              "durationMs": 7952.957399999956,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 7176.777299999958,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6448,
+            "completionTokens": 72,
+            "reasoningTokens": 668
+          },
+          {
+            "promptTokens": 6603,
+            "completionTokens": 84,
+            "reasoningTokens": 494
+          }
+        ]
+      }
+    ],
+    "freeform": [
+      {
+        "id": "ff14",
+        "run": 2,
+        "latencyMs": 41728,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 41727.6035,
+        "attempts": [
+          [
+            {
+              "durationMs": 30014.177200000006,
+              "outcome": "timeout",
+              "retryReason": "timeout"
+            },
+            {
+              "durationMs": 11713.342300000018,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7231,
+            "completionTokens": 175,
+            "reasoningTokens": 759
+          }
+        ]
+      },
+      {
+        "id": "ff15",
+        "run": 3,
+        "latencyMs": 25510,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 25507.208800000022,
+        "attempts": [
+          [
+            {
+              "durationMs": 25506.846900000004,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 14225,
+            "completionTokens": 54,
+            "reasoningTokens": 2423
+          }
+        ]
+      },
+      {
+        "id": "ff15",
+        "run": 2,
+        "latencyMs": 24738,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 24733.090400000016,
+        "attempts": [
+          [
+            {
+              "durationMs": 24732.450199999992,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 13809,
+            "completionTokens": 76,
+            "reasoningTokens": 2007
+          }
+        ]
+      },
+      {
+        "id": "ff14",
+        "run": 3,
+        "latencyMs": 24577,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 24574.67749999999,
+        "attempts": [
+          [
+            {
+              "durationMs": 24574.488699999987,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6849,
+            "completionTokens": 168,
+            "reasoningTokens": 377
+          }
+        ]
+      },
+      {
+        "id": "ff15",
+        "run": 1,
+        "latencyMs": 22517,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 22504.2531,
+        "attempts": [
+          [
+            {
+              "durationMs": 22504.03439999999,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 13418,
+            "completionTokens": 34,
+            "reasoningTokens": 1616
+          }
+        ]
+      },
+      {
+        "id": "ff09",
+        "run": 3,
+        "latencyMs": 21665,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 21663.444499999983,
+        "attempts": [
+          [
+            {
+              "durationMs": 21663.341000000015,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7949,
+            "completionTokens": 52,
+            "reasoningTokens": 2167
+          }
+        ]
+      },
+      {
+        "id": "ff04",
+        "run": 1,
+        "latencyMs": 19429,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 19403.870299999995,
+        "attempts": [
+          [
+            {
+              "durationMs": 9754.2328,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 9649.282500000001,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6762,
+            "completionTokens": 40,
+            "reasoningTokens": 299
+          },
+          {
+            "promptTokens": 7369,
+            "completionTokens": 165,
+            "reasoningTokens": 605
+          }
+        ]
+      },
+      {
+        "id": "ff04",
+        "run": 2,
+        "latencyMs": 18633,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 18631.301399999997,
+        "attempts": [
+          [
+            {
+              "durationMs": 8811.991899999994,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 9819.14439999999,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6741,
+            "completionTokens": 41,
+            "reasoningTokens": 278
+          },
+          {
+            "promptTokens": 7227,
+            "completionTokens": 169,
+            "reasoningTokens": 462
+          }
+        ]
+      },
+      {
+        "id": "ff09",
+        "run": 2,
+        "latencyMs": 17900,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 17899.313399999985,
+        "attempts": [
+          [
+            {
+              "durationMs": 17899.21160000001,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7434,
+            "completionTokens": 56,
+            "reasoningTokens": 1652
+          }
+        ]
+      },
+      {
+        "id": "ff10",
+        "run": 3,
+        "latencyMs": 17064,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 17062.357699999993,
+        "attempts": [
+          [
+            {
+              "durationMs": 11719.541199999978,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 5342.627599999949,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 5906,
+            "completionTokens": 34,
+            "reasoningTokens": 130
+          },
+          {
+            "promptTokens": 6037,
+            "completionTokens": 58,
+            "reasoningTokens": 115
+          }
+        ]
+      },
+      {
+        "id": "ff04",
+        "run": 3,
+        "latencyMs": 15672,
+        "llmCalls": 2,
+        "searchRounds": 1,
+        "modelMs": 15670.124699999986,
+        "attempts": [
+          [
+            {
+              "durationMs": 7251.42730000001,
+              "outcome": "success"
+            }
+          ],
+          [
+            {
+              "durationMs": 8418.464600000007,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6785,
+            "completionTokens": 41,
+            "reasoningTokens": 322
+          },
+          {
+            "promptTokens": 7209,
+            "completionTokens": 160,
+            "reasoningTokens": 444
+          }
+        ]
+      },
+      {
+        "id": "ff09",
+        "run": 1,
+        "latencyMs": 15606,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 15604.544699999999,
+        "attempts": [
+          [
+            {
+              "durationMs": 15603.657899999998,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7477,
+            "completionTokens": 59,
+            "reasoningTokens": 1695
+          }
+        ]
+      }
+    ],
+    "services": [
+      {
+        "id": "wf03",
+        "run": 3,
+        "latencyMs": 45991,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 45988.45279999997,
+        "attempts": [
+          [
+            {
+              "durationMs": 30013.380800000043,
+              "outcome": "timeout",
+              "retryReason": "timeout"
+            },
+            {
+              "durationMs": 15974.898899999913,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10434,
+            "completionTokens": 324,
+            "reasoningTokens": 1207
+          }
+        ]
+      },
+      {
+        "id": "ca04",
+        "run": 2,
+        "latencyMs": 45826,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 45824.73110000003,
+        "attempts": [
+          [
+            {
+              "durationMs": 30011.615900000033,
+              "outcome": "timeout",
+              "retryReason": "timeout"
+            },
+            {
+              "durationMs": 15813.064299999969,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6011,
+            "completionTokens": 54,
+            "reasoningTokens": 1470
+          }
+        ]
+      },
+      {
+        "id": "sh07",
+        "run": 2,
+        "latencyMs": 26458,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 26457.735400000005,
+        "attempts": [
+          [
+            {
+              "durationMs": 26457.690200000012,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 7330,
+            "completionTokens": 96,
+            "reasoningTokens": 2841
+          }
+        ]
+      },
+      {
+        "id": "ca04",
+        "run": 1,
+        "latencyMs": 22627,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 22624.824799999995,
+        "attempts": [
+          [
+            {
+              "durationMs": 22624.776700000002,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6622,
+            "completionTokens": 64,
+            "reasoningTokens": 2081
+          }
+        ]
+      },
+      {
+        "id": "sh04",
+        "run": 2,
+        "latencyMs": 20322,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 20321.81230000002,
+        "attempts": [
+          [
+            {
+              "durationMs": 20321.759899999975,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6641,
+            "completionTokens": 68,
+            "reasoningTokens": 2148
+          }
+        ]
+      },
+      {
+        "id": "sh04",
+        "run": 3,
+        "latencyMs": 20291,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 20289.1691,
+        "attempts": [
+          [
+            {
+              "durationMs": 20289.01880000002,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6281,
+            "completionTokens": 49,
+            "reasoningTokens": 1788
+          }
+        ]
+      },
+      {
+        "id": "no04",
+        "run": 2,
+        "latencyMs": 20138,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 20136.97019999998,
+        "attempts": [
+          [
+            {
+              "durationMs": 20136.906100000022,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6933,
+            "completionTokens": 28,
+            "reasoningTokens": 2218
+          }
+        ]
+      },
+      {
+        "id": "wf02",
+        "run": 1,
+        "latencyMs": 19579,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 19577.588099999994,
+        "attempts": [
+          [
+            {
+              "durationMs": 19577.484799999977,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10234,
+            "completionTokens": 345,
+            "reasoningTokens": 1765
+          }
+        ]
+      },
+      {
+        "id": "ca04",
+        "run": 3,
+        "latencyMs": 19125,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 19124.497299999988,
+        "attempts": [
+          [
+            {
+              "durationMs": 19124.39240000001,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6097,
+            "completionTokens": 52,
+            "reasoningTokens": 1556
+          }
+        ]
+      },
+      {
+        "id": "wf02",
+        "run": 2,
+        "latencyMs": 18872,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 18870.344999999972,
+        "attempts": [
+          [
+            {
+              "durationMs": 18869.6348,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10319,
+            "completionTokens": 343,
+            "reasoningTokens": 1850
+          }
+        ]
+      },
+      {
+        "id": "wf03",
+        "run": 1,
+        "latencyMs": 18308,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 18306.768299999996,
+        "attempts": [
+          [
+            {
+              "durationMs": 18306.657199999987,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10853,
+            "completionTokens": 350,
+            "reasoningTokens": 1626
+          }
+        ]
+      },
+      {
+        "id": "wf04",
+        "run": 3,
+        "latencyMs": 17488,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 17486.415700000012,
+        "attempts": [
+          [
+            {
+              "durationMs": 17486.13910000003,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10390,
+            "completionTokens": 447,
+            "reasoningTokens": 1433
+          }
+        ]
+      },
+      {
+        "id": "wf04",
+        "run": 1,
+        "latencyMs": 16134,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 16131.642300000007,
+        "attempts": [
+          [
+            {
+              "durationMs": 16131.465399999986,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10344,
+            "completionTokens": 489,
+            "reasoningTokens": 1387
+          }
+        ]
+      },
+      {
+        "id": "ji06",
+        "run": 3,
+        "latencyMs": 15248,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 15246.949699999997,
+        "attempts": [
+          [
+            {
+              "durationMs": 15246.80150000006,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 6509,
+            "completionTokens": 88,
+            "reasoningTokens": 1146
+          }
+        ]
+      },
+      {
+        "id": "wf04",
+        "run": 2,
+        "latencyMs": 15214,
+        "llmCalls": 1,
+        "searchRounds": 0,
+        "modelMs": 15210.029900000023,
+        "attempts": [
+          [
+            {
+              "durationMs": 15209.840499999991,
+              "outcome": "success"
+            }
+          ]
+        ],
+        "usage": [
+          {
+            "promptTokens": 10329,
+            "completionTokens": 418,
+            "reasoningTokens": 1372
+          }
+        ]
+      }
+    ]
+  },
+  "redactions": 1
+}

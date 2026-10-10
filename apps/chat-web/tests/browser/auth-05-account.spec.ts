@@ -10,7 +10,7 @@ const storedPassword = () => {
 };
 async function login(page: Page, email: string) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -27,10 +27,11 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     await one.getByRole('button', { name: /Menu người dùng/ }).click();
     await one.getByRole('menuitem', { name: 'Tài khoản' }).click();
     await expect(one).toHaveURL(/\/account$/);
-    await expect(one.getByText('Phiên này', { exact: true })).toBeVisible();
+    await expect(one.getByText('Phiên hiện tại', { exact: true })).toBeVisible();
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(1);
     await one.screenshot({ path: info.outputPath('AUTH05-account.png'), fullPage: true });
     await one.getByRole('button', { name: 'Đăng xuất khỏi mọi thiết bị khác' }).click();
+    await one.getByRole('button', { name: 'Xác nhận thu hồi' }).click();
     await expect(one.getByRole('main').getByRole('status')).toContainText('Đã đăng xuất 1 phiên khác');
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(0);
 
@@ -40,10 +41,10 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     await expect(two).toHaveURL(/\/login$/);
     await expect(two.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeVisible();
 
-    await one.getByLabel('Tên hiển thị').fill('Tên mới AUTH-05');
-    await one.getByRole('button', { name: 'Lưu tên' }).click();
+    await one.getByLabel(/Họ và tên/).fill('Tên mới AUTH-05');
+    await one.getByRole('button', { name: 'Lưu thay đổi họ tên' }).click();
     await expect(one.getByRole('main').getByRole('status')).toContainText('Đã lưu tên mới');
-    await one.getByRole('button', { name: 'Về workspace' }).click();
+    await one.getByRole('link', { name: 'Quay lại không gian làm việc' }).click();
     await expect(one.getByRole('button', { name: 'Menu người dùng: Tên mới AUTH-05', exact: true })).toBeVisible();
     expect((await db.query('SELECT name FROM users WHERE email=$1', [email])).rows[0].name).toBe('Tên mới AUTH-05');
   } finally { await first.close(); await second.close(); await db.end(); }

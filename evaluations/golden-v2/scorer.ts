@@ -66,10 +66,12 @@ export interface CaseRun {
   latencyMs: number;
   llmCalls: number;
   searches?: SearchTrace[];
+  prefetches?: SearchTrace[];
+  searchRounds?: number;
   score: CaseScore;
 }
 
-export interface SearchTrace { tool: string; args: Record<string, unknown>; result?: unknown; error?: string }
+export interface SearchTrace { tool: string; args: Record<string, unknown>; result?: unknown; error?: string; phase?: 'prefetch' | 'search' | 'gather' }
 
 type PlanResponse = Extract<PlannerResponse, { kind: 'plan' }>;
 
@@ -163,20 +165,24 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
   return { toolsAssigned, argsOk, passed, total, failures };
 }
 
-export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[], searches: SearchTrace[] = []): CaseScore {
+export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[], searches: SearchTrace[] = [], activity?: { llmCalls: number; searchRounds: number }): CaseScore {
   const kindOk = response?.kind === golden.expect.kind;
   const failures: string[] = [];
   if (!kindOk) failures.push(`kind: expected ${golden.expect.kind}, got ${response?.kind ?? 'error'}`);
+  if (golden.category === 'read_only' && activity) {
+    if (activity.llmCalls !== 1) failures.push(`read_only: expected 1 model call, got ${activity.llmCalls}`);
+    if (activity.searchRounds !== 0) failures.push(`read_only: expected 0 model-opened search rounds, got ${activity.searchRounds}`);
+  }
   if (golden.expect.searches?.length) {
     const traced: PlanResponse = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: searches
-      .filter(s => s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
+      .filter(s => s.phase !== 'prefetch' && s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
       .map((s, index) => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [] })) };
     const scored = scoreAlternative(golden.expect.searches, traced);
     return { kindOk, toolsOk: scored.toolsAssigned, argsOk: scored.argsOk,
-      passed: kindOk && scored.toolsAssigned && scored.argsOk, matchers: { passed: scored.passed, total: scored.total }, failures: [...failures, ...scored.failures] };
+      passed: kindOk && failures.length === 0 && scored.toolsAssigned && scored.argsOk, matchers: { passed: scored.passed, total: scored.total }, failures: [...failures, ...scored.failures] };
   }
   if (golden.expect.kind !== 'plan') {
-    return { kindOk, toolsOk: null, argsOk: null, passed: kindOk, matchers: { passed: 0, total: 0 }, failures };
+    return { kindOk, toolsOk: null, argsOk: null, passed: kindOk && failures.length === 0, matchers: { passed: 0, total: 0 }, failures };
   }
 
   const options = golden.expect.anyOf ?? [golden.expect.steps ?? []];
@@ -250,7 +256,7 @@ export function aggregateRuns(runs: CaseRun[][], catalog: ToolDefinition[] = ALL
         searches: r.case.expect.searches?.filter(s => s.tool.split('.')[0] === service),
         allowExtraTools: [...options.flat().filter(s => s.tool.split('.')[0] !== service).map(s => s.tool), ...r.case.expect.allowExtraTools ?? []],
       } };
-      return { ...r, score: scoreCase(narrowed, r.response, catalog, r.searches) };
+      return { ...r, score: scoreCase(narrowed, r.response, catalog, r.searches, r.searchRounds === undefined ? undefined : { llmCalls: r.llmCalls, searchRounds: r.searchRounds }) };
     }));
     const rows = serviceRuns.flat();
     const perServiceRun = serviceRuns.map(runMetrics);

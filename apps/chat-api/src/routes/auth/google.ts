@@ -1,9 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { createAuthMiddleware, generateAccessToken, type AuthUser } from '../../auth/jwt.js';
+import { LoginFailures } from '../../auth/login-failures.js';
 import { GOOGLE_ENDPOINTS, GoogleOIDC } from '../../auth/google-oidc.js';
 import { GoogleAccountError } from '../../db/repositories/google-auth-repo.js';
-import { toAuthUser } from '../../db/repositories/user-repo.js';
+import { toAuthUser, verifyPassword } from '../../db/repositories/user-repo.js';
 import { InvalidSessionUserError } from '../../db/repositories/session-repo.js';
 import { googleLinkedEmail, pendingApprovalEmail, sendEmailInBackground } from '../../services/email/index.js';
 import type { AuthRoutesOptions } from './index.js';
@@ -21,6 +22,7 @@ export function isGoogleEnabled(options: AuthRoutesOptions): boolean {
 export function createGoogleRoutes(options: AuthRoutesOptions): Router {
   const router = Router();
   const clock = options.clock ?? Date.now;
+  const failures = options.loginFailures ?? new LoginFailures(clock);
   const signupQuota = options.signupQuota ?? new SignupQuota(clock);
   const sessions = options.sessionRepo ?? options.userRepo?.sessions;
   const repo = options.userRepo?.googleAuth;
@@ -93,7 +95,32 @@ export function createGoogleRoutes(options: AuthRoutesOptions): Router {
     } catch (error) { failure(res, error); }
   });
   router.post('/google/unlink', unavailable, auth, async (req, res) => {
-    try { const user = (req as any).user as AuthUser; await repo!.unlink(user.id, user.sid!, clock()); res.json({ success: true }); }
+    const currentPassword = req.body?.currentPassword;
+    if (typeof currentPassword !== 'string' || !currentPassword || currentPassword.length > 128) {
+      res.status(400).json({ error: 'Vui lòng nhập mật khẩu hiện tại.', code: 'CURRENT_PASSWORD_REQUIRED' }); return;
+    }
+    try {
+      const user = (req as any).user as AuthUser;
+      const account = await options.userRepo!.findById(user.id);
+      if (!account || account.status !== 'active') throw new GoogleAccountError('INVALID_SESSION');
+      if (!account.password) throw new GoogleAccountError('PASSWORD_REQUIRED');
+      const key = LoginFailures.key(req.ip, account.email);
+      await failures.serialize(key, async () => {
+        const retryAfter = failures.retryAfter(key);
+        if (retryAfter !== null) {
+          res.setHeader('Retry-After', String(retryAfter));
+          res.status(429).json({ error: 'Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau.' }); return;
+        }
+        // Wrong credentials do not invalidate an otherwise valid account session.
+        if (!verifyPassword(currentPassword, account.password)) {
+          failures.record(key);
+          res.status(400).json({ error: 'Mật khẩu hiện tại không đúng.', code: 'INVALID_CURRENT_PASSWORD' }); return;
+        }
+        await repo!.unlink(user.id, user.sid!, account.password!, clock);
+        failures.clear(key);
+        res.json({ success: true });
+      });
+    }
     catch (error) { failure(res, error); }
   });
   return router;

@@ -1,3 +1,4 @@
+import type { ModelAttemptMetrics } from '../types.js';
 /** Timeout, bounded transient retry and cancellation shared by HTTP-backed providers. */
 export interface TransportOptions {
   /** Per-attempt deadline; the attempt's signal is aborted when it elapses. */
@@ -15,6 +16,8 @@ export interface TransportOptions {
   /** Provider name used in the timeout message. */
   label: string;
   signal?: AbortSignal;
+  /** Observer failures must not change provider behavior. */
+  onAttempt?: (metrics: ModelAttemptMetrics) => void;
 }
 
 const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
@@ -62,18 +65,31 @@ export async function callWithRetry<T>(attempt: (signal: AbortSignal) => Promise
   const timeoutRetries = options.timeoutRetries ?? 0;
   let retry = 0;
   let timeouts = 0;
+  const callStarted = performance.now();
   for (;;) {
     if (options.signal?.aborted) throw abortReason(options.signal, options.label);
+    const started = performance.now();
+    const record = (outcome: ModelAttemptMetrics['outcome'], status?: number, retryReason?: ModelAttemptMetrics['retryReason']) => {
+      try { options.onAttempt?.({ startedAtMs: started - callStarted, durationMs: performance.now() - started, outcome, status, retryReason }); }
+      catch { /* Diagnostics cannot fail a model call. */ }
+    };
     try {
-      return await attemptWithDeadline(attempt, options);
+      const result = await attemptWithDeadline(attempt, options);
+      record('success');
+      return result;
     } catch (err) {
-      if (options.signal?.aborted) throw abortReason(options.signal, options.label);
+      if (options.signal?.aborted) { record('cancelled'); throw abortReason(options.signal, options.label); }
       if (err instanceof DeadlineError) {
+        record('timeout', undefined, timeouts < timeoutRetries ? 'timeout' : undefined);
         if (timeouts >= timeoutRetries) throw err;
         timeouts += 1;
         continue;
       }
-      if (!isTransientStatus(err) || retry >= options.maxRetries) throw err;
+      const status = (err as { status?: unknown })?.status;
+      const code = typeof status === 'number' ? status : undefined;
+      const transient = isTransientStatus(err);
+      record(transient ? 'transient' : 'error', code, transient && code !== undefined && retry < options.maxRetries ? `http_${code}` : undefined);
+      if (!transient || retry >= options.maxRetries) throw err;
       await sleep(options.retryDelayMs * 2 ** retry, options.signal, options.label);
       retry += 1;
     }

@@ -56,12 +56,13 @@ it('integrates Calendar HTTP metadata, encrypted real SQL, read connection check
     const plan = { kind: 'plan', thinking: 'Use the observed allowed calendar and explicit offset times', summary: 'Create review', warnings: [], steps: [{ id: 'event', tool: 'calendar.create_event', description: 'Create', args, dependsOn: [] }] };
     const planner = new AIPlanner({ toolCatalog: catalog, searchMode: 'llm',
       gatherSearch: ({ tool, args, signal }) => adapter.execute(tool, args, { signal }),
-      provider: { name: 'contract-scripted', async generatePlan(input) { seen.push(input); return JSON.stringify(plan); } },
+      provider: { name: 'contract-scripted', async generatePlan(input) { seen.push(input);
+        if (seen.length === 1) return JSON.stringify({ kind: 'search', calls: [{ tool: catalog.find(t => t.listable && t.sideEffect === 'read')!.name, args: { query: '' } }] }); return JSON.stringify(plan); } },
     });
     expect((await planner.processMessage({ userMessage: 'Đặt lịch họp Google Calendar', memory: new WorkingMemory() })).kind).toBe('plan');
-    expect(seen[0].workingMemory.__observed.calendar).toEqual([{ id, title: 'ATI Review' }]);
+    expect(seen.at(-1).workingMemory.__observed.calendar).toEqual([{ id, title: 'ATI Review' }]);
     const fabricated = structuredClone(plan); fabricated.steps[0]!.args.calendarId = 'fabricated@group.calendar.google.com';
-    expect(validatePlan(JSON.stringify(fabricated), catalog, { grounding: { memory: seen[0].workingMemory, userTexts: [] } }).valid).toBe(false);
+    expect(validatePlan(JSON.stringify(fabricated), catalog, { grounding: { memory: seen.at(-1).workingMemory, userTexts: [] } }).valid).toBe(false);
     const before = vi.mocked(fetchFn).mock.calls.length;
     await expect(adapter.execute('calendar.create_event', fabricated.steps[0]!.args)).rejects.toMatchObject({ category: 'AUTH_ERROR' });
     expect(vi.mocked(fetchFn).mock.calls).toHaveLength(before);

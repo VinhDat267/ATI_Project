@@ -1,27 +1,28 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../services/api-client';
 import { authStorage } from '../services/auth-storage';
 import { userErrorMessage } from '../services/user-error';
-import { AuthFeedback, AuthFormFrame, authButtonClass, authInputClass, type AuthViewProps } from './AuthFormFrame';
-
+import { AuthActionPage } from '../pages/AuthAction/AuthActionPage';
+import type { AuthViewProps } from './AuthFormFrame';
 export function ResetPasswordView({ navigate, token }: AuthViewProps) {
-  const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState(''), [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (busy || !token) return;
+  const [busy, setBusy] = useState(false), [success, setSuccess] = useState(false), [error, setError] = useState<string | null>(null);
+  const mounted = useRef(false), pending = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const submit = async (password: string, confirmation: string) => {
+    if (pending.current || !token) return;
+    if (password.length < 12 || password.length > 128) { setError('Mật khẩu phải có từ 12 đến 128 ký tự.'); return; }
     if (password !== confirmation) { setError('Hai mật khẩu chưa trùng khớp.'); return; }
-    setBusy(true); setError(null);
-    try { await apiClient.resetPassword(token, password); authStorage.clearStoredTokens(); navigate('/login', true); }
-    catch (reason) { setError(userErrorMessage(reason)); }
-    finally { setBusy(false); }
+    pending.current = true; setBusy(true); setError(null);
+    const owner = authStorage.getStoredTokens();
+    try {
+      await apiClient.resetPassword(token, password);
+      if (!mounted.current) return;
+      const latest = authStorage.getStoredTokens();
+      if (latest.accessToken === owner.accessToken && latest.refreshToken === owner.refreshToken) authStorage.clearStoredTokens();
+      setSuccess(true);
+    } catch (reason) { if (mounted.current) setError(userErrorMessage(reason)); }
+    finally { pending.current = false; if (mounted.current) setBusy(false); }
   };
-  return <AuthFormFrame title="Đặt lại mật khẩu" description="Mọi phiên đăng nhập cũ sẽ kết thúc sau khi đổi mật khẩu." navigate={navigate}>
-    <AuthFeedback error={!token ? 'Link đặt lại mật khẩu không hợp lệ hoặc đã được mở. Hãy yêu cầu một link mới.' : error} />
-    {token ? <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="text-sm text-text-secondary">Mật khẩu mới<input type="password" className={authInputClass} value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
-      <label className="text-sm text-text-secondary">Nhập lại mật khẩu<input type="password" className={authInputClass} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" required minLength={12} maxLength={128} /></label>
-      <p className="text-xs text-text-muted">Mật khẩu từ 12 đến 128 ký tự.</p>
-      <button className={authButtonClass} disabled={busy}>{busy ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}</button>
-    </form> : <button type="button" className="text-sm text-primary-text hover:underline" onClick={() => navigate('/forgot-password')}>Yêu cầu link mới</button>}
-  </AuthFormFrame>;
+  return <AuthActionPage mode={success ? 'reset-success' : 'reset-password'} busy={busy} navigate={navigate} onReset={submit}
+    error={!token ? 'Link đặt lại mật khẩu không hợp lệ hoặc đã được mở. Hãy yêu cầu một link mới.' : error} />;
 }

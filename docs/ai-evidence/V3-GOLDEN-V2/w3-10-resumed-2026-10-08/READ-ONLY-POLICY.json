@@ -1,0 +1,167 @@
+{
+  "complete": true,
+  "rows": [
+    {
+      "id": "sh01",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "sh07",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "ca01",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "no01",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "tg01",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "ji01",
+      "run": 1,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 2,
+      "pass": true
+    },
+    {
+      "id": "sh01",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "sh07",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "ca01",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "no01",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "tg01",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "ji01",
+      "run": 2,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 2,
+      "pass": true
+    },
+    {
+      "id": "sh01",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "sh07",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 3,
+      "pass": true
+    },
+    {
+      "id": "ca01",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "no01",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "tg01",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 1,
+      "pass": true
+    },
+    {
+      "id": "ji01",
+      "run": 3,
+      "kind": "clarification",
+      "calls": 1,
+      "searchRounds": 0,
+      "prefetches": 2,
+      "pass": true
+    }
+  ]
+}

@@ -143,7 +143,7 @@ export class ApiClient {
   private async publicAuthAction(path: string, body: object): Promise<AuthMessageResponse> {
     const response = await fetch(`/api/auth/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(new Error(data.error || 'Không thể hoàn tất yêu cầu tài khoản.'), { status: response.status, data });
+    if (!response.ok) throw Object.assign(new Error(data.error || 'Không thể hoàn tất yêu cầu tài khoản.'), { status: response.status, data, response });
     return data;
   }
   signup(name: string, email: string, password: string) { return this.publicAuthAction('signup', { name, email, password }); }
@@ -176,9 +176,9 @@ export class ApiClient {
   completeGoogleAuth(code: string, state: string) {
     return this.googleAuthAction<{ accessToken: string; refreshToken: string; user: User } | { success: true }>('callback', { code, state });
   }
-  unlinkGoogle() {
+  unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
-      method: 'POST', credentials: 'include', body: JSON.stringify({}),
+      method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
     });
   }
 
@@ -186,6 +186,12 @@ export class ApiClient {
     email: string,
     password: string
   ): Promise<{ accessToken: string; refreshToken?: string; user: User }> {
+    const initial = authStorage.getStoredTokens();
+    let invalidated = false;
+    const unsubscribe = authStorage.subscribeAuthTokens(tokens => {
+      if (!tokens.accessToken || tokens.accessToken !== initial.accessToken || tokens.refreshToken !== initial.refreshToken) invalidated = true;
+    });
+    try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -193,15 +199,19 @@ export class ApiClient {
     });
 
     const data = await res.json().catch(() => ({}));
+    const latest = authStorage.getStoredTokens();
+    if (invalidated || latest.accessToken !== initial.accessToken || latest.refreshToken !== initial.refreshToken) throw new Error('Phiên đăng nhập đã thay đổi.');
     if (!res.ok || !data.accessToken || !data.user) {
       const error: any = new Error(
         data.error || 'Không thể xác thực với API backend'
       );
       error.status = res.status;
       error.data = data;
+      error.response = res;
       throw error;
     }
 
+    unsubscribe();
     authStorage.setStoredTokens({
       accessToken: data.accessToken,
       refreshToken: data.refreshToken || null,
@@ -209,6 +219,7 @@ export class ApiClient {
     });
 
     return data;
+    } finally { unsubscribe(); }
   }
 
   async refreshToken(): Promise<{ accessToken: string; refreshToken?: string }> {

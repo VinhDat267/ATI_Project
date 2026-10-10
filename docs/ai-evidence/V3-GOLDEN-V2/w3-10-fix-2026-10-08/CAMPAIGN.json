@@ -1,0 +1,44 @@
+{
+  "policy": "08/10: directory prefetch allowed; read_only requires clarification, one model call, zero model-opened search rounds",
+  "requestedModel": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "concurrency": 2,
+  "campaigns": [
+    {
+      "kind": "control",
+      "set": "core",
+      "runs": 1,
+      "startedAt": "2026-10-08T04:32:33.902Z",
+      "endedAt": "2026-10-08T04:33:35.920Z",
+      "exitCode": 2,
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-32-35-752Z"
+    },
+    {
+      "kind": "control",
+      "set": "core",
+      "runs": 1,
+      "startedAt": "2026-10-08T04:35:46.975Z",
+      "endedAt": "2026-10-08T04:36:47.927Z",
+      "exitCode": 2,
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-35-47-805Z"
+    },
+    {
+      "kind": "control",
+      "set": "core",
+      "runs": 1,
+      "startedAt": "2026-10-08T04:46:19.809Z",
+      "endedAt": "2026-10-08T04:51:34.563Z",
+      "exitCode": 2,
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-core-llm-2026-10-08T04-46-20-422Z"
+    },
+    {
+      "kind": "control",
+      "set": "services",
+      "runs": 1,
+      "startedAt": "2026-10-08T04:55:59.107Z",
+      "endedAt": "2026-10-08T05:00:09.534Z",
+      "exitCode": 2,
+      "report": "docs/ai-evidence/V3-GOLDEN-V2/w3-10-fix-2026-10-08/control/interrupted-services-llm-2026-10-08T04-56-00-872Z"
+    }
+  ]
+}

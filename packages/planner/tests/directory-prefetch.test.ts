@@ -15,6 +15,7 @@ function scripted(...outputs: unknown[]) {
   return { provider, inputs };
 }
 
+const lookup = { kind: 'search', calls: [{ tool: 'trello.search_boards', args: { query: 'Board' } }] };
 const ask = { kind: 'clarification', question: 'Which one?', context: 'need more' };
 const plan = {
   kind: 'plan', thinking: 't', summary: 's', warnings: [],
@@ -62,7 +63,17 @@ const make = (provider: LLMProvider, gatherSearch: any, extra: Record<string, un
   new AIPlanner({ provider, toolCatalog: ALL_TOOLS, gatherSearch, searchMode: 'llm', ...extra });
 
 describe('workspace directory prefetch', () => {
-  it('looks up boards, lists, members and channels before the first model call so one call can plan', async () => {
+  it('grounds a write plan on the first model call using the prefetched directory', async () => {
+    const { provider, inputs } = scripted(plan);
+    const w = workspace();
+    const response = await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
+    expect(response).toEqual(plan);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.workingMemory.__observed.list).toContainEqual({ id: 'list_todo', name: 'To Do', boardId: 'b0' });
+    expect(inputs[0]!.workingMemory.__observed.channel).toContainEqual({ id: 'C_FE', name: 'frontend' });
+    expect(inputs[0]!.workingMemory.__observed.member).toContainEqual({ id: 'm_minh', fullName: 'Minh', boardId: 'b0' });
+  });
+  it('makes the complete directory available before the first model call', async () => {
     const { provider, inputs } = scripted(plan);
     const w = workspace();
     const response = await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
@@ -77,16 +88,16 @@ describe('workspace directory prefetch', () => {
   });
 
   it('lists with an empty query and only through tools marked listable', async () => {
-    const { provider } = scripted(ask);
+    const { provider } = scripted(lookup, ask);
     const w = workspace();
     await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
     expect(new Set(w.calls.map((c) => c.tool))).toEqual(new Set(['trello.search_boards', 'trello.search_lists', 'trello.search_members', 'slack.search_channels']));
-    expect(w.calls.every((c) => c.args.query === '' && c.args.limit === 10)).toBe(true);
+    expect(w.calls.filter(c => c.args.query === '').every(c => c.args.limit === 10)).toBe(true);
     expect(w.calls.filter((c) => c.tool === 'trello.search_lists').map((c) => c.args.boardId).sort()).toEqual(['b0', 'b1']);
   });
 
   it('runs lookups in parallel, parents before children', async () => {
-    const { provider } = scripted(ask);
+    const { provider } = scripted(lookup, ask);
     const w = workspace({ delayMs: 20 });
     await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
     expect(w.maxRunning()).toBeGreaterThan(1);
@@ -95,36 +106,36 @@ describe('workspace directory prefetch', () => {
   });
 
   it('does not expand lists and members when there are more than three boards', async () => {
-    const { provider, inputs } = scripted(ask);
+    const { provider, inputs } = scripted(lookup, ask);
     const w = workspace({ boards: 4 });
     await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
-    expect(w.calls.map((c) => c.tool).sort()).toEqual(['slack.search_channels', 'trello.search_boards']);
-    expect(inputs[0]!.workingMemory.__observed.list).toBeUndefined();
+    expect(w.calls.filter(c => c.args.query === '').map(c => c.tool).sort()).toEqual(['slack.search_channels', 'trello.search_boards']);
+    expect(inputs[1]!.workingMemory.__observed.list).toBeUndefined();
   });
 
   it('gives up on a slow lookup after the time budget and still calls the model', async () => {
-    const { provider, inputs } = scripted(ask);
+    const { provider, inputs } = scripted(lookup, ask);
     const w = workspace({ hang: 'slack.search_channels' });
     const started = Date.now();
     const response = await make(provider, w.fn, { directoryBudgetMs: 60 }).processMessage({ userMessage: request, memory: new WorkingMemory() });
     expect(Date.now() - started).toBeLessThan(1500);
     expect(response.kind).toBe('clarification');
-    expect(inputs[0]!.workingMemory.__observed.board).toHaveLength(2);
-    expect(inputs[0]!.workingMemory.__observed.channel).toBeUndefined();
+    expect(inputs[1]!.workingMemory.__observed.board).toHaveLength(2);
+    expect(inputs[1]!.workingMemory.__observed.channel).toBeUndefined();
     expect(w.calls.find((c) => c.tool === 'slack.search_channels')!.signal!.aborted).toBe(true);
   });
 
   it('ignores a failing lookup', async () => {
-    const { provider, inputs } = scripted(ask);
+    const { provider, inputs } = scripted(lookup, ask);
     const w = workspace({ fail: 'trello.search_boards' });
     const response = await make(provider, w.fn).processMessage({ userMessage: request, memory: new WorkingMemory() });
     expect(response.kind).toBe('clarification');
-    expect(inputs[0]!.workingMemory.__observed.channel).toHaveLength(1);
-    expect(inputs[0]!.workingMemory.__observed.board).toBeUndefined();
+    expect(inputs[1]!.workingMemory.__observed.channel).toHaveLength(1);
+    expect(inputs[1]!.workingMemory.__observed.board).toBeUndefined();
   });
 
   it('does not look up again what an earlier turn already listed', async () => {
-    const { provider } = scripted(ask);
+    const { provider } = scripted(lookup, ask);
     const w = workspace();
     const memory = new WorkingMemory();
     const planner = make(provider, w.fn);
@@ -135,10 +146,10 @@ describe('workspace directory prefetch', () => {
   });
 
   it('only lists resources of the routed services', async () => {
-    const { provider } = scripted(ask);
+    const { provider } = scripted({ kind: 'search', calls: [{ tool: 'slack.search_channels', args: { query: 'release' } }] }, ask);
     const w = workspace();
     await make(provider, w.fn).processMessage({ userMessage: 'Post a message in the release channel on Slack', memory: new WorkingMemory() });
-    expect(w.calls.map((c) => c.tool)).toEqual(['slack.search_channels']);
+    expect(w.calls.map((c) => c.tool)).toEqual(['slack.search_channels', 'slack.search_channels']);
   });
 
   it('can be turned off, and never runs in regex mode', async () => {

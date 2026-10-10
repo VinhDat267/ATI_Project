@@ -82,13 +82,13 @@ alone is insufficient. Clarification/refusal cases contribute to kind and
 strict-pass scores, not the tool denominator. Argument quality is conditional
 on correct tools; latency is the entire request involving the service.
 
-The planner protocol currently has no read-answer response kind. The prompt
-instructs write-only plan steps, but the production validator does not enforce
+At the W3-06 measurement, the planner protocol had no read-answer response kind. The prompt
+instructed write-only plan steps, but the production validator did not enforce
 that side-effect restriction: it accepted three read-only plans in this run.
 Read-only cases preregister a clarification plus successful read calls;
 read-tool scores and response-kind failures are reported separately. These
-results do not establish usable answers to read-only requests. Answer policy
-and enforcement of the prompt rule require a separate product follow-up.
+results do not establish usable answers to read-only requests. The 05/10 policy
+and W3-10 changes below supersede those labels; historical reports are preserved.
 Text matchers check selected keywords/references rather than complete semantic
 correctness. Quoted A1 ranges and other unlabelled equivalent representations
 may conservatively miss an exact matcher. Calendar timestamps use equivalent
@@ -133,7 +133,7 @@ record label commits `5fccffd` and `695ad87`. A semantic comparison confirms
 that only `rf06` changed. The other 49 core cases passed 147/147, versus 49/49
 in the historical run. Changed-label `rf06` passed 3/3 separately.
 Freeform fell from 18/18 to 51/54; `ff15` was 0/3. Its unchanged prompt,
-“Let the frontend team know the deploy finished”, expects Slack. The expanded
+“case ff15 (see its preregistered label)”, expects Slack. The expanded
 workspace has both Slack `#frontend` and Telegram `frontend`; the model asks
 which service to use in all three runs. The spec requires clarification for
 ambiguity. This is an observed score decline under the old oracle and expanded
@@ -177,6 +177,36 @@ Local verification: `npm run check` exit 0 (874 v3 + 151 evaluation tests),
 `npx tsc -p evaluations/golden-v2/tsconfig.json` exit 0; real local HTTP abort
 test passed. Browser/live-service runs were not repeated for this evaluation
 change. See the [verification record](../docs/ai-evidence/V3-GOLDEN-V2/W3-06-VERIFICATION.md).
+
+### W3-10 — eager directory, read-only clarification, live remeasurement
+
+**Phép đo mới ngày 08/10 UTC, source 58d4fcd.** Đủ đối chứng core/services 1 run và đủ ba bộ sau sửa 3 runs. Read-only 18/18 theo policy; strict parity đạt; services p95 20.138s (chưa đạt mục tiêu <15s).
+
+User-authorized remeasurement resumed after main's successful live smoke (#115). Merge main e269743 at 5afc0a7 retains #102's exact served-model check and metrics when resolving the conflict with #113. Corrected campaigns use 58d4fcd; local control 7898aa7 is 8155c03 plus only the confirmed flash-n alias. Both use requested ag/gemini-3.8-flash, served gemini-3.8-flash-n, llm/concurrency 2 and unchanged production deadlines/retries. Campaigns are sequential, planning only on fixtures.
+
+The restored directory prefetch runs before call 1 under phase prefetch. Read-only requires clarification, exactly 1 model call and zero model-opened phase search; platform directory listing is allowed under the owner's 08/10 clarification. searches excludes directory; prefetches holds it separately. READ_ONLY_PLAN becomes the fixed Vietnamese question without a repair call; mixed read/write remains valid. Catalog is unchanged.
+
+Label795229e predates first report66896ca (git ancestry exit0), and no prompt or label was changed during remeasurement. Control retains its previous read-only search labels; that strict read-only rubric differs. Tool/argument denominators are recorded per service in the comparison. Historical W3-06 served base flash; use same-window control for comparison rather than attributing cross-day changes entirely to code. One control run is not three replicated runs.
+
+| Bộ | W3-06 lịch sử, flash | Đối chứng cùng ngày, -n | Sau sửa, -n |
+|---|---|---|---|
+| core | 150/150 strict; p50/p95 5.454/13.105s; 144/150 (96.0%) <15s; 171 calls | 50/50 strict; p50/p95 7.527/18.995s; 46/50 (92.0%) <15s; 57 calls | 150/150 strict; p50/p95 7.229/18.021s; 136/150 (90.7%) <15s; 168 calls |
+| freeform | 51/54 strict; p50/p95 5.942/13.092s; 52/54 (96.3%) <15s; 63 calls | NOT_RUN — không yêu cầu control freeform | 52/54 strict; p50/p95 10.108/24.738s; 42/54 (77.8%) <15s; 63 calls |
+| services | 111/132 strict; p50/p95 6.105/31.097s; 107/132 (81.1%) <15s; 172 calls | 37/44 strict; p50/p95 7.600/44.465s; 33/44 (75.0%) <15s; 57 calls | 129/132 strict; p50/p95 8.242/20.138s; 117/132 (88.6%) <15s; 135 calls |
+
+| Bộ | Calls / attempts / timeout | Model | Prefetch | Search | Other |
+|---|---|---|---|---|---|
+| core | 168/168/0 | 99.9649% | 0.0061% | 0.0002% | 0.0288% |
+| freeform | 63/64/1 | 99.9475% | 0.0089% | 0.0002% | 0.0433% |
+| services | 135/137/2 | 99.9623% | 0.0099% | 0.0001% | 0.0278% |
+
+[Comparison by category and case](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON.md) includes the three groups, under15s proportions, phase time, attempt/retry distribution, read-only18-run audit, service denominators, changed call counts and strict failures. [Fresh campaign manifest](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-resumed-2026-10-08/CAMPAIGN.json) records UTC/source/exit codes; [analysis](../docs/ai-evidence/V3-GOLDEN-V2/w3-10-resumed-2026-10-08/ANALYSIS.json) records sanitization hashes and scored-identity preservation. Directory/search results are fixtures, not production adapter timing. Attempt durations include response body; per-call durations include backoff. Missing usage stays null; reasoning may already be included in prompt_tokens, so do not add it twice. Client timing cannot split upstream queue/network/reasoning or prove an account switch.
+
+A new independent-review P2 showed a model can echo a full prompt inside search.args.query. Native writer now redacts the whole case projection after scoring, including traces and diagnostics, preserving raw scoring input. Actual main regression test: RED 1 failed/12 passed, exit 1; focused GREEN 362/362, exit 0. Independent mutation removing writer sanitization fails that test. Export-only follow-up 9e887d2 also redacts JSON object keys: RED 1 failed/12 passed, then GREEN 362/362; numeric metrics and original inputs remain intact. It does not change the measured planner/provider/prompt/labels/fixtures from 58d4fcd, so model campaigns remain valid without extra calls. The old control exporter is unchanged; public control copies are recursively sanitized outside its branch after scoring. Root .env is loaded with --env-file and never printed/copied; public evidence is scanned for corpus prompts/private secrets in both keys and values.
+
+The interrupted controls earlier on08/10 and the new incomplete campaigns retain separate folders; none is stitched into a complete run. Earlier deferred-directory source 50761b1 was abandoned after P1 review; its [archived comparison](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-COMPARISON-DEFERRED-DIRECTORY.md) and [verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION-DEFERRED-DIRECTORY.md) remain historical, excluded from corrected acceptance. Hedging and thinking variants previously showed no reliable benefit and are not reintroduced.
+
+Final code verification at 9e887d2: npm run check, 1544 v3 + 173 eval, exit 0; npm run test:browser:v3, 73/73 across 11 scenarios, exit 0 on its first run. The earlier FE-02 scroll failure at 58d4fcd is retained with DOM/output; its root cause is unresolved. [Verification](../docs/ai-evidence/V3-GOLDEN-V2/W3-10-VERIFICATION.md). Usable-plan rate, live service writes, production adapter latency and frontend live timing remain NOT_RUN within W3-10.
 
 ### Results (labels `ddd1304`, 9router `ag/gemini-3.8-flash`, 3 runs)
 

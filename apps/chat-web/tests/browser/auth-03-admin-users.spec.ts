@@ -6,7 +6,7 @@ import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
-  await page.getByLabel('Mật khẩu').fill(password);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
 }
@@ -26,17 +26,16 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await admin.getByRole('menuitem', { name: 'Quản lý người dùng' }).click();
     await expect(admin).toHaveURL(/\/admin\/users$/);
     await admin.getByRole('tab', { name: /Chờ duyệt/ }).click();
-    await admin.getByRole('searchbox', { name: 'Tìm theo email hoặc tên' }).fill(email);
-    await admin.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
-    const row = admin.getByRole('row').filter({ hasText: email });
+    await admin.getByRole('searchbox', { name: 'Tìm kiếm theo tên hoặc email' }).fill(email);
+    const row = admin.locator('#pending-list-container > div').filter({ hasText: email });
     await expect(row.getByRole('button', { name: 'Khóa', exact: true })).toHaveCount(0);
     await expect(row.getByRole('button', { name: 'Mở khóa', exact: true })).toHaveCount(0);
     const adminAccess = await admin.evaluate(() => localStorage.getItem('wap_access_token')!);
     expect((await admin.request.post(`/api/admin/users/${id}/disable`, { headers: { Authorization: `Bearer ${adminAccess}` } })).status()).toBe(409);
-    await row.getByRole('button', { name: 'Duyệt', exact: true }).click();
+    await row.getByRole('button', { name: /Duyệt & kích hoạt/ }).click();
     await expect(admin.getByRole('dialog')).toContainText('Người này sẽ dùng được các service đã kết nối của nhóm');
     expect((await db.query('SELECT status FROM users WHERE id=$1', [id])).rows[0].status).toBe('pending');
-    await admin.getByRole('button', { name: 'Xác nhận duyệt', exact: true }).click();
+    await admin.getByRole('button', { name: /Xác nhận duyệt/ }).click();
     await expect(admin.getByRole('dialog')).toHaveCount(0);
     await expect.poll(async () => (await db.query('SELECT status FROM users WHERE id=$1', [id])).rows[0].status).toBe('active');
     await expect.poll(async () => (await db.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [email])).rows[0].n).toBe(1);
@@ -51,9 +50,10 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await member.getByRole('button', { name: 'Về trang chính' }).click();
     const oldAccess = await member.evaluate(() => localStorage.getItem('wap_access_token')!);
     const oldRefresh = await member.evaluate(() => localStorage.getItem('wap_refresh_token')!);
-    await admin.getByRole('tab', { name: 'Tất cả người dùng' }).click();
-    await row.getByRole('button', { name: 'Khóa', exact: true }).click();
-    await expect(admin.getByRole('dialog')).toContainText('Mọi phiên đăng nhập');
+    await admin.getByRole('tab', { name: /Thành viên/ }).click();
+    const memberRow = admin.locator('#table-members-body tr').filter({ hasText: email });
+    await memberRow.getByRole('button', { name: 'Khóa', exact: true }).click();
+    await expect(admin.getByRole('dialog')).toContainText('bị đăng xuất khỏi mọi thiết bị');
     await admin.getByRole('button', { name: 'Xác nhận khóa', exact: true }).click();
     await expect(admin.getByRole('dialog')).toHaveCount(0);
     // Opening history makes the next authenticated request and detects revocation.

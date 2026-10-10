@@ -41,14 +41,16 @@ test('AUTH-05 Google: link and unlink refresh expired access while preserving th
   expect(paths.filter(path => path === '/api/auth/refresh')).toHaveLength(1);
   expect(paths.filter(path => path === '/api/auth/google/callback')).toHaveLength(1);
   await page.getByRole('button', { name: 'Về trang tài khoản', exact: true }).click();
-  await expect(page.getByText('Đã liên kết (auth04-google@example.test)')).toBeVisible();
+  await expect(page.locator('#google-linked-email-display')).toHaveText('auth04-google@example.test');
   expect((await db.query('SELECT google_sub FROM users WHERE id=$1', [userId])).rows[0].google_sub).toBe('fixture-google-user');
   expect(await expireAccess(page)).toBe(originalSid);
-  await page.getByRole('button', { name: 'Gỡ liên kết', exact: true }).click();
+  await page.getByRole('button', { name: 'Gỡ liên kết Google', exact: true }).click();
+  await page.getByRole('dialog').getByLabel(/Mật khẩu hiện tại/).fill(password);
+  await page.getByRole('button', { name: 'Xác nhận gỡ', exact: true }).click();
   await expect(page.getByRole('main').getByRole('status')).toContainText('Đã gỡ liên kết Google');
   expect(paths.filter(path => path === '/api/auth/refresh')).toHaveLength(2);
   expect((await db.query('SELECT google_sub,google_email FROM users WHERE id=$1', [userId])).rows[0]).toEqual({ google_sub: null, google_email: null });
-  await expect(page.getByText('Phiên này', { exact: true })).toBeVisible();
+  await expect(page.getByText('Phiên hiện tại', { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('AUTH05-Google-expired-access-recovered.png'), fullPage: true });
 });
 test('AUTH-05 Google: a revoked account session goes to login instead of repeatedly failing linking', async ({ page }) => {
@@ -80,10 +82,13 @@ for (const leave of ['logout', 'workspace'] as const) {
     });
     try {
       await page.getByRole('button', { name: 'Liên kết Google', exact: true }).click(); await started;
-      await page.getByRole('button', { name: leave === 'logout' ? 'Đăng xuất' : 'Về workspace', exact: true }).click();
+      if (leave === 'logout') {
+        await page.getByRole('button', { name: /Menu người dùng/ }).click();
+        await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click();
+      } else await page.getByRole('link', { name: 'Quay lại không gian làm việc' }).click();
       if (leave === 'logout') {
         await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
-        await expect(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).toBeVisible();
+        await expect(page.locator('[data-od-id="btn-header-login"]').or(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).first()).toBeVisible();
       } else await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
       release();
       await page.waitForFunction(() => sessionStorage.getItem('auth05-test-start-read') === 'true');

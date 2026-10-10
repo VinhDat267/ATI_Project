@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 async function login(page: Page, email = process.env.CHAT_ADMIN_EMAIL!, password = process.env.CHAT_ADMIN_PASSWORD!) {
-  await page.goto('/login'); await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(password); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('button', { name: /Menu người dùng/ })).toBeVisible();
 }
 async function headers(page: Page) { return { Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('wap_access_token'))}` }; }

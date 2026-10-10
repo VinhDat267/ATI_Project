@@ -62,11 +62,11 @@ async function openAccount() {
   render(<AccountView user={member} navigate={() => {}} onLogout={() => {}} />);
   await screen.findByDisplayValue('Member');
   // The sign-in methods section depends on a separate config request; wait for it too.
-  await screen.findByRole('heading', { name: 'Phương thức đăng nhập' });
+  await screen.findByRole('heading', { name: '4. Liên kết tài khoản Google' });
 }
 async function saveName(value: string) {
-  fireEvent.change(screen.getByLabelText('Tên hiển thị'), { target: { value } });
-  fireEvent.click(screen.getByRole('button', { name: 'Lưu tên' }));
+  fireEvent.change(screen.getByLabelText(/Họ và tên/), { target: { value } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi họ tên' }));
   await waitFor(() => expect(nameResponses).toHaveLength(1));
 }
 async function finishName(status = 200) {
@@ -79,21 +79,21 @@ async function finishName(status = 200) {
 }
 it('keeps a newer unsubmitted name draft when an earlier PATCH succeeds', async () => {
   await openAccount(); await saveName('Submitted A');
-  fireEvent.change(screen.getByLabelText('Tên hiển thị'), { target: { value: 'Unsubmitted B' } });
+  fireEvent.change(screen.getByLabelText(/Họ và tên/), { target: { value: 'Unsubmitted B' } });
   await finishName(); await screen.findByRole('status');
-  expect(screen.getByLabelText('Tên hiển thị')).toHaveValue('Unsubmitted B');
+  expect(screen.getByLabelText(/Họ và tên/)).toHaveValue('Unsubmitted B');
   expect(authStorage.getStoredTokens().user?.name).toBe('Submitted A');
   expect(calls.filter(call => call.path === '/api/account/profile').map(call => call.body)).toEqual([{ name: 'Submitted A' }]);
 });
 it('normalizes an unchanged submitted draft after success', async () => {
   await openAccount(); await saveName('  Submitted A  '); await finishName(); await screen.findByRole('status');
-  expect(screen.getByLabelText('Tên hiển thị')).toHaveValue('Submitted A');
+  expect(screen.getByLabelText(/Họ và tên/)).toHaveValue('Submitted A');
 });
 it('preserves edits when the pending name PATCH fails', async () => {
   await openAccount(); await saveName('Submitted A');
-  fireEvent.change(screen.getByLabelText('Tên hiển thị'), { target: { value: 'Unsubmitted B' } });
+  fireEvent.change(screen.getByLabelText(/Họ và tên/), { target: { value: 'Unsubmitted B' } });
   await finishName(400); await screen.findByRole('alert');
-  expect(screen.getByLabelText('Tên hiển thị')).toHaveValue('Unsubmitted B');
+  expect(screen.getByLabelText(/Họ và tên/)).toHaveValue('Unsubmitted B');
   expect(authStorage.getStoredTokens().user?.name).toBe('Member');
 });
 it('refreshes an expired access token once before starting authenticated Google linking', async () => {
@@ -107,23 +107,25 @@ it('refreshes an expired access token once before starting authenticated Google 
 });
 it('refreshes expired Google unlink and reloads the actual account method state', async () => {
   await openAccount(); authStorage.setStoredTokens({ accessToken: expired });
-  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
+  fireEvent.change(screen.getByRole('dialog').querySelector('input')!, { target: { value: 'Current!password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gỡ' }));
   expect(await screen.findByRole('status')).toHaveTextContent('Đã gỡ liên kết Google');
   expect(screen.getByRole('button', { name: 'Liên kết Google' })).toBeEnabled();
   expect(calls.filter(call => call.path.includes('/google/') || call.path.endsWith('/refresh')).map(call => call.path)).toEqual([
     '/api/auth/google/unlink', '/api/auth/refresh', '/api/auth/google/unlink',
   ]);
-  expect(calls.filter(call => call.path.endsWith('/unlink')).map(call => call.body)).toEqual([{}, {}]);
+  expect(calls.filter(call => call.path.endsWith('/unlink')).map(call => call.body)).toEqual([{ currentPassword: 'Current!password' }, { currentPassword: 'Current!password' }]);
 });
 it('clears the still-owned session when Google unlink cannot refresh a revoked session', async () => {
   refreshSucceeds = false; authStorage.setStoredTokens({ accessToken: expired });
-  await expect(apiClient.unlinkGoogle()).rejects.toMatchObject({ status: 401 });
+  await expect(apiClient.unlinkGoogle('Current!password')).rejects.toMatchObject({ status: 401 });
   expect(authStorage.getStoredTokens()).toEqual({ accessToken: null, refreshToken: null, user: null });
   expect(calls.map(call => call.path)).toEqual(['/api/auth/google/unlink', '/api/auth/refresh']);
 });
 it.each(['server', 'disconnect'] as const)('does not retry a Google mutation with an uncertain %s response', async failure => {
   googleFailure = failure;
-  await expect(apiClient.unlinkGoogle()).rejects.toBeInstanceOf(Error);
+  await expect(apiClient.unlinkGoogle('Current!password')).rejects.toBeInstanceOf(Error);
   expect(calls.map(call => call.path)).toEqual(['/api/auth/google/unlink']);
   expect(authStorage.getStoredTokens().accessToken).toBe(access);
 });

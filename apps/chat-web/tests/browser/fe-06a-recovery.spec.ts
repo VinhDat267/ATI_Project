@@ -28,7 +28,7 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
   test(`FE-06A: saved recovery moments 7-9 and terminal receipt ${width} ${theme}`,async({page},info)=>{
     test.setTimeout(60_000);
     await page.setViewportSize({width,height:width===375?812:900});await page.emulateMedia({colorScheme:theme});
-    await page.goto('/login');await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+    await page.goto('/login');await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!);await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
     await expect(page.getByRole('heading',{level:1})).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
     const db=new pg.Pool({connectionString:process.env.DATABASE_URL});
     const writes:string[]=[];page.on('request',request=>{if(request.method()==='POST' && request.url().includes('/api/executions/'))writes.push(new URL(request.url()).pathname);});

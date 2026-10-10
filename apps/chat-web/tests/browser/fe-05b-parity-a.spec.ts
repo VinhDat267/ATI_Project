@@ -7,8 +7,8 @@ for (const width of [1440, 375])
       await page.setViewportSize({ width, height: width === 375 ? 812 : 900 });
       await page.emulateMedia({ colorScheme: theme });
       await page.goto('/login');
-      await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);
-      await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);
+      await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!);
+      await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!);
       await page
         .getByRole('button', { name: 'Đăng nhập', exact: true })
         .click();
@@ -107,8 +107,8 @@ test('FE-05b clarification before plan has one textarea and explicit radio confi
   page,
 }) => {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(process.env.CHAT_ADMIN_EMAIL!);
-  await page.getByLabel('Mật khẩu').fill(process.env.CHAT_ADMIN_PASSWORD!);
+  await page.getByLabel('Email', { exact: true }).fill(process.env.CHAT_ADMIN_EMAIL!);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.CHAT_ADMIN_PASSWORD!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.locator('#moment-1')).toBeVisible();
   await page
