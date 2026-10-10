@@ -125,6 +125,8 @@ it.each([
   const opener = container.querySelector<HTMLAnchorElement>(`[data-od-id="${id}"]`)!;
   opener.focus(); fireEvent.click(opener);
   await waitFor(() => expect(screen.getByLabelText(id.includes('signup') ? 'Họ tên' : 'Email', { exact: true })).toHaveFocus());
+  expect(document.body).toHaveClass('overflow-hidden');
+  expect(document.documentElement).toHaveClass('overflow-hidden');
   if (method === 'forgot') {
     fireEvent.click(screen.getByRole('tab', { name: 'Đăng nhập' }));
     fireEvent.click(screen.getByRole('button', { name: 'Quên mật khẩu?' }));
@@ -134,6 +136,8 @@ it.each([
   else fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(window.location.pathname).toBe('/'));
   expect(container.querySelector(`[data-od-id="${id}"]`)).toHaveFocus();
+  expect(document.body).not.toHaveClass('overflow-hidden');
+  expect(document.documentElement).not.toHaveClass('overflow-hidden');
 });
 
 it('shows the root Google transfer modal for a real pending HTTP response and discards it after close', async () => {
