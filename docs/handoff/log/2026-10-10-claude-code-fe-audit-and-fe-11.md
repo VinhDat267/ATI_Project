@@ -9,4 +9,4 @@
   - Tái hiện lỗi: `/c/<id>` → `POST /api/auth/logout-all` → tải lại → `/login` "Phiên đăng nhập đã hết hạn" → đăng nhập → `/`; `/settings#notion` chưa đăng nhập → đăng nhập → `/`. `curl /api/conversations/khong-ton-tai` HTTP 500, `/api/conversations/00000000-0000-0000-0000-000000000000` HTTP 404.
   - Môi trường thử đã dọn: tắt tiến trình 3091/5191, xoá container PostgreSQL tạm.
 - **Chưa làm / vấn đề phát hiện:** không chạy full `npm run check`/browser ở máy (CI `main` xanh); không thử luồng duyệt/thực thi, chế độ live, đo tương phản (FE-10). Lỗi đã biết khác không kiểm lại ngoài việc đối chiếu mã (còn: `Workspace.tsx:121`, regex `ResponseMoment.tsx:15-16`, `PlanningErrors.tsx:51`, `use-sse.ts:311`).
-- **Việc tiếp theo đề xuất:** giao FE-11 cho `longnguyen005`, làm phần A trước 20/10; review khi có PR.
+- **Việc tiếp theo đề xuất:** FE-11 đã giao `longnguyen005` (người dùng chốt 10/10), làm phần A trước 20/10 và trước FE-10; review khi có PR.

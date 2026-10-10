@@ -1,6 +1,6 @@
 # FE-11 · Dọn lỗi frontend sau FE-05 → FE-09
 
-**Trạng thái:** chờ giao (người dùng định giao `longnguyen005`, thi công bằng Codex) · **Nhánh gợi ý:** `fix/fe-11-frontend-bugfixes` · **Phụ thuộc:** không; làm song song được với FE-10 (không chung file, trừ khi FE-10 sửa `routes.ts`/`App.tsx` cho `/guide`, `/privacy`: gộp `main` trước khi mở PR) · **Mốc:** phần A trước **20/10/2026** (trước buổi thử W4-03 dự kiến 23–25/10); phần B, C trước **28/10/2026**
+**Trạng thái:** đang làm, giao `longnguyen005` (thi công bằng Codex) ngày 10/10/2026; làm phần A trước FE-10 · **Nhánh gợi ý:** `fix/fe-11-frontend-bugfixes` · **Phụ thuộc:** không; làm song song được với FE-10 (không chung file, trừ khi FE-10 sửa `routes.ts`/`App.tsx` cho `/guide`, `/privacy`: gộp `main` trước khi mở PR) · **Mốc:** phần A trước **20/10/2026** (trước buổi thử W4-03 dự kiến 23–25/10); phần B, C trước **28/10/2026**
 **Nguồn:** audit frontend của Claude Code ngày 10/10/2026 trên `main` `c99b7ba` (sandbox, PostgreSQL tạm, quét 84 tổ hợp route × khổ × chế độ) và các P3 còn mở trong `CURRENT-STATE.md` mục 5.
 
 ## Vì sao quan trọng
