@@ -148,14 +148,16 @@ export class ChatService {
         ...correlation,
       });
     } else if (plannerResponse.kind === 'clarification') {
+      const reason = plannerResponse.reason ? { reason: plannerResponse.reason } : {};
       await this.msgRepo.createMessage(conversationId, 'assistant', plannerResponse.question, {
-        type: 'clarification', options: plannerResponse.options ?? [], context: plannerResponse.context, ...correlation,
+        type: 'clarification', options: plannerResponse.options ?? [], context: plannerResponse.context, ...reason, ...correlation,
       });
       this.eventEmitter.emit('clarification', {
         conversationId,
         question: plannerResponse.question,
         options: plannerResponse.options ?? [],
         context: plannerResponse.context,
+        ...reason,
         ...correlation,
       });
 
