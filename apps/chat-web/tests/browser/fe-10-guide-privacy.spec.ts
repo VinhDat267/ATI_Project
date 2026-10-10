@@ -101,6 +101,12 @@ test('FE-10: guide, privacy and 404 are public, responsive and screenshoted in b
         await setTheme(page, theme);
         await expect(page.locator('html')).toHaveAttribute('data-proto-page', entry.scope);
         await assertPageStructure(page, `${entry.path} ${viewport.width} ${theme}`);
+        if (entry.path === '/privacy') {
+          const header = page.getByRole('banner');
+          const themeToggle = header.getByRole('button', { name: /Chuyển sang giao diện/i });
+          await expect(themeToggle).toBeVisible();
+          expect(await page.getByRole('button', { name: /Chuyển sang giao diện/i }).count()).toBe(1);
+        }
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         const name = `FE10-app-${entry.scope}-${viewport.width}x${viewport.height}-${theme}.png`;
         const path = info.outputPath(name);

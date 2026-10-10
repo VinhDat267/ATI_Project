@@ -63,6 +63,15 @@ describe('FE-10 public guide and privacy routes', () => {
     expect(main).toHaveTextContent('Phiên đăng nhập có hạn 7 ngày');
     expect(main.textContent).not.toMatch(/gỡ khoá|bản nháp|lịch sử của cả nhóm|security@/i);
   });
+
+  it('keeps the privacy theme toggle inside the page header', async () => {
+    window.history.replaceState({}, '', '/privacy');
+    render(<App />);
+
+    const banner = await screen.findByRole('banner');
+    expect(within(banner).getByRole('button', { name: /chuyển sang giao diện/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /chuyển sang giao diện/i })).toHaveLength(1);
+  });
 });
 
 it('FE-10: every sample prompt declares real catalog tools for the same services', () => {

@@ -51,6 +51,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
           </div>
           {/* Cụm phải: Điều hướng nhanh */}
           <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
+            <ThemeToggle />
             <div className="hidden sm:flex items-center gap-2 sm:gap-3">
               <a href="/guide" onClick={appLink(navigate, '/guide')} className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
                 <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -769,7 +770,6 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
           </div>
         </div>
       </footer>
-      <ThemeToggle />
     </>
   );
 }
