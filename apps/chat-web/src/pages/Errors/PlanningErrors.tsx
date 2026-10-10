@@ -43,12 +43,14 @@ export function SlowPlanningMoment({ seconds, gather, services, onDismiss }: { s
     </div>
   </section>;
 }
-export function PlanningErrorMoment({ request, onRetry, onEdit }: { request: string; onRetry: () => void; onEdit: () => void }) {
+export function PlanningErrorMoment({ request, networkError = false, onRetry, onEdit }: { request: string; networkError?: boolean; onRetry: () => void; onEdit: () => void }) {
+  const label = networkError ? 'Mất kết nối' : 'Sự cố máy chủ';
+  const title = networkError ? 'Mất kết nối máy chủ' : 'Sự cố máy chủ';
   return <section id="view-server" data-moment="1" aria-label="Cockpit" className="v3-space-y-6">
     <div className="bg-white rounded-2xl border border-red-200 p-6 sm:p-8 shadow-soft max-w-2xl mx-auto v3-space-y-6">
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 border border-red-200"><ErrorIcon /></div>
-        <div className="v3-space-y-1.5 flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 uppercase tracking-wide">Sự cố máy chủ</span></div><h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">Sự cố máy chủ</h1><p role="alert" className="text-sm text-[#4B5563] leading-relaxed">Không thể lập kế hoạch lúc này. Hãy thử lại.</p></div>
+        <div className="v3-space-y-1.5 flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 uppercase tracking-wide">{label}</span></div><h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">{title}</h1><p role="alert" className="text-sm text-[#4B5563] leading-relaxed">{networkError ? 'Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.' : 'Không thể lập kế hoạch lúc này. Hãy thử lại.'}</p></div>
       </div>
       <PlanningSafetyNotice />
       {request && <div className="v3-space-y-1.5"><div className="flex items-center justify-between text-xs text-[#6B7280]"><span>Câu yêu cầu của bạn:</span></div><div id="failed-prompt-text" className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E7E7E2] text-xs font-mono text-[#111827] break-words whitespace-pre-wrap">{request}</div></div>}

@@ -354,7 +354,7 @@ export class ApiClient {
     id: string
   ): Promise<{ conversation: Conversation; messages: ChatMessage[] }> {
     return this.request<{ conversation: Conversation; messages: ChatMessage[] }>(
-      `/api/conversations/${id}`
+      `/api/conversations/${encodeURIComponent(id)}`
     );
   }
 
@@ -373,7 +373,7 @@ export class ApiClient {
     content: string,
     tempId: string
   ): Promise<any> {
-    return this.request<any>(`/api/conversations/${convId}/messages`, {
+    return this.request<any>(`/api/conversations/${encodeURIComponent(convId)}/messages`, {
       method: 'POST',
       body: JSON.stringify({ content, tempId }),
     });
@@ -383,7 +383,7 @@ export class ApiClient {
   async getActivePlan(convId: string): Promise<ActivePlan | null> {
     try {
       const data = await this.request<any>(
-        `/api/conversations/${convId}/plans/active`
+        `/api/conversations/${encodeURIComponent(convId)}/plans/active`
       );
       return data;
     } catch (err: any) {
@@ -409,7 +409,7 @@ export class ApiClient {
   // --- Executions ---
   async getLatestExecutionSnapshot(convId: string): Promise<ExecutionSnapshot | null> {
     try {
-      return await this.request<ExecutionSnapshot>(`/api/conversations/${convId}/executions/latest`);
+      return await this.request<ExecutionSnapshot>(`/api/conversations/${encodeURIComponent(convId)}/executions/latest`);
     } catch (err: any) {
       if (err.status === 404) return null;
       throw err;
