@@ -107,7 +107,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           </div>
           {' '}
           <p className="text-sm text-[#4B5563] leading-relaxed">
-            Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống ATI, đã được đổi tên hoặc chuyển sang vị trí khác. Dữ liệu công việc của bạn tại các dịch vụ vẫn an toàn tuyệt đối.
+            Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống ATI, đã được đổi tên hoặc chuyển sang vị trí khác. Lỗi điều hướng này không thay đổi dữ liệu công việc của bạn.
           </p>
           {/* Hành động điều hướng chính */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-3">

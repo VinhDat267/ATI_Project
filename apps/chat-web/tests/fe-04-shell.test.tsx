@@ -37,9 +37,9 @@ it('only exposes admin navigation to admins', () => {
   fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
   expect(screen.getByRole('menuitem', { name: 'Quản lý người dùng' })).toBeVisible();
 });
-it.each([['/guide', 'Cẩm nang'], ['/privacy', 'Chính sách an toàn']])('renders %s without a session', async (path, heading) => {
+it.each([['/guide', 'Cẩm nang kết nối & Mẫu câu lệnh ATI'], ['/privacy', 'Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.']])('renders %s without a session', async (path, heading) => {
   window.history.replaceState({}, '', path); await act(async () => { render(<App />); });
-  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+  expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeVisible();
   expect(screen.queryByLabelText('Mật khẩu')).toBeNull();
 });
 it.each([['/settings', 'settings'], ['/history', 'history']])('recognizes protected route %s', async (path, kind) => {

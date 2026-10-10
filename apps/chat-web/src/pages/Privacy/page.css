@@ -1,0 +1,42 @@
+/* <style> của privacy.html, giữ nguyên thứ tự. */
+
+    /* Design Tokens Agentic */
+    :root {
+      --bg: #F8F8F6;
+      --surface: #FFFFFF;
+      --border: #E7E7E2;
+      --fg: #111827;
+      --accent: #FF5701;
+      --muted: #6B7280;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .font-display {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Hiệu ứng cuộn và highlight section */
+    .nav-pill-active {
+      background-color: #FF5701;
+      color: #FFFFFF;
+      border-color: #FF5701;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
