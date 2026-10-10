@@ -1,6 +1,6 @@
 # FE-10 · Cẩm nang, Chính sách an toàn, 404 và rà soát toàn app
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
+**Trạng thái:** đang làm, giao `longnguyen005` (thi công bằng Codex) ngày 10/10/2026 · **Nhánh gợi ý:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
 **Đặc tả:** mục 6, 7, 8 · **Bản mẫu:** `guide.html`, `privacy.html`, `404.html`
 
 ## Vì sao quan trọng
@@ -18,6 +18,7 @@ Cẩm nang giúp quản trị viên tự kết nối dịch vụ đúng cách. T
    - đo tương phản ở cả hai chế độ trên mọi trang (tự động, kể cả trạng thái sau khi bấm: ngăn, hộp thoại, tab) và ghi lại; chỗ không đạt mà sửa thì đổi hình thức bản mẫu thì giữ như bản mẫu (đặc tả 1.1 điểm 4, người dùng chốt 07/10), chữ thường dưới 3:1 thì báo người dùng quyết định;
    - không kiểm cỡ chữ tối thiểu (bỏ yêu cầu 14px từ 07/10);
    - mỗi trang một `h1`, landmark đủ, nút chỉ có biểu tượng có nhãn;
+   - đo tương phản logo Jira (`#0052cc`, `apps/chat-web/src/assets/cockpit-services.json`) trên nền tối (chuyển từ CURRENT-STATE mục 5, thêm 10/10);
    - danh sách quy tắc trung thực (đặc tả mục 6) quét bằng test chuỗi trên bundle build.
 
 ## Tiêu chí nghiệm thu
