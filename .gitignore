@@ -76,3 +76,7 @@ docs/reports/
 # Impeccable: bộ nhớ đệm của hook thiết kế và cấu hình riêng từng máy (.impeccable/design.json được commit)
 **/.impeccable/hook.cache.json
 **/.impeccable/config.local.json
+
+# Per-machine agent configuration and hooks of the team lead
+.github/agents
+.github/hooks
