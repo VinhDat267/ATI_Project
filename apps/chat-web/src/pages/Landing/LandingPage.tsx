@@ -114,15 +114,17 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
     return () => { if (generation.current === owner) generation.current++; timers.current.forEach(window.clearTimeout); k2Timers.current.forEach(window.clearTimeout); lockScroll(false); };
   }, [initialMode]);
   useLayoutEffect(() => { if (!authOpen) restoreRequestedModalFocus(); }, [authOpen]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     lockScroll(authOpen);
-    const focusTimer = authOpen ? window.setTimeout(() => {
+    const active = document.activeElement;
+    const editingField = authCardRef.current?.contains(active) && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement);
+    if (authOpen && !editingField) {
       if (authView === 'google') authCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
       else if (authView === 'success') successCloseRef.current?.focus();
       else (authView === 'forgot' ? forgotEmailRef.current : initialMode === 'signup' ? signupNameRef.current : loginEmailRef.current)?.focus();
-    }, 100) : undefined;
-    return () => { window.clearTimeout(focusTimer); lockScroll(false); };
-  }, [authOpen, initialMode, authView]);
+    }
+    return () => { lockScroll(false); };
+  }, [authOpen, initialMode, authView, authConfig?.signupEnabled]);
   const clearK2Timers = () => {
     k2Timers.current.forEach(window.clearTimeout);
     k2Timers.current = [];

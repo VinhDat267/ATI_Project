@@ -21,6 +21,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/'); authStorage.clearStoredTokens(); });
 const open = (path: string) => { window.history.replaceState({}, '', path); return render(<App />); };
 
+it('does not move focus back to email after the user starts editing the password', async () => {
+  vi.useFakeTimers();
+  open('/login');
+  const email = screen.getByLabelText('Email', { exact: true });
+  const password = screen.getByLabelText('Mật khẩu', { exact: true });
+  email.focus();
+  fireEvent.change(email, { target: { value: 'focus@example.test' } });
+  password.focus();
+  await act(async () => { vi.advanceTimersByTime(100); });
+  expect(password).toHaveFocus();
+});
+
+it.each([
+  ['/login', 'Email'], ['/signup', 'Họ tên'], ['/forgot-password', 'Email'],
+])('focuses the first available field before interaction on %s', async (path, label) => {
+  open(path);
+  expect(await screen.findByLabelText(label, { exact: true })).toHaveFocus();
+});
+
 it('ports five landing moments and eight services with source classes and no demo controls', async () => {
   const { container } = open('/');
   expect(container.querySelectorAll('.moment-trigger')).toHaveLength(5);
