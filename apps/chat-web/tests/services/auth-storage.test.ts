@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   authStorage,
@@ -108,5 +109,13 @@ describe('authStorage', () => {
     unsubscribe();
     setStoredTokens({ accessToken: 't2' });
     expect(notifications).toHaveLength(2);
+  });
+
+  it('reports browser storage events as cross-tab changes', () => {
+    const sources: string[] = [];
+    const unsubscribe = subscribeAuthTokens((_tokens, source) => sources.push(source));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'wap_access_token', oldValue: 'old', newValue: null }));
+    expect(sources).toEqual(['storage']);
+    unsubscribe();
   });
 });

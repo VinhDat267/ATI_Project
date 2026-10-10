@@ -42,21 +42,33 @@ export function getStoredTokens(): StoredTokens {
   return { accessToken, refreshToken, user };
 }
 
-export type AuthChangeListener = (tokens: StoredTokens) => void;
+export type AuthChangeSource = 'local' | 'storage';
+export type AuthChangeListener = (tokens: StoredTokens, source: AuthChangeSource) => void;
 const listeners = new Set<AuthChangeListener>();
+let listensForStorage = false;
+
+function onStorage(event: StorageEvent): void {
+  if (event.storageArea && event.storageArea !== window.localStorage) return;
+  if (event.key !== null && ![ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)) return;
+  notifyListeners('storage');
+}
 
 export function subscribeAuthTokens(listener: AuthChangeListener): () => void {
+  if (!listensForStorage && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
+    listensForStorage = true;
+  }
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 }
 
-function notifyListeners(): void {
+function notifyListeners(source: AuthChangeSource = 'local'): void {
   const current = getStoredTokens();
   listeners.forEach((fn) => {
     try {
-      fn(current);
+      fn(current, source);
     } catch (err) {
       console.error('Error in auth token listener:', err);
     }

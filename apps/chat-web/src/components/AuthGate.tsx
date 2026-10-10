@@ -7,6 +7,7 @@ import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { routes, type AppRoute } from '../routes';
 import type { User } from '../types';
 import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
+import { clearAuthReturnTarget, consumeAuthReturnTarget, currentAuthReturnTarget, saveAuthReturnTarget } from '../services/auth-return-target';
 
 interface Session {
   authToken: string; user: User | null; authError: string | null;
@@ -26,24 +27,37 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const [authConfig, setAuthConfig] = useState({ signupEnabled: false, googleEnabled: false });
   const [blocked, setBlocked] = useState<{ mode: AuthActionMode; deadline?: number | null; message: string } | null>(null);
   const loginPending = useRef(false);
-  const hadSession = useRef(Boolean(authStorage.getStoredTokens().accessToken));
+  const initialTokens = useRef(authStorage.getStoredTokens());
+  const hadSession = useRef(Boolean(initialTokens.current.accessToken));
+  const previousUserId = useRef(initialTokens.current.user?.id);
   const loggingOut = useRef(false);
   useEffect(() => {
     let current = true;
     apiClient.getAuthConfig().then(data => { if (current) setAuthConfig(data); }).catch(() => {});
     return () => { current = false; };
   }, []);
-  useEffect(() => subscribeAuthTokens(tokens => {
+  useEffect(() => subscribeAuthTokens((tokens, source) => {
     const lostSession = hadSession.current && !tokens.accessToken;
     hadSession.current = Boolean(tokens.accessToken);
+    const lostUserId = previousUserId.current;
+    if (tokens.user?.id) previousUserId.current = tokens.user.id;
     setAuthToken(tokens.accessToken);
     if (tokens.user) setUser(tokens.user);
     else if (!tokens.accessToken) setUser(null);
     if (lostSession) {
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
-      if (!loggingOut.current && route.kind !== 'reset-password') { setAuthError('Phiên đăng nhập đã hết hạn'); navigate('/login', true); }
+      if (!loggingOut.current && route.kind !== 'reset-password') {
+        if (source !== 'storage') saveAuthReturnTarget(currentAuthReturnTarget(), lostUserId);
+        setAuthError(source === 'storage' ? 'Bạn đã đăng xuất ở một tab khác.' : 'Phiên đăng nhập đã hết hạn');
+        navigate('/login', true);
+      }
     }
   }), [navigate, route.kind]);
+  useEffect(() => {
+    const definition = routes.find(entry => entry.kind === route.kind);
+    const protectedRoute = route.kind !== 'not-found' && (!definition || !('publicView' in definition));
+    if (protectedRoute && !authStorage.getStoredTokens().accessToken) saveAuthReturnTarget(currentAuthReturnTarget());
+  }, [route]);
   useEffect(() => {
     let current = true;
     const { accessToken, refreshToken, user: storedUser } = authStorage.getStoredTokens();
@@ -71,14 +85,18 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     }
     return () => { current = false; };
   }, []);
-  useEffect(() => { if (authToken && route.kind === 'login') navigate('/', true); }, [authToken, route.kind, navigate]);
+  useEffect(() => {
+    if (authToken && user?.id && route.kind === 'login' && !loginPending.current) {
+      navigate(consumeAuthReturnTarget(user.id) ?? '/', true);
+    }
+  }, [authToken, user?.id, route.kind, navigate]);
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (loginPending.current) return;
     loginPending.current = true; setBlocked(null); setAuthError(null); setIsLoggingIn(true);
     try {
       const data = await apiClient.login(email, password);
       setAuthToken(data.accessToken); setUser(data.user); setPassword('');
-      if (route.kind !== 'conversation') navigate('/', true);
+      navigate(consumeAuthReturnTarget(data.user.id) ?? (route.kind === 'conversation' ? currentAuthReturnTarget() : '/'), true);
     } catch (reason) {
       const failure = reason as { status?: number; data?: { code?: string }; response?: Response };
       if (failure.status === 429) {
@@ -95,6 +113,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   };
   const onLogout = async () => {
     loggingOut.current = true;
+    clearAuthReturnTarget();
     try { await apiClient.logout(); } catch { /* Local logout still succeeds if the server cannot be reached. */ }
     finally {
       authStorage.clearStoredTokens(); setAuthToken(null); setUser(null);
