@@ -86,6 +86,28 @@ const responseCases = [
   ['refusal', 'Dịch vụ chưa được kết nối.', 'refusal'],
   ['planning_error', 'Lỗi: upstream failed', '1'],
 ] as const;
+it('keeps a newer SSE plan preview when delayed history ends in an old refusal', async () => {
+  useChatStore.getState().setConversationId('A');
+  let finishHistory!: (value: Awaited<ReturnType<typeof apiClient.getConversation>>) => void;
+  vi.mocked(apiClient.getConversation).mockImplementationOnce(() => new Promise(resolve => { finishHistory = resolve; }));
+  const newPlan = {
+    id: 'p-new', summary: 'Kế hoạch mới',
+    steps: [{ id: 's-new', tool: 'slack.send_message', description: 'Gửi thông báo mới', args: { channel: '#ati-test', text: 'Thông báo mới' } }],
+  };
+  const loading = loadConversationHistory('A', () => true);
+  handleSSEEvent('plan_preview', JSON.stringify({ planId: newPlan.id, plan: newPlan }), undefined, 'A');
+  finishHistory({ conversation: { id: 'A' }, messages: [
+    { id: 'old-request', role: 'user', content: 'Yêu cầu cũ' },
+    { id: 'old-refusal', role: 'assistant', content: 'Từ chối yêu cầu: Không hỗ trợ yêu cầu cũ.', metadata: { type: 'refusal' } },
+  ] });
+  await loading;
+
+  expect(useChatStore.getState().messages).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'old-refusal', metadata: { type: 'refusal' } }),
+  ]));
+  expect(useChatStore.getState().activePlan).toMatchObject(newPlan);
+  expect(useChatStore.getState().planStatus).toBe('preview');
+});
 it.each(responseCases.flatMap(([type, content, moment]) => [false, true].map(snapshotFirst => ({ type, content, moment, snapshotFirst }))))('reopening keeps the latest $type above an older receipt (snapshotFirst=$snapshotFirst)', async ({ type, content, moment, snapshotFirst }) => {
   useChatStore.getState().setConversationId('A');
   const history = { conversation: { id: 'A' }, messages: [
