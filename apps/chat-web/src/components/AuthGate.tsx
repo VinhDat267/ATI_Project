@@ -48,7 +48,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
       if (!loggingOut.current && route.kind !== 'reset-password') {
         if (source !== 'storage') saveAuthReturnTarget(currentAuthReturnTarget(), lostUserId);
-        setAuthError(source === 'storage' ? 'Bạn đã đăng xuất ở một tab khác.' : 'Phiên đăng nhập đã hết hạn');
+        setAuthError(source === 'storage' ? 'Phiên đăng nhập đã kết thúc ở một tab khác.' : 'Phiên đăng nhập đã hết hạn');
         navigate('/login', true);
       }
     }

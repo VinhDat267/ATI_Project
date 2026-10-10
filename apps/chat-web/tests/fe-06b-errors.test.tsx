@@ -1,20 +1,34 @@
 /** @vitest-environment jsdom */
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { Workspace } from '../src/components/Workspace';
 import { AuthGate } from '../src/components/AuthGate';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
+import { useSSE } from '../src/hooks/use-sse';
 import type { AppRoute } from '../src/routes';
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: () => ({ disconnected: false, reconnect: () => {} }) }));
+vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false, reconnect: () => {} })) }));
 vi.mock('../src/hooks/use-conversation-history', () => ({ useConversationHistory: () => ({ loading: false, error: null }) }));
 vi.mock('../src/services/api-client', () => ({ sharesAuthSession: () => false, apiClient: {
   getServices: async () => ({ services: [], canConfigure: false }), getRuntime: async () => ({ runtimeMode: 'sandbox' }),
   getConversations: async () => ({ conversations: [] }), getAuthConfig: async () => ({ signupEnabled: false, googleEnabled: false }),
   getMe: async () => ({ user: { id: 'u', name: 'User', email: 'user@example.test' } }), logout: async () => {},
 } }));
+beforeEach(() => { vi.mocked(useSSE).mockReturnValue({ disconnected: false, reconnect: () => {} }); });
 afterEach(() => { cleanup(); useChatStore.getState().reset(); authStorage.clearStoredTokens(); vi.restoreAllMocks(); });
+it.each([
+  [false, false], [true, false], [false, true], [true, true],
+])('Workspace passes SSE/browser connectivity into the planning error (disconnected=%s, offline=%s)', async (disconnected, offline) => {
+  vi.mocked(useSSE).mockReturnValue({ disconnected, reconnect: () => {} });
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(!offline);
+  useChatStore.setState({ messages: [
+    { id: 'request', role: 'user', content: 'Connectivity request' },
+    { id: 'error', role: 'assistant', content: 'Planning failed', metadata: { type: 'planning_error' } },
+  ] });
+  render(<Workspace authToken="test" user={null} onLogout={() => {}} authError={null} onClearAuthError={() => {}} route={{ kind: 'home' }} navigate={() => {}} />);
+  expect(await screen.findByRole('heading', { level: 1, name: disconnected || offline ? 'Mất kết nối máy chủ' : 'Sự cố máy chủ' })).toBeInTheDocument();
+});
 it('browser offline event shows the prototype banner and retry probes health without resending a write', async () => {
   const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
   render(<Workspace authToken="test" user={null} onLogout={() => {}} authError={null} onClearAuthError={() => {}} route={{ kind: 'home' }} navigate={() => {}} />);

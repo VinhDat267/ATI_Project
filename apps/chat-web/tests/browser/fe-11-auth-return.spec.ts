@@ -15,9 +15,9 @@ test('FE-11: revoked session logs back into the same saved conversation', async 
   try {
     const userId = (await db.query("INSERT INTO users(email,password,name,status,email_verified,role) VALUES($1,$2,'FE11 Return','active',true,'member') RETURNING id", [email, hashPassword()])).rows[0].id;
     const conversationId = (await db.query("INSERT INTO conversations(user_id,status) VALUES($1,'chatting') RETURNING id", [userId])).rows[0].id;
-    await db.query(`INSERT INTO messages(conv_id,role,content,metadata) VALUES
-      ($1,'user','FE11 durable request',NULL),
-      ($1,'assistant','FE11 durable planning error','{"type":"planning_error"}'::jsonb)`, [conversationId]);
+    await db.query(`INSERT INTO messages(conv_id,role,content,metadata,created_at) VALUES
+      ($1,'user','FE11 durable request',NULL,now() - interval '1 second'),
+      ($1,'assistant','FE11 durable planning error','{"type":"planning_error"}'::jsonb,now())`, [conversationId]);
 
     await page.goto('/login');
     await page.getByLabel('Email', { exact: true }).fill(email);
@@ -29,12 +29,13 @@ test('FE-11: revoked session logs back into the same saved conversation', async 
     const oldTokens = await page.evaluate(() => ({ access: localStorage.getItem('wap_access_token'), refresh: localStorage.getItem('wap_refresh_token') }));
     const otherSession = await page.request.post('/api/auth/login', { data: { email, password } });
     const otherAccessToken = (await otherSession.json()).accessToken;
+    await page.goto('about:blank');
     expect((await page.request.post('/api/auth/logout-all', { headers: { Authorization: `Bearer ${otherAccessToken}` } })).status()).toBe(200);
     expect((await page.request.get('/api/auth/me', { headers: { Authorization: `Bearer ${oldTokens.access}` } })).status()).toBe(401);
     const revokedRefresh = await page.request.post('/api/auth/refresh', { data: { refreshToken: oldTokens.refresh } });
     expect(revokedRefresh.status()).toBe(401);
 
-    await page.reload();
+    await page.goto(`/c/${conversationId}`);
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByText('Phiên đăng nhập đã hết hạn')).toBeVisible();
     await page.getByLabel('Email', { exact: true }).fill(email);

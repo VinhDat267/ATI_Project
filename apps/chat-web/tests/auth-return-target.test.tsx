@@ -108,5 +108,5 @@ it('reports a cross-tab logout differently from an expired refresh', async () =>
   localStorage.removeItem('wap_refresh_token');
   localStorage.removeItem('wap_user');
   act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'wap_access_token', oldValue: 'access', newValue: null })));
-  expect(await screen.findByText('Bạn đã đăng xuất ở một tab khác.')).toBeInTheDocument();
+  expect(await screen.findByText('Phiên đăng nhập đã kết thúc ở một tab khác.')).toBeInTheDocument();
 });
