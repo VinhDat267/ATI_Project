@@ -90,6 +90,7 @@ export interface ClarificationResponse {
   question: string;
   options?: string[];
   context: string;
+  reason?: 'read_only' | 'destination';
 }
 
 export interface RefusalResponse {
