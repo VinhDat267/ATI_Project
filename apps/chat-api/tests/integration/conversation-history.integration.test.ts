@@ -5,8 +5,12 @@ import request, { type Response } from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
+import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
+import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
+import { ExecutionService } from '../../src/services/execution-service.js';
+import { SSEManager } from '../../src/sse/sse-manager.js';
 
 const connectionString = process.env.DATABASE_URL;
 const schema = `fe02_history_${randomUUID().replaceAll('-', '')}`;
@@ -138,5 +142,35 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     for (const query of [{ cursor: 'bad cursor' }, { cursor: impossibleDate }, { limit: '500' }, { limit: '-1' }]) {
       expect((await request(app).get('/api/conversations').query(query).set('Authorization', bearer(owner))).status).toBe(400);
     }
+  });
+
+  it('returns not-found instead of PostgreSQL UUID errors for every ID-bearing HTTP route', async () => {
+    const owner = await user();
+    const planRepo = new PlanRepo(pool), stepRepo = new StepRepo(pool), sseManager = new SSEManager();
+    const executionService = new ExecutionService({ planRepo, stepRepo, convRepo: repo,
+      adapterFactory: { getAdapterForService: () => { throw new Error('must not resolve adapters for malformed ids'); } }, sseManager });
+    const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messages, planRepo, sseManager, executionService,
+      chatService: { handleUserMessage: () => { throw new Error('must not ingest malformed conversation ids'); } } as any });
+    const authorization = bearer(owner);
+    const malformed = 'khong-ton-tai';
+    const calls = [
+      request(app).get(`/api/conversations/${malformed}`),
+      request(app).get(`/api/conversations/${malformed}/plans/active`),
+      request(app).get(`/api/conversations/${malformed}/messages/latest`),
+      request(app).post(`/api/conversations/${malformed}/messages`).send({ content: 'Không được ghi' }),
+      request(app).patch(`/api/conversations/${malformed}`).send({ title: 'Tên hợp lệ' }),
+      request(app).get(`/api/conversations/${malformed}/stream`),
+      request(app).get(`/api/conversations/${malformed}/executions/latest`),
+      request(app).post(`/api/plans/${malformed}/approve`),
+      request(app).post(`/api/plans/${malformed}/reject`),
+      request(app).post(`/api/executions/${malformed}/continue`),
+      request(app).post(`/api/executions/${malformed}/steps/step_1/retry`),
+      request(app).post(`/api/executions/${malformed}/steps/step_1/skip`),
+      request(app).post(`/api/executions/${malformed}/stop`),
+      request(app).get(`/api/executions/${malformed}/status`),
+    ];
+    const responses = await Promise.all(calls.map(call => call.set('Authorization', authorization)));
+    expect(responses.map(response => response.status)).toEqual(Array(responses.length).fill(404));
+    expect(responses.every(response => !/uuid|syntax|database/i.test(String(response.body.error)))).toBe(true);
   });
 });

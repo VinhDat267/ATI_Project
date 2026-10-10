@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { isUuid } from './uuid.js';
 
 export interface PlanRow {
   id: string;
@@ -52,6 +53,7 @@ export class PlanRepo {
   }
 
   async getPlan(id: string): Promise<PlanRow | null> {
+    if (!isUuid(id)) return null;
     const res = await this.pool.query('SELECT *, xmin::text AS revision FROM plans WHERE id = $1', [id]);
     return res.rows[0] || null;
   }
