@@ -70,6 +70,9 @@ docs/ai-evidence/V3-LIVE-EXECUTION/
 # Real authentication evidence contains private email addresses and one-use links (AUTH-06)
 docs/ai-evidence/AUTH-LIVE/
 
+# Course reports stay on the team lead machine only (CURRENT-STATE section 1 and 7)
+docs/reports/
+
 # Impeccable: bộ nhớ đệm của hook thiết kế và cấu hình riêng từng máy (.impeccable/design.json được commit)
 **/.impeccable/hook.cache.json
 **/.impeccable/config.local.json
