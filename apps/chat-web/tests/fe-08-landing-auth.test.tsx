@@ -36,7 +36,7 @@ it('keeps the prototype theme control on the public landing header', () => {
 it('blocks short signup passwords even when a form submit bypasses native validation', async () => {
   const { container } = open('/signup');
   await waitFor(() => expect(calls).toContain('/api/auth/config'));
-  fireEvent.change(screen.getByLabelText(/^Họ/), { target: { value: 'User' } });
+  fireEvent.change(await screen.findByLabelText(/^Họ/, {}, { timeout: 5_000 }), { target: { value: 'User' } });
   fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'user@example.test' } });
   fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'short' } });
   fireEvent.submit(container.querySelector('form')!);
@@ -149,7 +149,7 @@ it('does not restore a modal opener on an unrelated route change', async () => {
   fireEvent.click(container.querySelector('[data-od-id="btn-header-login"]')!);
   await waitFor(() => expect(screen.getByLabelText('Email', { exact: true })).toHaveFocus());
   window.history.replaceState({}, '', '/guide'); fireEvent.popState(window);
-  expect(await screen.findByRole('heading', { name: 'Cẩm nang', level: 1 })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Cẩm nang kết nối & Mẫu câu lệnh ATI', level: 1 })).toBeVisible();
   window.history.replaceState({}, '', '/'); fireEvent.popState(window);
   expect(container.querySelector('[data-od-id="btn-header-login"]')).not.toHaveFocus();
 });

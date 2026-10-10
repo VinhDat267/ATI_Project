@@ -13,6 +13,7 @@ const exceptions = [
   { file: 'apps/chat-web/src/components/MissionControlLaunchpad.tsx', pattern: /^(trello\.(create_card|add_member|add_checklist|search_boards|search_cards)|slack\.(send_message|search_channels)|github\.search_issues)$/, reason: 'Existing sample workflows, registered-tool availability checked by FE-01; frontend naming follows W3-00b.' },
   { file: 'apps/chat-web/src/components/LandingPage.tsx', pattern: /^(trello|slack|github)$/, reason: 'Introduction display strings, permitted by task.' },
   { file: 'apps/chat-web/src/components/LoginPage.tsx', pattern: /^(trello|slack|github)$/, reason: 'Login display strings, permitted by task.' },
+  { file: 'apps/chat-web/src/pages/Guide/data.tsx', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'FE-10 presentation content; every declared tool is checked against the live catalog.' },
 ];
 
 function literals(source: string, ids: string[]) {

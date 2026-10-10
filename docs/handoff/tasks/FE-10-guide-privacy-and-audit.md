@@ -1,6 +1,6 @@
 # FE-10 · Cẩm nang, Chính sách an toàn, 404 và rà soát toàn app
 
-**Trạng thái:** đang làm, giao `longnguyen005` (thi công bằng Codex) ngày 10/10/2026 · **Nhánh gợi ý:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
+**Trạng thái:** đã triển khai, chờ review, giao `longnguyen005` (thi công bằng Codex) ngày 10/10/2026 · **Nhánh:** `feat/fe-10-guide-privacy-audit` · **Phụ thuộc:** FE-04b đã merge (lớp nền bản React; FE-04 đã merge) (rà soát cuối chạy sau FE-05 → FE-09) · **Mốc:** 28/10/2026
 **Đặc tả:** mục 6, 7, 8 · **Bản mẫu:** `guide.html`, `privacy.html`, `404.html`
 
 ## Vì sao quan trọng
@@ -37,4 +37,9 @@ Viết lại nội dung pháp lý; dịch sang tiếng Anh.
 
 ## Kết quả
 
-_(agent thi công điền)_
+- Đã thay hai placeholder công khai bằng trang React `/guide` và `/privacy`, giữ cấu trúc/CSS bản mẫu, nối điều hướng/theme/menu thật và bỏ vai trò, tài khoản, kịch bản demo. Cẩm nang có đủ 8 dịch vụ, 12 mẫu câu lệnh; từng mẫu khai báo tool và test đối chiếu trực tiếp `ALL_TOOLS`.
+- Privacy giữ đúng hợp đồng dữ liệu thật: lưu hội thoại/kế hoạch đã duyệt/kết quả từng bước, khoá mã hoá khi lưu, phiên 7 ngày; không quảng bá gỡ khoá, bản nháp, lịch sử cả nhóm hay tính năng không có. 404 được kiểm lại và bỏ tuyên bố “an toàn tuyệt đối”.
+- Bundle production được quét 6 nhóm tuyên bố cấm. Guard generic-plumbing chỉ có ngoại lệ hẹp cho `Guide/data.tsx`; logic trang không hardcode dịch vụ mặc định. Logo Jira dark mode đổi riêng sang `#60A5FA`, đạt **7,14:1** trên `#0E1528`.
+- Audit tự động đã đi qua toàn bộ route công khai/riêng tư ở sáng/tối: mỗi màn có một `h1` được expose, một `main`, header và nút biểu tượng có nhãn. Bảng tương phản không chặn merge được ghi đầy đủ trong [log FE-10](../log/2026-10-10-codex-fe-10.md); các chữ thường dưới 3:1 giữ nguyên theo bản mẫu và chờ quyết định thiết kế như yêu cầu task.
+- Visual parity tạo **12 cặp** app/prototype cho Guide, Privacy, 404 ở 1440×900 và 375×812, sáng/tối; ảnh nằm ngoài Git tại `node_modules/.cache/fe10-parity`, manifest SHA256 `cb07794a2ae30c2cc7925c0130fb2bc807884d625da3a510888250c19a4d0411`. Khác biệt còn lại là dữ liệu/điều hướng thật, bỏ control demo và Jira dark-mode accessibility; không có ảnh được commit.
+- RED ban đầu: focused test không import được `pages/Guide/data`. GREEN: 5/5 focused; frontend 648/648; `npm run check` exit 0 với **1.640 source tests + 173 eval**; `npm run test:browser:v3` exit 0 với **100 pass, 1 skip có sẵn, 11 scenario**. Một lần full check gặp Calendar integration flake; cùng test chạy riêng 1/1 và nguyên gate chạy lại exit 0, không sửa Calendar/timeout.

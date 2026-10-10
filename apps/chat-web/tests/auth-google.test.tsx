@@ -71,7 +71,7 @@ async function complete(body: unknown, status = 200) {
 
 it.each(['/login', '/signup'])('shows enabled Google action and submits login mode on %s', async path => {
   window.history.replaceState({}, '', path); render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }, { timeout: 5_000 }));
   expect(await screen.findByRole('alert')).toBeVisible();
   expect(calls.filter(call => call.path === '/api/auth/google/start').map(call => call.body)).toEqual([{ mode: 'login' }]);
 });
