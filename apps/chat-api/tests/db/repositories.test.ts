@@ -9,6 +9,12 @@ import {
 
 describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)', () => {
   describe('PlanRepo', () => {
+    it('treats a malformed PostgreSQL UUID plan id as not found without querying', async () => {
+      const query = vi.fn();
+      const repo = new PlanRepo({ query } as any);
+      await expect(repo.getPlan('khong-ton-tai')).resolves.toBeNull();
+      expect(query).not.toHaveBeenCalled();
+    });
     it('approves plan with optimistic locking query condition', async () => {
       const mockQuery = vi.fn().mockResolvedValue({
         rowCount: 1,
@@ -60,6 +66,13 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
   });
 
   describe('ConversationRepo', () => {
+    it('treats malformed PostgreSQL UUID conversation ids as not found without querying', async () => {
+      const query = vi.fn();
+      const repo = new ConversationRepo({ query } as any);
+      await expect(repo.getConversation('khong-ton-tai')).resolves.toBeNull();
+      await expect(repo.renameConversation('khong-ton-tai', 'u1', 'Tên hợp lệ')).resolves.toBeNull();
+      expect(query).not.toHaveBeenCalled();
+    });
     it('creates and lists conversations for user', async () => {
       const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
         if (sql.includes('INSERT INTO conversations')) {

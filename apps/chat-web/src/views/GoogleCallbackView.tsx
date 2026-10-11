@@ -4,6 +4,7 @@ import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import type { GoogleCallbackInput } from '../routes';
 import { type AuthViewProps } from './AuthFormFrame';
 import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
+import { consumeAuthReturnTarget } from '../services/auth-return-target';
 
 export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps & { googleCallback?: GoogleCallbackInput }) {
   const [busy, setBusy] = useState(true), [message, setMessage] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
       // Stop our listener before our own intentional principal transition.
       unsubscribe();
       authStorage.setStoredTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
-      setMessage('Đăng nhập Google thành công.'); navigate('/', true);
+      setMessage('Đăng nhập Google thành công.'); navigate(consumeAuthReturnTarget(data.user.id) ?? '/', true);
     }).catch(reason => {
       if (!canComplete()) return;
       const code = reason?.data?.code;

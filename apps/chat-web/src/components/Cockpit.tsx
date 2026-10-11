@@ -35,6 +35,7 @@ interface Props {
   onSendMessage: (text: string) => void; onNewConversation: () => void;
   onSelectConversation: (id: string) => void; onSettings: () => void;
   onApprove: () => void; onCancel: () => void; recovery: RecoveryControls | null;
+  networkError?: boolean;
   contentOverride?: ReactNode; canConfigureServices?: boolean;
 }
 const prompts: Record<string,string> = Object.fromEntries(Object.entries(presentation.services).map(([id, asset]) => [id, asset.prompt]));
@@ -139,7 +140,7 @@ export function Cockpit(props: Props) {
   const response = moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
     : slow ? <SlowPlanningMoment seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
-    : planningError ? <PlanningErrorMoment request={request ?? ''} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>
+    : planningError ? <PlanningErrorMoment request={request ?? ''} networkError={props.networkError} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>
     : null;
   const title = moment === 1 ? 'Bạn muốn nhờ ATI việc gì?' : moment === 2 ? 'Đang tìm đúng chỗ' : moment === 3 ? 'ATI cần bạn chọn thêm' : moment === 4 ? 'Kiểm tra trước khi làm' : moment === 5 ? 'ATI đang làm' : moment === 6 ? 'Việc đã xong' : moment === 'refusal' ? 'Chưa thể làm yêu cầu này' : moment === 'unsuccessful' ? 'Yêu cầu đã kết thúc' : 'Cần xử lý trước khi tiếp tục';
   return <>

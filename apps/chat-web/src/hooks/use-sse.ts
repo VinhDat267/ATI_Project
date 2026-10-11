@@ -177,6 +177,7 @@ export function handleSSEEvent(
         question: typeof data.question === 'string' && data.question.trim() ? data.question : 'Vui lòng làm rõ yêu cầu:',
         options: Array.isArray(data.options) ? data.options.filter((option: unknown): option is string => typeof option === 'string' && option.trim() !== '') : [],
         context: typeof data.context === 'string' && data.context.trim() ? data.context : undefined,
+        reason: data.reason === 'read_only' || data.reason === 'destination' ? data.reason : undefined,
       });
       break;
     }
@@ -289,6 +290,8 @@ export function handleSSEEvent(
 class StreamAuthError extends Error {}
 class StreamClientError extends Error {}
 
+export const conversationStreamPath = (conversationId: string) => `/api/conversations/${encodeURIComponent(conversationId)}/stream`;
+
 export function useSSE(conversationId: string | null, token: string | null) {
   const [disconnected, setDisconnected] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -306,7 +309,7 @@ export function useSSE(conversationId: string | null, token: string | null) {
     const connected = () => { if (timer) clearTimeout(timer); timer = undefined; setDisconnected(false); };
     const cursor = lastEventSeq.get(conversationId);
     const lastId = !cursor ? '0' : cursor.epoch === 'legacy' ? String(cursor.seq) : `${cursor.epoch}:${cursor.seq}`;
-    fetchEventSource(`/api/conversations/${conversationId}/stream`, {
+    fetchEventSource(conversationStreamPath(conversationId), {
       signal: ctrl.signal,
       openWhenHidden: true,
       headers: { Authorization: `Bearer ${token}`, 'Last-Event-ID': lastId },

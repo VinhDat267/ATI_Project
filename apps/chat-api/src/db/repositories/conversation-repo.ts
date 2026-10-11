@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { encodeConversationCursor, validateConversationPage, validateConversationTitle, type ConversationPageOptions } from './conversation-history.js';
+import { isUuid } from './uuid.js';
 
 export interface ConversationRow {
   id: string;
@@ -35,6 +36,7 @@ export class ConversationRepo {
   }
 
   async getConversation(id: string): Promise<ConversationRow | null> {
+    if (!isUuid(id)) return null;
     const res = await this.pool.query(
       'SELECT * FROM conversations WHERE id = $1',
       [id]
@@ -67,6 +69,7 @@ export class ConversationRepo {
   }
 
   async renameConversation(id: string, userId: string, title: string): Promise<ConversationRow | null> {
+    if (!isUuid(id)) return null;
     const result = await this.pool.query<ConversationRow>(
       'UPDATE conversations SET title=$3, updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *',
       [id, userId, validateConversationTitle(title)],

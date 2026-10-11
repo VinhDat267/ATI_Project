@@ -1,4 +1,6 @@
+/** @vitest-environment jsdom */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { transcriptText } from './cockpit-test-helpers';
 import { App } from '../src/App';
@@ -8,18 +10,24 @@ import { useChatStore } from '../src/store/chat-store';
 vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = {id:'u1', name:'Tester', email:'test@example.test'};
 beforeEach(() => {
+  window.history.replaceState({}, '', '/');
   useChatStore.getState().reset();
   authStorage.setStoredTokens({accessToken:'access', refreshToken:'refresh', user});
   vi.spyOn(apiClient, 'request').mockImplementation(async url => {
     if (url === '/api/auth/me') return {user};
     if (url === '/api/health') return {runtimeMode:'sandbox'};
     if (url === '/api/services') return {services:[]};
+    if (url === '/api/conversations/older-c2') return {conversation:{id:'older-c2'},messages:[{id:'m2',role:'user',content:'Older conversation'}]};
+    if (url === '/api/conversations/older-c2/plans/active' || url === '/api/conversations/older-c2/executions/latest') return null;
     return {conversations:[]};
   });
 });
-afterEach(() => {cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens();});
+afterEach(() => {cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); window.history.replaceState({}, '', '/');});
 async function openApp() { render(<App />); await screen.findByRole('heading',{level:1}); }
 it('preserves the current conversation and messages when creating a conversation fails', async () => {
+  window.history.replaceState({}, '', '/c/older-c2');
+  window.history.pushState({}, '', '/c/valid-c1');
+  const replace = vi.spyOn(window.history, 'replaceState');
   useChatStore.setState({conversationId:'valid-c1',messages:[{id:'m1',role:'user',content:'Keep this conversation'}]});
   vi.spyOn(apiClient,'createConversation').mockRejectedValue(new TypeError('Failed to fetch'));
   await openApp();
@@ -28,6 +36,9 @@ it('preserves the current conversation and messages when creating a conversation
   await screen.findByText(/Không thể kết nối máy chủ/);
   expect(useChatStore.getState().conversationId).toBe('valid-c1');
   expect(await transcriptText('Keep this conversation')).toBeInTheDocument();
+  expect(replace).toHaveBeenCalledWith({}, '', '/c/valid-c1');
+  window.history.back();
+  await waitFor(() => expect(window.location.pathname).toBe('/c/older-c2'));
 });
 it('disables approval without a real plan id', async () => {
   useChatStore.setState({conversationId:'c1',activePlan:{summary:'Invalid plan',steps:[]} as any,planStatus:'preview'});

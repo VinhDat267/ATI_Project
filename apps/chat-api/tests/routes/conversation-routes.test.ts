@@ -154,6 +154,7 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
         question: 'Which board?',
         options: ['Board A', 'Board B'],
         context: 'Need board',
+        reason: 'read_only',
       }),
     };
     const mockEmitter = {
@@ -181,8 +182,12 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
       expect.objectContaining({
         conversationId: 'conv-2',
         question: 'Which board?',
+        reason: 'read_only',
       })
     );
+    expect(mockMsgRepo.createMessage).toHaveBeenCalledWith('conv-2', 'assistant', 'Which board?', expect.objectContaining({
+      type: 'clarification', reason: 'read_only',
+    }));
   });
 
   it('handles error in planner and emits error event', async () => {

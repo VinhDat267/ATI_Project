@@ -118,7 +118,11 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
           retiredExecutionPlanId: previous.retiredExecutionPlanId,
         });
         setConversationId(previous.conversationId);
-        if (previousRoute.kind === 'conversation') navigate(conversationPath(previousRoute.conversationId));
+        if (previousRoute.kind === 'conversation') {
+          const path = conversationPath(previousRoute.conversationId);
+          window.addEventListener('popstate', () => navigate(path, true), { once: true });
+          window.history.back();
+        }
       }
       setActionError(userErrorMessage(error));
     }
@@ -246,6 +250,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
         {actionError && <p role="alert" className="px-4 py-2 text-danger-text">{actionError}</p>}
         <div className="contents">
           <Cockpit user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError}
+            networkError={disconnected || network.offline}
             contentOverride={history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6">Đang tải hội thoại...</p> : undefined}
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
             onSelectConversation={id => navigate(conversationPath(id))} onSettings={() => navigate('/settings')}

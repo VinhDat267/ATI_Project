@@ -101,7 +101,7 @@ function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
 
 function readOnlyQuestion(): PlannerResponse {
   return { kind: 'clarification', question: 'Bạn muốn làm gì với dữ liệu này, chẳng hạn gửi thông báo, ghi vào bảng tính hoặc tạo công việc?',
-    context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.' };
+    context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
 }
 
 export class AIPlanner {

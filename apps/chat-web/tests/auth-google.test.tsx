@@ -7,8 +7,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
+import { consumeAuthReturnTarget, saveAuthReturnTarget } from '../src/services/auth-return-target';
 
 const nativeFetch = globalThis.fetch;
+const getAuthConfig = apiClient.getAuthConfig.bind(apiClient);
+let authConfigRequests: Array<ReturnType<typeof apiClient.getAuthConfig>>;
 const user = { id: 'google-user', email: 'google@example.test', name: 'Google fixture' };
 let server: Server, base: string;
 let googleEnabled: boolean, signupEnabled: boolean;
@@ -23,6 +26,10 @@ function reply(response: ServerResponse, body: unknown, status = 200) {
   response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(body));
 }
 beforeEach(async () => {
+  sessionStorage.clear(); authConfigRequests = [];
+  vi.spyOn(apiClient, 'getAuthConfig').mockImplementation(() => {
+    const request = getAuthConfig(); authConfigRequests.push(request); return request;
+  });
   authStorage.clearStoredTokens(); googleEnabled = true; signupEnabled = true; calls = []; callbacks = []; holdMe = false; meResponses = []; holdRefresh = false; refreshResponses = []; protectedWrites = []; unauthorizedWriteToken = ''; meHeadersArrived = 0;
   window.history.replaceState({}, '', '/login');
   server = createServer(async (request, response) => {
@@ -32,7 +39,10 @@ beforeEach(async () => {
       protectedWrites.push({ authorization: request.headers.authorization, body: JSON.parse(raw) });
       return reply(response, { success: true }, request.headers.authorization === `Bearer ${unauthorizedWriteToken}` ? 401 : 200);
     }
-    if (request.url === '/api/auth/config') return reply(response, { signupEnabled, googleEnabled });
+    if (request.url === '/api/auth/config') {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return reply(response, { signupEnabled, googleEnabled });
+    }
     if (request.url === '/api/auth/google/callback') { callbacks.push(response); return; }
     if (request.url === '/api/auth/google/start') return reply(response, { code: 'GOOGLE_DISABLED', error: 'Không thể đăng nhập Google.' }, 503);
     if (request.url === '/api/auth/google/unlink') return reply(response, { success: true });
@@ -57,7 +67,7 @@ beforeEach(async () => {
   });
 });
 afterEach(async () => {
-  cleanup(); vi.unstubAllGlobals(); authStorage.clearStoredTokens(); window.history.replaceState({}, '', '/');
+  cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); sessionStorage.clear(); window.history.replaceState({}, '', '/');
   server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
 });
 function openCallback(query = 'code=private-code&state=private-state') {
@@ -65,24 +75,30 @@ function openCallback(query = 'code=private-code&state=private-state') {
   return render(<StrictMode><App /></StrictMode>);
 }
 async function waitCallback() { await waitFor(() => expect(callbacks).toHaveLength(1)); }
+async function waitAuthConfig() {
+  await waitFor(() => expect(authConfigRequests.length).toBeGreaterThan(0));
+  await act(async () => { await Promise.all(authConfigRequests); });
+}
 async function complete(body: unknown, status = 200) {
   await waitCallback(); await act(async () => { reply(callbacks[0], body, status); await nativeFetch(`${base}/round-trip`); });
 }
 
 it.each(['/login', '/signup'])('shows enabled Google action and submits login mode on %s', async path => {
   window.history.replaceState({}, '', path); render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }, { timeout: 5_000 }));
+  await waitAuthConfig();
+  fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Google' }));
   expect(await screen.findByRole('alert')).toBeVisible();
   expect(calls.filter(call => call.path === '/api/auth/google/start').map(call => call.body)).toEqual([{ mode: 'login' }]);
 });
 it.each(['/login', '/signup'])('hides Google when server config disables it on %s', async path => {
   googleEnabled = false; window.history.replaceState({}, '', path); render(<App />);
-  await waitFor(() => expect(calls.some(call => call.path === '/api/auth/config')).toBe(true));
+  await waitAuthConfig();
   expect(screen.queryByRole('button', { name: 'Tiếp tục với Google' })).toBeNull();
 });
 it('keeps Google signup available when only email signup is disabled', async () => {
   signupEnabled = false; window.history.replaceState({}, '', '/signup'); render(<App />);
-  expect(await screen.findByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
+  await waitAuthConfig();
+  expect(screen.getByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
   expect(screen.queryByLabelText('Mật khẩu')).toBeNull();
 });
 it('scrubs callback secrets before any HTTP request and consumes the state once in StrictMode', async () => {
@@ -94,6 +110,14 @@ it('scrubs callback secrets before any HTTP request and consumes the state once 
   expect(window.location.pathname).toBe('/');
   expect(authStorage.getStoredTokens()).toEqual({ accessToken: 'access-google', refreshToken: 'refresh-google', user });
   expect(JSON.stringify(localStorage)).not.toMatch(/private-code|private-state/);
+});
+it.each([true, false])('restores a Google callback target only for its saved owner (same user=%s)', async sameUser => {
+  saveAuthReturnTarget('/settings?tab=apps#notion', sameUser ? user.id : 'previous-user');
+  openCallback();
+  await complete({ accessToken: 'access-google', refreshToken: 'refresh-google', user });
+  await waitFor(() => expect(`${location.pathname}${location.search}${location.hash}`).toBe(sameUser ? '/settings?tab=apps#notion' : '/'));
+  expect(authStorage.getStoredTokens().user?.id).toBe(user.id);
+  expect(consumeAuthReturnTarget(user.id)).toBeNull();
 });
 it('shows pending approval without storing a session or opening chat', async () => {
   openCallback(); await complete({ code: 'ACCOUNT_PENDING', error: 'pending' }, 403);

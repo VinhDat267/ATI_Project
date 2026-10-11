@@ -98,6 +98,7 @@ export interface ClarificationState {
   question: string;
   options: string[];
   context?: string;
+  reason?: 'read_only' | 'destination';
 }
 
 export interface GatherStep {
