@@ -2,7 +2,7 @@
 
 ## Bắt đầu
 
-- [README gốc](../README.md): cài đặt, chạy sandbox/live và các lệnh.
+- [README](../README.md) (tiếng Anh) và [README.vi](../README.vi.md) (tiếng Việt): giới thiệu, cài đặt, chạy sandbox/live và các lệnh.
 - [Trạng thái hiện tại](handoff/CURRENT-STATE.md): số liệu mới nhất, lỗi đã biết, quy tắc đã chốt. Đọc trước khi làm bất cứ việc gì.
 - [Bàn giao giữa các agent](handoff/README.md), [lộ trình](handoff/ROADMAP.md) và [task card](handoff/tasks/).
 - [Môi trường v3 cục bộ](V3-LOCAL-SETUP.md): PostgreSQL thật ở chế độ sandbox.
