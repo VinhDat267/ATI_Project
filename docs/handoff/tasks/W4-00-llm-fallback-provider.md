@@ -1,6 +1,6 @@
 # W4-00 · Đường LLM dự phòng: chuyển sang Codex (`cx/`) trong 9router
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `chore/w4-00-llm-fallback` · **Phụ thuộc:** không; nên xong trước các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) và trước khi dựng môi trường demo tuần 5 · **Có phần việc nhỏ của con người**
+**Trạng thái:** xong trong phạm vi task; #133 merge 13/10/2026, core còn PARTIAL · **Nhánh gợi ý:** `chore/w4-00-llm-fallback` · **Phụ thuộc:** không; nên xong trước các phép đo chính thức của tuần 4 (W4-01, W4-03, W4-04) và trước khi dựng môi trường demo tuần 5 · **Có phần việc nhỏ của con người**
 
 ## Vấn đề
 
@@ -51,12 +51,12 @@ Chưa có đường thay thế nào được kiểm với sản phẩm. Gemini A
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Có bảng probe của các ứng viên và lý do chọn model.
-- [ ] Model đã chọn: JSON hợp lệ và served model đúng như cấu hình. Thay đổi code (nếu có) có test RED rồi GREEN; `npm run check` exit 0.
-- [ ] Bộ đo tối thiểu chạy xong (hoặc ghi rõ phần chưa chạy và lý do); báo cáo tách riêng, có tên model.
-- [ ] App live chạy với model `cx/` tới preview, đã Hủy; không có dòng nào trong `execution_steps`.
-- [ ] Chuyển qua lại không cần sửa `.env` chính; runbook có lệnh cho cả bash và PowerShell.
-- [ ] Không có khóa hay token trong PR, log, báo cáo.
+- [x] Có bảng probe của các ứng viên và lý do chọn model.
+- [x] Model đã chọn: JSON hợp lệ và served model đúng như cấu hình. Thay đổi code (nếu có) có test RED rồi GREEN; `npm run check` exit 0.
+- [x] Bộ đo tối thiểu chạy xong (hoặc ghi rõ phần chưa chạy và lý do); báo cáo tách riêng, có tên model.
+- [x] App live chạy với model `cx/` tới preview, đã Hủy; không có dòng nào trong `execution_steps`.
+- [x] Chuyển qua lại không cần sửa `.env` chính; runbook có lệnh cho cả bash và PowerShell.
+- [x] Không có khóa hay token trong PR, log, báo cáo.
 
 ## Ngoài phạm vi
 
@@ -66,7 +66,7 @@ Chưa có đường thay thế nào được kiểm với sản phẩm. Gemini A
 
 ## Kết quả (agent thi công điền)
 
-- PR: [#133](https://github.com/VinhDat267/ATI_Project/pull/133); nhánh `codex/w4-00-llm-fallback`, từ `main` `305302b`; chờ review/CI, chưa merge.
+- PR: [#133](https://github.com/VinhDat267/ATI_Project/pull/133); nhánh `codex/w4-00-llm-fallback`, từ `main` `305302b`; **đã merge 13/10/2026 (Asia/Saigon)** tại `6ee41097f2eca21a2c106af25dce0587d0981c8a`. Review độc lập **Đạt** trên head `2d803550844dc7af05ca188e87bb053929442ffd`; [CI](https://github.com/VinhDat267/ATI_Project/actions/runs/38279338897) SUCCESS đúng head: 1.674 v3 + 173 eval, browser 101 pass/1 skip có chủ đích qua 11 nhóm. [Log merge](../log/2026-10-13-codex-W4-00-merge.md).
 - Model đã chọn: **`cx/gpt-6.1-sol`**, served `gpt-6.1-sol`. Cả ba ứng viên chạy tám ca probe chung, có search nhiều lượt; sau các lỗi tham chiếu ở hai model Luna, chạy thêm bộ đầy đủ của từng ứng viên. [Bảng probe, kết quả và provenance](../../ai-evidence/V3-GOLDEN-V2/W4-00-REPORT.md).
 - Kết quả: core **48/50 nhưng partial** do `cl04` timeout hai lần và runner abort `rf07`; services **41/44**, tool **96,4%**, argument **96,3%**, p50/p95 **5,195/9,408 s**, 44/44 dưới 15 s. Cả năm service mới đạt ngưỡng tool/argument. Giữ nguyên core partial; fresh completion đạt trước khi chạy campaign services riêng, không sửa prompt/label/timeout/retry.
 - Tương thích: 100/100 HTTP 200 content của hai campaign JSON hợp lệ, served model đúng; timeout/cancel không được tính là JSON thành công. Provider 19/19 và native HTTP fault probe 5/5 đạt (429, 503, retry hết giới hạn, model sai, hủy kết nối khi timeout).
