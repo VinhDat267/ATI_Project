@@ -66,7 +66,7 @@ Chưa có đường thay thế nào được kiểm với sản phẩm. Gemini A
 
 ## Kết quả (agent thi công điền)
 
-- Nhánh: `codex/w4-00-llm-fallback`, từ `main` `305302b`; đưa vào PR riêng để review/CI, chưa merge.
+- PR: [#133](https://github.com/VinhDat267/ATI_Project/pull/133); nhánh `codex/w4-00-llm-fallback`, từ `main` `305302b`; chờ review/CI, chưa merge.
 - Model đã chọn: **`cx/gpt-6.1-sol`**, served `gpt-6.1-sol`. Cả ba ứng viên chạy tám ca probe chung, có search nhiều lượt; sau các lỗi tham chiếu ở hai model Luna, chạy thêm bộ đầy đủ của từng ứng viên. [Bảng probe, kết quả và provenance](../../ai-evidence/V3-GOLDEN-V2/W4-00-REPORT.md).
 - Kết quả: core **48/50 nhưng partial** do `cl04` timeout hai lần và runner abort `rf07`; services **41/44**, tool **96,4%**, argument **96,3%**, p50/p95 **5,195/9,408 s**, 44/44 dưới 15 s. Cả năm service mới đạt ngưỡng tool/argument. Giữ nguyên core partial; fresh completion đạt trước khi chạy campaign services riêng, không sửa prompt/label/timeout/retry.
 - Tương thích: 100/100 HTTP 200 content của hai campaign JSON hợp lệ, served model đúng; timeout/cancel không được tính là JSON thành công. Provider 19/19 và native HTTP fault probe 5/5 đạt (429, 503, retry hết giới hạn, model sai, hủy kết nối khi timeout).

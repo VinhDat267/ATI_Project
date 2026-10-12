@@ -1,6 +1,7 @@
 # 12/10/2026 · W4-00 · Model dự phòng qua 9router
 
 - Task: [W4-00](../tasks/W4-00-llm-fallback-provider.md).
+- PR: [#133](https://github.com/VinhDat267/ATI_Project/pull/133), mở draft chờ review/CI.
 - Worktree riêng `w4-00-llm-fallback`, nhánh `codex/w4-00-llm-fallback`, base `305302b`.
 - Chọn `cx/gpt-6.1-sol`, served `gpt-6.1-sol`; source/labels/prompt/catalog không đổi. Chỉ bốn file tài liệu thuộc task; không sửa CURRENT-STATE/ROADMAP.
 - Probe ba ứng viên, tám câu chung mỗi model: `gpt-5.6-luna` 8/8, `gpt-6-luna` 8/8, `gpt-6.1-sol` 7/8. Model Luna nhanh hơn nhưng phép đo đầy đủ bộc lộ tham chiếu dưới dạng chuỗi chưa được resolve; giữ cả các kết quả thấp.
