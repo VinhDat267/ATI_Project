@@ -551,6 +551,9 @@ $env:EVAL_SET = 'core'
 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
 $env:EVAL_SET = 'services'
 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+# These variables stay set in this PowerShell window. Remove them before
+# running `npm run up` here, or the app starts on the fallback model.
+Remove-Item Env:LLM_MODEL, Env:LIVE_EVAL, Env:PLANNER_SEARCH_MODE, Env:EVAL_SEARCH_MODE, Env:EVAL_RUNS, Env:EVAL_CONCURRENCY, Env:EVAL_SET -ErrorAction SilentlyContinue
 ```
 
 Equivalent bash commands:
