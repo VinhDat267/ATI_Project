@@ -488,6 +488,93 @@ from screenshots, and commit only aggregate results. SMTP accepting a send
 does not prove inbox receipt; record `PASS`, `FAIL`, `NOT_RUN` or `UNKNOWN`
 for each step without treating fixture browser tests as real-provider proof.
 
+## W4-00: manual Codex fallback through 9router
+
+The fallback route is `cx/gpt-6.1-sol`, served as `gpt-6.1-sol`. Keep
+`LLM_PROVIDER=openai-compatible` and the existing `LLM_BASE_URL`; change only
+`LLM_MODEL`. The production provider already accepts the served name without
+the routing prefix and rejects a different model. No alias or retry policy
+was changed. See the [dated probe and evaluation report](../docs/ai-evidence/V3-GOLDEN-V2/W4-00-REPORT.md)
+for results and limitations.
+
+Use the fallback when the primary model repeatedly fails with 429/5xx,
+timeouts or an unexpected served model. Stop the current app process before
+restarting it with another model. For a running evaluation, retain its
+checkpoint and start a separate campaign; never mix models within a report.
+Keep plan approval and resource scopes in place.
+
+From the repository root, PowerShell:
+
+```powershell
+# Fallback: .env stays unchanged. Stop this process with Ctrl+C before switching.
+$env:LLM_MODEL = 'cx/gpt-6.1-sol'
+npm run up
+```
+
+```powershell
+# Return to the primary route after stopping the fallback process.
+$env:LLM_MODEL = 'ag/gemini-3.8-flash'
+npm run up
+```
+
+To remove the shell override and use `.env` again:
+
+```powershell
+Remove-Item Env:LLM_MODEL -ErrorAction SilentlyContinue
+```
+
+On bash, each override applies to that command only:
+
+```bash
+LLM_MODEL=cx/gpt-6.1-sol npm run up
+# Stop with Ctrl+C, then return to the primary route:
+LLM_MODEL=ag/gemini-3.8-flash npm run up
+```
+
+Confirm the startup line says provider `openai-compatible` with model
+`cx/gpt-6.1-sol`. `/api/health` must report `runtimeMode: live` for live
+acceptance. A model listed by `/v1/models` does not prove completions work.
+The dated live browser check reached a real preview, cancelled it, and
+checked PostgreSQL for `rejected` and zero execution steps.
+
+For a separate minimum evaluation, PowerShell:
+
+```powershell
+$env:LLM_MODEL = 'cx/gpt-6.1-sol'
+$env:LIVE_EVAL = '1'
+$env:PLANNER_SEARCH_MODE = 'llm'
+$env:EVAL_SEARCH_MODE = 'llm'
+$env:EVAL_RUNS = '1'
+$env:EVAL_CONCURRENCY = '2'
+Remove-Item Env:EVAL_ONLY -ErrorAction SilentlyContinue
+$env:EVAL_SET = 'core'
+node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+$env:EVAL_SET = 'services'
+node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+Equivalent bash commands:
+
+```bash
+LLM_MODEL=cx/gpt-6.1-sol LIVE_EVAL=1 PLANNER_SEARCH_MODE=llm EVAL_SEARCH_MODE=llm EVAL_RUNS=1 EVAL_CONCURRENCY=2 EVAL_SET=core EVAL_ONLY= node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+LLM_MODEL=cx/gpt-6.1-sol LIVE_EVAL=1 PLANNER_SEARCH_MODE=llm EVAL_SEARCH_MODE=llm EVAL_RUNS=1 EVAL_CONCURRENCY=2 EVAL_SET=services EVAL_ONLY= node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+Golden runs plan against synthetic resource fixtures and do not execute
+service writes. Live planning sends the chat/history, tool definitions,
+working memory, resource names/IDs and search results through the `cx/`
+source in 9router. Review that data scope before using real workspace data.
+
+The account quota is **unknown**; successful calls prove availability only
+at the measurement time. Transport retains a 30-second per-attempt deadline,
+at most two transient retries and at most one timeout retry. Do not increase
+them to hide provider failures. The fallback uses the same 9router instance
+and machine, so a gateway or host outage affects both routes. Switching is
+manual; do not enable automatic gateway fallback because ATI rejects a
+different served model. These Codex results
+are separate from the Gemini campaigns and do not close W3-10, W3-11 or the
+week-four user-study gates.
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline

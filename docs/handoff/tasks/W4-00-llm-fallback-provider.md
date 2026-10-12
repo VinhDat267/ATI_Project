@@ -66,7 +66,11 @@ Chưa có đường thay thế nào được kiểm với sản phẩm. Gemini A
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Model đã chọn và bảng probe:
-- Kết quả bộ đo:
-- Điều chưa làm hoặc khác với task card:
+- Nhánh: `codex/w4-00-llm-fallback`, từ `main` `305302b`; đưa vào PR riêng để review/CI, chưa merge.
+- Model đã chọn: **`cx/gpt-6.1-sol`**, served `gpt-6.1-sol`. Cả ba ứng viên chạy tám ca probe chung, có search nhiều lượt; sau các lỗi tham chiếu ở hai model Luna, chạy thêm bộ đầy đủ của từng ứng viên. [Bảng probe, kết quả và provenance](../../ai-evidence/V3-GOLDEN-V2/W4-00-REPORT.md).
+- Kết quả: core **48/50 nhưng partial** do `cl04` timeout hai lần và runner abort `rf07`; services **41/44**, tool **96,4%**, argument **96,3%**, p50/p95 **5,195/9,408 s**, 44/44 dưới 15 s. Cả năm service mới đạt ngưỡng tool/argument. Giữ nguyên core partial; fresh completion đạt trước khi chạy campaign services riêng, không sửa prompt/label/timeout/retry.
+- Tương thích: 100/100 HTTP 200 content của hai campaign JSON hợp lệ, served model đúng; timeout/cancel không được tính là JSON thành công. Provider 19/19 và native HTTP fault probe 5/5 đạt (429, 503, retry hết giới hạn, model sai, hủy kết nối khi timeout).
+- App live với model đã chọn: preview **6,033 s**, Hủy → PostgreSQL `rejected`, **0 dòng `execution_steps` trong toàn database preview**, 0 request approve, probe exit 0. Đã xem ảnh preview/hủy. Database preview mới tách khỏi fixture DB của `npm run check`; `.env` chính giữ nguyên.
+- Kiểm tra: `npm run check` exit 0, **1.674 v3 + 173 eval**, typecheck/build/build-security/launcher/env-OIDC đạt. Mã sản phẩm không đổi; không cần sửa served-model alias. `evaluations/README.md` có runbook PowerShell/bash, cách xác nhận model, chuyển qua lại và giới hạn/data scope.
+- Bằng chứng gốc: `docs/ai-evidence/V3-LIVE-EXECUTION/W4-00-2026-10-12/` ở máy nhóm trưởng, ignored, có manifest SHA-256. Log: [2026-10-12-codex-W4-00-llm-fallback.md](../log/2026-10-12-codex-W4-00-llm-fallback.md).
+- Chưa làm/giới hạn: chưa có campaign core hoàn chỉnh của model được chọn sau timeout; task cho phép ghi rõ phần chưa chạy và lý do. Quota chưa rõ. Chưa chạy ghi live với Codex; không đo lại Gemini, không xử lý sự cố chính 9router/máy nhóm trưởng. Các số liệu là một lần chạy, không chứng nhận độ ổn định hoặc nghiệm thu toàn sản phẩm.
