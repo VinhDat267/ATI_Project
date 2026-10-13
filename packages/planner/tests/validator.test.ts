@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validatePlan } from '../src/index.js';
-import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS } from '@wap/tool-schemas';
+import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SHEETS_TOOLS, NOTION_TOOLS } from '@wap/tool-schemas';
 
 describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precedence)', () => {
   const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS];
@@ -225,6 +225,103 @@ describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precede
     });
     const resRef = validatePlan(validRefusal, catalog);
     expect(resRef.valid).toBe(true);
+  });
+});
+
+describe('W4-00b raw step placeholders', () => {
+  const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...SHEETS_TOOLS, ...NOTION_TOOLS];
+  const placeholder = '${step_1.output.url}';
+  const notifyPlan = (text: unknown) => JSON.stringify({
+    kind: 'plan', thinking: 'Create and notify', summary: 'Notify', warnings: [],
+    steps: [
+      { id: 'step_1', tool: 'trello.create_card', description: 'Create card',
+        args: { listId: 'L1', title: 'Task' }, dependsOn: [] },
+      { id: 'notify', tool: 'slack.send_message', description: 'Notify',
+        args: { channel: 'C1', text }, dependsOn: ['step_1'] },
+    ],
+  });
+  const grounding = (userTexts: string[]) => ({
+    memory: { list: { id: 'L1' }, channel: { id: 'C1' } }, userTexts,
+  });
+
+  it.each([
+    'Xem ${step_1.output.url}',
+    '${create-issue.output.url}',
+    '${  step_1.output.url  }',
+    '${step_1.output}',
+  ])('rejects a raw placeholder %s with actionable semantic feedback', (text) => {
+    const result = validatePlan(notifyPlan(text), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('semantic');
+      expect(result.error).toContain('notify');
+      expect(result.error).toContain('args.text');
+      expect(result.error).toContain('$template');
+      expect(result.error).toContain('$ref');
+      expect(result.error).toContain(text.match(/\$\{[^}]*\}/)![0]);
+    }
+  });
+
+  it.each([
+    { tool: 'sheets.append_rows', args: { spreadsheetId: 'spreadsheet_example_id_123', sheet: 'Tasks',
+      rows: [['ordinary', `Xem ${placeholder}`]] }, path: 'args.rows[0][1]' },
+    { tool: 'notion.create_page', args: { databaseId: '123456781234123412341234567890ab', title: 'Task',
+      properties: { Link: `Xem ${placeholder}` } }, path: 'args.properties.Link' },
+  ])('rejects a nested raw placeholder in $tool at $path', ({ tool, args, path }) => {
+    const parsed = JSON.parse(notifyPlan('Done'));
+    parsed.steps[1] = { ...parsed.steps[1], tool, args };
+    const result = validatePlan(JSON.stringify(parsed), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('semantic');
+      expect(result.error).toContain('notify');
+      expect(result.error).toContain(path);
+    }
+  });
+
+  it.each([{ $template: `Xem ${placeholder}` }, { $ref: 'step_1.output.url' }])(
+    'preserves a valid structured reference %j', (text) => {
+      expect(validatePlan(notifyPlan(text), catalog).valid).toBe(true);
+    },
+  );
+
+  it.each(['${HOME}', '$100', '${{ secrets.X }}', '${step_1.outputLabel}', 'step_1.output.url'])(
+    'preserves unrelated literal text %s', (text) => {
+      expect(validatePlan(notifyPlan(text), catalog).valid).toBe(true);
+    },
+  );
+
+  it('preserves a placeholder typed verbatim in userTexts, but rejects it without grounding', () => {
+    const plan = notifyPlan(`Ví dụ: ${placeholder}`);
+    expect(validatePlan(plan, catalog, { grounding: grounding([`Gửi nguyên văn ${placeholder}`]) }).valid).toBe(true);
+    const result = validatePlan(plan, catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.layer).toBe('semantic');
+  });
+
+  it('rejects an untyped placeholder even when another placeholder in the same string was typed', () => {
+    const result = validatePlan(notifyPlan(`${placeholder}, ${'${step_1.output.id}'}`), catalog,
+      { grounding: grounding([`Gửi nguyên văn ${placeholder}`]) });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('semantic');
+      expect(result.error).toContain('${step_1.output.id}');
+    }
+  });
+
+  it('does not treat a placeholder found only in working memory as user text', () => {
+    const result = validatePlan(notifyPlan(placeholder), catalog, { grounding: {
+      ...grounding([]), memory: { ...grounding([]).memory, note: { text: placeholder } },
+    } });
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.layer).toBe('semantic');
+  });
+
+  it('does not normalize a differently spaced user literal into permission for a raw placeholder', () => {
+    const result = validatePlan(notifyPlan(placeholder), catalog,
+      { grounding: grounding(['Gửi nguyên văn ${ step_1.output.url }']) });
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.layer).toBe('semantic');
   });
 });
 

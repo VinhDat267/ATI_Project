@@ -114,6 +114,30 @@ function userTokens(texts: string[]): Set<string> {
   return tokens;
 }
 
+/** Raw strings stay literal in the executor; only structured references are resolved. */
+function findRawStepPlaceholder(value: unknown, path: string, userTexts: string[]): string | null {
+  if (typeof value === 'string') {
+    for (const [placeholder] of value.matchAll(/\$\{\s*[A-Za-z_][\w-]*\.output\b[^}]*\}/g)) {
+      // Preserve each placeholder the user typed verbatim, not model/search text.
+      if (userTexts.some((text) => text.includes(placeholder))) continue;
+      return `${path} contains raw step placeholder '${placeholder}'. Use { "$template": "..." } for interpolated text or { "$ref": "..." } for a previous step's output.`;
+    }
+  } else if (Array.isArray(value)) {
+    for (const [index, child] of value.entries()) {
+      const error = findRawStepPlaceholder(child, `${path}[${index}]`, userTexts);
+      if (error) return error;
+    }
+  } else if (isObject(value)) {
+    if (Object.keys(value).length === 1 &&
+      (typeof value.$template === 'string' || typeof value.$ref === 'string')) return null;
+    for (const [key, child] of Object.entries(value)) {
+      const error = findRawStepPlaceholder(child, `${path}.${key}`, userTexts);
+      if (error) return error;
+    }
+  }
+  return null;
+}
+
 function memoryValues(memory: Record<string, any>, resource: string, field: string): Set<string> {
   const entity = memory[resource];
   const entries = Array.isArray(entity) ? entity : [entity];
@@ -348,6 +372,11 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     const argsError = validateSchemaValue(step.args, toolDef.inputSchema, `Step '${step.id}' args`);
     if (argsError) {
       return { valid: false, layer: 'schema', error: `${argsError} for tool '${step.tool}'` };
+    }
+
+    const placeholderError = findRawStepPlaceholder(step.args, `Step '${step.id}' args`, options.grounding?.userTexts ?? []);
+    if (placeholderError) {
+      return { valid: false, layer: 'semantic', error: placeholderError };
     }
 
     // Check declared dependencies existence
