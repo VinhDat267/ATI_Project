@@ -4,7 +4,7 @@
 - Task: [W4-00b](../tasks/W4-00b-raw-step-placeholders.md), giao `longnguyen005`.
 - Nhánh: `codex/fix-w4-00b-raw-placeholders`; base `3b60c28`.
 - Commit mã sản phẩm/test: `22288452d3e3cf57ead2747392ed665a5281fbe9`.
-- PR: bổ sung đường dẫn sau khi mở; chưa merge, chờ review độc lập và CI.
+- PR: [#137](https://github.com/VinhDat267/ATI_Project/pull/137); chưa merge, chờ review độc lập và CI.
 
 ## Thay đổi
 
