@@ -1,7 +1,7 @@
 # W4-00b · Validator từ chối tham chiếu bước viết thành chuỗi thô
 
-**Trạng thái:** chờ, chưa giao · **Nhánh gợi ý:** `fix/w4-00b-raw-step-placeholders` · **Phụ thuộc:** không · **Mốc:** trước **20/10/2026** (trước buổi thử W4-03 và trước khi diễn tập chuyển sang LLM dự phòng ở tuần 5)
-**Nguồn:** review độc lập #133 (W4-00) của Claude Code ngày 13/10/2026, trên bằng chứng gốc W4-00 (`docs/ai-evidence/V3-LIVE-EXECUTION/W4-00-2026-10-12/`, ignored) và các report golden Gemini trong `docs/ai-evidence/V3-GOLDEN-V2/`.
+**Trạng thái:** đang làm, giao `longnguyen005` ngày 13/10/2026 · **Nhánh gợi ý:** `fix/w4-00b-raw-step-placeholders` · **Phụ thuộc:** không · **Mốc:** trước **20/10/2026** (trước buổi thử W4-03 và trước khi diễn tập chuyển sang LLM dự phòng ở tuần 5)
+**Nguồn:** review độc lập #133 (W4-00) ngày 13/10/2026, trên bằng chứng gốc W4-00 (`docs/ai-evidence/V3-LIVE-EXECUTION/W4-00-2026-10-12/`, ignored) và các report golden Gemini trong `docs/ai-evidence/V3-GOLDEN-V2/`.
 
 ## Vấn đề
 
@@ -24,6 +24,10 @@ Quét các kế hoạch `kind: plan` (đã qua `AIPlanner.processMessage`, tức
 | `cx/gpt-6-luna` (W4-00) | 61 | 13 ca |
 
 Ví dụ `cx/gpt-5.6-luna` ca `cs04`: tham số `slack.send_message.text` là `"New issue opened for the 500 error on file upload: ${create_issue.output.url}"`. Hai model đang dùng chưa từng sinh lỗi này, nên đây là lỗi tiềm ẩn. Nó lộ ra khi đổi model (W4-00 vừa làm), đổi prompt hoặc khi upstream đổi model ngầm.
+
+## Môi trường
+
+Không cần 9router hay model thật. Test validator đưa kế hoạch JSON viết sẵn vào `validatePlan`; test planner dùng provider giả trả chuỗi theo lượt như các test hiện có trong `packages/planner/tests/`. `npm run check` cần Node và PostgreSQL tạm (Docker), như FE-10/FE-11.
 
 ## Việc cần làm
 
@@ -55,7 +59,7 @@ Viết test fail trước, ghi output fail thật, rồi mới sửa.
 - [ ] Test RED commit riêng (hoặc output fail dán trong log), GREEN sau sửa; đột biến ở trên bị bắt.
 - [ ] `npm run check` exit 0.
 - [ ] Không đổi prompt, executor, label hay matcher golden.
-- [ ] Không bắt buộc đo lại golden: Gemini và `cx/gpt-6.1-sol` có 0 chuỗi thô trong các report trên. Nếu có quota, chạy `EVAL_ONLY=cs03,cs04,ca03,ji03` một lần với `cx/gpt-5.6-luna` để xem lượt thử lại sửa được bao nhiêu; ghi rõ là đo tham khảo, không phải gate.
+- [ ] Không bắt buộc đo lại golden: Gemini và `cx/gpt-6.1-sol` có 0 chuỗi thô trong các report trên. Phép đo tham khảo `EVAL_ONLY=cs03,cs04,ca03,ji03` một lần với `cx/gpt-5.6-luna` (xem lượt thử lại sửa được bao nhiêu) cần 9router ở máy nhóm trưởng: người thi công ghi "không chạy" trong log; nhóm trưởng chạy sau merge. Không phải gate.
 
 ## Ngoài phạm vi
 
