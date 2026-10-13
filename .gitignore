@@ -70,6 +70,9 @@ docs/ai-evidence/V3-LIVE-EXECUTION/
 # Real authentication evidence contains private email addresses and one-use links (AUTH-06)
 docs/ai-evidence/AUTH-LIVE/
 
+# Real Gmail acceptance evidence contains private addresses and mail content (GMAIL-04)
+docs/ai-evidence/GMAIL-LIVE/
+
 # Course reports stay on the team lead machine only (CURRENT-STATE section 1 and 7)
 docs/reports/
 

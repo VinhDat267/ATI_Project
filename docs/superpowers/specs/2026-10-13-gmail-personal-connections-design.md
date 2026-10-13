@@ -1,6 +1,6 @@
 # Gmail theo kết nối riêng và kiểu phản hồi "trả lời"
 
-**Ngày:** 13/10/2026 (Asia/Saigon) · **Trạng thái:** bản thiết kế chờ người dùng duyệt (bản 2, sau review độc lập cùng ngày) · **Người quyết:** nhóm trưởng
+**Ngày:** 13/10/2026 (Asia/Saigon) · **Trạng thái:** đã duyệt 13/10/2026 (bản 2, sau review độc lập cùng ngày; mục 11 ghi các chỗ chỉnh khi lập task card) · **Người quyết:** nhóm trưởng
 
 Tài liệu này bổ sung đặc tả v3 (`2026-09-29-ai-workflow-platform-v3-design.md`). Nó thay một quyết định đã chốt ngày 05/10/2026 (mục 1.3). Khi hai tài liệu mâu thuẫn ở phần Gmail, kết nối riêng hoặc câu hỏi chỉ đọc, tài liệu này được ưu tiên.
 
@@ -75,6 +75,8 @@ Nơi dùng Gmail:
 **Cờ `GMAIL_ENABLED`** (`on`/`off`, mặc định `off`). Gmail chỉ bật khi cờ `on`, đủ ba biến `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REDIRECT_URI`, và có PostgreSQL. Khi cờ `on` mà thiếu biến hoặc thiếu DB:
 - ở live: server từ chối khởi động với câu lỗi cấu hình (giống cấu hình SMTP thiếu một phần);
 - ở sandbox: Gmail tắt và route trả 503.
+
+Sau phép đo riêng, PR bật cờ của GMAIL-04 đổi nghĩa của trường hợp **không đặt** `GMAIL_ENABLED`: bật khi đủ cấu hình, tắt mà không báo lỗi khi thiếu, giống SMTP. Đặt rõ `on` mà thiếu cấu hình vẫn là lỗi khởi động ở live; `off` luôn tắt. Nhờ vậy máy chưa cấu hình Gmail vẫn khởi động được.
 
 Khi Gmail tắt:
 - router, planner, catalog, `GET /api/services` không biết Gmail;
@@ -168,7 +170,7 @@ Ngoài ra `CredentialRepo.getCredentials(service, userId)` rơi về khoá chung
 
 **Interface** (chốt trước khi code, theo `docs/team-workflow.md`):
 - `ProcessMessageInput` thêm `actor?: { userId: string }`. Planner không đọc trường này, chỉ chuyển nguyên cho `gatherSearch` (`lookup` trong `planner.ts`).
-- `StepRunnerOptions.getAdapter(serviceName, context)` với `context = { userId, connections }`; `connections` lấy từ kế hoạch.
+- `AdapterFactory.getAdapterForService(serviceName, context)` với `context = { userId, phase, connections? }`; `connections` lấy từ kế hoạch. `ExecutionService` tạo `StepRunner` với `getAdapter: serviceName => adapterFactory.getAdapterForService(serviceName, context)`, nên package `executor` không đổi interface (chỉ đổi catalog của `isWriteTool`, mục 3.1).
 - `CredentialRepo` thêm:
   - `getPersonalCredentials(service, userId)`: bắt buộc có `userId`, thiếu thì ném lỗi; không rơi về khoá chung; chỉ trả bản ghi `status = 'active'`;
   - `getPersonalConnectionStatus(service, userId)`: trả `active`, `reconnect_required` hoặc không có, kèm `email`, cho giao diện.
@@ -242,6 +244,7 @@ Chỉ hiện khi Gmail bật (mục 3.1).
 - Xem trước có dòng "Gửi từ: <email>". Bước gửi, trả lời, chuyển tiếp hiện đủ người nhận (gồm `bcc`), tiêu đề, nội dung, và nguồn của từng người nhận (mục 4.2).
 
 **`/privacy`, `/guide`, Landing**
+- Ba trang này mở được khi chưa đăng nhập, nên không gọi được `GET /api/services`. `GET /api/health` (công khai) thêm `gmailEnabled: boolean`.
 - `/privacy` đang ghi "ATI không đọc Gmail, Drive hay lịch cá nhân của bạn". Câu này viết lại để đúng cả khi Gmail bật lẫn tắt: ATI chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. Khi Gmail bật, thêm các điểm của mục 3.8.
 - `/guide` và Landing chỉ thêm Gmail và mẫu câu khi Gmail bật; khi tắt vẫn ghi 8 dịch vụ. Test đối chiếu tool của mẫu câu dùng đúng catalog đang bật.
 - Quét bản build thêm mẫu chặn câu "không đọc Gmail".
@@ -465,15 +468,21 @@ Bằng chứng để ở `docs/ai-evidence/GMAIL-LIVE/`. Thêm thư mục này v
 
 ## 7. Task, lịch và thứ tự cắt
 
-Task card viết sau khi bản thiết kế này được duyệt. Chưa giao người làm.
+Task card ở `docs/handoff/tasks/` (quy tắc chung: `GMAIL-common.md`). Chia việc ngày 13/10/2026:
 
-| Task | Nội dung | Xong trước |
-|---|---|---|
-| GMAIL-01 | Phần 1 backend: cờ, export riêng, migration 0009, routes kết nối, quản lý token, catalog/adapter/executor theo người dùng, `connections` trong kế hoạch | 18/10 |
-| GMAIL-02 | Phần 2: tool schemas, adapter, `observedFields`, grounding người nhận, adapter giả | 21/10 |
-| GMAIL-03 | Giao diện: nhóm "Của riêng bạn", callback, cockpit, `/privacy`, `/guide`, Landing | 22/10 |
-| ANS-01 | Phần 3 backend và giao diện sau cờ `PLANNER_READ_ANSWERS` | 24/10 |
-| GMAIL-04 | Golden Gmail và `cases-answers.json`, phép đo riêng (26–28/10), nghiệm thu Google thật, PR đổi mặc định hai cờ sang `on` | 28/10 |
+| Task | Nội dung | Người làm | Phụ thuộc | Xong trước |
+|---|---|---|---|---|
+| GMAIL-01 | Phần 1 backend: cờ, export riêng (gồm 10 tool schema), migration 0009, routes kết nối, quản lý token, catalog/adapter/executor theo người dùng, `connections` trong kế hoạch | nhóm trưởng | không | 18/10 |
+| GMAIL-02 | Phần 2: adapter thật và adapter giả, `observedFields`, grounding người nhận, nhãn xem trước, nối Gmail vào planner/executor của `server.ts` | nhóm trưởng | GMAIL-01 | 21/10 |
+| ANS-01 | Phần 3 backend và giao diện sau cờ `PLANNER_READ_ANSWERS` | `longnguyen005` | W4-00b | 21/10 |
+| GMAIL-03 | Giao diện: nhóm "Của riêng bạn", callback, cockpit, `/privacy`, `/guide`, Landing, browser test nhóm `gmail` | `longnguyen005` | GMAIL-01; GMAIL-02 cho browser test | 23/10 |
+| GMAIL-04 | Golden Gmail và `cases-answers.json`, phép đo riêng (26–28/10), nghiệm thu Google thật, PR bật hai cờ | nhóm trưởng | bốn task trên | 28/10 |
+
+Lý do chia:
+- Nhóm trưởng giữ các phần cần Google thật, 9router và máy của mình (project Google, nghiệm thu, phép đo). GMAIL-01 và GMAIL-02 nối tiếp nhau trên cùng các file nên để một người.
+- ANS-01 không phụ thuộc Gmail. `longnguyen005` vừa làm W4-00b ở `validator.ts`, nên làm tiếp ANS-01 trong lúc chờ API của GMAIL-01, rồi sang GMAIL-03 (giao diện, như FE-10/FE-11).
+
+ANS-01 dời từ 24/10 lên 21/10 và GMAIL-03 từ 22/10 sang 23/10 theo thứ tự làm của `longnguyen005`.
 
 Hai cờ tắt nên các PR trên merge được trước buổi thử 23–25/10 mà không đổi hệ thống người tham gia dùng. Không bật cờ trên máy chạy buổi thử.
 
@@ -491,13 +500,13 @@ Hai cờ tắt nên các PR trên merge được trước buổi thử 23–25/1
 | Nội dung thư đi qua 9router tới tài khoản model bên thứ ba | Lộ dữ liệu riêng | Ghi rõ ở `/privacy` (3.8); chỉ người kết nối quyết định |
 | Hội thoại cũ giữ nội dung thư sau khi ngắt kết nối | Dữ liệu còn trong DB | Ghi rõ ở `/privacy`; xoá hội thoại ngoài phạm vi |
 | Prompt dài hơn, latency tăng | p95 vượt mục tiêu | Router chỉ thêm tool Gmail khi câu nói tới thư; giới hạn `get_thread`; đo riêng |
-| Lịch sát 29/10, chưa có người làm | Không kịp | Thứ tự cắt ở mục 7; hai cờ cho phép để tắt |
+| Lịch sát 29/10; nhóm trưởng vừa làm GMAIL-01/02/04 vừa chạy W3-11 và buổi thử W4-03 | Không kịp | Thứ tự cắt ở mục 7; hai cờ cho phép để tắt |
 | Thay đổi chạm nhiều package (`tool-schemas`, `planner`, `executor`, `chat-api`, `chat-web`) | Xung đột giữa người làm | Chốt interface ở mục 3.6, 4.3 và 5.1 trước khi code |
 
-## 9. Câu hỏi còn mở
+## 9. Câu hỏi đã trả lời (13/10/2026)
 
-1. Nhóm trưởng xác nhận chấp nhận việc nội dung thư đi qua 9router tới tài khoản model bên thứ ba và được giữ trong hội thoại (mục 3.8). Nếu không chấp nhận, phần 3 không áp dụng cho Gmail, và phần 2 cần chế độ không đưa nội dung thư cho model.
-2. Người làm từng task.
+1. Nhóm trưởng **chấp nhận** việc nội dung thư đi qua 9router tới tài khoản model bên thứ ba và được giữ trong hội thoại (mục 3.8). Phần 2 không cần chế độ giấu nội dung thư với model; phần 3 áp dụng cho Gmail.
+2. Người làm từng task: bảng ở mục 7.
 
 ## 10. Thay đổi so với bản 1 (sau review độc lập 13/10)
 
@@ -513,3 +522,11 @@ Hai cờ tắt nên các PR trên merge được trước buổi thử 23–25/1
 - Từ khoá router dùng cụm, không dùng `thư` đứng riêng.
 - Phần 3: prefetch tính là dữ liệu đọc; `lookups` chỉ gồm lời gọi do model yêu cầu; nhãn mới ở file riêng `cases-answers.json`.
 - Lịch có thứ tự cắt; GMAIL-01 dời 18/10.
+
+## 11. Chỉnh khi lập task card (13/10, sau khi duyệt)
+
+- Mục 3.6: tham chiếu kết nối đi qua `AdapterFactory.getAdapterForService(serviceName, context)`; package `executor` không đổi interface.
+- Mục 3.1: sau PR bật cờ, thiếu `GMAIL_ENABLED` nghĩa là "bật khi đủ cấu hình", để máy chưa cấu hình Gmail vẫn khởi động được ở live.
+- Mục 3.9: `GET /api/health` thêm `gmailEnabled` cho các trang công khai.
+- Mục 7: người làm, phụ thuộc, ngày mới của ANS-01 và GMAIL-03. Mục 9: câu trả lời của nhóm trưởng.
+- Mục 5.5 (GMAIL-04): thêm một lượt core và một lượt services với `PLANNER_READ_ANSWERS=on`, vì cờ đổi quy tắc 0 của prompt cho mọi câu; mục đích là kiểm câu có hành động ghi không bị biến thành câu trả lời. Scorer thêm matcher `excludes` cho câu injection; cách chấm ba bộ cũ không đổi.

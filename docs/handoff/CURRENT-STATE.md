@@ -418,11 +418,18 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - Design system rút từ 12 bản mẫu, đối chiếu gói Agentic của Open Design: [`docs/design/design-system.md`](../design/design-system.md). Chỗ lệch giữa các trang giữ nguyên; màn mới dùng giá trị chuẩn trong tài liệu (người dùng chốt 07/10).
   - Cách làm: đặc tả giao diện mục 1, 1.1, 1.2 bản 07/10; [FE-04b](tasks/FE-04b-prototype-foundation.md) đưa lớp nền vào trước, FE-05b → FE-10 chép trang của bản React rồi nối dữ liệu thật.
 
+- **Chốt 13/10/2026** ([đặc tả Gmail và kiểu "trả lời"](../superpowers/specs/2026-10-13-gmail-personal-connections-design.md), task [GMAIL-common](tasks/GMAIL-common.md)):
+  - thêm Gmail như dịch vụ **riêng của từng người**: mỗi người tự kết nối Google của mình, không rơi về khoá chung, quản trị viên không dùng được hộp thư người khác. Không xoá vĩnh viễn thư;
+  - Google Cloud project và client OAuth **riêng** cho Gmail, không dùng chung với đăng nhập Google (AUTH-04);
+  - cờ `GMAIL_ENABLED` và `PLANNER_READ_ANSWERS` tắt mặc định cho tới PR bật cờ của GMAIL-04. Gmail không vào `ALL_TOOLS`/`SERVICE_REGISTRY`, nên catalog 33 tool/8 dịch vụ chốt 20/10 và các phép đo tuần 4 không đổi; buổi thử 23–25/10 chạy với cờ tắt;
+  - khi `PLANNER_READ_ANSWERS` bật, câu chỉ đọc được **trả lời** sau khi tra cứu, thay phần "không thêm kiểu trả lời đọc dữ liệu" của chốt 05/10. Quy tắc "plan phải có ít nhất một bước ghi" giữ nguyên;
+  - nhóm trưởng chấp nhận việc nội dung thư đi qua 9router tới tài khoản model bên thứ ba và được giữ trong hội thoại; `/privacy` phải ghi đúng điều này khi Gmail bật.
+
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
 - Label của golden set được đăng ký trước. Chỉ sửa label trong commit riêng, có giải thích, không sửa để khớp kết quả.
 - W3-06: người dùng chốt rf06 clarification trước commit `1ab7f08`; labels44services `20fa6f0` trước provider calls. Catalog33tool/8service đóng băng cho phép đo03/10; giữ mốc20/10 và đo lại nếu catalog đổi.
 - Mô tả PR và commit **không** có dòng "Generated with …" hay chữ ký của AI.
 - Conventional Commits. Một task một nhánh một PR. Chỉ merge khi CI xanh.
-- Repo công khai: không commit `.env`, token, `docs/ai-evidence/V3-LIVE-EXECUTION/`, `docs/ai-evidence/AUTH-LIVE/` hay báo cáo môn học.
+- Repo công khai: không commit `.env`, token, `docs/ai-evidence/V3-LIVE-EXECUTION/`, `docs/ai-evidence/AUTH-LIVE/`, `docs/ai-evidence/GMAIL-LIVE/` hay báo cáo môn học.
 - Báo cáo môn học viết tiếng Việt, tiêu đề mục tiếng Anh, giữ thuật ngữ kỹ thuật tiếng Anh, file `.docx`, chữ đen, Times New Roman.
