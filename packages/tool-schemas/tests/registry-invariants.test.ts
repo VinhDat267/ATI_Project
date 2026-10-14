@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { SERVICE_REGISTRY, type ServiceDefinition } from '../src/index.js';
+import { GMAIL_SERVICE, SERVICE_REGISTRY, type ServiceDefinition } from '../src/index.js';
 
 const banned = new Set(['lịch', 'bảng', 'trang', 'tin nhắn', 'message', 'thông báo', 'báo', 'kênh', 'channel', 'issue', 'issues', 'task', 'tasks', 'chat', 'nhóm', 'page', 'database', 'sprint', 'board', 'list', 'note', 'dòng', 'row']);
 // Existing intent behavior is the routing baseline. Only these exact old words are grandfathered.
@@ -26,6 +26,10 @@ function problems(registry: ServiceDefinition[]): string[] {
 it('has unambiguous complete phrases and preserves only the documented legacy broad keywords', () => {
   expect(problems(SERVICE_REGISTRY)).toEqual([]);
   for (const service of SERVICE_REGISTRY) expect(service.scopeLabel, service.id).toBeTruthy();
+});
+
+it('keeps the opt-in Gmail service free of duplicate or generic phrases', () => {
+  expect(problems([...SERVICE_REGISTRY, GMAIL_SERVICE])).toEqual([]);
 });
 
 it.each(['intentKeywords', 'fallbackIntentKeywords', 'id', 'name'])('rejects cross-service duplicates through %s', field => {

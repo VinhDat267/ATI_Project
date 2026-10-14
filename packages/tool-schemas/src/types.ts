@@ -16,6 +16,8 @@ export interface ToolDefinition {
   /** The search may be called with an empty query to enumerate the resource (bounded by `limit`). */
   listable?: boolean;
   riskLevel: 'low' | 'medium' | 'high';
+  /** Overrides the planner's KEPT_FIELDS when this tool's results are written to working memory. */
+  observedFields?: string[];
   inputSchema: JSONSchema;
   outputSchema: JSONSchema;
   examples?: Array<{
@@ -44,6 +46,8 @@ export interface ServiceDefinition {
   id: string;
   name: string;
   description: string;
+  /** Missing means 'shared': an administrator configures one key for everyone. */
+  connection?: 'shared' | 'personal';
   scopes: string[];
   scopeKey: string;
   scopeLabel: string;
@@ -77,12 +81,19 @@ export interface PlanStep {
   dependsOn: string[];
 }
 
+/** The personal connections a plan was previewed with. */
+export interface PlanConnections {
+  gmail?: { credentialId: string; email: string };
+}
+
 export interface PlanResponse {
   kind: 'plan';
   thinking: string;
   summary: string;
   steps: PlanStep[];
   warnings: string[];
+  /** Written only by the server, after validation and before the plan hash is computed. */
+  connections?: PlanConnections;
 }
 
 export interface ClarificationResponse {
