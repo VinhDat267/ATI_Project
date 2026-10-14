@@ -106,6 +106,13 @@ describe('personal Gmail for two members A and B (spec 6.2)', () => {
       await expect(adapters.getAdapterForService('gmail', { userId: a.id, phase: 'planning' })).rejects.toMatchObject({ category: 'AUTH_ERROR' });
     });
 
+    it('reports an unreadable stored connection as AUTH_ERROR, never as a network failure', async () => {
+      const broken = await credentials.saveCredentials('gmail', 'v1:not-a-valid-ciphertext', a.id);
+      await expect(factory().getAdapterForService('gmail', { userId: a.id, phase: 'execution', connections: { gmail: { credentialId: broken.id, email: 'a@example.test' } } }))
+        .rejects.toMatchObject({ category: 'AUTH_ERROR' });
+      expect(created).toEqual([]);
+    });
+
     it('drops only one person when clearPersonal is called', async () => {
       await connect(a, 'a@example.test'); await connect(b, 'b@example.test');
       const adapters = factory();

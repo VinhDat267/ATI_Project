@@ -93,9 +93,12 @@ export class AdapterFactory {
     const cached = this.personalCache.get(key);
     if (cached?.credentialId === record.id) return cached.adapter;
     if (!this.options.createGmailAdapter || !this.options.gmailTokens) throw gmailError('VALIDATION', 'Gmail chưa sẵn sàng trên máy chủ này.');
-    const config = decryptCredentials(record.config, this.encryptionKey);
-    if (typeof config.refreshToken !== 'string' || !config.refreshToken) throw gmailError('AUTH_ERROR', 'Gmail cần được kết nối lại.');
-    const adapter = this.options.createGmailAdapter({ userId, tokens: this.options.gmailTokens.forConnection(userId, record.id, config.refreshToken) });
+    let refreshToken: unknown;
+    try {
+      refreshToken = decryptCredentials(record.config, this.encryptionKey).refreshToken;
+    } catch { /* An unreadable connection is a lost connection, not a network failure. */ }
+    if (typeof refreshToken !== 'string' || !refreshToken) throw gmailError('AUTH_ERROR', 'Gmail cần được kết nối lại.');
+    const adapter = this.options.createGmailAdapter({ userId, tokens: this.options.gmailTokens.forConnection(userId, record.id, refreshToken) });
     this.personalCache.set(key, { credentialId: record.id, adapter });
     return adapter;
   }
