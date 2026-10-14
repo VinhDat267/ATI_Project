@@ -27,6 +27,7 @@ export interface EnvConfig {
   LLM_PROVIDER: 'gemini' | 'openai-compatible';
   /** 'llm': the model calls search tools itself; 'regex': registry gather rules resolve names first. */
   PLANNER_SEARCH_MODE: 'llm' | 'regex';
+  PLANNER_READ_ANSWERS: boolean;
   /** IANA zone the planner resolves relative dates such as "thứ 6" in. */
   APP_TIME_ZONE: string;
   PORT: number;
@@ -63,6 +64,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     throw new Error('LLM_PROVIDER must be gemini or openai-compatible');
   }
   const PLANNER_SEARCH_MODE = env.PLANNER_SEARCH_MODE || (isLive ? 'llm' : 'regex');
+  const readAnswers = env.PLANNER_READ_ANSWERS ?? 'off';
+  if (readAnswers !== 'on' && readAnswers !== 'off') throw new Error('PLANNER_READ_ANSWERS must be on or off');
+  const PLANNER_READ_ANSWERS = readAnswers === 'on';
   if (PLANNER_SEARCH_MODE !== 'llm' && PLANNER_SEARCH_MODE !== 'regex') {
     throw new Error('PLANNER_SEARCH_MODE must be llm or regex');
   }
@@ -168,6 +172,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     GEMINI_API_KEY,
     LLM_PROVIDER,
     PLANNER_SEARCH_MODE,
+    PLANNER_READ_ANSWERS,
     APP_TIME_ZONE,
     PORT,
     RUNTIME_MODE,

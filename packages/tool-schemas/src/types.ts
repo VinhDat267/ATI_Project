@@ -111,6 +111,9 @@ export interface RefusalResponse {
   unavailableServices?: Array<{ id: string; name: string }>;
 }
 
-export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse;
+export interface AnswerLookup { tool: string; query?: string; resultCount: number; links: string[] }
+export interface AnswerResponse { kind: 'answer'; text: string; lookups: AnswerLookup[]; usedDirectory: string[] }
+
+export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse;
 
 export type AllowedScope = Partial<Record<string, string[]>>;

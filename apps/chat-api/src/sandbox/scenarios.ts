@@ -10,6 +10,21 @@ export function createSandboxProvider(scenario?: string) {
     ]);
     return mockProvider;
   }
+  if (scenario === 'answer') {
+    // Select by this conversation's context, not a global counter shared by users.
+    mockProvider.generatePlan = async input => {
+      if (input.conversationHistory.some(message => message.content.includes('<previous_answer>'))) return JSON.stringify({
+        kind: 'plan', thinking: 'Send summary', summary: 'Gửi tóm tắt vào Slack', warnings: [],
+        steps: [{ id: 'send', tool: 'slack.send_message', description: 'Gửi tóm tắt',
+          args: { channel: '#general', text: 'Jira ATI-42: Login bug' }, dependsOn: [] }],
+      });
+      if (input.conversationHistory.at(-1)?.content.includes('<search_results>')) return JSON.stringify({
+        kind: 'answer', text: 'Jira ATI-42: Login bug — Open.\n<b>x</b> https://a.example',
+      });
+      return JSON.stringify({ kind: 'search', calls: [{ tool: 'jira.search_issues', args: { projectKey: 'ATI', query: 'Login' } }] });
+    };
+    return mockProvider;
+  }
     const sandboxPlan = {
         kind: 'plan',
         thinking: 'Khảo sát board Frontend trên Trello và kênh Slack #general. Lập kế hoạch tạo task sửa CSS, gán thành viên Minh và thông báo hoàn tất lên Slack.',

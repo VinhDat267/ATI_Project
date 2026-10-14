@@ -15,7 +15,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
     const acceptedId = pending.messageId ?? data.messages?.find(message => message.role === 'user' &&
       pending.requestId && message.metadata?.requestId === pending.requestId)?.id;
     if (acceptedId && data.messages?.some(message =>
-      ['plan', 'clarification', 'refusal', 'planning_error'].includes(message.metadata?.type ?? '') &&
+      ['plan', 'clarification', 'refusal', 'answer', 'planning_error'].includes(message.metadata?.type ?? '') &&
       message.metadata?.replyToMessageId === acceptedId)) store.setIsPlanning(false, id, pending.requestId);
   }
   for (const message of data.messages || []) {
@@ -25,7 +25,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   const latest = data.messages?.filter(message => message.metadata?.type !== 'working_memory').at(-1);
   if (hydrateResponse && !useChatStore.getState().isPlanning) {
     const refusal = latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:');
-    if (refusal || ['clarification', 'planning_error'].includes(latest?.metadata?.type ?? '')) {
+    if (refusal || ['clarification', 'answer', 'planning_error'].includes(latest?.metadata?.type ?? '')) {
       // A snapshot started by SSE onopen may arrive before history. Restore the
       // latest response's owner too; the saved snapshot still governs unsafe work.
       store.setActivePlan(null); store.setPlanStatus(refusal ? 'rejected' : 'idle');
@@ -43,7 +43,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
     const current = useChatStore.getState();
     const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
       (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
-    if (activePlan && current.planRevision === revision && !alreadyExecuted && !current.isPlanning) {
+    if (activePlan && latest?.metadata?.type !== 'answer' && current.planRevision === revision && !alreadyExecuted && !current.isPlanning) {
       store.setActivePlan(activePlan);
       const status = activePlan.status;
       store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);

@@ -181,7 +181,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     // On reload there is no in-memory retired owner. A newer planner response still
     // owns the stage; keep safe terminal execution evidence as history.
     const hasNewResponse = ['idle', 'rejected'].includes(state.planStatus) &&
-      (state.activeClarification !== null || ['refusal', 'planning_error'].includes(latest?.metadata?.type ?? '') || latest?.content.startsWith('Từ chối yêu cầu:'));
+      (state.activeClarification !== null || ['refusal', 'answer', 'planning_error'].includes(latest?.metadata?.type ?? '') || latest?.content.startsWith('Từ chối yêu cầu:'));
     const hasNewRequest = (state.isPlanning || hasNewResponse || state.retiredExecutionPlanId === snapshot.plan.id) &&
       ['completed', 'stopped', 'failed', 'rejected'].includes(snapshot.execution.status) &&
       (snapshot.execution.status !== 'completed' || !snapshot.steps.some(step => step.status === 'unknown' || step.status === 'failed'));

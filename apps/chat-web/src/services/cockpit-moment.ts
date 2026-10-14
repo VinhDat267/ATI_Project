@@ -1,6 +1,6 @@
 import type { ChatStoreState } from '../store/chat-store';
 import type { ExecutionSnapshot } from '../types';
-export type CockpitMoment = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 'refusal' | 'unsuccessful';
+export type CockpitMoment = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 'refusal' | 'unsuccessful' | 'answer';
 export type MomentState = Pick<ChatStoreState, 'planStatus' | 'stepStatuses' | 'activeClarification' | 'messages' | 'isPlanning'>;
 /** Ordered by the approved section 5 table; persisted and live failures both matter. */
 export function selectMoment(state: MomentState, snapshot: ExecutionSnapshot | null): CockpitMoment {
@@ -25,6 +25,7 @@ export function selectMoment(state: MomentState, snapshot: ExecutionSnapshot | n
   if (state.activeClarification) return 3;
   if (latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:')) return 'refusal';
   if (state.isPlanning) return 2;
+  if (latest?.metadata?.type === 'answer') return 'answer';
   if (['stopped', 'rejected', 'failed'].includes(status)) return 'unsuccessful';
   return 1;
 }

@@ -21,7 +21,7 @@ import { HistoryDrawer } from '../pages/Cockpit/HistoryDrawer';
 import { PreviewModal } from '../pages/Cockpit/PreviewModal';
 import { DrawerBackdrop } from '../pages/Cockpit/DrawerBackdrop';
 import { formatDuration } from '../pages/Cockpit/presentation';
-import { RefusalMoment, ExpandedClarificationMoment, clarificationVariant } from '../pages/Responses/ResponseMoment';
+import { RefusalMoment, ExpandedClarificationMoment, clarificationVariant, AnswerMoment } from '../pages/Responses/ResponseMoment';
 import { SlowPlanningMoment, PlanningErrorMoment, latePlanNotice } from '../pages/Errors/PlanningErrors';
 import { usePlanningWait } from '../hooks/use-planning-wait';
 import responseCss from '../pages/Responses/page.css?inline';
@@ -132,17 +132,18 @@ export function Cockpit(props: Props) {
   const slow = moment === 2 && milliseconds > 15_000;
   const planningError = moment === 1 && terminalError?.metadata?.type === 'planning_error' && !responseEditing;
   const canConfigure = props.canConfigureServices ?? props.user?.role === 'admin';
-  usePrototypePage(planningError || slow ? errorMeta : moment === 'refusal' || expanded ? responseMeta : meta);
+  usePrototypePage(planningError || slow ? errorMeta : moment === 'refusal' || moment === 'answer' || expanded ? responseMeta : meta);
   const editRequest = (text: string) => {
     setDraft(text); setSelected(null); setDrawer(null); setEditingResponse(responseKey);
     queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
   };
-  const response = moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest}/>
+  const response = moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
+    : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
     : slow ? <SlowPlanningMoment seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
     : planningError ? <PlanningErrorMoment request={request ?? ''} networkError={props.networkError} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>
     : null;
-  const title = moment === 1 ? 'Bạn muốn nhờ ATI việc gì?' : moment === 2 ? 'Đang tìm đúng chỗ' : moment === 3 ? 'ATI cần bạn chọn thêm' : moment === 4 ? 'Kiểm tra trước khi làm' : moment === 5 ? 'ATI đang làm' : moment === 6 ? 'Việc đã xong' : moment === 'refusal' ? 'Chưa thể làm yêu cầu này' : moment === 'unsuccessful' ? 'Yêu cầu đã kết thúc' : 'Cần xử lý trước khi tiếp tục';
+  const title = moment === 1 ? 'Bạn muốn nhờ ATI việc gì?' : moment === 2 ? 'Đang tìm đúng chỗ' : moment === 3 ? 'ATI cần bạn chọn thêm' : moment === 4 ? 'Kiểm tra trước khi làm' : moment === 5 ? 'ATI đang làm' : moment === 6 ? 'Việc đã xong' : moment === 'answer' ? 'Câu trả lời' : moment === 'refusal' ? 'Chưa thể làm yêu cầu này' : moment === 'unsuccessful' ? 'Yêu cầu đã kết thúc' : 'Cần xử lý trước khi tiếp tục';
   return <>
     <div data-cockpit-background className="contents" onFocusCapture={event => { editing.current = (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) && !drawer && !preview; }} onBlurCapture={event => { if (!(event.relatedTarget instanceof HTMLTextAreaElement || event.relatedTarget instanceof HTMLInputElement) && (event.relatedTarget !== null || (event.target as HTMLElement).isConnected)) editing.current = false; }}>
       <CockpitHeader runtimeMode={runtimeMode} historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} request={request ?? ''} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
@@ -162,7 +163,7 @@ export function Cockpit(props: Props) {
         {state.executionSnapshot && state.activePlan && state.activePlan.id !== state.executionSnapshot.plan.id && moment!==6 && <details className="mt-5 text-xs text-brand-muted"><summary>Kế hoạch đang chờ: <span>{state.activePlan?.summary}</span></summary>{state.executionSnapshot.execution.status==='stopped' && <p role="status">Quy trình đã dừng.</p>}{state.executionSnapshot.execution.status==='completed' && <p role="status">Quy trình đã hoàn thành.</p>}</details>}
         {[4,5,6,7,8,9,'unsuccessful'].includes(moment as number) && state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
       </main>
-      {!props.contentOverride && (![1,3,4].includes(moment as number) || expanded || planningError) && drawer !== 'conversation' && <ChatComposer variant={moment === 'refusal' || expanded ? 'response' : 'bottom'} {...composerProps}/>}
+      {!props.contentOverride && (![1,3,4].includes(moment as number) || expanded || planningError) && drawer !== 'conversation' && <ChatComposer variant={moment === 'refusal' || moment === 'answer' || expanded ? 'response' : 'bottom'} {...composerProps}/>}
     </div>
     {drawer && <DrawerBackdrop onClose={()=>setDrawer(null)}/>}
     {drawer === 'history' && <HistoryDrawer conversationId={state.conversationId} onClose={()=>setDrawer(null)} onNewConversation={props.onNewConversation} onSelectConversation={props.onSelectConversation}/>}

@@ -227,6 +227,19 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
   return ungrounded;
 }
 
+export function validateAnswer(raw: string, options: { readAnswers: boolean; hasReadData: boolean }): ValidationResult {
+  if (!options.readAnswers) return { valid: false, layer: 'semantic', error: 'Read answers are disabled.' };
+  let parsed: any;
+  try { parsed = JSON.parse(raw); }
+  catch { return { valid: false, layer: 'json', error: 'Answer must be valid JSON.' }; }
+  if (parsed?.kind !== 'answer' || typeof parsed.text !== 'string' || !parsed.text.trim() || parsed.text.length > 4000) {
+    return { valid: false, layer: 'schema', error: 'Answer requires non-empty text of at most 4000 characters.' };
+  }
+  if (!options.hasReadData) return { valid: false, layer: 'semantic', error: 'Search with a read tool first, or ask for clarification. No successful read data exists in this turn.' };
+  // Provenance is supplied by the planner from executed reads, never by the model.
+  return { valid: true, parsed: { kind: 'answer', text: parsed.text, lookups: [], usedDirectory: [] } };
+}
+
 export function validatePlan(rawOutput: string, catalog: ToolDefinition[], options: ValidatePlanOptions = {}): ValidationResult {
   // Layer 4: Security validate (Check for prompt injection escape markers)
   for (const pattern of INJECTION_PATTERNS) {
