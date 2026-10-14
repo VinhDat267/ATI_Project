@@ -17,8 +17,11 @@ import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
-import { AdapterFactory } from './services/adapter-factory.js';
-import { getConfiguredToolCatalog } from './services/registered-services.js';
+import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
+import { getToolCatalogFor } from './services/registered-services.js';
+import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import { GmailOAuthClient } from './services/gmail/oauth-client.js';
+import { GmailTokenManager } from './services/gmail/token-manager.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -203,11 +206,12 @@ async function bootstrap() {
   // 3. AI Planner with Resilient Fallback
   const backupMockProvider = createBackupSandboxProvider();
 
-  let gatherAdapterFactory: { getAdapterForService: (serviceName: string) => Promise<any> | any } | null = null;
-  const gatherSearch = async ({ tool, args, signal }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal }) => {
+  let gatherAdapterFactory: { getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any } | null = null;
+  const gatherSearch = async ({ tool, args, signal, actor }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal; actor?: { userId: string } }) => {
     if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
     const serviceName = tool.split('.')[0]!;
-    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName);
+    // Lookups during planning use the planning member's own connection for personal services.
+    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, { userId: actor?.userId, phase: 'planning' });
     return adapter.execute(tool, args, { signal });
   };
   // Sandbox providers return canned plans without reading working memory, so
@@ -222,8 +226,9 @@ async function bootstrap() {
   const planner = createRuntimePlanner(env.RUNTIME_MODE,
     async (input: any) => new AIPlanner({
       provider,
+      // GMAIL-02 turns Gmail on here; until then the catalog equals the shared one.
       toolCatalog: env.RUNTIME_MODE === 'live'
-        ? await getConfiguredToolCatalog(credRepo, env.ENCRYPTION_KEY)
+        ? await getToolCatalogFor(credRepo, env.ENCRYPTION_KEY, { userId: input?.actor?.userId, gmailEnabled: false })
         : ALL_TOOLS,
       gatherSearch,
       requireGroundedResources: env.RUNTIME_MODE === 'live',
@@ -252,14 +257,22 @@ async function bootstrap() {
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)
-  const realAdapterFactory = new AdapterFactory({
+  // Gmail needs the flag, its own OAuth client and PostgreSQL; otherwise none of it exists.
+  const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
+  if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
+  const realAdapterFactory: AdapterFactory = new AdapterFactory({
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
+    gmailTokens: gmailAvailable ? new GmailTokenManager({
+      client: new GmailOAuthClient(env.GMAIL_OAUTH!),
+      credentials: credRepo,
+      onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    }) : undefined,
   });
 
-  const adapterFactory = createRuntimeAdapterFactory(env.RUNTIME_MODE,
-    (serviceName: string) => realAdapterFactory.getAdapterForService(serviceName),
-    (serviceName: string) => createSandboxAdapter(serviceName));
+  const adapterFactory = createRuntimeAdapterFactory<AdapterContext>(env.RUNTIME_MODE,
+    (serviceName, context) => realAdapterFactory.getAdapterForService(serviceName, context),
+    (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
 
   // 6. ExecutionService
@@ -295,6 +308,12 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
     onCredentialsChanged: (service) => realAdapterFactory.clearCache(service),
+    gmail: env.GMAIL_ENABLED ? {
+      enabled: true,
+      oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,
+      repo: gmailAvailable && pool ? new GmailConnectionRepo(pool) : undefined,
+      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
+    } : undefined,
     chatService,
     sseManager,
     executionService,

@@ -4,14 +4,15 @@ export function mayUseMemoryStorage(mode: RuntimeMode): boolean {
   return mode === 'sandbox';
 }
 
-export function createRuntimeAdapterFactory(
+export function createRuntimeAdapterFactory<TContext = unknown>(
   mode: RuntimeMode,
-  real: (serviceName: string) => Promise<any>,
-  sandbox: (serviceName: string) => any
+  real: (serviceName: string, context?: TContext) => Promise<any>,
+  sandbox: (serviceName: string, context?: TContext) => any
 ) {
   return {
-    getAdapterForService: (serviceName: string) =>
-      mode === 'live' ? real(serviceName) : sandbox(serviceName),
+    // The context (who, planning or execution, previewed connections) reaches both factories.
+    getAdapterForService: (serviceName: string, ...context: [TContext?]) =>
+      mode === 'live' ? real(serviceName, ...context) : sandbox(serviceName, ...context),
   };
 }
 

@@ -5,7 +5,8 @@ import { StepRunner, ExecutionController, type StepState } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoverySteps } from './execution-recovery.js';
+import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
+import type { AdapterContext } from './adapter-factory.js';
 
 export interface ApproveResult {
   success: boolean;
@@ -22,7 +23,7 @@ export interface ExecutionServiceOptions {
   };
   credentialRepo?: CredentialRepo;
   adapterFactory: {
-    getAdapterForService: (serviceName: string) => Promise<any> | any;
+    getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any;
   };
   sseManager?: {
     emitEvent: (convId: string, eventName: string, data: any) => void;
@@ -51,6 +52,16 @@ export class ExecutionService {
 
   getPlanRepo(): PlanRepo {
     return this.planRepo;
+  }
+
+  /**
+   * Steps always run as the owner of the plan's conversation, read from the
+   * database (never the request), with the connections stored in the
+   * integrity-checked plan.
+   */
+  private async executionContext(plan: PlanRow, connections: AdapterContext['connections']): Promise<AdapterContext> {
+    const conversation = this.convRepo ? await this.convRepo.getConversation(plan.conv_id) : null;
+    return { userId: conversation?.user_id ?? undefined, phase: 'execution', connections };
   }
 
   private async markExecutionFailed(planId: string, convId: string, err: unknown): Promise<void> {
@@ -117,6 +128,7 @@ export class ExecutionService {
 
     const convId = planRow.conv_id;
     const steps: PlanStep[] = planJson?.steps || [];
+    const context = await this.executionContext(planRow, planJson?.connections);
 
     // Emit exec_start
     this.sseManager?.emitEvent(convId, 'exec_start', { planId });
@@ -124,7 +136,7 @@ export class ExecutionService {
     // Launch background execution
     this.queuedStarts.add(planId);
     setImmediate(() => {
-      const run = this.executePlan(convId, planId, steps, userId);
+      const run = this.executePlan(convId, planId, steps, userId, context);
       this.activeRuns.set(planId, run);
       this.queuedStarts.delete(planId);
       run.catch((err) => {
@@ -145,9 +157,10 @@ export class ExecutionService {
     };
   }
 
-  private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, initialStates?: Record<string, StepState>) {
+  private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>) {
     return new ExecutionController({
-      runner: new StepRunner({ getAdapter: serviceName => this.adapterFactory.getAdapterForService(serviceName) }),
+      // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
+      runner: new StepRunner({ getAdapter: serviceName => this.adapterFactory.getAdapterForService(serviceName, context) }),
       steps, initialStates,
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
@@ -163,7 +176,8 @@ export class ExecutionService {
     if (!['partial', 'reconciliation_required'].includes(plan.status) || !this.stepRepo?.listSteps || !this.planRepo.claimRecovery) {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
-    const steps = verifiedRecoverySteps(plan);
+    const { steps, connections } = verifiedRecoveryPlan(plan);
+    const context = await this.executionContext(plan, connections);
     const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
     validateRecoveryAction(plan.status, before.states, stepId, action);
     if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
@@ -173,7 +187,7 @@ export class ExecutionService {
       // Read progress after the CAS: a stale request must not replay an earlier snapshot.
       const saved = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
       validateRecoveryAction(plan.status, saved.states, stepId, action);
-      const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, saved.states);
+      const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, context, saved.states);
       this.activeControllers.set(plan.id, controller);
       return controller;
     } catch (error) {
@@ -186,7 +200,8 @@ export class ExecutionService {
     convId: string,
     planId: string,
     steps: PlanStep[],
-    userId: string
+    userId: string,
+    context: AdapterContext,
   ): Promise<void> {
     try {
       if (this.stopRequests.has(planId)) return;
@@ -202,7 +217,7 @@ export class ExecutionService {
 
       if (this.stopRequests.has(planId)) return;
 
-      const controller = this.buildController(convId, planId, steps, stepDbIdMap);
+      const controller = this.buildController(convId, planId, steps, stepDbIdMap, context);
       this.activeControllers.set(planId, controller);
       const summary = await controller.runUntilPause();
       await this.planRepo.updatePlanStatus(planId, summary.status);
