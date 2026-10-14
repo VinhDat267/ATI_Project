@@ -8,6 +8,10 @@ import { createSandboxAdapter } from '../sandbox/index.js';
 import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.js';
 
 export const gmailServiceRegistry = (enabled: boolean) => enabled ? [...SERVICE_REGISTRY, GMAIL_SERVICE] : SERVICE_REGISTRY;
+/** The Gmail fixture explicitly searches before planning, unlike regex canned plans. */
+export function runtimePlannerSearchMode(mode: RuntimeMode, configured: 'llm' | 'regex', scenario?: string): 'llm' | 'regex' {
+  return mode === 'sandbox' && scenario === 'gmail' ? 'llm' : configured;
+}
 export async function runtimeToolCatalog(mode: RuntimeMode, repo: CredentialRepo, key: string, options: { userId?: string; gmailEnabled: boolean }) {
   const personal = await getToolCatalogFor(repo, key, options);
   return mode === 'live' ? personal : [...ALL_TOOLS, ...personal.filter(t => t.service === 'gmail')];

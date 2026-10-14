@@ -13,7 +13,7 @@ import {
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
 import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
-import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, mayFallbackToShared } from './config/gmail-tools-runtime.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -235,7 +235,7 @@ async function bootstrap() {
       gatherSearch,
       requireGroundedResources: env.RUNTIME_MODE === 'live',
       timeZone: env.APP_TIME_ZONE,
-      searchMode: env.PLANNER_SEARCH_MODE,
+      searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
     }).processMessage(input),
     (input: any) => {
       if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');

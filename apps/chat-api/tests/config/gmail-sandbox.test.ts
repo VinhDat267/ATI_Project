@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { createSandboxAdapter } from '../../src/sandbox/index.js';
 import { createSandboxProvider } from '../../src/sandbox/scenarios.js';
 import { createToolRuntimeFactory } from '../../src/config/gmail-tools-runtime.js';
+import * as runtime from '../../src/config/gmail-tools-runtime.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { WorkingMemory } from '@wap/planner';
 
@@ -18,6 +19,12 @@ it('gmail scenario searches then replies using literal header recipients', async
   expect(first).toMatchObject({ kind: 'search', calls: [{ tool: 'gmail.search_threads' }] });
   expect(second.steps[0]).toMatchObject({ tool: 'gmail.reply', args: { threadId: 'gmail-thread-1', to: ['lan@example.com'] } });
   expect(await createSandboxAdapter('gmail').execute(second.steps[0].tool, second.steps[0].args)).toEqual({ id: 'gmail-sandbox-reply', threadId: 'gmail-thread-1' });
+});
+it('gmail scenario selects the search loop despite sandbox default regex, preserving other modes', () => {
+  const select = (runtime as any).runtimePlannerSearchMode;
+  expect(select('sandbox', 'regex', 'gmail')).toBe('llm');
+  expect(select('sandbox', 'regex', 'default')).toBe('regex');
+  expect(select('live', 'regex', 'gmail')).toBe('regex');
 });
 it('sandbox still sends Gmail through personal factory with the complete context', async () => {
   const seen: any[] = [];

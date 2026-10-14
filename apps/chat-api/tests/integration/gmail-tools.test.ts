@@ -19,6 +19,7 @@ import { GmailTokenManager } from '../../src/services/gmail/token-manager.js';
 import { GmailOAuthClient } from '../../src/services/gmail/oauth-client.js';
 import { createGmailConnectionLookup } from '../../src/services/gmail/connection-reference.js';
 import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
+import * as runtime from '../../src/config/gmail-tools-runtime.js';
 import { createSandboxProvider } from '../../src/sandbox/scenarios.js';
 import { startFakeGoogleGmail, type FakeGoogleGmail } from '../../../../scripts/fake-google-gmail.mjs';
 
@@ -52,7 +53,7 @@ beforeAll(async () => {
     createGmailAdapter: ({ userId, tokens: provider }) => { owners.push(userId); return runtimeGmailAdapter('sandbox', provider, google.origin); } });
   const adapters = createToolRuntimeFactory('sandbox', (name, context) => personal.getAdapterForService(name, context));
   const planner = { processMessage: async (input: any) => new AIPlanner({ provider: createSandboxProvider('gmail'),
-    toolCatalog: await runtimeToolCatalog('sandbox', credentials, key, { userId: input.actor.userId, gmailEnabled: true }), serviceRegistry: gmailServiceRegistry(true), searchMode: 'llm',
+    toolCatalog: await runtimeToolCatalog('sandbox', credentials, key, { userId: input.actor.userId, gmailEnabled: true }), serviceRegistry: gmailServiceRegistry(true), searchMode: (runtime as any).runtimePlannerSearchMode?.('sandbox', 'regex', 'gmail') ?? 'regex',
     gatherSearch: async ({ tool, args, signal, actor }) => (await adapters.getAdapterForService('gmail', { userId: actor?.userId, phase: 'planning' })).execute(tool, args, { signal }),
     requireGroundedResources: true,
   }).processMessage(input) };
