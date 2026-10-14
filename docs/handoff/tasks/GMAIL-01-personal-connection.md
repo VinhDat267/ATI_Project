@@ -118,6 +118,12 @@ Bỏ kiểm người trong state; bỏ kiểm `mode` của state; cho Gmail rơi
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN và đột biến:
+- PR: chưa mở; nhánh `feat/gmail-01-personal-connection`, base `ebc192d`. Nhóm trưởng giao reviewer thi công ngày 14/10; cần review độc lập trước khi merge.
+- RED/GREEN và đột biến: mọi nhóm test trong mục "Test tối thiểu" viết trước và chạy fail đúng lý do, rồi mới cài đặt. 13 đột biến (9 của đặc tả mục 6.3 phần 1, cộng việc gắn route khi cờ tắt, lịch sử giữ `connections`, bỏ lượt làm mới chung, lưu callback muộn) đều bị test bắt. `npm run check` exit 0: 1.796 v3 + 173 eval; `npm run test:browser:v3` exit 0, 101 pass/1 skip qua 11 nhóm, không sửa assertion cũ; `ALL_TOOLS` 33 tool, `SERVICE_REGISTRY` 8 dịch vụ, routing offline không đổi. Số liệu từng nhóm và kết quả browser ở [log](../log/2026-10-14-reviewer-GMAIL-01-personal-connection.md).
 - Điều chưa làm hoặc khác với task card:
+  - mô tả tool viết tiếng Việt như các tool hiện có;
+  - `gmail.list_labels` giữ trường mặc định (`id`, `name`) trong bộ nhớ làm việc; hai tool đọc thư dùng `['id', 'participants']`;
+  - `/api/health` chỉ có `gmailEnabled` khi cờ bật; hàng Gmail ở `GET /api/services` và chặn route quản trị chỉ có khi Gmail dùng được. Đã sửa GMAIL-common mục 4.2;
+  - callback sau khi đăng xuất trả `401 INVALID_SESSION` (middleware xác thực), không phải `GMAIL_STATE_INVALID`;
+  - phần "câu Gmail của B bị từ chối" ở router thuộc GMAIL-02; GMAIL-01 kiểm từ chối ở `ChatService`;
+  - không gọi Google thật.
