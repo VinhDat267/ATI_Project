@@ -97,6 +97,7 @@ Cho trả lời khi không có dữ liệu đọc; dùng `lookups` do model vi�
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN và đột biến:
-- Điều chưa làm hoặc khác với task card:
+- PR: nhánh `codex/feat-ans-01-read-answers`, base `61d3be4`; commit mã/test `77676a1`. Đường dẫn PR bổ sung sau khi mở; chưa merge, chờ review độc lập.
+- RED/GREEN và đột biến: planner RED **14 fail/2 pass**, API PostgreSQL RED **2 fail**, web RED **5 fail/1 pass**; thêm RED cho preview cũ chiếm màn reload **1 fail/5 skip**. GREEN cuối **17 planner + 2 API + 6 web**, cùng **4/4 browser answer** (1440/375, sáng/tối). Năm mutation thật bị bắt: không cần dữ liệu đọc **3 fail/14 pass**; nguồn model **2 fail/15 pass**; dựng HTML **2 fail/4 pass**; lịch sử không bọc **1 fail/1 pass**; cờ tắt vẫn nhận answer **1 fail/16 pass**. Mỗi mutation exit 1 và source được khôi phục trước gate.
+- Gate: `npm run check` exit 0, **1.836 v3 + 173 eval** (63 schema + 340 adapter + 257 planner + 36 executor + 455 API + 685 web), typecheck/build/security/launcher/env đạt. PostgreSQL 16 tmpfs riêng, loopback 56533; sau hai gate chạm giới hạn 100 kết nối, gate cuối dùng 200 kết nối, không sửa product/test assertion. `npm run test:browser:v3` exit 0: **105 pass/1 skip có chủ đích**, đủ 12 nhóm, gồm answer 4/4; các nhóm cũ đạt, không sửa assertion.
+- Điều chưa làm hoặc khác với task card: **không chạy** model/9router/golden thật (GMAIL-04 làm). Cả hai cờ vẫn tắt mặc định, regex/READ_ONLY_PLAN/labels/scorer/catalog không đổi, prompt off và search envelope có test SHA256 giữ từng byte. Không sửa CURRENT-STATE/ROADMAP. Không sửa nhánh evaluations vì chúng đã xử lý kiểu mới mà không cần đổi scorer. Xem [nhật ký](../log/2026-10-14-codex-ANS-01-read-answers.md).
