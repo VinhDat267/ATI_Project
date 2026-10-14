@@ -68,14 +68,14 @@ export function createGoogleRoutes(options: AuthRoutesOptions): Router {
       res.status(400).json({ error: 'Yêu cầu Google không hợp lệ.', code: 'GOOGLE_AUTH_FAILED' }); return;
     }
     try {
-      const stored = await repo!.findState(state, browser, clock());
+      const stored = await repo!.findState(state, browser, clock(), ['login', 'link']);
       if (!stored) { res.status(400).json({ error: 'Yêu cầu Google đã hết hạn hoặc đã sử dụng.', code: 'GOOGLE_AUTH_FAILED' }); return; }
       if (stored.mode === 'link') auth(req, res, next); else next();
     } catch (error) { failure(res, error); }
   }, async (req, res) => {
     try {
       const caller = (req as any).user as AuthUser | undefined;
-      const state = await repo!.consumeState(req.body.state, binding(req)!, clock(), caller?.id, caller?.sid);
+      const state = await repo!.consumeState(req.body.state, binding(req)!, clock(), ['login', 'link'], caller?.id, caller?.sid);
       if (!state) { res.status(400).json({ error: 'Yêu cầu Google đã hết hạn hoặc đã sử dụng.', code: 'GOOGLE_AUTH_FAILED' }); return; }
       const profile = await oidc!.exchangeCode(req.body.code, state.code_verifier, state.nonce);
       const result = await repo!.resolveAccount(profile, state, options.googleSignupEnabled ?? options.signupEnabled ?? false, clock(),
