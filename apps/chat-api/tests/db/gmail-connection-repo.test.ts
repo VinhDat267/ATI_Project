@@ -155,7 +155,7 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
       expect(await gmail.saveConnection(bob.id, bobs.id!, 'v1:bob', Date.now())).toBeTruthy();
     });
 
-    it('orders a logout committed during the save after that save, never between its check and insert', async () => {
+    it.each(['logout', 'disable'] as const)('orders %s after the save, never between its check and insert', async (action) => {
       await gmail.saveConnection(alice.id, (await consume(alice)).id!, 'v1:existing', Date.now());
       const consumed = await consume(alice);
       const holder = await pool.connect();
@@ -170,7 +170,10 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
           AND query LIKE 'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2%'`)).rows[0]?.pid;
         await vi.waitFor(async () => expect(await waitingPid()).toBeTruthy(), { timeout: 5_000, interval: 20 });
         let loggedOutAt = 0;
-        const loggingOut = logout.query('UPDATE auth_sessions SET revoked_at = now() WHERE id = $1', [alice.sid]).then(() => { loggedOutAt = performance.now(); });
+        const loggingOut = (action === 'logout'
+          ? logout.query('UPDATE auth_sessions SET revoked_at = now() WHERE id = $1', [alice.sid])
+          : logout.query("UPDATE users SET status = 'disabled' WHERE id = $1", [alice.id]))
+          .then(() => { loggedOutAt = performance.now(); });
         await new Promise((resolve) => setTimeout(resolve, 400));
         await holder.query('ROLLBACK');
         const saved = await saving;

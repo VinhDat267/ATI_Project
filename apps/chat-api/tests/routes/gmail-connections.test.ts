@@ -245,6 +245,16 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
 
   describe('two flows of the same browser finishing out of order', () => {
     const configOf = async (who: Person) => decryptCredentials((await stored(who))!.config, key);
+    const beginDelayedCallback = async (app: ReturnType<typeof build>, flow: Awaited<ReturnType<typeof start>>, grant: Awaited<ReturnType<typeof authorize>>) => {
+      // Both callbacks must have consumed their states before the first save
+      // invalidates them. A callback not started yet has no exchanged token to revoke.
+      const before = google.stats.exchanges;
+      google.settings.exchangeDelayMs = 400;
+      const pending = callback(app, alice, flow.cookie, grant);
+      await vi.waitFor(() => expect(google.stats.exchanges).toBe(before + 1));
+      google.settings.exchangeDelayMs = 0;
+      return { pending };
+    };
 
     it('keeps the connection saved first and refuses the other callback, revoking its separate grant', async () => {
       const app = build();
@@ -255,10 +265,11 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       const newer = await start(app, alice, older.cookie);
       expect(newer.cookie).toBe(older.cookie);
       const newerGrant = await authorize(newer.url);
+      const { pending: delayedOlder } = await beginDelayedCallback(app, older, olderGrant);
       expect((await callback(app, alice, newer.cookie, newerGrant)).status).toBe(200);
       const saved = await configOf(alice);
       const before = google.stats.revocations;
-      const late = await callback(app, alice, older.cookie, olderGrant);
+      const late = await delayedOlder;
       expect(late.status).toBe(400); expect(late.body.code).toBe('GMAIL_STATE_INVALID');
       expect((await configOf(alice)).email).toBe('newer-mailbox@example.test');
       expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
@@ -272,14 +283,46 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       const firstGrant = await authorize(first.url);
       const second = await start(app, alice, first.cookie);
       const secondGrant = await authorize(second.url);
+      const { pending: delayedFirst } = await beginDelayedCallback(app, first, firstGrant);
       expect((await callback(app, alice, second.cookie, secondGrant)).status).toBe(200);
       const saved = await configOf(alice);
       const before = google.stats.revocations;
-      expect((await callback(app, alice, first.cookie, firstGrant)).body.code).toBe('GMAIL_STATE_INVALID');
+      expect((await delayedFirst).body.code).toBe('GMAIL_STATE_INVALID');
       await new Promise((resolve) => setTimeout(resolve, 200));
       expect(google.stats.revocations).toBe(before);
       expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
       expect((await stored(alice))?.status).toBe('active');
+    });
+
+    it('refuses a callback not started before another save without exchanging its code or revoking a grant', async () => {
+      const app = build();
+      const older = await start(app, alice);
+      const olderGrant = await authorize(older.url);
+      const newer = await start(app, alice, older.cookie);
+      expect((await callback(app, alice, newer.cookie, await authorize(newer.url))).status).toBe(200);
+      const saved = await configOf(alice);
+      const before = { exchanges: google.stats.exchanges, revocations: google.stats.revocations };
+      const late = await callback(app, alice, older.cookie, olderGrant);
+      expect(late.status).toBe(400); expect(late.body.code).toBe('GMAIL_STATE_INVALID');
+      expect(google.stats.exchanges).toBe(before.exchanges);
+      expect(google.stats.revocations).toBe(before.revocations);
+      expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
+    });
+
+    it.each(['profile', 'scope'] as const)('preserves an active grant when %s failure leaves the refused mailbox identity unknown', async (failure) => {
+      const app = build();
+      expect((await connect(app, alice)).status).toBe(200);
+      const saved = await configOf(alice);
+      const before = google.stats.revocations;
+      if (failure === 'profile') google.settings.profile = 'server_error';
+      else google.settings.grantedScopes = ['openid'];
+      const refused = await connect(app, alice);
+      expect(refused.status).toBe(400);
+      expect(refused.body.code).toBe(failure === 'profile' ? 'GMAIL_CONNECT_FAILED' : 'GMAIL_SCOPE_MISSING');
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(google.stats.revocations).toBe(before);
+      expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
+      expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
     });
   });
 
