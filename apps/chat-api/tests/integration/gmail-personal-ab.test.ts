@@ -149,6 +149,27 @@ describe('personal Gmail for two members A and B (spec 6.2)', () => {
         expect(calls).toEqual([]);
       });
 
+    it('never leaves an approved plan stuck when a conversation read fails after the owner check', async () => {
+      const card = { id: 'card', tool: 'trello.create_card', description: 'Card', args: { listId: 'L1', title: 'T' }, dependsOn: [] };
+      const plan = await storePlan(a, { kind: 'plan', thinking: 't', summary: 's', warnings: [], steps: [card] });
+      let reads = 0;
+      const flaky = { getConversation: async (id: string) => {
+        reads++;
+        if (reads > 1) throw new Error('Connection terminated unexpectedly');
+        return conversations.getConversation(id);
+      } };
+      const shared = { execute: async (tool: string, args: Record<string, unknown>) => { calls.push({ owner: 'shared', tool, args }); return { id: 'c1', name: 'T', url: 'https://trello.com/c/c1' }; } };
+      const execution = new ExecutionService({ planRepo: plans, stepRepo: steps, convRepo: flaky, adapterFactory: { getAdapterForService: () => shared } });
+      const result = await execution.approveAndStart(plan.id, a.id).catch((error: unknown) => ({ success: false, error }));
+      if (result.success) {
+        expect(await settle(plan.id)).toBe('completed');
+        expect(calls.map((c) => c.tool)).toEqual(['trello.create_card']);
+      } else {
+        // A failure must happen before approval, so the plan can still be approved or rejected.
+        expect((await plans.getPlan(plan.id))!.status).toBe('pending');
+      }
+    });
+
     it('keeps checking connections.gmail when recovery runs on a fresh service after a restart', async () => {
       const own = await connect(a, 'a@example.test');
       const plan = await storePlan(a, { kind: 'plan', thinking: 't', summary: 's', warnings: [], steps: [send('s1'), { ...send('s2'), dependsOn: ['s1'] }],

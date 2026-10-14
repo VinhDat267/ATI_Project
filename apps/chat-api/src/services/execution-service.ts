@@ -55,13 +55,13 @@ export class ExecutionService {
   }
 
   /**
-   * Steps always run as the owner of the plan's conversation, read from the
-   * database (never the request), with the connections stored in the
-   * integrity-checked plan.
+   * Steps always run as the owner of the plan's conversation: callers pass the
+   * user that getOwnedPlan just matched against conversations.user_id in the
+   * database, so no further read is needed (and none can fail after approval).
+   * Connections come from the integrity-checked plan.
    */
-  private async executionContext(plan: PlanRow, connections: AdapterContext['connections']): Promise<AdapterContext> {
-    const conversation = this.convRepo ? await this.convRepo.getConversation(plan.conv_id) : null;
-    return { userId: conversation?.user_id ?? undefined, phase: 'execution', connections };
+  private executionContext(ownerId: string, connections: AdapterContext['connections']): AdapterContext {
+    return { userId: ownerId, phase: 'execution', connections };
   }
 
   private async markExecutionFailed(planId: string, convId: string, err: unknown): Promise<void> {
@@ -116,6 +116,9 @@ export class ExecutionService {
       return { success: false, status: 409, error: 'Plan integrity check failed' };
     }
 
+    // Everything that can fail is done before the approval CAS commits.
+    const context = this.executionContext(userId, planJson?.connections);
+
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
     const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId);
     if (!approved) {
@@ -128,7 +131,6 @@ export class ExecutionService {
 
     const convId = planRow.conv_id;
     const steps: PlanStep[] = planJson?.steps || [];
-    const context = await this.executionContext(planRow, planJson?.connections);
 
     // Emit exec_start
     this.sseManager?.emitEvent(convId, 'exec_start', { planId });
@@ -177,7 +179,8 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
-    const context = await this.executionContext(plan, connections);
+    // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
+    const context = this.executionContext(userId, connections);
     const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
     validateRecoveryAction(plan.status, before.states, stepId, action);
     if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
