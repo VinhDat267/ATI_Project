@@ -1,5 +1,5 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { ALL_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
 import type {
   StepOutputs,
@@ -9,8 +9,10 @@ import type {
   ErrorCategory,
 } from './types.js';
 
+// Gmail is opt-in and outside ALL_TOOLS, but its writes must never fall to the name heuristic
+// (reply/forward/trash would read as reads: shorter timeout and no UNKNOWN, so a mail could be resent).
 const catalog = new Map<string, ToolDefinition>(
-  ALL_TOOLS.map((t) => [t.name, t])
+  [...ALL_TOOLS, ...GMAIL_TOOLS].map((t) => [t.name, t])
 );
 
 export function isWriteTool(toolName: string): boolean {
