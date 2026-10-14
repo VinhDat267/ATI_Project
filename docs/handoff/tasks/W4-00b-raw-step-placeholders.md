@@ -1,6 +1,6 @@
 # W4-00b · Validator từ chối tham chiếu bước viết thành chuỗi thô
 
-**Trạng thái:** đang làm, giao `longnguyen005` ngày 13/10/2026 · **Nhánh gợi ý:** `fix/w4-00b-raw-step-placeholders` · **Phụ thuộc:** không · **Mốc:** trước **20/10/2026** (trước buổi thử W4-03 và trước khi diễn tập chuyển sang LLM dự phòng ở tuần 5)
+**Trạng thái:** xong #137 tại `ebc192d` (14/10/2026), `longnguyen005` thi công; review độc lập đạt; phép đo tham khảo với Luna chưa chạy · **Nhánh gợi ý:** `fix/w4-00b-raw-step-placeholders` · **Phụ thuộc:** không · **Mốc:** trước **20/10/2026** (trước buổi thử W4-03 và trước khi diễn tập chuyển sang LLM dự phòng ở tuần 5)
 **Nguồn:** review độc lập #133 (W4-00) ngày 13/10/2026, trên bằng chứng gốc W4-00 (`docs/ai-evidence/V3-LIVE-EXECUTION/W4-00-2026-10-12/`, ignored) và các report golden Gemini trong `docs/ai-evidence/V3-GOLDEN-V2/`.
 
 ## Vấn đề
