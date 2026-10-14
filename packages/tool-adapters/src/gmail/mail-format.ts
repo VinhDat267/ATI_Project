@@ -21,7 +21,7 @@ export const header = (message: GmailMessage, name: string): string => message.p
 export function headerAddresses(value: string): string[] {
   const found: string[] = [];
   for (const match of value.matchAll(/(?:<([^<>]+)>|(?:^|,)\s*([^,<>]+)(?=,|$))/g)) {
-    try { const address = bareAddress(match[1] ?? match[2]); if (!found.includes(address)) found.push(address); } catch { /* untrusted/invalid header */ }
+    try { const address = bareAddress(match[1] ?? match[2] ?? ''); if (!found.includes(address)) found.push(address); } catch { /* untrusted/invalid header */ }
   }
   return found;
 }

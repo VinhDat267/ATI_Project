@@ -124,7 +124,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
               if (!/^<[^<>\s]+>$/.test(inReplyTo)) invalid('Gmail message has no valid Message-ID for reply');
               const previous = header(latest, 'References'); safeHeader(previous);
               if (previous && !/^(?:<[^<>\s]+>\s*)+$/.test(previous)) invalid('Invalid Gmail References header');
-              references = [...new Set((previous.match(/<[^<>\s]+>/g) ?? []).concat(inReplyTo))].join(' ');
+              references = [...new Set([...(previous.match(/<[^<>\s]+>/g) ?? []), inReplyTo])].join(' ');
             }
           }
           const raw = rawMessage({ to: args.to, cc: args.cc, bcc: args.bcc, subject: cut(subject, 250), body: cut(body, 20000), inReplyTo, references });
