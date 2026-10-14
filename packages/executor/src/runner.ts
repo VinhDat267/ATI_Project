@@ -113,7 +113,7 @@ export class StepRunner {
 
       // Write safety: Network/Server failures on write tools result in 'unknown' status
       const status =
-        isWrite && (category === 'NETWORK' || category === 'SERVER_ERROR' || category === 'UNKNOWN')
+        isWrite && err?.details?.requestSent !== false && (category === 'NETWORK' || category === 'SERVER_ERROR' || category === 'UNKNOWN')
           ? 'unknown'
           : 'failed';
 
