@@ -88,7 +88,7 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || req.path.startsWith('/api/connections/gmail')) {
+    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail'))) {
       const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');

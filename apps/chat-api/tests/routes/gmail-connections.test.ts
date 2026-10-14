@@ -83,6 +83,10 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
         expect(r.status, `${method} ${path}`).toBe(404);
       }
       expect((await request(app).get('/api/health')).body).toEqual({ status: 'ok', version: 'v3', runtimeMode: 'sandbox' });
+      // Not even the CORS answer of that path changes while the flag is off.
+      const preflight = await request(app).options('/api/connections/gmail/start').set('Origin', 'http://127.0.0.1:5174');
+      expect(preflight.headers['access-control-allow-origin']).toBe('*');
+      expect(preflight.headers['access-control-allow-credentials']).toBeUndefined();
       expect((await request(createApp({ jwtSecret: secret } as any)).get('/api/health')).body.gmailEnabled).toBeUndefined();
     });
 
@@ -96,6 +100,12 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
 
     it('requires a signed-in session on every route', async () => {
       const app = build();
+      // The browser-bound cookie needs credentialed CORS from the web origin only.
+      const allowed = await request(app).options('/api/connections/gmail/callback').set('Origin', 'http://127.0.0.1:5174');
+      expect(allowed.headers['access-control-allow-origin']).toBe('http://127.0.0.1:5174');
+      expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+      const foreign = await request(app).options('/api/connections/gmail/callback').set('Origin', 'https://evil.example');
+      expect(foreign.headers['access-control-allow-origin']).toBeUndefined();
       for (const [method, path] of [['post', '/start'], ['post', '/callback'], ['delete', '']] as const) {
         const r = await (request(app) as any)[method](`/api/connections/gmail${path}`).send({});
         expect(r.status).toBe(401);
