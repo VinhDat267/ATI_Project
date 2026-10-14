@@ -33,7 +33,7 @@ export async function startFakeGoogleGmail(options = {}) {
   const { port = 0, now = Date.now, clientId, clientSecret, redirectUri, email } = { ...defaults, ...options };
   const settings = {
     email, grantedScopes: [GMAIL_MODIFY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
-    accessTokenPrefix: 'ya29.fake', exchange: 'ok', refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
+    accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
     ...options.settings,
   };
   const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0 };
@@ -83,6 +83,7 @@ export async function startFakeGoogleGmail(options = {}) {
         }
         if (params.get('grant_type') === 'authorization_code') {
           stats.exchanges++;
+          if (settings.exchangeDelayMs) await new Promise((resolve) => setTimeout(resolve, settings.exchangeDelayMs));
           if (settings.exchange === 'server_error') return json(response, 500, { error: 'internal_failure' });
           if (settings.exchange === 'hang') return hang(response);
           const entry = codes.get(params.get('code'));

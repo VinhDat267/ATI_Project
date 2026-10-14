@@ -9,6 +9,7 @@ export interface FakeGoogleGmailSettings {
   accessTokenTtlSeconds: number;
   accessTokenPrefix: string;
   exchange: FakeOutcome;
+  exchangeDelayMs: number;
   refresh: FakeOutcome | 'invalid_grant';
   refreshDelayMs: number;
   revoke: FakeOutcome;
