@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { getRegisteredServices, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
@@ -12,7 +12,11 @@ export interface ServicesRoutesOptions {
   fetchFn?: typeof fetch;
   onCredentialsChanged?: (service: string) => void;
   adminUserIds?: string[];
+  /** Gmail is enabled and usable (flag on, OAuth and PostgreSQL configured). */
+  gmailAvailable?: boolean;
 }
+
+const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 
 async function verifyService(service: string, config: Record<string, unknown>, fetchFn: typeof fetch): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
   const registration = getRegisteredService(service);
@@ -36,10 +40,38 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   const versionOf = (config: string) => createHash('sha256').update(config).digest('hex');
   const checks = new Map<string, { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }>();
 
+  /** The caller's own Gmail row; another person's connection is never read. */
+  const personalGmail = async (userId: string) => {
+    const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = GMAIL_SERVICE;
+    const record = await credentialRepo!.getPersonalConnectionStatus('gmail', userId);
+    let details: { email?: string; connectedAt?: string } = {};
+    let personalStatus: 'connected' | 'reconnect_required' | 'not_connected' = record ? (record.status === 'active' ? 'connected' : 'reconnect_required') : 'not_connected';
+    if (record) {
+      try {
+        const config = decryptCredentials(record.config, encryptionKey!);
+        details = { email: String(config.email), connectedAt: String(config.connectedAt) };
+      } catch {
+        personalStatus = 'reconnect_required';
+      }
+    }
+    const connected = personalStatus === 'connected';
+    return {
+      id, name, description, scopes, scopeKey, scopeLabel, credentialFields, connection: 'personal' as const,
+      tools: GMAIL_TOOLS.map(tool => tool.name),
+      configured: connected, connected, connectionStatus: connected ? 'unchecked' : 'unconfigured', lastCheckedAt: null, allowedScope: [],
+      personalStatus, ...details,
+    };
+  };
+  // Shared-key administration never applies to the personal Gmail connection.
+  router.use('/gmail', (_req, res, next) => {
+    if (options.gmailAvailable) { res.status(400).json({ error: PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
+    next();
+  });
+
   // GET /api/services
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
-      const services = await Promise.all(getRegisteredServices().map(async definition => {
+      const services: Array<Record<string, unknown>> = await Promise.all(getRegisteredServices().map(async definition => {
         const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
         const record = await credentialRepo?.getCredentials(id);
         const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
@@ -49,7 +81,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const savedCheck = checks.get(id);
         const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
         return {
-          id, name, description, scopes, scopeKey, scopeLabel, credentialFields,
+          id, name, description, scopes, scopeKey, scopeLabel, credentialFields, connection: definition.connection ?? 'shared',
           tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
           configured,
           connected: configured && check?.connectionStatus === 'healthy',
@@ -58,6 +90,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           allowedScope: Array.isArray(entries) ? entries : [],
         };
       }));
+      if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));
       res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds) });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });

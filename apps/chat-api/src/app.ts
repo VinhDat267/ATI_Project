@@ -138,7 +138,8 @@ export function createApp(options: AppOptions): Express {
   app.use(
     '/api/services',
     authMiddleware,
-    createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds })
+    createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
+      gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)) })
   );
 
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
