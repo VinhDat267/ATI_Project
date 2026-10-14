@@ -98,6 +98,6 @@ Nhận địa chỉ chỉ có trong nội dung thư; nhận `$ref` ở `to`; b�
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN và đột biến:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#143](https://github.com/VinhDat267/ATI_Project/pull/143), nhánh `feat/gmail-02-gmail-tools`, mã sản phẩm `65e4619`. Chưa merge.
+- RED/GREEN và đột biến: adapter/executor 50 fail/3 pass → hai package 429/429; planner 12 fail/13 pass → planner/routing 282/282; sandbox/nhãn 3 fail/1 pass → API trọng tâm 14/14. Review độc lập `3d3072b` CHƯA ĐẠT (2 P1/4 P2); sửa RED 14 fail/68 pass → 82/82, thêm ca nhãn rỗng RED 1 và cấu hình sandbox RED 3 → GREEN. `npm run check` cuối tại `65e4619` exit 0: 1.922 v3 + 173 eval; browser tuần tự 101 pass/1 skip, exit 0. 16/16 đột biến bị bắt, SHA256 nguồn khôi phục. OAuth/PostgreSQL thật với A/B; kịch bản Gmail qua app đến biên nhận, 0 Gmail API request. [Nhật ký và giới hạn bằng chứng](../log/2026-10-14-codex-GMAIL-02-gmail-tools.md); CI/browser trên head bàn giao cuối ghi trong PR.
+- Điều chưa làm hoặc khác với task card: chưa gọi Google/model thật; UI/nhóm browser Gmail thuộc GMAIL-03, golden/live thuộc GMAIL-04. Helper runtime tách để test hàm server dùng. Kịch bản Gmail tự chọn vòng search dù sandbox mặc định regex. Reviewer kiểm bản đầu; các commit sửa được tác giả kiểm RED/GREEN, không tuyên bố có review độc lập lại bản sửa. Không sửa CURRENT-STATE/ROADMAP hay assertion cũ.
