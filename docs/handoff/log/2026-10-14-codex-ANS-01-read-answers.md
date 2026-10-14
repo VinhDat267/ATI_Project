@@ -2,7 +2,7 @@
 
 - Ngày: 14/10/2026, Asia/Saigon; task [ANS-01](../tasks/ANS-01-read-answers.md), giao `longnguyen005`.
 - Nhánh `codex/feat-ans-01-read-answers`, base `61d3be4`, mã/test `77676a1d68d88d127669aedfd477b9021f17882a`.
-- PR: bổ sung sau khi mở. Chưa merge, chờ review độc lập.
+- PR: [#142](https://github.com/VinhDat267/ATI_Project/pull/142). Chưa merge, chờ review độc lập/CI.
 
 ## Thay đổi
 
