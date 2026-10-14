@@ -5,7 +5,7 @@ import { routeIntent, unavailableServiceReason, type RoutedIntent } from './rout
 import { validatePlan } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
-  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, searchEntities,
+  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, searchEntities,
   type SearchOutcome,
 } from './search.js';
 
@@ -265,7 +265,11 @@ export class AIPlanner {
       if (tool.discovers) {
         // `stamp` records the parent a result was found under, e.g. the board of a member.
         const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...stamp, ...entity } : entity));
-        memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped));
+        memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped, tool.observedFields));
+        if (tool.service === 'gmail' && tool.discovers === 'thread') {
+          const labels = memory.getEntity('__labels') ?? {};
+          memory.setEntity('__labels', { ...labels, thread: recordThreadLabels(labels.thread, stamped) });
+        }
       }
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: result });
       return { tool: tool.name, args, result };
@@ -345,7 +349,7 @@ export class AIPlanner {
     // Search rounds, one final answer, and one correction of a rejected plan.
     for (let call = 0; call < this.maxSearchRounds + 2; call++) {
       const output = await this.provider.generatePlan({
-        systemPrompt, conversationHistory: conversation, toolCatalog: activeTools, workingMemory: memory.getAll(), signal,
+        systemPrompt, conversationHistory: conversation, toolCatalog: activeTools, workingMemory: providerMemory(memory.getAll()), signal,
       });
 
       const request = parseSearchRequest(output);
@@ -373,7 +377,7 @@ export class AIPlanner {
           const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
           return {
             kind: 'clarification',
-            question: `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
+            question: resources.includes('recipient') ? 'Bạn muốn gửi tới địa chỉ email nào?' : `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
             context: `Chưa xác minh được các giá trị này qua dịch vụ đã kết nối: ${validation.ungrounded
               .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Vui lòng nêu tên tài nguyên hoặc ID chính xác.`,
           };
@@ -423,7 +427,7 @@ export class AIPlanner {
     ];
 
     const validationOptions = this.requireGroundedResources ? { grounding: {
-      memory: memory.getAll(),
+      memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')),
       userTexts: conversationHistory.filter((message) => message.role === 'user').map((message) => message.content),
     } } : {};
 
@@ -432,7 +436,7 @@ export class AIPlanner {
       systemPrompt,
       conversationHistory,
       toolCatalog: activeTools,
-      workingMemory: memory.getAll(),
+      workingMemory: providerMemory(memory.getAll()),
       signal,
     });
 
@@ -456,7 +460,7 @@ export class AIPlanner {
       systemPrompt,
       conversationHistory: feedbackTurn,
       toolCatalog: activeTools,
-      workingMemory: memory.getAll(),
+      workingMemory: providerMemory(memory.getAll()),
       signal,
     });
 
@@ -473,7 +477,7 @@ export class AIPlanner {
       const resources = [...new Set(retryValidation.ungrounded.map((u) => u.resource))];
       return {
         kind: 'clarification',
-        question: `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
+        question: resources.includes('recipient') ? 'Bạn muốn gửi tới địa chỉ email nào?' : `Bạn muốn dùng tài nguyên ${resources.join(', ')} nào?`,
         context: `Chưa xác minh được các giá trị này qua dịch vụ đã kết nối: ${retryValidation.ungrounded
           .map((u) => `${u.argument}=${JSON.stringify(u.value)}`).join(', ')}. Vui lòng nêu tên tài nguyên (ví dụ "board Frontend list To Do") hoặc ID chính xác.`,
       };

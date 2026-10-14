@@ -92,9 +92,9 @@ export function prepareSearchCall(call: SearchCall, catalog: ToolDefinition[]): 
   return problem ? { error: `${call.tool}: ${problem}` } : { args };
 }
 
-function compact(entity: unknown): Record<string, unknown> | undefined {
+function compact(entity: unknown, fields = KEPT_FIELDS): Record<string, unknown> | undefined {
   if (!isObject(entity) || (typeof entity.id !== 'string' && typeof entity.id !== 'number')) return undefined;
-  return Object.fromEntries(KEPT_FIELDS.filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
+  return Object.fromEntries(fields.filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
 }
 
 /**
@@ -105,11 +105,12 @@ export function recordObserved(
   observed: Record<string, Array<Record<string, unknown>>> | undefined,
   resource: string,
   results: unknown[],
+  fields?: string[],
 ): Record<string, Array<Record<string, unknown>>> {
   const merged = { ...(observed ?? {}) };
-  const fresh = results.map(compact).filter((entity): entity is Record<string, unknown> => entity !== undefined);
+  const fresh = results.map(entity => compact(entity, fields)).filter((entity): entity is Record<string, unknown> => entity !== undefined);
   const freshIds = new Set(fresh.map((entity) => String(entity.id)));
-  const previous = merged[resource] ?? [];
+  const previous = (merged[resource] ?? []).map(entity => compact(entity, fields)).filter((entity): entity is Record<string, unknown> => entity !== undefined);
   for (const entity of fresh) {
     // A member can belong to several boards; keep every board it was seen on.
     const earlier = previous.find((candidate) => String(candidate.id) === String(entity.id));
@@ -119,6 +120,19 @@ export function recordObserved(
   const kept = previous.filter((entity) => !freshIds.has(String(entity.id)));
   merged[resource] = [...kept, ...fresh].slice(-MAX_OBSERVED_PER_RESOURCE);
   return merged;
+}
+
+/** Subjects belong to the server's display projection, outside provider input. */
+export function recordThreadLabels(labels: Record<string, string> | undefined, results: unknown[]): Record<string, string> {
+  const entries = new Map(Object.entries(labels ?? {}));
+  for (const result of results) if (isObject(result) && typeof result.id === 'string' && typeof result.subject === 'string') {
+    entries.delete(result.id); entries.set(result.id, Array.from(result.subject).slice(0, 250).join(''));
+  }
+  return Object.fromEntries([...entries].slice(-MAX_OBSERVED_PER_RESOURCE));
+}
+export function providerMemory(memory: Record<string, any>): Record<string, any> {
+  const { __labels: _displayOnly, ...safe } = memory;
+  return safe;
 }
 
 /** What the grounding layer may treat as looked up: resolved entities plus everything observed. */
