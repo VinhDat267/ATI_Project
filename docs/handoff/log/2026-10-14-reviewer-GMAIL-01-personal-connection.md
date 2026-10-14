@@ -86,7 +86,7 @@ Số dưới đây chạy trên head cuối `3ed608d` (sau hai lần sửa khi t
 
 ## Lưu ý cho GMAIL-02
 
-- Executor đổi `NETWORK`/`SERVER_ERROR` của tool ghi thành `unknown`. Token manager ném đúng các loại này khi làm mới lỗi (đặc tả mục 3.5). Nếu adapter để lỗi đó lộ ra từ `execute`, bước ghi thành "chưa rõ kết quả" dù Gmail chưa nhận gì. Đã ghi vào GMAIL-common mục 4.4.
+- Executor đổi `NETWORK`/`SERVER_ERROR` của tool ghi thành `unknown`. Token manager ném đúng các loại này khi làm mới lỗi (đặc tả mục 3.5). Nếu adapter để lỗi đó lộ ra từ `execute`, bước ghi thành "chưa rõ kết quả" dù Gmail chưa nhận gì. Nhóm trưởng chốt ngày 14/10: lỗi trước khi request đi mang `details.requestSent === false`, executor coi là `failed`; GMAIL-02 làm cả hai phía. Đã ghi vào đặc tả mục 11, GMAIL-common mục 4.4 và task card GMAIL-02.
 - Ở sandbox, `createRuntimeAdapterFactory` chuyển context nhưng `createSandboxAdapter` chưa biết Gmail.
 
 ## Chưa làm

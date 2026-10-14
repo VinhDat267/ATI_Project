@@ -145,7 +145,10 @@ Chỗ đặt sau GMAIL-01:
 - `GmailAccessTokenProvider` export từ `@wap/tool-adapters` (`packages/tool-adapters/src/gmail/token-provider.ts`), vì adapter của GMAIL-02 nằm trong package này và không import được `chat-api`;
 - `AdapterFactory` nhận thêm `gmailTokens` (`GmailTokenManager`) và có `clearPersonal(userId)`;
 - lỗi của factory với Gmail là `StepError` loại `AUTH_ERROR` (thiếu người, chưa kết nối, kết nối đã đổi) hoặc `VALIDATION` (máy chủ chưa nối adapter Gmail), để bước ghi báo thất bại chứ không thành `unknown`.
-- Lưu ý cho GMAIL-02: executor đổi `NETWORK`/`SERVER_ERROR` của tool ghi thành `unknown`. Lỗi làm mới token xảy ra trước khi gửi (bên trong `adapter.execute`) không được để lộ ra dưới dạng `NETWORK`/`SERVER_ERROR`, nếu không bước đó thành "chưa rõ kết quả" dù Gmail chưa nhận gì.
+- **Lỗi trước khi gửi request (chốt 14/10/2026, nhóm trưởng):** executor đổi `NETWORK`/`SERVER_ERROR` của tool ghi thành `unknown`. Lỗi xảy ra trước khi request tới Gmail API được gửi đi (làm mới token lỗi mạng hoặc 5xx, kiểm đầu vào, giới hạn tốc độ chưa cho gửi) là lỗi đã biết:
+  - adapter ném `StepError` có `details.requestSent === false`;
+  - executor coi lỗi của tool ghi có dấu này là `failed`, kể cả khi loại là `NETWORK`/`SERVER_ERROR`. Không có dấu thì giữ cách cũ: lỗi sau khi request đã đi vẫn là `unknown`;
+  - GMAIL-02 làm cả hai phía, có test và đột biến cho từng phía.
 
 ### 4.5. Kiểu "trả lời" (ANS-01 làm; GMAIL-03, GMAIL-04 dùng)
 

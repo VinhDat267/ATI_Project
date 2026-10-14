@@ -530,3 +530,4 @@ Hai cờ tắt nên các PR trên merge được trước buổi thử 23–25/1
 - Mục 3.9: `GET /api/health` thêm `gmailEnabled` cho các trang công khai.
 - Mục 7: người làm, phụ thuộc, ngày mới của ANS-01 và GMAIL-03. Mục 9: câu trả lời của nhóm trưởng.
 - Mục 5.5 (GMAIL-04): thêm một lượt core và một lượt services với `PLANNER_READ_ANSWERS=on`, vì cờ đổi quy tắc 0 của prompt cho mọi câu; mục đích là kiểm câu có hành động ghi không bị biến thành câu trả lời. Scorer thêm matcher `excludes` cho câu injection; cách chấm ba bộ cũ không đổi.
+- Mục 3.5 và 4.4 (chốt 14/10, phát hiện khi làm GMAIL-01): executor đổi mọi `NETWORK`/`SERVER_ERROR` của tool ghi thành `UNKNOWN`, nên lỗi làm mới token sẽ thành "chưa rõ kết quả" dù Gmail chưa nhận gì. Lỗi trước khi request đi mang `details.requestSent === false`, và executor coi lỗi của tool ghi có dấu này là `failed`. Package `executor` vẫn giữ interface `StepRunnerOptions`.
