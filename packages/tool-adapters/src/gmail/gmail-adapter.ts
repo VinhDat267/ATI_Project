@@ -76,7 +76,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
               path === 'messages/send' && !id(data?.threadId) ||
               path === 'drafts' && (!id(data?.message?.id) || !id(data?.message?.threadId)) ||
               path === 'labels' && typeof data?.name !== 'string' ||
-              path.endsWith('/modify') && (!Array.isArray(data?.messages) || data.messages.some((message: any) => !Array.isArray(message.labelIds) || message.labelIds.some((label: unknown) => !id(label)))));
+              path.endsWith('/modify') && (!Array.isArray(data?.messages) || data.messages.some((message: any) => !message || typeof message !== 'object' || message.labelIds !== undefined && (!Array.isArray(message.labelIds) || message.labelIds.some((label: unknown) => !id(label))))));
             if (!data || typeof data !== 'object' || invalidWrite) throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an invalid response' });
             return data;
           }

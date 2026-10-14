@@ -166,6 +166,11 @@ describe('Gmail native HTTP adapter', () => {
     expect(result).toEqual({ id: 'thread-1', labelIds: ['INBOX', 'STARRED'] });
     expect(server.stats.apiRequests.at(-1)).toMatchObject({ path: 'threads/thread-1/modify', method: 'POST', body: { addLabelIds: ['STARRED'], removeLabelIds: ['UNREAD'] } });
   });
+  it('normalizes a message with no labels when Google omits its empty labelIds field', async () => {
+    const { adapter, server } = await setup(); server.settings.apiResponses = [{ body: { id: 'thread-1', messages: [{ id: 'message-1' }] } }];
+    await expect(adapter.execute('gmail.modify_thread_labels', { threadId: 'thread-1', removeLabelIds: ['INBOX'] })).resolves.toEqual({ id: 'thread-1', labelIds: [] });
+    expect(server.stats.writes).toBe(1);
+  });
   it.each([
     ['send_message', { id: 'sent' }], ['send_message', { id: '', threadId: 't' }],
     ['create_draft', { id: 'draft' }], ['create_draft', { id: 'draft', message: { id: 'm' } }],
