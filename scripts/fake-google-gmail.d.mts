@@ -15,7 +15,7 @@ export interface FakeGoogleGmailSettings {
   revoke: FakeOutcome;
   profile: 'ok' | 'server_error';
   threads: { id: string; messages: any[] }[];
-  apiResponses: { status?: number; reason?: string; retryAfter?: string; mode?: 'hang' | 'disconnect' | 'invalid_json' | 'redirect' | 'server_error' }[];
+  apiResponses: { status?: number; reason?: string; retryAfter?: string; body?: unknown; mode?: 'hang' | 'disconnect' | 'invalid_json' | 'redirect' | 'server_error' }[];
 }
 export interface FakeGoogleGmail {
   server: Server;

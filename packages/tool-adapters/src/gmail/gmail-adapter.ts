@@ -50,11 +50,12 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       if (['to', 'cc', 'bcc'].reduce((n, key) => n + (args[key]?.length ?? 0), 0) > 20) invalid('Gmail allows at most 20 recipients total');
       async function request(path: string, body?: any): Promise<any> {
         const write = body !== undefined;
-        let refreshed = false, retries = 0;
+        let refreshed = false, forceRefresh = false, retries = 0;
         for (;;) {
           signal.throwIfAborted();
           if (!await limiter.waitForSlot('gmail', 30_000, 50, signal)) throw new StepError({ category: 'RATE_LIMIT', message: 'Gmail rate limiter timed out' });
-          const token = await options.tokens.getAccessToken({ signal, ...(refreshed ? { forceRefresh: true } : {}) });
+          const token = await options.tokens.getAccessToken({ signal, ...(forceRefresh ? { forceRefresh: true } : {}) });
+          forceRefresh = false;
           signal.throwIfAborted();
           let response: Response;
           try {
@@ -70,10 +71,18 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
             throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an unreadable response' });
           }
           if (response.ok) {
-            if (!data || typeof data !== 'object' || write && typeof data.id !== 'string') throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an invalid response' });
+            const id = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+            const invalidWrite = write && (!id(data?.id) ||
+              path === 'messages/send' && !id(data?.threadId) ||
+              path === 'drafts' && (!id(data?.message?.id) || !id(data?.message?.threadId)) ||
+              path === 'labels' && typeof data?.name !== 'string' ||
+              path.endsWith('/modify') && (!Array.isArray(data?.messages) || data.messages.some((message: any) => !Array.isArray(message.labelIds) || message.labelIds.some((label: unknown) => !id(label)))));
+            if (!data || typeof data !== 'object' || invalidWrite) throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an invalid response' });
             return data;
           }
-          if (response.status === 401 && !refreshed) { refreshed = true; continue; }
+          // 401 is a definitive rejection: no write occurred. A refresh failure
+          // before the next attempt is known unsent, unlike an ambiguous response.
+          if (response.status === 401 && !refreshed) { refreshed = true; forceRefresh = true; if (write) writeDispatched = false; continue; }
           const reasons = data?.error?.errors?.map((e: any) => e.reason) ?? [];
           const quota = response.status === 429 || response.status === 403 && reasons.some((r: string) => /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded/i.test(r));
           if (quota && !write && retries++ < 2) { await waitWithSignal(Math.min(5000, retryAfterMs(response.headers.get('retry-after'))), signal); continue; }
@@ -105,7 +114,10 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
         case 'gmail.list_labels': {
           const data = await request('labels'); return (data.labels ?? []).filter((l: any) => l.name.toLowerCase().includes(args.query.toLowerCase())).slice(0, args.limit ?? 10).map((l: any) => ({ id: l.id, name: l.name, type: l.type }));
         }
-        case 'gmail.modify_thread_labels': return await request(`threads/${args.threadId}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
+        case 'gmail.modify_thread_labels': {
+          const thread = await request(`threads/${args.threadId}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
+          return { id: thread.id, labelIds: [...new Set(thread.messages.flatMap((message: GmailMessage) => message.labelIds ?? []))] };
+        }
         case 'gmail.trash_thread': return await request(`threads/${args.threadId}/trash`, {});
         case 'gmail.create_label': return await request('labels', { name: args.name, labelListVisibility: 'labelShow', messageListVisibility: 'show' });
         default: {

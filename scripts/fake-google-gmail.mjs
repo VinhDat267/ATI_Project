@@ -151,6 +151,7 @@ export async function startFakeGoogleGmail(options = {}) {
         if (scripted?.mode === 'invalid_json') { response.writeHead(200); return response.end('not json'); }
         if (scripted?.mode === 'redirect') { response.writeHead(307, { Location: '/gmail/v1/users/me/profile' }); return response.end(); }
         if (scripted?.mode === 'server_error') return json(response, 503, { error: { code: 503 } });
+        if (scripted && Object.hasOwn(scripted, 'body')) return json(response, scripted.status ?? 200, scripted.body);
         if (scripted?.status) {
           if (scripted.retryAfter != null) response.setHeader('Retry-After', scripted.retryAfter);
           return json(response, scripted.status, { error: { code: scripted.status, errors: [{ reason: scripted.reason ?? 'forbidden' }] } });
@@ -165,7 +166,12 @@ export async function startFakeGoogleGmail(options = {}) {
         if (path === 'drafts') return json(response, 200, { id: `draft-${stats.writes}`, message: { id: `draft-message-${stats.writes}`, threadId: body.message.threadId ?? 'draft-thread' } });
         const match = /^threads\/([^/]+)(?:\/(modify|trash))?$/.exec(path);
         const thread = match && settings.threads.find(t => t.id === decodeURIComponent(match[1]));
-        if (thread) return json(response, 200, match[2] ? { id: thread.id, labelIds: body.addLabelIds ?? ['TRASH'] } : thread);
+        if (thread) {
+          if (match[2] === 'modify') return json(response, 200, { ...thread, messages: thread.messages.map(message => ({ ...message,
+            labelIds: [...new Set([...(message.labelIds ?? []).filter(id => !body.removeLabelIds?.includes(id)), ...(body.addLabelIds ?? [])])],
+          })) });
+          return json(response, 200, match[2] === 'trash' ? { id: thread.id } : thread);
+        }
       }
       return json(response, 404, { error: 'not_found' });
     } catch {

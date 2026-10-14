@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { GMAIL_TOOLS } from '@wap/tool-schemas';
-import { validatePlan } from '../src/index.js';
+import { validatePlan, userEmailAddresses } from '../src/index.js';
 
 const plan = (to: any, extra: any = {}) => JSON.stringify({ kind: 'plan', thinking: 'Gửi', summary: 'Gửi', warnings: [],
   steps: [{ id: 'send', tool: 'gmail.send_message', description: 'Gửi', args: { to, subject: 'Họp', body: 'OK', ...extra }, dependsOn: [] }] });
@@ -21,6 +21,12 @@ it('accepts only exact addresses from real user messages, ignoring case and oute
   expect(validate([' Lan@EXAMPLE.com '], {}, ['Gửi EMAIL cho lan@example.COM nhé.']).valid).toBe(true);
   expect(validate(['lan@example.com'], {}, ['Gửi cho evil+lan@example.com']).valid).toBe(false);
   expect(validate(['lan@example.com'], {}, ['Gửi cho lan@example.com.evil']).valid).toBe(false);
+});
+it.each(["o'connor@example.com", '{lan}@example.com', 'support?lan@example.com', 'team/lan@example.com'])('preserves every allowed local-part character in the exact user address %s', address => {
+  const texts = [`Gửi cho ${address}`];
+  expect([...userEmailAddresses(texts)]).toEqual([address]);
+  expect(validate([address], {}, texts).valid).toBe(true);
+  expect(validate(['lan@example.com', 'connor@example.com'], {}, texts)).toMatchObject({ valid: false, layer: 'grounding' });
 });
 it('accepts a normalized header participant in observed thread only', () => {
   expect(validate(['LAN@example.com'], { __observed: { thread: [{ id: 't', participants: ['lan@example.com'] }] } }).valid).toBe(true);

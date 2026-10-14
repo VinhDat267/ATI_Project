@@ -7,7 +7,7 @@ export function normalizedRecipient(value: unknown): string | undefined {
 /** Whole address tokens, never a substring of another mailbox or domain. */
 export function userEmailAddresses(texts: string[]): Set<string> {
   const result = new Set<string>();
-  for (const text of texts) for (const token of text.match(/[^\s@<>"',;:()\\[\]{}]+@[^\s@<>"',;:()\\[\]{}]+\.[^\s@<>"',;:()\\[\]{}]+/gu) ?? []) {
+  for (const text of texts) for (const token of text.match(/[^\s@<>",;:()\\[\]]+@[^\s@<>",;:()\\[\]]+\.[^\s@<>",;:()\\[\]]+/gu) ?? []) {
     const address = normalizedRecipient(token.replace(/[.!?]+$/u, ''));
     if (address) result.add(address);
   }

@@ -19,9 +19,31 @@ export interface GmailThread { id: string; messages?: GmailMessage[] }
 export const header = (message: GmailMessage, name: string): string => message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
 /** Header addresses only. Display names, comments and quoted commas never become participants. */
 export function headerAddresses(value: string): string[] {
+  if (/[\r\n\x00]/.test(value)) return [];
   const found: string[] = [];
-  for (const match of value.matchAll(/(?:<([^<>]+)>|(?:^|,)\s*([^,<>]+)(?=,|$))/g)) {
-    try { const address = bareAddress(match[1] ?? match[2] ?? ''); if (!found.includes(address)) found.push(address); } catch { /* untrusted/invalid header */ }
+  const mailboxes: { text: string; quoted: boolean }[] = [];
+  let text = '', quoted = false, inQuote = false, escaped = false, commentDepth = 0;
+  for (const char of value) {
+    if (escaped) { escaped = false; continue; }
+    if ((inQuote || commentDepth > 0) && char === '\\') { escaped = true; continue; }
+    if (commentDepth > 0) {
+      if (char === '(') commentDepth++;
+      if (char === ')') commentDepth--;
+      continue;
+    }
+    if (char === '"') { inQuote = !inQuote; quoted = true; text += ' '; continue; }
+    if (inQuote) continue;
+    if (char === '(') { commentDepth = 1; text += ' '; continue; }
+    if (char === ',') { mailboxes.push({ text, quoted }); text = ''; quoted = false; continue; }
+    text += char;
+  }
+  if (inQuote || commentDepth > 0 || escaped) return [];
+  mailboxes.push({ text, quoted });
+  for (const mailbox of mailboxes) {
+    const angle = /^[^<>]*<([^<>]+)>\s*$/.exec(mailbox.text);
+    const candidate = angle?.[1] ?? (!mailbox.quoted && !/[<>]/.test(mailbox.text) ? mailbox.text : undefined);
+    if (candidate === undefined) continue;
+    try { const address = bareAddress(candidate); if (!found.includes(address)) found.push(address); } catch { /* untrusted/invalid header */ }
   }
   return found;
 }
