@@ -22,6 +22,7 @@ import { getToolCatalogFor } from './services/registered-services.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
+import { createGmailConnectionLookup } from './services/gmail/connection-reference.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -191,6 +192,9 @@ async function bootstrap() {
   // fall back to memory after failing to reconcile an available database.
   if (pool && userRepo) await reconcileInterruptedExecutions(pool);
 
+  // Gmail needs the flag, its own OAuth client and PostgreSQL; otherwise none of it exists.
+  const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
+
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
@@ -254,11 +258,10 @@ async function bootstrap() {
     planRepo,
     planner: planner as any,
     eventEmitter: chatEventEmitter,
+    gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)
-  // Gmail needs the flag, its own OAuth client and PostgreSQL; otherwise none of it exists.
-  const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
   const realAdapterFactory: AdapterFactory = new AdapterFactory({
     credentialRepo: credRepo,
