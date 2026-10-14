@@ -1,11 +1,20 @@
 import type pg from 'pg';
 
+export type CredentialStatus = 'active' | 'reconnect_required';
+
 export interface ServiceCredentialRow {
   id: string;
   service: string;
   user_id: string | null;
   config: string;
   created_at: Date;
+  status: CredentialStatus;
+  status_changed_at: Date | null;
+}
+
+function requireUser(userId: string | null | undefined): string {
+  if (!userId) throw new Error('A personal credential needs a user id');
+  return userId;
 }
 
 export class CredentialRepo {
@@ -59,6 +68,34 @@ export class CredentialRepo {
       [service]
     );
     return sharedRes.rows[0] || null;
+  }
+
+  /** A personal connection (Gmail): only the owner's own active row, never a shared key. */
+  async getPersonalCredentials(service: string, userId: string): Promise<ServiceCredentialRow | null> {
+    const res = await this.pool.query(
+      "SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2 AND status = 'active'",
+      [service, requireUser(userId)],
+    );
+    return res.rows[0] ?? null;
+  }
+
+  /** The owner's own row in any status, for showing "connected" or "reconnect required". */
+  async getPersonalConnectionStatus(service: string, userId: string): Promise<ServiceCredentialRow | null> {
+    const res = await this.pool.query(
+      'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2',
+      [service, requireUser(userId)],
+    );
+    return res.rows[0] ?? null;
+  }
+
+  /** The grant is gone: keep the row for the UI. A newer connection (another id) is never touched. */
+  async markReconnectRequired(service: string, userId: string, credentialId: string): Promise<boolean> {
+    const res = await this.pool.query(
+      `UPDATE service_credentials SET status = 'reconnect_required', status_changed_at = now()
+       WHERE id = $3 AND service = $1 AND user_id = $2 AND status = 'active'`,
+      [service, requireUser(userId), credentialId],
+    );
+    return (res.rowCount ?? 0) > 0;
   }
 
   /** Read and transform shared config under the same lock as key replacement. */

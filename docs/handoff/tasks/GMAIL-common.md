@@ -92,7 +92,7 @@ Mọi route dưới `/api/connections/gmail` trả **404** khi cờ tắt, **503
 | `POST /api/connections/gmail/callback`, body `{ code, state }` | `200 { email }` | `400` với `code` là `GMAIL_STATE_INVALID` (hết hạn, đã dùng, sai luồng, sai người/phiên/trình duyệt), `GMAIL_SCOPE_MISSING`, `GMAIL_REFRESH_TOKEN_MISSING` hoặc `GMAIL_CONNECT_FAILED`; `401 INVALID_SESSION` |
 | `DELETE /api/connections/gmail` | `200 { success: true }`, kể cả khi chưa kết nối | `401 INVALID_SESSION` |
 
-`GET /api/services`: mỗi dịch vụ thêm `connection`. Gmail chỉ có trong danh sách khi cờ bật, và luôn là của chính người gọi:
+`GET /api/services`: mỗi dịch vụ thêm `connection`. Gmail chỉ có trong danh sách khi Gmail dùng được (cờ bật, đủ cấu hình OAuth và có PostgreSQL), và luôn là của chính người gọi:
 
 ```ts
 interface ServiceItemAdditions {
@@ -104,7 +104,7 @@ interface ServiceItemAdditions {
 }
 ```
 
-`GET /api/health` (công khai) thêm `gmailEnabled: boolean`.
+`GET /api/health` (công khai) thêm `gmailEnabled: boolean` khi cờ bật (`true` khi Gmail dùng được, `false` khi thiếu cấu hình). Khi cờ tắt, phản hồi giữ đúng như cũ, không có trường này; giao diện coi thiếu là `false`. (Chỉnh trong GMAIL-01: cờ tắt thì không có gì đổi.)
 
 ### 4.3. Kế hoạch và nhãn xem trước (GMAIL-01, GMAIL-02 làm; GMAIL-03 dùng)
 
@@ -140,6 +140,15 @@ export interface AdapterContext {
 ```
 
 GMAIL-01 không truyền `createGmailAdapter` trong `server.ts`; test của GMAIL-01 truyền một adapter thử ghi lại các lần gọi. GMAIL-02 truyền adapter thật (live) và adapter giả (sandbox).
+
+Chỗ đặt sau GMAIL-01:
+- `GmailAccessTokenProvider` export từ `@wap/tool-adapters` (`packages/tool-adapters/src/gmail/token-provider.ts`), vì adapter của GMAIL-02 nằm trong package này và không import được `chat-api`;
+- `AdapterFactory` nhận thêm `gmailTokens` (`GmailTokenManager`) và có `clearPersonal(userId)`;
+- lỗi của factory với Gmail là `StepError` loại `AUTH_ERROR` (thiếu người, chưa kết nối, kết nối đã đổi) hoặc `VALIDATION` (máy chủ chưa nối adapter Gmail), để bước ghi báo thất bại chứ không thành `unknown`.
+- **Lỗi trước khi gửi request (chốt 14/10/2026, nhóm trưởng):** executor đổi `NETWORK`/`SERVER_ERROR` của tool ghi thành `unknown`. Lỗi xảy ra trước khi request tới Gmail API được gửi đi (làm mới token lỗi mạng hoặc 5xx, kiểm đầu vào, giới hạn tốc độ chưa cho gửi) là lỗi đã biết:
+  - adapter ném `StepError` có `details.requestSent === false`;
+  - executor coi lỗi của tool ghi có dấu này là `failed`, kể cả khi loại là `NETWORK`/`SERVER_ERROR`. Không có dấu thì giữ cách cũ: lỗi sau khi request đã đi vẫn là `unknown`;
+  - GMAIL-02 làm cả hai phía, có test và đột biến cho từng phía.
 
 ### 4.5. Kiểu "trả lời" (ANS-01 làm; GMAIL-03, GMAIL-04 dùng)
 

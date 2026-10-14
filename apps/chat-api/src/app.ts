@@ -21,6 +21,20 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
+import type { GmailOAuthConfig } from './config/env.js';
+import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import { createGmailConnectionRoutes, isGmailAvailable } from './routes/connections/gmail.js';
+
+/** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
+export interface GmailAppOptions {
+  enabled: boolean;
+  oauth?: GmailOAuthConfig;
+  repo?: GmailConnectionRepo;
+  fetchFn?: typeof fetch;
+  googleTimeoutMs?: number;
+  revokeTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+}
 
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
@@ -46,10 +60,18 @@ export interface AppOptions extends AdminUsersOptions {
   chatService?: ChatService;
   sseManager?: SSEManager;
   executionService?: ExecutionService;
+  gmail?: GmailAppOptions;
 }
 
 export function createApp(options: AppOptions): Express {
   const app = express();
+  const sessionRepo = options.sessionRepo ?? options.userRepo?.sessions;
+  const gmailRoutes = options.gmail?.enabled ? {
+    jwtSecret: options.jwtSecret, sessionRepo, states: options.userRepo?.googleAuth, credentialRepo: options.credentialRepo,
+    repo: options.gmail.repo, oauth: options.gmail.oauth, encryptionKey: options.encryptionKey, fetchFn: options.gmail.fetchFn,
+    clock: options.authClock, googleTimeoutMs: options.gmail.googleTimeoutMs, revokeTimeoutMs: options.gmail.revokeTimeoutMs,
+    onConnectionChanged: options.gmail.onConnectionChanged,
+  } : undefined;
 
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -66,8 +88,8 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/')) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail'))) {
+      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -86,7 +108,9 @@ export function createApp(options: AppOptions): Express {
 
   // Health check
   app.get('/api/health', (_req, res) => {
-    res.status(200).json({ status: 'ok', version: 'v3', runtimeMode: options.runtimeMode ?? 'sandbox' });
+    // With GMAIL_ENABLED off the public health answer stays exactly as before; absent means false.
+    res.status(200).json({ status: 'ok', version: 'v3', runtimeMode: options.runtimeMode ?? 'sandbox',
+      ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}) });
   });
 
   // Auth routes (public login/refresh, protected /me)
@@ -114,8 +138,11 @@ export function createApp(options: AppOptions): Express {
   app.use(
     '/api/services',
     authMiddleware,
-    createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds })
+    createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
+      gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)) })
   );
+
+  if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
 
   // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {

@@ -12,3 +12,4 @@ export * from './calendar/calendar-adapter.js';
 export * from './notion/notion-adapter.js';
 export * from './telegram/telegram-adapter.js';
 export * from './jira/jira-adapter.js';
+export * from './gmail/token-provider.js';

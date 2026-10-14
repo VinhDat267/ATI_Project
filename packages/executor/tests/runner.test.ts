@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { StepRunner } from '../src/index.js';
+import { StepRunner, isWriteTool } from '../src/index.js';
 import type { PlanStep } from '@wap/tool-schemas';
 
 describe('packages/executor (Task 13: StepRunner with AbortSignal Timeout & UNKNOWN Status)', () => {
@@ -117,5 +117,29 @@ describe('packages/executor (Task 13: StepRunner with AbortSignal Timeout & UNKN
     }, new Map());
     expect(result.status).toBe('unknown');
     expect(result.error?.category).toBe('UNKNOWN');
+  });
+});
+
+describe('Gmail tools are classified from the Gmail catalog, not the name heuristic', () => {
+  it.each(['gmail.reply', 'gmail.forward', 'gmail.trash_thread', 'gmail.modify_thread_labels', 'gmail.send_message', 'gmail.create_draft', 'gmail.create_label'])(
+    '%s is a write tool even though GMAIL_TOOLS is not in ALL_TOOLS', (tool) => {
+      expect(isWriteTool(tool)).toBe(true);
+    });
+
+  it.each(['gmail.search_threads', 'gmail.get_thread', 'gmail.list_labels'])('%s is a read tool', (tool) => {
+    expect(isWriteTool(tool)).toBe(false);
+  });
+
+  it('marks a timed-out gmail.reply UNKNOWN instead of a retryable failure', async () => {
+    const runner = new StepRunner({
+      getAdapter: () => ({
+        execute: async (_tool: string, _args: any, options?: { signal?: AbortSignal }) => new Promise((_, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(new Error('Timeout')));
+        }),
+      }),
+    });
+    const step: PlanStep = { id: 'reply', tool: 'gmail.reply', description: 'Reply', args: { threadId: 't1', to: ['a@example.com'], body: 'Hi' }, dependsOn: [] };
+    const result = await runner.executeStep(step, new Map(), { timeoutMs: 20 });
+    expect(result.status).toBe('unknown');
   });
 });

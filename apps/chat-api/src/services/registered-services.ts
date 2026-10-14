@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -60,4 +60,17 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
     }
   }
   return ALL_TOOLS.filter((tool) => available.has(tool.service));
+}
+
+/**
+ * The catalog one caller may plan with: the shared services exactly as
+ * getConfiguredToolCatalog, plus Gmail only when Gmail is enabled and this
+ * caller has an active connection of their own.
+ */
+export async function getToolCatalogFor(credentialRepo: CredentialRepo, encryptionKey: string,
+  options: { userId?: string; gmailEnabled: boolean }): Promise<ToolDefinition[]> {
+  const catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
+  if (!options.gmailEnabled || !options.userId) return catalog;
+  const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
+  return gmail ? [...catalog, ...GMAIL_TOOLS] : catalog;
 }

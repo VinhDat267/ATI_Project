@@ -42,6 +42,8 @@ export interface GatherSearchRequest {
   tool: string;
   args: Record<string, unknown>;
   signal?: AbortSignal;
+  /** Who is planning; forwarded untouched so personal connections (Gmail) use the caller's own adapter. */
+  actor?: { userId: string };
 }
 
 export interface GatherEvent {
@@ -60,6 +62,8 @@ export interface ProcessMessageInput {
   onTiming?: (metrics: PlanningPhaseMetrics) => void;
   /** Internal turn clock forwarded through all phases. */
   timingStarted?: number;
+  /** The signed-in caller. The planner never reads it; it only passes it to `gatherSearch`. */
+  actor?: { userId: string };
 }
 
 interface GatherCandidate { id: string; name: string; [key: string]: unknown }
@@ -196,7 +200,7 @@ export class AIPlanner {
         args[required.argument] = parent.id;
       }
       onGatherEvent?.({ tool: request.rule.tool, status: 'started' });
-      const candidates = asCandidates(await this.gatherSearch({ tool: request.rule.tool, args, signal }), request.rule.nameField);
+      const candidates = asCandidates(await this.gatherSearch({ tool: request.rule.tool, args, signal, actor: input.actor }), request.rule.nameField);
       onGatherEvent?.({ tool: request.rule.tool, status: 'completed', output: candidates });
       if (candidates.length === 0) {
         memory.setEntity('__gatherIntent', intent);
@@ -254,7 +258,7 @@ export class AIPlanner {
     if (!this.gatherSearch) return { tool: tool.name, args, error: 'Search is unavailable in this session' };
     onGatherEvent?.({ tool: tool.name, status: 'started' });
     try {
-      const raw = await this.gatherSearch({ tool: tool.name, args, signal });
+      const raw = await this.gatherSearch({ tool: tool.name, args, signal, actor: input.actor });
       const list = searchEntities(raw, tool.outputSchema);
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
       const result = list.slice(0, MAX_RESULTS_PER_CALL);

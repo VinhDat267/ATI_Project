@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto';
 import type { GoogleProfile } from '../../auth/google-oidc.js';
 import type { UserRow } from './user-repo.js';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+export type OAuthMode = 'login' | 'link' | 'connect_gmail';
 export interface OAuthState {
+  id?: string;
   state_hash: string; browser_binding_hash: string; code_verifier: string; nonce: string;
-  mode: 'login' | 'link'; user_id: string | null; session_id: string | null;
+  mode: OAuthMode; user_id: string | null; session_id: string | null;
 }
 export class GoogleAccountError extends Error {
   constructor(readonly code: 'GOOGLE_LINK_CONFLICT' | 'SIGNUP_DISABLED' | 'INVALID_SESSION' | 'PASSWORD_REQUIRED' | 'PASSWORD_CHANGED_ELSEWHERE') {
@@ -19,16 +21,17 @@ export class GoogleAuthRepo {
     await this.pool.query(`INSERT INTO oauth_states(state_hash,browser_binding_hash,code_verifier,nonce,mode,user_id,session_id,expires_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [data.state_hash, data.browser_binding_hash, data.code_verifier, data.nonce, data.mode, data.user_id, data.session_id, new Date(now + 600000)]);
   }
-  async findState(state: string, binding: string, now: number): Promise<OAuthState | null> {
+  /** `modes` names the flows the calling callback serves; a state of another flow is never visible to it. */
+  async findState(state: string, binding: string, now: number, modes: OAuthMode[]): Promise<OAuthState | null> {
     return (await this.pool.query<OAuthState>(`SELECT * FROM oauth_states WHERE state_hash=$1 AND browser_binding_hash=$2
-      AND used_at IS NULL AND expires_at>$3`, [hash(state), hash(binding), new Date(now)])).rows[0] ?? null;
+      AND used_at IS NULL AND expires_at>$3 AND mode = ANY($4)`, [hash(state), hash(binding), new Date(now), modes])).rows[0] ?? null;
   }
-  async consumeState(state: string, binding: string, now: number, userId?: string, sessionId?: string): Promise<OAuthState | null> {
+  async consumeState(state: string, binding: string, now: number, modes: OAuthMode[], userId?: string, sessionId?: string): Promise<OAuthState | null> {
     return (await this.pool.query<OAuthState>(`UPDATE oauth_states o SET used_at=$3 WHERE state_hash=$1 AND browser_binding_hash=$2
-      AND used_at IS NULL AND expires_at>$3 AND (mode='login' OR (o.user_id=$4 AND o.session_id=$5 AND EXISTS
+      AND used_at IS NULL AND expires_at>$3 AND o.mode = ANY($6) AND (mode='login' OR (o.user_id=$4 AND o.session_id=$5 AND EXISTS
         (SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id=o.session_id AND s.user_id=o.user_id
          AND s.revoked_at IS NULL AND s.expires_at>$3 AND u.status='active')))
-      RETURNING o.*`, [hash(state), hash(binding), new Date(now), userId ?? null, sessionId ?? null])).rows[0] ?? null;
+      RETURNING o.*`, [hash(state), hash(binding), new Date(now), userId ?? null, sessionId ?? null, modes])).rows[0] ?? null;
   }
   async resolveAccount(profile: GoogleProfile, state: OAuthState, signupEnabled: boolean, now: number, beforeCreate?: () => void): Promise<{ user: UserRow; linked: boolean; created: boolean }> {
     const client = await this.pool.connect();

@@ -3,8 +3,14 @@ import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import { WorkingMemory, type AIPlanner, type ChatMessage } from '@wap/planner';
-import type { PlannerResponse } from '@wap/tool-schemas';
+import type { PlanConnections, PlannerResponse, PlanResponse } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
+
+/** Only the server writes plan connections; the model's version is never kept or shown back to it. */
+function withoutConnections(plan: PlanResponse): PlanResponse {
+  const { connections: _ignored, ...rest } = plan;
+  return rest;
+}
 
 export interface HandleUserMessageInput {
   conversationId: string;
@@ -26,6 +32,8 @@ export interface ChatServiceOptions {
   eventEmitter: {
     emit: (event: string, payload: any) => void;
   };
+  /** The caller's active Gmail connection; absent when Gmail is off, so a Gmail plan is refused. */
+  gmailConnection?: (userId: string) => Promise<NonNullable<PlanConnections['gmail']> | null>;
 }
 
 export class ChatService {
@@ -34,8 +42,10 @@ export class ChatService {
   private planRepo?: PlanRepo;
   private planner: AIPlanner;
   private eventEmitter: { emit: (event: string, payload: any) => void };
+  private gmailConnection?: ChatServiceOptions['gmailConnection'];
 
   constructor(options: ChatServiceOptions) {
+    this.gmailConnection = options.gmailConnection;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -69,9 +79,26 @@ export class ChatService {
     };
   }
 
+  /**
+   * After validation, before labels, hash and storage: drop any connections
+   * the model wrote and record the connection a Gmail step will use, so the
+   * integrity check covers it. Without one the plan is refused, not saved.
+   */
+  private async bindConnections(plan: PlanResponse, userId: string): Promise<PlannerResponse> {
+    const bound = withoutConnections(plan);
+    if (!bound.steps.some((step) => step.tool.startsWith('gmail.'))) return bound;
+    const gmail = await this.gmailConnection?.(userId);
+    if (!gmail) {
+      return { kind: 'refusal', reason: 'Gmail chưa được kết nối hoặc cần kết nối lại.',
+        suggestion: 'Hãy kết nối Gmail ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
+        unavailableServices: [{ id: 'gmail', name: 'Gmail' }] };
+    }
+    return { ...bound, connections: { gmail } };
+  }
+
   private async executePlannerPipeline(
     conversationId: string,
-    _userId: string,
+    userId: string,
     content: string,
     currentMessageId: string,
     requestId?: string
@@ -94,7 +121,7 @@ export class ChatService {
         role: m.role as any,
         // A saved plan goes back to the model as the JSON it produced, so a follow-up
         // such as "Điều chỉnh kế hoạch: …" can change it; people see only the summary.
-        content: m.metadata?.type === 'plan' && m.metadata.plan ? JSON.stringify(m.metadata.plan) : m.content,
+        content: m.metadata?.type === 'plan' && m.metadata.plan ? JSON.stringify(withoutConnections(m.metadata.plan)) : m.content,
       }));
 
     // Call planner
@@ -102,13 +129,15 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
-    const plannerResponse: PlannerResponse = await this.planner.processMessage({
+    let plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
       memory,
+      actor: { userId },
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
     });
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
+    if (plannerResponse.kind === 'plan') plannerResponse = await this.bindConnections(plannerResponse, userId);
 
     if (plannerResponse.kind === 'plan') {
       const labels = resourceLabels(plannerResponse, memory);

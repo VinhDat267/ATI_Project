@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import type { PlanStep } from '@wap/tool-schemas';
+import type { PlanConnections, PlanStep } from '@wap/tool-schemas';
 import type { StepState } from '@wap/executor';
 import type { PlanRow } from '../db/repositories/plan-repo.js';
 import type { ExecutionStepRow } from '../db/repositories/step-repo.js';
@@ -25,7 +25,8 @@ export function readableRecoveryPlan(plan: PlanRow): Record<string, any> {
   return {};
 }
 
-export function verifiedRecoverySteps(plan: PlanRow): PlanStep[] {
+/** The approved plan after the integrity check: its steps and the personal connections it was previewed with. */
+export function verifiedRecoveryPlan(plan: PlanRow): { steps: PlanStep[]; connections?: PlanConnections } {
   try {
     const parsed = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
     const text = plan.plan_text ?? JSON.stringify(parsed);
@@ -38,10 +39,14 @@ export function verifiedRecoverySteps(plan: PlanRow): PlanStep[] {
       if (!step || typeof step.id !== 'string' || typeof step.tool !== 'string' || ids.has(step.id)) throw new Error('Invalid steps');
       ids.add(step.id);
     }
-    return parsed.steps;
+    return { steps: parsed.steps, connections: parsed.connections };
   } catch {
     throw recoveryConflict('Cannot recover execution: approved plan integrity check failed');
   }
+}
+
+export function verifiedRecoverySteps(plan: PlanRow): PlanStep[] {
+  return verifiedRecoveryPlan(plan).steps;
 }
 
 export function restoredProgress(steps: PlanStep[], rows: ExecutionStepRow[]) {
