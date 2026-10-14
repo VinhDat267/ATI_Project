@@ -434,6 +434,70 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     });
   });
 
+  describe.each(['regex', 'llm'] as const)('W4-00b raw placeholder retry (%s)', (searchMode) => {
+    const placeholder = '${step_1.output.url}';
+    const plan = (text: unknown) => ({
+      kind: 'plan', thinking: 'Create and notify', summary: 'Create card and notify', warnings: [],
+      steps: [
+        { id: 'step_1', tool: 'trello.create_card', description: 'Create card',
+          args: { listId: 'L1', title: 'Task' }, dependsOn: [] },
+        { id: 'notify', tool: 'slack.send_message', description: 'Notify',
+          args: { channel: 'C1', text }, dependsOn: ['step_1'] },
+      ],
+    });
+    const memory = () => {
+      const value = new WorkingMemory();
+      value.setEntity('list', { id: 'L1' });
+      value.setEntity('channel', { id: 'C1' });
+      return value;
+    };
+    const userMessage = 'Create a Trello card and notify Slack';
+
+    it('returns the corrected template plan after exactly one retry with semantic feedback', async () => {
+      const provider = new MockLLMProvider();
+      const corrected = plan({ $template: `Xem ${placeholder}` });
+      provider.setPlanResponses([plan(`Xem ${placeholder}`), corrected]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, searchMode });
+      expect(await planner.processMessage({ userMessage, memory: memory() })).toEqual(corrected);
+      expect(provider.getCallCount()).toBe(2);
+      const feedback = provider.getLastInput()?.conversationHistory.at(-1)?.content;
+      expect(feedback).toContain('semantic');
+      expect(feedback).toContain('notify');
+      expect(feedback).toContain('args.text');
+      expect(feedback).toContain('$template');
+    });
+
+    it('throws after two raw plans without accepting the placeholder echoed in retry feedback', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([plan(placeholder), plan(placeholder)]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, searchMode });
+      await expect(planner.processMessage({ userMessage, memory: memory() }))
+        .rejects.toThrow(/Validation failed after retry: \[semantic\]/);
+      expect(provider.getCallCount()).toBe(2);
+    });
+
+    it('preserves a literal from user history on the first attempt', async () => {
+      const provider = new MockLLMProvider();
+      const literalPlan = plan(placeholder);
+      provider.setPlanResponses([literalPlan]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, searchMode });
+      expect(await planner.processMessage({ userMessage, history: [
+        { role: 'user', content: `Gửi nguyên văn ${placeholder}` },
+      ], memory: memory() })).toEqual(literalPlan);
+      expect(provider.getCallCount()).toBe(1);
+    });
+
+    it('rejects a placeholder seen only in assistant history', async () => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([plan(placeholder), plan(placeholder)]);
+      const planner = new AIPlanner({ provider, toolCatalog: tools, searchMode });
+      await expect(planner.processMessage({ userMessage, history: [
+        { role: 'assistant', content: placeholder },
+      ], memory: memory() })).rejects.toThrow(/Validation failed after retry: \[semantic\]/);
+      expect(provider.getCallCount()).toBe(2);
+    });
+  });
+
   describe('AIPlanner with 1x Retry', () => {
     const memoryWithList = () => {
       const memory = new WorkingMemory();

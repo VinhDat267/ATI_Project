@@ -68,6 +68,7 @@ Viết test fail trước, ghi output fail thật, rồi mới sửa.
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN và đột biến:
-- Điều chưa làm hoặc khác với task card:
+- PR: [#137](https://github.com/VinhDat267/ATI_Project/pull/137), nhánh `codex/fix-w4-00b-raw-placeholders`, base `3b60c28`; mã sản phẩm và test `2228845`. Chờ review độc lập/CI, chưa merge.
+- RED/GREEN và đột biến: test viết trước sửa, RED **16 fail / 73 pass**, exit 1; GREEN **89/89**, exit 0. Thêm 25 ca dùng catalog thật và provider giả, kiểm cả hai chế độ `regex`/`llm`, không coi assistant history hoặc feedback thử lại là câu người dùng. Ba mutation bị bắt: bỏ kiểm tra mới **16 fail / 9 pass**; chỉ kiểm cấp một **2 fail / 23 pass**; bỏ ngoại lệ `userTexts` **4 fail / 21 pass**; cả ba exit 1, 64 ca ngoài W4-00b được lọc bỏ. Validator được khôi phục nguyên bản trước gate cuối.
+- Gate: `npm run check` exit 0, **1.699 v3 + 173 eval** (47 schema + 340 adapter + 237 planner + 25 executor + 371 API + 679 web); typecheck, build, security scan, launcher 1/1 và env/OIDC 10/10 đạt. PostgreSQL 16 tạm riêng tại loopback cổng 56533, không dùng dữ liệu live hoặc volume phát triển.
+- Điều chưa làm hoặc khác với task card: không đổi prompt, executor, label/matcher golden, `CURRENT-STATE.md` hoặc `ROADMAP.md`. Không chạy model/golden thật hoặc phép đo Luna tham khảo; nhóm trưởng có thể chạy sau merge theo card, không phải gate. Chưa chạy browser cục bộ; CI sẽ chạy bộ browser hiện có. Chờ review độc lập trước nghiệm thu/merge. Xem [nhật ký và output RED/GREEN](../log/2026-10-13-codex-W4-00b-raw-step-placeholders.md).
