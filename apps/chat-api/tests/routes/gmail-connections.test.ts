@@ -30,8 +30,10 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
     seen.push(JSON.stringify(response.body), JSON.stringify(response.headers));
     return response;
   };
-  const start = async (app: ReturnType<typeof build>, who: Person) => {
-    const r = record(await request(app).post('/api/connections/gmail/start').set('Authorization', bearer(who)));
+  const start = async (app: ReturnType<typeof build>, who: Person, browserCookie?: string) => {
+    const req = request(app).post('/api/connections/gmail/start').set('Authorization', bearer(who));
+    if (browserCookie) req.set('Cookie', browserCookie);
+    const r = record(await req);
     expect(r.status).toBe(200);
     const raw = (r.headers['set-cookie'] as unknown as string[])[0]!;
     const url = new URL(r.body.url);
@@ -238,6 +240,46 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       expect(await stored(alice)).toBeNull();
       // The orphaned grant from the late exchange is revoked as well.
       await vi.waitFor(() => expect(google.stats.revocations).toBe(before + 1));
+    });
+  });
+
+  describe('two flows of the same browser finishing out of order', () => {
+    const configOf = async (who: Person) => decryptCredentials((await stored(who))!.config, key);
+
+    it('keeps the connection saved first and refuses the other callback, revoking its separate grant', async () => {
+      const app = build();
+      google.settings.email = 'older-mailbox@example.test';
+      const older = await start(app, alice);
+      const olderGrant = await authorize(older.url);
+      google.settings.email = 'newer-mailbox@example.test';
+      const newer = await start(app, alice, older.cookie);
+      expect(newer.cookie).toBe(older.cookie);
+      const newerGrant = await authorize(newer.url);
+      expect((await callback(app, alice, newer.cookie, newerGrant)).status).toBe(200);
+      const saved = await configOf(alice);
+      const before = google.stats.revocations;
+      const late = await callback(app, alice, older.cookie, olderGrant);
+      expect(late.status).toBe(400); expect(late.body.code).toBe('GMAIL_STATE_INVALID');
+      expect((await configOf(alice)).email).toBe('newer-mailbox@example.test');
+      expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
+      await vi.waitFor(() => expect(google.stats.revocations).toBe(before + 1));
+      expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
+    });
+
+    it('does not revoke a refused grant of the mailbox that is already connected, since Google revokes per grant', async () => {
+      const app = build();
+      const first = await start(app, alice);
+      const firstGrant = await authorize(first.url);
+      const second = await start(app, alice, first.cookie);
+      const secondGrant = await authorize(second.url);
+      expect((await callback(app, alice, second.cookie, secondGrant)).status).toBe(200);
+      const saved = await configOf(alice);
+      const before = google.stats.revocations;
+      expect((await callback(app, alice, first.cookie, firstGrant)).body.code).toBe('GMAIL_STATE_INVALID');
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(google.stats.revocations).toBe(before);
+      expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
+      expect((await stored(alice))?.status).toBe('active');
     });
   });
 

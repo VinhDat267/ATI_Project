@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
@@ -140,6 +140,50 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
       await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE id=$1', [alice.sid]);
       expect(await gmail.saveConnection(alice.id, consumed.id!, 'v1:late', Date.now())).toBeNull();
       expect(await credentials.getPersonalConnectionStatus('gmail', alice.id)).toBeNull();
+    });
+
+    it('makes every other connect_gmail flow of the person unusable once one connection is saved', async () => {
+      const older = await consume(alice);
+      const newer = await consume(alice);
+      const pending = await connectState(alice);
+      expect(await gmail.saveConnection(alice.id, newer.id!, 'v1:newer', Date.now())).toBeTruthy();
+      expect(await gmail.saveConnection(alice.id, older.id!, 'v1:older', Date.now())).toBeNull();
+      expect(await states.consumeState(pending.state, pending.browser, Date.now(), ['connect_gmail'], alice.id, alice.sid)).toBeNull();
+      expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:newer');
+      // Bob's flows are untouched.
+      const bobs = await consume(bob);
+      expect(await gmail.saveConnection(bob.id, bobs.id!, 'v1:bob', Date.now())).toBeTruthy();
+    });
+
+    it('orders a logout committed during the save after that save, never between its check and insert', async () => {
+      await gmail.saveConnection(alice.id, (await consume(alice)).id!, 'v1:existing', Date.now());
+      const consumed = await consume(alice);
+      const holder = await pool.connect();
+      const logout = await pool.connect();
+      try {
+        // Hold the current credential row so the save stops at its DELETE, after its validity check.
+        await holder.query('BEGIN');
+        await holder.query("SELECT id FROM service_credentials WHERE service='gmail' AND user_id=$1 FOR UPDATE", [alice.id]);
+        let savedAt = 0;
+        const saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:new', Date.now()).then((row) => { savedAt = performance.now(); return row; });
+        const waitingPid = async () => (await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type = 'Lock'
+          AND query LIKE 'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2%'`)).rows[0]?.pid;
+        await vi.waitFor(async () => expect(await waitingPid()).toBeTruthy(), { timeout: 5_000, interval: 20 });
+        let loggedOutAt = 0;
+        const loggingOut = logout.query('UPDATE auth_sessions SET revoked_at = now() WHERE id = $1', [alice.sid]).then(() => { loggedOutAt = performance.now(); });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await holder.query('ROLLBACK');
+        const saved = await saving;
+        await loggingOut;
+        if (saved) {
+          expect(loggedOutAt).toBeGreaterThan(savedAt);
+          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:new');
+        } else {
+          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:existing');
+        }
+      } finally {
+        holder.release(); logout.release();
+      }
     });
 
     it("refuses a state that belongs to someone else", async () => {
