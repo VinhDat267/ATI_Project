@@ -8,6 +8,12 @@ const validate = (to: any, memory: any = {}, userTexts: string[] = [], extra: an
 it.each([[{ $ref: 'draft.output.email' }], [{ $template: '${draft.output.email}' }], ['${draft.output.email}'], { $ref: 'draft.output.recipients' }])('rejects dynamic recipients even without grounding: %j', to => {
   expect(validatePlan(plan(to), GMAIL_TOOLS).valid).toBe(false);
 });
+it.each(['$ref', '$template'])('rejects %s even with a valid preceding step and output field', key => {
+  const response = JSON.parse(plan([{ [key]: key === '$ref' ? 'lookup.output.subject' : '${lookup.output.subject}' }]));
+  response.steps.unshift({ id: 'lookup', tool: 'gmail.get_thread', description: 'Đọc', args: { threadId: 't' }, dependsOn: [] });
+  response.steps[1].dependsOn = ['lookup'];
+  expect(validatePlan(JSON.stringify(response), GMAIL_TOOLS)).toMatchObject({ valid: false, layer: 'schema' });
+});
 it.each(['to', 'cc', 'bcc'])('rejects a dynamic address in %s even when user typed the placeholder', key => {
   expect(validatePlan(plan(['lan@example.com'], { [key]: ['${draft.output.email}'] }), GMAIL_TOOLS, { grounding: { memory: {}, userTexts: ['${draft.output.email} lan@example.com'] } }).valid).toBe(false);
 });

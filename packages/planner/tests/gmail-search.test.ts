@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
 import { AIPlanner, WorkingMemory, type LLMGeneratePlanInput, type LLMProvider, classifyIntent } from '../src/index.js';
-import { recordObserved } from '../src/search.js';
+import { recordObserved, recordThreadLabels } from '../src/search.js';
 import snapshot from '../../../evaluations/golden-v2/routing.snapshot.json';
 import services from '../../../evaluations/golden-v2/cases-services.json';
 
@@ -20,6 +20,11 @@ function setup(outputs: any[], extra: any = {}) {
 it('recordObserved overrides kept fields and caps at twenty identities', () => {
   const result = recordObserved(undefined, 'thread', Array.from({ length: 22 }, (_, i) => ({ id: `t${i}`, participants: ['lan@example.com'], subject: 'evil', title: 'evil', body: 'evil', secret: 'token' })), ['id', 'participants']);
   expect(result.thread).toHaveLength(20); expect(result.thread[0]).toEqual({ id: 't2', participants: ['lan@example.com'] });
+});
+it('caps display labels at twenty, updates newest duplicate and preserves Unicode', () => {
+  const results = Array.from({ length: 25 }, (_, i) => ({ id: `t${i}`, subject: '😊'.repeat(260) }));
+  const labels = recordThreadLabels(recordThreadLabels(undefined, results), [{ id: 't5', subject: 'Mới' }]);
+  expect(Object.keys(labels)).toHaveLength(20); expect(Object.keys(labels).at(-1)).toBe('t5'); expect(labels.t5).toBe('Mới'); expect(Array.from(labels.t24!).length).toBe(250);
 });
 it('search output remains delimited data; safe memory and separate bounded subject labels', async () => {
   const { planner, inputs, calls } = setup([search, plan()]); const memory = new WorkingMemory();

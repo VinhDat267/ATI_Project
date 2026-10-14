@@ -107,6 +107,28 @@ describe('Gmail native HTTP adapter', () => {
     await expect(adapter.execute('gmail.send_message', send)).rejects.toMatchObject({ category: 'AUTH_ERROR' });
     expect(calls.filter(c => c?.forceRefresh)).toHaveLength(1); expect(server.stats.writes).toBe(2);
   });
+  it('a definitive first 401 can be retried once with a refreshed token', async () => {
+    const { adapter, server, calls } = await setup(); server.settings.apiResponses = [{ status: 401 }];
+    await expect(adapter.execute('gmail.send_message', send)).resolves.toMatchObject({ id: 'sent-2' });
+    expect(calls.filter(c => c?.forceRefresh)).toHaveLength(1); expect(server.stats.writes).toBe(2);
+  });
+  it('chooses the most recent delivered message even if a later draft exists', async () => {
+    const { adapter, server } = await setup(); const original = server.settings.threads[0]!.messages[0];
+    server.settings.threads[0]!.messages.push({ ...original, id: 'latest-draft', labelIds: ['DRAFT'], payload: { ...original.payload, headers: [{ name: 'Subject', value: 'DO NOT REPLY TO DRAFT' }] } });
+    await adapter.execute('gmail.reply', { threadId: 'thread-1', to: send.to, body: 'OK' });
+    const message = server.stats.apiRequests.find(r => r.method === 'POST')!.body;
+    const mime = Buffer.from(message.raw, 'base64url').toString(); expect(mime).toContain('In-Reply-To: <original@example.com>'); expect(mime).not.toContain('DO NOT REPLY');
+  });
+  it('parses validated header participants only, deduplicated and capped at twenty', async () => {
+    const { adapter, server } = await setup();
+    server.settings.threads[0]!.messages[0].payload.headers = [
+      { name: 'From', value: '"Nguyễn, Lan" <LAN@example.com>' },
+      { name: 'To', value: Array.from({ length: 25 }, (_, i) => `user${i}@example.com`).join(', ') },
+      { name: 'Cc', value: 'invalid, LAN@example.com, injected@example.com\r\nBcc: attacker@example.com' },
+    ];
+    const result = await adapter.execute('gmail.get_thread', { threadId: 'thread-1' }); expect(result.participants).toHaveLength(20);
+    expect(result.participants[0]).toBe('lan@example.com'); expect(result.participants).not.toContain('attacker@example.com'); expect(result.participants).not.toContain('invalid');
+  });
   it('retries a read twice for quota but never resends a write', async () => {
     const { adapter, server } = await setup(); server.settings.apiResponses = [{ status: 429, retryAfter: '0' }, { status: 403, reason: 'rateLimitExceeded', retryAfter: '0' }];
     await expect(adapter.execute('gmail.list_labels', { query: '' })).resolves.toEqual(expect.any(Array));
