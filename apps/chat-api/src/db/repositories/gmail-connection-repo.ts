@@ -12,29 +12,66 @@ export class GmailConnectionRepo {
   constructor(private pool: pg.Pool) {}
 
   /**
-   * Saves only while the consumed connect_gmail state still exists (disconnect
-   * deletes the owner's states) and its session is still signed in. Returns
-   * null when the late callback must not write anything.
+   * Saves only while the consumed state still exists and its session is active.
+   * The first successful save invalidates all other flows of this owner.
+   * User/session row locks keep logout or disable from passing the validity
+   * check before the write commits, in the same user-then-session order as auth.
    */
-  async saveConnection(userId: string, stateId: string, config: string, now: number): Promise<ServiceCredentialRow | null> {
+  async saveConnection(userId: string, stateId: string, config: string, now: number | (() => number)): Promise<ServiceCredentialRow | null> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [SERVICE, userId]);
-      const live = await client.query(`SELECT 1 FROM oauth_states o
+      const owner = await client.query("SELECT id FROM users WHERE id=$1 AND status='active' FOR UPDATE", [userId]);
+      if (!owner.rows.length) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const live = await client.query<{ expires_at: Date }>(`SELECT s.expires_at FROM oauth_states o
         JOIN auth_sessions s ON s.id = o.session_id AND s.user_id = o.user_id
-        JOIN users u ON u.id = o.user_id
         WHERE o.id = $1 AND o.user_id = $2 AND o.mode = 'connect_gmail' AND o.used_at IS NOT NULL
-          AND s.revoked_at IS NULL AND s.expires_at > $3 AND u.status = 'active'`, [stateId, userId, new Date(now)]);
+          AND s.revoked_at IS NULL FOR UPDATE OF s`, [stateId, userId]);
       if (!live.rows.length) {
         await client.query('ROLLBACK');
         return null;
       }
+      await client.query("DELETE FROM oauth_states WHERE user_id = $1 AND mode = 'connect_gmail'", [userId]);
       await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2', [SERVICE, userId]);
+      // Any row lock, including the credential DELETE, can cross expiry. Check
+      // just before INSERT; rollback also restores the old credential and states.
+      const checkedAt = typeof now === 'function' ? now() : now;
+      if (live.rows[0]!.expires_at.getTime() <= checkedAt) {
+        await client.query('ROLLBACK');
+        return null;
+      }
       const row = (await client.query<ServiceCredentialRow>(
         'INSERT INTO service_credentials (service, user_id, config) VALUES ($1, $2, $3) RETURNING *', [SERVICE, userId, config])).rows[0]!;
       await client.query('COMMIT');
       return row;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Keep a rejected grant's cleanup decision stable against save/disconnect. */
+  async withLockedConnection(userId: string,
+    action: (current: ServiceCredentialRow | null, otherFlows: boolean) => Promise<void>, ignoredStateId?: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [SERVICE, userId]);
+      // The OAuth-state user FK takes a key-share lock on INSERT, so this also
+      // prevents a new flow from beginning during the grant cleanup decision.
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
+      const current = (await client.query<ServiceCredentialRow>(
+        'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2 FOR UPDATE', [SERVICE, userId])).rows[0] ?? null;
+      const otherFlows = (await client.query(`SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode='connect_gmail'
+        AND id IS DISTINCT FROM $2::uuid LIMIT 1`, [userId, ignoredStateId ?? null])).rows.length > 0;
+      await action(current, otherFlows);
+      await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

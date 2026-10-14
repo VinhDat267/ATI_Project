@@ -194,5 +194,122 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
       expect(await gmail.saveConnection(alice.id, bobs.id!, 'v1:stolen', Date.now())).toBeNull();
       expect(await credentials.getPersonalConnectionStatus('gmail', alice.id)).toBeNull();
     });
+
+    it('samples session expiry after waiting for the owner lock', async () => {
+      const consumed = await consume(alice);
+      let now = Date.now();
+      await pool.query('UPDATE auth_sessions SET expires_at=$2 WHERE id=$1', [alice.sid, new Date(now + 1_000)]);
+      const holder = await pool.connect();
+      let saving: Promise<unknown> | undefined;
+      try {
+        await holder.query('BEGIN');
+        await holder.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [alice.id]);
+        saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:expired-during-lock', () => now);
+        await vi.waitFor(async () => {
+          const waiting = await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock'
+            AND query=$1`, ["SELECT id FROM users WHERE id=$1 AND status='active' FOR UPDATE"]);
+          expect(waiting.rows.length).toBeGreaterThan(0);
+        }, { timeout: 5_000, interval: 20 });
+        now += 2_000;
+        await holder.query('ROLLBACK');
+        expect(await saving).toBeNull();
+        expect(await credentials.getPersonalConnectionStatus('gmail', alice.id)).toBeNull();
+      } finally {
+        await holder.query('ROLLBACK');
+        await saving?.catch(() => undefined);
+        holder.release();
+      }
+    });
+
+    it('rolls back the replacement when the session expires while the credential DELETE waits', async () => {
+      await gmail.saveConnection(alice.id, (await consume(alice)).id!, 'v1:keep-existing', Date.now());
+      const consumed = await consume(alice);
+      let now = Date.now();
+      await pool.query('UPDATE auth_sessions SET expires_at=$2 WHERE id=$1', [alice.sid, new Date(now + 1_000)]);
+      const holder = await pool.connect();
+      let saving: Promise<unknown> | undefined;
+      try {
+        await holder.query('BEGIN');
+        await holder.query("SELECT id FROM service_credentials WHERE service='gmail' AND user_id=$1 FOR UPDATE", [alice.id]);
+        saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:must-not-save', () => now);
+        await vi.waitFor(async () => {
+          const waiting = await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock'
+            AND query='DELETE FROM service_credentials WHERE service = $1 AND user_id = $2'`);
+          expect(waiting.rows.length).toBeGreaterThan(0);
+        }, { timeout: 5_000, interval: 20 });
+        now += 2_000;
+        await holder.query('ROLLBACK');
+        expect(await saving).toBeNull();
+        expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:keep-existing');
+      } finally {
+        await holder.query('ROLLBACK');
+        await saving?.catch(() => undefined);
+        holder.release();
+      }
+    });
+
+    it('keeps the no-connection cleanup decision locked until its grant action finishes', async () => {
+      const consumed = await consume(alice);
+      const holder = await pool.connect();
+      const gate = 'SELECT pg_advisory_xact_lock(94140, 1202)';
+      let cleanup: Promise<void> | undefined, saving: Promise<unknown> | undefined;
+      try {
+        await holder.query('BEGIN');
+        await holder.query(gate);
+        cleanup = gmail.withLockedConnection(alice.id, async (current) => {
+          expect(current).toBeNull();
+          // A real PostgreSQL gate stands in for the awaited Google revoke.
+          await pool.query(gate);
+        });
+        const waiting = async (query: string) => (await pool.query(
+          "SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock' AND query=$1", [query])).rows.length;
+        await vi.waitFor(async () => expect(await waiting(gate)).toBeGreaterThan(0), { timeout: 5_000, interval: 20 });
+        saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:after-cleanup', Date.now());
+        await vi.waitFor(async () => expect(await waiting('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))')).toBeGreaterThan(0),
+          { timeout: 1_000, interval: 20 });
+        expect(await credentials.getPersonalConnectionStatus('gmail', alice.id)).toBeNull();
+        await holder.query('ROLLBACK');
+        await cleanup;
+        expect(await saving).toBeTruthy();
+        expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:after-cleanup');
+      } finally {
+        await holder.query('ROLLBACK');
+        await Promise.allSettled([cleanup, saving].filter((task) => task !== undefined));
+        holder.release();
+      }
+    });
+
+    it('blocks new OAuth-state INSERTs through the user FK while grant cleanup is in progress', async () => {
+      const holder = await pool.connect();
+      const gate = 'SELECT pg_advisory_xact_lock(94140, 1203)';
+      let cleanup: Promise<void> | undefined, starting: ReturnType<typeof connectState> | undefined;
+      try {
+        await holder.query('BEGIN');
+        await holder.query(gate);
+        cleanup = gmail.withLockedConnection(alice.id, async (current, otherFlows) => {
+          expect(current).toBeNull(); expect(otherFlows).toBe(false);
+          await pool.query(gate);
+        });
+        await vi.waitFor(async () => {
+          const waiting = await pool.query("SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock' AND query=$1", [gate]);
+          expect(waiting.rows.length).toBeGreaterThan(0);
+        }, { timeout: 5_000, interval: 20 });
+        starting = connectState(alice);
+        await vi.waitFor(async () => {
+          const waiting = await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock'
+            AND query LIKE 'INSERT INTO oauth_states(state_hash,%'`);
+          expect(waiting.rows.length).toBeGreaterThan(0);
+        }, { timeout: 1_000, interval: 20 });
+        expect((await pool.query("SELECT id FROM oauth_states WHERE user_id=$1 AND mode='connect_gmail'", [alice.id])).rows).toEqual([]);
+        await holder.query('ROLLBACK');
+        await cleanup;
+        const started = await starting;
+        expect(await states.consumeState(started.state, started.browser, Date.now(), ['connect_gmail'], alice.id, alice.sid)).toBeTruthy();
+      } finally {
+        await holder.query('ROLLBACK');
+        await Promise.allSettled([cleanup, starting].filter((task) => task !== undefined));
+        holder.release();
+      }
+    });
   });
 });

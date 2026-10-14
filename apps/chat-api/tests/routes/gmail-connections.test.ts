@@ -324,6 +324,25 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
       expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
     });
+
+    it.each(['pending', 'inflight'] as const)('does not revoke a refused grant while another %s flow can still connect the same mailbox', async (phase) => {
+      const app = build();
+      const refused = await start(app, alice);
+      const refusedGrant = await authorize(refused.url);
+      const remaining = await start(app, alice, refused.cookie);
+      const remainingGrant = await authorize(remaining.url);
+      const delayed = phase === 'inflight' ? await beginDelayedCallback(app, remaining, remainingGrant) : undefined;
+      const before = google.stats.revocations;
+      google.settings.profile = 'server_error';
+      expect((await callback(app, alice, refused.cookie, refusedGrant)).body.code).toBe('GMAIL_CONNECT_FAILED');
+      google.settings.profile = 'ok';
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(google.stats.revocations).toBe(before);
+      const connected = delayed ? await delayed.pending : await callback(app, alice, remaining.cookie, remainingGrant);
+      expect(connected.status).toBe(200);
+      expect((await stored(alice))?.status).toBe('active');
+      expect(google.stats.revocations).toBe(before);
+    });
   });
 
   describe('disconnect', () => {
