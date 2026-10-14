@@ -1,6 +1,6 @@
 # GMAIL-01 · Kết nối Gmail riêng của từng người (backend)
 
-**Trạng thái:** chờ, giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026 · **Nhánh gợi ý:** `feat/gmail-01-personal-connection` · **Phụ thuộc:** không · **Mốc:** trước **18/10/2026**
+**Trạng thái:** xong #140 tại `8973a9e` (14/10/2026); review độc lập lỗi 1–2 đạt, lỗi 3 chỉ kiểm phía thi công · **Nhánh gợi ý:** `feat/gmail-01-personal-connection` · **Phụ thuộc:** không · **Mốc:** trước **18/10/2026**
 **Đặc tả:** mục 3.1–3.8, 3.10, 3.11, 6.2 và phần 1 của 6.3. **Quy tắc chung và hợp đồng:** [GMAIL-common](GMAIL-common.md), đọc trước.
 
 ## Mục tiêu
