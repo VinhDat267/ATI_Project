@@ -1,7 +1,7 @@
 # 14/10/2026 · GMAIL-01 · Kết nối Gmail riêng của từng người (backend)
 
 - Task: [GMAIL-01](../tasks/GMAIL-01-personal-connection.md), nhóm trưởng giao reviewer thi công ngày 14/10. Quy tắc chung: [GMAIL-common](../tasks/GMAIL-common.md).
-- Nhánh: `feat/gmail-01-personal-connection`, base `ebc192d`.
+- Nhánh: `feat/gmail-01-personal-connection`, base `ebc192d`. PR: [#140](https://github.com/VinhDat267/ATI_Project/pull/140).
 - Cờ `GMAIL_ENABLED` mặc định `off`. Gmail không vào `ALL_TOOLS`, `TOOL_MAP` hay `SERVICE_REGISTRY`.
 
 ## Đã làm
