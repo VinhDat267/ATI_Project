@@ -197,7 +197,20 @@ describe('Gmail native HTTP adapter', () => {
   });
   it.each(['hang', 'disconnect', 'invalid_json', 'server_error'])('a dispatched %s write is UNKNOWN and reaches server once', async mode => {
     const { adapter, server } = await setup(); server.settings.apiResponses = [{ mode: mode as any }];
-    await expect(adapter.execute('gmail.send_message', send, { signal: AbortSignal.timeout(150) })).rejects.toMatchObject({ category: 'UNKNOWN' });
+    const error = await adapter.execute('gmail.send_message', send, { signal: AbortSignal.timeout(150) }).catch(error => error);
+    expect(error).toMatchObject({ category: 'UNKNOWN' });
+    expect(error.details?.requestSent).not.toBe(false);
+    expect(server.stats.writes).toBe(1);
+  });
+  it.each(['hang', 'disconnect', 'invalid_json', 'server_error'])('executor keeps a dispatched %s write unknown with one HTTP write', async mode => {
+    const { adapter, server } = await setup(); server.settings.apiResponses = [{ mode: mode as any }];
+    const runner = new StepRunner({ getAdapter: () => adapter });
+    const result = await runner.executeStep(
+      { id: 'send', tool: 'gmail.send_message', description: 'Send', args: send, dependsOn: [] },
+      new Map(), { timeoutMs: 1000 },
+    );
+    expect(result).toMatchObject({ status: 'unknown', output: null, error: { category: 'UNKNOWN' } });
+    expect(result.error?.details?.requestSent).not.toBe(false);
     expect(server.stats.writes).toBe(1);
   });
   it.each(['NETWORK', 'SERVER_ERROR'])('marks token refresh %s before dispatch as requestSent false', async category => {
