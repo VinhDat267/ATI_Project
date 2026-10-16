@@ -63,7 +63,7 @@ Harness `evaluations/live-app/` sửa lần cuối ngày 01/10. `live-app.e2e.ts
 
 ## Kết quả (agent thi công điền)
 
-- PR: nhánh `test/w3-11-new-services-frontend`, base `e03a9c8`. Nhóm trưởng giao reviewer thi công và ngồi duyệt cùng ngày 16/10/2026. [Log](../log/2026-10-16-reviewer-W3-11-new-services-frontend.md).
+- PR: [#146](https://github.com/VinhDat267/ATI_Project/pull/146), nhánh `test/w3-11-new-services-frontend`, base `e03a9c8`. Nhóm trưởng giao reviewer thi công và ngồi duyệt cùng ngày 16/10/2026. [Log](../log/2026-10-16-reviewer-W3-11-new-services-frontend.md).
 - Bằng chứng (đường dẫn ở máy): `docs/ai-evidence/V3-LIVE-EXECUTION/W3-11-2026-10-16/` (ignore, không commit). Mỗi lượt có `plan.json` (hash, nhãn tài nguyên, thời gian tới xem trước), `confirm.txt`, `result.json` (bước, output, link biên nhận), `readback.json` và ảnh xem trước/biên nhận đã che menu người dùng.
 - Kết quả từng service và workflow. App live dùng `ag/gemini-3.8-flash` qua 9router và PostgreSQL tạm riêng. 7 dịch vụ lưu khoá bằng `setup-credentials.ts`; Google Sheets do nhóm trưởng nhập ở `/settings` với private key nhiều dòng thật. Cả 8 dịch vụ "Kiểm tra kết nối" `healthy`.
 
