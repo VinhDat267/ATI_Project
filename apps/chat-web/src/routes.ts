@@ -22,6 +22,7 @@ export const routes = [
   { kind: 'forgot-password', pattern: /^\/forgot-password\/?$/, publicView: (props: PublicViewProps) => createElement(ForgotPasswordView, props) },
   { kind: 'reset-password', pattern: /^\/reset-password\/?$/, publicView: (props: PublicViewProps) => createElement(ResetPasswordView, props) },
   { kind: 'google-callback', pattern: /^\/auth\/google\/callback\/?$/, publicView: (props: PublicViewProps) => createElement(GoogleCallbackView, props) },
+  { kind: 'gmail-callback', pattern: /^\/connections\/gmail\/callback\/?$/ },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
   { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
   { kind: 'account', pattern: /^\/account\/?$/ },
@@ -41,7 +42,7 @@ export function readRoute(): AppRoute {
   for (const route of routes) {
     const match = window.location.pathname.match(route.pattern);
     if (!match) continue;
-    if (route.kind === 'google-callback') {
+    if (route.kind === 'google-callback' || route.kind === 'gmail-callback') {
       const single = (key: string) => query.getAll(key).length === 1 ? query.get(key) || undefined : undefined;
       return { kind: route.kind, googleCallback: { code: single('code'), state: single('state'), error: query.has('error') ? 'denied' : undefined } };
     }

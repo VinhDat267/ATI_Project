@@ -5,6 +5,10 @@ export function useRoute(initialView?: 'landing' | 'login') {
   const [route, setRoute] = useState<AppRoute>(() => initialView
     ? { kind: initialView === 'login' ? 'login' : 'home' } : readRoute());
   useLayoutEffect(() => {
+    if (route.kind === 'gmail-callback') {
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+      return;
+    }
     if (route.kind === 'google-callback') {
       const url = new URL(window.location.href);
       for (const key of ['code', 'state', 'error', 'error_description', 'error_uri']) url.searchParams.delete(key);

@@ -19,7 +19,9 @@ export function useSettings(user: User | null) {
   const [keyHelpOpen, setKeyHelpOpen] = useState(false);
   const epoch = useRef(0), read = useRef(0), pending = useRef(new Set<string>());
   const controllers = useRef(new Set<AbortController>());
-  const list = services.map(serviceView);
+  const routeHash = window.location.hash;
+  const personal = services.find(s => s.id === 'gmail' && s.connection === 'personal');
+  const list = services.filter(s => s.connection !== 'personal').map(serviceView);
   const active = list.find(s => s.id === selected);
   const draft = active ? drafts[active.id] ?? { credentials: {}, scopes: active.allowedScope ?? [], newScope: '' } : null;
   const updateDraft = (id: string, update: (current: Draft) => Draft) => setDrafts(current => ({ ...current, [id]: update(current[id] ?? { credentials: {}, scopes: services.find(s => s.id === id)?.allowedScope ?? [], newScope: '' }) }));
@@ -47,7 +49,7 @@ export function useSettings(user: User | null) {
     return () => { window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync); };
   // Re-read a deep link after the asynchronous catalogue first arrives, without
   // reopening a drawer on each metadata refresh.
-  }, [services.length]);
+  }, [services.length, routeHash]);
   const closeServiceDrawer = () => {
     setSelected(null);
     if (window.location.hash) window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
@@ -115,7 +117,7 @@ export function useSettings(user: User | null) {
       if (owner === epoch.current) { pending.current.delete(id); setBusy(b => { const next = { ...b }; delete next[id]; return next; }); }
     }
   };
-  return { list, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
+  return { list, personal, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
     actions: { openServiceDrawer, closeServiceDrawer, toggleKeyHelp: () => setKeyHelpOpen(o => !o), addNewScopeItem,
       removeScopeItem: (index: number) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, scopes: d.scopes.filter((_, i) => i !== index) })); },
       onKeyInputChanged: (key: string, value: string) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, credentials: { ...d.credentials, [key]: value } })); },

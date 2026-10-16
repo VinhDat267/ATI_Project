@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Mous
 import { flushSync } from 'react-dom';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { LoginViewProps } from '../../components/LoginView';
+import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import css from './page.css?inline';
@@ -87,6 +88,7 @@ export interface LandingPageProps extends Partial<LoginViewProps> {
 }
 export function LandingPage({ navigate, initialMode, email = '', setEmail = () => {}, password = '', setPassword = () => {},
   isLoggingIn = false, authError, onLogin, authConfig }: LandingPageProps) {
+  const gmailEnabled = useGmailEnabled();
   usePrototypePage(meta);
   const model = useRef({ moment: 1, isTyping: false });
   const [moment, setMoment] = useState(1), [switched, setSwitched] = useState(false);
@@ -574,7 +576,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                         </div>
                         {/* 4 dòng tìm kiếm kết quả hiện rõ với SVG thật */}
                         <div className="v3-space-y-3" id="k2-services-list">
-                          {/* 1. Trello */}
+                          {gmailEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] v3-space-y-3">
+                <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
+                <p className="text-xs text-[#4B5563]">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
+                <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
+              </div>}
+              {/* 1. Trello */}
                           <div className="p-3.5 rounded-xl border border-[#E7E7E2] bg-[#FAFAF8] flex items-center justify-between k2-service-item" data-index="0">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-[#0079BF]/10 flex items-center justify-center p-1.5 flex-shrink-0">

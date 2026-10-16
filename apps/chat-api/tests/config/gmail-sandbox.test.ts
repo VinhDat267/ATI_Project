@@ -26,6 +26,14 @@ it('gmail scenario selects the search loop despite sandbox default regex, preser
   expect(select('sandbox', 'regex', 'default')).toBe('regex');
   expect(select('live', 'regex', 'gmail')).toBe('regex');
 });
+it('starts each Gmail conversation with its own search despite interleaved model calls', async () => {
+  const provider = createSandboxProvider('gmail');
+  const input = (content: string) => ({ conversationHistory: [{ role: 'user', content }] } as any);
+  expect(JSON.parse(await provider.generatePlan(input('Tìm thư A'))).kind).toBe('search');
+  expect(JSON.parse(await provider.generatePlan(input('Tìm thư B'))).kind).toBe('search');
+  expect(JSON.parse(await provider.generatePlan(input('<search_results>Mail A</search_results>'))).kind).toBe('plan');
+  expect(JSON.parse(await provider.generatePlan(input('<search_results>Mail B</search_results>'))).kind).toBe('plan');
+});
 it('sandbox still sends Gmail through personal factory with the complete context', async () => {
   const seen: any[] = [];
   const factory = createToolRuntimeFactory('sandbox', async (service, context) => { seen.push({ service, context }); throw new Error('Connection missing'); }, name => createSandboxAdapter(name));

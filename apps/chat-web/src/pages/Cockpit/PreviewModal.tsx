@@ -4,7 +4,7 @@ import type { PlanStep,ServiceInfo } from '../../types';
 import { PreviewContents } from './PreviewContents';
 import { servicePalette,serviceName,serviceId } from './presentation';
 import { useDialogFocus } from './useDialogFocus';
-export function PreviewModal({step,services,labels,destination,onClose}:{step:PlanStep;services:ServiceInfo[];labels?:Record<string,string>;destination:(step:PlanStep,labels?:Record<string,string>)=>string;onClose:()=>void}){const dialog=useRef<HTMLDivElement>(null);useDialogFocus(dialog,onClose,`preview-${step.id}`);return (<div ref={dialog} tabIndex={-1} aria-label="Xem trước nội dung" id="preview-modal" className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4`} role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
+export function PreviewModal({step,services,labels,sender,destination,onClose}:{step:PlanStep;services:ServiceInfo[];labels?:Record<string,string>;sender?:string;destination:(step:PlanStep,labels?:Record<string,string>)=>string;onClose:()=>void}){const dialog=useRef<HTMLDivElement>(null);useDialogFocus(dialog,onClose,`preview-${step.id}`);return (<div ref={dialog} tabIndex={-1} aria-label="Xem trước nội dung" id="preview-modal" className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4`} role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
         <div id="preview-modal-box" className="bg-white rounded-2xl max-w-xl w-full border border-brand-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
           <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-neutral-50">
             <div className="flex items-center gap-2">
@@ -24,7 +24,8 @@ export function PreviewModal({step,services,labels,destination,onClose}:{step:Pl
             </button>
           </div>
           <div className="p-5 overflow-y-auto v3-space-y-4 text-xs sm:text-sm text-brand-text" id="preview-modal-content">
-            <PreviewContents step={step} destination={destination(step,labels)}/>
+            {step.tool.startsWith('gmail.') && sender && <p className="break-words">Gửi từ: {sender}</p>}
+            <PreviewContents step={step} labels={labels} destination={destination(step,labels)}/>
           </div>
           <div className="px-5 py-3 border-t border-brand-border bg-neutral-50 flex justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-xl transition-colors">

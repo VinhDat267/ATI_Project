@@ -3,6 +3,7 @@ import { getToolDefinition } from '@wap/tool-schemas';
 import type { PlanStep } from '../../types';
 import { formatArgValue } from '../../components/PlanStepItem';
 import { operation } from './presentation';
+import { GmailPreview } from './GmailPreview';
 
 const names: Record<string,string> = {
   title:'Tiêu đề', name:'Tên', summary:'Tiêu đề', body:'Nội dung', text:'Nội dung',
@@ -17,7 +18,8 @@ function OtherArguments({step,except}:{step:PlanStep;except:string[]}) {
   </div>);
 }
 
-export function PreviewContents({step,destination}:{step:PlanStep;destination:string}) {
+export function PreviewContents({step,destination,labels}:{step:PlanStep;destination:string;labels?:Record<string,string>}) {
+  if (step.tool.startsWith('gmail.')) return <GmailPreview step={step} labels={labels} />;
   const style=operation(step.tool).previewStyle;
   if(style==='card') return <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
     {step.args.title!=null && <div>

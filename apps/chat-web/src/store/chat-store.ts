@@ -190,6 +190,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       summary: snapshot.plan.summary || 'Quy trình đã lưu',
       steps: snapshot.plan.steps || snapshot.steps.map(row => ({ id: row.stepId, tool: row.tool, description: row.stepId, args: {} })),
       resourceLabels: snapshot.plan.resourceLabels,
+      connections: snapshot.plan.connections,
     };
     return {
       executionSnapshot: snapshot,

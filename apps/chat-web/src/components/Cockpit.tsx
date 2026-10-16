@@ -168,7 +168,7 @@ export function Cockpit(props: Props) {
     {drawer && <DrawerBackdrop onClose={()=>setDrawer(null)}/>}
     {drawer === 'history' && <HistoryDrawer conversationId={state.conversationId} onClose={()=>setDrawer(null)} onNewConversation={props.onNewConversation} onSelectConversation={props.onSelectConversation}/>}
     {drawer === 'conversation' && <ConversationDrawer messages={state.messages} streamingText={state.streamingText} isStreaming={state.isStreaming} onClose={()=>setDrawer(null)} composer={<ChatComposer variant="drawer" {...composerProps}/>}/>}
-    {preview && <PreviewModal step={preview} services={props.services} labels={state.activePlan?.resourceLabels} destination={resourceDestination} onClose={()=>setPreview(null)}/>}
+    {preview && <PreviewModal sender={state.activePlan?.connections?.gmail?.email} step={preview} services={props.services} labels={state.activePlan?.resourceLabels} destination={resourceDestination} onClose={()=>setPreview(null)}/>}
 
   </>;
 }
