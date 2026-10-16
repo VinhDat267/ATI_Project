@@ -1,8 +1,8 @@
-import { getToolDefinition, type PlanResponse } from '@wap/tool-schemas';
-import { groundingMemory, type WorkingMemory } from '@wap/planner';
+import { getToolDefinition, GMAIL_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { groundingMemory, normalizedRecipient, observedThreads, userEmailAddresses, type WorkingMemory } from '@wap/planner';
 
 /** Display-only projection of actual lookups; never part of the approved payload. */
-export function resourceLabels(plan: PlanResponse, memory: WorkingMemory): Record<string, string> {
+export function resourceLabels(plan: PlanResponse, memory: WorkingMemory, userTexts: string[] = []): Record<string, string> {
   const known = groundingMemory(memory.getAll(), memory.getEntity('__observed'));
   const entries = (key: string): Array<Record<string, any>> => {
     const value = known[key];
@@ -11,10 +11,22 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory): Recor
   const name = (entity: Record<string, any>) => [entity.name, entity.fullName, entity.title].find(value => typeof value === 'string' && value.trim());
   const labels: Record<string, string> = Object.create(null);
   const ambiguous = new Set<string>();
+  const subjects = memory.getEntity('__labels')?.thread ?? {};
+  const typed = userEmailAddresses(userTexts);
+  const threads = observedThreads(memory.getAll());
   for (const step of plan.steps) {
-    const properties = getToolDefinition(step.tool)?.inputSchema.properties ?? {};
+    const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries(properties)) {
       const annotation = schema as Record<string, any>;
+      if (annotation['x-recipient'] && Array.isArray(step.args[argument])) for (const value of step.args[argument]) {
+        const address = normalizedRecipient(value);
+        if (!address) continue;
+        if (typed.has(address)) labels[`recipient:${address}`] = 'user';
+        else {
+          const source = threads.find(t => t.participants.some(p => normalizedRecipient(p) === address));
+          if (source && typeof subjects[source.id] === 'string') labels[`recipient:${address}`] = `thread:${subjects[source.id]}`;
+        }
+      }
       const key = annotation['x-resource'];
       if (typeof key !== 'string') continue;
       const parents = Object.entries(properties).filter(([other, property]) =>
@@ -22,6 +34,7 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory): Recor
       const values = Array.isArray(step.args[argument]) ? step.args[argument] : [step.args[argument]];
       for (const value of values) {
         if (typeof value !== 'string' && typeof value !== 'number') continue;
+        if (key === 'thread' && typeof subjects[String(value)] === 'string') { labels[String(value)] = subjects[String(value)]; continue; }
         const candidates = entries(key).filter(item =>
           String(item[annotation['x-resource-field'] ?? 'id']) === String(value) &&
           parents.every(([parent]) => {

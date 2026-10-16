@@ -62,7 +62,7 @@ export function routeIntent(
     const unavailable = fallback.filter((service) => !available.has(service.id)).map(({ id, name }) => ({ id, name }));
     return unavailable.length > 0 ? { services: [], unavailable } : { services: fallback.map((service) => service.id), unavailable: [] };
   }
-  return { services: services.filter((service) => available.has(service.id)).map((service) => service.id), unavailable: [] };
+  return { services: services.filter((service) => service.connection !== 'personal' && available.has(service.id)).map((service) => service.id), unavailable: [] };
 }
 
 /** "A", "A và B", "A, B và C": the refusal names every service the request still needs. */

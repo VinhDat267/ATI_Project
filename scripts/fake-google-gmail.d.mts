@@ -14,12 +14,14 @@ export interface FakeGoogleGmailSettings {
   refreshDelayMs: number;
   revoke: FakeOutcome;
   profile: 'ok' | 'server_error';
+  threads: { id: string; messages: any[] }[];
+  apiResponses: { status?: number; reason?: string; retryAfter?: string; body?: unknown; mode?: 'hang' | 'disconnect' | 'invalid_json' | 'redirect' | 'server_error' }[];
 }
 export interface FakeGoogleGmail {
   server: Server;
   origin: string;
   settings: FakeGoogleGmailSettings;
-  stats: { authorizations: number; exchanges: number; refreshes: number; revocations: number; profiles: number };
+  stats: { authorizations: number; exchanges: number; refreshes: number; revocations: number; profiles: number; writes: number; apiRequests: { method: string; path: string; query: Record<string, string>; body?: any }[] };
   endpoints: { authorizationUrl: string; tokenUrl: string; revokeUrl: string; apiBaseUrl: string };
   mintRefreshToken(email?: string): string;
   isRevoked(token: string): boolean;

@@ -1,4 +1,5 @@
 import type { ToolDefinition, PlannerResponse, PlanStep } from '@wap/tool-schemas';
+import { normalizedRecipient, observedThreads, userEmailAddresses } from './recipients.js';
 
 export interface ValidationSuccess {
   valid: true;
@@ -47,6 +48,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 export function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
+  if (schema['x-recipient']) {
+    if (!Array.isArray(value) || value.some(address => !normalizedRecipient(address))) return `${path} must contain literal bare email addresses; references and templates are forbidden`;
+    if (value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 20)) return `${path} recipient count is out of range`;
+  }
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
     const key = '$ref' in value ? '$ref' : '$template';
     if (schema.type !== 'string' || Object.keys(value).length !== 1 ||
@@ -194,10 +199,19 @@ function findMembersOffBoard(steps: PlanStep[], memory: Record<string, any>): Un
 
 function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
   const typed = userTokens(grounding.userTexts);
+  const typedEmails = userEmailAddresses(grounding.userTexts);
+  const seenEmails = new Set(observedThreads(grounding.memory).flatMap(t => t.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))));
   const ungrounded: UngroundedArgument[] = [];
   for (const step of steps) {
     const properties = catalog.get(step.tool)?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries<Record<string, any>>(properties)) {
+      if (schema['x-recipient'] && Array.isArray(step.args[argument])) {
+        for (const value of step.args[argument]) {
+          const address = normalizedRecipient(value);
+          if (address && !typedEmails.has(address) && !seenEmails.has(address)) ungrounded.push({ stepId: step.id, argument, resource: 'recipient', value: address });
+        }
+        continue;
+      }
       const resource = schema['x-resource'];
       if (typeof resource !== 'string' || step.args[argument] === undefined) continue;
       const known = memoryValues(grounding.memory, resource, schema['x-resource-field'] ?? 'id');

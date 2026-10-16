@@ -2,6 +2,14 @@ import { MockLLMProvider } from '@wap/planner';
 
 export function createSandboxProvider(scenario?: string) {
   const mockProvider = new MockLLMProvider();
+  if (scenario === 'gmail') {
+    mockProvider.setPlanResponses([
+      { kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'Họp nhóm ATI', limit: 10 } }] },
+      { kind: 'plan', thinking: 'Trả lời luồng thư đã tìm thấy.', summary: 'Trả lời thư họp nhóm ATI', warnings: [],
+        steps: [{ id: 'gmail_reply', tool: 'gmail.reply', description: 'Trả lời Lan về buổi họp', args: { threadId: 'gmail-thread-1', to: ['lan@example.com'], body: 'Mình đồng ý, hẹn gặp lúc 9 giờ.' }, dependsOn: [] }] },
+    ]);
+    return mockProvider;
+  }
     const sandboxPlan = {
         kind: 'plan',
         thinking: 'Khảo sát board Frontend trên Trello và kênh Slack #general. Lập kế hoạch tạo task sửa CSS, gán thành viên Minh và thông báo hoàn tất lên Slack.',

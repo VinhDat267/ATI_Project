@@ -14,6 +14,16 @@ const json = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 const random = () => randomBytes(24).toString('base64url');
+function defaultThreads() {
+  const message = { id: 'message-1', labelIds: ['INBOX', 'UNREAD'], snippet: 'Chào nhóm, họp lúc 9 giờ.', payload: {
+    mimeType: 'text/plain', headers: [
+      { name: 'From', value: 'Lan <lan@example.com>' }, { name: 'To', value: defaults.email }, { name: 'Cc', value: 'Minh <minh@example.com>' },
+      { name: 'Subject', value: 'Họp nhóm ATI' }, { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+      { name: 'Message-ID', value: '<original@example.com>' }, { name: 'References', value: '<ancestor@example.com>' },
+    ], body: { data: Buffer.from('Chào nhóm, họp lúc 9 giờ.').toString('base64url') },
+  } };
+  return [{ id: 'thread-1', messages: [message] }, { id: 'draft-only', messages: [{ ...message, id: 'draft-message', labelIds: ['DRAFT'] }] }];
+}
 async function form(request) {
   if (!request.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) return null;
   let body = '';
@@ -34,9 +44,9 @@ export async function startFakeGoogleGmail(options = {}) {
   const settings = {
     email, grantedScopes: [GMAIL_MODIFY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
     accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
-    ...options.settings,
+    threads: defaultThreads(), apiResponses: [], ...options.settings,
   };
-  const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0 };
+  const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0, apiRequests: [], writes: 0 };
   const codes = new Map();
   const refreshTokens = new Map();
   const accessTokens = new Map();
@@ -129,6 +139,39 @@ export async function startFakeGoogleGmail(options = {}) {
         const entry = token ? accessTokens.get(token) : undefined;
         if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, status: 'UNAUTHENTICATED' } });
         return json(response, 200, { emailAddress: entry.email, messagesTotal: 0, threadsTotal: 0, historyId: '1' });
+      }
+      if (url.pathname.startsWith('/gmail/v1/users/me/')) {
+        const path = url.pathname.slice('/gmail/v1/users/me/'.length);
+        let body;
+        if (request.method === 'POST') { let raw = ''; for await (const chunk of request) raw += chunk; body = JSON.parse(raw || '{}'); stats.writes++; }
+        stats.apiRequests.push({ method: request.method, path, query: Object.fromEntries(url.searchParams), body });
+        const scripted = settings.apiResponses.shift();
+        if (scripted?.mode === 'hang') return hang(response);
+        if (scripted?.mode === 'disconnect') return response.destroy();
+        if (scripted?.mode === 'invalid_json') { response.writeHead(200); return response.end('not json'); }
+        if (scripted?.mode === 'redirect') { response.writeHead(307, { Location: '/gmail/v1/users/me/profile' }); return response.end(); }
+        if (scripted?.mode === 'server_error') return json(response, 503, { error: { code: 503 } });
+        if (scripted && Object.hasOwn(scripted, 'body')) return json(response, scripted.status ?? 200, scripted.body);
+        if (scripted?.status) {
+          if (scripted.retryAfter != null) response.setHeader('Retry-After', scripted.retryAfter);
+          return json(response, scripted.status, { error: { code: scripted.status, errors: [{ reason: scripted.reason ?? 'forbidden' }] } });
+        }
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = accessTokens.get(token);
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401 } });
+        if (path === 'threads' && request.method === 'GET') return json(response, 200, { threads: settings.threads.slice(0, Number(url.searchParams.get('maxResults') ?? 10)).map(t => ({ id: t.id })) });
+        if (path === 'labels' && request.method === 'GET') return json(response, 200, { labels: ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' })) });
+        if (path === 'labels' && request.method === 'POST') return json(response, 200, { id: `label-${stats.writes}`, name: body.name, type: 'user' });
+        if (path === 'messages/send') return json(response, 200, { id: `sent-${stats.writes}`, threadId: body.threadId ?? `new-thread-${stats.writes}` });
+        if (path === 'drafts') return json(response, 200, { id: `draft-${stats.writes}`, message: { id: `draft-message-${stats.writes}`, threadId: body.message.threadId ?? 'draft-thread' } });
+        const match = /^threads\/([^/]+)(?:\/(modify|trash))?$/.exec(path);
+        const thread = match && settings.threads.find(t => t.id === decodeURIComponent(match[1]));
+        if (thread) {
+          if (match[2] === 'modify') return json(response, 200, { ...thread, messages: thread.messages.map(message => ({ ...message,
+            labelIds: [...new Set([...(message.labelIds ?? []).filter(id => !body.removeLabelIds?.includes(id)), ...(body.addLabelIds ?? [])])],
+          })) });
+          return json(response, 200, match[2] === 'trash' ? { id: thread.id } : thread);
+        }
       }
       return json(response, 404, { error: 'not_found' });
     } catch {

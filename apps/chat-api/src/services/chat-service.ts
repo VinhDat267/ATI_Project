@@ -140,7 +140,7 @@ export class ChatService {
     if (plannerResponse.kind === 'plan') plannerResponse = await this.bindConnections(plannerResponse, userId);
 
     if (plannerResponse.kind === 'plan') {
-      const labels = resourceLabels(plannerResponse, memory);
+      const labels = resourceLabels(plannerResponse, memory, [...history.filter(m => m.role === 'user').map(m => m.content), content]);
       const planHash = createHash('sha256')
         .update(JSON.stringify(plannerResponse))
         .digest('hex');

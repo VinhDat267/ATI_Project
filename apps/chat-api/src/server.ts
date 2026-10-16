@@ -12,13 +12,13 @@ import {
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
-import { createRuntimeAdapterFactory, createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
+import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
-import { getToolCatalogFor } from './services/registered-services.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
@@ -229,17 +229,18 @@ async function bootstrap() {
 
   const planner = createRuntimePlanner(env.RUNTIME_MODE,
     async (input: any) => new AIPlanner({
-      provider,
-      // GMAIL-02 turns Gmail on here; until then the catalog equals the shared one.
-      toolCatalog: env.RUNTIME_MODE === 'live'
-        ? await getToolCatalogFor(credRepo, env.ENCRYPTION_KEY, { userId: input?.actor?.userId, gmailEnabled: false })
-        : ALL_TOOLS,
+      provider: env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'gmail' ? createSandboxProvider('gmail') : provider,
+      toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, { userId: input?.actor?.userId, gmailEnabled: gmailAvailable }),
+      serviceRegistry: gmailServiceRegistry(gmailAvailable),
       gatherSearch,
       requireGroundedResources: env.RUNTIME_MODE === 'live',
       timeZone: env.APP_TIME_ZONE,
-      searchMode: env.PLANNER_SEARCH_MODE,
+      searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
     }).processMessage(input),
-    (input: any) => backupPlanner.processMessage(input));
+    (input: any) => {
+      if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');
+      return backupPlanner.processMessage(input);
+    });
 
   // 4. ChatService Event Bridge to SSE
   const chatEventEmitter = {
@@ -271,9 +272,10 @@ async function bootstrap() {
       credentials: credRepo,
       onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
     }) : undefined,
+    createGmailAdapter: gmailAvailable ? ({ tokens }) => runtimeGmailAdapter(env.RUNTIME_MODE, tokens, env.GMAIL_OAUTH!.apiBaseUrl) : undefined,
   });
 
-  const adapterFactory = createRuntimeAdapterFactory<AdapterContext>(env.RUNTIME_MODE,
+  const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
     (serviceName, context) => realAdapterFactory.getAdapterForService(serviceName, context),
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
