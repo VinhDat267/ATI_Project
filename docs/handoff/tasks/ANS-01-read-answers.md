@@ -1,6 +1,6 @@
 # ANS-01 · Kiểu phản hồi "trả lời" cho câu chỉ đọc
 
-**Trạng thái:** chờ, giao `longnguyen005` ngày 13/10/2026 (làm sau W4-00b) · **Nhánh gợi ý:** `feat/ans-01-read-answers` · **Phụ thuộc:** W4-00b đã merge (cùng sửa `validator.ts`); không phụ thuộc Gmail · **Mốc:** trước **21/10/2026**
+**Trạng thái:** xong #142 tại `96f9f09` (16/10/2026), giao `longnguyen005` ngày 13/10/2026; review độc lập Đạt sau một lượt sửa · **Nhánh gợi ý:** `feat/ans-01-read-answers` · **Phụ thuộc:** W4-00b đã merge (cùng sửa `validator.ts`); không phụ thuộc Gmail · **Mốc:** trước **21/10/2026**
 **Đặc tả:** phần 3 (mục 5.1–5.4), dòng "Lịch sử hội thoại" ở mục 4.3, và phần 3 của 6.3. **Quy tắc chung và hợp đồng:** [GMAIL-common](GMAIL-common.md), đọc trước, nhất là mục 3 (file nhiều task cùng sửa) và 4.5.
 
 ## Mục tiêu
