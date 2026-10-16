@@ -58,9 +58,9 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 4 (thêm 13/10, trước 20/10) | Validator từ chối tham chiếu bước viết thành chuỗi thô `${step.output…}` ngoài `$template` (executor gửi nguyên chuỗi đó lên dịch vụ); phát hiện khi review #133 | [W4-00b](tasks/W4-00b-raw-step-placeholders.md) | **xong** #137 (`ebc192d`, 14/10), `longnguyen005`; review độc lập đạt. Phép đo tham khảo với Luna do nhóm trưởng chạy, chưa chạy |
 | 4 (thêm 13/10, trước 18/10) | Gmail phần 1: mỗi người tự kết nối Gmail (OAuth, token, migration 0009), planner/executor theo người dùng, cờ `GMAIL_ENABLED` tắt mặc định ([đặc tả](../superpowers/specs/2026-10-13-gmail-personal-connections-design.md), [quy tắc chung](tasks/GMAIL-common.md)) | [GMAIL-01](tasks/GMAIL-01-personal-connection.md) | **xong** #140 (`8973a9e`, 14/10); review độc lập lỗi 1–2 đạt, lỗi 3 chỉ kiểm phía thi công |
 | 4 (thêm 13/10, trước 21/10) | Gmail phần 2: 10 tool, adapter thật và giả, chặn người nhận bịa, nội dung thư không vào prompt ngoài khối dữ liệu | [GMAIL-02](tasks/GMAIL-02-gmail-tools.md) | **xong** #143 (`7c260c1`, 16/10), nhóm trưởng; review độc lập Đạt sau một lượt sửa P2 (thiếu test chống gửi trùng); 2 P3 về adapter ở CURRENT-STATE mục 5 |
-| 4 (thêm 13/10, trước 21/10) | Kiểu phản hồi "trả lời" cho câu chỉ đọc, mọi dịch vụ, sau cờ `PLANNER_READ_ANSWERS` tắt mặc định (thay chốt 05/10 khi cờ bật) | [ANS-01](tasks/ANS-01-read-answers.md) | PR [#142](https://github.com/VinhDat267/ATI_Project/pull/142), `longnguyen005`; review độc lập Đạt sau khi sửa nhỏ (1 P2 thiếu test prefetch lỗi); chờ sửa rồi rebase lên `main` sau #143 |
-| 4 (thêm 13/10, trước 23/10) | Giao diện Gmail: nhóm "Của riêng bạn" ở `/settings`, callback, "Gửi từ" và nguồn người nhận ở xem trước, `/privacy`, `/guide`, Landing | [GMAIL-03](tasks/GMAIL-03-gmail-ui.md) | chờ, giao `longnguyen005`; API của GMAIL-01 đã có (#140), tool và kịch bản sandbox `gmail` của GMAIL-02 đã có (#143); làm sau ANS-01 |
-| 4–5 (Google project trước 21/10; đo 26–28/10) | Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, PR bật hai cờ trước mốc chốt tính năng 29/10 | [GMAIL-04](tasks/GMAIL-04-measure-and-live.md) | chờ, giao nhóm trưởng; có phần việc của con người |
+| 4 (thêm 13/10, trước 21/10) | Kiểu phản hồi "trả lời" cho câu chỉ đọc, mọi dịch vụ, sau cờ `PLANNER_READ_ANSWERS` tắt mặc định (thay chốt 05/10 khi cờ bật) | [ANS-01](tasks/ANS-01-read-answers.md) | **xong** #142 (`96f9f09`, 16/10), `longnguyen005`; review độc lập Đạt sau một lượt sửa (1 P2, 1 P3 thiếu test) và rebase lên `main` có #143 |
+| 4 (thêm 13/10, trước 23/10) | Giao diện Gmail: nhóm "Của riêng bạn" ở `/settings`, callback, "Gửi từ" và nguồn người nhận ở xem trước, `/privacy`, `/guide`, Landing | [GMAIL-03](tasks/GMAIL-03-gmail-ui.md) | chờ, giao `longnguyen005`; API của GMAIL-01 đã có (#140), tool và kịch bản sandbox `gmail` của GMAIL-02 đã có (#143); ANS-01 đã merge (#142), bắt đầu được |
+| 4–5 (Google project trước 21/10; đo 26–28/10) | Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, PR bật hai cờ trước mốc chốt tính năng 29/10 | [GMAIL-04](tasks/GMAIL-04-measure-and-live.md) | chờ, giao nhóm trưởng; có phần việc của con người. Bước 1 (Google Cloud project riêng cho Gmail) xong 16/10, `.env` đã kiểm; bộ đo làm được vì GMAIL-02 và ANS-01 đã merge; nghiệm thu Google thật cần GMAIL-03 |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
@@ -103,6 +103,13 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - chữ trên nút cam giữ **màu trắng** (3,2:1, ngoại lệ có chủ đích, đặc tả mục 3.2);
 - chữ thường dùng Be Vietnam Pro, tiêu đề dùng Playfair Display;
 - cỡ chữ tối thiểu 14px áp dụng khi làm app, không sửa bản mẫu.
+
+**Cập nhật 16/10 (ANS-01):** ANS-01 xong qua #142 (`96f9f09`), cờ `PLANNER_READ_ANSWERS` vẫn tắt mặc định. Review độc lập Đạt sau một lượt sửa thiếu test và rebase lên `main` có #143; trên bản tích hợp, 22/22 đột biến bị bắt, gồm 5 đột biến vào bảo đảm của GMAIL-02. Bước 1 của GMAIL-04 (Google Cloud project cho Gmail) xong cùng ngày. Việc tiếp theo:
+- `longnguyen005` làm GMAIL-03 (trước 23/10);
+- nhóm trưởng làm W3-11 (trước buổi thử 23/10), hẹn người tham gia W4-03, rồi làm bộ đo GMAIL-04;
+- sửa test GMAIL-01 chập chờn bằng PR nhỏ riêng.
+
+[Log merge](log/2026-10-16-reviewer-merge-142.md).
 
 **Cập nhật 16/10 (GMAIL-02):** GMAIL-02 xong qua #143 (`7c260c1`). Gmail vẫn tắt mặc định; khi bật, 10 tool đi qua planner, executor và sandbox. Review độc lập Đạt sau một lượt sửa P2 (thiếu test chống gửi trùng). ANS-01 (#142) đã review, còn 1 P2 thiếu test; #142 cần rebase lên `main` vì xung đột với #143 ở `server.ts` và `sandbox/scenarios.ts`. Việc tiếp theo:
 - `longnguyen005` sửa và rebase #142, rồi làm GMAIL-03;
