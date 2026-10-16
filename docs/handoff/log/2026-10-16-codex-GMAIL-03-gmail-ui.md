@@ -1,6 +1,6 @@
 # 16/10/2026 · GMAIL-03 · Giao diện Gmail theo kết nối riêng
 
-- Task: [GMAIL-03](../tasks/GMAIL-03-gmail-ui.md). Nhánh `codex/feat-gmail-03-ui`, base `96f9f09` sau merge #142. Commit tính năng `d9e16d811b0cb57f6cae856793bd9b7222db23f7`, phần sửa `4ae7eb129c8f17ece96eb21d72ff8072d4a5e8d6` trước rebase (màu Settings/callback và bỏ trạng thái chờ cũ). Nhánh PR: `codex/feat-gmail-03-ui` (URL bổ sung sau khi GitHub cấp số).
+- Task: [GMAIL-03](../tasks/GMAIL-03-gmail-ui.md). Nhánh `codex/feat-gmail-03-ui`, base `96f9f09` sau merge #142. Commit tính năng `d9e16d811b0cb57f6cae856793bd9b7222db23f7`, phần sửa `4ae7eb129c8f17ece96eb21d72ff8072d4a5e8d6` trước rebase (màu Settings/callback và bỏ trạng thái chờ cũ). PR [#147](https://github.com/VinhDat267/ATI_Project/pull/147), nhánh `codex/feat-gmail-03-ui`.
 - Main nhận #145 trong lúc kiểm thử. Rebase lên `87b31e3`, hai commit tương ứng thành `c12b5b94c848b1e53f5b3f452c7e335252b26b96` và `b81ac3560c4c3c84d9bfea7fb9b521e2608fcb82`. #145 chỉ đổi bốn file handoff. `git diff --quiet 4ae7eb1 HEAD -- apps packages scripts db prompts evaluations package.json package-lock.json` exit 0: mã đã chạy check/browser không đổi byte. Lặp năm mutation sau rebase, vẫn bị bắt.
 - Đọc CURRENT-STATE, README, ba log mới nhất, task/common, đặc tả Gmail và design system trước khi thi công. Checkout sạch; nhánh trước là ANS-01 đã merge, không chuyển nhánh có thay đổi của người khác.
 
