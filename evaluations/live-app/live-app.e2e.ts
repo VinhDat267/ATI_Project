@@ -94,22 +94,39 @@ test('live app: chat, preview, human approval and real execution', async ({ page
 
     await approve.click();
     const running = ['pending', 'approved', 'executing'];
-    let status = '';
-    await expect.poll(async () => {
-      status = (await pool.query('SELECT status FROM plans WHERE id = $1', [planRow.id])).rows[0]?.status;
-      return !running.includes(status);
-    }, { timeout: 180_000 }).toBe(true);
-    const steps = (await pool.query('SELECT step_id, tool, status, output_json, error_json, duration_ms FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planRow.id])).rows;
-    const receipt = page.getByRole('heading', { name: /^Đã xong \d+ việc trên \d+ công cụ$/ });
-    if (status === 'completed') await expect(receipt).toBeVisible({ timeout: 30_000 });
-    else await page.waitForTimeout(2000);
-    const links = await page.locator('#receipt-chain a[href]').evaluateAll((anchors) => anchors.map((a) => ({ text: a.textContent?.trim(), href: a.getAttribute('href') })));
-    await shot(page, 'executed.png');
-    save('result.json', { planId: planRow.id, status, steps, receiptLinks: links });
+    const readExecution = async () => ({
+      status: (await pool.query('SELECT status FROM plans WHERE id = $1', [planRow.id])).rows[0]?.status as string,
+      steps: (await pool.query('SELECT step_id, tool, status, output_json, error_json, duration_ms FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planRow.id])).rows,
+    });
+    // What the executor wrote is saved before any UI check, so a failing receipt never loses it.
+    let execution = await readExecution();
+    try {
+      await expect.poll(async () => {
+        execution = await readExecution();
+        return !running.includes(execution.status);
+      }, { timeout: 180_000 }).toBe(true);
+    } finally {
+      save('result.json', { planId: planRow.id, ...execution });
+    }
 
-    expect(status).toBe('completed');
-    expect(steps.map((step) => step.status)).toEqual(steps.map(() => 'succeeded'));
-    expect(steps).toHaveLength(planRow.plan_json.steps.length);
+    let receiptError: unknown;
+    if (execution.status === 'completed') {
+      await expect(page.getByRole('heading', { name: /^Đã xong \d+ việc trên \d+ công cụ$/ })).toBeVisible({ timeout: 30_000 })
+        .catch((error) => { receiptError = error; });
+    } else {
+      await page.waitForTimeout(2000);
+    }
+    const receiptLinks = await page.locator('#receipt-chain a[href]')
+      .evaluateAll((anchors) => anchors.map((a) => ({ text: a.textContent?.trim(), href: a.getAttribute('href') })))
+      .catch(() => []);
+    const screenshot = await shot(page, 'executed.png').then(() => true, () => false);
+    save('result.json', { planId: planRow.id, ...execution, receiptHeadingVisible: execution.status === 'completed' ? !receiptError : null,
+      receiptLinks, executedScreenshot: screenshot });
+
+    if (receiptError) throw receiptError;
+    expect(execution.status).toBe('completed');
+    expect(execution.steps.map((step) => step.status)).toEqual(execution.steps.map(() => 'succeeded'));
+    expect(execution.steps).toHaveLength(planRow.plan_json.steps.length);
   } finally {
     await pool.end();
   }
