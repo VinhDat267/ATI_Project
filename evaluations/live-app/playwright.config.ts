@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 if (process.env.LIVE_APP !== '1') {
-  throw new Error('This run writes to real Trello, Slack and GitHub through the app; set LIVE_APP=1 to confirm');
+  throw new Error('This run writes to real services through the app; set LIVE_APP=1 to confirm');
 }
 
 /**

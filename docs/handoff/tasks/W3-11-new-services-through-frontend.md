@@ -63,8 +63,27 @@ Harness `evaluations/live-app/` sửa lần cuối ngày 01/10. `live-app.e2e.ts
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Bằng chứng (đường dẫn ở máy):
-- Kết quả từng service và workflow (plan hash, trạng thái step, ID kết quả đã che bớt nếu cần):
-- Lỗi phát hiện và task đề xuất:
+- PR: [#146](https://github.com/VinhDat267/ATI_Project/pull/146), nhánh `test/w3-11-new-services-frontend`, base `e03a9c8`. Nhóm trưởng giao reviewer thi công và ngồi duyệt cùng ngày 16/10/2026. [Log](../log/2026-10-16-reviewer-W3-11-new-services-frontend.md).
+- Bằng chứng (đường dẫn ở máy): `docs/ai-evidence/V3-LIVE-EXECUTION/W3-11-2026-10-16/` (ignore, không commit). Mỗi lượt có `plan.json` (hash, nhãn tài nguyên, thời gian tới xem trước), `confirm.txt`, `result.json` (bước, output, link biên nhận), `readback.json` và ảnh xem trước/biên nhận đã che menu người dùng.
+- Kết quả từng service và workflow. App live dùng `ag/gemini-3.8-flash` qua 9router và PostgreSQL tạm riêng. 7 dịch vụ lưu khoá bằng `setup-credentials.ts`; Google Sheets do nhóm trưởng nhập ở `/settings` với private key nhiều dòng thật. Cả 8 dịch vụ "Kiểm tra kết nối" `healthy`.
+
+  | Lượt | Plan hash | Tới xem trước | Kết quả | Đọc lại |
+  |---|---|---|---|---|
+  | Hủy (Trello, Slack) | `8f28d53f…` | 9,7 s | `rejected`, 0 `execution_steps` | — |
+  | Sheets + Slack | `c2bd9fc9…` | 12,3 s | `completed`, 2/2 `succeeded` | `sheets.read_range`: dòng 3 tab Tasks đúng nội dung |
+  | Calendar + Slack | `0fd1803c…` | 15,0 s | `completed`, 2/2 | `calendar.list_events`: sự kiện `ujv7cah9…` 17/10 15:00–15:30 |
+  | Notion + Slack | `964af12a…` | 12,8 s | `completed`, 2/2 | `notion.query_database`: page `3fbf24d5-…-81aa…`, Trạng thái "Mới" |
+  | Telegram + Slack | `3fc1ad27…` | 12,1 s | `completed`, 2/2, `messageId` 7 | không có tool đọc tin; nhóm trưởng xác nhận tin đã hiện trong nhóm |
+  | Jira + Slack | `c8159765…` | 7,1 s | `completed`, 2/2 | `jira.search_issues`: `ATIT-5` |
+  | Jira → Notion → Telegram → Slack | `946c5959…` | 13,9 s | `completed`, 4/4, thực thi 5,1 s | `ATIT-6`; Link của page Notion bằng URL của `ATIT-6`; Telegram `messageId` 8, nhóm trưởng xác nhận đã hiện |
+
+  Mỗi lệnh ghi chỉ chạy sau khi nhóm trưởng duyệt đúng mã băm trong chat. Biên nhận trên giao diện có link an toàn ("Xem dòng", "Mở lịch", "Mở trang", "Mở issue"); Telegram không có link.
+- Sửa sau review độc lập: P2 của [review #146](https://github.com/VinhDat267/ATI_Project/pull/146#issuecomment-6218570771). Harness nay lưu kết quả PostgreSQL trước khi kiểm biên nhận trên giao diện, nên không mất bằng chứng thực thi khi biên nhận lỗi. Phép thử ẩn tiêu đề biên nhận: RED trên `f636d98` (thiếu `result.json`), GREEN sau sửa (có `result.json` và ảnh, lượt chạy vẫn fail). Chi tiết ở log.
+- Lỗi phát hiện và task đề xuất: không có lỗi sản phẩm. Ghi nhận:
+  - thời gian tới xem trước 7,1–15,0 s là từng lượt đơn lẻ, không phải phép đo W4-04;
+  - tin Slack vẫn không đọc lại được bằng tool (giới hạn đã có).
 - Điều chưa làm hoặc khác với task card:
+  - **nhãn Đọc/Ghi:** giao diện từ FE-05b không còn nhãn này; mỗi bước có nhãn hành động ("Tạo mới", "Gửi tin"), và kế hoạch chỉ gồm bước ghi;
+  - **database riêng:** chạy trên PostgreSQL tạm, không dùng DB của `.env`; khoá lưu trong DB tạm mất khi xoá container;
+  - **ảnh chụp:** ảnh toàn trang có ô nhắn thêm (cố định ở đáy màn hình) nằm đè lên phần giữa biên nhận, đúng chỗ đáy khung nhìn ban đầu; nhiều khả năng do cách Playwright chụp toàn trang, chưa kiểm bằng cách cuộn trên trình duyệt thật;
+  - **harness:** sửa theo giao diện hiện tại (`/login`, ô nhập chung, mã hội thoại từ URL, "Duyệt kế hoạch"/"Hủy", biên nhận "Đã xong…", che menu người dùng khi chụp), thêm `LIVE_APP_CANCEL` và `LIVE_APP_SKIP_SERVICES`. Không sửa mã sản phẩm.
