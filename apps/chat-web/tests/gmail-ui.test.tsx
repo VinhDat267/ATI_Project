@@ -52,6 +52,7 @@ it('ignores a late start after the owning session changes', async () => {
   settings(); fireEvent.click(await screen.findByRole('button', { name: 'Kết nối Gmail' }));
   authStorage.setStoredTokens({ accessToken: 'b', refreshToken: 'br', user: { ...member, id: 'b' } });
   await act(async () => resolve({ url: 'https://accounts.google.com/authorize' })); expect(redirect).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Kết nối Gmail' })).not.toBeDisabled();
 });
 it('disconnects exactly once after confirmation and refreshes the personal catalogue', async () => {
   authStorage.setStoredTokens({ accessToken: 'a', refreshToken: 'ar', user: member }); catalogue([gmail('connected')]);

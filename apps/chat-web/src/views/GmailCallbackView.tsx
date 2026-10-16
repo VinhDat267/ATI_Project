@@ -32,9 +32,9 @@ export function GmailCallbackView({ navigate, input }: { navigate: (path: string
     }
     return () => { mounted = false; unsubscribe(); window.removeEventListener('storage', onStorage); };
   }, [navigate]);
-  return <main className="max-w-xl mx-auto px-4 py-16 text-brand-text v3-space-y-5">
+  return <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
     <h1 className="font-display text-3xl">Kết nối Gmail</h1>
     {error ? <p role="alert">{error}</p> : <p role="status">Đang hoàn tất kết nối Gmail…</p>}
-    <a href="/settings" onClick={event => { event.preventDefault(); navigate('/settings', true); }} className="text-brand-primary underline">Về Kết nối dịch vụ</a>
+    <a href="/settings" onClick={event => { event.preventDefault(); navigate('/settings', true); }} className="text-[#FF5701] underline">Về Kết nối dịch vụ</a>
   </main>;
 }

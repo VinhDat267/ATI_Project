@@ -25,6 +25,8 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.goto('/settings#gmail');
     const row = page.locator('#service-row-gmail');
     await expect(row).toBeFocused(); await expect(row).toContainText('không xoá vĩnh viễn');
+    expect(await row.getByRole('heading', { name: 'Gmail' }).evaluate(element => getComputedStyle(element).color)).toBe(theme === 'dark' ? 'rgb(241, 245, 249)' : 'rgb(17, 24, 39)');
+    expect(await row.getByRole('button', { name: 'Kết nối Gmail', exact: true }).evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 87, 1)');
     await page.evaluate(() => { window.location.hash = 'slack'; });
     await expect(page.getByRole('dialog', { name: 'Slack' })).toBeVisible();
     await page.evaluate(() => { window.location.hash = 'gmail'; });

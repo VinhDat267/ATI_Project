@@ -225,7 +225,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         </div>
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
-        {connectedEmail && <p role="status" className="text-sm text-brand-text mb-4">Đã kết nối {connectedEmail}</p>}
+        {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
         {personal && <PersonalGmail key={user?.id} selected={selected} service={personal} refresh={refresh} />}
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
         {hasCatalogue && <div className="v3-space-y-8 sm:v3-space-y-10">
