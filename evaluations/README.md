@@ -379,25 +379,61 @@ hashes and IDs are in `docs/handoff/tasks/W3-07-new-services-live.md`.
 live mode, PostgreSQL, the real model and the real services.
 
 1. Start the server with `RUNTIME_MODE=live npm run up`. It needs `JWT_SECRET`,
-   `ENCRYPTION_KEY`, a provisioned `CHAT_ADMIN_*` user and that user's id in
-   `SERVICE_ADMIN_USER_IDS`. In live mode the API listens on `0.0.0.0`.
+   `ENCRYPTION_KEY` and a provisioned `CHAT_ADMIN_*` user (`npm run
+   db:migrate:v3`, then `npm run admin:provision:v3`); the provisioned user has
+   the admin role, which may configure services. In live mode the API listens
+   on `0.0.0.0`. To run against a separate database, set `DATABASE_URL` in the
+   shell: with `--env-file`, a variable already set in the environment wins
+   over `.env`.
 2. Store the service tokens and allowlists through the server's configuration
-   API (run this yourself; it prints service names and status only):
+   API. It prints service names, allowlists and connection status only:
 
    ```bash
    node --env-file=.env --import tsx evaluations/live-app/setup-credentials.ts
    ```
 
-3. Run the browser scenario. It sends `LIVE_APP_PROMPT`, stops at the preview
-   and saves `plan.json` with the plan's hash. It clicks "Duyệt kế hoạch" only
-   after that hash is written to `confirm.txt` in the run directory; otherwise
-   it cancels the plan.
+   `LIVE_APP_SKIP_SERVICES=sheets` (comma-separated ids) leaves those services
+   for a person to enter on the settings page (`/settings`), for example to
+   check the multi-line private key field with a real key.
+3. Run the browser scenario. It signs in at `/login`, sends `LIVE_APP_PROMPT`,
+   stops at the preview and saves `plan.json` with the plan's hash, the
+   resource labels and the time to the preview. It clicks "Duyệt kế hoạch"
+   only after that hash is written to `confirm.txt` in the run directory;
+   otherwise it cancels the plan. `LIVE_APP_CANCEL=1` cancels right after the
+   preview and checks that the plan is `rejected` with no execution steps.
+   After approval it waits for the plan to finish, saves the steps and the
+   receipt links in `result.json`, and screenshots with the user menu masked.
 
    ```bash
-   LIVE_APP=1 LIVE_APP_PROMPT="<request>" node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/playwright.config.ts
+   LIVE_APP=1 LIVE_APP_PROMPT="<request>" LIVE_APP_RUN_DIR=<dir> node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/playwright.config.ts
    ```
 
-One run so far (2026-09-30): a three-service request reached the preview in
+#### W3-11 runs (16/10/2026)
+
+The five services added in week 3 ran through the web UI in live mode with
+`ag/gemini-3.8-flash`, on a separate temporary PostgreSQL. Seven services were
+stored with `setup-credentials.ts`; Google Sheets was entered on the settings
+page with the real multi-line private key, and all eight connection checks
+were healthy. Every write followed a plan whose hash the project owner
+approved, and each result was checked in the UI receipt, in PostgreSQL and by
+the service's own read tool:
+
+| Run | Services | Time to preview | Result | Read back |
+|---|---|---|---|---|
+| Cancel | Trello, Slack | 9.7 s | `rejected`, 0 execution steps | — |
+| Sheets | Sheets, Slack | 12.3 s | `completed`, 2/2 | `sheets.read_range`: new row 3 of Tasks |
+| Calendar | Calendar, Slack | 15.0 s | `completed`, 2/2 | `calendar.list_events`: event on 17/10 15:00–15:30 |
+| Notion | Notion, Slack | 12.8 s | `completed`, 2/2 | `notion.query_database`: page with Trạng thái "Mới" |
+| Telegram | Telegram, Slack | 12.1 s | `completed`, 2/2 | no read tool; owner checked the group |
+| Jira | Jira, Slack | 7.1 s | `completed`, 2/2 | `jira.search_issues`: `ATIT-5` |
+| Workflow | Jira → Notion → Telegram → Slack | 13.9 s | `completed`, 4/4 | `ATIT-6`; the Notion page's Link equals the issue URL |
+
+Previews showed resource names instead of IDs (for example "Cần làm (board To
+Do)", "ATI Test Notes"). Slack messages are still not read back, as no Slack
+read tool returns messages. Times to the preview are single runs, not the W4-04
+measurement.
+
+Earlier run (2026-09-30): a three-service request reached the preview in
 17.3 s, above the 15 s target, and after approval created a GitHub issue, a
 Trello card linking it and a Slack message; plan and steps ended `completed` /
 `succeeded` in PostgreSQL, and the issue and card were read back from the
