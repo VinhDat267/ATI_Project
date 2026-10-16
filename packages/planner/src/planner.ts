@@ -1,8 +1,8 @@
-import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule } from '@wap/tool-schemas';
+import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
-import { validatePlan } from './validator.js';
+import { validatePlan, validateAnswer } from './validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
   MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, searchEntities,
@@ -20,6 +20,7 @@ export interface AIPlannerOptions {
    * working memory (sandbox fixtures) should disable this.
    */
   requireGroundedResources?: boolean;
+  readAnswers?: boolean;
   /** Clock used to resolve relative dates such as "thứ 6"; defaults to the system clock. */
   now?: () => Date;
   /** IANA time zone users plan in; defaults to Asia/Ho_Chi_Minh. */
@@ -103,6 +104,22 @@ function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
     ...(unavailable.length > 0 ? { unavailableServices: unavailable } : {}) };
 }
 
+function answerLookup(outcome: SearchOutcome): AnswerLookup {
+  const links = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === 'object') {
+      for (const [key, child] of Object.entries(value)) {
+        if (key === 'url' && typeof child === 'string' && child.startsWith('https://') && links.size < 5) links.add(child);
+        else if (typeof child === 'object') visit(child);
+      }
+    }
+  };
+  visit(outcome.result);
+  return { tool: outcome.tool, ...(typeof outcome.args.query === 'string' ? { query: outcome.args.query } : {}),
+    resultCount: Array.isArray(outcome.result) ? outcome.result.length : 1, links: [...links] };
+}
+
 function readOnlyQuestion(): PlannerResponse {
   return { kind: 'clarification', question: 'Bạn muốn làm gì với dữ liệu này, chẳng hạn gửi thông báo, ghi vào bảng tính hoặc tạo công việc?',
     context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
@@ -122,6 +139,7 @@ export class AIPlanner {
   private gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
   private serviceRegistry: ServiceDefinition[];
   private requireGroundedResources: boolean;
+  private readAnswers: boolean;
   private now: () => Date;
   private timeZone: string;
   private searchMode: 'regex' | 'llm';
@@ -141,6 +159,7 @@ export class AIPlanner {
     this.gatherSearch = options.gatherSearch;
     this.serviceRegistry = options.serviceRegistry ?? SERVICE_REGISTRY;
     this.requireGroundedResources = options.requireGroundedResources ?? true;
+    this.readAnswers = options.readAnswers ?? false;
   }
 
   private async gather(input: ProcessMessageInput): Promise<PlannerResponse | undefined> {
@@ -285,8 +304,9 @@ export class AIPlanner {
    * without search rounds. Bounded by a call cap and a time budget; whatever is
    * missing the model can still search for.
    */
-  private async listDirectory(activeTools: ToolDefinition[], input: ProcessMessageInput): Promise<void> {
+  private async listDirectory(activeTools: ToolDefinition[], input: ProcessMessageInput): Promise<string[]> {
     const { memory } = input;
+    const successful = new Set<string>();
     const budget = new AbortController();
     const timer = setTimeout(() => budget.abort(new Error('Directory lookup budget exceeded')), this.directoryBudgetMs);
     const signal = input.signal ? AbortSignal.any([input.signal, budget.signal]) : budget.signal;
@@ -298,12 +318,16 @@ export class AIPlanner {
     const known = observed();
     const listable = activeTools.filter((tool) => tool.listable && tool.discovers && tool.sideEffect === 'read' && !known[tool.discovers]);
     const run = (calls: Array<{ tool: ToolDefinition; args: Record<string, unknown>; stamp?: Record<string, unknown> }>) =>
-      Promise.race([Promise.all(calls.map((call) => this.lookup(call.tool, call.args, signal, input, call.stamp))), expired]);
+      Promise.race([Promise.all(calls.map(async (call) => {
+        const outcome = await this.lookup(call.tool, call.args, signal, input, call.stamp);
+        if (!signal.aborted && outcome.result !== undefined && outcome.error === undefined) successful.add(call.tool.service);
+        return outcome;
+      })), expired]);
 
     try {
       await run(listable.filter((tool) => parentsOf(tool).length === 0)
         .map((tool) => ({ tool, args: { query: '', limit: MAX_RESULTS_PER_CALL } })));
-      if (signal.aborted) return;
+      if (signal.aborted) return [...successful];
       const children = listable.flatMap((tool) => {
         const parents = parentsOf(tool);
         if (parents.length !== 1) return [];
@@ -319,6 +343,7 @@ export class AIPlanner {
       clearTimeout(timer);
       budget.abort();
     }
+    return [...successful];
   }
 
   /**
@@ -339,11 +364,13 @@ export class AIPlanner {
 
     if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
 
-    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch) });
+    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch), readAnswers: this.readAnswers });
     let searchRounds = 0;
     let rejectedPlans = 0;
+    const successfulReads: SearchOutcome[] = [];
+    let usedDirectory: string[] = [];
     if (this.prefetchDirectory && this.gatherSearch) {
-      await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
+      usedDirectory = await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
       if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
     }
     // Search rounds, one final answer, and one correction of a rejected plan.
@@ -361,18 +388,28 @@ export class AIPlanner {
           conversation.push({ role: 'user', content: 'The search limit was reached, so no more searches are allowed. Answer now with a plan, or ask the user for what is still missing.' });
         } else {
           searchRounds++;
-          conversation.push({ role: 'user', content: formatSearchResults(await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input))) });
+          const outcomes = await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input));
+          successfulReads.push(...outcomes.filter(outcome => outcome.result !== undefined && outcome.error === undefined));
+          conversation.push({ role: 'user', content: formatSearchResults(outcomes, { readAnswers: this.readAnswers }) });
         }
         continue;
       }
 
-      const validation = validatePlan(output, activeTools, this.requireGroundedResources ? { grounding: {
+      let answerOutput = false;
+      try { answerOutput = this.readAnswers && JSON.parse(output)?.kind === 'answer'; } catch { /* Normal JSON validation reports this. */ }
+      const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
+        hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : validatePlan(output, activeTools, this.requireGroundedResources ? { grounding: {
         memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts,
       } } : {});
-      if (validation.valid) return validation.parsed;
+      if (validation.valid) {
+        if (validation.parsed.kind === 'answer') return { ...validation.parsed,
+          lookups: successfulReads.map(answerLookup), usedDirectory };
+        return validation.parsed;
+      }
       if (validation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
 
       if (++rejectedPlans > 1) {
+        if (answerOutput) return readOnlyQuestion();
         if (validation.layer === 'grounding' && validation.ungrounded) {
           const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
           return {

@@ -236,6 +236,7 @@ async function bootstrap() {
       requireGroundedResources: env.RUNTIME_MODE === 'live',
       timeZone: env.APP_TIME_ZONE,
       searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
+      readAnswers: env.PLANNER_READ_ANSWERS,
     }).processMessage(input),
     (input: any) => {
       if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');

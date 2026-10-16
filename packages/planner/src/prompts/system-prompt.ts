@@ -7,6 +7,7 @@ export interface PromptOptions {
   search?: boolean;
   /** List tools as compact signatures instead of full JSON schemas. */
   compactTools?: boolean;
+  readAnswers?: boolean;
 }
 
 function searchProtocol(tools: ToolDefinition[]): string {
@@ -51,7 +52,7 @@ export function buildSystemPrompt(tools: ToolDefinition[], dateContext?: DateCon
 }
 ` : '';
 
-  return `You are the AI Workflow Planner for an automation platform. Available connected services: ${serviceNames}.
+  const prompt = `You are the AI Workflow Planner for an automation platform. Available connected services: ${serviceNames}.
 
 Parse the user's intent, consult working memory, and produce one valid JSON PlannerResponse.
 
@@ -69,4 +70,7 @@ ${toolList}
 7. For a previous step's output use { "$ref": "step_id.output.propertyName" }, or { "$template": "See \${step_id.output.url}" }. Declare that step first and list it in \`dependsOn\`.
 8. Never invent resource identifiers. An input marked \`x-resource\` must be the matching Working Memory entity's value (its \`x-resource-field\`, default \`id\`), an identifier the user typed, or a \`$ref\` to an earlier step. If it is unknown, return a clarification asking which resource to use. IDs in examples are placeholders.
 ${options.search ? searchProtocol(tools) : ''}${dateContext ? `\n${buildDateContext(dateContext)}\n` : ''}${crossServiceExample}`;
+  if (!options.readAnswers) return prompt;
+  return prompt.replace(/^0\..*$/m, '0. FIRST decide whether the request includes a write action. For a read-only request, look up data with the read tools, then return {"kind":"answer","text":"…"}, plain text of at most 4000 characters. Do not write lookups or usedDirectory; the server supplies them. Use only data read in this turn, never your own memory. For a write request, plan normally: a plan must contain at least one write step. Consider the whole conversation.')
+    .replace('or answer with a plan, clarification or refusal.', 'or answer with a plan, an answer, clarification or refusal.');
 }

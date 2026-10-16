@@ -43,7 +43,7 @@ export function handleSSEEvent(
   const source = conversationId ?? store.conversationId;
   const pending = source ? store.planningByConversation[source] : undefined;
   if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
-  if (['plan', 'plan_preview', 'clarification', 'refusal', 'error'].includes(event)) store.setIsPlanning(false, source, data.requestId);
+  if (['plan', 'plan_preview', 'clarification', 'refusal', 'answer', 'error'].includes(event)) store.setIsPlanning(false, source, data.requestId);
   if (event === 'agent_state' && data.state === 'planning') {
     store.setIsPlanning(true, source, data.requestId);
     if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
@@ -59,6 +59,14 @@ export function handleSSEEvent(
     ? store.executionSnapshot : null;
 
   switch (event) {
+    case 'answer':
+      if (typeof data.text !== 'string') break;
+      store.setActivePlan(null); store.setPlanStatus('idle'); store.setClarification(null); store.setIsStreaming(false);
+      store.addMessage({ id: `answer_${data.replyToMessageId ?? Date.now()}`, role: 'assistant', content: data.text,
+        metadata: { type: 'answer', lookups: Array.isArray(data.lookups) ? data.lookups : [],
+          usedDirectory: Array.isArray(data.usedDirectory) ? data.usedDirectory : [],
+          replyToMessageId: data.replyToMessageId, requestId: data.requestId } });
+      break;
     case 'agent_state':
       break;
 

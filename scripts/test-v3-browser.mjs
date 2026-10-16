@@ -22,6 +22,7 @@ const scenarios = [
   { name: 'notion_slack', grep: 'approved Notion workflow carries page url to Slack' },
   { name: 'telegram_slack', grep: 'approved Telegram workflow carries messageId to Slack' },
   { name: 'jira_slack', grep: 'approved Jira workflow carries key and url to Slack' },
+  { name: 'answer', grep: 'ANS-01:' },
 ];
 
 for (const scenario of scenarios) {
@@ -31,6 +32,9 @@ for (const scenario of scenarios) {
   const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
   if (['default', 'auth02', 'auth04'].includes(scenario.name)) delete env.SANDBOX_SCENARIO;
   else env.SANDBOX_SCENARIO = scenario.name;
+  // Keep every existing group on the old read-only policy regardless of the invoking shell.
+  env.PLANNER_READ_ANSWERS = scenario.name === 'answer' ? 'on' : 'off';
+  if (scenario.name === 'answer') env.PLANNER_SEARCH_MODE = 'llm';
   if (scenario.name === 'auth02') env.AUTH_SIGNUP_ENABLED = 'true';
   let stopFixture;
   try {

@@ -1,5 +1,5 @@
 // Structure and classes from PROTO-01 ResponsesPage; demo controls are omitted.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 
@@ -23,6 +23,29 @@ export function NoWritesNotice() {
     <svg aria-hidden="true" className="w-4 h-4 text-[#16A34A] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
     <span>Chưa có gì được ghi lên công cụ nào.</span>
   </div>;
+}
+export function AnswerMoment({ message, request, services }: { message: ChatMessage; request: string; services: ServiceInfo[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const lookups = message.metadata?.lookups ?? [];
+  const directory = message.metadata?.usedDirectory ?? [];
+  const serviceName = (id: string) => services.find(service => service.id === id)?.name ?? id;
+  const names = [...new Set([...lookups.map(lookup => lookup.tool.split('.')[0]), ...directory])].map(serviceName);
+  const source = [lookups.length ? `${lookups.length} lần tra cứu` : '', directory.length ? `Danh mục ${directory.map(serviceName).join(', ')}` : ''].filter(Boolean).join(' · ');
+  const safeLink = (link: string) => { try { return new URL(link).protocol === 'https:'; } catch { return false; } };
+  return <ResponseCard request={request} title="Câu trả lời" moment="answer">
+    <p data-answer-text className="text-sm sm:text-base text-[#111827] leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+    <p className="text-xs sm:text-sm text-[#6B7280]">{source}{source ? ' · ' : ''}hãy kiểm lại ở {names.join(', ') || 'dịch vụ đã kết nối'}.</p>
+    {lookups.length > 0 && <div>
+      <button type="button" className={secondary} aria-expanded={expanded} aria-controls="answer-lookups" onClick={() => setExpanded(value => !value)}>Đã tra cứu</button>
+      {expanded && <ul id="answer-lookups" className="mt-3 v3-space-y-3 text-xs sm:text-sm break-words">
+        {lookups.map((lookup, index) => <li key={index} className="border border-[#E7E7E2] rounded-xl p-3">
+          <p className="font-mono">{lookup.tool}</p>{lookup.query !== undefined && <p>{lookup.query}</p>}
+          <p>{lookup.resultCount} kết quả</p>
+          {lookup.links.filter(safeLink).map(link => <p key={link}><a className="text-[#FF5701] underline break-all" href={link} target="_blank" rel="noopener noreferrer">{link}</a></p>)}
+        </li>)}
+      </ul>}
+    </div>}
+  </ResponseCard>;
 }
 function ResponseCard({ request, title, children, moment }: { request: string; title: string; children: ReactNode; moment: string }) {
   return <section id={`moment-${moment}`} data-moment={moment} aria-label="Cockpit" className="v3-space-y-6">
