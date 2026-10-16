@@ -29,6 +29,11 @@ describe('ANS-01 read answers', () => {
     expect(prompt).toContain('"kind":"answer"'); expect(prompt).not.toContain('clarification" IMMEDIATELY');
     expect(prompt).toContain('lookups');
   });
+  it('includes the answer option in the enabled search-results continuation', () => {
+    const results = formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }], { readAnswers: true });
+    expect(results).toContain('</search_results>\nContinue:');
+    expect(results.split('</search_results>')[1]).toContain('or an answer');
+  });
   it('rejects answers with the flag off even when data exists', () => {
     expect(validate(JSON.stringify(answer()), { readAnswers: false, hasReadData: true }).valid).toBe(false);
     expect(validatePlan(JSON.stringify(answer()), SLACK_TOOLS).valid).toBe(false);
@@ -85,6 +90,21 @@ describe('ANS-01 read answers', () => {
     expect(await s.run()).toMatchObject({ kind: 'clarification', reason: 'read_only' });
     expect(s.provider.getCallCount()).toBe(3);
     expect(s.provider.getLastInput()?.conversationHistory.at(-1)?.content).toMatch(/search|look up/i);
+  });
+  it('retries then asks read_only when every enabled prefetch fails without aborting', async () => {
+    const reads: Array<{ tool: string; aborted: boolean }> = [];
+    const s = setup([answer(), answer()], { prefetchDirectory: true,
+      gatherSearch: async ({ tool, signal }: { tool: string; signal: AbortSignal }) => {
+        reads.push({ tool, aborted: signal.aborted });
+        throw new Error('invalid_auth');
+      },
+    });
+    const result = await s.run();
+    expect(reads).toEqual([{ tool: 'slack.search_channels', aborted: false }]);
+    expect(result).toMatchObject({ kind: 'clarification', reason: 'read_only', question: expect.stringMatching(/Bạn muốn.*dữ liệu/) });
+    expect(result).not.toHaveProperty('usedDirectory');
+    expect(s.provider.getCallCount()).toBe(2);
+    expect(s.provider.getLastInput()?.conversationHistory.at(-1)?.content).toMatch(/No successful read data/);
   });
   it('repairs oversized text once without changing lookup evidence', async () => {
     const s = setup([search, answer('x'.repeat(4001)), answer('Ngắn')]);
