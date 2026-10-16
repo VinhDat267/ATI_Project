@@ -78,6 +78,7 @@ Harness `evaluations/live-app/` sửa lần cuối ngày 01/10. `live-app.e2e.ts
   | Jira → Notion → Telegram → Slack | `946c5959…` | 13,9 s | `completed`, 4/4, thực thi 5,1 s | `ATIT-6`; Link của page Notion bằng URL của `ATIT-6`; Telegram `messageId` 8, nhóm trưởng xác nhận đã hiện |
 
   Mỗi lệnh ghi chỉ chạy sau khi nhóm trưởng duyệt đúng mã băm trong chat. Biên nhận trên giao diện có link an toàn ("Xem dòng", "Mở lịch", "Mở trang", "Mở issue"); Telegram không có link.
+- Sửa sau review độc lập: P2 của [review #146](https://github.com/VinhDat267/ATI_Project/pull/146#issuecomment-6218570771). Harness nay lưu kết quả PostgreSQL trước khi kiểm biên nhận trên giao diện, nên không mất bằng chứng thực thi khi biên nhận lỗi. Phép thử ẩn tiêu đề biên nhận: RED trên `f636d98` (thiếu `result.json`), GREEN sau sửa (có `result.json` và ảnh, lượt chạy vẫn fail). Chi tiết ở log.
 - Lỗi phát hiện và task đề xuất: không có lỗi sản phẩm. Ghi nhận:
   - thời gian tới xem trước 7,1–15,0 s là từng lượt đơn lẻ, không phải phép đo W4-04;
   - tin Slack vẫn không đọc lại được bằng tool (giới hạn đã có).

@@ -56,6 +56,21 @@ Mỗi lệnh ghi chỉ chạy sau khi nhóm trưởng trả lời duyệt đúng
 - Typecheck riêng ba file harness: `tsc --noEmit --strict` (module `nodenext`), exit 0.
 - Harness được kiểm bằng chính 7 lượt chạy live ở trên, mỗi lượt exit 0.
 
+## Sửa sau review độc lập (P2)
+
+[Review tại `f636d98`](https://github.com/VinhDat267/ATI_Project/pull/146#issuecomment-6218570771) kết luận **chưa đạt**, 1 P2. Assertion tiêu đề biên nhận chạy trước khi lưu `result.json` và `executed.png`. Nếu executor đã ghi xong mà giao diện không hiện tiêu đề, lượt chạy mất toàn bộ bằng chứng thực thi.
+
+- **Sửa:** sau khi duyệt, harness đọc trạng thái kế hoạch và các bước từ PostgreSQL, rồi lưu `result.json` trong `finally` của vòng chờ. Nhờ vậy cả khi chờ quá hạn, bằng chứng vẫn được lưu. Sau đó mới kiểm biên nhận; link và ảnh được thu kể cả khi kiểm thất bại; `result.json` ghi thêm `receiptHeadingVisible` và `executedScreenshot`. Assertion biên nhận vẫn làm lượt chạy fail.
+- **Phép thử:** dùng cách của reviewer, trên adapter sandbox, PostgreSQL tmpfs riêng và tự duyệt chỉ trong probe (thư mục `.codex/w311-probe/`, ignore). Một init script ẩn `#heading-moment-6` bằng CSS.
+
+  | Lượt | Harness cũ `f636d98` (RED) | Harness đã sửa (GREEN) |
+  |---|---|---|
+  | Bình thường | exit 0, đủ file | exit 0, đủ file |
+  | Ẩn tiêu đề biên nhận | exit 1; chỉ còn `confirm.txt`, `plan.json`, `preview.png`; PostgreSQL `completed` 3/3 `succeeded` | exit 1 vẫn do assertion; có `result.json` (`completed`, 3/3, `receiptHeadingVisible: false`) và `executed.png` |
+  | `LIVE_APP_CANCEL=1` | exit 0, `rejected`, 0 bước | exit 0, `rejected`, 0 bước |
+
+- **Kiểm thêm:** `tsc --noEmit --strict` cho ba file harness, exit 0. Nhánh chờ quá hạn không được thử riêng; `result.json` ở đó được lưu bằng `finally`.
+
 ## Dọn dẹp
 
 - App live đã dừng, PostgreSQL tạm đã xoá, khoá lưu trong đó mất theo. DB dev 15433 không bị đụng.
