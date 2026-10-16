@@ -83,6 +83,9 @@ Mỗi đột biến phải bị ít nhất một test bắt; ghi kết quả và
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN và đột biến:
-- Điều chưa làm hoặc khác với task card:
+- PR: nhánh `codex/feat-gmail-03-ui` (URL bổ sung sau khi mở). Base mới `87b31e3`, mã `c12b5b9` và `b81ac35`; rebase #145 chỉ tài liệu, mã sản phẩm không đổi byte.
+- Kết quả: nhóm Gmail riêng của mọi thành viên, callback một lần và không giành điều hướng sau đổi phiên, xem trước người gửi/Tới/Cc/Bcc/nguồn/cảnh báo, link Đã gửi cho ba lệnh gửi unknown; Privacy/Guide/Landing theo capability, giữ hai cờ off. Bảo toàn connections qua SSE/reload; sửa focus Slack → Gmail, trạng thái chờ cũ và màu đúng của Settings ở dark.
+- RED/GREEN: giao diện cũ 11 fail/1 pass; mất connections 1 fail/6 pass; focus drawer 1 fail/17 pass; bỏ trạng thái chờ cũ 1 fail/17 pass; màu thực tế 1440 dark 1 fail. Sau sửa, 42 test frontend mới và một test sandbox mới đạt trong check. Năm mutation bắt buộc đều bị bắt; bảng và output thật trong log.
+- Gate: `npm run check` exit 0, **1.996 v3 + 173 eval**; typecheck/build/security 7 mẫu/launcher/env đạt. Canonical browser tại commit tính năng exit 0, **110 pass/1 skip, 13 nhóm**; sau sửa màu/tiến trình, nhóm Gmail chạy lại **4/4 exit 0**, có assertion màu và 24 ảnh mới. CI cần xác nhận toàn bộ đúng head; chưa tự merge/review đạt.
+- Bằng chứng: [log](../log/2026-10-16-codex-GMAIL-03-gmail-ui.md); ảnh + comparison.html + manifest SHA256 trong `docs/ai-evidence/GMAIL-LIVE/GMAIL-03-2026-10-16/` (ignore).
+- Điều chưa làm hoặc khác với task card: không Google/model thật; nghiệm thu live/bật cờ thuộc GMAIL-04. Lượt browser tổng đầu gặp FE-07/Notion (đối chứng baseline/current chạy riêng đều đạt); hai lượt check lại gặp test thời gian GMAIL-01 có sẵn. Giữ log lỗi, không đổi assertion/timeout/retry hoặc sửa ngoài phạm vi. Không chạy lại toàn bộ canonical sau sửa màu, chỉ nhóm Gmail; không sửa CURRENT-STATE/ROADMAP.
