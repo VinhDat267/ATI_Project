@@ -218,7 +218,8 @@ Phần này phải nói đúng trên `/privacy` và trong báo cáo.
 
 **Giữ lại trong DB của ATI**
 - Câu trả lời của phần 3 (tin `assistant`).
-- Ảnh chụp bộ nhớ làm việc mỗi lượt (`working_memory`). Với Gmail, chỉ gồm id luồng và địa chỉ người tham gia (mục 4.3).
+- Ảnh chụp bộ nhớ làm việc mỗi lượt (`working_memory`). Với Gmail, phần gửi cho model chỉ gồm id luồng và địa chỉ người tham gia (mục 4.3). Ảnh chụp còn giữ tiêu đề của các luồng đã tra trong khoá `__labels` (tối đa 20 tiêu đề, mỗi tiêu đề 250 ký tự), để lượt sau vẫn làm được nhãn xem trước; `__labels` không được gửi cho model.
+- Nhãn xem trước của kế hoạch (`plans.resource_labels` và metadata của tin kế hoạch): tiêu đề luồng của bước Gmail và nguồn của từng người nhận (`user` khi người dùng gõ địa chỉ, hoặc tiêu đề của luồng có người đó).
 - Tham số và kết quả các bước đã chạy (`execution_steps`): người nhận, tiêu đề, nội dung thư do ATI gửi.
 - Report của phép đo dùng hộp thư giả, không có thư thật.
 

@@ -1,6 +1,6 @@
 # GMAIL-02 · Công cụ Gmail: adapter, chặn người nhận bịa, nội dung thư đưa cho model
 
-**Trạng thái:** chờ, giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026 · **Nhánh gợi ý:** `feat/gmail-02-gmail-tools` · **Phụ thuộc:** GMAIL-01 đã merge; W4-00b đã merge (cùng sửa `validator.ts`) · **Mốc:** trước **21/10/2026**
+**Trạng thái:** xong #143 tại `7c260c1` (16/10/2026), giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026; review độc lập Đạt sau một lượt sửa P2 · **Nhánh gợi ý:** `feat/gmail-02-gmail-tools` · **Phụ thuộc:** GMAIL-01 đã merge; W4-00b đã merge (cùng sửa `validator.ts`) · **Mốc:** trước **21/10/2026**
 **Đặc tả:** mục 3.10, 4.1–4.5 và phần 2 của 6.3. **Quy tắc chung và hợp đồng:** [GMAIL-common](GMAIL-common.md), đọc trước.
 
 ## Mục tiêu
