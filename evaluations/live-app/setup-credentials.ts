@@ -6,6 +6,8 @@
  *
  * Tokens and allowlists come from the environment exactly as in
  * live-execution (readLiveConfig); nothing secret is printed.
+ * LIVE_APP_SKIP_SERVICES (comma-separated ids) leaves services for a person
+ * to enter through the settings page instead.
  */
 import { readLiveConfig } from '../live-execution/harness.js';
 
@@ -36,9 +38,14 @@ async function main() {
 
   const { services, skipped } = readLiveConfig(process.env);
   for (const [service, reason] of Object.entries(skipped)) console.log(`${service}: OFF - ${reason}`);
+  const manual = new Set((process.env.LIVE_APP_SKIP_SERVICES ?? '').split(',').map((id) => id.trim()).filter(Boolean));
 
   let failed = false;
   for (const [service, config] of Object.entries(services)) {
+    if (manual.has(service)) {
+      console.log(`${service}: left for the settings page (LIVE_APP_SKIP_SERVICES)`);
+      continue;
+    }
     const saved = await call(`/api/services/${service}/credentials`, {
       method: 'POST', token,
       body: JSON.stringify({ credentials: config.credentials, allowedScope: config.allowedScope }),
