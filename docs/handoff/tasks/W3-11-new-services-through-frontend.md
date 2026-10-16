@@ -1,6 +1,6 @@
 # W3-11 · Chạy thật năm service mới qua frontend
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w3-11-new-services-frontend` · **Phụ thuộc:** W3-07 (đã xong), tài nguyên thử nghiệm của W3-07 còn dùng được, 9router hoạt động (model chính, hoặc model dự phòng `cx/` của [W4-00](W4-00-llm-fallback-provider.md); ghi model đã dùng); nên xong trước buổi thử W4-03 · **Có phần việc của con người:** duyệt từng plan ghi, tự nhập credentials trên giao diện
+**Trạng thái:** xong #146 tại `2960ab0` (16/10/2026); review độc lập Đạt sau một lượt sửa P2 của harness · **Nhánh gợi ý:** `test/w3-11-new-services-frontend` · **Phụ thuộc:** W3-07 (đã xong), tài nguyên thử nghiệm của W3-07 còn dùng được, 9router hoạt động (model chính, hoặc model dự phòng `cx/` của [W4-00](W4-00-llm-fallback-provider.md); ghi model đã dùng); nên xong trước buổi thử W4-03 · **Có phần việc của con người:** duyệt từng plan ghi, tự nhập credentials trên giao diện
 
 ## Vấn đề
 
@@ -63,7 +63,7 @@ Harness `evaluations/live-app/` sửa lần cuối ngày 01/10. `live-app.e2e.ts
 
 ## Kết quả (agent thi công điền)
 
-- PR: [#146](https://github.com/VinhDat267/ATI_Project/pull/146), nhánh `test/w3-11-new-services-frontend`, base `e03a9c8`. Nhóm trưởng giao reviewer thi công và ngồi duyệt cùng ngày 16/10/2026. [Log](../log/2026-10-16-reviewer-W3-11-new-services-frontend.md).
+- PR: [#146](https://github.com/VinhDat267/ATI_Project/pull/146), nhánh `test/w3-11-new-services-frontend`, base `96f9f09` (sau merge #142; sửa sau merge, trước đó ghi nhầm `e03a9c8`). Nhóm trưởng giao reviewer thi công và ngồi duyệt cùng ngày 16/10/2026. [Log](../log/2026-10-16-reviewer-W3-11-new-services-frontend.md).
 - Bằng chứng (đường dẫn ở máy): `docs/ai-evidence/V3-LIVE-EXECUTION/W3-11-2026-10-16/` (ignore, không commit). Mỗi lượt có `plan.json` (hash, nhãn tài nguyên, thời gian tới xem trước), `confirm.txt`, `result.json` (bước, output, link biên nhận), `readback.json` và ảnh xem trước/biên nhận đã che menu người dùng.
 - Kết quả từng service và workflow. App live dùng `ag/gemini-3.8-flash` qua 9router và PostgreSQL tạm riêng. 7 dịch vụ lưu khoá bằng `setup-credentials.ts`; Google Sheets do nhóm trưởng nhập ở `/settings` với private key nhiều dòng thật. Cả 8 dịch vụ "Kiểm tra kết nối" `healthy`.
 
