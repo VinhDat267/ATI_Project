@@ -28,7 +28,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Giới hạn kích thước kết quả đọc (Sheets, Notion, Calendar, giới hạn chung trong planner), test 403 Calendar, phân loại lỗi token Google (từ audit W3 03/10) | [W3-08](tasks/W3-08-bounded-read-results.md) | xong: #39 và bản sửa #45 tại `81225de`; hai P2 đã sửa, review độc lập đạt, CI955+165/browser20 xanh; xem [bằng chứng](log/2026-10-03-codex-W3-08-review-fixes.md) |
 | 3 | Jira: tìm kiếm với dấu gạch ngang, báo đúng lỗi token khi đọc (phát hiện khi chạy thật W3-07) | [W3-09](tasks/W3-09-jira-live-findings.md) | xong, #63 tại `f284b12`; review độc lập đạt, CI head971c3b2 xanh; token giả AUTH_ERROR và W3-07 → ATIT-4 đã kiểm thật chỉ đọc sau merge |
 | 3 | Yêu cầu chỉ đọc hỏi lại ngay (không tra cứu, plan phải có bước ghi); đo thời gian từng lời gọi model; giảm p95 services (31,1 s) về dưới 15 s; đo lại golden một lần thay cho các lần còn nợ (phân tích W3-06 ngày 05/10) | [W3-10](tasks/W3-10-read-only-and-latency.md) | xong, #102 tại `d40d735` (09/10); read_only 18/18, golden core 150/150, freeform 52/54, services 129/132; **p95 services 20,1 s chưa đạt mục tiêu 15 s**, cần task latency riêng |
-| 3 | Chạy thật năm service mới qua frontend (bước 2 của W3-07 chưa làm), cập nhật harness `live-app` theo giao diện sau AUTH/FE | [W3-11](tasks/W3-11-new-services-through-frontend.md) | chờ; có phần việc của con người; nên xong trước buổi thử W4-03 |
+| 3 | Chạy thật năm service mới qua frontend (bước 2 của W3-07 chưa làm), cập nhật harness `live-app` theo giao diện sau AUTH/FE | [W3-11](tasks/W3-11-new-services-through-frontend.md) | **xong** #146 (`2960ab0`, 16/10); 5 service mới và workflow Jira → Notion → Telegram → Slack chạy thật qua giao diện, mỗi lệnh ghi duyệt đúng mã băm; review độc lập Đạt sau một lượt sửa P2 của harness |
 | 3–4 (02–24/10) | Tài khoản: phiên đăng nhập lưu ở server, đăng xuất thu hồi token, trạng thái và vai trò tài khoản | [AUTH-01](tasks/AUTH-01-sessions-logout-roles.md) | xong, #41 tại `fbd993f`; review độc lập đạt, CI xanh |
 | 3–4 | Gửi email qua Gmail SMTP, đăng ký, xác minh email, quên mật khẩu | [AUTH-02](tasks/AUTH-02-signup-email-password-reset.md) | xong, #52 tại `e578520`; P2 thời gian phản hồi → AUTH-02b |
 | 3–4 | Trang quản trị người dùng: duyệt, khóa, phân quyền | [AUTH-03](tasks/AUTH-03-admin-user-management.md) | xong, #53 tại `46cc6e6` |
@@ -103,6 +103,13 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - chữ trên nút cam giữ **màu trắng** (3,2:1, ngoại lệ có chủ đích, đặc tả mục 3.2);
 - chữ thường dùng Be Vietnam Pro, tiêu đề dùng Playfair Display;
 - cỡ chữ tối thiểu 14px áp dụng khi làm app, không sửa bản mẫu.
+
+**Cập nhật 16/10 (W3-11):** W3-11 xong qua #146 (`2960ab0`), trước buổi thử W4-03. Năm service mới và một workflow 4 dịch vụ chạy thật qua giao diện ở chế độ live; không phát hiện lỗi sản phẩm. Việc tiếp theo:
+- khung W4-03 (`PROTOCOL.md`, script tính tỉ lệ) phải vào `main` trước buổi thử 23–25/10;
+- nhóm trưởng hẹn người tham gia W4-03 và người viết câu hỏi W4-01;
+- `longnguyen005` làm GMAIL-03.
+
+[Log merge](log/2026-10-16-reviewer-merge-146.md).
 
 **Cập nhật 16/10 (ANS-01):** ANS-01 xong qua #142 (`96f9f09`), cờ `PLANNER_READ_ANSWERS` vẫn tắt mặc định. Review độc lập Đạt sau một lượt sửa thiếu test và rebase lên `main` có #143; trên bản tích hợp, 22/22 đột biến bị bắt, gồm 5 đột biến vào bảo đảm của GMAIL-02. Bước 1 của GMAIL-04 (Google Cloud project cho Gmail) xong cùng ngày. Việc tiếp theo:
 - `longnguyen005` làm GMAIL-03 (trước 23/10);

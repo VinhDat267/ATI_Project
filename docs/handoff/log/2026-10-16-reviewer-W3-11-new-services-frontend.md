@@ -1,6 +1,6 @@
 # 16/10/2026 · W3-11 · Chạy thật năm service mới qua giao diện
 
-**Người viết:** reviewer (nhóm trưởng giao thi công, ngồi duyệt cùng) · **Nhánh:** `test/w3-11-new-services-frontend`, base `e03a9c8` · Task: [W3-11](../tasks/W3-11-new-services-through-frontend.md).
+**Người viết:** reviewer (nhóm trưởng giao thi công, ngồi duyệt cùng) · **Nhánh:** `test/w3-11-new-services-frontend`, base `96f9f09` (sửa sau merge, trước đó ghi nhầm `e03a9c8`; app live chạy trên mã đã có ANS-01, cờ `PLANNER_READ_ANSWERS` tắt) · Task: [W3-11](../tasks/W3-11-new-services-through-frontend.md).
 
 ## Môi trường
 
