@@ -33,7 +33,7 @@ Hai bộ đánh giá hiện có do cùng một người viết câu hỏi lẫn 
 
 ## Kết quả (agent thi công điền)
 
-- PR: (điền khi mở PR), nhánh `test/w4-01-independent-eval`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-01-independent-eval-framework.md).
+- PR: [#150](https://github.com/VinhDat267/ATI_Project/pull/150), nhánh `test/w4-01-independent-eval`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-01-independent-eval-framework.md).
 - Commit đăng ký label: chưa có (bộ câu còn rỗng).
 - Kết quả: **phần khung xong; chưa có câu nào, chưa chạy model.**
   - `evaluations/golden-independent/GUIDE.md`, tiếng Việt, không cần đọc code:
