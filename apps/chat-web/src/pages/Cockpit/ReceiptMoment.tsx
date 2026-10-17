@@ -23,7 +23,7 @@ function ReceiptCard({step,index,services,planSteps,labels,destination}:CardProp
                       <h3 className="text-sm sm:text-base font-bold text-brand-text line-clamp-2 leading-snug">
                         {resultTitle(step)}
                       </h3>
-                      <p className="text-xs text-brand-muted mt-1">
+                      <p className="text-xs text-brand-muted mt-1 break-words">
                         {destination(planSteps.find(row=>row.id===step.id) ?? {id:step.id,tool:step.tool,description:step.description,args:{}}, labels)}
                       </p>
                     </div>

@@ -37,7 +37,7 @@ export function PlanMoment({runtimeMode,plan,services,destination,onPreview,onAp
                     <h2 className="text-base font-semibold text-brand-text mt-1.5 leading-snug">
                       {step.description}
                     </h2>
-                    <p className="text-xs text-brand-muted mt-1">
+                    <p className="text-xs text-brand-muted mt-1 break-words">
                       Đích đến: {destination(step, plan.resourceLabels)}
                     </p>
                   </div>

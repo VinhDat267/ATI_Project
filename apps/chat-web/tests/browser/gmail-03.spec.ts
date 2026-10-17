@@ -70,8 +70,20 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
+    const destinationLine = page.locator('#plan-cards-container p').filter({ hasText: 'Đích đến:' });
+    await expect(destinationLine).toHaveText('Đích đến: Họp nhóm ATI');
+    // A thread title can be one long unbroken string; give this pending plan one
+    // in the disposable database and check that it wraps instead of widening the page.
+    const longTitle = 'X'.repeat(120);
+    const labelsDb = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      expect((await labelsDb.query("UPDATE plans SET resource_labels = resource_labels || jsonb_build_object('gmail-thread-1', $1::text) WHERE conv_id = $2 AND status = 'pending' AND resource_labels->>'gmail-thread-1' = 'Họp nhóm ATI' RETURNING id", [longTitle, new URL(page.url()).pathname.split('/').pop()])).rowCount).toBe(1);
+    } finally { await labelsDb.end(); }
     await page.reload();
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
+    await expect(destinationLine).toHaveText(`Đích đến: ${longTitle}`);
+    expect(await destinationLine.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: 'Xem trước', exact: true }).click();
     const preview = page.getByRole('dialog', { name: 'Xem trước nội dung' });
     await expect(preview).toContainText('lan@example.com'); await expect(preview).toContainText("lấy từ luồng thư 'Họp nhóm ATI'");
@@ -82,6 +94,10 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Đóng xem trước', exact: true }).click();
     await page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }).click();
     await expect(page.locator('#moment-6')).toBeVisible();
+    const receiptDestination = page.locator('#moment-6 p').filter({ hasText: longTitle });
+    await expect(receiptDestination).toHaveText(longTitle);
+    expect(await receiptDestination.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.goto('/settings#gmail'); await page.getByRole('button', { name: 'Ngắt kết nối', exact: true }).click();
     await page.getByRole('button', { name: 'Xác nhận ngắt kết nối', exact: true }).click();
     await expect(row).toContainText('Chưa kết nối');
