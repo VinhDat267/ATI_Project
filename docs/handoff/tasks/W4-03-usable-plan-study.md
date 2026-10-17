@@ -1,6 +1,6 @@
 # W4-03 · Đo tỉ lệ plan dùng được với người dùng thật
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-03-usable-plan-study` · **Phụ thuộc:** buổi thử nên chạy sau FE-01 và FE-03 (plan hiện tên tài nguyên thay vì ID; không còn trạng thái dịch vụ giả) · **Có phần việc của con người**
+**Trạng thái:** khung xong #149 (`fb38a4d`, 17/10); chờ buổi thử 23–25/10 · **Nhánh gợi ý:** `test/w4-03-usable-plan-study` · **Phụ thuộc:** buổi thử nên chạy sau FE-01 và FE-03 (plan hiện tên tài nguyên thay vì ID; không còn trạng thái dịch vụ giả) · **Có phần việc của con người**
 
 ## Vấn đề
 

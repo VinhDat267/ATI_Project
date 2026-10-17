@@ -1,6 +1,6 @@
 # W4-04 · Đo latency qua frontend với số mẫu đủ lớn
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-04-frontend-latency` · **Phụ thuộc:** không
+**Trạng thái:** công cụ xong #151 (`ce59f4f`, 17/10); chờ phép đo live sau 20/10 · **Nhánh gợi ý:** `test/w4-04-frontend-latency` · **Phụ thuộc:** không
 
 ## Vấn đề
 

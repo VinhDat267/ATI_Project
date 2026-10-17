@@ -1,6 +1,6 @@
 # W4-01 · Bộ đánh giá độc lập do thành viên khác viết
 
-**Trạng thái:** chờ · **Nhánh gợi ý:** `test/w4-01-independent-eval` · **Phụ thuộc:** khung làm ngay được; câu hỏi nên viết sau mốc chốt catalog (20/10) để có cả các service mới · **Có phần việc của con người**
+**Trạng thái:** khung xong #150 (`98d880b`, 17/10); chờ câu của thành viên từ 22/10 · **Nhánh gợi ý:** `test/w4-01-independent-eval` · **Phụ thuộc:** khung làm ngay được; câu hỏi nên viết sau mốc chốt catalog (20/10) để có cả các service mới · **Có phần việc của con người**
 
 ## Vấn đề
 
