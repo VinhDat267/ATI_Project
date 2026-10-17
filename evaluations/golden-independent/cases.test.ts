@@ -26,6 +26,10 @@ function completeSet(): GoldenCase[] {
 const single = () => ({ ...example('vd-1'), id: 'm2-01', author: 'member-2', prompt: 'Thêm dòng "Đăng ký tên miền", "To Do" vào tab Tasks của bảng tính Frontend' }) as GoldenCase;
 const cross = () => ({ ...example('vd-3'), id: 'm2-02', author: 'member-2', prompt: 'File a Jira ticket in Frontend about the broken cart and share its link with the Telegram group frontend' }) as GoldenCase;
 const step = (c: GoldenCase, index = 0) => c.expect.steps![index]!;
+const addLabel = (args: Record<string, unknown>) => ({ ...single(), services: ['github'], prompt: 'Gắn nhãn bug cho issue 42 của repo acme/web',
+  expect: { kind: 'plan', steps: [{ tool: 'github.add_label', args: { repo: { equals: 'acme/web' }, label: { includesAny: ['bug'] }, ...args } }] } }) as GoldenCase;
+const updateCard = (args: Record<string, unknown>) => ({ ...single(), services: ['trello'], prompt: 'Đóng card Lỗi đăng nhập Safari trên Trello',
+  expect: { kind: 'plan', steps: [{ tool: 'trello.update_card', args: { cardId: { equals: 'card_fe_login' }, ...args } }] } }) as GoldenCase;
 
 describe('registration file', () => {
   it('is well formed, and once cases are added the whole set must pass the full check', () => {
@@ -107,6 +111,15 @@ describe('case checks', () => {
     ['an example id', () => ({ ...single(), id: 'vd-9' }), /ví dụ của GUIDE.md/],
     ['an id with capitals or accents', () => ({ ...single(), id: 'Câu 1' }), /"id" chỉ gồm/],
     ['an extra write tool that is a read tool', () => { const c = single(); c.expect.allowExtraTools = ['slack.search_channels']; return c; }, /không phải tool ghi/],
+    // Conditions a correct, schema-valid plan can never meet; the scorer would fail the case on every run.
+    ['equals true on a list argument', () => { const c = single(); step(c).args!.rows = { equals: true }; return c; }, /rows: "equals" là true\/false, nhưng tham số này nhận danh sách/],
+    ['a text ID for a number argument', () => addLabel({ issueNumber: { equals: '42' } }), /issueNumber: "equals" là chữ, nhưng tham số này nhận số/],
+    ['startsWith on a number argument', () => addLabel({ issueNumber: { startsWith: '4' } }), /issueNumber: "startsWith" chỉ dùng cho tham số chữ/],
+    ['minItems on a text argument', () => { const c = cross(); step(c).args!.summary = { minItems: 1 }; return c; }, /summary: "minItems" chỉ dùng cho tham số danh sách/],
+    ['includesAny on a true/false argument', () => updateCard({ closed: { includesAny: ['đóng'] } }), /closed: "includesAny" chỉ dùng cho tham số chữ hoặc danh sách/],
+    ['contains a text item in a list of rows', () => { const c = single(); step(c).args!.rows = { contains: 'Doing' }; return c; }, /rows: "contains" là chữ, nhưng mỗi phần tử của tham số này là danh sách/],
+    ['a wrong type nested in anyOf', () => { const c = single(); step(c).args!.rows = { anyOf: [{ minItems: 1 }, { equals: 'Doing' }] }; return c; }, /rows\.anyOf\[1\]: "equals" là chữ/],
+    ['an empty services list on a plan', () => ({ ...single(), services: [] }), /"services" phải liệt kê/],
   ])('rejects %s', (_label, build, message) => {
     const problems = caseProblems(build(), none);
     expect(problems.some((problem) => message.test(problem)), problems.join('\n')).toBe(true);
@@ -117,6 +130,16 @@ describe('case checks', () => {
     expect(caseProblems({ ...single(), prompt: `  ${earlier.toUpperCase()}` }, reserved)).toContainEqual(expect.stringMatching(/trùng một câu của bộ cũ/));
     expect(caseProblems({ ...single(), prompt: example('vd-1').prompt }, reserved)).toContainEqual(expect.stringMatching(/ví dụ trong GUIDE.md/));
     expect(caseProblems(single(), reserved)).toEqual([]);
+  });
+  it('accepts conditions that fit the argument type', () => {
+    expect(caseProblems(addLabel({ issueNumber: { equals: 42 } }), none)).toEqual([]);
+    expect(caseProblems(updateCard({ closed: { equals: true }, title: { anyOf: [{ includesAny: ['safari'] }, { refTo: 'trello.update_card' }] } }), none)).toEqual([]);
+  });
+  it('accepts an empty services list for a refusal or clarification that names no supported service', () => {
+    const refusal = { ...example('vd-5'), id: 'm2-09', author: 'member-2', services: [], prompt: 'Gửi email cho cả nhóm báo lịch nghỉ lễ sắp tới' } as GoldenCase;
+    expect(caseProblems(refusal, none)).toEqual([]);
+    expect(caseProblems({ ...refusal, category: 'clarification', expect: { kind: 'clarification' } }, none)).toEqual([]);
+    expect(caseProblems({ ...refusal, services: undefined }, none)).toContainEqual(expect.stringMatching(/"services"/));
   });
   it('accepts an ID the user typed even when the workspace does not have it', () => {
     const c = single();

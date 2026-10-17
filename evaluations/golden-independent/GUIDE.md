@@ -121,7 +121,7 @@ Không có tool xoá board, xoá repo, xoá bảng tính, xoá sự kiện, mờ
 }
 ```
 
-Tên dịch vụ trong `services`: `trello`, `slack`, `github`, `sheets`, `calendar`, `notion`, `telegram`, `jira`. Câu hỏi lại hoặc từ chối cũng ghi `services`, ví dụ câu nhờ gửi email báo Slack thì ghi `["slack"]`.
+Tên dịch vụ trong `services`: `trello`, `slack`, `github`, `sheets`, `calendar`, `notion`, `telegram`, `jira`. Câu hỏi lại hoặc từ chối cũng ghi `services`, ví dụ câu nhờ gửi email báo Slack thì ghi `["slack"]`. Câu hỏi lại hoặc từ chối không nhắc dịch vụ nào trong danh sách, ví dụ chỉ nhờ gửi email, thì ghi `[]`. Câu có kế hoạch luôn cần ít nhất một dịch vụ.
 
 ### `expect`
 
@@ -149,6 +149,12 @@ Máy chấm không quan tâm thứ tự các bước. Tham số không ghi đi�
 | `anyOf` | đạt khi **một** trong các điều kiện con đạt | `{ "anyOf": [ { "equals": "card_fe_login" }, { "refTo": "trello.update_card" } ] }` |
 
 Một điều kiện có nhiều khoá thì phải đạt tất cả, ví dụ `{ "minItems": 1, "includesAll": ["Fix footer"] }`.
+
+Điều kiện phải hợp với kiểu của tham số, nếu không thì không kế hoạch nào đạt được. Công cụ kiểm tra báo lỗi khi:
+- `equals` khác kiểu: `issueNumber` là số nên ghi `42`, không ghi `"42"`; `closed` là `true`/`false`;
+- `startsWith`, `endsWith`, `instantEquals` đặt cho tham số không phải chữ;
+- `includesAny`, `includesAll` đặt cho tham số không phải chữ hay danh sách;
+- `contains`, `minItems` đặt cho tham số không phải danh sách, hoặc `contains` khác kiểu phần tử. Ví dụ `rows` là danh sách các dòng, nên kiểm nội dung dòng bằng `includesAll`, không bằng `contains`.
 
 Gợi ý:
 - ID ghi bằng `equals`; chữ do người dùng đặt (tiêu đề, nội dung) ghi bằng `includesAny`/`includesAll` với vài từ chính, không ghi cả câu.

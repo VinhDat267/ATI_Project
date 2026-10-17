@@ -45,6 +45,41 @@ export function guideExamples(markdown: string): GoldenCase[] {
     .filter((value): value is GoldenCase => !!value && typeof value === 'object' && String((value as GoldenCase).id ?? '').startsWith('vd-'));
 }
 
+/** JSON Schema types an argument accepts, with integer folded into number; null when the schema does not say. */
+function schemaTypes(schema: unknown): Set<string> | null {
+  if (!schema || typeof schema !== 'object') return null;
+  const { type, anyOf, oneOf } = schema as { type?: unknown; anyOf?: unknown; oneOf?: unknown };
+  const listed = Array.isArray(type) ? type : typeof type === 'string' ? [type] : null;
+  if (listed) return new Set(listed.map((t) => (t === 'integer' ? 'number' : String(t))));
+  const alternatives = Array.isArray(anyOf) ? anyOf : Array.isArray(oneOf) ? oneOf : null;
+  if (!alternatives) return null;
+  const sets = alternatives.map(schemaTypes);
+  return sets.every((set) => set) ? new Set(sets.flatMap((set) => [...set!])) : null;
+}
+const TYPE_NAMES: Record<string, string> = { string: 'chữ', number: 'số', boolean: 'true/false', array: 'danh sách', object: 'object' };
+const typeName = (types: Set<string>) => [...types].map((t) => TYPE_NAMES[t] ?? t).join(' hoặc ');
+const valueType = (value: unknown) => (typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : 'string');
+
+/** Conditions that no schema-valid argument can meet, given how scorer.ts compares them. */
+function typeProblems(where: string, m: Matcher, property: Record<string, any>): string[] {
+  const types = schemaTypes(property);
+  if (!types) return [];
+  const problems: string[] = [];
+  const accepts = (...wanted: string[]) => wanted.some((t) => types.has(t));
+  if ('equals' in m && ['string', 'number', 'boolean'].includes(typeof m.equals) && !accepts(valueType(m.equals)))
+    problems.push(`${where}: "equals" là ${TYPE_NAMES[valueType(m.equals)]}, nhưng tham số này nhận ${typeName(types)}`);
+  for (const key of ['startsWith', 'endsWith', 'instantEquals'] as const)
+    if (key in m && !accepts('string')) problems.push(`${where}: "${key}" chỉ dùng cho tham số chữ; tham số này nhận ${typeName(types)}`);
+  for (const key of ['includesAny', 'includesAll'] as const)
+    if (key in m && !accepts('string', 'array')) problems.push(`${where}: "${key}" chỉ dùng cho tham số chữ hoặc danh sách; tham số này nhận ${typeName(types)}`);
+  for (const key of ['contains', 'minItems'] as const)
+    if (key in m && !accepts('array')) problems.push(`${where}: "${key}" chỉ dùng cho tham số danh sách; tham số này nhận ${typeName(types)}`);
+  const items = schemaTypes(property.items);
+  if ('contains' in m && accepts('array') && items && ['string', 'number'].includes(typeof m.contains) && !items.has(valueType(m.contains)))
+    problems.push(`${where}: "contains" là ${TYPE_NAMES[valueType(m.contains)]}, nhưng mỗi phần tử của tham số này là ${typeName(items)}`);
+  return problems;
+}
+
 function matcherProblems(where: string, matcher: unknown, property: Record<string, any>, prompt: string, alternative: StepSpec[]): string[] {
   if (!matcher || typeof matcher !== 'object' || Array.isArray(matcher)) return [`${where}: điều kiện phải là một object, ví dụ { "equals": "..." }`];
   const m = matcher as Matcher & Record<string, unknown>;
@@ -72,6 +107,7 @@ function matcherProblems(where: string, matcher: unknown, property: Record<strin
     if (!Array.isArray(m.anyOf) || !m.anyOf.length) problems.push(`${where}: "anyOf" phải là danh sách điều kiện không rỗng`);
     else m.anyOf.forEach((nested, index) => problems.push(...matcherProblems(`${where}.anyOf[${index}]`, nested, property, prompt, alternative)));
   }
+  problems.push(...typeProblems(where, m, property));
   const resource = property['x-resource'] as string | undefined;
   for (const key of ['equals', 'contains'] as const) {
     if (!resource || !(key in m)) continue;
@@ -99,7 +135,10 @@ export function caseProblems(c: GoldenCase, reserved: Set<string> = new Set()): 
   if (prompt.trim().length < 10) problems.push(at(': "prompt" phải là câu chat đầy đủ (ít nhất 10 ký tự)'));
   else if (reserved.has(normalize(prompt))) problems.push(at(': "prompt" trùng một câu của bộ cũ hoặc của ví dụ trong GUIDE.md'));
   const caseServices = Array.isArray(c.services) ? c.services : [];
-  if (!caseServices.length) problems.push(at(': "services" phải liệt kê các dịch vụ câu chat nhắc tới, ví dụ ["trello", "slack"]'));
+  // A refusal or clarification may name no supported service at all, e.g. a request to send an email.
+  const mayNameNone = (c.category === 'refusal' || c.category === 'clarification') && Array.isArray(c.services);
+  if (!caseServices.length && !mayNameNone)
+    problems.push(at(': "services" phải liệt kê các dịch vụ câu chat nhắc tới, ví dụ ["trello", "slack"]; chỉ câu hỏi lại hoặc từ chối không nhắc dịch vụ nào mới ghi []'));
   for (const service of caseServices) if (!services.has(service)) problems.push(at(`: không có dịch vụ "${service}"`));
   if (new Set(caseServices).size !== caseServices.length) problems.push(at(': "services" có dịch vụ lặp lại'));
 
