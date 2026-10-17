@@ -614,6 +614,44 @@ different served model. These Codex results
 are separate from the Gemini campaigns and do not close W3-10, W3-11 or the
 week-four user-study gates.
 
+## W4-03: usable-plan study
+
+`usable-plan/` measures the spec's "usable plan rate ≥ 70%" with real
+participants. The definition of a usable turn, the ten scenarios and the
+facilitator's steps are in [`usable-plan/PROTOCOL.md`](usable-plan/PROTOCOL.md).
+That definition is fixed before the first session.
+
+- **Mode:** the session runs in live mode with `ag/gemini-3.8-flash` (sandbox
+  always returns the same canned plan), with `GMAIL_ENABLED=off` and
+  `PLANNER_READ_ANSWERS=off`.
+- **No writes:** nothing is written to the services. The participant says
+  whether they would approve the plan; the facilitator records that answer and
+  "would the result match what you meant", then cancels the plan.
+- **Limitation:** this measures approval of the plan as previewed, not
+  executed results.
+
+The facilitator fills a sheet (`usable-plan/sheet-template.csv`) with one row
+per turn: participant code, turn number, conversation ID, decision and the
+intent answer. The report joins the sheet with PostgreSQL inside a `READ ONLY`
+transaction. Each plan after a conversation's first plan counts as one "Sửa
+qua Chat" edit. Clarifying questions create no plan, so they are not counted
+as edits.
+
+```bash
+node --env-file=.env --import tsx evaluations/usable-plan/report.ts --sheet docs/ai-evidence/USABLE-PLAN/<date>/sheet.csv --out docs/ai-evidence/USABLE-PLAN/<date>/
+```
+
+The command writes `turns.csv` (per-turn plans, edits, clarifications,
+refusals, time to the first plan, final plan status, verdict and reason) and
+`summary.md` (rate, Wilson 95% interval, reasons for unusable turns). It never
+reads chat text. Exit codes:
+- 2: fewer than 20 turns or 5 participants;
+- 1: a malformed sheet or a database error.
+
+Sheets and outputs stay in the ignored `docs/ai-evidence/USABLE-PLAN/`; only
+the summary goes here after the session. **Not measured yet**: no session has
+run.
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline

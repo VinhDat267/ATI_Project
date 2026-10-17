@@ -73,6 +73,9 @@ docs/ai-evidence/AUTH-LIVE/
 # Real Gmail acceptance evidence contains private addresses and mail content (GMAIL-04)
 docs/ai-evidence/GMAIL-LIVE/
 
+# Usable-plan study sheets and outputs stay on the facilitator machine (W4-03)
+docs/ai-evidence/USABLE-PLAN/
+
 # Course reports stay on the team lead machine only (CURRENT-STATE section 1 and 7)
 docs/reports/
 
