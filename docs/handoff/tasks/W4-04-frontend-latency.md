@@ -25,7 +25,7 @@ Thời gian từ lúc gửi câu chat tới khi plan preview hiện ra mới đ�
 
 ## Kết quả (agent thi công điền)
 
-- PR: (điền khi mở PR), nhánh `test/w4-04-frontend-latency`, base `ab54c77`. Nhóm trưởng giao reviewer làm ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-04-batch-latency.md).
+- PR: [#151](https://github.com/VinhDat267/ATI_Project/pull/151), nhánh `test/w4-04-frontend-latency`, base `ab54c77`. Nhóm trưởng giao reviewer làm ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-04-batch-latency.md).
 - Bằng chứng: phép đo live chưa chạy. Khi chạy, bằng chứng nằm trong `docs/ai-evidence/V3-LIVE-EXECUTION/W4-04-<ngày>/` (ignore, không commit): `batch.json` và `summary.md`.
 - Kết quả: **phần công cụ xong; phép đo live chưa chạy.**
   - `evaluations/live-app/batch.ts`: mỗi câu một hội thoại mới.
