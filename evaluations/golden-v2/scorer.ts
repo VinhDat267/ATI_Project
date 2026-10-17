@@ -30,6 +30,8 @@ export interface GoldenCase {
   category: Category;
   language: 'vi' | 'en';
   prompt: string;
+  /** Role code of the writer (W4-01 independent set), e.g. "member-2"; never a name. */
+  author?: string;
   /** Service-set attribution, preregistered rather than inferred from a model answer. */
   primaryService?: string;
   services?: string[];

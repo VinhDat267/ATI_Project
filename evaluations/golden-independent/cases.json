@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "description": "W4-01 independent golden set, written by members who did not write the planner prompt. Format and rules: GUIDE.md. Relative dates use the clock below; resources come from evaluations/golden-v2/fixtures.ts. Commit the full set before any model run.",
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "cases": []
+}
