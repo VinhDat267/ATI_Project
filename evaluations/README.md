@@ -326,6 +326,47 @@ each report names the labels' commit and SHA-256 it was scored against.
 Re-scoring all 17 stored cs11 plans with the revised label changes only the two
 plans above, from fail to pass.
 
+### W4-01: independent set
+
+`golden-independent/cases.json` will hold at least 30 cases written by members
+who did not write the planner prompt. Every case records the writer's role code
+in `author` (for example `member-2`), never a name. The writers' guide,
+[`golden-independent/GUIDE.md`](golden-independent/GUIDE.md), is in Vietnamese
+and needs no code reading. It covers:
+- the five groups;
+- the fixture workspace from `golden-v2/fixtures.ts`;
+- the fourteen write tools;
+- the matchers;
+- worked examples;
+- rules: no reading the planner prompt or the earlier sets, and no model runs
+  before submitting.
+
+The set uses the same fixtures, scorer and clock as the services set (Tuesday
+2026-09-29 10:00, Asia/Ho_Chi_Minh).
+
+`golden-independent/validate.ts` checks format only and names each problem in
+Vietnamese. It checks that:
+- labels use real tools, write-tool steps, schema arguments and known matchers;
+- resource IDs exist in the fixtures or are typed in the prompt;
+- `refTo` targets are in the same alternative;
+- the listed services cover every labelled step, and each group's shape holds;
+- no prompt repeats the earlier sets or the guide's examples.
+
+Without `--partial` it also requires at least 30 cases, four per group and five
+per language. A writer checks their own file with:
+
+```bash
+node --import tsx evaluations/golden-independent/validate.ts member-2.json --partial
+```
+
+`EVAL_SET=independent` runs the set through `golden-v2/run.ts`. The runner
+refuses to start until the committed set passes the full check, and the
+preregistration check also covers `evaluations/golden-independent`. Commit the
+set before the first model run. Run it three times each with
+`EVAL_SEARCH_MODE=llm` and `regex`.
+
+**Not measured yet**: the set is empty until members submit their cases.
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against
@@ -379,25 +420,61 @@ hashes and IDs are in `docs/handoff/tasks/W3-07-new-services-live.md`.
 live mode, PostgreSQL, the real model and the real services.
 
 1. Start the server with `RUNTIME_MODE=live npm run up`. It needs `JWT_SECRET`,
-   `ENCRYPTION_KEY`, a provisioned `CHAT_ADMIN_*` user and that user's id in
-   `SERVICE_ADMIN_USER_IDS`. In live mode the API listens on `0.0.0.0`.
+   `ENCRYPTION_KEY` and a provisioned `CHAT_ADMIN_*` user (`npm run
+   db:migrate:v3`, then `npm run admin:provision:v3`); the provisioned user has
+   the admin role, which may configure services. In live mode the API listens
+   on `0.0.0.0`. To run against a separate database, set `DATABASE_URL` in the
+   shell: with `--env-file`, a variable already set in the environment wins
+   over `.env`.
 2. Store the service tokens and allowlists through the server's configuration
-   API (run this yourself; it prints service names and status only):
+   API. It prints service names, allowlists and connection status only:
 
    ```bash
    node --env-file=.env --import tsx evaluations/live-app/setup-credentials.ts
    ```
 
-3. Run the browser scenario. It sends `LIVE_APP_PROMPT`, stops at the preview
-   and saves `plan.json` with the plan's hash. It clicks "Duyệt kế hoạch" only
-   after that hash is written to `confirm.txt` in the run directory; otherwise
-   it cancels the plan.
+   `LIVE_APP_SKIP_SERVICES=sheets` (comma-separated ids) leaves those services
+   for a person to enter on the settings page (`/settings`), for example to
+   check the multi-line private key field with a real key.
+3. Run the browser scenario. It signs in at `/login`, sends `LIVE_APP_PROMPT`,
+   stops at the preview and saves `plan.json` with the plan's hash, the
+   resource labels and the time to the preview. It clicks "Duyệt kế hoạch"
+   only after that hash is written to `confirm.txt` in the run directory;
+   otherwise it cancels the plan. `LIVE_APP_CANCEL=1` cancels right after the
+   preview and checks that the plan is `rejected` with no execution steps.
+   After approval it waits for the plan to finish, saves the steps and the
+   receipt links in `result.json`, and screenshots with the user menu masked.
 
    ```bash
-   LIVE_APP=1 LIVE_APP_PROMPT="<request>" node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/playwright.config.ts
+   LIVE_APP=1 LIVE_APP_PROMPT="<request>" LIVE_APP_RUN_DIR=<dir> node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/playwright.config.ts
    ```
 
-One run so far (2026-09-30): a three-service request reached the preview in
+#### W3-11 runs (16/10/2026)
+
+The five services added in week 3 ran through the web UI in live mode with
+`ag/gemini-3.8-flash`, on a separate temporary PostgreSQL. Seven services were
+stored with `setup-credentials.ts`; Google Sheets was entered on the settings
+page with the real multi-line private key, and all eight connection checks
+were healthy. Every write followed a plan whose hash the project owner
+approved, and each result was checked in the UI receipt, in PostgreSQL and by
+the service's own read tool:
+
+| Run | Services | Time to preview | Result | Read back |
+|---|---|---|---|---|
+| Cancel | Trello, Slack | 9.7 s | `rejected`, 0 execution steps | — |
+| Sheets | Sheets, Slack | 12.3 s | `completed`, 2/2 | `sheets.read_range`: new row 3 of Tasks |
+| Calendar | Calendar, Slack | 15.0 s | `completed`, 2/2 | `calendar.list_events`: event on 17/10 15:00–15:30 |
+| Notion | Notion, Slack | 12.8 s | `completed`, 2/2 | `notion.query_database`: page with Trạng thái "Mới" |
+| Telegram | Telegram, Slack | 12.1 s | `completed`, 2/2 | no read tool; owner checked the group |
+| Jira | Jira, Slack | 7.1 s | `completed`, 2/2 | `jira.search_issues`: `ATIT-5` |
+| Workflow | Jira → Notion → Telegram → Slack | 13.9 s | `completed`, 4/4 | `ATIT-6`; the Notion page's Link equals the issue URL |
+
+Previews showed resource names instead of IDs (for example "Cần làm (board To
+Do)", "ATI Test Notes"). Slack messages are still not read back, as no Slack
+read tool returns messages. Times to the preview are single runs, not the W4-04
+measurement.
+
+Earlier run (2026-09-30): a three-service request reached the preview in
 17.3 s, above the 15 s target, and after approval created a GitHub issue, a
 Trello card linking it and a Slack message; plan and steps ended `completed` /
 `succeeded` in PostgreSQL, and the issue and card were read back from the
@@ -407,6 +484,56 @@ read the text that would be sent, and that a sent message stayed marked
 "Đang gửi…"; both were fixed afterwards and confirmed in a second live run
 that stopped at the preview and cancelled (8.6 s to the preview, nothing
 executed).
+
+#### W4-04: batch latency
+
+`live-app/latency.e2e.ts` (config `live-app/latency.config.ts`) sends every
+prompt of `LIVE_APP_PROMPTS_FILE` through the web UI, each in a new
+conversation. The default file is `live-app/latency-prompts.json`: 24 prompts,
+six each over one, two, three and four or more services, adapted from the
+free-form and services sets to the test resources. For each turn it records:
+- the time from clicking send to the first visible response: plan preview,
+  clarification, refusal, answer or planning error (the cockpit's
+  `data-moment`);
+- from PostgreSQL, the server's part: user message saved → working memory
+  saved (the planner: model calls, directory listing, searches and
+  validation) → response saved;
+- the rest (request to the API, SSE delivery, rendering) as the difference.
+
+It presses "Hủy" on every plan. A response that arrives after
+`LIVE_APP_TURN_TIMEOUT_MS` is awaited for up to `LIVE_APP_GRACE_MS`, and its
+plan is cancelled too. It never presses "Duyệt kế hoạch"; a unit test checks
+the source. The run fails when any execution step exists or a plan is left
+open. Model time cannot be separated from the rest of the planner without
+product changes, because chat-api does not record per-call timing.
+
+```bash
+LIVE_APP_LATENCY=1 LIVE_APP_RUN_DIR=<dir> node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/latency.config.ts
+```
+
+Options:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LIVE_APP_PAUSE_MS` | 5000 | pause between prompts |
+| `LIVE_APP_TURN_TIMEOUT_MS` | 120000 | wait for a visible response |
+| `LIVE_APP_GRACE_MS` | 60000 | extra wait for a late response, so its plan can be cancelled |
+| `LIVE_APP_FINAL_WAIT_MS` | 120000 | after the last prompt, total wait for responses still missing |
+| `LIVE_APP_ONLY` | all | comma-separated prompt ids |
+
+After the last prompt, every conversation is waited for, cancelled and read
+back. A turn whose response still has not arrived stays unresolved. In that
+case `batch.json` has `complete: false` with the unresolved conversation IDs,
+and the run fails; open those conversations and cancel their plans.
+
+The run writes `batch.json` after every turn, then `summary.md`. The summary
+has the share under 15 s, p50/p95/max by number of services, response kinds
+and the server's share. A turn with no visible response counts as slower than
+the wait in every percentile, shown as "> N s"; it is never left out. The browser suite runs the same module in sandbox
+(`W4-04:` in the default group and `W4-04 clarification` in the clarification
+group). Every plan ends `rejected`, with no execution steps.
+
+**Not measured yet**: the measured run follows the 20/10 catalog freeze.
 
 ### AUTH-06: real email and Google authentication
 
@@ -577,6 +704,50 @@ manual; do not enable automatic gateway fallback because ATI rejects a
 different served model. These Codex results
 are separate from the Gemini campaigns and do not close W3-10, W3-11 or the
 week-four user-study gates.
+
+## W4-03: usable-plan study
+
+`usable-plan/` measures the spec's "usable plan rate ≥ 70%" with real
+participants. The definition of a usable turn, the ten scenarios and the
+facilitator's steps are in [`usable-plan/PROTOCOL.md`](usable-plan/PROTOCOL.md).
+That definition is fixed before the first session.
+
+- **Mode:** the session runs in live mode with `ag/gemini-3.8-flash` (sandbox
+  always returns the same canned plan), with `GMAIL_ENABLED=off` and
+  `PLANNER_READ_ANSWERS=off`.
+- **No writes:** nothing is written to the services. The participant says
+  whether they would approve the plan; the facilitator records that answer and
+  "would the result match what you meant", then cancels the plan.
+- **Limitation:** this measures approval of the plan as previewed, not
+  executed results.
+
+The facilitator fills a sheet (`usable-plan/sheet-template.csv`) with one row
+per turn: participant code, turn number, conversation ID, decision and the
+intent answer. The report joins the sheet with PostgreSQL inside a `READ ONLY`
+transaction. Each plan after a conversation's first plan counts as one "Sửa
+qua Chat" edit. Clarifying questions create no plan, so they are not counted
+as edits.
+
+```bash
+node --env-file=.env --import tsx evaluations/usable-plan/report.ts --sheet docs/ai-evidence/USABLE-PLAN/<date>/sheet.csv --out docs/ai-evidence/USABLE-PLAN/<date>/
+```
+
+The command writes two files and never reads chat text:
+- `turns.csv`, one row per turn: plans, superseded plans, edits,
+  clarifications, refusals, time to the first plan, final plan status,
+  execution rows and steps that started running, verdict and reason;
+- `summary.md`: rate, Wilson 95% interval, turns per participant, reasons for
+  unusable turns.
+
+A step counts as started only once it turned `running`. The executor creates
+every row as `pending` first, so a row alone proves nothing ran. Exit codes:
+- 2: fewer than 20 turns, fewer than 5 participants, or a participant with
+  fewer than 4 turns;
+- 1: a malformed sheet or a database error.
+
+Sheets and outputs stay in the ignored `docs/ai-evidence/USABLE-PLAN/`; only
+the summary goes here after the session. **Not measured yet**: no session has
+run.
 
 ## Legacy golden set (v1)
 

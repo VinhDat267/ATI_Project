@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { MockLLMProvider, OpenAICompatibleProvider, type LLMProvider } from '@wap/planner';
 import { loadEvalFile, parseEvalOptions, runCase, runPool, safeGateway } from './run.js';
 import * as runner from './run.js';
+import { validateIndependentSet } from '../golden-independent/validate.js';
 
 describe('service evaluation runner', () => {
   it('exports scored search traces without a full prompt echoed by the model', async () => {
@@ -160,6 +162,23 @@ describe('service evaluation runner', () => {
     expect(loadEvalFile('services').file.cases).toHaveLength(44);
     for (const env of [{ EVAL_SET: 'oops' }, { EVAL_RUNS: '0' }, { EVAL_RUNS: 'NaN' }, { EVAL_CONCURRENCY: '-1' },
       { EVAL_SEARCH_MODE: 'regex', PLANNER_SEARCH_MODE: 'llm' }, { PLANNER_SEARCH_MODE: 'bad' }]) expect(() => parseEvalOptions(env)).toThrow();
+  });
+  it('loads the W4-01 independent set and refuses to score it until the full set validates', () => {
+    expect(parseEvalOptions({ EVAL_SET: 'independent', EVAL_SEARCH_MODE: 'llm' })).toMatchObject({ set: 'independent', searchMode: 'llm' });
+    for (const set of ['toString', 'golden-independent']) expect(() => parseEvalOptions({ EVAL_SET: set })).toThrow(/EVAL_SET/);
+    const independent = loadEvalFile('independent');
+    expect([independent.relativePath, independent.casesFile]).toEqual(['evaluations/golden-independent/cases.json', 'golden-independent/cases.json']);
+    expect(loadEvalFile('core').casesFile).toBe('cases.json');
+    expect(() => runner.assertSetReady('independent', { ...independent.file, cases: [] })).toThrow(/^Independent set is not ready: 8 problems;/);
+    expect(() => runner.assertSetReady('core', { ...loadEvalFile('core').file, cases: [] })).not.toThrow();
+  });
+  it('runs the readiness gate from the command line before anything else', () => {
+    // EVAL_ONLY names no case, so a ready set stops right after the gate without scoring anything.
+    const result = spawnSync(process.execPath, ['--import', 'tsx', 'evaluations/golden-v2/run.ts'], { encoding: 'utf8',
+      env: { ...process.env, EVAL_DRY_RUN: '1', EVAL_SET: 'independent', EVAL_ONLY: 'no-such-case', EVAL_OUTPUT_DIR: mkdtempSync(join(tmpdir(), 'w401-run-')) } });
+    expect(result.status).toBe(1);
+    const ready = validateIndependentSet(loadEvalFile('independent').file, { complete: true }).length === 0;
+    expect(result.stderr.includes('Independent set is not ready')).toBe(!ready);
   });
   it('rejects read-only clarification following a model-opened search round', async () => {
     const { file } = loadEvalFile('services');

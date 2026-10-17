@@ -37,6 +37,21 @@ Lượt bị **Hủy**, phải sửa từ hai lần trở lên, hoặc thực th
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Kết quả:
+- PR: [#149](https://github.com/VinhDat267/ATI_Project/pull/149), nhánh `test/w4-03-usable-plan-study`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-03-usable-plan-framework.md).
+- Kết quả: **phần agent xong; buổi thử chưa chạy.**
+  - `evaluations/usable-plan/PROTOCOL.md`:
+    - định nghĩa chép nguyên văn từ task card, chốt trước buổi thử đầu tiên;
+    - chế độ live với `ag/gemini-3.8-flash`, `GMAIL_ENABLED=off`, `PLANNER_READ_ANSWERS=off`;
+    - bối cảnh nhóm (8 tài nguyên thử nghiệm) và 10 tình huống bằng lời thường, không gợi ý câu chat, phủ cả 8 dịch vụ; bảng chia lượt cho 5 người × 4 lượt, mỗi tình huống 2 lần;
+    - các bước của một lượt, phiếu ghi và quyền riêng tư (mã P01…, không chép câu chat).
+  - `evaluations/usable-plan/report.ts` và `report-lib.ts`:
+    - đọc phiếu CSV, rồi đọc PostgreSQL trong transaction `READ ONLY` (luôn rollback) theo danh sách mã hội thoại;
+    - mỗi lượt: số kế hoạch, số `superseded`, số lần sửa (mỗi kế hoạch sau kế hoạch đầu), số câu hỏi lại, số lần từ chối, thời gian từ câu đầu tới kế hoạch đầu, trạng thái kế hoạch cuối, số bước đã thực thi;
+    - xuất `turns.csv` và `summary.md` (tỉ lệ, Wilson 95%, nguyên nhân không dùng được, trạng thái cuối). Không đọc nội dung câu chat.
+  - `report.test.ts`: 25 test, gồm nhóm PostgreSQL thật (schema riêng dựng từ migration `db/v3`, 5 hội thoại: duyệt ngay, sửa một lần, sửa hai lần, hủy, có câu hỏi lại) và test transaction chỉ đọc từ chối `INSERT`. RED (chưa có module) → GREEN 25/25; 12/12 đột biến bị bắt.
+  - `sheet-template.csv`; `.gitignore` thêm `docs/ai-evidence/USABLE-PLAN/`; mục "W4-03: usable-plan study" trong `evaluations/README.md` ghi rõ **chưa đo**.
+  - `npm run check` exit 0: **1.953 v3 + 198 eval** (173 + 25 test mới); chi tiết trong log.
 - Điều chưa làm hoặc khác với task card:
+  - **Chưa chạy buổi thử**, nên ba tiêu chí sau buổi thử (tỉ lệ trên ≥ 20 lượt, Wilson, tóm tắt kết quả trong README) còn mở. Cần nhóm trưởng hẹn ít nhất 5 người (23–25/10).
+  - **"Sau khi thực thi" đổi thành "nếu chạy đúng kế hoạch này".** Theo quyết định của nhóm trưởng ngày 17/10, buổi thử chỉ xem, không ghi lên dịch vụ: người tham gia nói "duyệt", người điều phối ghi nhận, hỏi câu cuối lượt trên kế hoạch xem trước, rồi bấm Hủy. Định nghĩa giữ nguyên chữ; `PROTOCOL.md` ghi cách áp dụng và giới hạn (đo việc *sẽ* duyệt, không đo kết quả thực thi). Vì vậy quyết định "duyệt" lấy từ phiếu, không lấy từ `approved` trong PostgreSQL (mọi kế hoạch được duyệt đều thành `rejected` sau khi bấm Hủy).
+  - Thời gian tới kế hoạch đầu tiên tính từ câu chat đầu, nên gồm cả lúc người tham gia trả lời câu hỏi lại; chỉ để tham khảo, không phải phép đo W4-04.
