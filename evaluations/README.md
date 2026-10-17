@@ -485,6 +485,56 @@ read the text that would be sent, and that a sent message stayed marked
 that stopped at the preview and cancelled (8.6 s to the preview, nothing
 executed).
 
+#### W4-04: batch latency
+
+`live-app/latency.e2e.ts` (config `live-app/latency.config.ts`) sends every
+prompt of `LIVE_APP_PROMPTS_FILE` through the web UI, each in a new
+conversation. The default file is `live-app/latency-prompts.json`: 24 prompts,
+six each over one, two, three and four or more services, adapted from the
+free-form and services sets to the test resources. For each turn it records:
+- the time from clicking send to the first visible response: plan preview,
+  clarification, refusal, answer or planning error (the cockpit's
+  `data-moment`);
+- from PostgreSQL, the server's part: user message saved → working memory
+  saved (the planner: model calls, directory listing, searches and
+  validation) → response saved;
+- the rest (request to the API, SSE delivery, rendering) as the difference.
+
+It presses "Hủy" on every plan. A response that arrives after
+`LIVE_APP_TURN_TIMEOUT_MS` is awaited for up to `LIVE_APP_GRACE_MS`, and its
+plan is cancelled too. It never presses "Duyệt kế hoạch"; a unit test checks
+the source. The run fails when any execution step exists or a plan is left
+open. Model time cannot be separated from the rest of the planner without
+product changes, because chat-api does not record per-call timing.
+
+```bash
+LIVE_APP_LATENCY=1 LIVE_APP_RUN_DIR=<dir> node --env-file=.env node_modules/playwright/cli.js test --config evaluations/live-app/latency.config.ts
+```
+
+Options:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LIVE_APP_PAUSE_MS` | 5000 | pause between prompts |
+| `LIVE_APP_TURN_TIMEOUT_MS` | 120000 | wait for a visible response |
+| `LIVE_APP_GRACE_MS` | 60000 | extra wait for a late response, so its plan can be cancelled |
+| `LIVE_APP_FINAL_WAIT_MS` | 120000 | after the last prompt, total wait for responses still missing |
+| `LIVE_APP_ONLY` | all | comma-separated prompt ids |
+
+After the last prompt, every conversation is waited for, cancelled and read
+back. A turn whose response still has not arrived stays unresolved. In that
+case `batch.json` has `complete: false` with the unresolved conversation IDs,
+and the run fails; open those conversations and cancel their plans.
+
+The run writes `batch.json` after every turn, then `summary.md`. The summary
+has the share under 15 s, p50/p95/max by number of services, response kinds
+and the server's share. A turn with no visible response counts as slower than
+the wait in every percentile, shown as "> N s"; it is never left out. The browser suite runs the same module in sandbox
+(`W4-04:` in the default group and `W4-04 clarification` in the clarification
+group). Every plan ends `rejected`, with no execution steps.
+
+**Not measured yet**: the measured run follows the 20/10 catalog freeze.
+
 ### AUTH-06: real email and Google authentication
 
 Keep credentials in the ignored root `.env`. Set `RUNTIME_MODE=live`,

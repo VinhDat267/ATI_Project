@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "description": "W4-04 latency prompts through the web UI. Adapted from golden-v2 free-form and services cases to the real test resources: Trello board To Do / list Cần làm, Slack ati-test, GitHub VinhDat267/ati-test, Google Sheets ATI Test Tracker / Tasks, Google Calendar ATI Test, Notion ATI Test Notes, Telegram ATI Test, Jira ATIT. Every plan is cancelled; nothing is executed. Commit before the measured run.",
+  "prompts": [
+    { "id": "s1-01", "services": ["slack"], "prompt": "Tell the Slack channel ati-test that v2.5 is live" },
+    { "id": "s1-02", "services": ["trello"], "prompt": "Put a card 'Fix footer links' in the Cần làm list of the Trello board To Do" },
+    { "id": "s1-03", "services": ["sheets"], "prompt": "Thêm một dòng gồm \"Fix footer\", \"To Do\" vào tab Tasks của Google Sheets ATI Test Tracker" },
+    { "id": "s1-04", "services": ["calendar"], "prompt": "Tạo sự kiện \"Demo\" trên Google Calendar ATI Test ngày mai từ 15:00 đến 16:00, chỉ ghi lịch, không mời người tham gia" },
+    { "id": "s1-05", "services": ["notion"], "prompt": "Tạo trang \"Sprint notes\" trong database Notion ATI Test Notes, nội dung \"Demo completed\"" },
+    { "id": "s1-06", "services": ["jira"], "prompt": "Thêm comment \"QA passed\" vào issue ATIT-4 trên Jira" },
+
+    { "id": "s2-01", "services": ["github", "slack"], "prompt": "Mở issue trong repo VinhDat267/ati-test về lỗi nút thanh toán bị lệch trên điện thoại, rồi báo kênh Slack ati-test" },
+    { "id": "s2-02", "services": ["calendar", "slack"], "prompt": "Create \"Release review\" in Google Calendar ATI Test tomorrow 10am–11am, with no invitations, then send its new event URL to Slack #ati-test" },
+    { "id": "s2-03", "services": ["notion", "telegram"], "prompt": "Create a Notion page \"Demo notes\" in database ATI Test Notes, then send the new page URL to the Telegram group ATI Test" },
+    { "id": "s2-04", "services": ["github", "telegram"], "prompt": "Tạo issue \"Fix navbar\" trong GitHub VinhDat267/ati-test rồi gửi URL issue vừa tạo tới nhóm Telegram ATI Test" },
+    { "id": "s2-05", "services": ["jira", "trello"], "prompt": "Create Jira issue \"Fix contrast\" in project ATIT, then create a Trello card with the same title in To Do / Cần làm and put the new Jira URL in its description" },
+    { "id": "s2-06", "services": ["jira", "sheets"], "prompt": "Create Jira issue \"Audit forms\" in project ATIT, then append its new URL and \"Audit forms\" to tab Tasks in Google Sheets ATI Test Tracker" },
+
+    { "id": "s3-01", "services": ["github", "trello", "slack"], "prompt": "Create an issue in VinhDat267/ati-test about the 500 error on large uploads, add a card for it in the Cần làm list of the Trello board To Do, then tell Slack #ati-test" },
+    { "id": "s3-02", "services": ["jira", "notion", "slack"], "prompt": "Tạo ticket Jira trong project ATIT tên \"Xuất báo cáo PDF\", tạo page cùng tên trong database ATI Test Notes trên Notion với Link là link ticket, rồi báo kênh Slack ati-test kèm link page" },
+    { "id": "s3-03", "services": ["calendar", "sheets", "slack"], "prompt": "Tạo sự kiện \"Demo cuối kỳ\" trên lịch ATI Test thứ Hai tuần sau 09:00–10:00, không mời người; thêm tên và link sự kiện vào tab Tasks của bảng tính ATI Test Tracker; rồi báo kênh Slack ati-test" },
+    { "id": "s3-04", "services": ["trello", "telegram", "slack"], "prompt": "Create a Trello card \"Prepare demo slides\" in To Do / Cần làm, then post the card link to the Telegram group ATI Test and to Slack #ati-test" },
+    { "id": "s3-05", "services": ["github", "jira", "slack"], "prompt": "Mở issue GitHub \"Lỗi trang cài đặt trên điện thoại\" trong VinhDat267/ati-test, tạo ticket Jira cùng tên trong project ATIT với link issue trong mô tả, rồi báo kênh Slack ati-test kèm link ticket" },
+    { "id": "s3-06", "services": ["notion", "sheets", "telegram"], "prompt": "Create Notion page \"Weekly report\" in ATI Test Notes, add a row with \"Weekly report\" and the page URL to tab Tasks of Google Sheets ATI Test Tracker, then send the page URL to the Telegram group ATI Test" },
+
+    { "id": "s4-01", "services": ["github", "jira", "notion", "telegram"], "prompt": "Create GitHub issue \"Keyboard fix\" in VinhDat267/ati-test; create Jira issue \"Keyboard fix\" in ATIT with that new GitHub URL in its description; create Notion page \"Keyboard fix\" in ATI Test Notes with the new Jira URL in its content; send the new Notion page URL to the Telegram group ATI Test." },
+    { "id": "s4-02", "services": ["calendar", "sheets", "trello", "slack"], "prompt": "Tạo sự kiện \"Release demo\" trên Google Calendar ATI Test ngày mai 15:00–16:00, không mời người; thêm tên và URL sự kiện vừa tạo vào Tasks của Google Sheets ATI Test Tracker; tạo Trello card \"Release demo\" ở To Do / Cần làm với URL sự kiện trong mô tả; gửi URL card mới tới Slack #ati-test." },
+    { "id": "s4-03", "services": ["notion", "jira", "trello", "telegram"], "prompt": "Create Notion page \"QA checklist\" in ATI Test Notes; create Jira issue \"QA checklist\" in ATIT whose description links the new page; create Trello card \"QA checklist\" in To Do / Cần làm whose description links the new Jira issue; send the new Trello card URL to the Telegram group ATI Test." },
+    { "id": "s4-04", "services": ["jira", "calendar", "notion", "sheets", "telegram"], "prompt": "Tạo Jira issue \"Release pipeline\" trong ATIT; tạo sự kiện \"Release pipeline\" trên Google Calendar ATI Test ngày mai 09:00–10:00 không mời người và ghi URL issue mới vào mô tả; tạo trang Notion \"Release pipeline\" trong ATI Test Notes với URL sự kiện mới; thêm tên và URL trang mới vào Tasks của Google Sheets ATI Test Tracker; gửi URL trang mới tới nhóm Telegram ATI Test." },
+    { "id": "s4-05", "services": ["jira", "notion", "telegram", "slack"], "prompt": "Tạo ticket Jira trong project ATIT với tiêu đề \"Đồng bộ lịch họp\", tạo page cùng tên trong database ATI Test Notes trên Notion với Trạng thái là Mới và Link là link của ticket, gửi tin nhắn Telegram vào nhóm ATI Test kèm link của page, rồi báo kênh Slack ati-test kèm link ticket và link page" },
+    { "id": "s4-06", "services": ["github", "trello", "sheets", "slack"], "prompt": "Create GitHub issue \"Checkout timeout\" in VinhDat267/ati-test; create a Trello card with the same title in To Do / Cần làm whose description links the issue; add the title and the card URL to tab Tasks of Google Sheets ATI Test Tracker; then tell Slack #ati-test with the card link." }
+  ]
+}
