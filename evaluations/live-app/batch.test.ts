@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { SERVICE_REGISTRY } from '@wap/tool-schemas';
-import { SERVICES, parseLatencyPrompts, percentile, readServerTiming, serverTimingFromRow, serviceGroup, summarizeLatency, uiKindOf, type LatencyTurn } from './batch.js';
+import { SERVICES, isSettled, parseLatencyPrompts, percentile, readServerTiming, serverTimingFromRow, serviceGroup, summarizeLatency, uiKindOf, type LatencyTurn } from './batch.js';
 
 const read = (name: string) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
 
@@ -54,6 +54,11 @@ describe('response kinds and timing', () => {
     expect(serverTimingFromRow({ user_at: t0, memory_at: null, response_at: null, response_type: null, plans: 0, plan_statuses: null, execution_steps: 0 }))
       .toMatchObject({ kind: null, plannerMs: null, serverMs: null });
   });
+  it('settles a conversation only when it has a response and no open plan', () => {
+    const server = (kind: 'plan' | null, planStatuses: string[]) => ({ kind, plannerMs: null, saveMs: null, serverMs: null, plans: planStatuses.length, planStatuses, executionSteps: 0 });
+    expect([isSettled(server('plan', ['rejected'])), isSettled(server('plan', ['superseded', 'pending'])), isSettled(server('plan', ['approved'])),
+      isSettled(server(null, [])), isSettled(null)]).toEqual([true, false, false, false, false]);
+  });
   it('uses nearest-rank percentiles', () => {
     expect([percentile([5, 1, 3, 2, 4], 0.5), percentile([5, 1, 3, 2, 4], 0.95), percentile([], 0.5)]).toEqual([3, 5, null]);
   });
@@ -61,7 +66,7 @@ describe('response kinds and timing', () => {
 
 describe('summary', () => {
   const turn = (index: number, serviceCount: number, visibleMs: number | null, uiKind: LatencyTurn['uiKind'] = 'plan'): LatencyTurn => ({
-    id: `t${index}`, services: SERVICES.slice(0, serviceCount), serviceCount, startedAt: '2026-10-21T03:00:00.000Z', conversationId: randomUUID(), uiKind, visibleMs,
+    id: `t${index}`, services: SERVICES.slice(0, serviceCount), serviceCount, startedAt: '2026-10-21T03:00:00.000Z', conversationId: randomUUID(), uiKind, visibleMs, resolved: true,
     frontendMs: visibleMs === null ? null : 500,
     server: { kind: uiKind === 'timeout' ? null : uiKind === 'error' ? 'error' : uiKind, plannerMs: visibleMs === null ? null : visibleMs - 600,
       saveMs: visibleMs === null ? null : 100, serverMs: visibleMs === null ? null : visibleMs - 500,
@@ -74,15 +79,31 @@ describe('summary', () => {
       ...[11_000, 13_000, 15_000, 17_000, 30_000].map((ms, i) => turn(20 + i, 3, ms)),
       turn(30, 4, 18_000), turn(31, 5, 25_000), turn(32, 4, 4000, 'clarification'), turn(33, 4, null, 'timeout'),
     ];
-    const summary = summarizeLatency(turns);
-    expect(summary).toMatchObject({ turns: 19, under15: 11, executionSteps: 0, openPlans: 0, kinds: { plan: 17, clarification: 1, timeout: 1 } });
+    const summary = summarizeLatency(turns, { timeoutMs: 120_000 });
+    expect(summary).toMatchObject({ turns: 19, under15: 11, executionSteps: 0, openPlans: 0, unresolved: [], kinds: { plan: 17, clarification: 1, timeout: 1 } });
     expect(summary.byGroup['1']).toEqual({ turns: 5, p50: 8000, p95: 10_000, max: 10_000 });
-    expect(summary.byGroup['≥4']).toEqual({ turns: 4, p50: 18_000, p95: 25_000, max: 25_000 });
+    // The timed-out turn is slower than the wait, not left out: it sets p95 and max of its group.
+    expect(summary.byGroup['≥4']).toEqual({ turns: 4, p50: 18_000, p95: Infinity, max: Infinity });
     const visible = turns.filter((t) => t.visibleMs !== null);
     expect(summary.serverShare).toBeCloseTo(visible.reduce((s, t) => s + t.visibleMs! - 500, 0) / visible.reduce((s, t) => s + t.visibleMs!, 0), 10);
     expect(summary.markdown).toContain('Dưới 15 s: **11/19 = 57,9%**');
-    expect(summary.markdown).toContain('| ≥4 | 4 | 18,0 s | 25,0 s | 25,0 s |');
+    expect(summary.markdown).toContain('| ≥4 | 4 | 18,0 s | > 120,0 s | > 120,0 s |');
     expect(summary.markdown).toContain('| t33 | trello, slack, github, sheets | timeout | — |');
+    expect(summary.markdown).toContain('Có phản hồi: 18/19');
+  });
+  it('does not report the percentiles of the few turns that answered when most timed out', () => {
+    const turns = [turn(0, 1, 5000), ...Array.from({ length: 19 }, (_, i) => turn(i + 1, 1, null, 'timeout'))];
+    const summary = summarizeLatency(turns, { timeoutMs: 120_000 });
+    expect(summary.byGroup['1']).toEqual({ turns: 20, p50: Infinity, p95: Infinity, max: Infinity });
+    expect(summary.markdown).toMatch(/Toàn bộ 20 lượt[^\n]*p50 > 120,0 s, p95 > 120,0 s, max > 120,0 s/);
+    expect(summary.markdown).toContain('Dưới 15 s: **1/20 = 5,0%**');
+  });
+  it('lists turns whose conversation was not settled when the batch ended', () => {
+    const settled = turn(1, 1, 5000);
+    const late = { ...turn(2, 2, null, 'timeout'), resolved: false };
+    const summary = summarizeLatency([settled, late], { timeoutMs: 25 });
+    expect(summary.unresolved).toEqual([{ id: 't2', conversationId: late.conversationId }]);
+    expect(summary.markdown).toContain(`Lượt chưa xác minh xong: **1** (t2: ${late.conversationId})`);
   });
   it('counts executed steps and plans left open, which must both be zero', () => {
     const leaked = turn(1, 1, 5000);

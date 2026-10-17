@@ -477,11 +477,18 @@ Options:
 | `LIVE_APP_PAUSE_MS` | 5000 | pause between prompts |
 | `LIVE_APP_TURN_TIMEOUT_MS` | 120000 | wait for a visible response |
 | `LIVE_APP_GRACE_MS` | 60000 | extra wait for a late response, so its plan can be cancelled |
+| `LIVE_APP_FINAL_WAIT_MS` | 120000 | after the last prompt, total wait for responses still missing |
 | `LIVE_APP_ONLY` | all | comma-separated prompt ids |
+
+After the last prompt, every conversation is waited for, cancelled and read
+back. A turn whose response still has not arrived stays unresolved. In that
+case `batch.json` has `complete: false` with the unresolved conversation IDs,
+and the run fails; open those conversations and cancel their plans.
 
 The run writes `batch.json` after every turn, then `summary.md`. The summary
 has the share under 15 s, p50/p95/max by number of services, response kinds
-and the server's share. The browser suite runs the same module in sandbox
+and the server's share. A turn with no visible response counts as slower than
+the wait in every percentile, shown as "> N s"; it is never left out. The browser suite runs the same module in sandbox
 (`W4-04:` in the default group and `W4-04 clarification` in the clarification
 group). Every plan ends `rejected`, with no execution steps.
 

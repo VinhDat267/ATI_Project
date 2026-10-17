@@ -24,6 +24,7 @@ const number = (name: string, fallback: number) => {
 const pauseMs = number('LIVE_APP_PAUSE_MS', 5000);
 const timeoutMs = number('LIVE_APP_TURN_TIMEOUT_MS', 120_000);
 const graceMs = number('LIVE_APP_GRACE_MS', 60_000);
+const finalWaitMs = number('LIVE_APP_FINAL_WAIT_MS', 120_000);
 if (!email || !password || !connectionString) throw new Error('Latency run requires CHAT_ADMIN_* and DATABASE_URL');
 
 test('live app latency: every prompt through the UI, every plan cancelled', async ({ page }) => {
@@ -38,22 +39,25 @@ test('live app latency: every prompt through the UI, every plan cancelled', asyn
     promptsFile, promptsSha256: createHash('sha256').update(raw).digest('hex'), subset: only.length ? only : undefined,
     sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     requestedModel: process.env.LLM_MODEL ?? null, webUrl: process.env.LIVE_APP_WEB_URL || 'http://127.0.0.1:5174',
-    pauseMs, timeoutMs, graceMs, startedAt: new Date().toISOString(),
+    pauseMs, timeoutMs, graceMs, finalWaitMs, startedAt: new Date().toISOString(),
   };
   const pool = new pg.Pool({ connectionString });
   try {
     await loginAtLoginPage(page, email!, password!);
     const turns = await runLatencyBatch(page, pool, prompts, {
-      pauseMs, timeoutMs, graceMs,
+      pauseMs, timeoutMs, graceMs, finalWaitMs,
       onTurn: (turn, done) => {
         console.log(`${turn.id}: ${turn.uiKind} ${turn.visibleMs ?? '—'} ms`);
         writeFileSync(join(runDir, 'batch.json'), `${JSON.stringify({ ...meta, complete: false, turns: done }, null, 2)}\n`);
       },
     });
-    const summary = summarizeLatency(turns);
-    writeFileSync(join(runDir, 'batch.json'), `${JSON.stringify({ ...meta, complete: true, finishedAt: new Date().toISOString(), turns }, null, 2)}\n`);
+    const summary = summarizeLatency(turns, { timeoutMs });
+    // Complete only when every conversation was read back settled after the final cancel.
+    const complete = summary.unresolved.length === 0 && summary.openPlans === 0 && summary.executionSteps === 0;
+    writeFileSync(join(runDir, 'batch.json'), `${JSON.stringify({ ...meta, complete, unresolved: summary.unresolved, finishedAt: new Date().toISOString(), turns }, null, 2)}\n`);
     writeFileSync(join(runDir, 'summary.md'), summary.markdown);
     console.log(summary.markdown);
+    expect(summary.unresolved).toEqual([]);
     expect(summary.executionSteps).toBe(0);
     expect(summary.openPlans).toBe(0);
   } finally {

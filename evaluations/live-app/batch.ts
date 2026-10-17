@@ -38,6 +38,8 @@ export interface LatencyTurn {
   /** visibleMs − serverMs: request to the API, SSE delivery and rendering. */
   frontendMs: number | null;
   server: ServerTiming | null;
+  /** The conversation has a saved response and no open plan, as read after the batch's final pass. */
+  resolved: boolean;
 }
 
 const COMPOSER = /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/;
@@ -154,11 +156,23 @@ export async function runLatencyTurn(page: Page, pool: pg.Pool, item: LatencyPro
     await cancelThroughUi(page, pool, id);
     server = await readServerTiming(pool, id);
   }
-  const frontendMs = visible !== null && server?.serverMs != null ? visible - server.serverMs : null;
-  return { id: item.id, services: item.services, serviceCount: item.services.length, startedAt, conversationId: id, uiKind, visibleMs: visible, frontendMs, server };
+  const turn = { id: item.id, services: item.services, serviceCount: item.services.length, startedAt, conversationId: id, uiKind, visibleMs: visible, frontendMs: null, server, resolved: false };
+  return settle(turn, server);
 }
 
-export interface BatchOptions extends TurnOptions { pauseMs: number; onTurn?: (turn: LatencyTurn, turns: LatencyTurn[]) => void }
+/** A saved response and no plan left pending, approved or executing. */
+export const isSettled = (server: ServerTiming | null) => !!server && server.kind !== null && !server.planStatuses.some((s) => OPEN_PLAN.includes(s));
+function settle(turn: LatencyTurn, server: ServerTiming | null): LatencyTurn {
+  const frontendMs = turn.visibleMs !== null && server?.serverMs != null ? turn.visibleMs - server.serverMs : null;
+  return { ...turn, server, frontendMs, resolved: isSettled(server) };
+}
+
+export interface BatchOptions extends TurnOptions {
+  pauseMs: number;
+  /** After the last prompt: total time to wait for responses still missing, so their plans can be cancelled. */
+  finalWaitMs: number;
+  onTurn?: (turn: LatencyTurn, turns: LatencyTurn[]) => void;
+}
 export async function runLatencyBatch(page: Page, pool: pg.Pool, prompts: LatencyPrompt[], options: BatchOptions): Promise<LatencyTurn[]> {
   const turns: LatencyTurn[] = [];
   for (const [index, item] of prompts.entries()) {
@@ -167,8 +181,16 @@ export async function runLatencyBatch(page: Page, pool: pg.Pool, prompts: Latenc
     turns.push(turn);
     options.onTurn?.(turn, turns);
   }
-  // Safety net: a plan that arrived after its turn ended is cancelled before the batch returns.
-  for (const turn of turns) if (turn.conversationId) await cancelThroughUi(page, pool, turn.conversationId);
+  // Final pass: wait for responses still missing, cancel anything open, then read every conversation again.
+  // A turn stays unresolved when its response has not arrived by then; the batch must not be reported complete.
+  const deadline = Date.now() + options.finalWaitMs;
+  for (const [index, turn] of turns.entries()) {
+    const id = turn.conversationId;
+    if (!id) continue;
+    await waitUntil(async () => (await readServerTiming(pool, id)).kind !== null, Math.max(0, deadline - Date.now()), 1000);
+    await cancelThroughUi(page, pool, id);
+    turns[index] = settle(turn, await readServerTiming(pool, id));
+  }
   return turns;
 }
 
@@ -185,16 +207,21 @@ export const UNDER_MS = 15_000;
 export interface LatencySummary {
   turns: number;
   under15: number;
+  /** Infinity stands for a turn with no visible response: slower than the wait, not left out. */
   byGroup: Record<string, { turns: number; p50: number | null; p95: number | null; max: number | null }>;
   kinds: Record<string, number>;
   executionSteps: number;
   openPlans: number;
+  unresolved: Array<{ id: string; conversationId: string | null }>;
   serverShare: number | null;
   markdown: string;
 }
-export function summarizeLatency(turns: LatencyTurn[]): LatencySummary {
-  const visible = (rows: LatencyTurn[]) => rows.map((t) => t.visibleMs).filter((ms): ms is number => ms !== null);
-  const stats = (rows: LatencyTurn[]) => ({ turns: rows.length, p50: percentile(visible(rows), 0.5), p95: percentile(visible(rows), 0.95), max: percentile(visible(rows), 1) });
+export function summarizeLatency(turns: LatencyTurn[], options: { timeoutMs?: number } = {}): LatencySummary {
+  const censored = (rows: LatencyTurn[]) => rows.map((t) => t.visibleMs ?? Infinity);
+  const stats = (rows: LatencyTurn[]) => ({ turns: rows.length, p50: percentile(censored(rows), 0.5), p95: percentile(censored(rows), 0.95), max: percentile(censored(rows), 1) });
+  const show = (ms: number | null) => (ms === Infinity ? `> ${options.timeoutMs != null ? seconds(options.timeoutMs) : 'ngưỡng chờ'}` : seconds(ms));
+  const unresolved = turns.filter((t) => !t.resolved).map((t) => ({ id: t.id, conversationId: t.conversationId }));
+  const answered = turns.filter((t) => t.visibleMs !== null).length;
   const groups = ['1', '2', '3', '≥4'].filter((group) => turns.some((t) => serviceGroup(t.serviceCount) === group));
   const byGroup = Object.fromEntries(groups.map((group) => [group, stats(turns.filter((t) => serviceGroup(t.serviceCount) === group))]));
   const kinds: Record<string, number> = {};
@@ -211,20 +238,21 @@ export function summarizeLatency(turns: LatencyTurn[]): LatencySummary {
     '# W4-04 · Thời gian tới phản hồi qua giao diện',
     '',
     `- Lượt: **${turns.length}**. Dưới 15 s: **${under15}/${turns.length} = ${percent(under15, turns.length)}** (lượt không có phản hồi tính là không đạt).`,
-    `- Toàn bộ: p50 ${seconds(all.p50)}, p95 ${seconds(all.p95)}, max ${seconds(all.max)}.`,
+    `- Có phản hồi: ${answered}/${turns.length}. Toàn bộ ${turns.length} lượt, lượt không có phản hồi tính là chậm hơn ngưỡng chờ: p50 ${show(all.p50)}, p95 ${show(all.p95)}, max ${show(all.max)}.`,
     `- Loại phản hồi: ${Object.entries(kinds).map(([kind, count]) => `${kind} ${count}`).join(', ')}.`,
     `- Phía server (từ lúc lưu câu chat tới lúc lưu phản hồi) chiếm ${serverShare === null ? '—' : percent(serverShare, 1)} tổng thời gian. Trung vị: server ${seconds(median(split.map((t) => t.server!.serverMs)))}, trong đó planner ${seconds(median(split.map((t) => t.server!.plannerMs)))}; phần còn lại (gửi request, SSE, vẽ) ${seconds(median(split.map((t) => t.frontendMs)))}.`,
     '- Thời gian của model không tách được khỏi planner (tra danh mục, tra cứu, kiểm kế hoạch): chat-api không ghi thời gian từng lời gọi model.',
-    `- Bước đã thực thi: **${executionSteps}**; kế hoạch còn mở: **${openPlans}** (cả hai phải bằng 0).`,
+    `- Dòng execution_steps: **${executionSteps}**; kế hoạch còn mở: **${openPlans}** (cả hai phải bằng 0).`,
+    `- Lượt chưa xác minh xong: **${unresolved.length}**${unresolved.length ? ` (${unresolved.map((t) => `${t.id}: ${t.conversationId ?? 'không có hội thoại'}`).join(', ')}). Lượt chạy chưa hoàn tất; mở các hội thoại này và hủy kế hoạch còn mở` : ''}.`,
     '',
     '| Số dịch vụ | Lượt | p50 | p95 | max |',
     '|---|---|---|---|---|',
-    ...groups.map((group) => `| ${group} | ${byGroup[group]!.turns} | ${seconds(byGroup[group]!.p50)} | ${seconds(byGroup[group]!.p95)} | ${seconds(byGroup[group]!.max)} |`),
+    ...groups.map((group) => `| ${group} | ${byGroup[group]!.turns} | ${show(byGroup[group]!.p50)} | ${show(byGroup[group]!.p95)} | ${show(byGroup[group]!.max)} |`),
     '',
     '| Lượt | Dịch vụ | Phản hồi | Thấy phản hồi | Server | Planner | Frontend |',
     '|---|---|---|---|---|---|---|',
     ...turns.map((t) => `| ${t.id} | ${t.services.join(', ')} | ${t.uiKind} | ${seconds(t.visibleMs)} | ${seconds(t.server?.serverMs ?? null)} | ${seconds(t.server?.plannerMs ?? null)} | ${seconds(t.frontendMs)} |`),
     '',
   ].join('\n');
-  return { turns: turns.length, under15, byGroup, kinds, executionSteps, openPlans, serverShare, markdown };
+  return { turns: turns.length, under15, byGroup, kinds, executionSteps, openPlans, unresolved, serverShare, markdown };
 }

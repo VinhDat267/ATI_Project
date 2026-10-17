@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
-import { loginAtLoginPage, runLatencyBatch, summarizeLatency } from '../../../../evaluations/live-app/batch.js';
+import { cancelThroughUi, loginAtLoginPage, readServerTiming, runLatencyBatch, summarizeLatency, type LatencyTurn } from '../../../../evaluations/live-app/batch.js';
 
 const email = process.env.CHAT_ADMIN_EMAIL;
 const password = process.env.CHAT_ADMIN_PASSWORD;
@@ -19,10 +19,11 @@ test('W4-04: batch latency run cancels every plan and executes nothing', async (
     await loginAtLoginPage(page, email!, password!);
     const stamp = Date.now();
     const prompts = [1, 2, 3].map((i) => ({ id: `w404-${i}`, services: ['trello', 'slack'], prompt: `Tạo task Trello và báo Slack W4-04 batch ${i} ${stamp}` }));
-    const seen: string[] = [];
-    const turns = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 20_000, graceMs: 5_000, onTurn: (turn) => seen.push(turn.id) });
-    expect(seen).toEqual(['w404-1', 'w404-2', 'w404-3']);
-    expect(turns.map((t) => t.uiKind)).toEqual(['plan', 'plan', 'plan']);
+    // Each turn cancels its own plan before the next prompt; the final pass is only a safety net.
+    const seen: LatencyTurn[] = [];
+    const turns = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 20_000, graceMs: 5_000, finalWaitMs: 5_000, onTurn: (turn) => seen.push(turn) });
+    expect(seen.map((t) => [t.id, t.server?.planStatuses])).toEqual([['w404-1', ['rejected']], ['w404-2', ['rejected']], ['w404-3', ['rejected']]]);
+    expect(turns.map((t) => [t.uiKind, t.resolved])).toEqual([['plan', true], ['plan', true], ['plan', true]]);
     expect(new Set(turns.map((t) => t.conversationId)).size).toBe(3);
     for (const turn of turns) {
       expect(turn.visibleMs).toBeGreaterThan(0);
@@ -50,10 +51,69 @@ test('W4-04: a plan that arrives after its turn timed out is still cancelled', a
     await loginAtLoginPage(page, email!, password!);
     const prompts = [{ id: 'w404-late', services: ['trello', 'slack'], prompt: `Tạo task Trello và báo Slack W4-04 late ${Date.now()}` }];
     // A 1 ms wait gives up on the screen before the sandbox plan arrives.
-    const [turn] = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 1, graceMs: 20_000 });
-    expect(turn).toMatchObject({ uiKind: 'timeout', visibleMs: null, frontendMs: null });
+    const seen: LatencyTurn[] = [];
+    const [turn] = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 1, graceMs: 20_000, finalWaitMs: 5_000, onTurn: (t) => seen.push(t) });
+    // The turn itself waited out the late plan and cancelled it, before the final pass.
+    expect(seen[0]!.server).toMatchObject({ kind: 'plan', planStatuses: ['rejected'] });
+    expect(turn).toMatchObject({ uiKind: 'timeout', visibleMs: null, frontendMs: null, resolved: true });
     expect(turn!.server).toMatchObject({ kind: 'plan', planStatuses: ['rejected'], executionSteps: 0 });
     expect((await plansOf(pool, [turn!.conversationId])).map(({ status, steps }) => [status, steps])).toEqual([['rejected', 0]]);
+  } finally {
+    await pool.end();
+  }
+});
+
+/** Holds the plan insert of conversations whose prompt carries the marker, so the response arrives after the batch has looked. */
+async function withSlowPlans(pool: pg.Pool, marker: string, seconds: number, run: () => Promise<void>) {
+  const name = `w404_slow_${marker}`;
+  await pool.query(`CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+    IF EXISTS (SELECT 1 FROM messages WHERE conv_id = NEW.conv_id AND content LIKE '%${marker}%') THEN PERFORM pg_sleep(${seconds}); END IF;
+    RETURN NEW; END $$`);
+  await pool.query(`CREATE TRIGGER ${name} BEFORE INSERT ON plans FOR EACH ROW EXECUTE FUNCTION ${name}()`);
+  try { await run(); } finally {
+    await pool.query(`DROP TRIGGER IF EXISTS ${name} ON plans`);
+    await pool.query(`DROP FUNCTION IF EXISTS ${name}()`);
+  }
+}
+
+test('W4-04: a response that arrives after the final check leaves the batch unsettled', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await loginAtLoginPage(page, email!, password!);
+    const marker = `late${Date.now()}`;
+    let conversationId: string | null = null;
+    await withSlowPlans(pool, marker, 6, async () => {
+      const [turn] = await runLatencyBatch(page, pool, [{ id: 'w404-unsettled', services: ['trello', 'slack'], prompt: `Tạo task Trello và báo Slack W4-04 ${marker}` }],
+        { pauseMs: 0, timeoutMs: 25, graceMs: 0, finalWaitMs: 0 });
+      conversationId = turn!.conversationId;
+      expect(turn).toMatchObject({ uiKind: 'timeout', resolved: false });
+      expect(turn!.server).toMatchObject({ kind: null, plans: 0 });
+      const summary = summarizeLatency([turn!], { timeoutMs: 25 });
+      expect(summary.unresolved).toEqual([{ id: 'w404-unsettled', conversationId }]);
+    });
+    // The plan the batch could not see still arrives; it is pending until someone cancels it.
+    await expect.poll(async () => (await readServerTiming(pool, conversationId!)).planStatuses, { timeout: 20_000 }).toEqual(['pending']);
+    await cancelThroughUi(page, pool, conversationId!);
+    expect((await readServerTiming(pool, conversationId!)).planStatuses).toEqual(['rejected']);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('W4-04: the final wait settles a response that arrives after its turn and grace', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await loginAtLoginPage(page, email!, password!);
+    const marker = `final${Date.now()}`;
+    await withSlowPlans(pool, marker, 6, async () => {
+      const [turn] = await runLatencyBatch(page, pool, [{ id: 'w404-final', services: ['trello', 'slack'], prompt: `Tạo task Trello và báo Slack W4-04 ${marker}` }],
+        { pauseMs: 0, timeoutMs: 25, graceMs: 0, finalWaitMs: 30_000 });
+      expect(turn).toMatchObject({ uiKind: 'timeout', resolved: true });
+      expect(turn!.server).toMatchObject({ kind: 'plan', planStatuses: ['rejected'], executionSteps: 0 });
+      expect(summarizeLatency([turn!], { timeoutMs: 25 }).unresolved).toEqual([]);
+    });
   } finally {
     await pool.end();
   }
@@ -65,7 +125,7 @@ test('W4-04 clarification turn is recorded with no plan', async ({ page }) => {
   try {
     await loginAtLoginPage(page, email!, password!);
     const prompts = [{ id: 'w404-ask', services: ['trello', 'slack'], prompt: `Tạo task trên board Frontend, gán Minh và thông báo Slack W4-04 ambiguous ${Date.now()}` }];
-    const [turn] = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 20_000, graceMs: 5_000 });
+    const [turn] = await runLatencyBatch(page, pool, prompts, { pauseMs: 0, timeoutMs: 20_000, graceMs: 5_000, finalWaitMs: 5_000 });
     expect(turn!.uiKind).toBe('clarification');
     expect(turn!.visibleMs).toBeGreaterThan(0);
     expect(turn!.server).toMatchObject({ kind: 'clarification', plans: 0, executionSteps: 0 });
