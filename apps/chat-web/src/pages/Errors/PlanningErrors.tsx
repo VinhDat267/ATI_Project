@@ -1,5 +1,6 @@
 // Structure/classes ported from PROTO-01 ErrorsPage; progress is supplied by the server.
-import { getServiceDefinition, getToolDefinition } from '@wap/tool-schemas';
+import { getServiceDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import type { GatherState, ServiceInfo } from '../../types';
 const primary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#e04d00] text-white text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5';
 const secondary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-50 text-[#111827] text-xs font-medium border border-[#E7E7E2] transition-colors';
@@ -29,7 +30,7 @@ export function SlowPlanningMoment({ seconds, gather, services, onDismiss }: { s
         {gather?.summary && <p className="text-xs text-[#4B5563] break-words">{gather.summary}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           {gather?.steps.map((step, index) => {
-            const id = getToolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
+            const id = toolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
             return <div key={`${step.tool}:${index}`} className={`p-2.5 rounded-lg ${step.status === 'running' ? 'bg-orange-50 border-orange-200' : 'bg-white border-[#E7E7E2]'} border flex items-center justify-between gap-2 flex-wrap`}>
               <span className="break-words">{services.find(row => row.id === id)?.name ?? getServiceDefinition(id)?.name ?? id}{step.result && <span className="block mt-1">{step.result}</span>}</span>
               <span className={`${step.status === 'completed' ? 'text-emerald-600' : 'text-orange-700'} font-medium`}>{step.status === 'completed' ? '✓ Đã tra cứu' : 'Đang chờ phản hồi…'}</span>

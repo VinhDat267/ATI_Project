@@ -1,6 +1,7 @@
 import React from 'react';
 import type { StepState, PlanStatus } from '../types';
-import { getToolDefinition, type JSONSchema } from '@wap/tool-schemas';
+import { type JSONSchema } from '@wap/tool-schemas';
+import { toolDefinition } from '../services/tool-definitions';
 import { ServiceLogo } from './ServiceLogo';
 
 export interface ExecutionStepInfo {
@@ -35,7 +36,7 @@ function FieldList({ value }: { value: Record<string, unknown> }) {
 
 /** Read collections are taken only from the tool's declared output shape. */
 function collectionRows(value: unknown, tool: string): unknown[] | undefined {
-  const definition = getToolDefinition(tool);
+  const definition = toolDefinition(tool);
   if (definition?.sideEffect !== 'read') return;
   const schema = definition.outputSchema;
   if (schema.type === 'array' && schema.items?.type === 'object') return Array.isArray(value) ? value : undefined;
@@ -135,7 +136,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
               <div className="flex-1 pb-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <ServiceLogo service={getToolDefinition(step.tool)?.service ?? step.tool.split('.')[0]} />
+                    <ServiceLogo service={toolDefinition(step.tool)?.service ?? step.tool.split('.')[0]} />
                     <span className="text-sm font-semibold text-text">
                       {step.description}
                     </span>

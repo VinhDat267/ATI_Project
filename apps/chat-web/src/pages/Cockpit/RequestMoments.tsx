@@ -1,6 +1,7 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
 import type { KeyboardEvent, RefObject, ReactNode } from 'react';
-import { getServiceDefinition, getToolDefinition } from '@wap/tool-schemas';
+import { getServiceDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
@@ -319,7 +320,7 @@ export function DiscoveryMoment({
           ) : (
             gather.steps.map((step, index) => {
               const service =
-                getToolDefinition(step.tool)?.service ??
+                toolDefinition(step.tool)?.service ??
                 step.tool.split('.')[0];
               const found = step.status === 'completed';
               return (

@@ -7,6 +7,7 @@ import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
 const button = 'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50';
+const secondary = 'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50';
 export function PersonalGmail({ service, refresh, selected }: { service: ServiceInfo; refresh: () => Promise<void>; selected: string | null }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
   const mounted = useRef(false), pending = useRef(false);
@@ -48,7 +49,7 @@ export function PersonalGmail({ service, refresh, selected }: { service: Service
       {error && <p role="alert" className="text-xs text-[#DC2626]">{error}</p>}
     </div>
     {confirm && createPortal(<CockpitDialog title="Ngắt kết nối Gmail?" returnFocusId="gmail-action" onClose={() => { if (!busy) setConfirm(false); }}>
-      <div className="p-5 v3-space-y-4"><p className="text-sm">ATI sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không thể dùng kết nối đã ngắt.</p><button className={button} disabled={busy} onClick={() => setConfirm(false)}>Tiếp tục kết nối</button>{' '}<button className={button} disabled={busy} onClick={() => void act(true)}>Xác nhận ngắt kết nối</button>{error && <p role="alert">{error}</p>}</div>
+      <div className="p-5 v3-space-y-4"><p className="text-sm">ATI sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không thể dùng kết nối đã ngắt.</p><button className={secondary} disabled={busy} onClick={() => setConfirm(false)}>Giữ kết nối</button>{' '}<button className={button} disabled={busy} onClick={() => void act(true)}>Xác nhận ngắt kết nối</button>{error && <p role="alert">{error}</p>}</div>
     </CockpitDialog>, document.body)}
   </section>;
 }

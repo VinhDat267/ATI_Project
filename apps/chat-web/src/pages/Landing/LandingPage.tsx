@@ -576,12 +576,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                         </div>
                         {/* 4 dòng tìm kiếm kết quả hiện rõ với SVG thật */}
                         <div className="v3-space-y-3" id="k2-services-list">
-                          {gmailEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] v3-space-y-3">
-                <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
-                <p className="text-xs text-[#4B5563]">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
-                <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
-              </div>}
-              {/* 1. Trello */}
+                          {/* 1. Trello */}
                           <div className="p-3.5 rounded-xl border border-[#E7E7E2] bg-[#FAFAF8] flex items-center justify-between k2-service-item" data-index="0">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-[#0079BF]/10 flex items-center justify-center p-1.5 flex-shrink-0">
@@ -1439,7 +1434,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 Không cần chuyển đổi phần mềm làm việc. ATI liên kết trực tiếp với các dịch vụ quen thuộc của bạn.
               </p>
             </div>
-            {/* Lưới 8 dịch vụ, mỗi dịch vụ 1 card trang nhã */}
+            {/* Lưới 8 dịch vụ dùng chung, mỗi dịch vụ 1 card trang nhã; Gmail của riêng từng người thêm vào khi được bật */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
               {/* 1. Trello */}
               <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group">
@@ -1625,6 +1620,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                   </p>
                 </div>
               </div>
+              {/* 9. Gmail, của riêng từng người */}
+              {gmailEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group v3-space-y-3">
+                <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
+                <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
+              </div>}
             </div>
           </div>
         </section>

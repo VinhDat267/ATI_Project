@@ -1,11 +1,12 @@
-import { getToolDefinition, getServiceDefinition } from '@wap/tool-schemas';
+import { getServiceDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../services/tool-definitions';
 import { ResultFields, type ExecutionStepInfo } from './ExecutionProgress';
 import { ServiceLogo } from './ServiceLogo';
 import type { ServiceInfo } from '../types';
 export function ExecutionReceipt({ steps, services }: {steps: ExecutionStepInfo[];services: ServiceInfo[]}) {
   const groups = new Map<string, ExecutionStepInfo[]>();
   for (const step of steps) {
-    const service=getToolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
+    const service=toolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
     groups.set(service,[...(groups.get(service) ?? []),step]);
   }
   const succeeded=steps.filter(step=>step.status==='succeeded').length;

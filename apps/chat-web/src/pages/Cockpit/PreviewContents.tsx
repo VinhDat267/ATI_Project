@@ -1,5 +1,5 @@
 // Source: AppStagePage.tsx PREVIEW.card/issue/rows/message content, with actual plan arguments.
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import type { PlanStep } from '../../types';
 import { formatArgValue } from '../../components/PlanStepItem';
 import { operation } from './presentation';
@@ -12,7 +12,7 @@ const names: Record<string,string> = {
 const text = (value:unknown) => formatArgValue(value).text;
 
 function OtherArguments({step,except}:{step:PlanStep;except:string[]}) {
-  return Object.entries(step.args).filter(([key])=>!except.includes(key) && !getToolDefinition(step.tool)?.inputSchema.properties?.[key]?.['x-resource']).map(([key,value])=><div key={key}>
+  return Object.entries(step.args).filter(([key])=>!except.includes(key) && !toolDefinition(step.tool)?.inputSchema.properties?.[key]?.['x-resource']).map(([key,value])=><div key={key}>
     <span className="text-[11px] text-neutral-400 uppercase font-semibold">{names[key] ?? key}:</span>
     <div className="text-xs text-neutral-800 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed v3-space-y-1.5 whitespace-pre-wrap break-words">{text(value)}</div>
   </div>);
