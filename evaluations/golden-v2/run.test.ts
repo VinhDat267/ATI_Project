@@ -161,6 +161,15 @@ describe('service evaluation runner', () => {
     for (const env of [{ EVAL_SET: 'oops' }, { EVAL_RUNS: '0' }, { EVAL_RUNS: 'NaN' }, { EVAL_CONCURRENCY: '-1' },
       { EVAL_SEARCH_MODE: 'regex', PLANNER_SEARCH_MODE: 'llm' }, { PLANNER_SEARCH_MODE: 'bad' }]) expect(() => parseEvalOptions(env)).toThrow();
   });
+  it('loads the W4-01 independent set and refuses to score it until the full set validates', () => {
+    expect(parseEvalOptions({ EVAL_SET: 'independent', EVAL_SEARCH_MODE: 'llm' })).toMatchObject({ set: 'independent', searchMode: 'llm' });
+    for (const set of ['toString', 'golden-independent']) expect(() => parseEvalOptions({ EVAL_SET: set })).toThrow(/EVAL_SET/);
+    const independent = loadEvalFile('independent');
+    expect([independent.relativePath, independent.casesFile]).toEqual(['evaluations/golden-independent/cases.json', 'golden-independent/cases.json']);
+    expect(loadEvalFile('core').casesFile).toBe('cases.json');
+    expect(() => runner.assertSetReady('independent', { ...independent.file, cases: [] })).toThrow(/^Independent set is not ready: 8 problems;/);
+    expect(() => runner.assertSetReady('core', { ...loadEvalFile('core').file, cases: [] })).not.toThrow();
+  });
   it('rejects read-only clarification following a model-opened search round', async () => {
     const { file } = loadEvalFile('services');
     const c = file.cases.find(c => c.id === 'sh01')!;

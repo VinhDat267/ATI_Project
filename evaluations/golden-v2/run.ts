@@ -8,9 +8,14 @@ import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type 
 import { ALL_TOOLS, type PlannerResponse } from '@wap/tool-schemas';
 import { aggregateRuns, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
 import { buildMemory, fixtureSearch } from './fixtures.js';
+import { validateIndependentSet } from '../golden-independent/validate.js';
 
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
-export type EvalSet = 'core' | 'freeform' | 'services';
+export type EvalSet = 'core' | 'freeform' | 'services' | 'independent';
+const EVAL_FILES: Record<EvalSet, string> = {
+  core: 'evaluations/golden-v2/cases.json', freeform: 'evaluations/golden-v2/cases-freeform.json',
+  services: 'evaluations/golden-v2/cases-services.json', independent: 'evaluations/golden-independent/cases.json',
+};
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
 export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
   modelCalls: Array<ModelCallMetrics & { startedAtMs: number }>; phases: PlanningPhaseMetrics[] }
@@ -20,7 +25,7 @@ const pct = (value: number | null | undefined) => value == null ? 'n/a' : `${(va
 
 export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const set = env.EVAL_SET ?? 'core';
-  if (!['core', 'freeform', 'services'].includes(set)) throw new Error('EVAL_SET must be core, freeform or services');
+  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services or independent');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
   const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';
@@ -33,10 +38,16 @@ export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   return { set: set as EvalSet, searchMode: searchMode as 'regex' | 'llm', runsCount: integer('EVAL_RUNS', 3, 10), concurrency: integer('EVAL_CONCURRENCY', 2, 4) };
 }
 export function loadEvalFile(set: EvalSet) {
-  const casesFile = { core: 'cases.json', freeform: 'cases-freeform.json', services: 'cases-services.json' }[set];
-  const relativePath = `evaluations/golden-v2/${casesFile}`;
+  const relativePath = EVAL_FILES[set];
+  const casesFile = relativePath.replace(/^evaluations\/(golden-v2\/)?/, '');
   const raw = readFileSync(resolve(relativePath), 'utf8');
   return { casesFile, relativePath, raw, file: JSON.parse(raw) as GoldenFile };
+}
+/** The W4-01 set is scored only once its writers' full set passes the format and composition checks. */
+export function assertSetReady(set: EvalSet, file: GoldenFile) {
+  if (set !== 'independent') return;
+  const problems = validateIndependentSet(file, { complete: true });
+  if (problems.length) throw new Error(`Independent set is not ready: ${problems.length} problems; run evaluations/golden-independent/validate.ts`);
 }
 export function safeGateway(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -50,6 +61,7 @@ function safeError(err: unknown): string {
   if (err instanceof SyntaxError) return 'Gateway returned invalid JSON';
   const text = String((err as Error)?.message ?? '');
   if (text === 'Evaluation stopped after provider failure') return text;
+  if (/^Independent set is not ready: \d+ problems;/.test(text)) return text;
   if (/request timed out after \d+ms$/.test(text)) return 'Model request timed out';
   if (/Completion was served by/.test(text)) return 'Gateway served an unexpected model';
   return 'Request failed (details omitted from public evidence)';
@@ -182,7 +194,7 @@ async function preflight(dryRun: boolean): Promise<void> {
 function preregistration(relativePath: string, raw: string, dryRun: boolean) {
   const committed = execFileSync('git', ['show', `HEAD:${relativePath}`], { encoding: 'utf8' });
   if (!dryRun && hash(committed) !== hash(raw)) throw new Error('Labels differ from their committed preregistration');
-  if (!dryRun && git('status', '--porcelain', '--', 'evaluations/golden-v2', 'packages/planner', 'packages/tool-schemas'))
+  if (!dryRun && git('status', '--porcelain', '--', 'evaluations/golden-v2', 'evaluations/golden-independent', 'packages/planner', 'packages/tool-schemas'))
     throw new Error('Commit evaluation/source changes before provider calls');
   return git('log', '-1', '--format=%H', '--', relativePath);
 }
@@ -191,6 +203,7 @@ export async function main() {
   if (!dryRun && process.env.LIVE_EVAL !== '1') throw new Error('Set LIVE_EVAL=1 for provider calls, or EVAL_DRY_RUN=1');
   const { set, searchMode, runsCount, concurrency } = parseEvalOptions(process.env);
   const { casesFile, relativePath, raw, file } = loadEvalFile(set);
+  assertSetReady(set, file);
   const labelCommit = preregistration(relativePath, raw, dryRun);
   const only = [...new Set((process.env.EVAL_ONLY ?? '').split(',').map(id => id.trim()).filter(Boolean))];
   const unknown = only.filter(id => !file.cases.some(c => c.id === id));
@@ -244,7 +257,7 @@ export async function main() {
       thresholds: THRESHOLDS, gate: { toolSelectionAccuracy: (aggregate.mean.toolSelectionAccuracy ?? 0) >= THRESHOLDS.toolSelectionAccuracy,
         argumentQuality: (aggregate.mean.argumentQuality ?? 0) >= THRESHOLDS.argumentQuality }, serviceGate,
       qualityGate: 'incomplete', aggregate, comparison, timing,
-      results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => publicEvidenceValue({ id: r.case.id, category: r.case.category, passed: r.score.passed,
+      results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => publicEvidenceValue({ id: r.case.id, category: r.case.category, author: r.case.author, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
         response: r.response, searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases }, r.case.prompt)) })),
     };

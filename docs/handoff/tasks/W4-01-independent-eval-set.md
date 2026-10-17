@@ -33,7 +33,27 @@ Hai bộ đánh giá hiện có do cùng một người viết câu hỏi lẫn 
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit đăng ký label:
-- Kết quả:
+- PR: (điền khi mở PR), nhánh `test/w4-01-independent-eval`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-01-independent-eval-framework.md).
+- Commit đăng ký label: chưa có (bộ câu còn rỗng).
+- Kết quả: **phần khung xong; chưa có câu nào, chưa chạy model.**
+  - `evaluations/golden-independent/GUIDE.md`, tiếng Việt, không cần đọc code:
+    - mục đích và quy tắc: không xem prompt, không xem bộ cũ, không chạy AI trước khi nộp, không chép ví dụ, không ghi tên;
+    - năm nhóm câu (thêm `read_only` không bắt buộc);
+    - workspace giả lập của `golden-v2/fixtures.ts` với tên → ID, và đồng hồ 10:00 thứ Ba 29/09/2026;
+    - 14 tool ghi và tham số; cách viết label, mọi loại điều kiện kèm ví dụ;
+    - 5 ví dụ hoàn chỉnh (mỗi nhóm một ví dụ), cách tự kiểm và cách nộp.
+  - `cases.json` rỗng theo định dạng của `golden-v2` (`version`, `clock`, `timeZone`, `cases`).
+  - `validate.ts`: kiểm định dạng từng câu, báo lỗi bằng tiếng Việt kèm mã câu. Không có `--partial` thì kiểm thêm thành phần: ≥ 30 câu, mỗi nhóm ≥ 4, mỗi ngôn ngữ ≥ 5.
+  - `cases.test.ts`: 36 test, gồm 24 kiểu lỗi, các ví dụ của GUIDE qua được bộ kiểm, GUIDE liệt kê đủ tool ghi và ID, và CLI.
+  - `golden-v2/run.ts` nhận `EVAL_SET=independent`: đọc `golden-independent/cases.json`, từ chối chạy khi bộ chưa qua kiểm đầy đủ, kiểm commit đăng ký cả thư mục mới, ghi `author` của từng câu vào báo cáo. `GoldenCase` thêm trường `author`.
+  - 21/21 đột biến bị bắt; `npm run check` exit 0: **1.953 v3 + 210 eval** (173 + 37 test mới); chi tiết trong log.
 - Điều chưa làm hoặc khác với task card:
+  - **Chưa có câu, chưa chạy model, chưa có báo cáo** (việc 4, 5). Cần các thành viên viết từ 22/10. Bốn tiêu chí còn mở: nhóm trưởng xác nhận `GUIDE.md` đủ cho người chưa đọc code; commit đăng ký; kết quả 3 lần chạy; test cấu trúc đạt với bộ đã nộp.
+  - **Test cấu trúc vẫn đạt khi `cases.json` rỗng**, nếu không thì `npm run check` đỏ cho tới khi có câu. Test chứng minh bộ rỗng không qua kiểm đầy đủ (8 lỗi thiếu); CLI và runner từ chối bộ rỗng với exit 1. Khi đã có câu trong `cases.json`, test bắt buộc cả bộ qua kiểm đầy đủ.
+  - **Không thêm `author: "author-v2"` vào ba file label cũ**, vì sửa các file đó làm đổi SHA-256 đã đăng ký mà các báo cáo cũ ghi lại. Câu cũ không có `author` nghĩa là `author-v2`; bộ kiểm từ chối giá trị `author-v2` ở bộ mới.
+  - **Thêm so với task card:**
+    - mỗi câu ghi `services` (dịch vụ câu chat nhắc tới), để báo cáo tính được theo dịch vụ;
+    - "có cả tiếng Việt và tiếng Anh" thành mỗi ngôn ngữ ≥ 5 câu;
+    - không dùng `memory` (câu một lượt);
+    - đồng hồ giữ như bộ services để dùng chung workspace giả lập;
+    - câu trùng bộ cũ hoặc trùng ví dụ của GUIDE bị từ chối.

@@ -326,6 +326,47 @@ each report names the labels' commit and SHA-256 it was scored against.
 Re-scoring all 17 stored cs11 plans with the revised label changes only the two
 plans above, from fail to pass.
 
+### W4-01: independent set
+
+`golden-independent/cases.json` will hold at least 30 cases written by members
+who did not write the planner prompt. Every case records the writer's role code
+in `author` (for example `member-2`), never a name. The writers' guide,
+[`golden-independent/GUIDE.md`](golden-independent/GUIDE.md), is in Vietnamese
+and needs no code reading. It covers:
+- the five groups;
+- the fixture workspace from `golden-v2/fixtures.ts`;
+- the fourteen write tools;
+- the matchers;
+- worked examples;
+- rules: no reading the planner prompt or the earlier sets, and no model runs
+  before submitting.
+
+The set uses the same fixtures, scorer and clock as the services set (Tuesday
+2026-09-29 10:00, Asia/Ho_Chi_Minh).
+
+`golden-independent/validate.ts` checks format only and names each problem in
+Vietnamese. It checks that:
+- labels use real tools, write-tool steps, schema arguments and known matchers;
+- resource IDs exist in the fixtures or are typed in the prompt;
+- `refTo` targets are in the same alternative;
+- the listed services cover every labelled step, and each group's shape holds;
+- no prompt repeats the earlier sets or the guide's examples.
+
+Without `--partial` it also requires at least 30 cases, four per group and five
+per language. A writer checks their own file with:
+
+```bash
+node --import tsx evaluations/golden-independent/validate.ts member-2.json --partial
+```
+
+`EVAL_SET=independent` runs the set through `golden-v2/run.ts`. The runner
+refuses to start until the committed set passes the full check, and the
+preregistration check also covers `evaluations/golden-independent`. Commit the
+set before the first model run. Run it three times each with
+`EVAL_SEARCH_MODE=llm` and `regex`.
+
+**Not measured yet**: the set is empty until members submit their cases.
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against
