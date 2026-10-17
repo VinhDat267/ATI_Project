@@ -21,4 +21,4 @@
 - GREEN: 28/28; toàn bộ eval 201/201.
 - Đột biến: 17/17 bị bắt. Gồm 12 đột biến cũ và 5 đột biến mới vào ba chỗ sửa.
 - Typecheck chặt 3 file exit 0.
-- **Chưa chạy lại `npm run check` đầy đủ** sau bản sửa; chỉ có `evaluations/` thay đổi.
+- `npm run check` trên `4a7aa2c` (worktree, database tạm 55533 đã migrate, sandbox, không có `.env`): exit 0, **1.953 v3 + 201 eval**.
