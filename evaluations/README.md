@@ -641,11 +641,17 @@ as edits.
 node --env-file=.env --import tsx evaluations/usable-plan/report.ts --sheet docs/ai-evidence/USABLE-PLAN/<date>/sheet.csv --out docs/ai-evidence/USABLE-PLAN/<date>/
 ```
 
-The command writes `turns.csv` (per-turn plans, edits, clarifications,
-refusals, time to the first plan, final plan status, verdict and reason) and
-`summary.md` (rate, Wilson 95% interval, reasons for unusable turns). It never
-reads chat text. Exit codes:
-- 2: fewer than 20 turns or 5 participants;
+The command writes two files and never reads chat text:
+- `turns.csv`, one row per turn: plans, superseded plans, edits,
+  clarifications, refusals, time to the first plan, final plan status,
+  execution rows and steps that started running, verdict and reason;
+- `summary.md`: rate, Wilson 95% interval, turns per participant, reasons for
+  unusable turns.
+
+A step counts as started only once it turned `running`. The executor creates
+every row as `pending` first, so a row alone proves nothing ran. Exit codes:
+- 2: fewer than 20 turns, fewer than 5 participants, or a participant with
+  fewer than 4 turns;
 - 1: a malformed sheet or a database error.
 
 Sheets and outputs stay in the ignored `docs/ai-evidence/USABLE-PLAN/`; only

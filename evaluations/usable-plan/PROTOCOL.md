@@ -18,7 +18,7 @@ Theo quyết định của nhóm trưởng ngày 17/10/2026, buổi thử **khô
 - **Duyệt:** người tham gia nói "duyệt" cho kế hoạch đang hiện. Người điều phối không bấm "Duyệt kế hoạch": ghi `duyet` vào phiếu, hỏi câu cuối lượt, rồi bấm **Hủy**.
 - **Câu cuối lượt** được hỏi trên kế hoạch xem trước, thay cho "sau khi thực thi": *"Nếu ATI chạy đúng kế hoạch này, kết quả có đúng ý bạn không?"* Ghi `co` hoặc `khong`.
 - **Giới hạn** (báo cáo phải ghi): cách này đo việc người tham gia *sẽ* duyệt kế hoạch họ thấy, không đo kết quả thực thi thật.
-- **Ngoại lệ:** chỉ khi nhóm trưởng đồng ý trước cho chạy thật trên tài nguyên thử nghiệm. Khi đó người tham gia tự bấm Duyệt, câu cuối lượt hỏi sau khi xem biên nhận, và phiếu ghi rõ lượt nào chạy thật.
+- **Ngoại lệ:** chỉ khi nhóm trưởng đồng ý trước cho chạy thật trên tài nguyên thử nghiệm. Khi đó người tham gia tự bấm Duyệt, câu cuối lượt hỏi sau khi xem biên nhận, và cột `note` của lượt đó bắt đầu bằng `chay-that`. Báo cáo đếm các lượt có bước đã bắt đầu chạy (từ PostgreSQL); người điều phối đối chiếu số đó với các lượt ghi `chay-that`.
 
 Số lần sửa lấy từ PostgreSQL: mỗi kế hoạch sau kế hoạch đầu tiên của hội thoại là một lần "Sửa qua Chat". Câu hỏi lại của AI không tạo kế hoạch nên không bị tính.
 
@@ -108,7 +108,7 @@ Có thêm người thì lặp lại từ P01.
 | `conversation_id` | mã hội thoại trong URL `/c/<mã>` |
 | `decision` | `duyet`, `huy` hoặc `bo-cuoc` |
 | `matches_intent` | `co` hoặc `khong`; bắt buộc khi `decision` là `duyet`, để trống khi khác |
-| `note` | ghi chú ngắn, không chứa câu chat |
+| `note` | ghi chú ngắn, không chứa câu chat; lượt được phép chạy thật bắt đầu bằng `chay-that` |
 
 ## 8. Sau buổi thử
 
@@ -118,8 +118,10 @@ Có thêm người thì lặp lại từ P01.
    node --env-file=.env --import tsx evaluations/usable-plan/report.ts --sheet docs/ai-evidence/USABLE-PLAN/<ngày>/sheet.csv --out docs/ai-evidence/USABLE-PLAN/<ngày>/
    ```
 
-   - **Kết quả:** `turns.csv` (mỗi lượt một dòng: số kế hoạch, số lần sửa, số câu hỏi lại, thời gian tới kế hoạch đầu tiên, trạng thái cuối, kết luận và nguyên nhân) và `summary.md` (tỉ lệ, khoảng tin cậy 95% Wilson, nguyên nhân không dùng được).
-   - **Exit code:** 2 nếu chưa đủ 20 lượt hoặc 5 người; 1 nếu phiếu sai định dạng hoặc lỗi database.
+   - **Kết quả:** `turns.csv` và `summary.md`.
+     - `turns.csv`: mỗi lượt một dòng, gồm số kế hoạch, số kế hoạch `superseded`, số lần sửa, số câu hỏi lại, thời gian tới kế hoạch đầu tiên, trạng thái cuối, số bản ghi bước và số bước đã bắt đầu chạy, kết luận và nguyên nhân.
+     - `summary.md`: tỉ lệ, khoảng tin cậy 95% Wilson, số lượt của từng người, nguyên nhân không dùng được.
+   - **Exit code:** 2 nếu chưa đủ 20 lượt, chưa đủ 5 người, hoặc có người chưa đủ 4 lượt (tóm tắt ghi tên mã đó); 1 nếu phiếu sai định dạng hoặc lỗi database.
 2. Đưa phần tóm tắt (tỉ lệ, khoảng tin cậy, bảng nguyên nhân, giới hạn "chỉ xem") vào `evaluations/README.md`. Không đưa câu chat, mã hội thoại hay ghi chú vào repo.
 3. Giữ phiếu, `turns.csv` và database ở máy. Dọn database khi nhóm trưởng yêu cầu.
 

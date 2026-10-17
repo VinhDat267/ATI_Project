@@ -9,7 +9,7 @@ const header = 'participant,turn,conversation_id,decision,matches_intent,note';
 const id = () => randomUUID();
 const facts = (over: Partial<TurnFacts> = {}): TurnFacts => ({
   conversationId: id(), plans: 1, superseded: 0, clarifications: 0, refusals: 0,
-  firstPreviewMs: 9000, lastPlanStatus: 'rejected', executedSteps: 0, succeededSteps: 0, ...over,
+  firstPreviewMs: 9000, lastPlanStatus: 'rejected', executionRows: 0, startedSteps: 0, succeededSteps: 0, ...over,
 });
 
 describe('parseSheet', () => {
@@ -82,15 +82,40 @@ describe('buildReport', () => {
     expect(report.summary).toContain('48,1%');
     expect(report.summary).toMatch(/huy.*5/);
     expect(report.summary).toMatch(/khong-dung-y.*1/);
-    expect(report.csv.split('\n')[0]).toBe('participant,turn,conversation_id,plans,edits,clarifications,refusals,first_preview_ms,last_plan_status,executed_steps,decision,matches_intent,usable,reason,note');
+    expect(report.csv.split('\n')[0]).toBe('participant,turn,conversation_id,plans,superseded,edits,clarifications,refusals,first_preview_ms,last_plan_status,execution_rows,started_steps,decision,matches_intent,usable,reason,note');
     expect(report.csv).toContain('"ghi chú, có dấu phẩy"');
+    expect(report).toMatchObject({ shortParticipants: [] });
+    expect(report.summary).toContain('P01 4, P02 4, P03 4, P04 4, P05 4');
   });
-  it('flags a sample below 20 turns or 5 participants', () => {
+  it('exports superseded plans apart from edits, which count every plan after the first', () => {
+    // An earlier plan that expired is not superseded but still means the participant asked again.
+    const [turn] = buildReport([classifyTurn({ participant: 'P01', turn: 1, conversationId: id(), decision: 'duyet', matchesIntent: 'co', note: '' },
+      facts({ plans: 2, superseded: 0, lastPlanStatus: 'rejected' }))]).csv.split('\n').slice(1);
+    expect(turn!.split(',').slice(3, 6)).toEqual(['2', '0', '1']);
+  });
+  it('flags a sample below 20 turns, 5 participants or 4 turns for each participant', () => {
     const one = classifyTurn({ participant: 'P01', turn: 1, conversationId: id(), decision: 'duyet', matchesIntent: 'co', note: '' }, null);
     expect(buildReport([one])).toMatchObject({ meetsMinimum: false });
     const fourPeople = Array.from({ length: 20 }, (_, i) => classifyTurn(
       { participant: `P0${(i % 4) + 1}`, turn: Math.floor(i / 4) + 1, conversationId: id(), decision: 'duyet', matchesIntent: 'co', note: '' }, facts()));
     expect(buildReport(fourPeople)).toMatchObject({ total: 20, participants: 4, meetsMinimum: false });
+    // 16-1-1-1-1: twenty turns and five codes, but only one person took four turns.
+    const lopsided = Array.from({ length: 20 }, (_, i) => classifyTurn(
+      { participant: i < 16 ? 'P01' : `P0${i - 14}`, turn: i < 16 ? i + 1 : 1, conversationId: id(), decision: 'duyet', matchesIntent: 'co', note: '' }, facts()));
+    const report = buildReport(lopsided);
+    expect(report).toMatchObject({ total: 20, participants: 5, meetsMinimum: false, shortParticipants: ['P02', 'P03', 'P04', 'P05'] });
+    expect(report.summary).toContain('P01 16, P02 1, P03 1, P04 1, P05 1');
+    expect(report.summary).toContain('Chưa đủ 4 lượt: P02, P03, P04, P05');
+  });
+  it('reports steps that started without claiming anyone allowed a real run', () => {
+    const turn = (startedSteps: number, executionRows: number) => classifyTurn(
+      { participant: 'P01', turn: 1, conversationId: id(), decision: 'duyet', matchesIntent: 'co', note: '' }, facts({ startedSteps, executionRows }));
+    const previewOnly = buildReport([turn(0, 2)]).summary;
+    expect(previewOnly).toContain('Lượt có bước đã bắt đầu chạy: 0');
+    const ran = buildReport([turn(1, 2)]).summary;
+    expect(ran).toContain('Lượt có bước đã bắt đầu chạy: 1');
+    expect(ran).toContain('đối chiếu với phiếu');
+    for (const summary of [previewOnly, ran]) expect(summary).not.toMatch(/chủ dự án|cho chạy thật/);
   });
 });
 
@@ -145,13 +170,27 @@ describe('PostgreSQL', () => {
       `P01,5,${conversations.clarified},duyet,co,`,
     ].join('\n'));
     const found = await withReadOnly(pool, (client) => readTurnFacts(client, sheet.map((r) => r.conversationId)));
-    expect(found.get(conversations.first)).toMatchObject({ plans: 1, superseded: 0, firstPreviewMs: 8000, lastPlanStatus: 'rejected', executedSteps: 0 });
+    expect(found.get(conversations.first)).toMatchObject({ plans: 1, superseded: 0, firstPreviewMs: 8000, lastPlanStatus: 'rejected', executionRows: 0, startedSteps: 0 });
     expect(found.get(conversations.twoEdits)).toMatchObject({ plans: 3, superseded: 2, lastPlanStatus: 'rejected', firstPreviewMs: 8000 });
     expect(found.get(conversations.clarified)).toMatchObject({ clarifications: 1, plans: 1 });
     const turns = sheet.map((row) => classifyTurn(row, found.get(row.conversationId) ?? null));
     expect(turns.map((t) => [t.usable, t.reason])).toEqual([[true, ''], [true, ''], [false, 'sua-qua-nhieu'], [false, 'huy'], [true, '']]);
     expect(buildReport(turns)).toMatchObject({ total: 5, usable: 3 });
     expect(buildReport(turns).csv).not.toContain('nội dung riêng tư');
+  });
+
+  it('counts a step as started only when it turned running, not when its row was created', async () => {
+    const owner = (await pool.query('SELECT user_id FROM conversations WHERE id = $1', [conversations.first])).rows[0].user_id;
+    const conv = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
+    await pool.query("INSERT INTO messages (conv_id, role, content, created_at) VALUES ($1, 'user', 'x', $2)", [conv, at(0)]);
+    const plan = (await pool.query("INSERT INTO plans (conv_id, plan_json, plan_hash, status, expires_at, created_at) VALUES ($1, '{}', 'h', 'stopped', now(), $2) RETURNING id", [conv, at(8)])).rows[0].id;
+    // executePlan creates every row as pending before the controller runs; a skipped step may never have started.
+    for (const [step, status, started] of [['step_1', 'succeeded', true], ['step_2', 'pending', false], ['step_3', 'skipped', false]] as const) {
+      await pool.query(`INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, requested_by, started_at)
+        VALUES ($1, $2, 'slack.send_message', '{}', $3, $4, CASE WHEN $5 THEN now() ELSE NULL END)`, [plan, step, status, owner, started]);
+    }
+    const found = await withReadOnly(pool, (client) => readTurnFacts(client, [conv]));
+    expect(found.get(conv)).toMatchObject({ executionRows: 3, startedSteps: 1, succeededSteps: 1 });
   });
 
   it('runs inside a read-only transaction', async () => {

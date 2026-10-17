@@ -27,7 +27,10 @@ export interface TurnFacts {
   /** From the first user message to the first saved plan, the moment the preview appears. */
   firstPreviewMs: number | null;
   lastPlanStatus: string | null;
-  executedSteps: number;
+  /** Rows in execution_steps: executePlan creates every step as pending before anything runs. */
+  executionRows: number;
+  /** Steps that turned running at least once (started_at is set only then). */
+  startedSteps: number;
   succeededSteps: number;
 }
 export interface TurnResult extends SheetRow {
@@ -42,6 +45,8 @@ export interface Report {
   usable: number;
   participants: number;
   meetsMinimum: boolean;
+  /** Participant codes with fewer than MIN_TURNS_PER_PARTICIPANT turns. */
+  shortParticipants: string[];
   interval: { low: number; high: number } | null;
   csv: string;
   summary: string;
@@ -51,6 +56,7 @@ const COLUMNS = ['participant', 'turn', 'conversation_id', 'decision', 'matches_
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MIN_TURNS = 20;
 export const MIN_PARTICIPANTS = 5;
+export const MIN_TURNS_PER_PARTICIPANT = 4;
 
 /** RFC 4180 subset: commas, quoted fields with escaped quotes, CRLF or LF. */
 function parseCsv(text: string): string[][] {
@@ -126,7 +132,8 @@ export async function readTurnFacts(client: pg.PoolClient | pg.Pool, conversatio
       (SELECT min(m.created_at) FROM messages m WHERE m.conv_id = c.id AND m.role = 'user') AS first_user_at,
       (SELECT min(p.created_at) FROM plans p WHERE p.conv_id = c.id) AS first_plan_at,
       (SELECT p.status FROM plans p WHERE p.conv_id = c.id ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS last_plan_status,
-      (SELECT count(*) FROM execution_steps s JOIN plans p ON p.id = s.plan_id WHERE p.conv_id = c.id)::int AS executed_steps,
+      (SELECT count(*) FROM execution_steps s JOIN plans p ON p.id = s.plan_id WHERE p.conv_id = c.id)::int AS execution_rows,
+      (SELECT count(*) FROM execution_steps s JOIN plans p ON p.id = s.plan_id WHERE p.conv_id = c.id AND s.started_at IS NOT NULL)::int AS started_steps,
       (SELECT count(*) FROM execution_steps s JOIN plans p ON p.id = s.plan_id WHERE p.conv_id = c.id AND s.status = 'succeeded')::int AS succeeded_steps
     FROM conversations c WHERE c.id = ANY($1::uuid[])`, [conversationIds]);
   return new Map(rows.map((row) => [row.conversation_id, {
@@ -134,7 +141,7 @@ export async function readTurnFacts(client: pg.PoolClient | pg.Pool, conversatio
     plans: row.plans, superseded: row.superseded, clarifications: row.clarifications, refusals: row.refusals,
     firstPreviewMs: row.first_user_at && row.first_plan_at ? new Date(row.first_plan_at).getTime() - new Date(row.first_user_at).getTime() : null,
     lastPlanStatus: row.last_plan_status ?? null,
-    executedSteps: row.executed_steps, succeededSteps: row.succeeded_steps,
+    executionRows: row.execution_rows, startedSteps: row.started_steps, succeededSteps: row.succeeded_steps,
   }]));
 }
 
@@ -174,28 +181,35 @@ function quantile(sorted: number[], q: number): number {
 
 export function buildReport(turns: TurnResult[]): Report {
   const total = turns.length, usable = turns.filter((t) => t.usable).length;
-  const participants = new Set(turns.map((t) => t.participant)).size;
-  const meetsMinimum = total >= MIN_TURNS && participants >= MIN_PARTICIPANTS;
+  const perParticipant = new Map<string, number>();
+  for (const t of turns) perParticipant.set(t.participant, (perParticipant.get(t.participant) ?? 0) + 1);
+  const participants = perParticipant.size;
+  const counts = [...perParticipant].sort(([a], [b]) => a.localeCompare(b));
+  const shortParticipants = counts.filter(([, count]) => count < MIN_TURNS_PER_PARTICIPANT).map(([code]) => code);
+  const meetsMinimum = total >= MIN_TURNS && participants >= MIN_PARTICIPANTS && shortParticipants.length === 0;
   const interval = wilson(usable, total);
-  const header = ['participant', 'turn', 'conversation_id', 'plans', 'edits', 'clarifications', 'refusals', 'first_preview_ms', 'last_plan_status', 'executed_steps', 'decision', 'matches_intent', 'usable', 'reason', 'note'];
-  const csv = [header.join(','), ...turns.map((t) => [t.participant, t.turn, t.conversationId, t.facts?.plans ?? '', t.edits, t.facts?.clarifications ?? '',
-    t.facts?.refusals ?? '', t.facts?.firstPreviewMs ?? '', t.facts?.lastPlanStatus ?? '', t.facts?.executedSteps ?? '', t.decision, t.matchesIntent,
-    t.usable ? 'co' : 'khong', t.reason, t.note].map(csvCell).join(','))].join('\n') + '\n';
+  const header = ['participant', 'turn', 'conversation_id', 'plans', 'superseded', 'edits', 'clarifications', 'refusals', 'first_preview_ms', 'last_plan_status',
+    'execution_rows', 'started_steps', 'decision', 'matches_intent', 'usable', 'reason', 'note'];
+  const csv = [header.join(','), ...turns.map((t) => [t.participant, t.turn, t.conversationId, t.facts?.plans ?? '', t.facts?.superseded ?? '', t.edits,
+    t.facts?.clarifications ?? '', t.facts?.refusals ?? '', t.facts?.firstPreviewMs ?? '', t.facts?.lastPlanStatus ?? '', t.facts?.executionRows ?? '',
+    t.facts?.startedSteps ?? '', t.decision, t.matchesIntent, t.usable ? 'co' : 'khong', t.reason, t.note].map(csvCell).join(','))].join('\n') + '\n';
 
   const reasons = new Map<string, number>();
   for (const t of turns) if (!t.usable) reasons.set(t.reason, (reasons.get(t.reason) ?? 0) + 1);
   const previews = turns.map((t) => t.facts?.firstPreviewMs).filter((ms): ms is number => typeof ms === 'number').sort((a, b) => a - b);
   const statuses = new Map<string, number>();
   for (const t of turns) { const s = t.facts?.lastPlanStatus ?? '(không có kế hoạch)'; statuses.set(s, (statuses.get(s) ?? 0) + 1); }
-  const executed = turns.filter((t) => (t.facts?.executedSteps ?? 0) > 0).length;
+  const started = turns.filter((t) => (t.facts?.startedSteps ?? 0) > 0).length;
 
   const lines = [
     '# W4-03 · Tỉ lệ kế hoạch dùng được',
     '',
-    `- Lượt: **${total}**, người tham gia: **${participants}**. Mẫu tối thiểu (≥ ${MIN_TURNS} lượt, ≥ ${MIN_PARTICIPANTS} người): **${meetsMinimum ? 'đạt' : 'chưa đạt'}**.`,
+    `- Lượt: **${total}**, người tham gia: **${participants}**. Mẫu tối thiểu (≥ ${MIN_TURNS} lượt, ≥ ${MIN_PARTICIPANTS} người, mỗi người ≥ ${MIN_TURNS_PER_PARTICIPANT} lượt): **${meetsMinimum ? 'đạt' : 'chưa đạt'}**.`,
+    `- Lượt theo người: ${counts.map(([code, count]) => `${code} ${count}`).join(', ') || '(không có)'}.${shortParticipants.length ? ` Chưa đủ ${MIN_TURNS_PER_PARTICIPANT} lượt: ${shortParticipants.join(', ')}.` : ''}`,
     `- Dùng được: **${usable}/${total}**${interval ? ` = **${percent(usable / total)}**, khoảng tin cậy 95% (Wilson) **${percent(interval.low)} – ${percent(interval.high)}**` : ''}.`,
     previews.length ? `- Thời gian tới kế hoạch đầu tiên (${previews.length} lượt có kế hoạch): p50 ${seconds(quantile(previews, 0.5))}, p95 ${seconds(quantile(previews, 0.95))}.` : '- Không có lượt nào có kế hoạch.',
-    `- Lượt có bước đã thực thi: ${executed}${executed ? ' (chủ dự án cho chạy thật)' : ' (đúng quy trình chỉ xem)'}.`,
+    // A started step is a fact from PostgreSQL; whether a real run was allowed is only in the sheet.
+    `- Lượt có bước đã bắt đầu chạy: ${started}${started ? '. Quy trình chỉ xem không chạy bước nào; đối chiếu với phiếu để biết các lượt này có được phép chạy thật không.' : ' (đúng quy trình chỉ xem).'}`,
     '',
     '## Không dùng được, theo nguyên nhân',
     '',
@@ -210,5 +224,5 @@ export function buildReport(turns: TurnResult[]): Report {
     ...[...statuses].sort((a, b) => b[1] - a[1]).map(([status, count]) => `| ${status} | ${count} |`),
     '',
   ];
-  return { total, usable, participants, meetsMinimum, interval, csv, summary: lines.join('\n') };
+  return { total, usable, participants, meetsMinimum, shortParticipants, interval, csv, summary: lines.join('\n') };
 }
