@@ -60,6 +60,9 @@ export function RecoveryMoment({moment,snapshot,steps,services,controls}:{moment
   const service=serviceName(serviceId(paused?.tool ?? ''),services);
   const destination=recoveryDestination(planStep && snapshot ? {...planStep,args:savedArguments(planStep.args,snapshot) as Record<string,unknown>}:planStep);
   const hasUnknown=unknown.length>0;
+  const gmailSender = snapshot?.plan.connections?.gmail?.email;
+  const sentFolder = paused?.status === 'unknown' && ['gmail.send_message', 'gmail.reply', 'gmail.forward'].includes(planStep?.tool ?? '') && gmailSender
+    ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(gmailSender)}#sent` : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
@@ -91,6 +94,7 @@ export function RecoveryMoment({moment,snapshot,steps,services,controls}:{moment
       </>}
       {paused && <details className="text-xs text-brand-muted"><summary>Chi tiết để đối chiếu</summary><code>{paused.tool}</code><p>{paused.description}</p>{planStep && snapshot && <pre className="whitespace-pre-wrap break-all">{JSON.stringify(savedArguments(planStep.args,snapshot),null,2)}</pre>}{paused.duration && <p>{paused.duration}</p>}</details>}
     </div>
+    {sentFolder && <p className="text-sm text-brand-text">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở thư mục Đã gửi</a></p>}
     {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
     <div className="flex flex-wrap items-center gap-3">
       {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { PlanStep } from '../types';
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../services/tool-definitions';
 
 export interface PlanStepItemProps {
   step: PlanStep;
@@ -38,7 +38,7 @@ export const PlanStepItem: React.FC<PlanStepItemProps> = ({
   isLast = false,
   resourceLabels = {},
 }) => {
-  const tool = getToolDefinition(step.tool);
+  const tool = toolDefinition(step.tool);
   return (
     <div className="relative flex items-start gap-3.5">
       {/* Step Circle & Connector */}

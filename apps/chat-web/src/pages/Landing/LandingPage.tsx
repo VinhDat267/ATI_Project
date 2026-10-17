@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Mous
 import { flushSync } from 'react-dom';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { LoginViewProps } from '../../components/LoginView';
+import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import css from './page.css?inline';
@@ -87,6 +88,7 @@ export interface LandingPageProps extends Partial<LoginViewProps> {
 }
 export function LandingPage({ navigate, initialMode, email = '', setEmail = () => {}, password = '', setPassword = () => {},
   isLoggingIn = false, authError, onLogin, authConfig }: LandingPageProps) {
+  const gmailEnabled = useGmailEnabled();
   usePrototypePage(meta);
   const model = useRef({ moment: 1, isTyping: false });
   const [moment, setMoment] = useState(1), [switched, setSwitched] = useState(false);
@@ -1432,7 +1434,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 Không cần chuyển đổi phần mềm làm việc. ATI liên kết trực tiếp với các dịch vụ quen thuộc của bạn.
               </p>
             </div>
-            {/* Lưới 8 dịch vụ, mỗi dịch vụ 1 card trang nhã */}
+            {/* Lưới 8 dịch vụ dùng chung, mỗi dịch vụ 1 card trang nhã; Gmail của riêng từng người thêm vào khi được bật */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
               {/* 1. Trello */}
               <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group">
@@ -1618,6 +1620,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                   </p>
                 </div>
               </div>
+              {/* 9. Gmail, của riêng từng người */}
+              {gmailEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group v3-space-y-3">
+                <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
+                <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
+              </div>}
             </div>
           </div>
         </section>

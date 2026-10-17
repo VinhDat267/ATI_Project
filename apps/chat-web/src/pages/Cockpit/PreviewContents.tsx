@@ -1,8 +1,9 @@
 // Source: AppStagePage.tsx PREVIEW.card/issue/rows/message content, with actual plan arguments.
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import type { PlanStep } from '../../types';
 import { formatArgValue } from '../../components/PlanStepItem';
 import { operation } from './presentation';
+import { GmailPreview } from './GmailPreview';
 
 const names: Record<string,string> = {
   title:'Tiêu đề', name:'Tên', summary:'Tiêu đề', body:'Nội dung', text:'Nội dung',
@@ -11,13 +12,14 @@ const names: Record<string,string> = {
 const text = (value:unknown) => formatArgValue(value).text;
 
 function OtherArguments({step,except}:{step:PlanStep;except:string[]}) {
-  return Object.entries(step.args).filter(([key])=>!except.includes(key) && !getToolDefinition(step.tool)?.inputSchema.properties?.[key]?.['x-resource']).map(([key,value])=><div key={key}>
+  return Object.entries(step.args).filter(([key])=>!except.includes(key) && !toolDefinition(step.tool)?.inputSchema.properties?.[key]?.['x-resource']).map(([key,value])=><div key={key}>
     <span className="text-[11px] text-neutral-400 uppercase font-semibold">{names[key] ?? key}:</span>
     <div className="text-xs text-neutral-800 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed v3-space-y-1.5 whitespace-pre-wrap break-words">{text(value)}</div>
   </div>);
 }
 
-export function PreviewContents({step,destination}:{step:PlanStep;destination:string}) {
+export function PreviewContents({step,destination,labels}:{step:PlanStep;destination:string;labels?:Record<string,string>}) {
+  if (step.tool.startsWith('gmail.')) return <GmailPreview step={step} labels={labels} />;
   const style=operation(step.tool).previewStyle;
   if(style==='card') return <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
     {step.args.title!=null && <div>

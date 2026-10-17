@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../services/tool-definitions';
 import presentation from '../assets/cockpit-services.json';
 import { useChatStore } from '../store/chat-store';
 import { selectMoment } from '../services/cockpit-moment';
@@ -40,9 +40,11 @@ interface Props {
 }
 const prompts: Record<string,string> = Object.fromEntries(Object.entries(presentation.services).map(([id, asset]) => [id, asset.prompt]));
 export function resourceDestination(step: PlanStep, labels: Record<string, string> = {}): string {
-  const definition = getToolDefinition(step.tool);
+  const definition = toolDefinition(step.tool);
   const resourceNames = presentation.resourceNames as Record<string,string>;
-  return Object.entries(step.args).filter(([key]) => definition?.inputSchema.properties?.[key]?.['x-resource']).map(([key, value]) => {
+  // A Gmail label is what a step applies to a thread, not where it writes.
+  const destinationResource = (key: string) => { const resource = definition?.inputSchema.properties?.[key]?.['x-resource']; return resource && resource !== 'label'; };
+  return Object.entries(step.args).filter(([key]) => destinationResource(key)).map(([key, value]) => {
     if ((typeof value === 'string' || typeof value === 'number') && Object.hasOwn(labels, String(value))) return labels[String(value)];
     const reference = value && typeof value === 'object' && '$ref' in value ? String(value.$ref) : typeof value === 'string' && value.startsWith('$step_') ? value : null;
     const number = reference?.match(/step_(\d+)/)?.[1];
@@ -168,7 +170,7 @@ export function Cockpit(props: Props) {
     {drawer && <DrawerBackdrop onClose={()=>setDrawer(null)}/>}
     {drawer === 'history' && <HistoryDrawer conversationId={state.conversationId} onClose={()=>setDrawer(null)} onNewConversation={props.onNewConversation} onSelectConversation={props.onSelectConversation}/>}
     {drawer === 'conversation' && <ConversationDrawer messages={state.messages} streamingText={state.streamingText} isStreaming={state.isStreaming} onClose={()=>setDrawer(null)} composer={<ChatComposer variant="drawer" {...composerProps}/>}/>}
-    {preview && <PreviewModal step={preview} services={props.services} labels={state.activePlan?.resourceLabels} destination={resourceDestination} onClose={()=>setPreview(null)}/>}
+    {preview && <PreviewModal sender={state.activePlan?.connections?.gmail?.email} step={preview} services={props.services} labels={state.activePlan?.resourceLabels} destination={resourceDestination} onClose={()=>setPreview(null)}/>}
 
   </>;
 }

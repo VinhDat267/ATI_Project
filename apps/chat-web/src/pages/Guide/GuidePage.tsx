@@ -3,10 +3,14 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { UserNavMenu } from '../../components/layout/UserNavMenu';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
+import { ServiceLogo } from '../../components/ServiceLogo';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import { CAPABILITIES_DATA, SAMPLE_PROMPTS, SERVICE_GUIDES, SERVICE_SVGS } from './data';
+import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
+import { GMAIL_GUIDE, GMAIL_PROMPTS, GMAIL_CAPABILITY } from './gmail-data';
+import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS } from './data';
 
+const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
 type Toast = { id: number; message: string; fading: boolean };
 const TAB_ON = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#FF5701] text-white shadow-sm';
@@ -35,13 +39,13 @@ function initialService() {
 }
 
 // Phân khu 1: chi tiết hướng dẫn lấy khoá của một dịch vụ (renderServiceGuideDetail).
-function ServiceGuideDetail({ serviceId, navigate }: { serviceId: string; navigate: Navigate }) {
-  const s = SERVICE_GUIDES[serviceId];
+function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { serviceId: string; navigate: Navigate; guides?: typeof SERVICE_GUIDES }) {
+  const s = guides[serviceId];
   return <>
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E7E7E2]">
       <div className="flex items-center gap-3.5">
         <div className="w-12 h-12 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-2.5 shadow-sm">
-          {SERVICE_SVGS[serviceId] || ''}
+          {SERVICE_SVGS[serviceId] || <ServiceLogo service={serviceId} className="w-5 h-5" />}
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -52,16 +56,16 @@ function ServiceGuideDetail({ serviceId, navigate }: { serviceId: string; naviga
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title="Mở trang cài đặt để dán khoá">
-          <span>Đi tới Cài đặt khoá →</span>
+        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title={s.id === 'gmail' ? 'Mở kết nối Gmail' : 'Mở trang cài đặt để dán khoá'}>
+          <span>{s.id === 'gmail' ? 'Kết nối Gmail →' : 'Đi tới Cài đặt khoá →'}</span>
         </a>
       </div>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-[11px] text-[#6B7280] font-medium">Khoá cần lấy:</div>
+        <div className="text-[11px] text-[#6B7280] font-medium">{s.id === 'gmail' ? 'Cách kết nối:' : 'Khoá cần lấy:'}</div>
         <div className="font-semibold text-xs text-[#111827] mt-1 flex flex-wrap gap-1">
-          {s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
+          {s.id === 'gmail' && <span>Google OAuth · không nhập khoá</span>}{s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
         </div>
       </div>
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
@@ -87,7 +91,7 @@ function ServiceGuideDetail({ serviceId, navigate }: { serviceId: string; naviga
     </div>
     <div className="v3-space-y-4 pt-2">
       <h4 className="text-sm font-bold text-[#111827] uppercase tracking-wider">
-        Các bước lấy khoá chi tiết từng thao tác:
+        {s.id === 'gmail' ? 'Các bước kết nối hộp thư:' : 'Các bước lấy khoá chi tiết từng thao tác:'}
       </h4>
       <div className="v3-space-y-3">
         {s.steps.map(st => (
@@ -150,8 +154,8 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
         <div className="flex flex-wrap items-center gap-1.5">
           {p.services.map(sid => (
             <span key={sid} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E7E7E2] text-[11px] font-medium text-neutral-700">
-              <span className="w-3.5 h-3.5 flex items-center justify-center">{SERVICE_SVGS[sid] || ''}</span>
-              <span>{SERVICE_GUIDES[sid]?.name || sid}</span>
+              <span className="w-3.5 h-3.5 flex items-center justify-center">{SERVICE_SVGS[sid] || <ServiceLogo service={sid} className="w-5 h-5" />}</span>
+              <span>{sid === 'gmail' ? 'Gmail' : SERVICE_GUIDES[sid]?.name || sid}</span>
             </span>
           ))}
         </div>
@@ -186,7 +190,7 @@ function CapabilityCard({ c, navigate }: { c: typeof CAPABILITIES_DATA[number]; 
     <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#E7E7E2]">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-1.5">
-          {SERVICE_SVGS[c.id] || ''}
+          {SERVICE_SVGS[c.id] || <ServiceLogo service={c.id} className="w-5 h-5" />}
         </div>
         <div>
           <h4 className="font-bold text-base text-[#111827]">{c.name}</h4>
@@ -240,6 +244,11 @@ export const meta: PageMeta = {
 
 export function GuidePage({ navigate, user = null, onLogout = () => navigate('/') }: { navigate: Navigate; user?: User | null; onLogout?: () => void }) {
   usePrototypePage(meta);
+  const gmailEnabled = useGmailEnabled();
+  const SERVICE_GUIDES = gmailEnabled ? { ...BASE_GUIDES, gmail: GMAIL_GUIDE } : BASE_GUIDES;
+  const SAMPLE_PROMPTS = gmailEnabled ? [...BASE_PROMPTS, ...GMAIL_PROMPTS] : BASE_PROMPTS;
+  const CAPABILITIES_DATA = gmailEnabled ? [...BASE_CAPABILITIES, GMAIL_CAPABILITY] : BASE_CAPABILITIES;
+  useEffect(() => { if (gmailEnabled && new URLSearchParams(window.location.search).get('service') === 'gmail') setServiceId('gmail'); }, [gmailEnabled]);
   const [tab, setTab] = useState<MainTab>(initialTab);
   const [serviceId, setServiceId] = useState(initialService);
   const [category, setCategory] = useState('all');
@@ -432,7 +441,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 return (
                   <button key={id} type="button" onClick={() => actions.selectServiceGuide(id)} id={`service-pill-${id}`} className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group ${isSelected ? 'bg-orange-50/80 border-[#FF5701] ring-1 ring-[#FF5701]' : 'bg-[#F8F8F6] border-[#E7E7E2] hover:bg-white hover:border-neutral-300'}`}>
                     <div className="w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-110">
-                      {SERVICE_SVGS[id] || ''}
+                      {SERVICE_SVGS[id] || <ServiceLogo service={id} className="w-5 h-5" />}
                     </div>
                     <span className={`text-xs font-semibold mt-1.5 ${isSelected ? 'text-[#FF5701]' : 'text-[#374151]'}`}>{SERVICE_GUIDES[id].name}</span>
                   </button>
@@ -442,7 +451,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           </div>
           {/* Khung chi tiết hướng dẫn của dịch vụ được chọn */}
           <div id="service-guide-detail" className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm v3-space-y-6">
-            <ServiceGuideDetail serviceId={serviceId} navigate={navigate} />
+            <ServiceGuideDetail serviceId={SERVICE_GUIDES[serviceId] ? serviceId : DEFAULT_SERVICE} guides={SERVICE_GUIDES} navigate={navigate} />
           </div>
         </section>
         {/* ========================================================
@@ -464,8 +473,9 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </div>
               {/* Các nút lọc nhóm nghiệp vụ */}
               <div className="flex flex-wrap gap-1.5 sm:gap-2" id="prompt-category-filter">
+                {gmailEnabled && <button type="button" className={catClass('email')} onClick={() => actions.setPromptCategory('email')}>Email ({GMAIL_PROMPTS.length})</button>}
                 <button type="button" onClick={() => actions.setPromptCategory('all')} id="btn-cat-all" className={catClass('all')}>
-                  Tất cả (12)
+                  {`Tất cả (${SAMPLE_PROMPTS.length})`}
                 </button>
                 <button type="button" onClick={() => actions.setPromptCategory('sprint-bug')} id="btn-cat-sprint-bug" className={catClass('sprint-bug')}>
                   Lỗi Sprint (4)

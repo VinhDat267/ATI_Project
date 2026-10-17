@@ -1,4 +1,5 @@
 // Chuyển từ docs/design/prototypes/privacy.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
+import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
 import type { MouseEvent } from 'react';
 import { UserNavMenu } from '../../components/layout/UserNavMenu';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
@@ -25,6 +26,7 @@ export const meta: PageMeta = {
 
 export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('/') }: { navigate: Navigate; user?: User | null; onLogout?: () => void }) {
   usePrototypePage(meta);
+  const gmailEnabled = useGmailEnabled();
   return (
     <>
       {/* ==================== HEADER (COCKPIT BAR) ==================== */}
@@ -447,15 +449,21 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   {' '}
                 </svg>
                 <span>
-                  ATI TUYỆT ĐỐI KHÔNG TRUY CẬP
+                  Quyền truy cập Google
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-[#374151] leading-relaxed">
-                Đăng nhập Google chỉ dùng để xác định bạn là ai. ATI không đọc Gmail, Drive hay lịch cá nhân của bạn. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
+                Đăng nhập Google chỉ dùng để xác định bạn là ai. ATI chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. ATI không truy cập Drive hay lịch cá nhân. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
               </p>
             </div>
           </div>
-          {/* Quy định duyệt tài khoản Google mới */}
+          {gmailEnabled && <section aria-label="Dữ liệu Gmail" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
+              <h3 className="font-semibold text-[#111827]">Hộp thư Gmail bạn kết nối</h3>
+              <p>Nội dung và tiêu đề thư đi qua 9router tới tài khoản model bên thứ ba để lập kế hoạch hoặc trả lời.</p>
+              <p>Token được mã hoá trong cơ sở dữ liệu. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư ATI gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
+              <p>Ngắt kết nối chỉ xoá token và thu hồi quyền Google; hội thoại, câu trả lời và kế hoạch cũ vẫn còn. Hiện chưa có chức năng xoá hội thoại. ATI không xoá vĩnh viễn thư.</p>
+            </section>}
+            {/* Quy định duyệt tài khoản Google mới */}
           <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">
             <div className="font-semibold text-[#111827] mb-1 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#FF5701]" />

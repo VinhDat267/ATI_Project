@@ -130,7 +130,9 @@
     "page": "Trang",
     "database": "Cơ sở dữ liệu",
     "chat": "Cuộc trò chuyện",
-    "project": "Dự án"
+    "project": "Dự án",
+    "thread": "Luồng thư",
+    "label": "Nhãn"
   },
   "operations": {
     "github.create_issue": {
@@ -201,6 +203,55 @@
       "kind": "Issue",
       "link": "Mở issue",
       "titleField": "key"
+    },
+    "gmail.send_message": {
+      "action": "Gửi thư",
+      "done": "Đã gửi thư",
+      "receipt": "Đã gửi thư",
+      "kind": "Thư",
+      "link": "Mở kết quả"
+    },
+    "gmail.reply": {
+      "action": "Trả lời thư",
+      "done": "Đã gửi trả lời",
+      "receipt": "Đã gửi trả lời",
+      "kind": "Thư",
+      "link": "Mở kết quả"
+    },
+    "gmail.forward": {
+      "action": "Chuyển tiếp thư",
+      "done": "Đã chuyển tiếp",
+      "receipt": "Đã chuyển tiếp thư",
+      "kind": "Thư",
+      "link": "Mở kết quả"
+    },
+    "gmail.create_draft": {
+      "action": "Tạo thư nháp",
+      "done": "Đã tạo thư nháp",
+      "receipt": "Đã tạo thư nháp",
+      "kind": "Thư nháp",
+      "link": "Mở kết quả"
+    },
+    "gmail.modify_thread_labels": {
+      "action": "Đổi nhãn",
+      "done": "Đã đổi nhãn",
+      "receipt": "Đã đổi nhãn luồng thư",
+      "kind": "Nhãn",
+      "link": "Mở kết quả"
+    },
+    "gmail.trash_thread": {
+      "action": "Chuyển vào thùng rác",
+      "done": "Đã chuyển vào thùng rác",
+      "receipt": "Đã chuyển vào thùng rác",
+      "kind": "Luồng thư",
+      "link": "Mở kết quả"
+    },
+    "gmail.create_label": {
+      "action": "Tạo nhãn",
+      "done": "Đã tạo nhãn",
+      "receipt": "Đã tạo nhãn",
+      "kind": "Nhãn",
+      "link": "Mở kết quả"
     }
   }
 }

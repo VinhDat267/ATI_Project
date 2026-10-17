@@ -1,5 +1,5 @@
 // Ported from PROTO-01 SettingsPage: source markup/classes and page.css retained.
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { usePrototypePage } from '../../prototype/usePrototypePage';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { UserNavMenu } from '../../components/layout/UserNavMenu';
@@ -7,6 +7,8 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import type { User } from '../../types';
 import { type Service } from './data';
 import { useSettings } from './useSettings';
+import { PersonalGmail } from './PersonalGmail';
+import { gmailConnectionNotice } from '../../services/gmail-connection';
 import { meta } from './meta';
 
 const SAVED_PLACEHOLDER = 'Đã lưu · nhập lại nếu muốn thay';
@@ -87,7 +89,9 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
 export interface SettingsPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void; authToken?: string | null }
 export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
-  const { list, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
+  const { list, personal, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
+  const [connectedEmail, setConnectedEmail] = useState<string>();
+  useEffect(() => { const email = gmailConnectionNotice.take(user?.id); if (email) setConnectedEmail(email); }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(actions.closeServiceDrawer); closeRef.current = actions.closeServiceDrawer;
   useLayoutEffect(() => {
@@ -125,7 +129,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   const result = results[selected ?? ''] ?? { kind: null, visible: false, message: '', time: '' };
   const visibleResult = !!results[selected ?? ''];
   return <>
-    <div ref={backgroundRef} className="contents" onClick={event => {
+    <div data-cockpit-background ref={backgroundRef} className="contents" onClick={event => {
       const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
       if (anchor && anchor.origin === window.location.origin && !anchor.target && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(`${anchor.pathname}${anchor.search}${anchor.hash}`); }
     }}>
@@ -221,6 +225,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         </div>
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
+        {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
+        {personal && <PersonalGmail key={user?.id} selected={selected} service={personal} refresh={refresh} />}
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
         {hasCatalogue && <div className="v3-space-y-8 sm:v3-space-y-10">
           {/* Nhóm 1: Đã thiết lập */}
@@ -273,7 +279,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật
+              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. Gmail riêng do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">
