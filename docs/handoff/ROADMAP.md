@@ -61,10 +61,10 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 4 (thêm 13/10, trước 21/10) | Kiểu phản hồi "trả lời" cho câu chỉ đọc, mọi dịch vụ, sau cờ `PLANNER_READ_ANSWERS` tắt mặc định (thay chốt 05/10 khi cờ bật) | [ANS-01](tasks/ANS-01-read-answers.md) | **xong** #142 (`96f9f09`, 16/10), `longnguyen005`; review độc lập Đạt sau một lượt sửa (1 P2, 1 P3 thiếu test) và rebase lên `main` có #143 |
 | 4 (thêm 13/10, trước 23/10) | Giao diện Gmail: nhóm "Của riêng bạn" ở `/settings`, callback, "Gửi từ" và nguồn người nhận ở xem trước, `/privacy`, `/guide`, Landing | [GMAIL-03](tasks/GMAIL-03-gmail-ui.md) | chờ, giao `longnguyen005`; API của GMAIL-01 đã có (#140), tool và kịch bản sandbox `gmail` của GMAIL-02 đã có (#143); ANS-01 đã merge (#142), bắt đầu được |
 | 4–5 (Google project trước 21/10; đo 26–28/10) | Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, PR bật hai cờ trước mốc chốt tính năng 29/10 | [GMAIL-04](tasks/GMAIL-04-measure-and-live.md) | chờ, giao nhóm trưởng; có phần việc của con người. Bước 1 (Google Cloud project riêng cho Gmail) xong 16/10, `.env` đã kiểm; bộ đo làm được vì GMAIL-02 và ANS-01 đã merge; nghiệm thu Google thật cần GMAIL-03 |
-| 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | chờ (khung làm ngay được; câu hỏi do con người viết) |
+| 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | **khung xong** #150 (`98d880b`, 17/10): `GUIDE.md`, `cases.json` rỗng, bộ kiểm định dạng, `EVAL_SET=independent`; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3), reviewer xác nhận GUIDE đủ để giao. Chờ thành viên viết câu từ 22/10, commit đăng ký, rồi 3 lần chạy mỗi chế độ |
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | chờ |
-| 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | chờ (script làm ngay được; buổi thử do con người) |
-| 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | chờ |
+| 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | **khung xong** #149 (`fb38a4d`, 17/10): `PROTOCOL.md` (chỉ xem, không chạy thật; 10 tình huống), script báo cáo chỉ đọc; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3). Chờ buổi thử 23–25/10 với ≥ 5 người × 4 lượt |
+| 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | **công cụ xong** #151 (`ce59f4f`, 17/10): chế độ đo hàng loạt luôn bấm Hủy, 24 câu, tách thời gian server/frontend từ PostgreSQL; review độc lập Đạt sau một lượt sửa (2 P2). Chờ phép đo live sau 20/10; thời gian model chưa tách được khỏi planner |
 | 5 (29/10–04/11) | Ngừng thêm tính năng; môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
 | 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
 
@@ -103,6 +103,14 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - chữ trên nút cam giữ **màu trắng** (3,2:1, ngoại lệ có chủ đích, đặc tả mục 3.2);
 - chữ thường dùng Be Vietnam Pro, tiêu đề dùng Playfair Display;
 - cỡ chữ tối thiểu 14px áp dụng khi làm app, không sửa bản mẫu.
+
+**Cập nhật 17/10 (W4-01, W4-03, W4-04):** phần khung và công cụ của ba task đo tuần 4 vào `main`: #149 (`fb38a4d`), #150 (`98d880b`), #151 (`ce59f4f`). Reviewer thi công theo yêu cầu nhóm trưởng. Mỗi PR có review độc lập lần 1 chưa đạt, sửa một lượt, review lại Đạt; CI xanh đúng head. Không đổi mã sản phẩm. Việc tiếp theo:
+- nhóm trưởng cấp mã `member-N` và gửi `evaluations/golden-independent/GUIDE.md` cho người viết câu (từ 22/10);
+- nhóm trưởng hẹn ≥ 5 người cho buổi thử W4-03 (23–25/10), theo `evaluations/usable-plan/PROTOCOL.md`;
+- phép đo live W4-04 (24 câu, không ghi dịch vụ) sau mốc chốt catalog 20/10, khi nhóm trưởng đồng ý;
+- `longnguyen005` sửa GMAIL-03 (#147) theo review; sửa test GMAIL-01 chập chờn bằng PR nhỏ riêng.
+
+[Log merge](log/2026-10-17-reviewer-merge-149-150-151.md).
 
 **Cập nhật 16/10 (W3-11):** W3-11 xong qua #146 (`2960ab0`), trước buổi thử W4-03. Năm service mới và một workflow 4 dịch vụ chạy thật qua giao diện ở chế độ live; không phát hiện lỗi sản phẩm. Việc tiếp theo:
 - khung W4-03 (`PROTOCOL.md`, script tính tỉ lệ) phải vào `main` trước buổi thử 23–25/10;
