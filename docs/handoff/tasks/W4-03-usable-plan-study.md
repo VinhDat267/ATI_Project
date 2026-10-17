@@ -37,7 +37,7 @@ Lượt bị **Hủy**, phải sửa từ hai lần trở lên, hoặc thực th
 
 ## Kết quả (agent thi công điền)
 
-- PR: (điền khi mở PR), nhánh `test/w4-03-usable-plan-study`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-03-usable-plan-framework.md).
+- PR: [#149](https://github.com/VinhDat267/ATI_Project/pull/149), nhánh `test/w4-03-usable-plan-study`, base `ab54c77`. Nhóm trưởng giao reviewer dựng khung ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-03-usable-plan-framework.md).
 - Kết quả: **phần agent xong; buổi thử chưa chạy.**
   - `evaluations/usable-plan/PROTOCOL.md`:
     - định nghĩa chép nguyên văn từ task card, chốt trước buổi thử đầu tiên;
