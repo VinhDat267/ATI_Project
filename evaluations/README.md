@@ -474,7 +474,10 @@ resources.
 LIVE_EVAL=1 EVAL_SET=multiturn PLANNER_SEARCH_MODE=llm PLANNER_READ_ANSWERS=off EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
 ```
 
-**Not measured yet**: labels `4d63bd6` were committed before any model call.
+**Not measured yet**: labels `4d63bd6` were committed before any model call;
+`9cf3c11` tightened them after the independent review of #157, also before any
+model call. Titles kept from the earlier plan or written out by the user are
+matched exactly.
 A planner fault found by the run gets its own task; the prompt is not changed
 in the W4-02 PR.
 

@@ -37,3 +37,29 @@ Không sửa mã sản phẩm hay prompt.
 - `npm run check` (PostgreSQL 16 tmpfs riêng ở 55533, sandbox, hai cờ tắt, không dùng `.env`): **exit 0** ngay lượt đầu, **2.014 v3 + 353 eval** (332 + 21 mới); quét bản build đạt 7 mẫu.
 
 Không gọi model.
+
+## Sửa theo review #157
+
+[Review độc lập](https://github.com/VinhDat267/ATI_Project/pull/157#issuecomment-6245562173) tại `6803f53`: chưa đạt, 1 P2. Label chỉ tìm một chữ trong tiêu đề hoặc nội dung. Vì vậy một kế hoạch sửa đúng chỗ được yêu cầu nhưng viết lại một trường phải giữ vẫn đạt, ví dụ:
+- đổi kênh nhưng đổi luôn tiêu đề card thành "Không viết release notes";
+- tiêu đề chỉ còn "Safari";
+- báo "build succeeded" trong khi người dùng nói build failed.
+
+Chưa có lời gọi model nào, nên label được siết trước khi đo. Commit `9cf3c11`, riêng, có giải thích:
+- **Tiêu đề phải so khớp chính xác** (`equals`) khi đó là:
+  - tiêu đề mang sang từ kế hoạch trước: `mt_edit02`…`mt_edit06`;
+  - tiêu đề người dùng viết rõ: `mt_edit01`, `mt_reply01`, `mt_new02`, `mt_new03`.
+- **`mt_reply02`:** tin nhắn phải nói build thất bại (`fail`/`broke`/`lỗi`/`hỏng`), không được có `succeed`/`success`/`thành công`.
+- **`mt_reply03`:** tiêu đề do model đặt, nên vẫn chỉ kiểm có `footer`, cộng thêm `form`/`field`/`ô`.
+- **`mt_new01`:** tin nhắn phải nhắc cuộc họp và đúng giờ.
+
+Test mới là một bảng kế hoạch cuối cho cả 12 câu, chấm bằng `scoreCase`:
+- **kế hoạch tốt:** sửa đúng chỗ được yêu cầu và giữ nguyên phần còn lại;
+- **kế hoạch xấu:** sửa đúng chỗ nhưng làm sai một trường khác. Bảng gồm mọi phản ví dụ của review.
+
+Một test khác buộc tiêu đề trong các câu trên dùng `equals`.
+
+Kiểm thử:
+- RED: trên label cũ, 9 câu để kế hoạch xấu đạt, và luật `equals` fail (10 fail / 19 pass). GREEN: 29/29.
+- Đột biến, mỗi lần khôi phục và kiểm SHA-256: runner **5/5** và label **5/5** vẫn bị bắt.
+- `npm run check` (PostgreSQL 16 tmpfs riêng ở 55533, sandbox, hai cờ tắt, không dùng `.env`): **exit 0** ngay lượt đầu, **2.014 v3 + 366 eval** (thêm 13 test so với `6803f53`).
