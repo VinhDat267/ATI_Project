@@ -60,11 +60,11 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 4 (thêm 13/10, trước 21/10) | Gmail phần 2: 10 tool, adapter thật và giả, chặn người nhận bịa, nội dung thư không vào prompt ngoài khối dữ liệu | [GMAIL-02](tasks/GMAIL-02-gmail-tools.md) | **xong** #143 (`7c260c1`, 16/10), nhóm trưởng; review độc lập Đạt sau một lượt sửa P2 (thiếu test chống gửi trùng); 2 P3 về adapter ở CURRENT-STATE mục 5 |
 | 4 (thêm 13/10, trước 21/10) | Kiểu phản hồi "trả lời" cho câu chỉ đọc, mọi dịch vụ, sau cờ `PLANNER_READ_ANSWERS` tắt mặc định (thay chốt 05/10 khi cờ bật) | [ANS-01](tasks/ANS-01-read-answers.md) | **xong** #142 (`96f9f09`, 16/10), `longnguyen005`; review độc lập Đạt sau một lượt sửa (1 P2, 1 P3 thiếu test) và rebase lên `main` có #143 |
 | 4 (thêm 13/10, trước 23/10) | Giao diện Gmail: nhóm "Của riêng bạn" ở `/settings`, callback, "Gửi từ" và nguồn người nhận ở xem trước, `/privacy`, `/guide`, Landing | [GMAIL-03](tasks/GMAIL-03-gmail-ui.md) | **xong** #147 (`6233637`, 18/10), `longnguyen005`; reviewer sửa theo review khi Long bận (P2 thẻ duyệt mô tả sai bước Gmail, 3 P3, rồi 1 P3 tiêu đề dài tràn ngang); review lại Đạt; cờ vẫn tắt |
-| 4–5 (Google project trước 21/10; đo 26–28/10) | Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, PR bật hai cờ trước mốc chốt tính năng 29/10 | [GMAIL-04](tasks/GMAIL-04-measure-and-live.md) | đang làm, giao nhóm trưởng; có phần việc của con người. Bước 1 (Google Cloud project riêng cho Gmail) xong 16/10. **Bước 2–3 (bộ đo, label đăng ký trước) xong #154** (`32d71fd`, 18/10); reviewer thi công, review lại lần 2 Đạt. Còn: đo (nhóm trưởng chốt khoảng 21–22/10, dự phòng 26–27/10), nghiệm thu Google thật qua giao diện, PR bật cờ trước 28/10 |
+| 4–5 (Google project trước 21/10; đo xong 18/10) | Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, PR bật hai cờ trước mốc chốt tính năng 29/10 | [GMAIL-04](tasks/GMAIL-04-measure-and-live.md) | đang làm, giao nhóm trưởng; có phần việc của con người. Bước 1 (Google Cloud project riêng cho Gmail) xong 16/10. **Bước 2–3 (bộ đo, label đăng ký trước) xong #154** (`32d71fd`, 18/10); reviewer thi công, review lại lần 2 Đạt. **Bước 4 (đo) xong #159** (`778f22f`, 18/10): `gmail` 59/60, injection 9/9; `answers` 27/30; kiểu trả lời bật `core` 50/50, không câu hành động nào của `core`/`services` thành câu trả lời; review lại Đạt. Còn: nghiệm thu Google thật qua giao diện, PR bật cờ trước 28/10 |
 | 4 (22–28/10) | Bộ đánh giá độc lập ≥ 30 câu do thành viên khác viết | [W4-01](tasks/W4-01-independent-eval-set.md) | **khung xong** #150 (`98d880b`, 17/10): `GUIDE.md`, `cases.json` rỗng, bộ kiểm định dạng, `EVAL_SET=independent`; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3), reviewer xác nhận GUIDE đủ để giao. Chờ thành viên viết câu từ 22/10, commit đăng ký, rồi 3 lần chạy mỗi chế độ |
-| 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | **bộ đo xong** #157 (`efaafb2`, 18/10): `turns` → lịch sử như `chat-service`, 12 câu đăng ký trước (6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới); reviewer thi công, review lại Đạt. Chưa đo: 3 lượt bằng model thật cùng đợt GMAIL-04 (khoảng 21–22/10), khi nhóm trưởng đồng ý |
+| 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | **xong**, 18/10: bộ đo #157 (`efaafb2`): `turns` → lịch sử như `chat-service`, 12 câu đăng ký trước (6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới). Phép đo #159 (`778f22f`): 3 lượt `ag/gemini-3.8-flash` đạt **36/36**, mỗi nhóm 100%. Reviewer thi công; mỗi PR review lại Đạt |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | **khung xong** #149 (`fb38a4d`, 17/10): `PROTOCOL.md` (chỉ xem, không chạy thật; 10 tình huống), script báo cáo chỉ đọc; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3). Chờ buổi thử 23–25/10 với ≥ 5 người × 4 lượt |
-| 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | **công cụ xong** #151 (`ce59f4f`, 17/10): chế độ đo hàng loạt luôn bấm Hủy, 24 câu, tách thời gian server/frontend từ PostgreSQL; review độc lập Đạt sau một lượt sửa (2 P2). Chờ phép đo live sau 20/10; thời gian model chưa tách được khỏi planner |
+| 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | **xong**. Công cụ #151 (`ce59f4f`, 17/10): chế độ đo hàng loạt luôn bấm Hủy, 24 câu, tách thời gian server/frontend từ PostgreSQL; review độc lập Đạt sau một lượt sửa (2 P2). Phép đo live #159 (`778f22f`, 18/10): **23/24 dưới 15 s**, p50/p95/max 9,6/14,7/15,8 s, 0 bước thực thi. Đo trước mốc chốt catalog 20/10 theo yêu cầu nhóm trưởng; catalog đổi thì đo lại. Thời gian model chưa tách được khỏi planner |
 | 5 (29/10–04/11) | Ngừng thêm tính năng; môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
 | 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
 
@@ -103,6 +103,18 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - chữ trên nút cam giữ **màu trắng** (3,2:1, ngoại lệ có chủ đích, đặc tả mục 3.2);
 - chữ thường dùng Be Vietnam Pro, tiêu đề dùng Playfair Display;
 - cỡ chữ tối thiểu 14px áp dụng khi làm app, không sửa bản mẫu.
+
+**Cập nhật 18/10 (đo GMAIL-04, W4-02, W4-04):** ba phép đo bằng model thật vào `main` qua #159 (`778f22f`), sớm hơn lịch 21–22/10 theo yêu cầu nhóm trưởng:
+- GMAIL-04: `gmail` 59/60 (injection 9/9), `answers` 27/30, `core` bật kiểu trả lời 50/50; không câu hành động nào của `services` thành câu trả lời;
+- W4-02: 36/36;
+- W4-04: 23/24 lượt dưới 15 s qua giao diện, p95 14,7 s.
+
+Review độc lập lần 1 chưa đạt: báo cáo quy một câu trượt cho label, trong khi lỗi ở truy vấn của model. Review lại Đạt. Việc tiếp theo:
+- GMAIL-04: nghiệm thu Google thật qua giao diện, rồi PR bật cờ trước 28/10;
+- W4-01 từ 22/10; W4-03 ngày 23–25/10 với cờ tắt;
+- task card cho khung giờ "cả ngày" của planner (CURRENT-STATE mục 5), khi nhóm trưởng đồng ý.
+
+[Log merge](log/2026-10-18-reviewer-merge-159.md).
 
 **Cập nhật 18/10 (W4-02, test GMAIL-01):** bộ đo hội thoại nhiều lượt vào `main` qua #157 (`efaafb2`). Có 12 câu, label đăng ký trước, chưa đo. Test GMAIL-01 hay fail ngẫu nhiên đã sửa qua #156 (`f0e24f0`): thứ tự được đọc trong PostgreSQL. Mỗi PR có review độc lập chưa đạt trước khi sửa, rồi review lại Đạt. Việc tiếp theo:
 - đợt đo bằng model thật khoảng 21–22/10, khi nhóm trưởng đồng ý: GMAIL-04 (`gmail`, `answers`, `core`/`services` với kiểu trả lời bật) và W4-02 (`multiturn` ×3);
