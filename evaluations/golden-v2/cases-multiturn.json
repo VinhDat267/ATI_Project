@@ -510,12 +510,25 @@
                   "fail",
                   "broke",
                   "lỗi",
-                  "hỏng"
+                  "hỏng",
+                  "unsuccessful",
+                  "did not succeed",
+                  "didn't succeed",
+                  "not successful",
+                  "thất bại"
                 ],
                 "excludes": [
                   "succeed",
                   "success",
                   "thành công"
+                ],
+                "excludeExceptions": [
+                  "unsuccessful",
+                  "did not succeed",
+                  "didn't succeed",
+                  "not successful",
+                  "không thành công",
+                  "failed to complete successfully"
                 ]
               }
             }
