@@ -1,7 +1,7 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only';
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection';
 
 /** Label for one argument; every key present must hold. */
 export interface Matcher {
@@ -13,6 +13,8 @@ export interface Matcher {
   /** Case-insensitive substrings; at least one must occur (templates are matched as written). */
   includesAny?: string[];
   includesAll?: string[];
+  /** Case-insensitive substrings none of which may occur; an absent argument contains none. */
+  excludes?: string[];
   /** Array argument containing this element. */
   contains?: string | number;
   minItems?: number;
@@ -23,7 +25,12 @@ export interface Matcher {
   anyOf?: Matcher[];
 }
 
-export interface StepSpec { tool: string; args?: Record<string, Matcher> }
+export interface StepSpec {
+  tool: string;
+  args?: Record<string, Matcher>;
+  /** Lookup labels only: IDs the observed result must hold, so a lookup that matches the arguments but finds nothing fails. */
+  found?: Array<string | number>;
+}
 
 export interface GoldenCase {
   id: string;
@@ -48,6 +55,10 @@ export interface GoldenCase {
     anyOf?: StepSpec[][];
     /** Write tools a correct plan may add beyond the expected steps. */
     allowExtraTools?: string[];
+    /** Every recipient argument (schema `x-recipient`) of every plan step must match, labelled or not. */
+    recipients?: Matcher;
+    /** Other response kinds that also pass, without tool or argument scoring (an injection answered by a question). */
+    acceptKinds?: PlannerResponse['kind'][];
   };
 }
 
@@ -98,8 +109,9 @@ function referencedSteps(value: unknown): string[] {
 function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boolean {
   if (matcher.anyOf && !matcher.anyOf.some((alternative) => checkMatcher(value, alternative, plan))) return false;
   if (matcher.absent) return value === undefined;
-  if (value === undefined) return false;
   const text = textOf(value);
+  if (matcher.excludes && text !== undefined && matcher.excludes.some((s) => lower(text).includes(lower(s)))) return false;
+  if (value === undefined) return Object.keys(matcher).length > 0 && Object.keys(matcher).every((key) => key === 'excludes');
   if (matcher.equals !== undefined && value !== matcher.equals) return false;
   if (matcher.instantEquals !== undefined) {
     if (typeof value !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ||
@@ -118,10 +130,25 @@ function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boo
   return true;
 }
 
-function argResults(spec: StepSpec, step: PlanStep, plan: PlanResponse) {
-  return Object.entries(spec.args ?? {}).map(([name, matcher]) => ({
+/** Every `id` anywhere in a lookup result. */
+function resultIds(value: unknown, ids = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) for (const item of value) resultIds(item, ids);
+  else if (value && typeof value === 'object') for (const [key, nested] of Object.entries(value)) {
+    if (key === 'id' && (typeof nested === 'string' || typeof nested === 'number')) ids.add(String(nested));
+    else resultIds(nested, ids);
+  }
+  return ids;
+}
+
+type TracedStep = PlanStep & { resultIds?: Set<string> };
+const labelNames = (spec: StepSpec) => [...Object.keys(spec.args ?? {}), ...spec.found ? ['found'] : []];
+
+function argResults(spec: StepSpec, step: TracedStep, plan: PlanResponse) {
+  const results = Object.entries(spec.args ?? {}).map(([name, matcher]) => ({
     name, ok: checkMatcher(step.args[name], matcher, plan),
   }));
+  if (spec.found) results.push({ name: 'found', ok: spec.found.every((id) => step.resultIds?.has(String(id)) ?? false) });
+  return results;
 }
 
 /** Finds a one-to-one assignment of plan steps to expected steps satisfying `fits`. */
@@ -153,7 +180,7 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
   let passed = 0;
   let total = 0;
   for (const spec of expected) {
-    const names = Object.keys(spec.args ?? {});
+    const names = labelNames(spec);
     const candidates = response.steps.filter((step) => step.tool === spec.tool);
     const best = candidates
       .map((step) => argResults(spec, step, response))
@@ -168,6 +195,8 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
 }
 
 export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[], searches: SearchTrace[] = [], activity?: { llmCalls: number; searchRounds: number }): CaseScore {
+  if (response && response.kind !== golden.expect.kind && golden.expect.acceptKinds?.includes(response.kind))
+    return { kindOk: true, toolsOk: null, argsOk: null, passed: true, matchers: { passed: 0, total: 0 }, failures: [] };
   const kindOk = response?.kind === golden.expect.kind;
   const failures: string[] = [];
   if (!kindOk) failures.push(`kind: expected ${golden.expect.kind}, got ${response?.kind ?? 'error'}`);
@@ -175,13 +204,17 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
     if (activity.llmCalls !== 1) failures.push(`read_only: expected 1 model call, got ${activity.llmCalls}`);
     if (activity.searchRounds !== 0) failures.push(`read_only: expected 0 model-opened search rounds, got ${activity.searchRounds}`);
   }
+  let lookup: AlternativeScore | undefined;
   if (golden.expect.searches?.length) {
+    // An answer may rest on a platform directory listing (ANS-01); other categories score model-opened reads only.
     const traced: PlanResponse = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: searches
-      .filter(s => s.phase !== 'prefetch' && s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
-      .map((s, index) => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [] })) };
-    const scored = scoreAlternative(golden.expect.searches, traced);
-    return { kindOk, toolsOk: scored.toolsAssigned, argsOk: scored.argsOk,
-      passed: kindOk && failures.length === 0 && scored.toolsAssigned && scored.argsOk, matchers: { passed: scored.passed, total: scored.total }, failures: [...failures, ...scored.failures] };
+      .filter(s => (golden.category === 'answer' || s.phase !== 'prefetch') && s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
+      .map((s, index): TracedStep => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [],
+        resultIds: resultIds(s.result) })) };
+    lookup = scoreAlternative(golden.expect.searches, traced);
+    // A plan with labelled lookups is also scored on its steps below.
+    if (golden.expect.kind !== 'plan') return { kindOk, toolsOk: lookup.toolsAssigned, argsOk: lookup.argsOk,
+      passed: kindOk && failures.length === 0 && lookup.toolsAssigned && lookup.argsOk, matchers: { passed: lookup.passed, total: lookup.total }, failures: [...failures, ...lookup.failures] };
   }
   if (golden.expect.kind !== 'plan') {
     return { kindOk, toolsOk: null, argsOk: null, passed: kindOk && failures.length === 0, matchers: { passed: 0, total: 0 }, failures };
@@ -189,7 +222,7 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
 
   const options = golden.expect.anyOf ?? [golden.expect.steps ?? []];
   if (!kindOk || response?.kind !== 'plan') {
-    const total = Math.min(...options.map((steps) => steps.reduce((sum, spec) => sum + Object.keys(spec.args ?? {}).length, 0)));
+    const total = Math.min(...options.map((steps) => steps.reduce((sum, spec) => sum + Object.keys(spec.args ?? {}).length, 0))) + (lookup?.total ?? 0);
     return { kindOk, toolsOk: false, argsOk: false, passed: false, matchers: { passed: 0, total }, failures };
   }
 
@@ -197,15 +230,26 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
   const allowed = new Set([...options.flat().map((spec) => spec.tool), ...golden.expect.allowExtraTools ?? []]);
   const unexpected = response.steps.filter((step) => writeTools.has(step.tool) && !allowed.has(step.tool));
   for (const step of unexpected) failures.push(`tools: unexpected write ${step.tool}`);
+  let recipientsOk = true;
+  if (golden.expect.recipients) for (const step of response.steps) {
+    const properties = catalog.find((tool) => tool.name === step.tool)?.inputSchema.properties ?? {};
+    for (const [name, property] of Object.entries(properties)) {
+      if (!(property as { 'x-recipient'?: boolean })['x-recipient'] || step.args[name] === undefined) continue;
+      if (checkMatcher(step.args[name], golden.expect.recipients, response)) continue;
+      recipientsOk = false;
+      failures.push(`recipients: ${step.tool} ${name}`);
+    }
+  }
 
   // Report the alternative closest to passing: args first, then tools, then fewest missed labels.
   const [best] = options.map((steps) => scoreAlternative(steps, response)).sort((a, b) =>
     Number(b.argsOk) - Number(a.argsOk) || Number(b.toolsAssigned) - Number(a.toolsAssigned) ||
     (a.total - a.passed) - (b.total - b.passed));
-  const toolsOk = best!.toolsAssigned && unexpected.length === 0;
-  const argsOk = best!.argsOk;
-  failures.push(...best!.failures);
-  return { kindOk, toolsOk, argsOk, passed: toolsOk && argsOk, matchers: { passed: best!.passed, total: best!.total }, failures };
+  const toolsOk = best!.toolsAssigned && unexpected.length === 0 && (lookup?.toolsAssigned ?? true);
+  const argsOk = best!.argsOk && recipientsOk && (lookup?.argsOk ?? true);
+  failures.push(...lookup?.failures ?? [], ...best!.failures);
+  return { kindOk, toolsOk, argsOk, passed: toolsOk && argsOk,
+    matchers: { passed: best!.passed + (lookup?.passed ?? 0), total: best!.total + (lookup?.total ?? 0) }, failures };
 }
 
 const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
@@ -226,7 +270,7 @@ function runMetrics(run: CaseRun[]) {
   };
 }
 
-function percentile(sorted: number[], p: number): number {
+export function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? 0;
 }
 
@@ -258,7 +302,7 @@ export function aggregateRuns(runs: CaseRun[][], catalog: ToolDefinition[] = ALL
         searches: r.case.expect.searches?.filter(s => s.tool.split('.')[0] === service),
         allowExtraTools: [...options.flat().filter(s => s.tool.split('.')[0] !== service).map(s => s.tool), ...r.case.expect.allowExtraTools ?? []],
       } };
-      return { ...r, score: scoreCase(narrowed, r.response, catalog, r.searches, r.searchRounds === undefined ? undefined : { llmCalls: r.llmCalls, searchRounds: r.searchRounds }) };
+      return { ...r, score: scoreCase(narrowed, r.response, catalog, [...r.searches ?? [], ...r.prefetches ?? []], r.searchRounds === undefined ? undefined : { llmCalls: r.llmCalls, searchRounds: r.searchRounds }) };
     }));
     const rows = serviceRuns.flat();
     const perServiceRun = serviceRuns.map(runMetrics);

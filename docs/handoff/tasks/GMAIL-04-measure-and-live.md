@@ -79,5 +79,20 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 ## Kết quả (agent thi công điền)
 
 - PR:
-- Số liệu và quyết định bật cờ:
+  - **Bộ đo** (bước 2, 3): nhánh `eval/gmail-04-measure`, reviewer thi công theo yêu cầu nhóm trưởng. Bộ đo `8eae4f3`; label Gmail `34c595c` (20 câu) và label trả lời `d53f24b` (10 câu) commit trước lời gọi model đầu tiên. 19/19 đột biến bị bắt. [Log](../log/2026-10-18-reviewer-GMAIL-04-measure-harness.md).
+  - Sửa theo [review](https://github.com/VinhDat267/ATI_Project/pull/154#issuecomment-6244612341), trước lời gọi model đầu tiên:
+    - `5cf9a02`: kế hoạch có label tra cứu được chấm cả lần tra cứu lẫn các bước;
+    - `b6a5450`: `an_gm02` phải lọc thư chưa đọc; `gm15` phải tìm thư trước khi đăng Slack.
+
+    22/22 đột biến bị bắt. [Log sửa](../log/2026-10-18-reviewer-GMAIL-04-review-fixes.md).
+  - Sửa theo review lại, vẫn trước lời gọi model đầu tiên:
+    - `30733f0`: label tra cứu có `found`, danh sách ID mà kết quả phải có; hộp thư giả hiểu toán tử phủ định `-`;
+    - `a9d7a5b`: mọi label tra cứu có tham số không cố định đều có `found`.
+
+    26/26 đột biến bị bắt (cùng log).
+  - Đo, nghiệm thu Google thật, PR bật cờ: chưa làm.
+- Số liệu và quyết định bật cờ: chưa đo. Ngày 18/10, nhóm trưởng đồng ý đo ngay khi PR bộ đo merge (khoảng 21–22/10), giữ 26–27/10 làm dự phòng.
 - Điều chưa làm hoặc khác với task card:
+  - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; nhóm trưởng đồng ý ngày 18/10, trước lời gọi model đầu tiên;
+  - 20 câu Gmail thay vì khoảng 16;
+  - xem log.
