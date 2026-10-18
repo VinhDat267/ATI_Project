@@ -25,7 +25,12 @@ export interface Matcher {
   anyOf?: Matcher[];
 }
 
-export interface StepSpec { tool: string; args?: Record<string, Matcher> }
+export interface StepSpec {
+  tool: string;
+  args?: Record<string, Matcher>;
+  /** Lookup labels only: IDs the observed result must hold, so a lookup that matches the arguments but finds nothing fails. */
+  found?: Array<string | number>;
+}
 
 export interface GoldenCase {
   id: string;
@@ -125,10 +130,25 @@ function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boo
   return true;
 }
 
-function argResults(spec: StepSpec, step: PlanStep, plan: PlanResponse) {
-  return Object.entries(spec.args ?? {}).map(([name, matcher]) => ({
+/** Every `id` anywhere in a lookup result. */
+function resultIds(value: unknown, ids = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) for (const item of value) resultIds(item, ids);
+  else if (value && typeof value === 'object') for (const [key, nested] of Object.entries(value)) {
+    if (key === 'id' && (typeof nested === 'string' || typeof nested === 'number')) ids.add(String(nested));
+    else resultIds(nested, ids);
+  }
+  return ids;
+}
+
+type TracedStep = PlanStep & { resultIds?: Set<string> };
+const labelNames = (spec: StepSpec) => [...Object.keys(spec.args ?? {}), ...spec.found ? ['found'] : []];
+
+function argResults(spec: StepSpec, step: TracedStep, plan: PlanResponse) {
+  const results = Object.entries(spec.args ?? {}).map(([name, matcher]) => ({
     name, ok: checkMatcher(step.args[name], matcher, plan),
   }));
+  if (spec.found) results.push({ name: 'found', ok: spec.found.every((id) => step.resultIds?.has(String(id)) ?? false) });
+  return results;
 }
 
 /** Finds a one-to-one assignment of plan steps to expected steps satisfying `fits`. */
@@ -160,7 +180,7 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
   let passed = 0;
   let total = 0;
   for (const spec of expected) {
-    const names = Object.keys(spec.args ?? {});
+    const names = labelNames(spec);
     const candidates = response.steps.filter((step) => step.tool === spec.tool);
     const best = candidates
       .map((step) => argResults(spec, step, response))
@@ -189,7 +209,8 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
     // An answer may rest on a platform directory listing (ANS-01); other categories score model-opened reads only.
     const traced: PlanResponse = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: searches
       .filter(s => (golden.category === 'answer' || s.phase !== 'prefetch') && s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
-      .map((s, index) => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [] })) };
+      .map((s, index): TracedStep => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [],
+        resultIds: resultIds(s.result) })) };
     lookup = scoreAlternative(golden.expect.searches, traced);
     // A plan with labelled lookups is also scored on its steps below.
     if (golden.expect.kind !== 'plan') return { kindOk, toolsOk: lookup.toolsAssigned, argsOk: lookup.argsOk,

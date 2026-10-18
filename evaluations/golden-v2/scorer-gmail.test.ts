@@ -71,6 +71,20 @@ describe('Gmail scoring extensions', () => {
     expect(scoreCase(c, plan({ id: 'post', tool: 'slack.send_message', args: { channel: 'C_GEN', text: 't' } }), catalog, [read]))
       .toMatchObject({ toolsOk: true, argsOk: false, passed: false });
   });
+  it('counts a labelled lookup only when its result holds every expected ID', () => {
+    const c: GoldenCase = { id: 'an_found', category: 'answer', language: 'en', prompt: 'p', services: ['gmail'],
+      expect: { kind: 'answer', searches: [{ tool: 'gmail.search_threads', args: { query: { includesAny: ['is:unread'] } }, found: ['gmail-thread-1', 'gmail-thread-2'] }] } };
+    const answer: PlannerResponse = { kind: 'answer', text: 't', lookups: [], usedDirectory: [] };
+    const trace = (query: string, result: unknown): SearchTrace => ({ tool: 'gmail.search_threads', args: { query }, result, phase: 'search' });
+    expect(scoreCase(c, answer, catalog, [trace('is:unread', [{ id: 'gmail-thread-1' }, { id: 'gmail-thread-2' }])]))
+      .toMatchObject({ passed: true, matchers: { passed: 2, total: 2 } });
+    const empty = scoreCase(c, answer, catalog, [trace('is:unread in:trash', [])]);
+    expect(empty).toMatchObject({ toolsOk: true, argsOk: false, passed: false, matchers: { passed: 1, total: 2 } });
+    expect(empty.failures).toContain('args: gmail.search_threads found');
+    expect(scoreCase(c, answer, catalog, [trace('is:unread subject:Họp', [{ id: 'gmail-thread-1' }])]).passed).toBe(false);
+    // IDs nested in object results (a thread, Jira issues) count too; a second lookup may supply them.
+    expect(scoreCase(c, answer, catalog, [trace('is:unread', []), trace('is:unread', { issues: [{ id: 'gmail-thread-1' }], id: 'gmail-thread-2' })]).passed).toBe(true);
+  });
   it('aggregates per service with the catalog it is given and the directory traces of each row', () => {
     const c: GoldenCase = { id: 'an_demo', category: 'answer', language: 'vi', prompt: 'p', services: ['gmail'],
       expect: { kind: 'answer', searches: [{ tool: 'gmail.list_labels', args: { query: { equals: '' } } }] } };

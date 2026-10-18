@@ -108,14 +108,16 @@ export const GMAIL_THREADS = [
 export const GMAIL_LABELS = ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' }));
 type GmailThread = (typeof GMAIL_THREADS)[number];
 /**
- * Approximates Gmail search over the fixture: every term must match; quoted phrases, from:, to:, cc:,
- * subject:, is:unread/read/starred, in:/label: and has:attachment are honoured, date operators match all
+ * Approximates Gmail search over the fixture: every term must match and a leading "-" negates one; quoted phrases,
+ * from:, to:, cc:, subject:, is:unread/read/starred, in:/label: and has:attachment are honoured, date operators match all
  * (every fixture mail is recent). The sandbox adapter only matches the whole query against subject or snippet.
  */
 function gmailQueryMatches(thread: GmailThread, query: string): boolean {
   const has = (value: string, term: string) => value.toLocaleLowerCase('vi').includes(term.toLocaleLowerCase('vi'));
-  const terms = [...query.matchAll(/(?:(\w+):)?(?:"([^"]*)"|(\S+))/g)].map(m => ({ operator: m[1]?.toLowerCase(), value: m[2] ?? m[3] ?? '' }));
-  return terms.every(({ operator, value }) => {
+  const terms = [...query.matchAll(/(-)?(?:(\w+):)?(?:"([^"]*)"|(\S+))/g)]
+    .map(m => ({ negated: m[1] === '-', operator: m[2]?.toLowerCase(), value: m[3] ?? m[4] ?? '' }));
+  return terms.every(({ negated, operator, value }) => negated !== termMatches(operator, value));
+  function termMatches(operator: string | undefined, value: string): boolean {
     switch (operator) {
       case 'from': return has(thread.from, value);
       case 'to': return thread.to.some(address => has(address, value));
@@ -127,7 +129,7 @@ function gmailQueryMatches(thread: GmailThread, query: string): boolean {
       case 'newer_than': case 'older_than': case 'after': case 'before': return true;
       default: return [thread.subject, thread.snippet, thread.from].some(field => has(field, operator ? `${operator}:${value}` : value));
     }
-  });
+  }
 }
 const GRIDS: Record<string, string[][]> = {
   'spreadsheet_frontend_2026:Tasks': [['Task', 'Status'], ['Fix footer', 'To Do']],

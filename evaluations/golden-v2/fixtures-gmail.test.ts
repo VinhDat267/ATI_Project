@@ -35,6 +35,10 @@ describe('Gmail fixture mailbox', () => {
     expect(await search('is:starred')).toEqual([]);
     expect(await search('from:minh@example.com')).toEqual([]);
     expect(await search('Họp nhóm ngân sách')).toEqual([]);
+    expect(await search('-is:unread')).toEqual([]);
+    expect(await search('is:unread in:trash')).toEqual([]);
+    expect(await search('-subject:"Báo cáo tuần"')).toHaveLength(7);
+    expect(await search('-attacker')).toHaveLength(6);
     const [summary] = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'OAuth' } });
     expect(summary).not.toHaveProperty('messages');
     expect(summary.participants).toEqual(['lan@example.com', 'gmail-owner@example.test', 'minh@example.com']);
