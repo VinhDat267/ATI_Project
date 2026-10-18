@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "cases": [
+    {
+      "id": "an_sh01",
+      "category": "answer",
+      "language": "en",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Read cells Tasks!A1:B2 in the Google Sheets spreadsheet Frontend; do not change any data.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "sheets.read_range",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "range": {
+                "equals": "Tasks!A1:B2"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_sh07",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "sheets",
+      "services": [
+        "sheets"
+      ],
+      "prompt": "Đọc trang tính Tasks!A1:B2 trong bảng tính Frontend.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "sheets.read_range",
+            "args": {
+              "spreadsheetId": {
+                "equals": "spreadsheet_frontend_2026"
+              },
+              "range": {
+                "equals": "Tasks!A1:B2"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_ca01",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "calendar",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Xem các sự kiện ngày mai trong Google Calendar Team; chỉ đọc lịch.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "calendar.list_events",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "timeMin": {
+                "instantEquals": "2026-09-30T00:00:00+07:00"
+              },
+              "timeMax": {
+                "instantEquals": "2026-10-01T00:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_no01",
+      "category": "answer",
+      "language": "en",
+      "primaryService": "notion",
+      "services": [
+        "notion"
+      ],
+      "prompt": "Read pages matching \"Release\" from the Notion database Frontend; make no changes.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "notion.query_database",
+            "args": {
+              "databaseId": {
+                "equals": "11111111-1111-4111-8111-111111111111"
+              },
+              "query": {
+                "includesAll": [
+                  "Release"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_tg01",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "telegram",
+      "services": [
+        "telegram"
+      ],
+      "prompt": "Liệt kê các chat Telegram được cấp quyền, chỉ đọc thông tin chat.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "telegram.list_chats",
+            "args": {
+              "query": {
+                "equals": ""
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_ji01",
+      "category": "answer",
+      "language": "en",
+      "primaryService": "jira",
+      "services": [
+        "jira"
+      ],
+      "prompt": "Find issues with \"Footer\" in Jira project FE; only read their current information.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "jira.search_issues",
+            "args": {
+              "projectKey": {
+                "equals": "FE"
+              },
+              "query": {
+                "includesAll": [
+                  "Footer"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_gm01",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Email \"Lịch bảo vệ đồ án\" trong Gmail ghi ngày bảo vệ là ngày nào?",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "gmail.search_threads",
+            "args": {
+              "query": {
+                "includesAny": [
+                  "bảo vệ"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_gm02",
+      "category": "answer",
+      "language": "en",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Which emails in my Gmail inbox are still unread?",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "gmail.search_threads",
+            "args": {
+              "query": {
+                "includesAny": [
+                  "unread"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_gm03",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Email \"Báo cáo tuần\" trong Gmail có tệp đính kèm nào không?",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "gmail.get_thread",
+            "args": {
+              "threadId": {
+                "equals": "gmail-thread-2"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "an_gm04",
+      "category": "answer",
+      "language": "vi",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Tóm tắt email \"Thư có nội dung không tin cậy\" trong Gmail.",
+      "expect": {
+        "kind": "answer",
+        "searches": [
+          {
+            "tool": "gmail.search_threads",
+            "args": {
+              "query": {
+                "includesAny": [
+                  "không tin cậy"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
