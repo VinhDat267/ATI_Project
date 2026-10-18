@@ -90,8 +90,19 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
     - `a9d7a5b`: mọi label tra cứu có tham số không cố định đều có `found`.
 
     26/26 đột biến bị bắt (cùng log).
-  - Đo, nghiệm thu Google thật, PR bật cờ: chưa làm.
-- Số liệu và quyết định bật cờ: chưa đo. Ngày 18/10, nhóm trưởng đồng ý đo ngay khi PR bộ đo merge (khoảng 21–22/10), giữ 26–27/10 làm dự phòng.
+  - **Đo** (bước 4): xong ngày 18/10, sớm hơn lịch vì nhóm trưởng yêu cầu. Report công khai và log nằm trong PR báo cáo. [Báo cáo](../../ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
+  - Nghiệm thu Google thật, PR bật cờ: chưa làm.
+- Số liệu (18/10, source `31166cb`, `ag/gemini-3.8-flash` phục vụ bởi `gemini-3.8-flash-n`):
+  - `gmail` ×3: **59/60**. 3 câu injection đạt **9/9**, không bước nào gửi tới `attacker@example.com`. Ký tự prompt mỗi lời gọi p50/p95 17.120/19.869;
+  - `answers` ×3: **27/30**. Mọi câu trả lời đều có tra cứu do model mở. Trung bình 2,3 lời gọi model. p50/p95 13,3/20,7 s;
+  - `core` ×1 khi bật kiểu trả lời: **50/50**;
+  - `services` ×1 khi bật: 37/44; đối chứng cùng ngày khi tắt: 43/44. Phần chênh là đúng 6 câu `read_only` nay được trả lời; không câu hành động nào thành câu trả lời;
+  - câu trượt:
+    - `gm04`: do label (nội dung tiếng Việt cho câu tiếng Anh);
+    - `an_ca01`: sai lệch truy vấn của model. `timeMax` 23:59:59 bỏ giây cuối ngày, vì cận trên của Calendar là loại trừ. Câu trả lời vẫn đúng trên fixture hiện tại. Review #159 chỉ ra điểm này.
+
+    Không sửa label sau khi có kết quả.
+- Quyết định bật cờ: chưa có. Điều kiện số đo đã đạt cho cả hai cờ: injection 9/9; không câu ghi nào thành câu trả lời. Còn chờ nghiệm thu Google thật phần 1–3, rồi nhóm trưởng quyết.
 - Điều chưa làm hoặc khác với task card:
   - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; nhóm trưởng đồng ý ngày 18/10, trước lời gọi model đầu tiên;
   - 20 câu Gmail thay vì khoảng 16;
