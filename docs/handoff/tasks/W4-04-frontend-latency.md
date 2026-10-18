@@ -26,8 +26,16 @@ Thời gian từ lúc gửi câu chat tới khi plan preview hiện ra mới đ�
 ## Kết quả (agent thi công điền)
 
 - PR: [#151](https://github.com/VinhDat267/ATI_Project/pull/151), nhánh `test/w4-04-frontend-latency`, base `ab54c77`. Nhóm trưởng giao reviewer làm ngày 17/10/2026. [Log](../log/2026-10-17-reviewer-W4-04-batch-latency.md).
-- Bằng chứng: phép đo live chưa chạy. Khi chạy, bằng chứng nằm trong `docs/ai-evidence/V3-LIVE-EXECUTION/W4-04-<ngày>/` (ignore, không commit): `batch.json` và `summary.md`.
-- Kết quả: **phần công cụ xong; phép đo live chưa chạy.**
+- Bằng chứng: phép đo live ngày 18/10 nằm trong `docs/ai-evidence/V3-LIVE-EXECUTION/W4-04-2026-10-18/` ở máy nhóm trưởng (ignore, không commit): `batch.json` (SHA-256 `cced019527fbef4c…`) và `summary.md` (`032df9ae5b758f8b…`).
+- **Phép đo live (18/10):** app live trên `31166cb`, `ag/gemini-3.8-flash`, PostgreSQL tạm, 8 dịch vụ `healthy`, hai cờ tắt. Nhóm trưởng yêu cầu đo trước mốc chốt catalog 20/10; khi đó không có thay đổi catalog nào đang chờ.
+  - **Kết quả:** 24/24 lượt có phản hồi; **23/24 dưới 15 s (95,8%)**; p50/p95/max **9,6/14,7/15,8 s**.
+  - **Theo số dịch vụ (p95):** 1 dịch vụ 8,1 s; 2 dịch vụ 15,8 s; 3 dịch vụ 12,7 s; ≥ 4 dịch vụ 14,7 s.
+  - **Phản hồi:** 23 kế hoạch, 1 từ chối (`s3-03`).
+  - **Thời gian:** server chiếm 96,8%; phần request, SSE và vẽ có trung vị 0,3 s.
+  - **An toàn:** 0 bước thực thi; 23 kế hoạch đều `rejected`.
+
+  [Báo cáo](../../ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
+- Kết quả: **phần công cụ xong (#151); phép đo live xong ngày 18/10** (xem trên).
   - `evaluations/live-app/batch.ts`: mỗi câu một hội thoại mới.
     - Ghi lúc bấm gửi và lúc phản hồi đầu tiên hiện ra, theo `data-moment` của cockpit: xem trước kế hoạch (4), hỏi lại (3), từ chối, trả lời, lỗi lập kế hoạch (`#view-server`).
     - Bấm **Hủy** với mọi kế hoạch. Phản hồi đến sau `LIVE_APP_TURN_TIMEOUT_MS` được chờ thêm tối đa `LIVE_APP_GRACE_MS` để hủy cả kế hoạch đến muộn; cuối lượt chạy kiểm lại mọi hội thoại.
@@ -39,6 +47,6 @@ Thời gian từ lúc gửi câu chat tới khi plan preview hiện ra mới đ�
   - Test: 23 test đơn vị và PostgreSQL thật (`batch.test.ts`). 3 test browser sandbox (`w4-04-latency-batch.spec.ts`): chạy hết danh sách, mọi kế hoạch `rejected`, 0 `execution_steps`; kế hoạch đến muộn vẫn bị hủy; lượt hỏi lại không có kế hoạch. `scripts/test-v3-browser.mjs` thêm `W4-04:` vào nhóm default và `W4-04 clarification` vào nhóm clarification.
   - 13/13 đột biến bị bắt; `npm run check` exit 0: **1.953 v3 + 196 eval** (173 + 23 test mới). Chi tiết trong log.
 - Điều chưa làm hoặc khác với task card:
-  - **Chưa chạy phép đo live.** Tiêu chí "≥ 20 lượt đo live" và "phần trăm dưới 15 s" còn mở. Theo task card, phép đo chính thức chạy sau mốc chốt catalog 20/10, trên app live với `ag/gemini-3.8-flash`. Lượt chạy chỉ gọi model, không ghi lên dịch vụ, nhưng vẫn cần nhóm trưởng đồng ý vì dùng quota và tài khoản thật.
+  - Phép đo chạy ngày 18/10, trước mốc chốt catalog 20/10, theo yêu cầu nhóm trưởng. Nếu catalog đổi trước 20/10 thì phải đo lại. Lý do của lượt từ chối `s3-03` không được ghi trong `batch.json`, và DB tạm đã dừng.
   - **Chưa tách được thời gian model** khỏi phần còn lại của planner: chat-api không ghi thời gian từng lời gọi model, và task card không cho sửa mã sản phẩm. Phép đo tách được server với frontend/SSE. Theo W3-10 (đo planner trực tiếp), model chiếm 99,96% thời gian lập kế hoạch.
   - Thời gian lấy theo lúc Playwright thấy phần tử, nên có thêm độ trễ dò của Playwright (cỡ vài chục ms).

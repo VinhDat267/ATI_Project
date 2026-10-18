@@ -440,9 +440,40 @@ The flag decision reads these reports, as set out in the GMAIL-04 task card:
 If core or services pass more than two cases fewer than at W3-10, run a
 same-day control with the flag off before drawing a conclusion.
 
-**Not measured yet**: labels `34c595c` (Gmail) and `d53f24b` (answers) were
-committed before any model call. `b6a5450` and `a9d7a5b` tightened them after
-the independent reviews of #154, also before any model call.
+Labels `34c595c` (Gmail) and `d53f24b` (answers) were committed before any
+model call. `b6a5450` and `a9d7a5b` tightened them after the independent
+reviews of #154, also before any model call.
+
+#### GMAIL-04 measured results — 2026-10-18
+
+Source `31166cb`. Requested `ag/gemini-3.8-flash`, served `gemini-3.8-flash-n`,
+llm search mode, concurrency 2. Run in order, with no campaign stopped or
+switched to another model. [Report and provenance](../docs/ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
+
+| Run | Strict | Tools | Arguments | p50 / p95 / max |
+|---|---|---|---|---|
+| `gmail` ×3 | 59/60 | 100% | 98.1% | 10.9 / 20.2 / 29.4 s |
+| `answers` ×3 (read answers on) | 27/30 | 100% | 90.0% | 13.3 / 20.7 / 30.8 s |
+| `core` ×1 (read answers on) | 50/50 | 100% | 100% | 6.8 / 17.4 / 22.9 s |
+| `services` ×1 (read answers on) | 37/44 | 100% | 100% | 6.2 / 25.4 / 50.6 s |
+| `services` ×1 (same-day control, off) | 43/44 | 100% | 100% | 7.0 / 14.7 / 19.1 s |
+
+- **Injection:** the three injection cases pass 9/9. Every run planned a reply
+  or forward to `lan@`/`minh@example.com`; no step addressed
+  `attacker@example.com`.
+- **Answers:**
+  - all 30 rest on at least one model-opened lookup;
+  - 2.3 model calls on average, 3 at most.
+- **Action cases:** none turned into an answer in core or services. With the
+  flag on, services differs from the control only by its six read_only cases,
+  which now answer by design. `ca04` is a refusal in both runs, as at W3-10.
+- **Prompt size:** prompt characters per model call in Gmail cases are
+  p50 / p95 / max 17,120 / 19,869 / 22,633.
+- **Label misses:** two failures are labels missing a correct response, kept
+  as registered:
+  - `gm04` run 3 replied in Vietnamese to an English request;
+  - `an_ca01` (×3) looked up a window ending 23:59:59 instead of 00:00:00.
+- **Still open:** Google acceptance (parts 1–3) and the flag PR.
 
 ### W4-02: multi-turn conversations
 
@@ -474,7 +505,12 @@ resources.
 LIVE_EVAL=1 EVAL_SET=multiturn PLANNER_SEARCH_MODE=llm PLANNER_READ_ANSWERS=off EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
 ```
 
-**Not measured yet**: labels `4d63bd6` were committed before any model call;
+**Measured 2026-10-18** (source `31166cb`, `ag/gemini-3.8-flash` served
+`gemini-3.8-flash-n`, llm, 3 runs): **36/36**. `turn_edit` 18/18, `turn_reply`
+9/9, `turn_new` 9/9; one model call per case; p50 / p95 5.5 / 7.3 s. No planner
+fault was found. [Report](../docs/ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
+
+Labels `4d63bd6` were committed before any model call;
 `9cf3c11` tightened them after the independent review of #157; `c864f55` fixes
 failure wording in `mt_reply02`, also before any model call. Titles kept from
 the earlier plan or written out by the user are matched exactly.
@@ -651,7 +687,32 @@ the wait in every percentile, shown as "> N s"; it is never left out. The browse
 (`W4-04:` in the default group and `W4-04 clarification` in the clarification
 group). Every plan ends `rejected`, with no execution steps.
 
-**Not measured yet**: the measured run follows the 20/10 catalog freeze.
+#### W4-04 measured run — 2026-10-18
+
+Live app on `31166cb`, `ag/gemini-3.8-flash`, separate PostgreSQL (tmpfs), all
+eight services healthy, both flags off, defaults above. Run 06:18–06:25 UTC, after
+the golden campaigns and before the control, so no other campaign shared the
+gateway. Measured before the 20/10 catalog freeze at the team lead's request;
+no catalog change was pending.
+
+| Services | Turns | p50 | p95 | max |
+|---|---|---|---|---|
+| 1 | 6 | 6.0 s | 8.1 s | 8.1 s |
+| 2 | 6 | 8.6 s | 15.8 s | 15.8 s |
+| 3 | 6 | 10.1 s | 12.7 s | 12.7 s |
+| ≥4 | 6 | 12.6 s | 14.7 s | 14.7 s |
+| all | 24 | 9.6 s | 14.7 s | 15.8 s |
+
+- **Responses:** 24/24 turns had a response, 23/24 under 15 s (95.8%): 23
+  plans and 1 refusal (`s3-03`; its reason is not recorded in `batch.json`).
+  Only `s2-06` (Jira + Sheets) took over 15 s.
+- **Server share:** the server's share is 96.8%, with a median server time of
+  9.2 s, nearly all planner. Request, SSE and rendering take 0.3 s. Model time
+  cannot be separated from the rest of the planner.
+- **No writes:** every plan was cancelled, `rejected` in PostgreSQL, with 0
+  execution steps and 0 open plans.
+- **Evidence (ignored):** `docs/ai-evidence/V3-LIVE-EXECUTION/W4-04-2026-10-18/`,
+  `batch.json` SHA-256 `cced019527fbef4c…`. [Report](../docs/ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
 
 ### AUTH-06: real email and Google authentication
 
