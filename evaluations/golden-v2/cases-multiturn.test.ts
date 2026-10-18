@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { ALL_TOOLS, type PlanStep } from '@wap/tool-schemas';
+import { ALL_TOOLS, type PlannerResponse, type PlanStep } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, validatePlan } from '@wap/planner';
 import { buildMemory, fixtureSearch, knownResourceValues } from './fixtures.js';
 import * as runner from './run.js';
-import type { GoldenCase, Matcher, StepSpec } from './scorer.js';
+import { scoreCase, type GoldenCase, type Matcher, type StepSpec } from './scorer.js';
 
 const file = JSON.parse(readFileSync(new URL('./cases-multiturn.json', import.meta.url), 'utf8'));
 const cases = file.cases as GoldenCase[];
@@ -15,6 +15,52 @@ const matchers = (matcher: Matcher): Matcher[] => [matcher, ...(matcher.anyOf ??
 const lastAssistant = (c: GoldenCase) => c.turns!.at(-1)!.content;
 const isPlan = (content: unknown): content is { steps: PlanStep[] } => typeof content === 'object' && content !== null;
 const resource = (tool: string, name: string) => ALL_TOOLS.find(t => t.name === tool)!.inputSchema.properties[name] as Record<string, string>;
+
+// Final plans, scored directly: a good plan changes what was asked and keeps the rest;
+// each bad one gets the asked-for change right but breaks one other field.
+type Step = { id: string; tool: string; args: Record<string, unknown>; dependsOn?: string[] };
+const plan = (...steps: Step[]): PlannerResponse => ({ kind: 'plan', thinking: 't', summary: 's', warnings: [],
+  steps: steps.map(step => ({ description: 'd', dependsOn: [], ...step })) as PlanStep[] });
+const card = (listId: string, title: string, extra: Record<string, unknown> = {}): Step => ({ id: 'card', tool: 'trello.create_card', args: { listId, title, ...extra } });
+const slack = (channel: string, text: unknown, dependsOn: string[] = []): Step => ({ id: 'notify', tool: 'slack.send_message', args: { channel, text }, dependsOn });
+const issue = (repo: string, title: string): Step => ({ id: 'issue', tool: 'github.create_issue', args: { repo, title } });
+const link = (step: string) => ({ $template: `Link: \${${step}.output.url}` });
+const examples: Record<string, { good: Step[][]; bad: Record<string, Step[]> }> = {
+  mt_edit01: { good: [[card('list_fe_todo', 'Sửa lỗi đăng nhập trên Safari')]],
+    bad: { 'title cut to the new word': [card('list_fe_todo', 'Safari')], 'list changed': [card('list_fe_doing', 'Sửa lỗi đăng nhập trên Safari')] } },
+  mt_edit02: { good: [[card('list_fe_todo', 'Viết release notes'), slack('C_RELEASE', link('card'), ['card'])]],
+    bad: { 'kept title changed': [card('list_fe_todo', 'Không viết release notes'), slack('C_RELEASE', link('card'), ['card'])],
+      'channel not changed': [card('list_fe_todo', 'Viết release notes'), slack('C_FE', link('card'), ['card'])],
+      'card link dropped': [card('list_fe_todo', 'Viết release notes'), slack('C_RELEASE', 'Đã tạo card.')] } },
+  mt_edit03: { good: [[card('list_fe_doing', 'Thiết kế trang hồ sơ', { idMembers: ['member_lan'] })],
+    [card('list_fe_doing', 'Thiết kế trang hồ sơ'), { id: 'assign', tool: 'trello.add_member', args: { cardId: { $ref: 'card.output.id' }, memberId: 'member_lan' }, dependsOn: ['card'] }]],
+    bad: { 'kept title changed': [card('list_fe_doing', 'Xóa hồ sơ', { idMembers: ['member_lan'] })],
+      'someone else assigned': [card('list_fe_doing', 'Thiết kế trang hồ sơ', { idMembers: ['member_minh'] })] } },
+  mt_edit04: { good: [[issue('acme/web', 'Footer overlaps'), slack('C_FE', link('issue'), ['issue'])]],
+    bad: { 'kept issue title shortened': [issue('acme/web', 'Footer'), slack('C_FE', link('issue'), ['issue'])],
+      'dropped card kept': [issue('acme/web', 'Footer overlaps'), card('list_fe_todo', 'Footer overlaps'), slack('C_FE', link('issue'), ['issue'])],
+      'channel changed': [issue('acme/web', 'Footer overlaps'), slack('C_GEN', link('issue'), ['issue'])] } },
+  mt_edit05: { good: [[card('list_be_backlog', 'Retry webhook')]],
+    bad: { 'kept title changed': [card('list_be_backlog', 'Cancel Retry webhook')], 'list not changed': [card('list_be_todo', 'Retry webhook')] } },
+  mt_edit06: { good: [[card('list_fe_todo', 'Chuẩn bị demo', { due: '2026-10-05T17:00:00+07:00' })]],
+    bad: { 'kept title changed': [card('list_fe_todo', 'Không Chuẩn bị demo', { due: '2026-10-05T17:00:00+07:00' })],
+      'deadline not moved': [card('list_fe_todo', 'Chuẩn bị demo', { due: '2026-10-02T17:00:00+07:00' })] } },
+  mt_reply01: { good: [[card('list_fe_todo', 'Kiểm tra form đăng ký')]],
+    bad: { 'another list': [card('list_fe_done', 'Kiểm tra form đăng ký')], 'title of the request changed': [card('list_fe_todo', 'Kiểm tra')] } },
+  mt_reply02: { good: [[slack('C_FE', "Tonight's build failed.")]],
+    bad: { 'meaning of the request flipped': [slack('C_FE', "Tonight's build succeeded.")], 'another channel': [slack('C_GEN', "Tonight's build failed.")] } },
+  mt_reply03: { good: [[issue('acme/web', 'Footer covers the last form field')]],
+    bad: { 'another repo': [issue('acme/api', 'Footer covers the last form field')], 'unrelated title': [issue('acme/web', 'Login bug')] } },
+  mt_new01: { good: [[slack('C_GEN', 'Họp nhóm lúc 3 giờ chiều nay.')]],
+    bad: { 'old step carried over': [card('list_fe_todo', 'Sửa lỗi đăng nhập'), slack('C_GEN', 'Họp nhóm lúc 3 giờ chiều nay.')],
+      'wrong time': [slack('C_GEN', 'Họp nhóm lúc 9 giờ sáng nay.')] } },
+  mt_new02: { good: [[issue('acme/api', 'Webhook retries drop events')]],
+    bad: { 'old step carried over': [slack('C_RELEASE', 'Bản 1.2 đã phát hành.'), issue('acme/api', 'Webhook retries drop events')],
+      'title the user gave changed': [issue('acme/api', 'Webhook')] } },
+  mt_new03: { good: [[card('list_be_backlog', 'Write the API docs')]],
+    bad: { 'old step carried over': [issue('acme/web', 'Footer overlaps on small screens'), card('list_be_backlog', 'Write the API docs')],
+      'title the user gave changed': [card('list_be_backlog', 'API docs draft')] } },
+};
 
 describe('preregistered multi-turn labels', () => {
   it('has at least 12 cases: six edits, three replies to a question, three new requests', () => {
@@ -65,6 +111,16 @@ describe('preregistered multi-turn labels', () => {
         for (const tool of old) expect(allowed, `${c.id}:${tool}`).not.toContain(tool);
       }
     }
+  });
+  it.each(Object.entries(examples))('%s passes a plan that keeps every other field and fails one that changes any of them', (id, { good, bad }) => {
+    const c = cases.find(item => item.id === id)!;
+    for (const [index, steps] of good.entries()) expect(scoreCase(c, plan(...steps), ALL_TOOLS).passed, `${id} good ${index}`).toBe(true);
+    for (const [why, steps] of Object.entries(bad)) expect(scoreCase(c, plan(...steps), ALL_TOOLS).passed, `${id}: ${why}`).toBe(false);
+  });
+  it('covers every case in the examples and matches titles that must stay or that the user wrote out exactly', () => {
+    expect(Object.keys(examples).sort()).toEqual(cases.map(c => c.id).sort());
+    for (const c of cases.filter(item => item.category !== 'turn_reply' || item.id === 'mt_reply01'))
+      for (const spec of specs(c)) if (spec.args?.title) expect(Object.keys(spec.args.title), `${c.id}:${spec.tool}`).toEqual(['equals']);
   });
   it.each(cases.map(c => [c.id, c] as const))('%s offers every labelled tool to the model with its history', async (_id, c) => {
     const provider = new MockLLMProvider();
