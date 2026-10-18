@@ -1,6 +1,6 @@
 # GMAIL-04 · Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, bật cờ
 
-**Trạng thái:** đang làm, giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026; bộ đo và label (bước 2–3) xong #154 tại `32d71fd` (18/10); còn đo, nghiệm thu Google thật, PR bật cờ · **Nhánh gợi ý:** `eval/gmail-04-measure` (bộ đo), `feat/gmail-04-enable-flags` (PR bật cờ) · **Phụ thuộc:** GMAIL-01, GMAIL-02, GMAIL-03, ANS-01 đã merge; 9router và tài khoản Google của nhóm · **Mốc:** Google Cloud project trước **21/10**; đo **26–28/10**; PR bật cờ trước **28/10**, trước mốc chốt tính năng 29/10
+**Trạng thái:** đang làm, giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026; bộ đo và label (bước 2–3) xong #154 tại `32d71fd` (18/10); phép đo (bước 4) xong #159 tại `778f22f` (18/10); còn nghiệm thu Google thật, PR bật cờ · **Nhánh gợi ý:** `eval/gmail-04-measure` (bộ đo), `feat/gmail-04-enable-flags` (PR bật cờ) · **Phụ thuộc:** GMAIL-01, GMAIL-02, GMAIL-03, ANS-01 đã merge; 9router và tài khoản Google của nhóm · **Mốc:** Google Cloud project trước **21/10**; đo **26–28/10**; PR bật cờ trước **28/10**, trước mốc chốt tính năng 29/10
 **Đặc tả:** mục 3.7, 4.6, 5.5, 6.4 và mục 7 (thứ tự cắt). **Quy tắc chung:** [GMAIL-common](GMAIL-common.md).
 **Có phần việc của con người:** tạo project Google, duyệt từng kế hoạch ghi thật, thao tác trên trang tài khoản Google.
 

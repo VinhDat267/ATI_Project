@@ -1,6 +1,6 @@
 # W4-02 · Đánh giá hội thoại nhiều lượt (sửa plan, trả lời câu hỏi làm rõ)
 
-**Trạng thái:** đang làm; bộ đo và label (bước 1, 2 và phần đăng ký label của bước 3) xong #157 tại `efaafb2` (18/10), reviewer thi công theo yêu cầu nhóm trưởng; còn đo 3 lần và báo cáo · **Nhánh gợi ý:** `test/w4-02-multi-turn-eval` · **Phụ thuộc:** không
+**Trạng thái:** xong; bộ đo và label xong #157 tại `efaafb2`, phép đo 3 lần và báo cáo xong #159 tại `778f22f` (đều 18/10); reviewer thi công theo yêu cầu nhóm trưởng · **Nhánh gợi ý:** `test/w4-02-multi-turn-eval` · **Phụ thuộc:** không
 
 ## Vấn đề
 

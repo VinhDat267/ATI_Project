@@ -1,6 +1,6 @@
 # W4-04 · Đo latency qua frontend với số mẫu đủ lớn
 
-**Trạng thái:** công cụ xong #151 (`ce59f4f`, 17/10); chờ phép đo live sau 20/10 · **Nhánh gợi ý:** `test/w4-04-frontend-latency` · **Phụ thuộc:** không
+**Trạng thái:** xong; công cụ #151 (`ce59f4f`, 17/10), phép đo live #159 (`778f22f`, 18/10, trước mốc chốt catalog 20/10 theo yêu cầu nhóm trưởng; catalog đổi thì đo lại) · **Nhánh gợi ý:** `test/w4-04-frontend-latency` · **Phụ thuộc:** không
 
 ## Vấn đề
 
