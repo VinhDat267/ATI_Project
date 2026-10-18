@@ -26,7 +26,10 @@ Từ PR #13, mỗi plan được lưu vào hội thoại và gửi lại cho mod
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Commit đăng ký label:
-- Kết quả:
+- PR: bộ đo và label, nhánh `test/w4-02-multi-turn-eval`. Reviewer thi công theo yêu cầu nhóm trưởng. [Log](../log/2026-10-18-reviewer-W4-02-multi-turn-eval.md).
+- Commit đăng ký label: `4d63bd6` (`cases-multiturn.json`, 12 câu: 6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới), trước mọi lời gọi model.
+- Kết quả: chưa đo. Ba lần chạy với `EVAL_SEARCH_MODE=llm` làm sau khi merge, khi nhóm trưởng đồng ý, dự kiến cùng đợt đo GMAIL-04 (khoảng 21–22/10). Báo cáo theo nhóm kèm câu fail thuộc PR sau.
 - Điều chưa làm hoặc khác với task card:
+  - đúng 12 câu, mức tối thiểu;
+  - câu trả lời câu hỏi lại không có câu "Minh Nguyễn": fixture không có thành viên tên này, nên thay bằng trả lời list, kênh và repo;
+  - bản public che cả câu người dùng ở các lượt trước, task card không ghi.
