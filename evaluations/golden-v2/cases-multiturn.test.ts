@@ -88,11 +88,19 @@ describe('preregistered multi-turn labels', () => {
       PLANNER_SEARCH_MODE: 'llm', EVAL_READ_ANSWERS: 'off', PLANNER_READ_ANSWERS: 'off', EVAL_ONLY: c.id, EVAL_OUTPUT_DIR: output })) vi.stubEnv(name, value);
     try {
       await runner.main();
-      const raw = readFileSync(join(output, readdirSync(output)[0]!, 'report.json'), 'utf8');
-      const report = JSON.parse(raw);
+      const report = JSON.parse(readFileSync(join(output, readdirSync(output)[0]!, 'report.json'), 'utf8'));
       expect(report).toMatchObject({ set: 'multiturn', labels: { file: 'cases-multiturn.json', cases: cases.length } });
-      expect(report.results[0].cases[0]).toMatchObject({ id: c.id, category: 'turn_edit', passed: true });
-      for (const text of runner.casePrompts(c)) expect(raw).not.toContain(text);
+      const row = report.results[0].cases[0];
+      expect(row).toMatchObject({ id: c.id, category: 'turn_edit', passed: true,
+        response: { thinking: '[redacted case prompt]', summary: '[redacted case prompt]' } });
+      // Search parsed strings: the prompts contain quotes, which the raw JSON escapes.
+      const strings: string[] = [];
+      const collect = (value: unknown): void => {
+        if (typeof value === 'string') strings.push(value);
+        else if (value && typeof value === 'object') for (const [key, nested] of Object.entries(value)) { strings.push(key); collect(nested); }
+      };
+      collect(report);
+      for (const text of runner.casePrompts(c)) expect(strings.filter(s => s.includes(text)), text).toEqual([]);
     } finally { generate.mockRestore(); vi.unstubAllEnvs(); }
   });
 });
