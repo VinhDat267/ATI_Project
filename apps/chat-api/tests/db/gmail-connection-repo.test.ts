@@ -164,27 +164,30 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
         // Hold the current credential row so the save stops at its DELETE, after its validity check.
         await holder.query('BEGIN');
         await holder.query("SELECT id FROM service_credentials WHERE service='gmail' AND user_id=$1 FOR UPDATE", [alice.id]);
-        let savedAt = 0;
-        const saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:new', Date.now()).then((row) => { savedAt = performance.now(); return row; });
-        const waitingPid = async () => (await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type = 'Lock'
+        const saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:new', Date.now());
+        const waitingPid = async () => (await pool.query<{ pid: number }>(`SELECT pid FROM pg_stat_activity WHERE wait_event_type = 'Lock'
           AND query LIKE 'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2%'`)).rows[0]?.pid;
-        await vi.waitFor(async () => expect(await waitingPid()).toBeTruthy(), { timeout: 5_000, interval: 20 });
-        let loggedOutAt = 0;
-        const loggingOut = (action === 'logout'
+        let savePid: number | undefined;
+        await vi.waitFor(async () => { savePid = await waitingPid(); expect(savePid).toBeTruthy(); }, { timeout: 5_000, interval: 20 });
+        // Read the order from PostgreSQL rather than from when the two promises settle: the save still
+        // commits and releases its client after the logout's UPDATE may already have returned.
+        const logoutPid = (await logout.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+        const loggingOut = action === 'logout'
           ? logout.query('UPDATE auth_sessions SET revoked_at = now() WHERE id = $1', [alice.sid])
-          : logout.query("UPDATE users SET status = 'disabled' WHERE id = $1", [alice.id]))
-          .then(() => { loggedOutAt = performance.now(); });
-        await new Promise((resolve) => setTimeout(resolve, 400));
+          : logout.query("UPDATE users SET status = 'disabled' WHERE id = $1", [alice.id]);
+        await vi.waitFor(async () => expect((await pool.query<{ blockers: number[] }>('SELECT pg_blocking_pids($1) AS blockers', [logoutPid]))
+          .rows[0]!.blockers).toContain(savePid), { timeout: 5_000, interval: 20 });
         await holder.query('ROLLBACK');
-        const saved = await saving;
+        expect(await saving).toBeTruthy();
         await loggingOut;
-        if (saved) {
-          expect(loggedOutAt).toBeGreaterThan(savedAt);
-          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:new');
-        } else {
-          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:existing');
-        }
+        expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:new');
+        const after = action === 'logout'
+          ? (await pool.query('SELECT revoked_at IS NOT NULL AS done FROM auth_sessions WHERE id = $1', [alice.sid])).rows[0]
+          : (await pool.query("SELECT status = 'disabled' AS done FROM users WHERE id = $1", [alice.id])).rows[0];
+        expect(after.done).toBe(true);
       } finally {
+        // A failed assertion must not hand the pool a client still holding the credential row lock.
+        await holder.query('ROLLBACK');
         holder.release(); logout.release();
       }
     });
