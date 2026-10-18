@@ -469,10 +469,14 @@ switched to another model. [Report and provenance](../docs/ai-evidence/V3-GOLDEN
   which now answer by design. `ca04` is a refusal in both runs, as at W3-10.
 - **Prompt size:** prompt characters per model call in Gmail cases are
   p50 / p95 / max 17,120 / 19,869 / 22,633.
-- **Label misses:** two failures are labels missing a correct response, kept
-  as registered:
-  - `gm04` run 3 replied in Vietnamese to an English request;
-  - `an_ca01` (×3) looked up a window ending 23:59:59 instead of 00:00:00.
+- **Failures:**
+  - `gm04` run 3 is a label missing a correct response: the reply is in
+    Vietnamese to an English request. Kept as registered.
+  - `an_ca01` (×3) is a query fault. The model set `timeMax` to 23:59:59, but
+    Calendar's `timeMax` is an exclusive upper bound on start time, so the last
+    second of the day is missed; the label's 00:00:00 next day covers it. The
+    answer happens to be right on the current fixture. Proposed backlog item:
+    full-day windows end at 00:00 the next day.
 - **Still open:** Google acceptance (parts 1–3) and the flag PR.
 
 ### W4-02: multi-turn conversations

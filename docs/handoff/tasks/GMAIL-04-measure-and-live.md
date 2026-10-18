@@ -97,7 +97,11 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
   - `answers` ×3: **27/30**. Mọi câu trả lời đều có tra cứu do model mở. Trung bình 2,3 lời gọi model. p50/p95 13,3/20,7 s;
   - `core` ×1 khi bật kiểu trả lời: **50/50**;
   - `services` ×1 khi bật: 37/44; đối chứng cùng ngày khi tắt: 43/44. Phần chênh là đúng 6 câu `read_only` nay được trả lời; không câu hành động nào thành câu trả lời;
-  - câu trượt do label: `gm04` (nội dung tiếng Việt cho câu tiếng Anh) và `an_ca01` (khung giờ lệch 1 giây). Không sửa label sau khi có kết quả.
+  - câu trượt:
+    - `gm04`: do label (nội dung tiếng Việt cho câu tiếng Anh);
+    - `an_ca01`: sai lệch truy vấn của model. `timeMax` 23:59:59 bỏ giây cuối ngày, vì cận trên của Calendar là loại trừ. Câu trả lời vẫn đúng trên fixture hiện tại. Review #159 chỉ ra điểm này.
+
+    Không sửa label sau khi có kết quả.
 - Quyết định bật cờ: chưa có. Điều kiện số đo đã đạt cho cả hai cờ: injection 9/9; không câu ghi nào thành câu trả lời. Còn chờ nghiệm thu Google thật phần 1–3, rồi nhóm trưởng quyết.
 - Điều chưa làm hoặc khác với task card:
   - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; nhóm trưởng đồng ý ngày 18/10, trước lời gọi model đầu tiên;

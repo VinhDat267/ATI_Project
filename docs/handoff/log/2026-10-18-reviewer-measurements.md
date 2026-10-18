@@ -39,9 +39,9 @@ Chi tiết và nguồn gốc (commit, SHA-256 label và catalog) nằm trong bá
   - `services` bật cờ 37/44, đối chứng 43/44. Không câu hành động nào thành câu trả lời.
 - **W4-02:** `multiturn` **36/36**.
 - **W4-04:** 23/24 dưới 15 s; p50/p95/max 9,6/14,7/15,8 s; 0 lệnh ghi.
-- **Câu trượt do label**, giữ nguyên điểm theo label đã đăng ký:
-  - `gm04` lượt 3: nội dung tiếng Việt cho câu yêu cầu tiếng Anh;
-  - `an_ca01` cả 3 lượt: `timeMax` 23:59:59, label đòi 00:00:00.
+- **Câu trượt**, giữ nguyên điểm theo label đã đăng ký:
+  - `gm04` lượt 3: do label, nội dung tiếng Việt cho câu yêu cầu tiếng Anh;
+  - `an_ca01` cả 3 lượt: sai lệch truy vấn, `timeMax` 23:59:59 bỏ giây cuối ngày (xem mục sửa theo review bên dưới).
 - `ca04` của services trả `refusal` ở cả hai lượt, như ở W3-10.
 
 ## Kiểm bản public
@@ -63,3 +63,13 @@ Chi tiết và nguồn gốc (commit, SHA-256 label và catalog) nằm trong bá
 
 - Nghiệm thu GMAIL-04 với Google thật (phần 1–3) và PR bật cờ, trước 28/10.
 - W4-04 đo trước mốc chốt catalog 20/10, theo yêu cầu nhóm trưởng. Nếu catalog đổi trước 20/10 thì phải đo lại.
+
+## Sửa theo review #159
+
+[Review độc lập](https://github.com/VinhDat267/ATI_Project/pull/159#issuecomment-6246992327) tại `d2a1b89`: chưa đạt, 1 P2. Bản đầu quy `an_ca01` cho label ("lệch 1 giây, cùng kết quả"); kết luận đó sai.
+
+- Trong Google Calendar `events.list`, `timeMax` là cận trên **loại trừ** của giờ bắt đầu sự kiện. Adapter truyền nguyên giá trị đó, và fixture cũng lọc bằng `start < timeMax`.
+- Vì vậy `timeMax` 23:59:59 của model bỏ sót sự kiện bắt đầu ở giây cuối ngày, còn 00:00:00 hôm sau của label phủ trọn ngày.
+- Reviewer thêm một sự kiện bắt đầu lúc 23:59:59 vào bộ nhớ của tiến trình review: tham số của model không thấy sự kiện đó, mốc của label thì thấy.
+
+Đã sửa diễn giải ở báo cáo, README, task card GMAIL-04 và log này: `an_ca01` là **sai lệch truy vấn chưa làm đổi câu trả lời trên fixture hiện tại**. Label, bằng chứng JSON và điểm **27/30** giữ nguyên, không chạy lại campaign. Đề xuất backlog: khi hỏi "cả ngày", planner cần dùng 00:00 hôm sau làm `timeMax`.
