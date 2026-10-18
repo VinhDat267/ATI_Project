@@ -35,3 +35,18 @@ PostgreSQL 16 tmpfs riêng ở 55533. Mỗi file bị đổi tạm đều đư�
   - mỗi đột biến chỉ làm fail đúng ca của nó.
 - **Lặp:** hai ca chạy lại 20 lần, **20/20** đạt.
 - `npm run check` (sandbox, hai cờ tắt, không dùng `.env`): **exit 0** ngay lượt đầu, **2.014 v3** (63 + 408 + 291 + 42 + 465 + 745) **+ 332 eval**. Số test không đổi vì chỉ sửa nội dung một test.
+
+## Sửa theo review #156
+
+[Review độc lập](https://github.com/VinhDat267/ATI_Project/pull/156#issuecomment-6245561734) tại `b388e03`: chưa đạt, 1 P2. `waitingPid()` chọn PID chỉ theo câu lệnh `DELETE` đang chờ khoá trong `pg_stat_activity`. Một tiến trình ở schema khác, ví dụ một file test chạy song song, chờ đúng câu đó thì có thể bị chọn nhầm, làm cả hai ca fail dù mã sản phẩm giữ khoá đúng.
+
+- Mỗi ca nay dựng sẵn một **tiến trình mồi**: một schema riêng có bảng `service_credentials`, một client giữ dòng, và một client khác gửi đúng câu `DELETE` và bị chặn. Sau ca thì dọn hết.
+- `waitingPid()` chỉ nhận PID đang bị **chính client giữ dòng của test** chặn: `$1 = ANY(pg_blocking_pids(pid))` với PID của client đó.
+
+Kiểm thử:
+- **RED:** có tiến trình mồi, `waitingPid()` cũ fail **2/2**, ổn định qua 3 lượt. Lý do đúng là lấy nhầm PID: `expected [ 121 ] to include 123`. Ở ca `logout`, lệnh đăng xuất còn được gửi trước khi phần lưu kịp khoá phiên (`expected [] to include 118`).
+- **GREEN:** `waitingPid()` mới, file test **16/16**; typecheck `apps/chat-api` exit 0.
+- **Chạy lại phần chứng minh:**
+  - phần lưu trả về chậm 300 ms: test cũ 2/2 fail, test mới 2/2 đạt;
+  - bỏ khoá phiên: chỉ ca `logout` fail; bỏ khoá `users`: chỉ ca `disable` fail;
+  - lặp **20/20**.
