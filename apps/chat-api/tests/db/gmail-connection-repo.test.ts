@@ -158,34 +158,59 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
     it.each(['logout', 'disable'] as const)('orders %s after the save, never between its check and insert', async (action) => {
       await gmail.saveConnection(alice.id, (await consume(alice)).id!, 'v1:existing', Date.now());
       const consumed = await consume(alice);
+      // A writer in another schema blocked on the same DELETE text, as a test file running in parallel
+      // could be: the save's PID must come from this test's own lock, not from the statement text.
+      const decoySchema = `${schema}_decoy_${action}`, decoyUser = randomUUID();
+      await admin.query(`CREATE SCHEMA "${decoySchema}"`);
+      await admin.query(`CREATE TABLE "${decoySchema}".service_credentials (service text NOT NULL, user_id uuid NOT NULL)`);
+      await admin.query(`INSERT INTO "${decoySchema}".service_credentials VALUES ('gmail', $1)`, [decoyUser]);
+      const decoyUrl = new URL(process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3');
+      decoyUrl.searchParams.set('options', `-c search_path=${decoySchema}`);
+      const decoyHolder = new pg.Client({ connectionString: decoyUrl.href }), decoyWriter = new pg.Client({ connectionString: decoyUrl.href });
+      await decoyHolder.connect(); await decoyWriter.connect();
+      await decoyHolder.query('BEGIN');
+      await decoyHolder.query('SELECT 1 FROM service_credentials FOR UPDATE');
+      await decoyWriter.query('BEGIN');
+      const decoyDelete = decoyWriter.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2', ['gmail', decoyUser]);
+      await vi.waitFor(async () => expect((await admin.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1',
+        [(decoyWriter as unknown as { processID: number }).processID])).rows[0]?.wait_event_type).toBe('Lock'), { timeout: 5_000, interval: 20 });
       const holder = await pool.connect();
       const logout = await pool.connect();
       try {
         // Hold the current credential row so the save stops at its DELETE, after its validity check.
         await holder.query('BEGIN');
         await holder.query("SELECT id FROM service_credentials WHERE service='gmail' AND user_id=$1 FOR UPDATE", [alice.id]);
-        let savedAt = 0;
-        const saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:new', Date.now()).then((row) => { savedAt = performance.now(); return row; });
-        const waitingPid = async () => (await pool.query(`SELECT pid FROM pg_stat_activity WHERE wait_event_type = 'Lock'
-          AND query LIKE 'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2%'`)).rows[0]?.pid;
-        await vi.waitFor(async () => expect(await waitingPid()).toBeTruthy(), { timeout: 5_000, interval: 20 });
-        let loggedOutAt = 0;
-        const loggingOut = (action === 'logout'
+        const holderPid = (await holder.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+        const saving = gmail.saveConnection(alice.id, consumed.id!, 'v1:new', Date.now());
+        // Only the save is blocked by this test's holder; the statement text alone also matches other writers.
+        const waitingPid = async () => (await pool.query<{ pid: number }>(`SELECT pid FROM pg_stat_activity
+          WHERE $1 = ANY(pg_blocking_pids(pid)) AND query LIKE $2`,
+          [holderPid, 'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2%'])).rows[0]?.pid;
+        let savePid: number | undefined;
+        await vi.waitFor(async () => { savePid = await waitingPid(); expect(savePid).toBeTruthy(); }, { timeout: 5_000, interval: 20 });
+        // Read the order from PostgreSQL rather than from when the two promises settle: the save still
+        // commits and releases its client after the logout's UPDATE may already have returned.
+        const logoutPid = (await logout.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+        const loggingOut = action === 'logout'
           ? logout.query('UPDATE auth_sessions SET revoked_at = now() WHERE id = $1', [alice.sid])
-          : logout.query("UPDATE users SET status = 'disabled' WHERE id = $1", [alice.id]))
-          .then(() => { loggedOutAt = performance.now(); });
-        await new Promise((resolve) => setTimeout(resolve, 400));
+          : logout.query("UPDATE users SET status = 'disabled' WHERE id = $1", [alice.id]);
+        await vi.waitFor(async () => expect((await pool.query<{ blockers: number[] }>('SELECT pg_blocking_pids($1) AS blockers', [logoutPid]))
+          .rows[0]!.blockers).toContain(savePid), { timeout: 5_000, interval: 20 });
         await holder.query('ROLLBACK');
-        const saved = await saving;
+        expect(await saving).toBeTruthy();
         await loggingOut;
-        if (saved) {
-          expect(loggedOutAt).toBeGreaterThan(savedAt);
-          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:new');
-        } else {
-          expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:existing');
-        }
+        expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.config).toBe('v1:new');
+        const after = action === 'logout'
+          ? (await pool.query('SELECT revoked_at IS NOT NULL AS done FROM auth_sessions WHERE id = $1', [alice.sid])).rows[0]
+          : (await pool.query("SELECT status = 'disabled' AS done FROM users WHERE id = $1", [alice.id])).rows[0];
+        expect(after.done).toBe(true);
       } finally {
+        // A failed assertion must not hand the pool a client still holding the credential row lock.
+        await holder.query('ROLLBACK');
         holder.release(); logout.release();
+        await decoyHolder.query('ROLLBACK'); await decoyDelete; await decoyWriter.query('ROLLBACK');
+        await decoyHolder.end(); await decoyWriter.end();
+        await admin.query(`DROP SCHEMA "${decoySchema}" CASCADE`);
       }
     });
 
