@@ -57,6 +57,20 @@ describe('Gmail scoring extensions', () => {
     expect(scoreCase({ ...c, category: 'read_only', expect: { ...c.expect, kind: 'clarification' } },
       { kind: 'clarification', question: 'q', context: '' }, catalog, directory).toolsOk).toBe(false);
   });
+  it('scores a plan with labelled lookups on both the lookups and the steps', () => {
+    const c: GoldenCase = { id: 'cs_demo', category: 'cross_service', language: 'en', prompt: 'p', services: ['gmail', 'slack'],
+      expect: { kind: 'plan', searches: [{ tool: 'gmail.search_threads', args: { query: { includesAny: ['kiểm thử'] } } }],
+        steps: [{ tool: 'slack.send_message', args: { channel: { equals: 'C_FE' } } }] } };
+    const post = plan({ id: 'post', tool: 'slack.send_message', args: { channel: 'C_FE', text: 'Chạy test trước khi gửi PR.' } });
+    const read: SearchTrace = { tool: 'gmail.search_threads', args: { query: 'Kế hoạch kiểm thử' }, result: [{ id: 'gmail-thread-5' }], phase: 'search' };
+    expect(scoreCase(c, post, catalog, [read])).toMatchObject({ kindOk: true, toolsOk: true, argsOk: true, passed: true, matchers: { passed: 2, total: 2 } });
+    const unread = scoreCase(c, post, catalog, []);
+    expect(unread).toMatchObject({ toolsOk: false, passed: false });
+    expect(unread.failures).toContain('tools: expected gmail.search_threads; got ');
+    expect(scoreCase(c, post, catalog, [{ ...read, args: { query: 'Họp nhóm' } }])).toMatchObject({ toolsOk: true, argsOk: false, passed: false });
+    expect(scoreCase(c, plan({ id: 'post', tool: 'slack.send_message', args: { channel: 'C_GEN', text: 't' } }), catalog, [read]))
+      .toMatchObject({ toolsOk: true, argsOk: false, passed: false });
+  });
   it('aggregates per service with the catalog it is given and the directory traces of each row', () => {
     const c: GoldenCase = { id: 'an_demo', category: 'answer', language: 'vi', prompt: 'p', services: ['gmail'],
       expect: { kind: 'answer', searches: [{ tool: 'gmail.list_labels', args: { query: { equals: '' } } }] } };

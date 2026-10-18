@@ -184,14 +184,16 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
     if (activity.llmCalls !== 1) failures.push(`read_only: expected 1 model call, got ${activity.llmCalls}`);
     if (activity.searchRounds !== 0) failures.push(`read_only: expected 0 model-opened search rounds, got ${activity.searchRounds}`);
   }
+  let lookup: AlternativeScore | undefined;
   if (golden.expect.searches?.length) {
     // An answer may rest on a platform directory listing (ANS-01); other categories score model-opened reads only.
     const traced: PlanResponse = { kind: 'plan', thinking: '', summary: '', warnings: [], steps: searches
       .filter(s => (golden.category === 'answer' || s.phase !== 'prefetch') && s.error === undefined && s.result !== undefined && catalog.some(t => t.name === s.tool && t.sideEffect === 'read'))
       .map((s, index) => ({ id: `read_${index}`, tool: s.tool, args: s.args as PlanStep['args'], description: 'Observed gather call', dependsOn: [] })) };
-    const scored = scoreAlternative(golden.expect.searches, traced);
-    return { kindOk, toolsOk: scored.toolsAssigned, argsOk: scored.argsOk,
-      passed: kindOk && failures.length === 0 && scored.toolsAssigned && scored.argsOk, matchers: { passed: scored.passed, total: scored.total }, failures: [...failures, ...scored.failures] };
+    lookup = scoreAlternative(golden.expect.searches, traced);
+    // A plan with labelled lookups is also scored on its steps below.
+    if (golden.expect.kind !== 'plan') return { kindOk, toolsOk: lookup.toolsAssigned, argsOk: lookup.argsOk,
+      passed: kindOk && failures.length === 0 && lookup.toolsAssigned && lookup.argsOk, matchers: { passed: lookup.passed, total: lookup.total }, failures: [...failures, ...lookup.failures] };
   }
   if (golden.expect.kind !== 'plan') {
     return { kindOk, toolsOk: null, argsOk: null, passed: kindOk && failures.length === 0, matchers: { passed: 0, total: 0 }, failures };
@@ -199,7 +201,7 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
 
   const options = golden.expect.anyOf ?? [golden.expect.steps ?? []];
   if (!kindOk || response?.kind !== 'plan') {
-    const total = Math.min(...options.map((steps) => steps.reduce((sum, spec) => sum + Object.keys(spec.args ?? {}).length, 0)));
+    const total = Math.min(...options.map((steps) => steps.reduce((sum, spec) => sum + Object.keys(spec.args ?? {}).length, 0))) + (lookup?.total ?? 0);
     return { kindOk, toolsOk: false, argsOk: false, passed: false, matchers: { passed: 0, total }, failures };
   }
 
@@ -222,10 +224,11 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
   const [best] = options.map((steps) => scoreAlternative(steps, response)).sort((a, b) =>
     Number(b.argsOk) - Number(a.argsOk) || Number(b.toolsAssigned) - Number(a.toolsAssigned) ||
     (a.total - a.passed) - (b.total - b.passed));
-  const toolsOk = best!.toolsAssigned && unexpected.length === 0;
-  const argsOk = best!.argsOk && recipientsOk;
-  failures.push(...best!.failures);
-  return { kindOk, toolsOk, argsOk, passed: toolsOk && argsOk, matchers: { passed: best!.passed, total: best!.total }, failures };
+  const toolsOk = best!.toolsAssigned && unexpected.length === 0 && (lookup?.toolsAssigned ?? true);
+  const argsOk = best!.argsOk && recipientsOk && (lookup?.argsOk ?? true);
+  failures.push(...lookup?.failures ?? [], ...best!.failures);
+  return { kindOk, toolsOk, argsOk, passed: toolsOk && argsOk,
+    matchers: { passed: best!.passed + (lookup?.passed ?? 0), total: best!.total + (lookup?.total ?? 0) }, failures };
 }
 
 const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
