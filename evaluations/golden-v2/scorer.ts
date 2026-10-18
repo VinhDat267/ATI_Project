@@ -17,6 +17,8 @@ export interface Matcher {
   includesAll?: string[];
   /** Case-insensitive substrings none of which may occur; an absent argument contains none. */
   excludes?: string[];
+  /** Literal phrases removed only for excludes; all other matchers inspect the original text. */
+  excludeExceptions?: string[];
   /** Array argument containing this element. */
   contains?: string | number;
   minItems?: number;
@@ -114,7 +116,10 @@ function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boo
   if (matcher.anyOf && !matcher.anyOf.some((alternative) => checkMatcher(value, alternative, plan))) return false;
   if (matcher.absent) return value === undefined;
   const text = textOf(value);
-  if (matcher.excludes && text !== undefined && matcher.excludes.some((s) => lower(text).includes(lower(s)))) return false;
+  if (matcher.excludes && text !== undefined) {
+    const remaining = (matcher.excludeExceptions ?? []).reduce((value, phrase) => value.replaceAll(lower(phrase), ' '), lower(text));
+    if (matcher.excludes.some((s) => remaining.includes(lower(s)))) return false;
+  }
   if (value === undefined) return Object.keys(matcher).length > 0 && Object.keys(matcher).every((key) => key === 'excludes');
   if (matcher.equals !== undefined && value !== matcher.equals) return false;
   if (matcher.instantEquals !== undefined) {

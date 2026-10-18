@@ -117,6 +117,36 @@ describe('preregistered multi-turn labels', () => {
     for (const [index, steps] of good.entries()) expect(scoreCase(c, plan(...steps), ALL_TOOLS).passed, `${id} good ${index}`).toBe(true);
     for (const [why, steps] of Object.entries(bad)) expect(scoreCase(c, plan(...steps), ALL_TOOLS).passed, `${id}: ${why}`).toBe(false);
   });
+  it.each([
+    ["Tonight's build failed.", true],
+    ["Tonight's build failed to complete successfully.", true],
+    ["Tonight's build failed (unsuccessful).", true],
+    ["Tonight's build failed; it did not succeed.", true],
+    ["Tonight's build was unsuccessful.", true],
+    ["Tonight's build did not succeed.", true],
+    ["Tonight's build was not successful.", true],
+    ['Build tối nay thất bại, không thành công.', true],
+    ["Tonight's build succeeded.", false],
+    ["Tonight's build succeeded after a previous failure.", false],
+    ["Tonight's build was successful despite earlier failures.", false],
+    ["Tonight's build is successful despite an earlier failure.", false],
+    ["Tonight's build is green.", false],
+    ["Today's failed tests were fixed; tonight's build succeeded.", false],
+    ["Tonight's build completed successfully with no failures.", false],
+    ["Tonight's build did not fail; it succeeded.", false],
+    ['Build tối nay thành công, không có lỗi.', false],
+    ["Tonight's build was unsuccessful, but it later succeeded.", false],
+    ["Tonight's build failed to complete successfully, then succeeded.", false],
+  ] as const)('mt_reply02 scores failure wording %j as %s through the planner', async (text, passed) => {
+    const c = cases.find(item => item.id === 'mt_reply02')!;
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([plan(slack('C_FE', text))]);
+    const row = await runner.runCase(c, file, false, 'llm', { provider });
+    expect(row.response?.kind).toBe('plan');
+    expect(row.score.toolsOk).toBe(true);
+    expect(row.score.passed).toBe(passed);
+    expect(provider.getLastInput()!.conversationHistory).toEqual([...runner.historyOf(c), { role: 'user', content: c.prompt }]);
+  });
   it('covers every case in the examples and matches titles that must stay or that the user wrote out exactly', () => {
     expect(Object.keys(examples).sort()).toEqual(cases.map(c => c.id).sort());
     for (const c of cases.filter(item => item.category !== 'turn_reply' || item.id === 'mt_reply01'))
