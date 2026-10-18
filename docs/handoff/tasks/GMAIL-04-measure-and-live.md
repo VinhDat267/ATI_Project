@@ -79,5 +79,10 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 ## Kết quả (agent thi công điền)
 
 - PR:
-- Số liệu và quyết định bật cờ:
+  - **Bộ đo** (bước 2, 3): nhánh `eval/gmail-04-measure`, reviewer thi công theo yêu cầu nhóm trưởng. Bộ đo `8eae4f3`; label Gmail `34c595c` (20 câu) và label trả lời `d53f24b` (10 câu) commit trước lời gọi model đầu tiên. 19/19 đột biến bị bắt. [Log](../log/2026-10-18-reviewer-GMAIL-04-measure-harness.md).
+  - Đo, nghiệm thu Google thật, PR bật cờ: chưa làm.
+- Số liệu và quyết định bật cờ: chưa đo. Ngày 18/10, nhóm trưởng đồng ý đo ngay khi PR bộ đo merge (khoảng 21–22/10), giữ 26–27/10 làm dự phòng.
 - Điều chưa làm hoặc khác với task card:
+  - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; chờ nhóm trưởng xác nhận trước khi đo;
+  - 20 câu Gmail thay vì khoảng 16;
+  - xem log.

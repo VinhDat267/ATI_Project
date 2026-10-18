@@ -72,16 +72,20 @@ describe('preregistered Gmail planning labels', () => {
   });
   it('runs through the command entry point with the Gmail catalog and its own catalog hash', async () => {
     const output = mkdtempSync(join(tmpdir(), 'ati-gmail-04-dry-'));
+    // The planner validates against the catalog it was built with, so this plan scores only with Gmail in it.
+    const send = { kind: 'plan', thinking: 't', summary: 'Gửi thư', warnings: [], steps: [{ id: 'send', tool: 'gmail.send_message', description: 'Gửi thư',
+      args: { to: ['lan@example.com'], subject: 'Lịch họp tuần sau', body: 'Họp nhóm lúc 9 giờ sáng thứ Hai.' }, dependsOn: [] }] };
+    const generate = vi.spyOn(MockLLMProvider.prototype, 'generatePlan').mockImplementation(async () => JSON.stringify(send));
     for (const [name, value] of Object.entries({ EVAL_DRY_RUN: '1', EVAL_SET: 'gmail', EVAL_RUNS: '1', EVAL_CONCURRENCY: '1', EVAL_SEARCH_MODE: 'llm',
-      PLANNER_SEARCH_MODE: 'llm', EVAL_ONLY: 'gm01,gi01', EVAL_OUTPUT_DIR: output })) vi.stubEnv(name, value);
+      PLANNER_SEARCH_MODE: 'llm', EVAL_READ_ANSWERS: 'off', PLANNER_READ_ANSWERS: 'off', EVAL_ONLY: 'gm01', EVAL_OUTPUT_DIR: output })) vi.stubEnv(name, value);
     try {
       await runner.main();
       const report = JSON.parse(readFileSync(join(output, readdirSync(output)[0]!, 'report.json'), 'utf8'));
-      expect(report).toMatchObject({ set: 'gmail', readAnswers: false, labels: { file: 'cases-gmail.json', cases: cases.length, selectedCases: 2 },
+      expect(report).toMatchObject({ set: 'gmail', readAnswers: false, labels: { file: 'cases-gmail.json', cases: cases.length, selectedCases: 1 },
         catalog: { tools: catalog.length }, catalogSha256: createHash('sha256').update(JSON.stringify(catalog)).digest('hex') });
       expect(report.catalog.services).toContain('gmail');
-      expect(report.results[0].cases.map((row: { id: string }) => row.id)).toEqual(['gm01', 'gi01']);
-      expect(report.responses.gmailPromptChars.calls).toBeGreaterThanOrEqual(2);
-    } finally { vi.unstubAllEnvs(); }
+      expect(report.results[0].cases[0]).toMatchObject({ id: 'gm01', passed: true });
+      expect(report.responses.gmailPromptChars.calls).toBe(1);
+    } finally { generate.mockRestore(); vi.unstubAllEnvs(); }
   });
 });

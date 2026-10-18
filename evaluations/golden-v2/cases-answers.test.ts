@@ -63,14 +63,19 @@ describe('preregistered answer labels', () => {
   });
   it('runs through the command entry point with read answers on and the Gmail catalog', async () => {
     const output = mkdtempSync(join(tmpdir(), 'ati-gmail-04-answers-'));
+    // The planner keeps an answer only when it was built with read answers on.
+    const responses = [{ kind: 'search', calls: [{ tool: 'sheets.read_range', args: { spreadsheetId: 'spreadsheet_frontend_2026', range: 'Tasks!A1:B2' } }] },
+      { kind: 'answer', text: 'Hai dòng: Task/Status và Fix footer/To Do.' }];
+    const generate = vi.spyOn(MockLLMProvider.prototype, 'generatePlan').mockImplementation(async () => JSON.stringify(responses.shift()));
     for (const [name, value] of Object.entries({ EVAL_DRY_RUN: '1', EVAL_SET: 'answers', EVAL_RUNS: '1', EVAL_CONCURRENCY: '1', EVAL_SEARCH_MODE: 'llm',
-      PLANNER_SEARCH_MODE: 'llm', EVAL_ONLY: 'an_sh01', EVAL_OUTPUT_DIR: output })) vi.stubEnv(name, value);
+      PLANNER_SEARCH_MODE: 'llm', EVAL_READ_ANSWERS: 'on', PLANNER_READ_ANSWERS: 'on', EVAL_ONLY: 'an_sh01', EVAL_OUTPUT_DIR: output })) vi.stubEnv(name, value);
     try {
       await runner.main();
       const report = JSON.parse(readFileSync(join(output, readdirSync(output)[0]!, 'report.json'), 'utf8'));
       expect(report).toMatchObject({ set: 'answers', readAnswers: true, labels: { file: 'cases-answers.json' },
         catalogSha256: createHash('sha256').update(JSON.stringify(catalog)).digest('hex') });
-      expect(report.responses.answers).toMatchObject({ count: 0 });
-    } finally { vi.unstubAllEnvs(); }
+      expect(report.results[0].cases[0]).toMatchObject({ id: 'an_sh01', passed: true, response: { kind: 'answer' } });
+      expect(report.responses.answers).toMatchObject({ count: 1, modelCalls: { max: 2 } });
+    } finally { generate.mockRestore(); vi.unstubAllEnvs(); }
   });
 });
