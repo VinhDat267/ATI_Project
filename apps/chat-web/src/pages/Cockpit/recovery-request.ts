@@ -1,4 +1,4 @@
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import type { ExecutionSnapshot } from '../../types';
 import { savedArguments } from './RecoveryMoment';
 import { recoveryFieldLabel, recoveryOutputLabel } from './recovery-labels';
@@ -51,7 +51,7 @@ export function recoveryEditRequest(snapshot: ExecutionSnapshot, stepId: string,
     return entries.length ? entries.map(([key, item]) => `thuộc tính ${quote(key)}: ${text(item, true)}`).join('; ') : '(đối tượng rỗng)';
   };
   const fields = (tool: string, values: Record<string, unknown>) => {
-    const properties = (getToolDefinition(tool)?.inputSchema as { properties?: Record<string, { description?: string }> } | undefined)?.properties ?? {};
+    const properties = (toolDefinition(tool)?.inputSchema as { properties?: Record<string, { description?: string }> } | undefined)?.properties ?? {};
     return Object.entries(values).filter(([, value]) => value !== undefined).map(([key, value]) => [recoveryFieldLabel(tool, key, properties[key]?.description), text(value)] as const);
   };
   const failed = steps.find(step => step.id === stepId);

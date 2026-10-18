@@ -3,11 +3,18 @@ import { MockLLMProvider } from '@wap/planner';
 export function createSandboxProvider(scenario?: string) {
   const mockProvider = new MockLLMProvider();
   if (scenario === 'gmail') {
-    mockProvider.setPlanResponses([
+    const responses = [
       { kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'Họp nhóm ATI', limit: 10 } }] },
       { kind: 'plan', thinking: 'Trả lời luồng thư đã tìm thấy.', summary: 'Trả lời thư họp nhóm ATI', warnings: [],
         steps: [{ id: 'gmail_reply', tool: 'gmail.reply', description: 'Trả lời Lan về buổi họp', args: { threadId: 'gmail-thread-1', to: ['lan@example.com'], body: 'Mình đồng ý, hẹn gặp lúc 9 giờ.' }, dependsOn: [] }] },
-    ]);
+    ];
+    mockProvider.setPlanResponses(responses);
+    const fallback = mockProvider.generatePlan.bind(mockProvider);
+    // Each browser conversation starts with a search; another user's request
+    // must not consume a global sequence of canned responses.
+    mockProvider.generatePlan = async input => Array.isArray(input.conversationHistory)
+      ? JSON.stringify(responses[input.conversationHistory.at(-1)?.content.includes('<search_results>') ? 1 : 0])
+      : fallback(input);
     return mockProvider;
   }
   if (scenario === 'answer') {

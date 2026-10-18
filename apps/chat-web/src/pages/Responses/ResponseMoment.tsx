@@ -81,7 +81,9 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const ids = new Set(unavailable.map(row => row.id));
   const relevant = services.filter(service => ids.has(service.id) || new RegExp(`(^|[^\\p{L}\\p{N}])${service.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(request));
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
-  const path = unavailable.length === 1 ? `/settings#${encodeURIComponent(unavailable[0].id)}` : '/settings';
+  const hasGmail = unavailable.some(row => row.id === 'gmail');
+  const shared = unavailable.filter(row => row.id !== 'gmail');
+  const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -101,7 +103,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
         </div>
       </div>}
       <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3" id="s1-action-area">
-        {unavailable.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{unavailable.length === 1 ? `Kết nối ${unavailable[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
+        {hasGmail && <a href="/settings#gmail" onClick={event => { event.preventDefault(); navigate('/settings#gmail'); }} className={`${primary} flex items-center gap-1.5`}>Kết nối Gmail<span aria-hidden="true">→</span></a>}
+        {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>
       </div>

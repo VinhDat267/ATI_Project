@@ -176,6 +176,18 @@ export class ApiClient {
   completeGoogleAuth(code: string, state: string) {
     return this.googleAuthAction<{ accessToken: string; refreshToken: string; user: User } | { success: true }>('callback', { code, state });
   }
+  startGmailConnection() {
+    return this.request<{ url: string }>('/api/connections/gmail/start', { method: 'POST', credentials: 'include' });
+  }
+  completeGmailConnection(code: string, state: string) {
+    // OAuth state is one-use. Never replay this request, including on a 401.
+    return this.request<{ email: string }>('/api/connections/gmail/callback', {
+      method: 'POST', credentials: 'include', body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  disconnectGmail() {
+    return this.request<{ success: true }>('/api/connections/gmail', { method: 'DELETE', credentials: 'include' });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
@@ -295,7 +307,7 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live' }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean }> {
     return this.request('/api/health');
   }
 

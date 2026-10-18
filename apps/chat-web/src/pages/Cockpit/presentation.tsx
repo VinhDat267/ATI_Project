@@ -1,4 +1,5 @@
-import { getServiceDefinition, getToolDefinition } from '@wap/tool-schemas';
+import { getServiceDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import assets from '../../assets/cockpit-services.json';
 import type { PlanStep, ServiceInfo, StepState } from '../../types';
 import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
@@ -8,13 +9,13 @@ interface Operation { action:string; done:string; receipt:string; kind:string; l
 const palettes:Record<string,Palette>=Object.fromEntries(Object.entries(assets.services).map(([id,value])=>[id,{...value.suggestion,...value}]));
 const operations:Record<string,Operation>=assets.operations;
 export function serviceRecoveryLink(id:string):{url:string;argument:string;query:string}|undefined {return (assets.services as Record<string,{recoveryLink?:{url:string;argument:string;query:string}}>)[id]?.recoveryLink;}
-export const serviceId=(tool:string)=>getToolDefinition(tool)?.service ?? tool.split('.')[0];
+export const serviceId=(tool:string)=>toolDefinition(tool)?.service ?? tool.split('.')[0];
 export const serviceName=(id:string,services:ServiceInfo[])=>services.find(service=>service.id===id)?.name ?? getServiceDefinition(id)?.name ?? id;
 export function servicePalette(id:string) { const palette=palettes[id] ?? {icon:'bg-neutral-100 border-neutral-200',name:'text-neutral-800'}; return {...palette,badge:palette.badge ?? `${palette.icon.split(' ').filter(cls=>cls.startsWith('bg-')).join(' ')} ${palette.name}`,receiptHover:palette.receiptHover ?? 'hover:border-neutral-300'}; }
 export function operation(tool:string):Operation {
   if(operations[tool]) return operations[tool];
   const verb=tool.split('.')[1] ?? '';
-  const action=getToolDefinition(tool)?.sideEffect==='read' ? 'Đọc' : /^create/.test(verb) ? 'Tạo mới' : /^(send|post)/.test(verb) ? 'Gửi tin' : 'Cập nhật';
+  const action=toolDefinition(tool)?.sideEffect==='read' ? 'Đọc' : /^create/.test(verb) ? 'Tạo mới' : /^(send|post)/.test(verb) ? 'Gửi tin' : 'Cập nhật';
   return {action,done:action==='Đọc'?'Đã đọc':action==='Tạo mới'?'Đã tạo':action==='Gửi tin'?'Đã gửi':'Đã cập nhật',receipt:action==='Đọc'?'Đã đọc':'Đã hoàn thành',kind:action,link:'Mở kết quả'};
 }
 export const statusLabel=(status:StepState)=>({pending:'Chờ',running:'Đang chạy',succeeded:'Hoàn thành',failed:'Lỗi đã biết',paused:'Tạm dừng',skipped:'Đã bỏ qua',unknown:'Chưa rõ kết quả'})[status];

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { getToolDefinition } from '@wap/tool-schemas';
+import { toolDefinition } from '../../services/tool-definitions';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { recoveryFieldLabel } from './recovery-labels';
 
 export function RecoveryEditor({tool,stepArgs,prompt,busy,onClose,onSubmit}:{tool:string;stepArgs?:Record<string,unknown>;prompt?:string;busy:boolean;onClose:()=>void;onSubmit:(args:Record<string,unknown>,prompt?:string)=>void}) {
-  const schema=getToolDefinition(tool)?.inputSchema as { properties?: Record<string,{description?:string;type?:string}>;required?:string[] } | undefined;
+  const schema=toolDefinition(tool)?.inputSchema as { properties?: Record<string,{description?:string;type?:string}>;required?:string[] } | undefined;
   const [args]=useState(stepArgs ?? {});
   const [fieldText,setFieldText]=useState<Record<string,string>>({});
   const [json,setJson]=useState(JSON.stringify(stepArgs ?? {},null,2));

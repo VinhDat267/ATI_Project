@@ -26,6 +26,7 @@ export interface PlanStep {
 }
 
 export interface ActivePlan {
+  connections?: { gmail?: { credentialId: string; email: string } };
   resourceLabels?: Record<string, string>;
   id?: string;
   status?: PlanStatus | 'pending' | 'approved';
@@ -115,6 +116,10 @@ export interface GatherState {
 }
 
 export interface ServiceInfo {
+  connection?: 'shared' | 'personal';
+  personalStatus?: 'connected' | 'reconnect_required' | 'not_connected';
+  email?: string;
+  connectedAt?: string;
   id: string;
   name: string;
   connected: boolean;

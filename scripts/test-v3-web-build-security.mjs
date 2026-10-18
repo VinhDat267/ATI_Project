@@ -7,7 +7,7 @@ const scratch = await mkdtemp(join(tmpdir(), 'ati-fe01-build-'));
 const sentinels = ['FE01_admin_sentinel_92!', 'FE01_demo_sentinel_38!'];
 // FE-10 truthfulness guard: these labels describe unsupported features,
 // invented identifiers/contact details, or unmeasured guarantees.
-const forbiddenClaims = ['100% minh bạch', 'REQ-20', 'security@', 'Allowed Scope', 'Đăng xuất mọi thiết bị', 'an toàn tuyệt đối'];
+const forbiddenClaims = ['ATI không đọc Gmail', '100% minh bạch', 'REQ-20', 'security@', 'Allowed Scope', 'Đăng xuất mọi thiết bị', 'an toàn tuyệt đối'];
 // Every condition that enables the dev demo helper is set, so the build must rely on its own gates.
 const keys = ['CHAT_ADMIN_EMAIL', 'CHAT_ADMIN_PASSWORD', 'SANDBOX_USER_EMAIL', 'SANDBOX_USER_PASSWORD', 'VITE_SHOW_DEMO_LOGIN', 'RUNTIME_MODE'];
 const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
