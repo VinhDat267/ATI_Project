@@ -1,7 +1,9 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection';
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection'
+  /** Multi-turn (W4-02): edit the previous plan, answer the assistant's question, or a new request after a plan. */
+  | 'turn_edit' | 'turn_reply' | 'turn_new';
 
 /** Label for one argument; every key present must hold. */
 export interface Matcher {
@@ -46,6 +48,8 @@ export interface GoldenCase {
   routing?: { legacy: string[]; full: string[] };
   /** Resources resolved in earlier turns: entity key -> fixture id. */
   memory?: Record<string, string>;
+  /** Earlier turns of the conversation; an assistant plan is an object, sent back as its JSON like chat-service does. */
+  turns?: Array<{ role: 'user' | 'assistant'; content: string | Record<string, unknown> }>;
   expect: {
     kind: PlannerResponse['kind'];
     steps?: StepSpec[];
