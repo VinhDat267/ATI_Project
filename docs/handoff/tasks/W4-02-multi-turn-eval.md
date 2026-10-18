@@ -28,6 +28,8 @@ Từ PR #13, mỗi plan được lưu vào hội thoại và gửi lại cho mod
 
 - PR: bộ đo và label, nhánh `test/w4-02-multi-turn-eval`. Reviewer thi công theo yêu cầu nhóm trưởng. [Log](../log/2026-10-18-reviewer-W4-02-multi-turn-eval.md).
 - Commit đăng ký label: `4d63bd6` (`cases-multiturn.json`, 12 câu: 6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới), trước mọi lời gọi model. Siết lại ở `9cf3c11` theo review (tiêu đề phải giữ hoặc người dùng viết rõ thì so khớp chính xác), vẫn trước khi đo.
+- Sửa P2 lần 2 tại `c864f55`: `mt_reply02` nhận các cụm thất bại có chữ `success`/`succeed` hoặc `thành công` bị phủ định; vẫn loại thông báo thành công. [Log phần sửa cuối](../log/2026-10-18-reviewer-W4-02-final-fix.md).
+- Bản sửa cuối: test tập trung 67/67 (reviewer độc lập chạy lại), browser Gmail 4/4, đột biến scorer 3/3 bị bắt; check tại máy exit 0, **2.014 v3 + 389 eval** sau khi chạy lại một timeout FE-04 ngoài diff. Chưa gọi model.
 - Kết quả: chưa đo. Ba lần chạy với `EVAL_SEARCH_MODE=llm` làm sau khi merge, khi nhóm trưởng đồng ý, dự kiến cùng đợt đo GMAIL-04 (khoảng 21–22/10). Báo cáo theo nhóm kèm câu fail thuộc PR sau.
 - Điều chưa làm hoặc khác với task card:
   - đúng 12 câu, mức tối thiểu;
