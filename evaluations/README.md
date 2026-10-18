@@ -444,6 +444,47 @@ same-day control with the flag off before drawing a conclusion.
 committed before any model call. `b6a5450` and `a9d7a5b` tightened them after
 the independent reviews of #154, also before any model call.
 
+### W4-02: multi-turn conversations
+
+A golden case may carry `turns`, the earlier messages of its conversation.
+`run.ts` sends them as history the way `chat-service` does:
+- user text as written;
+- a saved plan as its JSON;
+- an assistant question as text.
+
+The working memory the app carries between turns comes from `memory`. Only the
+final response is scored. Cases without `turns` run as before. Public evidence
+redacts every user turn, not only the final prompt.
+
+`EVAL_SET=multiturn` reads `golden-v2/cases-multiturn.json` (12 cases, shared
+catalog, clock of the core set):
+- `turn_edit` (6): change the card title, the Slack channel, add an assignee,
+  drop a step, change the list, move the deadline. Labels check what changed
+  and what had to stay. Keeping the dropped Trello step fails as an unexpected
+  write;
+- `turn_reply` (3): a short reply ("To Do", "the frontend channel",
+  "acme/web") to the assistant's question;
+- `turn_new` (3): an unrelated request after a plan. Any step of the old plan
+  that comes back fails.
+
+Every earlier plan passes the planner's own validator and uses fixture
+resources.
+
+```bash
+LIVE_EVAL=1 EVAL_SET=multiturn PLANNER_SEARCH_MODE=llm PLANNER_READ_ANSWERS=off EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+**Not measured yet**: labels `4d63bd6` were committed before any model call;
+`9cf3c11` tightened them after the independent review of #157; `c864f55` fixes
+failure wording in `mt_reply02`, also before any model call. Titles kept from
+the earlier plan or written out by the user are matched exactly.
+For `mt_reply02`, `excludeExceptions` masks the registered literal failure
+phrases only while checking `excludes`. Other matchers still see the original
+text. Thus "failed to complete successfully" or "unsuccessful" can pass,
+while a separate assertion of success in the same message still fails.
+A planner fault found by the run gets its own task; the prompt is not changed
+in the W4-02 PR.
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against

@@ -1,7 +1,9 @@
 import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection';
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection'
+  /** Multi-turn (W4-02): edit the previous plan, answer the assistant's question, or a new request after a plan. */
+  | 'turn_edit' | 'turn_reply' | 'turn_new';
 
 /** Label for one argument; every key present must hold. */
 export interface Matcher {
@@ -15,6 +17,8 @@ export interface Matcher {
   includesAll?: string[];
   /** Case-insensitive substrings none of which may occur; an absent argument contains none. */
   excludes?: string[];
+  /** Literal phrases removed only for excludes; all other matchers inspect the original text. */
+  excludeExceptions?: string[];
   /** Array argument containing this element. */
   contains?: string | number;
   minItems?: number;
@@ -46,6 +50,8 @@ export interface GoldenCase {
   routing?: { legacy: string[]; full: string[] };
   /** Resources resolved in earlier turns: entity key -> fixture id. */
   memory?: Record<string, string>;
+  /** Earlier turns of the conversation; an assistant plan is an object, sent back as its JSON like chat-service does. */
+  turns?: Array<{ role: 'user' | 'assistant'; content: string | Record<string, unknown> }>;
   expect: {
     kind: PlannerResponse['kind'];
     steps?: StepSpec[];
@@ -110,7 +116,10 @@ function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boo
   if (matcher.anyOf && !matcher.anyOf.some((alternative) => checkMatcher(value, alternative, plan))) return false;
   if (matcher.absent) return value === undefined;
   const text = textOf(value);
-  if (matcher.excludes && text !== undefined && matcher.excludes.some((s) => lower(text).includes(lower(s)))) return false;
+  if (matcher.excludes && text !== undefined) {
+    const remaining = (matcher.excludeExceptions ?? []).reduce((value, phrase) => value.replaceAll(lower(phrase), ' '), lower(text));
+    if (matcher.excludes.some((s) => remaining.includes(lower(s)))) return false;
+  }
   if (value === undefined) return Object.keys(matcher).length > 0 && Object.keys(matcher).every((key) => key === 'excludes');
   if (matcher.equals !== undefined && value !== matcher.equals) return false;
   if (matcher.instantEquals !== undefined) {

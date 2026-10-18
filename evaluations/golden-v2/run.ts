@@ -4,18 +4,19 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type LLMGeneratePlanInput, type LLMProvider, type ModelCallMetrics, type PlanningPhaseMetrics } from '@wap/planner';
+import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type ChatMessage, type LLMGeneratePlanInput, type LLMProvider, type ModelCallMetrics, type PlanningPhaseMetrics } from '@wap/planner';
 import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import { aggregateRuns, percentile, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
 import { buildMemory, fixtureSearch } from './fixtures.js';
 import { validateIndependentSet } from '../golden-independent/validate.js';
 
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
-export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers';
+export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers' | 'multiturn';
 const EVAL_FILES: Record<EvalSet, string> = {
   core: 'evaluations/golden-v2/cases.json', freeform: 'evaluations/golden-v2/cases-freeform.json',
   services: 'evaluations/golden-v2/cases-services.json', independent: 'evaluations/golden-independent/cases.json',
   gmail: 'evaluations/golden-v2/cases-gmail.json', answers: 'evaluations/golden-v2/cases-answers.json',
+  multiturn: 'evaluations/golden-v2/cases-multiturn.json',
 };
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
 export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
@@ -37,7 +38,7 @@ const pct = (value: number | null | undefined) => value == null ? 'n/a' : `${(va
 
 export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const set = env.EVAL_SET ?? 'core';
-  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers');
+  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
   const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';
@@ -85,9 +86,19 @@ function safeError(err: unknown): string {
   return 'Request failed (details omitted from public evidence)';
 }
 
+/** Earlier turns as chat-service sends them: user text as written, a saved plan as its JSON, a question as text. */
+export function historyOf(golden: GoldenCase): ChatMessage[] {
+  return (golden.turns ?? []).map(turn => ({ role: turn.role, content: typeof turn.content === 'string' ? turn.content : JSON.stringify(turn.content) }));
+}
+/** Every request text of a case: the final prompt and the user's earlier turns. */
+export function casePrompts(golden: GoldenCase): string[] {
+  return [golden.prompt, ...(golden.turns ?? []).filter(turn => turn.role === 'user' && typeof turn.content === 'string').map(turn => turn.content as string)];
+}
 /** Model output, search arguments and score diagnostics can echo the request. */
-function publicEvidenceValue<T>(value: T, prompt: string): T {
-  const redact = (text: string) => prompt ? text.split(prompt).join('[redacted case prompt]') : text;
+function publicEvidenceValue<T>(value: T, prompts: string | string[]): T {
+  // Longest first, so a prompt that contains another is redacted whole.
+  const texts = [prompts].flat().filter(Boolean).sort((a, b) => b.length - a.length);
+  const redact = (text: string) => texts.reduce((current, prompt) => current.split(prompt).join('[redacted case prompt]'), text);
   return JSON.parse(JSON.stringify(value), (_key, nested: unknown) => {
     if (typeof nested === 'string') return redact(nested);
     if (nested && typeof nested === 'object' && !Array.isArray(nested))
@@ -96,8 +107,8 @@ function publicEvidenceValue<T>(value: T, prompt: string): T {
   }) as T;
 }
 /** Redact only the public copy after scoring; keep the response interface for callers. */
-export function publicEvidenceResponse(response: PlannerResponse | undefined, prompt: string): PlannerResponse | undefined {
-  return response ? publicEvidenceValue(response, prompt) : response;
+export function publicEvidenceResponse(response: PlannerResponse | undefined, prompts: string | string[]): PlannerResponse | undefined {
+  return response ? publicEvidenceValue(response, prompts) : response;
 }
 
 export function summarizeTiming(rows: ObservedRun[]) {
@@ -199,7 +210,7 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   memory.fromJSON(buildMemory(golden.memory));
   const started = Date.now();
   let response: PlannerResponse | undefined, error: string | undefined;
-  try { response = await planner.processMessage({ userMessage: golden.prompt, memory, signal: options.signal, onTiming: metrics => {
+  try { response = await planner.processMessage({ userMessage: golden.prompt, history: historyOf(golden), memory, signal: options.signal, onTiming: metrics => {
     phases.push(metrics);
     // Planner phases are sequential; each callback closes the current batch,
     // including parallel directory calls. Tool names alone cannot identify origin.
@@ -306,7 +317,7 @@ export async function main() {
       qualityGate: 'incomplete', aggregate, comparison, timing, responses,
       results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => publicEvidenceValue({ id: r.case.id, category: r.case.category, author: r.case.author, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
-        response: r.response, searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases }, r.case.prompt)) })),
+        response: r.response, searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases }, casePrompts(r.case))) })),
     };
     writeFileSync(join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     const m = aggregate.mean;

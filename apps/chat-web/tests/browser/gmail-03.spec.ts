@@ -75,11 +75,18 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     // A thread title can be one long unbroken string; give this pending plan one
     // in the disposable database and check that it wraps instead of widening the page.
     const longTitle = 'X'.repeat(120);
+    const conversationPath = new URL(page.url()).pathname;
     const labelsDb = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     try {
       expect((await labelsDb.query("UPDATE plans SET resource_labels = resource_labels || jsonb_build_object('gmail-thread-1', $1::text) WHERE conv_id = $2 AND status = 'pending' AND resource_labels->>'gmail-thread-1' = 'Họp nhóm ATI' RETURNING id", [longTitle, new URL(page.url()).pathname.split('/').pop()])).rowCount).toBe(1);
     } finally { await labelsDb.end(); }
-    await page.reload();
+    // Reopen within the app: the SQL-only fixture edit does not change the SSE
+    // buffer. A full reload replays its old label and races the updated plan read.
+    await page.locator('#btn-open-history').click();
+    await page.getByRole('button', { name: 'Cuộc hội thoại mới', exact: true }).click();
+    await page.waitForURL(url => url.pathname.startsWith('/c/') && url.pathname !== conversationPath);
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`${conversationPath}$`));
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
     await expect(destinationLine).toHaveText(`Đích đến: ${longTitle}`);
     expect(await destinationLine.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

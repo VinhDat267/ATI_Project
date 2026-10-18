@@ -33,6 +33,21 @@ const goodDemo = plan(
 );
 
 describe('scoreCase', () => {
+  it.each([
+    ['Build was UNSUCCESSFUL.', true],
+    ['Unsuccessful build; still unsuccessful.', true],
+    ['Build was unsuccessful, but then succeeded successfully.', false],
+    ['Build succeeded successfully.', false],
+  ] as const)('ignores only registered failure phrases for excludes: %s', (text, passed) => {
+    const c: GoldenCase = { ...demoCase, expect: { kind: 'plan', steps: [
+      { tool: 'slack.send_message', args: { text: {
+        includesAll: ['unsuccessful'], excludes: ['success', 'succeed'], excludeExceptions: ['unsuccessful'],
+      } } },
+    ] } };
+    const response = plan({ id: 'notify', tool: 'slack.send_message', args: { channel: 'C_FE', text } });
+    expect(scoreCase(c, response, ALL_TOOLS).passed).toBe(passed);
+  });
+
   it('passes a plan whose tools and labelled arguments all match', () => {
     const score = scoreCase(demoCase, goodDemo, ALL_TOOLS);
     expect(score).toMatchObject({ kindOk: true, toolsOk: true, argsOk: true, passed: true });
