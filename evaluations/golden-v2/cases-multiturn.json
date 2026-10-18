@@ -1,0 +1,745 @@
+{
+  "version": 1,
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "cases": [
+    {
+      "id": "mt_edit01",
+      "category": "turn_edit",
+      "language": "vi",
+      "services": [
+        "trello"
+      ],
+      "memory": {
+        "board": "board_fe",
+        "list": "list_fe_todo"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Sửa lỗi đăng nhập\" trong list To Do của board Frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo một card trong To Do theo yêu cầu.",
+            "summary": "Tạo một card trong To Do",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card trong To Do",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Sửa lỗi đăng nhập"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Điều chỉnh kế hoạch: đổi tiêu đề card thành \"Sửa lỗi đăng nhập trên Safari\".",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "Safari"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_edit02",
+      "category": "turn_edit",
+      "language": "vi",
+      "services": [
+        "trello",
+        "slack"
+      ],
+      "memory": {
+        "board": "board_fe",
+        "list": "list_fe_todo",
+        "channel": "C_FE"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Viết release notes\" trong list To Do board Frontend rồi báo lên Slack #frontend kèm link card."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo card rồi báo Slack theo yêu cầu.",
+            "summary": "Tạo card rồi báo Slack",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card trong To Do",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Viết release notes"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify",
+                "tool": "slack.send_message",
+                "description": "Báo kênh frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Card mới: ${card.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "card"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Điều chỉnh kế hoạch: gửi thông báo vào kênh release thay vì frontend.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "release notes"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_RELEASE"
+              },
+              "text": {
+                "refTo": "trello.create_card"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_edit03",
+      "category": "turn_edit",
+      "language": "vi",
+      "services": [
+        "trello"
+      ],
+      "memory": {
+        "board": "board_fe",
+        "list": "list_fe_doing"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Thiết kế trang hồ sơ\" trong list Doing của board Frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo một card trong Doing theo yêu cầu.",
+            "summary": "Tạo một card trong Doing",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card trong Doing",
+                "args": {
+                  "listId": "list_fe_doing",
+                  "title": "Thiết kế trang hồ sơ"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Điều chỉnh kế hoạch: gán card cho Lan.",
+      "expect": {
+        "kind": "plan",
+        "anyOf": [
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_doing"
+                },
+                "title": {
+                  "includesAll": [
+                    "hồ sơ"
+                  ]
+                },
+                "idMembers": {
+                  "contains": "member_lan"
+                }
+              }
+            }
+          ],
+          [
+            {
+              "tool": "trello.create_card",
+              "args": {
+                "listId": {
+                  "equals": "list_fe_doing"
+                },
+                "title": {
+                  "includesAll": [
+                    "hồ sơ"
+                  ]
+                }
+              }
+            },
+            {
+              "tool": "trello.add_member",
+              "args": {
+                "memberId": {
+                  "equals": "member_lan"
+                },
+                "cardId": {
+                  "refTo": "trello.create_card"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "mt_edit04",
+      "category": "turn_edit",
+      "language": "vi",
+      "services": [
+        "github",
+        "trello",
+        "slack"
+      ],
+      "memory": {
+        "repository": "repo_web",
+        "list": "list_fe_todo",
+        "channel": "C_FE"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo issue \"Footer overlaps\" trong repo acme/web, tạo card cùng tên trong list To Do board Frontend, rồi báo Slack #frontend kèm link issue."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo issue, card, rồi báo Slack theo yêu cầu.",
+            "summary": "Tạo issue, card, rồi báo Slack",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue trong acme/web",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Footer overlaps"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card trong To Do",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Footer overlaps"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "notify",
+                "tool": "slack.send_message",
+                "description": "Báo kênh frontend",
+                "args": {
+                  "channel": "C_FE",
+                  "text": {
+                    "$template": "Issue mới: ${issue.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "issue"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Điều chỉnh kế hoạch: bỏ bước tạo card Trello, giữ nguyên phần còn lại.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/web"
+              },
+              "title": {
+                "includesAll": [
+                  "Footer"
+                ]
+              }
+            }
+          },
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_FE"
+              },
+              "text": {
+                "refTo": "github.create_issue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_edit05",
+      "category": "turn_edit",
+      "language": "en",
+      "services": [
+        "trello"
+      ],
+      "memory": {
+        "board": "board_be",
+        "list": "list_be_todo"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Create a card \"Retry webhook\" in the To Do list of the Backend board."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Create one card in To Do theo yêu cầu.",
+            "summary": "Create one card in To Do",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Create the card in To Do",
+                "args": {
+                  "listId": "list_be_todo",
+                  "title": "Retry webhook"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Edit the plan: put the card in the Backlog list instead.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_be_backlog"
+              },
+              "title": {
+                "includesAll": [
+                  "Retry webhook"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_edit06",
+      "category": "turn_edit",
+      "language": "vi",
+      "services": [
+        "trello"
+      ],
+      "memory": {
+        "board": "board_fe",
+        "list": "list_fe_todo"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Chuẩn bị demo\" trong list To Do board Frontend, hạn thứ Sáu này."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo một card có hạn theo yêu cầu.",
+            "summary": "Tạo một card có hạn",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card có hạn thứ Sáu",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Chuẩn bị demo",
+                  "due": "2026-10-02T17:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Điều chỉnh kế hoạch: dời hạn sang thứ Hai tuần sau.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "Chuẩn bị demo"
+                ]
+              },
+              "due": {
+                "startsWith": "2026-10-05"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_reply01",
+      "category": "turn_reply",
+      "language": "vi",
+      "services": [
+        "trello"
+      ],
+      "memory": {
+        "board": "board_fe"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Kiểm tra form đăng ký\" trong board Frontend."
+        },
+        {
+          "role": "assistant",
+          "content": "Bạn muốn tạo card trong list nào của board Frontend: To Do, Doing hay Done?"
+        }
+      ],
+      "prompt": "To Do",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "includesAll": [
+                  "form đăng ký"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_reply02",
+      "category": "turn_reply",
+      "language": "en",
+      "services": [
+        "slack"
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tell the team on Slack that tonight's build failed."
+        },
+        {
+          "role": "assistant",
+          "content": "Which Slack channel should I post to?"
+        }
+      ],
+      "prompt": "the frontend channel",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_FE"
+              },
+              "text": {
+                "includesAny": [
+                  "build"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_reply03",
+      "category": "turn_reply",
+      "language": "vi",
+      "services": [
+        "github"
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo issue trên GitHub về lỗi footer che ô cuối của form."
+        },
+        {
+          "role": "assistant",
+          "content": "Bạn muốn tạo issue trong repo nào: acme/web hay acme/api?"
+        }
+      ],
+      "prompt": "acme/web",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/web"
+              },
+              "title": {
+                "includesAny": [
+                  "footer"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_new01",
+      "category": "turn_new",
+      "language": "vi",
+      "services": [
+        "trello",
+        "slack"
+      ],
+      "memory": {
+        "board": "board_fe",
+        "list": "list_fe_todo"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo card \"Sửa lỗi đăng nhập\" trong list To Do của board Frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Tạo một card trong To Do theo yêu cầu.",
+            "summary": "Tạo một card trong To Do",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "card",
+                "tool": "trello.create_card",
+                "description": "Tạo card trong To Do",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Sửa lỗi đăng nhập"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Gửi tin nhắn vào kênh Slack general: họp nhóm lúc 3 giờ chiều nay.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_GEN"
+              },
+              "text": {
+                "includesAny": [
+                  "3 giờ",
+                  "15"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_new02",
+      "category": "turn_new",
+      "language": "vi",
+      "services": [
+        "slack",
+        "github"
+      ],
+      "memory": {
+        "channel": "C_RELEASE"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Báo Slack #release rằng bản 1.2 đã phát hành."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Gửi một tin vào release theo yêu cầu.",
+            "summary": "Gửi một tin vào release",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "notify",
+                "tool": "slack.send_message",
+                "description": "Báo kênh release",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "Bản 1.2 đã phát hành."
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Tạo issue \"Webhook retries drop events\" trong repo acme/api trên GitHub.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "github.create_issue",
+            "args": {
+              "repo": {
+                "equals": "acme/api"
+              },
+              "title": {
+                "includesAll": [
+                  "Webhook"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mt_new03",
+      "category": "turn_new",
+      "language": "en",
+      "services": [
+        "github",
+        "trello"
+      ],
+      "memory": {
+        "repository": "repo_web"
+      },
+      "turns": [
+        {
+          "role": "user",
+          "content": "Create the issue \"Footer overlaps on small screens\" in acme/web."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "kind": "plan",
+            "thinking": "Create one issue theo yêu cầu.",
+            "summary": "Create one issue",
+            "warnings": [],
+            "steps": [
+              {
+                "id": "issue",
+                "tool": "github.create_issue",
+                "description": "Create the issue in acme/web",
+                "args": {
+                  "repo": "acme/web",
+                  "title": "Footer overlaps on small screens"
+                },
+                "dependsOn": []
+              }
+            ]
+          }
+        }
+      ],
+      "prompt": "Now create a card \"Write the API docs\" in the Backlog list of the Backend board.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_be_backlog"
+              },
+              "title": {
+                "includesAll": [
+                  "API docs"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
