@@ -83,6 +83,6 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
   - Đo, nghiệm thu Google thật, PR bật cờ: chưa làm.
 - Số liệu và quyết định bật cờ: chưa đo. Ngày 18/10, nhóm trưởng đồng ý đo ngay khi PR bộ đo merge (khoảng 21–22/10), giữ 26–27/10 làm dự phòng.
 - Điều chưa làm hoặc khác với task card:
-  - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; chờ nhóm trưởng xác nhận trước khi đo;
+  - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; nhóm trưởng đồng ý ngày 18/10, trước lời gọi model đầu tiên;
   - 20 câu Gmail thay vì khoảng 16;
   - xem log.
