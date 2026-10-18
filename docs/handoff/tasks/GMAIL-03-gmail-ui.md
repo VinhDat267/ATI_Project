@@ -1,6 +1,6 @@
 # GMAIL-03 · Giao diện Gmail: "Của riêng bạn", callback, cockpit, trang công khai
 
-**Trạng thái:** chờ, giao `longnguyen005` ngày 13/10/2026 (làm sau ANS-01) · **Nhánh gợi ý:** `feat/gmail-03-gmail-ui` · **Phụ thuộc:** GMAIL-01 đã merge (API). Browser test và nhãn người nhận cần GMAIL-02 · **Mốc:** trước **23/10/2026**
+**Trạng thái:** xong #147 tại `6233637` (18/10/2026), giao `longnguyen005` ngày 13/10/2026; reviewer sửa theo review, review lại Đạt · **Nhánh gợi ý:** `feat/gmail-03-gmail-ui` · **Phụ thuộc:** GMAIL-01 đã merge (API). Browser test và nhãn người nhận cần GMAIL-02 · **Mốc:** trước **23/10/2026**
 **Đặc tả:** mục 3.9, dòng "Màn chưa rõ kết quả" ở 4.4, và 6.1. **Quy tắc chung và hợp đồng:** [GMAIL-common](GMAIL-common.md), đọc trước, nhất là mục 4.2 và 4.3.
 
 ## Mục tiêu
