@@ -44,6 +44,16 @@ describe('preregistered answer labels', () => {
       }
     }
   });
+  it('names the IDs a lookup must find whenever its arguments are not exact', () => {
+    const resources = ['board', 'list', 'member', 'card', 'channel', 'repository', 'issue', 'spreadsheet', 'sheet', 'calendar', 'database', 'page',
+      'chat', 'project', 'jira_issue', 'thread', 'label'];
+    const fixtureIds = new Set(resources.flatMap(resource => [...knownResourceValues(resource)]));
+    for (const c of cases) for (const spec of c.expect.searches!) {
+      const exact = Object.values(spec.args ?? {}).every(m => Object.keys(m).every(key => key === 'equals' || key === 'instantEquals'));
+      if (!exact) expect(spec.found?.length, `${c.id}:${spec.tool}`).toBeGreaterThan(0);
+      for (const id of spec.found ?? []) expect(fixtureIds.has(String(id)), `${c.id}:${id}`).toBe(true);
+    }
+  });
   it.each(cases.map(c => [c.id, c] as const))('%s offers its lookup tools to the model with read answers on', async (_id, c) => {
     const provider = new MockLLMProvider();
     provider.setPlanResponses([{ kind: 'refusal', reason: 'offline catalog reachability only' }]);
@@ -58,9 +68,11 @@ describe('preregistered answer labels', () => {
       provider.setPlanResponses([{ kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query } }] }, { kind: 'answer', text: 'Kết quả tìm.' }]);
       return runner.runCase(cases.find(c => c.id === 'an_gm02')!, file as GoldenFile, false, 'llm', { provider, catalog: runner.evalCatalog('answers'), readAnswers: true });
     };
-    const word = await run('unread');
-    expect(word.searches[0]!.result).toEqual([]);
-    expect(word.score.passed).toBe(false);
+    for (const query of ['unread', '-is:unread', 'is:unread in:trash', 'is:unread subject:Họp']) {
+      const missed = await run(query);
+      expect((missed.searches[0]!.result as unknown[]).length, query).toBeLessThan(8);
+      expect(missed.score.passed, query).toBe(false);
+    }
     for (const query of ['is:unread', 'in:inbox is:unread', 'label:UNREAD']) {
       const filtered = await run(query);
       expect(filtered.searches[0]!.result, query).toHaveLength(8);

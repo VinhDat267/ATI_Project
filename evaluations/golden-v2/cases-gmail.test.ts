@@ -82,6 +82,10 @@ describe('preregistered Gmail planning labels', () => {
     const unread = await run(post);
     expect(unread.searches).toEqual([]);
     expect(unread.score.passed).toBe(false);
+    const trash = await run({ kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'subject:"Kế hoạch kiểm thử" in:trash' } }] }, post);
+    expect(trash.searches[0]!.result).toEqual([]);
+    expect(trash.score.passed).toBe(false);
+    for (const spec of cases.flatMap(c => c.expect.searches ?? [])) expect(spec.found?.length, spec.tool).toBeGreaterThan(0);
     const read = await run({ kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'Kế hoạch kiểm thử' } }] },
       { ...post, steps: [{ ...post.steps[0]!, args: { channel: 'C_FE', text: 'Nhắc: chạy test trước khi gửi PR.' } }] });
     expect(read.searches[0]!.result).toHaveLength(1);
