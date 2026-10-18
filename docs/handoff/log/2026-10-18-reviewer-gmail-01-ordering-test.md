@@ -50,3 +50,4 @@ Kiểm thử:
   - phần lưu trả về chậm 300 ms: test cũ 2/2 fail, test mới 2/2 đạt;
   - bỏ khoá phiên: chỉ ca `logout` fail; bỏ khoá `users`: chỉ ca `disable` fail;
   - lặp **20/20**.
+- `npm run check` (sandbox, hai cờ tắt, không dùng `.env`): **exit 0** ngay lượt đầu, **2.014 v3 + 332 eval**.
