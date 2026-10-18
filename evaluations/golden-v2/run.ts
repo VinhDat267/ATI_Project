@@ -5,37 +5,55 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type LLMGeneratePlanInput, type LLMProvider, type ModelCallMetrics, type PlanningPhaseMetrics } from '@wap/planner';
-import { ALL_TOOLS, type PlannerResponse } from '@wap/tool-schemas';
-import { aggregateRuns, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { aggregateRuns, percentile, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
 import { buildMemory, fixtureSearch } from './fixtures.js';
 import { validateIndependentSet } from '../golden-independent/validate.js';
 
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
-export type EvalSet = 'core' | 'freeform' | 'services' | 'independent';
+export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers';
 const EVAL_FILES: Record<EvalSet, string> = {
   core: 'evaluations/golden-v2/cases.json', freeform: 'evaluations/golden-v2/cases-freeform.json',
   services: 'evaluations/golden-v2/cases-services.json', independent: 'evaluations/golden-independent/cases.json',
+  gmail: 'evaluations/golden-v2/cases-gmail.json', answers: 'evaluations/golden-v2/cases-answers.json',
 };
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
 export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
-  modelCalls: Array<ModelCallMetrics & { startedAtMs: number }>; phases: PlanningPhaseMetrics[] }
+  modelCalls: Array<ModelCallMetrics & { startedAtMs: number; promptChars: number }>; phases: PlanningPhaseMetrics[] }
+export interface EvalCatalog { tools: ToolDefinition[]; services: ServiceDefinition[] }
+/** Gmail stays outside ALL_TOOLS (GMAIL-01): only its own sets add it, so the older sets keep their catalog and hash. */
+export function evalCatalog(set: EvalSet): EvalCatalog {
+  return set === 'gmail' || set === 'answers' ? { tools: [...ALL_TOOLS, ...GMAIL_TOOLS], services: [...SERVICE_REGISTRY, GMAIL_SERVICE] }
+    : { tools: ALL_TOOLS, services: SERVICE_REGISTRY };
+}
+/** Characters of the request messages, composed as OpenAICompatibleProvider sends them. */
+export function promptCharacters(input: LLMGeneratePlanInput): number {
+  const system = `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`;
+  return system.length + input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);
+}
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const pct = (value: number | null | undefined) => value == null ? 'n/a' : `${(value * 100).toFixed(1)}%`;
 
 export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const set = env.EVAL_SET ?? 'core';
-  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services or independent');
+  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
   const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';
   if (searchMode !== 'regex' && searchMode !== 'llm') throw new Error('Search mode must be regex or llm');
+  if (env.EVAL_READ_ANSWERS && env.PLANNER_READ_ANSWERS && env.EVAL_READ_ANSWERS !== env.PLANNER_READ_ANSWERS)
+    throw new Error('EVAL_READ_ANSWERS and PLANNER_READ_ANSWERS disagree');
+  const readAnswers = env.EVAL_READ_ANSWERS ?? env.PLANNER_READ_ANSWERS ?? (set === 'answers' ? 'on' : 'off');
+  if (readAnswers !== 'on' && readAnswers !== 'off') throw new Error('Read answers must be on or off');
+  if (set === 'answers' && readAnswers !== 'on') throw new Error('EVAL_SET=answers needs read answers on');
   const integer = (name: string, fallback: number, maximum: number) => {
     const value = Number(env[name] ?? fallback);
     if (!Number.isInteger(value) || value < 1 || value > maximum) throw new Error(`${name} must be an integer from 1 to ${maximum}`);
     return value;
   };
-  return { set: set as EvalSet, searchMode: searchMode as 'regex' | 'llm', runsCount: integer('EVAL_RUNS', 3, 10), concurrency: integer('EVAL_CONCURRENCY', 2, 4) };
+  return { set: set as EvalSet, searchMode: searchMode as 'regex' | 'llm', readAnswers: readAnswers === 'on',
+    runsCount: integer('EVAL_RUNS', 3, 10), concurrency: integer('EVAL_CONCURRENCY', 2, 4) };
 }
 export function loadEvalFile(set: EvalSet) {
   const relativePath = EVAL_FILES[set];
@@ -104,6 +122,31 @@ export function summarizeTiming(rows: ObservedRun[]) {
     under15Seconds: { count: rows.filter(r => r.latencyMs < 15000).length, total: rows.length,
       rate: rows.length ? rows.filter(r => r.latencyMs < 15000).length / rows.length : null } };
 }
+/**
+ * Answers take several model calls, so their latency is reported apart from planning (GMAIL spec 5.5).
+ * An action case is any case except read_only and answer; one that got an answer is what the read-answers flag must not cause.
+ */
+export function summarizeResponses(runs: ObservedRun[][]) {
+  const rows = runs.flat();
+  const latency = (list: ObservedRun[]) => {
+    const sorted = list.map(r => r.latencyMs).sort((a, b) => a - b);
+    return { p50: percentile(sorted, 0.5), p95: percentile(sorted, 0.95), max: sorted.at(-1) ?? 0 };
+  };
+  const answers = rows.filter(r => r.response?.kind === 'answer');
+  const calls = answers.map(r => r.llmCalls);
+  const distribution: Record<string, number> = {};
+  for (const count of calls) distribution[count] = (distribution[count] ?? 0) + 1;
+  const prompts = rows.filter(r => r.case.services?.includes('gmail')).flatMap(r => r.modelCalls.map(c => c.promptChars)).sort((a, b) => a - b);
+  return {
+    answers: { count: answers.length, latencyMs: latency(answers),
+      modelCalls: { mean: calls.length ? calls.reduce((sum, n) => sum + n, 0) / calls.length : null, max: calls.length ? Math.max(...calls) : 0, distribution },
+      withoutLookups: answers.filter(r => r.response?.kind === 'answer' && r.response.lookups.length === 0).length },
+    plans: { count: rows.filter(r => r.response?.kind === 'plan').length, latencyMs: latency(rows.filter(r => r.response?.kind === 'plan')) },
+    answeredActionCases: runs.flatMap((run, index) => run.filter(r => !['read_only', 'answer'].includes(r.case.category) && r.response?.kind === 'answer')
+      .map(r => ({ id: r.case.id, run: index + 1 }))),
+    gmailPromptChars: { calls: prompts.length, p50: percentile(prompts, 0.5), p95: percentile(prompts, 0.95), max: prompts.at(-1) ?? 0 },
+  };
+}
 class CountingProvider implements LLMProvider {
   readonly name: string;
   calls = 0;
@@ -114,6 +157,7 @@ class CountingProvider implements LLMProvider {
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
     this.calls++;
     const started = performance.now();
+    const promptChars = promptCharacters(input);
     try {
       const output = await this.inner.generatePlan(input);
       if (this.inner.lastServedModel) this.servedModels.push(this.inner.lastServedModel);
@@ -124,7 +168,7 @@ class CountingProvider implements LLMProvider {
     } finally {
       this.modelCalls.push({ ...(this.inner.lastCallMetrics ? structuredClone(this.inner.lastCallMetrics) : {
         durationMs: performance.now() - started, attempts: [], usage: { promptTokens: null, completionTokens: null, reasoningTokens: null } }),
-        startedAtMs: started - this.turnStarted });
+        startedAtMs: started - this.turnStarted, promptChars });
     }
   }
 }
@@ -135,13 +179,14 @@ function makeProvider(dryRun: boolean): LLMProvider & { model?: string } {
   return mock;
 }
 export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: boolean, searchMode: 'regex' | 'llm',
-  options: { provider?: LLMProvider; signal?: AbortSignal } = {}): Promise<ObservedRun> {
+  options: { provider?: LLMProvider; signal?: AbortSignal; catalog?: EvalCatalog; readAnswers?: boolean } = {}): Promise<ObservedRun> {
   const turnStarted = performance.now();
   const provider = new CountingProvider(options.provider ?? makeProvider(dryRun), turnStarted);
+  const catalog = options.catalog ?? evalCatalog('core');
   const phases: PlanningPhaseMetrics[] = [];
   const traces: SearchTrace[] = [];
   const planner = new AIPlanner({
-    provider, toolCatalog: ALL_TOOLS, searchMode,
+    provider, toolCatalog: catalog.tools, serviceRegistry: catalog.services, readAnswers: options.readAnswers ?? false, searchMode,
     now: () => new Date(file.clock), timeZone: file.timeZone,
     gatherSearch: async request => {
       const trace: SearchTrace = { tool: request.tool, args: structuredClone(request.args) };
@@ -166,7 +211,7 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   const searchRounds = phases.filter(phase => phase.phase === 'search').length;
   return { case: golden, response, error, searches, prefetches, searchRounds, latencyMs: Date.now() - started, llmCalls: provider.calls,
     servedModels: provider.servedModels, providerError: provider.providerError, modelCalls: provider.modelCalls, phases,
-    score: scoreCase(golden, response, ALL_TOOLS, searches, { llmCalls: provider.calls, searchRounds }) };
+    score: scoreCase(golden, response, catalog.tools, [...searches, ...prefetches], { llmCalls: provider.calls, searchRounds }) };
 }
 /** Cancel in-flight work and stop dispatching after a provider failure. No automatic campaign retry. */
 export async function runPool(items: GoldenCase[], limit: number, worker: (item: GoldenCase, signal: AbortSignal) => Promise<ObservedRun>) {
@@ -201,7 +246,8 @@ function preregistration(relativePath: string, raw: string, dryRun: boolean) {
 export async function main() {
   const dryRun = process.env.EVAL_DRY_RUN === '1';
   if (!dryRun && process.env.LIVE_EVAL !== '1') throw new Error('Set LIVE_EVAL=1 for provider calls, or EVAL_DRY_RUN=1');
-  const { set, searchMode, runsCount, concurrency } = parseEvalOptions(process.env);
+  const { set, searchMode, readAnswers, runsCount, concurrency } = parseEvalOptions(process.env);
+  const catalog = evalCatalog(set);
   const { casesFile, relativePath, raw, file } = loadEvalFile(set);
   assertSetReady(set, file);
   const labelCommit = preregistration(relativePath, raw, dryRun);
@@ -216,22 +262,23 @@ export async function main() {
   const sourceTrees = Object.fromEntries(['packages/planner', 'packages/tool-schemas'].map(path => [path, git('rev-parse', `HEAD:${path}`)]));
   const startedAt = new Date().toISOString();
   const stamp = startedAt.replace(/[:.]/g, '-');
-  const dir = join(process.env.EVAL_OUTPUT_DIR ?? join('docs', 'ai-evidence', 'V3-GOLDEN-V2'), `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${only.length ? 'subset-' : ''}${stamp}`);
+  const dir = join(process.env.EVAL_OUTPUT_DIR ?? join('docs', 'ai-evidence', 'V3-GOLDEN-V2'), `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${readAnswers && set !== 'answers' ? 'answers-on-' : ''}${only.length ? 'subset-' : ''}${stamp}`);
   mkdirSync(dir, { recursive: true });
   const runs: ObservedRun[][] = [];
   let stopped = false;
   let pendingIds: string[] = [];
   for (let index = 0; index < runsCount; index++) {
     const result = await runPool(file.cases, concurrency, async (golden, signal) => {
-      const row = await runCase(golden, file, dryRun, searchMode, { signal });
+      const row = await runCase(golden, file, dryRun, searchMode, { signal, catalog, readAnswers });
       console.log(`run ${index + 1}/${runsCount} ${golden.id}: ${row.score.passed ? 'PASS' : 'FAIL'} ${row.latencyMs}ms ${row.llmCalls} model calls`);
       return row;
     });
     runs.push(result.rows);
     stopped = result.stopped;
     pendingIds = result.pendingIds;
-    const aggregate = aggregateRuns(runs);
+    const aggregate = aggregateRuns(runs, catalog.tools);
     const timing = summarizeTiming(runs.flat());
+    const responses = summarizeResponses(runs);
     const servedModels = [...new Set(runs.flat().flatMap(r => r.servedModels))];
     const complete = !stopped && runs.length === runsCount && runs.every(run => run.length === file.cases.length);
     const serviceGate = Object.fromEntries(Object.entries(aggregate.byService).map(([service, metrics]) => [service, {
@@ -246,17 +293,17 @@ export async function main() {
     const report = {
       evidence: dryRun ? 'dry_run' : complete ? 'provider_observed' : 'provider_observed_partial', complete,
       provider: configured.name, model: configured.model ?? 'mock', gateway: safeGateway(process.env.LLM_BASE_URL), servedModels,
-      set, searchMode, subset: only.length ? only : undefined,
+      set, searchMode, readAnswers, subset: only.length ? only : undefined,
       labels: { file: casesFile, commit: labelCommit, sha256: hash(raw), version: file.version, cases: allCases, selectedCases: file.cases.length },
       sourceCommit, sourceTrees, fixtureSha256: hash(readFileSync('evaluations/golden-v2/fixtures.ts', 'utf8')),
-      catalogSha256: hash(JSON.stringify(ALL_TOOLS)), catalog: { tools: ALL_TOOLS.length, services: [...new Set(ALL_TOOLS.map(t => t.service))] },
+      catalogSha256: hash(JSON.stringify(catalog.tools)), catalog: { tools: catalog.tools.length, services: [...new Set(catalog.tools.map(t => t.service))] },
       clock: file.clock, timeZone: file.timeZone, requestedRuns: runsCount, completedRuns: runs.filter(run => run.length === file.cases.length).length,
       attemptedCaseRuns: runs.flat().length, plannedCaseRuns: runsCount * file.cases.length, concurrency, startedAt, runAt: new Date().toISOString(),
       stopped, pendingIds, stopReason: runs.flat().find(r => r.providerError)?.providerError,
       scope: 'Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.',
       thresholds: THRESHOLDS, gate: { toolSelectionAccuracy: (aggregate.mean.toolSelectionAccuracy ?? 0) >= THRESHOLDS.toolSelectionAccuracy,
         argumentQuality: (aggregate.mean.argumentQuality ?? 0) >= THRESHOLDS.argumentQuality }, serviceGate,
-      qualityGate: 'incomplete', aggregate, comparison, timing,
+      qualityGate: 'incomplete', aggregate, comparison, timing, responses,
       results: runs.map((run, i) => ({ run: i + 1, cases: run.map(r => publicEvidenceValue({ id: r.case.id, category: r.case.category, author: r.case.author, passed: r.score.passed,
         score: r.score, latencyMs: r.latencyMs, llmCalls: r.llmCalls, servedModels: r.servedModels, error: r.error, providerError: r.providerError,
         response: r.response, searches: r.searches, prefetches: r.prefetches, searchRounds: r.searchRounds, modelCalls: r.modelCalls, phases: r.phases }, r.case.prompt)) })),
@@ -286,6 +333,12 @@ Model-opened search rounds (phase search): ${timing.searchRounds}; platform dire
 Attempts per call (0 means provider does not expose diagnostics): ${JSON.stringify(timing.attemptDistribution)}. Retry reasons: ${JSON.stringify(timing.retryReasons)}.
 Time share: model ${pct(timing.timeShare.model)}, directory ${pct(timing.timeShare.prefetch)}, search rounds ${pct(timing.timeShare.search)}, regex gather ${pct(timing.timeShare.gather)}, other ${pct(timing.timeShare.other)}.
 Under 15 seconds: ${timing.under15Seconds.count}/${timing.under15Seconds.total} (${pct(timing.under15Seconds.rate)}).
+
+Read answers: ${readAnswers ? 'on' : 'off'}; catalog ${report.catalog.tools} tools (${report.catalog.services.join(', ')}), SHA-256 \`${report.catalogSha256}\`.
+Answers: ${responses.answers.count}; p50 / p95 / max ${responses.answers.latencyMs.p50} / ${responses.answers.latencyMs.p95} / ${responses.answers.latencyMs.max} ms; model calls per answer mean ${responses.answers.modelCalls.mean?.toFixed(2) ?? 'n/a'}, max ${responses.answers.modelCalls.max}, ${JSON.stringify(responses.answers.modelCalls.distribution)}; answers without a model-opened lookup (directory only): ${responses.answers.withoutLookups}.
+Plans: ${responses.plans.count}; p50 / p95 / max ${responses.plans.latencyMs.p50} / ${responses.plans.latencyMs.p95} / ${responses.plans.latencyMs.max} ms. Answers are not held to the 15-second planning target.
+Action cases (every category except read_only and answer) that got an answer: ${responses.answeredActionCases.map(r => `${r.id} (run ${r.run})`).join(', ') || 'none'}.
+${responses.gmailPromptChars.calls ? `Prompt characters per model call in Gmail cases: p50 / p95 / max ${responses.gmailPromptChars.p50} / ${responses.gmailPromptChars.p95} / ${responses.gmailPromptChars.max} over ${responses.gmailPromptChars.calls} calls (system prompt, working memory and history, as sent).\n` : ''}
 Per-call timing includes retry backoff; attempts measure each actual transport attempt, including reading the response body. Missing token counts are null, never fabricated. Reasoning may be included in prompt_tokens by the gateway; do not add it to prompt/completion totals.
 
 Service metrics score only that service's preregistered tool/argument labels within each workflow. Immediate read-only clarification has no tool/argument denominator. Clarification/refusal contribute to kind/strict scores. Latency is the entire request involving the service.
