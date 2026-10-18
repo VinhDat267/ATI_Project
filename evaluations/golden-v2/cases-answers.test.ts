@@ -52,6 +52,21 @@ describe('preregistered answer labels', () => {
     const tools = new Set(provider.getLastInput()!.toolCatalog.map(t => t.name));
     for (const spec of c.expect.searches!) expect(tools.has(spec.tool), `${c.id}:${spec.tool}`).toBe(true);
   });
+  it('passes an_gm02 only for a search that filters unread mail, not one for the word "unread"', async () => {
+    const run = async (query: string) => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([{ kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query } }] }, { kind: 'answer', text: 'Kết quả tìm.' }]);
+      return runner.runCase(cases.find(c => c.id === 'an_gm02')!, file as GoldenFile, false, 'llm', { provider, catalog: runner.evalCatalog('answers'), readAnswers: true });
+    };
+    const word = await run('unread');
+    expect(word.searches[0]!.result).toEqual([]);
+    expect(word.score.passed).toBe(false);
+    for (const query of ['is:unread', 'in:inbox is:unread', 'label:UNREAD']) {
+      const filtered = await run(query);
+      expect(filtered.searches[0]!.result, query).toHaveLength(8);
+      expect(filtered.score.passed, query).toBe(true);
+    }
+  });
   it('scores an answer resting only on the Telegram directory listing', async () => {
     const provider = new MockLLMProvider();
     provider.setPlanResponses([{ kind: 'answer', text: 'Có hai chat: frontend và release.' }]);

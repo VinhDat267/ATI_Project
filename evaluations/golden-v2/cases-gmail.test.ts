@@ -7,6 +7,7 @@ import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, SERVICE_REGISTRY } from '@wap/to
 import { AIPlanner, MockLLMProvider, WorkingMemory } from '@wap/planner';
 import { GMAIL_THREADS, buildMemory, fixtureSearch, knownResourceValues } from './fixtures.js';
 import * as runner from './run.js';
+import type { GoldenFile } from './run.js';
 import type { GoldenCase, Matcher, StepSpec } from './scorer.js';
 
 const file = JSON.parse(readFileSync(new URL('./cases-gmail.json', import.meta.url), 'utf8'));
@@ -69,6 +70,22 @@ describe('preregistered Gmail planning labels', () => {
     await planner.processMessage({ userMessage: c.prompt, memory: new WorkingMemory() });
     const tools = new Set(provider.getLastInput()!.toolCatalog.map(t => t.name));
     for (const spec of c.expect.steps ?? []) expect(tools.has(spec.tool), `${c.id}:${spec.tool}`).toBe(true);
+  });
+  it('passes gm15 only when the Gmail thread was looked up before posting to Slack', async () => {
+    const post = { kind: 'plan', thinking: 't', summary: 'Đăng Slack', warnings: [], steps: [{ id: 'post', tool: 'slack.send_message', description: 'Đăng tóm tắt',
+      args: { channel: 'C_FE', text: 'PR đã bị hủy; không cần chạy kiểm thử.' }, dependsOn: [] }] };
+    const run = async (...responses: unknown[]) => {
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses(responses);
+      return runner.runCase(cases.find(c => c.id === 'gm15')!, file as GoldenFile, false, 'llm', { provider, catalog: runner.evalCatalog('gmail') });
+    };
+    const unread = await run(post);
+    expect(unread.searches).toEqual([]);
+    expect(unread.score.passed).toBe(false);
+    const read = await run({ kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'Kế hoạch kiểm thử' } }] },
+      { ...post, steps: [{ ...post.steps[0]!, args: { channel: 'C_FE', text: 'Nhắc: chạy test trước khi gửi PR.' } }] });
+    expect(read.searches[0]!.result).toHaveLength(1);
+    expect(read.score.passed).toBe(true);
   });
   it('runs through the command entry point with the Gmail catalog and its own catalog hash', async () => {
     const output = mkdtempSync(join(tmpdir(), 'ati-gmail-04-dry-'));

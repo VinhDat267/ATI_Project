@@ -451,8 +451,19 @@
               "text": {
                 "includesAny": [
                   "test",
-                  "kiểm thử",
-                  "PR"
+                  "kiểm thử"
+                ]
+              }
+            }
+          }
+        ],
+        "searches": [
+          {
+            "tool": "gmail.search_threads",
+            "args": {
+              "query": {
+                "includesAny": [
+                  "kiểm thử"
                 ]
               }
             }

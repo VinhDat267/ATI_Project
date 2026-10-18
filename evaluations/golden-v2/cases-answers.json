@@ -205,7 +205,8 @@
             "args": {
               "query": {
                 "includesAny": [
-                  "unread"
+                  "is:unread",
+                  "label:unread"
                 ]
               }
             }
