@@ -44,7 +44,8 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     await one.getByLabel(/Họ và tên/).fill('Tên mới AUTH-05');
     await one.getByRole('button', { name: 'Lưu thay đổi họ tên' }).click();
     await expect(one.getByRole('main').getByRole('status')).toContainText('Đã lưu tên mới');
-    await one.getByRole('link', { name: 'Quay lại không gian làm việc' }).click();
+    // FE-12: the back link became the shared bar; its logo returns to the workspace at every width.
+    await one.getByRole('banner').getByRole('link', { name: /Về không gian làm việc/ }).click();
     await expect(one.getByRole('button', { name: 'Menu người dùng: Tên mới AUTH-05', exact: true })).toBeVisible();
     expect((await db.query('SELECT name FROM users WHERE email=$1', [email])).rows[0].name).toBe('Tên mới AUTH-05');
   } finally { await first.close(); await second.close(); await db.end(); }

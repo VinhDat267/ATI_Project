@@ -1,7 +1,7 @@
 // Chuyển từ docs/design/prototypes/privacy.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
 import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
+import { MainNav } from '../../components/layout/MainNav';
 import type { MouseEvent } from 'react';
-import { UserNavMenu } from '../../components/layout/UserNavMenu';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { User } from '../../types';
@@ -29,71 +29,72 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
   const gmailEnabled = useGmailEnabled();
   return (
     <>
-      {/* ==================== HEADER (COCKPIT BAR) ==================== */}
-      <header className="sticky top-0 z-40 bg-[#F8F8F6]/95 backdrop-blur-md border-b border-[#E7E7E2]" data-od-id="privacy-header">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          {/* Cụm trái: Logo ATI & Nhãn trang */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
-              <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
-                A
+      {/* FE-12: đã đăng nhập thì dùng thanh điều hướng chung; chưa đăng nhập giữ thanh của bản mẫu. */}
+      {user ? <MainNav user={user} current={null} pageName="Chính sách an toàn" navigate={navigate} onLogout={onLogout} /> : (
+        <header className="sticky top-0 z-40 bg-[#F8F8F6]/95 backdrop-blur-md border-b border-[#E7E7E2]" data-od-id="privacy-header">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+            {/* Cụm trái: Logo ATI & Nhãn trang */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
+                <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
+                  A
+                </div>
+                <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
+                  ATI
+                </span>
+              </a>
+              <span className="text-[#E7E7E2] select-none flex-shrink-0" aria-hidden="true">
+                /
+              </span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs sm:text-sm font-medium text-[#111827] truncate">
+                  Chính sách an toàn &amp; Dữ liệu
+                </span>
               </div>
-              <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
-                ATI
-              </span>
-            </a>
-            <span className="text-[#E7E7E2] select-none flex-shrink-0" aria-hidden="true">
-              /
-            </span>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs sm:text-sm font-medium text-[#111827] truncate">
-                Chính sách an toàn &amp; Dữ liệu
-              </span>
             </div>
-          </div>
-          {/* Cụm phải: Điều hướng nhanh */}
-          <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
-            <ThemeToggle />
-            <div className="hidden sm:flex items-center gap-2 sm:gap-3">
-              <a href="/guide" onClick={appLink(navigate, '/guide')} className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  {' '}
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  {' '}
+            {/* Cụm phải: Điều hướng nhanh */}
+            <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
+              <ThemeToggle />
+              <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+                <a href="/guide" onClick={appLink(navigate, '/guide')} className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
+                  <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    {' '}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    {' '}
+                  </svg>
+                  <span>
+                    Cẩm nang
+                  </span>
+                </a>
+                {' '}
+                <a href="/settings" onClick={appLink(navigate, '/settings')} className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
+                  <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    {' '}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    {' '}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    {' '}
+                  </svg>
+                  <span>
+                    Kết nối dịch vụ
+                  </span>
+                </a>
+              </div>
+              <a href="/" onClick={appLink(navigate, '/')} className="px-2.5 sm:px-3.5 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all duration-150 inline-flex items-center gap-1.5 focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] text-xs sm:text-sm flex-shrink-0">
+                <svg className="w-4 h-4 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                <span>
-                  Cẩm nang
+                <span className="hidden sm:inline">
+                  Về không gian làm việc
+                </span>
+                <span className="sm:hidden">
+                  Quay lại
                 </span>
               </a>
-              {' '}
-              <a href="/settings" onClick={appLink(navigate, '/settings')} className="px-3 py-1.5 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-200/50 transition-colors font-medium inline-flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  {' '}
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  {' '}
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  {' '}
-                </svg>
-                <span>
-                  Kết nối dịch vụ
-                </span>
-              </a>
             </div>
-            <a href="/" onClick={appLink(navigate, '/')} className="px-2.5 sm:px-3.5 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all duration-150 inline-flex items-center gap-1.5 focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] text-xs sm:text-sm flex-shrink-0">
-              <svg className="w-4 h-4 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span className="hidden sm:inline">
-                Về không gian làm việc
-              </span>
-              <span className="sm:hidden">
-                Quay lại
-              </span>
-            </a>
-            {user ? <UserNavMenu user={user} onLogout={onLogout} navigate={navigate} onOpenSettings={() => navigate('/settings')} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} variant="prototype" /> : null}
           </div>
-        </div>
-      </header>
+        </header>
+      )}
       {/* ==================== MAIN CONTENT CONTAINER ==================== */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12" id="main-content">
         {/* HERO HEADER */}

@@ -72,6 +72,14 @@ beforeEach(async () => {
 afterEach(async () => { releaseSave(); releaseCatalogue(); cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
 const mount = (user = admin) => render(<SettingsPage user={user} navigate={() => {}} onLogout={() => {}} />);
 const open = async (name = 'GitHub') => { fireEvent.click(await screen.findByRole('button', { name: new RegExp(`${name} —`) })); return screen.findByRole('dialog', { name }); };
+// FE-12: the role pill left the bar; the avatar menu still names the role.
+const roleInMenu = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: /Menu người dùng/ }));
+  const menu = screen.getByRole('menu', { name: 'Người dùng' });
+  const role = within(menu).getByText(/^(Quản trị viên|Thành viên)$/).textContent;
+  fireEvent.keyDown(menu, { key: 'Escape' });
+  return role;
+};
 const addScope = (value = 'owner/repo') => { fireEvent.change(screen.getByLabelText('Thêm Repository'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
 
 it('uses field placeholders for Jira site and email without suggesting a secret', async () => {
@@ -195,8 +203,9 @@ it('locks member credentials and scopes but allows configured checks with live r
 });
 
 it('allows an allowlisted member to configure using the API capability while retaining the member role label', async () => {
-  canConfigure = true; mount({ ...admin, role: 'member' }); const dialog = await open();
-  expect(within(screen.getByRole('banner', { hidden: true })).getByText('Thành viên')).toBeVisible();
+  canConfigure = true; mount({ ...admin, role: 'member' });
+  expect(await roleInMenu()).toBe('Thành viên');
+  const dialog = await open();
   expect(within(dialog).getByLabelText('Token')).toBeEnabled();
   expect(within(dialog).getByLabelText('Thêm Repository')).toBeEnabled();
   fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'synthetic-allowlisted-token' } }); addScope();
@@ -206,12 +215,13 @@ it('allows an allowlisted member to configure using the API capability while ret
   expect(screen.queryByText('Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm.')).not.toBeInTheDocument();
 });
 it.each([false, undefined])('uses the API capability instead of the admin role and fails closed when it is %s', async capability => {
-  canConfigure = capability; mount(); const dialog = await open('Notion');
+  canConfigure = capability; mount();
+  expect(await roleInMenu()).toBe('Quản trị viên');
+  const dialog = await open('Notion');
   expect(within(dialog).getByLabelText('Token')).toBeDisabled();
   expect(within(dialog).getByLabelText('Thêm Repository')).toBeDisabled();
   expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   expect(within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' })).toBeEnabled();
-  expect(within(screen.getByRole('banner', { hidden: true })).getByText('Quản trị viên')).toBeVisible();
 });
 it('ignores a previous user catalogue capability arriving after switching to an ordinary member', async () => {
   let release!: (data: { services: ServiceInfo[]; canConfigure: boolean }) => void;

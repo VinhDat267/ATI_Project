@@ -6,6 +6,7 @@ import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { OutcomeLink, serviceId, serviceName, serviceRecoveryLink, statusLabel } from './presentation';
 import { RecoveryEditor } from './RecoveryEditor';
+import { RequestEcho } from './RequestEcho';
 
 export interface RecoveryControls {
   busy: boolean; error: string | null;
@@ -50,7 +51,7 @@ function SavedWork({steps}:{steps:ExecutionStepInfo[]}) { return <div className=
     <div className="flex items-center gap-2.5 min-w-0"><span className={`w-5 h-5 rounded-full ${step.status==='succeeded'?'bg-emerald-100 text-emerald-700':'bg-neutral-200 text-neutral-600'} flex items-center justify-center font-bold text-xs flex-shrink-0`}>{step.status==='succeeded'?'✓':index+1}</span><span className={step.status==='succeeded'?'font-medium text-neutral-800 break-words min-w-0':'break-words min-w-0'}>Việc {index+1}: {step.description}</span></div>
     <div className="flex-shrink-0">{step.status==='succeeded' && step.duration && <span className="text-xs text-neutral-500 mr-2">{step.duration}</span>}<OutcomeLink step={step} className="text-brand-primary hover:underline font-medium inline-flex items-center gap-1"/>{step.status!=='succeeded' && <span className="text-neutral-500 italic">{step.status==='pending'?'Chưa làm':statusLabel(step.status)}</span>}</div>
   </div>)}</div>; }
-export function RecoveryMoment({moment,snapshot,steps,services,controls}:{moment:7|8|9;snapshot:ExecutionSnapshot|null;steps:ExecutionStepInfo[];services:ServiceInfo[];controls:RecoveryControls|null}) {
+export function RecoveryMoment({request,moment,snapshot,steps,services,controls}:{request?:string;moment:7|8|9;snapshot:ExecutionSnapshot|null;steps:ExecutionStepInfo[];services:ServiceInfo[];controls:RecoveryControls|null}) {
   const [dialog,setDialog]=useState<'stop'|'edit'|null>(null);
   const unknown=steps.filter(step=>step.status==='unknown');
   const paused=steps.find(step=>step.id===snapshot?.execution.pausedStepId && (step.status==='unknown'||step.status==='failed')) ?? unknown[0] ?? steps.find(step=>step.status==='failed');
@@ -79,6 +80,7 @@ export function RecoveryMoment({moment,snapshot,steps,services,controls}:{moment
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={moment===7?'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z':moment===8?'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z':'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'}/></svg>
         <span>{moment===7?'Cần bạn xử lý · Lỗi đã biết':moment===8?'Cần bạn xử lý · Chưa chắc kết quả':'Khôi phục phiên làm việc'}</span>
       </div>{' '}
+      <RequestEcho request={request} />
       <h1 id={`heading-moment-${moment}`} className="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabIndex={-1}>{moment===7?`${service} chưa hoàn thành việc này`:moment===8?`Chưa rõ kết quả trên ${service}`:'Hệ thống vừa khởi động lại'}</h1>
       {moment===7 && <p className="text-sm text-brand-muted">{paused?.description}</p>}
     </div>

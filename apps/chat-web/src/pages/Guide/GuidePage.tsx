@@ -1,6 +1,6 @@
 // Chuyển từ docs/design/prototypes/guide.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { UserNavMenu } from '../../components/layout/UserNavMenu';
+import { MainNav } from '../../components/layout/MainNav';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { ServiceLogo } from '../../components/ServiceLogo';
@@ -291,69 +291,61 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
   const catClass = (key: string) => (category === key ? CAT_ON : CAT_OFF);
   return (
     <>
-      {/* ==================== HEADER (COCKPIT NAVIGATION) ==================== */}
-      <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-          {/* Cụm Logo & Điều hướng */}
-          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-            <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2.5 group flex-shrink-0" title="Về không gian làm việc">
-              <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                A
-              </div>
-              <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                ATI
-              </span>
-            </a>
-            <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/" onClick={appLink(navigate, '/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span className="hidden sm:inline">
-                Về không gian làm việc
-              </span>
-              <span className="sm:hidden">
-                Quay lại
-              </span>
-            </a>
-            <div className="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            {/* Liên kết chéo */}
-            <a href="/settings" onClick={appLink(navigate, '/settings')} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              {' '}
-              <span>
-                Kết nối dịch vụ
-              </span>
-            </a>
-            <a href="/history" onClick={appLink(navigate, '/history')} className="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {' '}
-              <span>
-                Nhật ký
-              </span>
-            </a>
-            {user?.role === 'admin' && <a href="/admin/users" onClick={appLink(navigate, '/admin/users')} className="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Quản lý người dùng">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              {' '}
-              <span>
-                Người dùng
-              </span>
-            </a>}
+      {/* FE-12: đã đăng nhập thì dùng thanh điều hướng chung; chưa đăng nhập giữ thanh của bản mẫu. */}
+      {user ? <MainNav user={user} current="guide" pageName="Cẩm nang" navigate={navigate} onLogout={onLogout} /> : (
+        <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+            {/* Cụm Logo & Điều hướng */}
+            <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+              <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2.5 group flex-shrink-0" title="Về không gian làm việc">
+                <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
+                  A
+                </div>
+                <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
+                  ATI
+                </span>
+              </a>
+              <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
+              <a href="/" onClick={appLink(navigate, '/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="hidden sm:inline">
+                  Về không gian làm việc
+                </span>
+                <span className="sm:hidden">
+                  Quay lại
+                </span>
+              </a>
+              <div className="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
+              {/* Liên kết chéo */}
+              <a href="/settings" onClick={appLink(navigate, '/settings')} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                {' '}
+                <span>
+                  Kết nối dịch vụ
+                </span>
+              </a>
+              <a href="/history" onClick={appLink(navigate, '/history')} className="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {' '}
+                <span>
+                  Nhật ký
+                </span>
+              </a>
+            </div>
+            {/* Cụm phải dùng trạng thái thật của app; bỏ menu kịch bản và vai trò giả của bản mẫu. */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <ThemeToggle />
+              <a href="/login" onClick={appLink(navigate, '/login')} className="px-3 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all inline-flex items-center">Đăng nhập</a>
+            </div>
           </div>
-          {/* Cụm phải dùng trạng thái thật của app; bỏ menu kịch bản và vai trò giả của bản mẫu. */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <ThemeToggle />
-            {user ? <UserNavMenu user={user} onLogout={onLogout} navigate={navigate} onOpenSettings={() => navigate('/settings')} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} variant="prototype" />
-              : <a href="/login" onClick={appLink(navigate, '/login')} className="px-3 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E7E7E2] shadow-sm transition-all inline-flex items-center">Đăng nhập</a>}
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
       {/* ==================== MAIN CONTENT ==================== */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-6">
         {/* HERO / TIÊU ĐỀ TRANG */}

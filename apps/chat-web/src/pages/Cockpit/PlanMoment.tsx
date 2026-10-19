@@ -3,10 +3,12 @@ import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { operation, serviceId, servicePalette, serviceName } from './presentation';
-export function PlanMoment({runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
+import { RequestEcho } from './RequestEcho';
+export function PlanMoment({request,runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{request?:string;runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
  const [techOpen,setTechOpen]=useState(false);
  return (<section id="moment-4" className="stage-section is-active v3-space-y-6 relative" aria-label="Cockpit" data-moment="4" aria-labelledby="heading-moment-4">
           <div className="v3-space-y-2">
+            <RequestEcho request={request} />
             <h1 id="heading-moment-4" className="font-display text-4xl sm:text-5xl text-brand-text font-normal tracking-tight leading-tight" tabIndex={-1}>
               Tôi sẽ làm {plan.steps.length} việc, theo thứ tự
             </h1>

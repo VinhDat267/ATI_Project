@@ -149,3 +149,26 @@ Máy tính (≥ 1280 px), cockpit đang có yêu cầu (admin):
 - Dòng "Bạn nhờ" lấy câu gốc thay vì tin mới nhất sau khi "Sửa qua Chat". Giữ cách chọn câu như thanh hiện nay.
 
 ## Kết quả (agent thi công điền)
+
+- **PR:** nhánh `feat/fe-12-shared-nav-bar`, tách từ `docs/fe-12-nav-bar` (#161). Reviewer thi công theo yêu cầu nhóm trưởng ngày 19/10. [Log](../log/2026-10-19-reviewer-FE-12-shared-nav-bar.md).
+- **Đã làm:**
+  - `components/layout/MainNav.tsx`: thanh dùng chung theo mục 1–2; lưới `1fr auto 1fr`, các cụm ghim cột.
+  - `pages/Cockpit/RequestEcho.tsx`: dòng "Bạn nhờ".
+  - `CockpitHeader.tsx` dựng trên `MainNav`: hai nút ngăn thành `actions`, dải thử nghiệm thành `children`, bỏ khối "Yêu cầu hiện tại".
+  - Khoảnh khắc 3, 4, 5, 6, kết thúc không thành công, 7–9 và lập kế hoạch lâu có dòng "Bạn nhờ" ngay trên `h1`.
+  - Sáu trang con dùng `MainNav`. Cẩm nang và Chính sách an toàn chỉ khi đã đăng nhập.
+  - `FE-12:` thêm vào nhóm default của runner browser.
+- **Test:**
+  - TDD: hai file test unit viết trước, RED (lỗi import và 11 ca fail), GREEN 28/28.
+  - Test browser mới `fe-12-nav.spec.ts`, 4 ca: đi mọi tab từ mọi trang; bố cục ở 1440/1280/1024/375, sáng/tối; thành viên và menu avatar trên điện thoại; dòng "Bạn nhờ" và hai ngăn trong cockpit thật.
+  - Sửa 7 test cũ khẳng định thanh cũ, mỗi chỗ ghi lý do trong log.
+- **Đột biến:** 8/8 mức unit bị bắt. Mức trình duyệt 2/3 bị bắt; đột biến bỏ `whitespace-nowrap` sống sót vì tương đương ở các khổ đang đo (log ghi rõ).
+- **Lệnh kiểm:**
+  - `npm run check` exit 0: **2.042 v3 + 389 eval**;
+  - `npm run test:browser:v3` exit 0: **119 pass, 1 skip có chủ đích, 13 nhóm**. Lượt đầu có 4 fail ở FE-05 do lỗi reviewer chèn chú thích giữa dòng khi sửa test; đã sửa;
+  - PostgreSQL 16 tạm ở 55533, sandbox.
+- **Ảnh trước/sau:** 54 + 54 ảnh, 9 màn × 3 khổ × sáng/tối, ở `.codex/fe12-screenshots-2026-10-19/` của máy nhóm trưởng (ignore). SHA-256 manifest ghi trong log. **Nhóm trưởng xem bộ ảnh trước khi merge.**
+- **Khác task card:**
+  - nút sáng/tối của cockpit dùng `ThemeToggle` chung, nên `#btn-theme-toggle` không còn;
+  - bề rộng thanh chọn `max-w-7xl`. Ở 1280 px, cụm phải của cockpit cần 330 px, nên khoảng cách giữa các tab là `gap-1` và giữa các cột là `gap-2`;
+  - không xoá `AppShell.tsx`/`ShellPageView.tsx` (tuỳ chọn).

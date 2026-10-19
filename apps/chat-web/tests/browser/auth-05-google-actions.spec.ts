@@ -85,7 +85,7 @@ for (const leave of ['logout', 'workspace'] as const) {
       if (leave === 'logout') {
         await page.getByRole('button', { name: /Menu người dùng/ }).click();
         await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click();
-      } else await page.getByRole('link', { name: 'Quay lại không gian làm việc' }).click();
+      } else await page.getByRole('banner').getByRole('link', { name: /Về không gian làm việc/ }).click(); // FE-12: shared bar logo
       if (leave === 'logout') {
         await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
         await expect(page.locator('[data-od-id="btn-header-login"]').or(page.getByRole('button', { name: 'Đăng nhập vào hệ thống', exact: true })).first()).toBeVisible();

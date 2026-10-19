@@ -3,6 +3,7 @@ import type { PlanStep } from '../../types';
 import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { operation, serviceId, servicePalette, statusLabel, OutcomeLink } from './presentation';
+import { RequestEcho } from './RequestEcho';
 const ITEM_DONE = 'p-4 bg-white rounded-2xl border border-brand-border shadow-sm flex items-center justify-between gap-3';
 const ITEM_RUNNING = 'p-4 bg-white rounded-2xl border-2 border-brand-primary shadow-orange-glow animate-pulse-soft flex items-center justify-between gap-3 opacity-100';
 const ITEM_SKIPPED = 'p-4 bg-neutral-100 rounded-2xl border border-neutral-300 flex items-center justify-between gap-3 opacity-80';
@@ -10,13 +11,14 @@ const BADGE_DONE = 'text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded
 const BADGE_RUNNING = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rounded font-medium';
 const ITEM_PENDING='p-4 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 flex items-center justify-between gap-3 opacity-60';
 const BADGE_PENDING='text-xs text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-medium';
-export function ExecutionMoment({steps,planSteps,labels,destination}:{steps:ExecutionStepInfo[];planSteps:PlanStep[];labels?:Record<string,string>;destination:(step:PlanStep,labels?:Record<string,string>)=>string}){
+export function ExecutionMoment({request,steps,planSteps,labels,destination}:{request?:string;steps:ExecutionStepInfo[];planSteps:PlanStep[];labels?:Record<string,string>;destination:(step:PlanStep,labels?:Record<string,string>)=>string}){
  const completed=steps.filter(step=>['succeeded','skipped'].includes(step.status)).length;
  const running=steps.findIndex(step=>step.status==='running');
  const current=running<0 ? Math.min(completed+1,steps.length) : running+1;
  return (<section id="moment-5" className="stage-section is-active v3-space-y-6" aria-label="Cockpit" data-moment="5" aria-labelledby="heading-moment-5">
           <div className="flex items-center justify-between gap-4">
             <div>
+              <RequestEcho request={request} />
               <h1 id="heading-moment-5" className="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabIndex={-1}>
                 Đang thực hiện công việc
               </h1>

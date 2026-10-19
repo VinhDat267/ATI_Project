@@ -4,7 +4,9 @@ import type { KeyboardEvent, RefObject } from 'react';
 import { SERVICE_REGISTRY } from '@wap/tool-schemas';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { NoWritesNotice } from '../Responses/ResponseMoment';
+import { RequestEcho } from './RequestEcho';
 interface Props {
+  request?: string;
   question: string;
   context?: string;
   options: string[];
@@ -20,6 +22,7 @@ interface Props {
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 export function ClarificationMoment({
+  request,
   question,
   context,
   options,
@@ -58,6 +61,7 @@ export function ClarificationMoment({
           </svg>
           <span>Tôi cần bạn xác nhận thêm một thông tin</span>
         </div>{' '}
+        <RequestEcho request={request} />
         <h1
           id="heading-moment-3"
           className="font-display text-3xl sm:text-4xl lg:text-[44px] text-brand-text font-normal leading-tight"
