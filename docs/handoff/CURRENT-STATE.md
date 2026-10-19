@@ -713,6 +713,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - khi `PLANNER_READ_ANSWERS` bật, câu chỉ đọc được **trả lời** sau khi tra cứu, thay phần "không thêm kiểu trả lời đọc dữ liệu" của chốt 05/10. Quy tắc "plan phải có ít nhất một bước ghi" giữ nguyên;
   - nhóm trưởng chấp nhận việc nội dung thư đi qua 9router tới tài khoản model bên thứ ba và được giữ trong hội thoại; `/privacy` phải ghi đúng điều này khi Gmail bật.
 
+- **Chốt 19/10/2026** ([FE-12](tasks/FE-12-shared-nav-bar.md), đặc tả giao diện mục 1.1 điểm 10):
+  - mọi trang sau khi đăng nhập, kể cả cockpit, dùng một thanh điều hướng chung. Các tab căn giữa thanh;
+  - câu "Yêu cầu hiện tại" rời thanh trên và thành dòng "Bạn nhờ" trong nội dung cockpit. Không thêm dòng thứ hai dưới thanh;
+  - đây là chỗ lệch bản mẫu có chủ đích, ngoài chốt 07/10. Bản mẫu trong `docs/` không sửa theo.
+
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
 - Label của golden set được đăng ký trước. Chỉ sửa label trong commit riêng, có giải thích, không sửa để khớp kết quả.
