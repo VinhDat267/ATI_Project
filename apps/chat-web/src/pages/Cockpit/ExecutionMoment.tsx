@@ -17,7 +17,8 @@ export function ExecutionMoment({request,steps,planSteps,labels,destination}:{re
  const current=running<0 ? Math.min(completed+1,steps.length) : running+1;
  return (<section id="moment-5" className="stage-section is-active v3-space-y-6" aria-label="Cockpit" data-moment="5" aria-labelledby="heading-moment-5">
           <div className="flex items-center justify-between gap-4">
-            <div>
+            {/* FE-12: min-w-0 lets a request without spaces wrap; flex-1 keeps the step counter at its own width. */}
+            <div className="min-w-0 flex-1">
               <RequestEcho request={request} />
               <h1 id="heading-moment-5" className="font-display text-3xl sm:text-4xl text-brand-text font-normal leading-tight" tabIndex={-1}>
                 Đang thực hiện công việc

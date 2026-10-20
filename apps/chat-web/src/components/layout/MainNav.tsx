@@ -1,6 +1,8 @@
 // FE-12: thanh điều hướng chung của mọi trang sau khi đăng nhập (nhóm trưởng chốt 19/10/2026,
 // đặc tả giao diện mục 1.1 điểm 10). Không có trong bản mẫu; class màu lấy từ header của bản React
 // để prototype/theme.css lo chế độ tối như ở các trang khác.
+// Tab hiện từ 900 px: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh
+// (review #162, nhóm trưởng chốt 20/10/2026).
 import type { MouseEvent, ReactNode } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import type { User } from '../../types';
@@ -26,7 +28,7 @@ export interface MainNavProps {
   navigate: (path: string) => void;
   onLogout: () => void;
   onOpenSettings?: () => void;
-  /** Tên trang hiện cạnh logo khi màn hẹp hơn 768 px (lúc đó không có tab). */
+  /** Tên trang hiện cạnh logo khi màn hẹp hơn 900 px (lúc đó không có tab). */
   pageName?: string;
   /** Nút riêng của trang, đặt trước nút sáng/tối (cockpit: Lịch sử, Xem hội thoại). */
   actions?: ReactNode;
@@ -54,9 +56,9 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               ATI
             </span>
           </a>
-          {pageName && <span data-nav-page-name className="md:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
+          {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
         </div>
-        <nav aria-label="Điều hướng chính" className="col-start-2 hidden md:flex items-center gap-1 justify-self-center">
+        <nav aria-label="Điều hướng chính" className="col-start-2 hidden min-[900px]:flex items-center gap-1 justify-self-center">
           {tabs.map(tab => (
             <a key={tab.id} href={tab.path} onClick={follow(tab.path)} aria-label={tab.name} aria-current={current === tab.id ? 'page' : undefined} className={current === tab.id ? TAB_ON : TAB_OFF}>
               <span className="xl:hidden">{tab.short}</span>

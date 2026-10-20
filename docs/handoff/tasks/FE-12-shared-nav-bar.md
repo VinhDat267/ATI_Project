@@ -67,8 +67,10 @@ Máy tính (≥ 1280 px), cockpit đang có yêu cầu (admin):
 | Độ rộng | Tab | Hai nút của cockpit |
 |---|---|---|
 | ≥ 1280 px | chữ đầy đủ | chữ + biểu tượng ("Lịch sử", "Xem hội thoại 4") |
-| 768–1279 px | chữ rút gọn: "Làm việc", "Nhật ký", "Kết nối", "Cẩm nang", "Người dùng" | chỉ biểu tượng; "Xem hội thoại" vẫn có số tin |
-| < 768 px | ẩn; trang con ghi tên trang đang mở cạnh logo; đi trang khác qua menu avatar | chỉ biểu tượng, như hiện nay |
+| 900–1279 px | chữ rút gọn: "Làm việc", "Nhật ký", "Kết nối", "Cẩm nang", "Người dùng" | chỉ biểu tượng; "Xem hội thoại" vẫn có số tin |
+| < 900 px | ẩn; trang con ghi tên trang đang mở cạnh logo; đi trang khác qua menu avatar | chỉ biểu tượng, như hiện nay |
+
+Mốc ẩn tab ban đầu là 768 px. Ngày 20/10/2026 nhóm trưởng chốt đổi sang 900 px, sau review #162: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh.
 
 - **Tên truy cập của tab luôn là tên đầy đủ**, kể cả khi chữ hiển thị được rút gọn. Ví dụ tab "Kết nối" vẫn có tên truy cập "Kết nối dịch vụ".
 - **Không chồng lấn, không cuộn ngang:** ở mọi khổ, tab, logo và cụm phải không đè lên nhau, và trang không cuộn ngang. Ca khó nhất là cockpit của admin có 5 tab và "Xem hội thoại 99" ở 1280 px và 1024 px.
@@ -172,3 +174,8 @@ Máy tính (≥ 1280 px), cockpit đang có yêu cầu (admin):
   - nút sáng/tối của cockpit dùng `ThemeToggle` chung, nên `#btn-theme-toggle` không còn;
   - bề rộng thanh chọn `max-w-7xl`. Ở 1280 px, cụm phải của cockpit cần 330 px, nên khoảng cách giữa các tab là `gap-1` và giữa các cột là `gap-2`;
   - không xoá `AppShell.tsx`/`ShellPageView.tsx` (tuỳ chọn).
+- **Sửa sau review độc lập lần 1** (tại `71bb895`, chưa đạt: 1 P2, 1 P3), 20/10. [Log sửa](../log/2026-10-20-reviewer-FE-12-review-fixes.md).
+  - P2: câu yêu cầu liền ký tự (ví dụ một link dài) làm màn đang thực thi tràn ngang, 375 px thành 2.568 px. Cột chữ của `ExecutionMoment` thêm `min-w-0 flex-1`.
+  - P3: tab lệch tâm 48 px ở 768 px trên cockpit của admin. Nhóm trưởng chốt hiện tab từ 900 px (mục 2).
+  - Test browser mới cho câu dài ở 7 khoảnh khắc; test bố cục đo thêm 900, 899 và 768 px. 4/4 đột biến bị bắt.
+  - `npm run check` exit 0, 2.042 v3 + 389 eval; `npm run test:browser:v3` exit 0 ngay lượt đầu, 120 pass, 1 skip có chủ đích, 13 nhóm.

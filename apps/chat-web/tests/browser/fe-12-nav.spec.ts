@@ -86,7 +86,7 @@ test('FE-12: an admin reaches every tab from every page and the current tab is m
 });
 
 test('FE-12: the bar fits without overlap, centres its tabs and never scrolls sideways, light and dark', async ({ page }, info) => {
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const hashes: string[] = [];
   try {
@@ -94,7 +94,8 @@ test('FE-12: the bar fits without overlap, centres its tabs and never scrolls si
     const request = `FE12 tạo issue GitHub rồi báo Slack #ati-test ${randomUUID().slice(0, 8)}`;
     const conversation = await seedPlanWithManyMessages(db, user.id, request);
     const pages = [{ path: `/c/${conversation}`, scope: 'cockpit-plan' }, ...PAGES.filter(entry => entry.path !== '/').map(entry => ({ path: entry.path, scope: entry.path.slice(1).replace('/', '-') }))];
-    for (const width of [1440, 1280, 1024, 375]) {
+    // Tabs start at 900 px. Review #162 measured them 51 px off centre at 768 px when they started there.
+    for (const width of [1440, 1280, 1024, 900, 899, 768, 375]) {
       await page.setViewportSize({ width, height: 900 });
       for (const theme of ['light', 'dark'] as const) {
         for (const entry of pages) {
@@ -110,14 +111,12 @@ test('FE-12: the bar fits without overlap, centres its tabs and never scrolls si
           expect(layout.scroll, `${label}: no sideways scroll`).toBeLessThanOrEqual(layout.viewport);
           expect(layout.bar.right - layout.right!.right, `${label}: avatar cluster sits at the right edge`).toBeLessThanOrEqual(24);
           expect(layout.right!.bottom - layout.right!.top, `${label}: right cluster stays on one line`).toBeLessThanOrEqual(40);
-          if (width >= 768) {
+          if (width >= 900) {
             expect(layout.nav, `${label}: tabs visible`).not.toBeNull();
             expect(apart(layout.left!, layout.nav!), `${label}: logo and tabs do not overlap`).toBe(true);
             expect(apart(layout.nav!, layout.right!), `${label}: tabs and right cluster do not overlap`).toBe(true);
-            if (width >= 1024) {
-              const centre = (box: Box) => (box.left + box.right) / 2;
-              expect(Math.abs(centre(layout.nav!) - centre(layout.bar)), `${label}: tabs centred`).toBeLessThanOrEqual(2);
-            }
+            const centre = (box: Box) => (box.left + box.right) / 2;
+            expect(Math.abs(centre(layout.nav!) - centre(layout.bar)), `${label}: tabs centred`).toBeLessThanOrEqual(2);
           } else {
             expect(layout.nav, `${label}: tabs hidden on phones`).toBeNull();
             if (entry.scope !== 'cockpit-plan') await expect(page.locator('[data-nav-page-name]')).toBeVisible();
@@ -131,6 +130,79 @@ test('FE-12: the bar fits without overlap, centres its tabs and never scrolls si
     }
   } finally { await db.end(); }
   console.log(`FE-12 screenshot SHA256\n${hashes.join('\n')}`);
+});
+
+// Review #162 (P2): a request without spaces (a pasted link) must wrap inside every moment that repeats it.
+test('FE-12: a long request without spaces wraps in every cockpit moment and never widens the page', async ({ page }) => {
+  test.setTimeout(240_000);
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const user = await admin(page);
+    const request = `Tạo issue theo https://example.test/${'a'.repeat(300)}`;
+    const plan = { kind: 'plan', summary: 'FE12 câu không có khoảng trắng', steps: [
+      { id: 'step_1', tool: 'github.create_issue', description: 'Tạo issue', args: { repo: 'org/ati-test', title: 'FE12' } },
+      { id: 'step_2', tool: 'slack.send_message', description: 'Báo Slack', args: { channel: '#ati-test', text: 'FE12' } },
+    ], warnings: [] };
+    const text = JSON.stringify(plan);
+    // Moment 5 is the pending plan with its approval held, as in fe-05b-parity-b.
+    const cases = [
+      { moment: '4', status: 'pending', steps: [] },
+      { moment: '5', status: 'pending', steps: ['succeeded', 'running'] },
+      { moment: '6', status: 'completed', steps: ['succeeded', 'succeeded'] },
+      { moment: '7', status: 'partial', steps: ['succeeded', 'failed'] },
+      { moment: '8', status: 'partial', steps: ['succeeded', 'unknown'] },
+      { moment: '9', status: 'reconciliation_required', steps: ['succeeded', 'pending'] },
+      { moment: 'unsuccessful', status: 'stopped', steps: ['succeeded', 'pending'] },
+    ];
+    const seeded: { moment: string; conversation: string }[] = [];
+    for (const entry of cases) {
+      const conversation = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [user.id, `FE12 long ${entry.moment}`])).rows[0].id;
+      await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [conversation, request]);
+      const planId = (await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at,decided_at) VALUES($1,$2::jsonb,$3,$4,$5,now()+interval '30 minutes',CASE WHEN $5='pending' THEN NULL ELSE now() END) RETURNING id", [conversation, text, text, createHash('sha256').update(text).digest('hex'), entry.status])).rows[0].id;
+      for (const [index, status] of entry.steps.entries()) {
+        const step = plan.steps[index];
+        const output = status === 'succeeded' ? (index ? { ok: true } : { number: 42, html_url: 'https://github.com/org/ati-test/issues/42' }) : null;
+        const error = status === 'failed' ? { message: 'Slack từ chối gửi tin nhắn.' } : null;
+        await db.query('INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,error_json,requested_by,duration_ms) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7::jsonb,$8,$9)', [planId, step.id, step.tool, JSON.stringify(step.args), status, output && JSON.stringify(output), error && JSON.stringify(error), user.id, 250]);
+      }
+      seeded.push({ moment: entry.moment, conversation });
+    }
+    for (const width of [375, 1024]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const { moment, conversation } of seeded) {
+        let release: (() => void) | undefined;
+        if (moment === '5') {
+          const approval = new Promise<void>(resolve => { release = resolve; });
+          await page.route('**/api/plans/*/approve', async route => { await approval; await route.fulfill({ status: 409, json: { error: 'FE-12 held approval' } }); });
+        }
+        await page.goto(`/c/${conversation}`);
+        if (moment === '5') {
+          await expect(page.locator('#moment-4')).toBeVisible();
+          await page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }).click();
+        }
+        const stage = page.locator(`section[data-moment="${moment}"]`);
+        await expect(stage).toBeVisible();
+        await expect(stage.locator('[data-request-echo]')).toContainText(request);
+        const measured = await stage.evaluate(section => {
+          const right = (selector: string) => section.querySelector(selector)?.getBoundingClientRect().right ?? 0;
+          const echo = section.querySelector('[data-request-echo]') as HTMLElement;
+          const counter = section.querySelector('#exec-progress-label')?.getBoundingClientRect();
+          return { scroll: document.documentElement.scrollWidth, viewport: window.innerWidth, echoScroll: echo.scrollWidth, echoClient: echo.clientWidth, heading: right('h1'), counter: counter?.right ?? 0, counterHeight: counter?.height ?? 0 };
+        });
+        const label = `moment ${moment} at ${width}`;
+        expect(measured.scroll, `${label}: no sideways scroll`).toBeLessThanOrEqual(measured.viewport);
+        expect(measured.echoScroll, `${label}: the request wraps inside its line`).toBeLessThanOrEqual(measured.echoClient);
+        expect(measured.heading, `${label}: heading stays on screen`).toBeLessThanOrEqual(measured.viewport);
+        expect(measured.counter, `${label}: step counter stays on screen`).toBeLessThanOrEqual(measured.viewport);
+        expect(measured.counterHeight, `${label}: step counter stays on one line`).toBeLessThanOrEqual(32);
+        if (release) {
+          release();
+          await expect(page.locator('#moment-4')).toBeVisible();
+          await page.unroute('**/api/plans/*/approve');
+        }
+      }
+    }
+  } finally { await db.end(); }
 });
 
 test('FE-12: a member gets four tabs on desktop and reaches every page from the avatar menu on a phone', async ({ page }) => {
