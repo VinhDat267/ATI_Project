@@ -1,6 +1,6 @@
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
-import { ThemeToggle } from '../../prototype/ThemeToggle';
-import { UserNavMenu, avatarInitials } from '../../components/layout/UserNavMenu';
+import { MainNav } from '../../components/layout/MainNav';
+import { avatarInitials } from '../../components/layout/UserNavMenu';
 import type { User } from '../../types';
 import css from './page.css?inline';
 import type { AccountSession } from '../../types';
@@ -59,62 +59,8 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
   if (!account) return <main className="p-6"><p role={error ? 'alert' : 'status'}>{error ?? 'Đang tải thông tin tài khoản...'}</p></main>;
   return (
     <>
-      {/* THANH TRÊN (COCKPIT HEADER) */}
-      <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-          {/* Cụm Logo & Điều hướng quay lại */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
-              <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                A
-              </div>
-              <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                ATI
-              </span>
-            </a>
-            <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5 flex-shrink-0" title="Quay lại không gian làm việc" aria-label="Quay lại không gian làm việc">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span className="hidden sm:inline">
-                Về không gian làm việc
-              </span>
-            </a>
-            <div className="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/history" onClick={event => { event.preventDefault(); navigate("/history"); }} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {' '}
-              <span>
-                Nhật ký
-              </span>
-            </a>
-            <a href="/settings" onClick={event => { event.preventDefault(); navigate("/settings"); }} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              {' '}
-              <span>
-                Kết nối dịch vụ
-              </span>
-            </a>
-          </div>
-          {/* Cụm Trạng thái Vai trò & Điều khiển Demo */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Nhãn vai trò hiện tại */}
-            <div id="role-pill-badge" className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-[#E7E7E2] text-[#4B5563] shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" id="role-indicator-dot" />
-              {' '}
-              <span id="header-role-display">
-                {roleName}
-              </span>
-            </div>
-<ThemeToggle /><UserNavMenu user={user} variant="prototype" triggerClassName="w-8 h-8 rounded-full bg-[#FF5701] text-white text-xs font-bold flex items-center justify-center shadow-sm flex-shrink-0 hover:opacity-90" menuItemClassName="flex w-full text-left items-center gap-2.5 px-4 py-2 text-xs text-[#111827] dark:text-slate-50 hover:bg-neutral-100 dark:hover:bg-slate-700 hover:text-[#FF5701] focus:bg-neutral-100 dark:focus:bg-slate-700 focus:text-[#FF5701] focus:outline-none transition-colors" navigate={navigate} onOpenSettings={() => navigate("/settings")} onOpenAccount={() => navigate("/account")} onManageUsers={() => navigate("/admin/users")} onLogout={onLogout} />
-          </div>
-        </div>
-      </header>
+      {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
+      <MainNav user={user} current={null} pageName="Tài khoản" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
         {!modal && error && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}

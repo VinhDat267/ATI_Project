@@ -5,6 +5,7 @@ import type { PlanStep,ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
+import { RequestEcho } from './RequestEcho';
 interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;destination:(step:PlanStep,labels?:Record<string,string>)=>string}
 function ReceiptCard({step,index,services,planSteps,labels,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
@@ -85,7 +86,7 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({terminalStatus,steps,planSteps,services,labels,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
+export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
  const cardProps={services,planSteps,labels,destination};
@@ -97,6 +98,7 @@ export function ReceiptMoment({terminalStatus,steps,planSteps,services,labels,de
               </svg>
             </div>
             <div>
+              <RequestEcho request={request} />
               <h1 id="heading-moment-6" className="font-display text-3xl sm:text-4xl lg:text-[42px] text-brand-text font-normal tracking-tight" tabIndex={-1}>
                 {terminalStatus ? terminalStatus==='stopped'?'Kế hoạch đã dừng':terminalStatus==='rejected'?'Kế hoạch đã hủy':'Kế hoạch chưa hoàn thành' : <>Đã xong {steps.filter(step=>step.status==='succeeded').length} việc trên {new Set(steps.filter(step=>step.status==='succeeded').map(step=>serviceId(step.tool))).size} công cụ</>}
               </h1>

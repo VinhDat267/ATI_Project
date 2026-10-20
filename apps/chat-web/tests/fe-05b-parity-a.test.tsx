@@ -134,7 +134,7 @@ it('FE-05b uses the app-stage page metadata, source ids and request card', async
   cleanup();
   expect(document.documentElement).not.toHaveAttribute('data-proto-page');
 });
-it('FE-05b renders actual discovery and request within the compact header without estimates', () => {
+it('FE-05b renders actual discovery and request in the discovery heading without estimates', () => {
   useChatStore.setState({
     isPlanning: true,
     messages: [{ id: 'u', role: 'user', content: 'Tạo issue kiểm tra' }],
@@ -152,10 +152,9 @@ it('FE-05b renders actual discovery and request within the compact header withou
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
     'Tạo issue kiểm tra',
   );
-  expect(document.querySelector('header #top-bar-query')).toHaveAttribute(
-    'title',
-    'Tạo issue kiểm tra',
-  );
+  // FE-12: the request left the top bar; discovery already shows it in its heading, so no extra request line.
+  expect(within(screen.getByRole('banner')).queryByText('Tạo issue kiểm tra')).toBeNull();
+  expect(document.querySelector('[data-request-echo]')).toBeNull();
   expect(document.querySelector('#discovery-steps-list')).toHaveTextContent(
     'ati/test',
   );
@@ -200,7 +199,8 @@ it('FE-05b no configured service replaces suggestions with the required settings
   expect(
     screen.getByText('Chưa có dịch vụ nào được kết nối'),
   ).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Kết nối dịch vụ' })).toHaveAttribute(
+  // FE-12: the shared bar also has a Kết nối dịch vụ tab; this checks the guidance link in the moment.
+  expect(within(screen.getByRole('main')).getByRole('link', { name: 'Kết nối dịch vụ' })).toHaveAttribute(
     'href',
     '/settings',
   );
@@ -212,7 +212,7 @@ it.each([
   setup([], { loading, error });
   expect(screen.getByRole('status')).toHaveTextContent(status);
   expect(screen.queryByText('Chưa có dịch vụ nào được kết nối')).toBeNull();
-  expect(screen.queryByRole('link', { name: 'Kết nối dịch vụ' })).toBeNull();
+  expect(within(screen.getByRole('main')).queryByRole('link', { name: 'Kết nối dịch vụ' })).toBeNull();
 });
 const connected = [
     { id: 'trello', name: 'Trello' },

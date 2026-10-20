@@ -51,12 +51,13 @@ it('SSE refusal retains server metadata for service-specific admin navigation', 
 });
 it('multiple unavailable services send the admin to the whole settings page', async () => {
   refusal([{ id: 'notion', name: 'Notion' }, { id: 'jira', name: 'Jira' }]); view();
-  expect(await screen.findByRole('link', { name: 'Kết nối dịch vụ' })).toHaveAttribute('href', '/settings');
+  // FE-12: scoped to the response; the shared bar has its own Kết nối dịch vụ tab.
+  expect(await within(screen.getByRole('main')).findByRole('link', { name: 'Kết nối dịch vụ' })).toHaveAttribute('href', '/settings');
 });
 it('a member sees the admin instruction and cannot connect services', async () => {
   refusal([{ id: 'notion', name: 'Notion' }]); view('member');
   expect(await screen.findByText(/Chỉ quản trị viên kết nối được dịch vụ mới/)).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: /Kết nối/ })).toBeNull();
+  expect(within(screen.getByRole('main')).queryByRole('link', { name: /Kết nối/ })).toBeNull();
 });
 it('legacy refusal keeps its reason, edits the original request and sends nothing until submitted', async () => {
   useChatStore.setState({ messages: [{ id: 'u', role: 'user', content: prompt }, { id: 'r', role: 'assistant', content: 'Từ chối yêu cầu: Không hỗ trợ việc này.\nGợi ý: Hãy lưu trữ.', metadata: { type: 'refusal' } }] });

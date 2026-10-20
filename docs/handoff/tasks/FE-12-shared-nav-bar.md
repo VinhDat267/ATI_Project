@@ -67,8 +67,10 @@ Máy tính (≥ 1280 px), cockpit đang có yêu cầu (admin):
 | Độ rộng | Tab | Hai nút của cockpit |
 |---|---|---|
 | ≥ 1280 px | chữ đầy đủ | chữ + biểu tượng ("Lịch sử", "Xem hội thoại 4") |
-| 768–1279 px | chữ rút gọn: "Làm việc", "Nhật ký", "Kết nối", "Cẩm nang", "Người dùng" | chỉ biểu tượng; "Xem hội thoại" vẫn có số tin |
-| < 768 px | ẩn; trang con ghi tên trang đang mở cạnh logo; đi trang khác qua menu avatar | chỉ biểu tượng, như hiện nay |
+| 900–1279 px | chữ rút gọn: "Làm việc", "Nhật ký", "Kết nối", "Cẩm nang", "Người dùng" | chỉ biểu tượng; "Xem hội thoại" vẫn có số tin |
+| < 900 px | ẩn; trang con ghi tên trang đang mở cạnh logo; đi trang khác qua menu avatar | chỉ biểu tượng, như hiện nay |
+
+Mốc ẩn tab ban đầu là 768 px. Ngày 20/10/2026 nhóm trưởng chốt đổi sang 900 px, sau review #162: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh.
 
 - **Tên truy cập của tab luôn là tên đầy đủ**, kể cả khi chữ hiển thị được rút gọn. Ví dụ tab "Kết nối" vẫn có tên truy cập "Kết nối dịch vụ".
 - **Không chồng lấn, không cuộn ngang:** ở mọi khổ, tab, logo và cụm phải không đè lên nhau, và trang không cuộn ngang. Ca khó nhất là cockpit của admin có 5 tab và "Xem hội thoại 99" ở 1280 px và 1024 px.
@@ -149,3 +151,31 @@ Máy tính (≥ 1280 px), cockpit đang có yêu cầu (admin):
 - Dòng "Bạn nhờ" lấy câu gốc thay vì tin mới nhất sau khi "Sửa qua Chat". Giữ cách chọn câu như thanh hiện nay.
 
 ## Kết quả (agent thi công điền)
+
+- **PR:** nhánh `feat/fe-12-shared-nav-bar`, tách từ `docs/fe-12-nav-bar` (#161). Reviewer thi công theo yêu cầu nhóm trưởng ngày 19/10. [Log](../log/2026-10-19-reviewer-FE-12-shared-nav-bar.md).
+- **Đã làm:**
+  - `components/layout/MainNav.tsx`: thanh dùng chung theo mục 1–2; lưới `1fr auto 1fr`, các cụm ghim cột.
+  - `pages/Cockpit/RequestEcho.tsx`: dòng "Bạn nhờ".
+  - `CockpitHeader.tsx` dựng trên `MainNav`: hai nút ngăn thành `actions`, dải thử nghiệm thành `children`, bỏ khối "Yêu cầu hiện tại".
+  - Khoảnh khắc 3, 4, 5, 6, kết thúc không thành công, 7–9 và lập kế hoạch lâu có dòng "Bạn nhờ" ngay trên `h1`.
+  - Sáu trang con dùng `MainNav`. Cẩm nang và Chính sách an toàn chỉ khi đã đăng nhập.
+  - `FE-12:` thêm vào nhóm default của runner browser.
+- **Test:**
+  - TDD: hai file test unit viết trước, RED (lỗi import và 11 ca fail), GREEN 28/28.
+  - Test browser mới `fe-12-nav.spec.ts`, 4 ca: đi mọi tab từ mọi trang; bố cục ở 1440/1280/1024/375, sáng/tối; thành viên và menu avatar trên điện thoại; dòng "Bạn nhờ" và hai ngăn trong cockpit thật.
+  - Sửa 7 test cũ khẳng định thanh cũ, mỗi chỗ ghi lý do trong log.
+- **Đột biến:** 8/8 mức unit bị bắt. Mức trình duyệt 2/3 bị bắt; đột biến bỏ `whitespace-nowrap` sống sót vì tương đương ở các khổ đang đo (log ghi rõ).
+- **Lệnh kiểm:**
+  - `npm run check` exit 0: **2.042 v3 + 389 eval**;
+  - `npm run test:browser:v3` exit 0: **119 pass, 1 skip có chủ đích, 13 nhóm**. Lượt đầu có 4 fail ở FE-05 do lỗi reviewer chèn chú thích giữa dòng khi sửa test; đã sửa;
+  - PostgreSQL 16 tạm ở 55533, sandbox.
+- **Ảnh trước/sau:** 54 + 54 ảnh, 9 màn × 3 khổ × sáng/tối, ở `.codex/fe12-screenshots-2026-10-19/` của máy nhóm trưởng (ignore). SHA-256 manifest ghi trong log. **Nhóm trưởng xem bộ ảnh trước khi merge.**
+- **Khác task card:**
+  - nút sáng/tối của cockpit dùng `ThemeToggle` chung, nên `#btn-theme-toggle` không còn;
+  - bề rộng thanh chọn `max-w-7xl`. Ở 1280 px, cụm phải của cockpit cần 330 px, nên khoảng cách giữa các tab là `gap-1` và giữa các cột là `gap-2`;
+  - không xoá `AppShell.tsx`/`ShellPageView.tsx` (tuỳ chọn).
+- **Sửa sau review độc lập lần 1** (tại `71bb895`, chưa đạt: 1 P2, 1 P3), 20/10. [Log sửa](../log/2026-10-20-reviewer-FE-12-review-fixes.md).
+  - P2: câu yêu cầu liền ký tự (ví dụ một link dài) làm màn đang thực thi tràn ngang, 375 px thành 2.568 px. Cột chữ của `ExecutionMoment` thêm `min-w-0 flex-1`.
+  - P3: tab lệch tâm 48 px ở 768 px trên cockpit của admin. Nhóm trưởng chốt hiện tab từ 900 px (mục 2).
+  - Test browser mới cho câu dài ở 7 khoảnh khắc; test bố cục đo thêm 900, 899 và 768 px. 4/4 đột biến bị bắt.
+  - `npm run check` exit 0, 2.042 v3 + 389 eval; `npm run test:browser:v3` exit 0 ngay lượt đầu, 120 pass, 1 skip có chủ đích, 13 nhóm.

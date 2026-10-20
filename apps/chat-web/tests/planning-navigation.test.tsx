@@ -311,7 +311,8 @@ it('sends a message typed while New conversation is pending into that conversati
   await waitFor(() => expect(sends.map(row => [row.convId, row.content])).toEqual([['c-new', 'Plan in the new conversation']]));
   expect(creations).toHaveLength(1);
   expect(window.location.pathname).toBe('/c/c-new');
-  expect(screen.getByText('Plan in the new conversation')).toBeInTheDocument();
+  // FE-12: the request left the top bar; while planning, discovery shows it in its heading.
+  expect(document.querySelector('#moment-2-query-display')).toHaveTextContent('Plan in the new conversation');
   expect(screen.getByText('Đang lập kế hoạch…')).toBeInTheDocument();
 });
 it('sends into the pending new conversation instead of the conversation being left', async () => {

@@ -1,8 +1,7 @@
 // Ported from PROTO-01 SettingsPage: source markup/classes and page.css retained.
 import { useEffect, useState, useLayoutEffect, useRef } from 'react';
+import { MainNav } from '../../components/layout/MainNav';
 import { usePrototypePage } from '../../prototype/usePrototypePage';
-import { ThemeToggle } from '../../prototype/ThemeToggle';
-import { UserNavMenu } from '../../components/layout/UserNavMenu';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import type { User } from '../../types';
 import { type Service } from './data';
@@ -116,7 +115,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       document.getElementById(`service-row-${id}`)?.focus();
     };
   }, [active?.id]);
-  const role = user?.role ?? 'member', drawer = active ? { service: active } : null, badge = active;
+  const drawer = active ? { service: active } : null, badge = active;
   const configured = list.filter(s => s.configured), unconfigured = list.filter(s => !s.configured), okCount = configured.filter(s => s.statusType === 'ok').length;
   const hasCatalogue = list.length > 0;
   const isMemberDrawer = !canEdit, scopeLabel = active?.scopeLabel;
@@ -133,66 +132,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
       if (anchor && anchor.origin === window.location.origin && !anchor.target && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(`${anchor.pathname}${anchor.search}${anchor.hash}`); }
     }}>
-      {/* THANH TRÊN (COCKPIT HEADER) */}
-      <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-          {/* Cụm Logo & Điều hướng quay lại */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <a href="/" className="flex items-center gap-2.5 group flex-shrink-0" title="Về sân khấu điều phối">
-              <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                A
-              </div>
-              <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                ATI
-              </span>
-            </a>
-            <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span className="hidden sm:inline">
-                Về không gian làm việc
-              </span>
-              <span className="sm:hidden">
-                Quay lại
-              </span>
-            </a>
-            <div className="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/history" className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {' '}
-              <span>
-                Nhật ký
-              </span>
-            </a>
-            <div className="hidden md:block h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/guide" className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title={"Cẩm nang kết nối & Mẫu câu lệnh"}>
-              <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              {' '}
-              <span>
-                Cẩm nang
-              </span>
-            </a>
-          </div>
-          {/* Cụm Trạng thái Vai trò & Điều khiển */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Nhãn vai trò hiện tại */}
-            <div id="role-pill-badge" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-[#E7E7E2] text-[#4B5563] shadow-sm">
-              <span className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-[#16A34A]' : 'bg-[#6B7280]'}`} id="role-indicator-dot" />
-              <span id="role-name-display">
-                {role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-              </span>
-            </div>
-            <ThemeToggle />
-            <UserNavMenu variant="prototype" user={user} navigate={navigate} onOpenSettings={() => navigate('/settings')} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
-          </div>
-        </div>
-      </header>
+      {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
+      <MainNav user={user} current="settings" pageName="Kết nối dịch vụ" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
         {/* Tiêu đề trang & Nguyên tắc */}

@@ -2,6 +2,7 @@
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { GatherState, ServiceInfo } from '../../types';
+import { RequestEcho } from '../Cockpit/RequestEcho';
 const primary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#e04d00] text-white text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5';
 const secondary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-50 text-[#111827] text-xs font-medium border border-[#E7E7E2] transition-colors';
 export const latePlanNotice = 'Nếu kế hoạch đến sau, nó vẫn nằm trong hội thoại và chưa chạy cho tới khi bạn duyệt.';
@@ -14,13 +15,14 @@ function PlanningSafetyNotice({ slow = false }: { slow?: boolean }) {
     <p className={slow ? '' : 'text-xs text-emerald-800 leading-relaxed'}><strong>Chưa có gì được ghi lên công cụ nào.</strong>{slow && ' Hệ thống chỉ mới đang ở bước đọc thông tin để lên kế hoạch.'}</p>
   </div>;
 }
-export function SlowPlanningMoment({ seconds, gather, services, onDismiss }: { seconds: number; gather: GatherState | null; services: ServiceInfo[]; onDismiss: () => void }) {
+export function SlowPlanningMoment({ request, seconds, gather, services, onDismiss }: { request?: string; seconds: number; gather: GatherState | null; services: ServiceInfo[]; onDismiss: () => void }) {
   return <section id="view-timeout" data-moment="2" aria-label="Cockpit" className="v3-space-y-6">
     <div className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-soft max-w-2xl mx-auto v3-space-y-6">
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-xl bg-orange-50 text-[#FF5701] flex items-center justify-center flex-shrink-0 border border-orange-200"><ErrorIcon slow /></div>
         <div className="v3-space-y-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wide">Đang lập kế hoạch</span><span className="text-xs font-mono text-[#FF5701] font-bold">Thời gian chờ: <span id="timer-seconds-display">{seconds}</span>s</span></div>
+          <RequestEcho request={request} />
           <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">ATI đang suy nghĩ lâu hơn thường lệ</h1>
           <p className="text-sm text-[#4B5563] leading-relaxed">ATI chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
         </div>
