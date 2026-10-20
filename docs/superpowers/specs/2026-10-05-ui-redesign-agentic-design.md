@@ -42,6 +42,12 @@
 7. **Màn chưa có bản mẫu** (kết thúc không thành công) theo bố cục gần nhất (khoảnh khắc 6).
 8. **Route:** app giữ các route hiện có (`/c/:id`, `/login`, `/signup`, `/forgot-password`, `/verify-email`, `/reset-password`, `/auth/google/callback`, `/admin/users`…) vì link trong email và luồng Google dùng chúng. Link giữa các trang của bản React (ví dụ `/app-stage`, `/users`) đổi sang route tương ứng của app (mục 2).
 9. **Dải "Chế độ thử nghiệm"** hiện theo `runtimeMode` của API (FE-01), không theo menu demo.
+10. **Thanh điều hướng chung** (nhóm trưởng chốt 19/10/2026, [FE-12](../../handoff/tasks/FE-12-shared-nav-bar.md)):
+    - mọi trang sau khi đăng nhập dùng một thanh trên, kể cả cockpit. Logo ở trái, các tab Không gian làm việc · Nhật ký · Kết nối dịch vụ · Cẩm nang · Người dùng (chỉ quản trị viên) căn giữa thanh, nút Sáng/Tối và avatar ở phải;
+    - bỏ nút "← Về không gian làm việc", các link chéo và nhãn vai trò của bản mẫu;
+    - ở cockpit, nút Lịch sử và Xem hội thoại lên cụm phải. Câu "Yêu cầu hiện tại" rời thanh và thành một dòng nhỏ "Bạn nhờ: “…”" trên tiêu đề của khoảnh khắc.
+
+    Bản mẫu HTML và bản React trong `docs/` **không sửa** theo điểm này. Đây là ngoại lệ có chủ đích của mục 1.2 điểm 4.
 
 Bỏ so với bản 06/10: điểm 4 cũ (chữ tối thiểu 14px, tiêu đề tối đa 40px) và điểm 5 cũ (token màu của app, nền `#F6F6F1`, chế độ tối theo token, chữ `#111827` trên nền cam).
 
@@ -144,7 +150,7 @@ Màu nhận diện dịch vụ (Trello `#0079BF`, Slack, GitHub…) chỉ dùng 
 - Giữ router hiện tại (`routes.ts`, không thêm thư viện). Thêm các route: `/settings`, `/history`, `/guide`, `/privacy`.
 - `/privacy` và `/guide` xem được khi chưa đăng nhập; các route còn lại như hiện tại.
 - Link trong email (`/verify-email`, `/reset-password`, `/?view=…`) giữ nguyên đường dẫn và tham số.
-- Thanh trên của mọi trang đã đăng nhập: logo (về cockpit), nút lịch sử, nút giao diện Sáng/Tối, avatar mở menu người dùng. Menu người dùng gồm: Nhật ký điều phối, Kết nối dịch vụ, Cẩm nang, Tài khoản, Quản lý người dùng (chỉ quản trị viên), Chính sách an toàn, Đăng xuất. Không có "Đăng xuất mọi thiết bị" trong menu; tính năng này ở trang Tài khoản.
+- Thanh trên của mọi trang đã đăng nhập: logo (về cockpit), nút lịch sử, nút giao diện Sáng/Tối, avatar mở menu người dùng. **Từ FE-12 (chốt 19/10/2026):** thanh chung có các tab căn giữa, xem mục 1.1 điểm 10 và [task card FE-12](../../handoff/tasks/FE-12-shared-nav-bar.md); nút lịch sử chỉ có ở cockpit. Menu người dùng gồm: Nhật ký điều phối, Kết nối dịch vụ, Cẩm nang, Tài khoản, Quản lý người dùng (chỉ quản trị viên), Chính sách an toàn, Đăng xuất. Không có "Đăng xuất mọi thiết bị" trong menu; tính năng này ở trang Tài khoản.
 - Chữ viết tắt trên avatar lấy chữ cái đầu của từ đầu và từ cuối trong tên ("Lan Nguyễn" → "LN"), không phải hai ký tự đầu.
 
 ## 5. Cockpit: trạng thái thật → khoảnh khắc
