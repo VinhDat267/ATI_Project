@@ -1,6 +1,6 @@
 # FE-12 · Thanh điều hướng chung cho mọi trang sau khi đăng nhập
 
-**Trạng thái:** đang làm, giao reviewer ngày 19/10/2026 theo yêu cầu nhóm trưởng · **Nhánh gợi ý:** `feat/fe-12-shared-nav-bar` · **Phụ thuộc:** không · **Mốc:** merge trước **29/10/2026** (mốc ngừng thêm tính năng); **không merge trong 23–25/10** (buổi thử W4-03 chạy trên giao diện hiện tại). Nên mở PR trước 22/10 hoặc trong 26–28/10.
+**Trạng thái:** **xong**, #162 (`6307962`, merge 20/10/2026); kế hoạch #161 (`729577f`). Reviewer thi công theo yêu cầu nhóm trưởng ngày 19/10/2026 · **Nhánh gợi ý:** `feat/fe-12-shared-nav-bar` · **Phụ thuộc:** không · **Mốc:** merge trước **29/10/2026** (mốc ngừng thêm tính năng); **không merge trong 23–25/10** (buổi thử W4-03 chạy trên giao diện hiện tại). Nên mở PR trước 22/10 hoặc trong 26–28/10.
 **Nguồn:** nhóm trưởng chốt ngày 19/10/2026 sau khi xem mockup trong phiên lập kế hoạch với reviewer ([log](../log/2026-10-19-reviewer-plan-fe-12-nav.md)).
 
 ## Vì sao làm
