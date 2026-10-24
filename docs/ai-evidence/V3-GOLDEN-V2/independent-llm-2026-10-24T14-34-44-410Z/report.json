@@ -1,0 +1,1505 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "independent",
+  "searchMode": "llm",
+  "readAnswers": false,
+  "labels": {
+    "file": "golden-independent/cases.json",
+    "commit": "2cdaf90a6215ac541bc077d57e4d89a4fcac7fe7",
+    "sha256": "c4425f512ac037eb82aa24fca8df023c280775e8e487cf0292f5364d879f7959",
+    "version": 1,
+    "cases": 32,
+    "selectedCases": 32
+  },
+  "sourceCommit": "2cdaf90a6215ac541bc077d57e4d89a4fcac7fe7",
+  "sourceTrees": {
+    "packages/planner": "c690f5e8bf8d27128a609952bc9816fb28e7e6a7",
+    "packages/tool-schemas": "d4c23482af2dcc6a072bd982526104217269b7c5"
+  },
+  "fixtureSha256": "a021ffc7a3e66cf9efc700450f6d79432617e1473b5c741739cfcc2393d8f051",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 7,
+  "plannedCaseRuns": 96,
+  "concurrency": 2,
+  "startedAt": "2026-10-24T14:34:44.410Z",
+  "runAt": "2026-10-24T14:35:49.692Z",
+  "stopped": true,
+  "pendingIds": [
+    "m1-08",
+    "m2-01",
+    "m2-02",
+    "m2-03",
+    "m2-04",
+    "m2-05",
+    "m2-06",
+    "m2-07",
+    "m2-08",
+    "m3-01",
+    "m3-02",
+    "m3-03",
+    "m3-04",
+    "m3-05",
+    "m3-06",
+    "m3-07",
+    "m3-08",
+    "m4-01",
+    "m4-02",
+    "m4-03",
+    "m4-04",
+    "m4-05",
+    "m4-06",
+    "m4-07",
+    "m4-08"
+  ],
+  "stopReason": "Model request timed out",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "jira": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "github": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "trello": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "telegram": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "calendar": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.7142857142857143,
+        "toolSelectionAccuracy": 0.8333333333333334,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 0.8571428571428571,
+        "strictPassRate": 0.7142857142857143
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.7142857142857143,
+      "toolSelectionAccuracy": 0.8333333333333334,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 0.8571428571428571,
+      "strictPassRate": 0.7142857142857143
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "multi_step": {
+        "cases": 2,
+        "strictPassRate": 0.5
+      },
+      "cross_service": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "clarification": {
+        "cases": 1,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {
+      "slack": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 2,
+        "argumentAttempts": 2,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 5235,
+          "p95": 11735
+        }
+      },
+      "jira": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 13354,
+          "p95": 13354
+        }
+      },
+      "github": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 60034,
+          "p95": 60034
+        }
+      },
+      "trello": {
+        "cases": 3,
+        "attempts": 3,
+        "scoredAttempts": 2,
+        "argumentAttempts": 2,
+        "runs": [
+          {
+            "kindAccuracy": 0.6666666666666666,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.6666666666666666
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.6666666666666666,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.6666666666666666
+        },
+        "latencyMs": {
+          "p50": 10145,
+          "p95": 23736
+        }
+      },
+      "telegram": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 10145,
+          "p95": 10145
+        }
+      },
+      "calendar": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 11735,
+          "p95": 11735
+        }
+      }
+    },
+    "stability": {
+      "m1-01": "1/1",
+      "m1-02": "1/1",
+      "m1-03": "0/1",
+      "m1-04": "1/1",
+      "m1-05": "1/1",
+      "m1-06": "1/1",
+      "m1-07": "0/1"
+    },
+    "latencyMs": {
+      "p50": 11735,
+      "p95": 60034,
+      "max": 60034
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 7,
+    "attempts": 8,
+    "timeouts": 2,
+    "searchRounds": 0,
+    "directoryCalls": 29,
+    "attemptDistribution": {
+      "1": 6,
+      "2": 1
+    },
+    "retryReasons": {
+      "timeout": 1
+    },
+    "timeMs": {
+      "total": 130476,
+      "model": 130273.93569999997,
+      "prefetch": 25.224299999998834,
+      "search": 0,
+      "gather": 0,
+      "other": 176.84000000002845
+    },
+    "timeShare": {
+      "model": 0.9984513297464666,
+      "prefetch": 0.00019332520923387317,
+      "search": 0,
+      "gather": 0,
+      "other": 0.0013553450442995527
+    },
+    "under15Seconds": {
+      "count": 5,
+      "total": 7,
+      "rate": 0.7142857142857143
+    }
+  },
+  "responses": {
+    "answers": {
+      "count": 0,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "modelCalls": {
+        "mean": null,
+        "max": 0,
+        "distribution": {}
+      },
+      "withoutLookups": 0
+    },
+    "plans": {
+      "count": 5,
+      "latencyMs": {
+        "p50": 10145,
+        "p95": 13354,
+        "max": 13354
+      }
+    },
+    "answeredActionCases": [],
+    "gmailPromptChars": {
+      "calls": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "m1-01",
+          "category": "single_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 5235,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Gửi tin nhắn thông báo bảo trì bằng slack.send_message.",
+            "summary": "Gửi tin nhắn bảo trì vào kênh release trên Slack.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo bảo trì kênh release",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "Server bảo trì lúc 23h đêm nay"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 5149.3423,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002800000000206637,
+                  "durationMs": 5148.9852,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4107,
+                "completionTokens": 95,
+                "reasoningTokens": 161
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 81.94920000000002,
+              "promptChars": 7472
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 61.01310000000001,
+              "durationMs": 20.33669999999995
+            }
+          ]
+        },
+        {
+          "id": "m1-02",
+          "category": "single_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 13354,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using jira.add_comment to comment on the Jira issue.",
+            "summary": "Add a comment to Jira issue API-42.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "jira.add_comment",
+                "description": "Add comment to Jira issue",
+                "args": {
+                  "issueKey": "API-42",
+                  "body": "Investigating the root cause"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 13331.5952,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001099999999951251,
+                  "durationMs": 13331.5179,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6575,
+                "completionTokens": 86,
+                "reasoningTokens": 1211
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 21.917299999999955,
+              "promptChars": 12749
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 17.267900000000054,
+              "durationMs": 1.8777999999999793
+            }
+          ]
+        },
+        {
+          "id": "m1-03",
+          "category": "multi_step",
+          "author": "member-1",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60034,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60007.03629999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0014000000001033186,
+                  "durationMs": 30004.0815,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30004.090399999997,
+                  "durationMs": 30002.773100000006,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 25.927599999999984,
+              "promptChars": 9808
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 25.348800000000665,
+              "durationMs": 0.4808999999995649
+            }
+          ]
+        },
+        {
+          "id": "m1-04",
+          "category": "multi_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6237,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create card in Backend Backlog and add checklist using trello.create_card and trello.add_checklist.",
+            "summary": "Create 'Prepare release v1.2' in Backend Backlog and add checklist 'Deployment steps'.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Create card in Backlog",
+                "args": {
+                  "listId": "list_be_backlog",
+                  "title": "Prepare release v1.2"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "trello.add_checklist",
+                "description": "Add checklist Deployment steps",
+                "args": {
+                  "cardId": {
+                    "$ref": "step_1.output.id"
+                  },
+                  "title": "Deployment steps"
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 6201.744400000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0011000000013154931,
+                  "durationMs": 6201.638500000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6068,
+                "completionTokens": 163,
+                "reasoningTokens": 270
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 35.54099999999926,
+              "promptChars": 13786
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 34.15099999999984,
+              "durationMs": 1.147399999999834
+            }
+          ]
+        },
+        {
+          "id": "m1-05",
+          "category": "cross_service",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 10145,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use trello.create_card and telegram.send_message.",
+            "summary": "Tạo task trên Trello và thông báo qua Telegram",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ trên Trello",
+                "args": {
+                  "listId": "list_be_todo",
+                  "title": "Cập nhật tài liệu API"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "telegram.send_message",
+                "description": "Gửi thông báo vào Telegram",
+                "args": {
+                  "chatId": "-1009876543210",
+                  "text": {
+                    "$template": "Đã tạo task 'Cập nhật tài liệu API': ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 10125.327299999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999976775143,
+                  "durationMs": 10125.2316,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7681,
+                "completionTokens": 170,
+                "reasoningTokens": 791
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 18.54030000000057,
+              "promptChars": 17417
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 17.696899999999005,
+              "durationMs": 0.7027999999991152
+            }
+          ]
+        },
+        {
+          "id": "m1-06",
+          "category": "cross_service",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 11735,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using calendar.create_event and slack.send_message.",
+            "summary": "Schedule the Sprint Review meeting in the Team calendar and announce it in the general Slack channel.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Sprint Review calendar event",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Sprint Review",
+                  "start": "2026-09-30T14:00:00+07:00",
+                  "end": "2026-09-30T15:00:00+07:00"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Post meeting alert to Slack",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": {
+                    "$template": "Sprint Review meeting has been scheduled for tomorrow from 14:00 to 15:00: ${step_1.output.url}"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 11726.197900000003,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999990919605,
+                  "durationMs": 11726.131800000003,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5832,
+                "completionTokens": 224,
+                "reasoningTokens": 876
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 9.117699999998877,
+              "promptChars": 10426
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 8.666700000001583,
+              "durationMs": 0.3834999999999127
+            }
+          ]
+        },
+        {
+          "id": "m1-07",
+          "category": "clarification",
+          "author": "member-1",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 23736,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 23732.692300000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999990919605,
+                  "durationMs": 23732.4507,
+                  "outcome": "cancelled"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 2.820899999998801,
+              "promptChars": 13696
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 2.4663000000000466,
+              "durationMs": 0.2952000000004773
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

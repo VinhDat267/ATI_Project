@@ -1,0 +1,830 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "independent",
+  "searchMode": "regex",
+  "readAnswers": false,
+  "labels": {
+    "file": "golden-independent/cases.json",
+    "commit": "2cdaf90a6215ac541bc077d57e4d89a4fcac7fe7",
+    "sha256": "c4425f512ac037eb82aa24fca8df023c280775e8e487cf0292f5364d879f7959",
+    "version": 1,
+    "cases": 32,
+    "selectedCases": 32
+  },
+  "sourceCommit": "2cdaf90a6215ac541bc077d57e4d89a4fcac7fe7",
+  "sourceTrees": {
+    "packages/planner": "c690f5e8bf8d27128a609952bc9816fb28e7e6a7",
+    "packages/tool-schemas": "d4c23482af2dcc6a072bd982526104217269b7c5"
+  },
+  "fixtureSha256": "a021ffc7a3e66cf9efc700450f6d79432617e1473b5c741739cfcc2393d8f051",
+  "catalogSha256": "8e14ff40f2dd15760798b2050e46af93edd6d4cfc9682957dcdd55ed8b33f0ce",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 6,
+  "plannedCaseRuns": 96,
+  "concurrency": 2,
+  "startedAt": "2026-10-24T14:35:50.914Z",
+  "runAt": "2026-10-24T14:37:03.324Z",
+  "stopped": true,
+  "pendingIds": [
+    "m1-07",
+    "m1-08",
+    "m2-01",
+    "m2-02",
+    "m2-03",
+    "m2-04",
+    "m2-05",
+    "m2-06",
+    "m2-07",
+    "m2-08",
+    "m3-01",
+    "m3-02",
+    "m3-03",
+    "m3-04",
+    "m3-05",
+    "m3-06",
+    "m3-07",
+    "m3-08",
+    "m4-01",
+    "m4-02",
+    "m4-03",
+    "m4-04",
+    "m4-05",
+    "m4-06",
+    "m4-07",
+    "m4-08"
+  ],
+  "stopReason": "Model request timed out",
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "slack": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": true
+    },
+    "jira": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "github": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "trello": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "telegram": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "calendar": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.5,
+        "toolSelectionAccuracy": 0.5,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 0.3333333333333333,
+        "strictPassRate": 0.5
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.5,
+      "toolSelectionAccuracy": 0.5,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 0.3333333333333333,
+      "strictPassRate": 0.5
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "multi_step": {
+        "cases": 2,
+        "strictPassRate": 0.5
+      },
+      "cross_service": {
+        "cases": 2,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {
+      "slack": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 2,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 0.5,
+            "toolSelectionAccuracy": 0.5,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 0.5,
+            "strictPassRate": 0.5
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.5,
+          "toolSelectionAccuracy": 0.5,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 0.5,
+          "strictPassRate": 0.5
+        },
+        "latencyMs": {
+          "p50": 3678,
+          "p95": 36890
+        }
+      },
+      "jira": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 35504,
+          "p95": 35504
+        }
+      },
+      "github": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 8658,
+          "p95": 8658
+        }
+      },
+      "trello": {
+        "cases": 2,
+        "attempts": 2,
+        "scoredAttempts": 2,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 0,
+          "p95": 60063
+        }
+      },
+      "telegram": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 60063,
+          "p95": 60063
+        }
+      },
+      "calendar": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 0,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0,
+          "toolSelectionAccuracy": 0,
+          "argumentQuality": null,
+          "argumentMatcherRate": 0,
+          "strictPassRate": 0
+        },
+        "latencyMs": {
+          "p50": 36890,
+          "p95": 36890
+        }
+      }
+    },
+    "stability": {
+      "m1-01": "1/1",
+      "m1-02": "1/1",
+      "m1-03": "1/1",
+      "m1-04": "0/1",
+      "m1-05": "0/1",
+      "m1-06": "0/1"
+    },
+    "latencyMs": {
+      "p50": 8658,
+      "p95": 60063,
+      "max": 60063
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 5,
+    "attempts": 8,
+    "timeouts": 4,
+    "searchRounds": 0,
+    "directoryCalls": 0,
+    "attemptDistribution": {
+      "1": 2,
+      "2": 3
+    },
+    "retryReasons": {
+      "timeout": 3
+    },
+    "timeMs": {
+      "total": 144793,
+      "model": 144579.1589,
+      "prefetch": 0,
+      "search": 0,
+      "gather": 65.26040000000125,
+      "other": 148.5806999999893
+    },
+    "timeShare": {
+      "model": 0.9985231254273342,
+      "prefetch": 0,
+      "search": 0,
+      "gather": 0.00045071515888199884,
+      "other": 0.0010261594137837417
+    },
+    "under15Seconds": {
+      "count": 3,
+      "total": 6,
+      "rate": 0.5
+    }
+  },
+  "responses": {
+    "answers": {
+      "count": 0,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "modelCalls": {
+        "mean": null,
+        "max": 0,
+        "distribution": {}
+      },
+      "withoutLookups": 0
+    },
+    "plans": {
+      "count": 3,
+      "latencyMs": {
+        "p50": 8658,
+        "p95": 35504,
+        "max": 35504
+      }
+    },
+    "answeredActionCases": [],
+    "gmailPromptChars": {
+      "calls": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "m1-01",
+          "category": "single_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 3678,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send maintenance notice to release Slack channel using slack.send_message.",
+            "summary": "Gửi tin nhắn bảo trì vào kênh Slack release",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo bảo trì lên kênh release",
+                "args": {
+                  "channel": "C_RELEASE",
+                  "text": "Server bảo trì lúc 23h đêm nay"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "release",
+                "limit": 5
+              },
+              "result": [
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "gather"
+            }
+          ],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 3586.7177999999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.005999999999858119,
+                  "durationMs": 3586.6261999999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 3336,
+                "completionTokens": 93,
+                "reasoningTokens": 67
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 88.41190000000006,
+              "promptChars": 4598
+            }
+          ],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.055399999999963256,
+              "durationMs": 57.69479999999999
+            }
+          ]
+        },
+        {
+          "id": "m1-02",
+          "category": "single_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 35504,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "thinking": "Use jira.add_comment to post a comment to issue API-42.",
+            "kind": "plan",
+            "summary": "Add comment to Jira issue API-42",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "jira.add_comment",
+                "description": "Add comment to Jira issue API-42",
+                "args": {
+                  "issueKey": "API-42",
+                  "body": "Investigating the root cause"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 35457.26119999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004599999999982174,
+                  "durationMs": 30012.9553,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30012.967900000003,
+                  "durationMs": 5444.075499999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4747,
+                "completionTokens": 92,
+                "reasoningTokens": 193
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 46.09850000000006,
+              "promptChars": 9537
+            }
+          ],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.0040999999998803105,
+              "durationMs": 2.2197000000001026
+            }
+          ]
+        },
+        {
+          "id": "m1-03",
+          "category": "multi_step",
+          "author": "member-1",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8658,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create GitHub issue with bug label using github.create_issue.",
+            "summary": "Tạo issue mới với nhãn bug trên acme/api",
+            "steps": [
+              {
+                "id": "create_issue",
+                "tool": "github.create_issue",
+                "description": "Tạo issue mới trên GitHub",
+                "args": {
+                  "repo": "acme/api",
+                  "title": "Database connection pool exhausted",
+                  "labels": [
+                    "bug"
+                  ]
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "acme/api",
+                "limit": 5
+              },
+              "result": [
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "gather"
+            }
+          ],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8646.4328,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004300000000512227,
+                  "durationMs": 8646.3361,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4182,
+                "completionTokens": 91,
+                "reasoningTokens": 314
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 10.744399999999587,
+              "promptChars": 6991
+            }
+          ],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.004199999999400461,
+              "durationMs": 4.951700000000528
+            }
+          ]
+        },
+        {
+          "id": "m1-04",
+          "category": "multi_step",
+          "author": "member-1",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got clarification"
+            ]
+          },
+          "latencyMs": 0,
+          "llmCalls": 0,
+          "servedModels": [],
+          "response": {
+            "kind": "clarification",
+            "question": "Danh sách này nằm trong board nào?",
+            "context": "Cần chọn board trước khi tra cứu danh sách."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.005400000000008731,
+              "durationMs": 0.08890000000064902
+            }
+          ]
+        },
+        {
+          "id": "m1-05",
+          "category": "cross_service",
+          "author": "member-1",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60063,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "Backend",
+                "limit": 5
+              },
+              "result": [
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                }
+              ],
+              "phase": "gather"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "To Do",
+                "limit": 5,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "gather"
+            }
+          ],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60013.74710000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.005700000001525041,
+                  "durationMs": 30005.521699999998,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30005.532100000004,
+                  "durationMs": 30008.0323,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 49.02930000000015,
+              "promptChars": 13067
+            }
+          ],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.002799999998387648,
+              "durationMs": 0.2845000000015716
+            }
+          ]
+        },
+        {
+          "id": "m1-06",
+          "category": "cross_service",
+          "author": "member-1",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 6
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 36890,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 36874.99999999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004099999998288695,
+                  "durationMs": 30003.427800000005,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30003.439000000006,
+                  "durationMs": 6871.421899999987,
+                  "outcome": "cancelled"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 15.104299999999057,
+              "promptChars": 7251
+            }
+          ],
+          "phases": [
+            {
+              "phase": "gather",
+              "startedAtMs": 0.002599999999802094,
+              "durationMs": 0.02079999999841675
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

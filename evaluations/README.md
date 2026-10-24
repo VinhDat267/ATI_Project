@@ -332,8 +332,10 @@ plans above, from fail to pass.
 
 ### W4-01: independent set
 
-`golden-independent/cases.json` will hold at least 30 cases written by members
-who did not write the planner prompt. Every case records the writer's role code
+`golden-independent/cases.json` holds 32 cases written by the four team
+members, 8 each. The task card asked for writers who did not write the planner
+prompt; two of the four had seen or edited it, so results are reported per
+writer group and the set is not called independent. Every case records the writer's role code
 in `author` (for example `member-2`), never a name. The writers' guide,
 [`golden-independent/GUIDE.md`](golden-independent/GUIDE.md), is in Vietnamese
 and needs no code reading. It covers:
@@ -369,7 +371,35 @@ preregistration check also covers `evaluations/golden-independent`. Commit the
 set before the first model run. Run it three times each with
 `EVAL_SEARCH_MODE=llm` and `regex`.
 
-**Not measured yet**: the set is empty until members submit their cases.
+#### W4-01 measured results — 2026-10-24
+
+Labels registered at `2cdaf90` before the first model call; complete runs on
+source `91cd5c1`. Requested `ag/gemini-3.8-flash`, served
+`gemini-3.8-flash-n`, concurrency 2, read answers and Gmail off.
+[Report and provenance](../docs/ai-evidence/V3-GOLDEN-V2/2026-10-24-W4-01-REPORT.md).
+
+| Run | Strict | Tools | Arguments | p50 / p95 / max | Under 15 s |
+|---|---|---|---|---|---|
+| `llm` ×3 | 89/96 | 93.7% | 100% | 10.8 / 60.0 / 76.6 s | 71/96 |
+| `regex` ×3 | 37/96 | 27.0% | 76.7% | 6.7 / 60.0 / 60.0 s | 70/96 |
+
+- **Deadline misses.** Some cases make the model reason for 3,800–4,800 tokens
+  (35–45 s), so both 30 s attempts time out. Four earlier campaigns stopped on
+  the first such case and are kept as partial evidence; `91cd5c1` then scored a
+  deadline miss as a failed case (4 in `llm`, 15 in `regex`).
+- **By writer group (`llm`):** writers who had seen the prompt 47/48, the other
+  two 42/48. Each group wrote 16 cases, too few for a statistical claim.
+- **Against the 50-case set:** 92.7% strict versus 150/150 after W3-10 (08/10,
+  not a same-day control); p95 60.0 s versus 18.0 s.
+- **Failures (`llm`):** four deadline misses, and `m4-07` (×3): a request
+  for a "task row" in the "Tasks tab" is routed to Trello only, so the model
+  refuses instead of asking which spreadsheet. No label error was found; labels
+  are kept as registered.
+- **`regex`** mostly fails before the model: its name extraction misreads
+  phrases ("bảng tính" as a board named "tính", "PR #15" as a channel) and asks
+  a clarification with no model call (27 case runs), and it looks up only
+  Trello, Slack and GitHub names, so the model has no IDs for the five newer
+  services. Live runs use `llm`.
 
 ### GMAIL-04: Gmail and answer sets
 
