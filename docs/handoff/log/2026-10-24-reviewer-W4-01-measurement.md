@@ -71,3 +71,15 @@ Commit và `cases.json` chỉ có mã `member-N`.
   - task độ trễ: giới hạn thời gian suy nghĩ của model hoặc xem lại deadline của app, có đối chứng cùng ngày;
   - định tuyến câu "task row … tab" (`m4-07`);
   - bước tra tên của `regex`.
+
+## Sửa theo review #164
+
+[Review độc lập](https://github.com/VinhDat267/ATI_Project/pull/164#pullrequestreview-5638836127) tại `15ac249`: chưa đạt, 1 P2. Ở `run.ts:244`, câu nào không có lỗi provider cũng đặt bộ đếm quá hạn về 0, kể cả câu không gọi model lần nào. Ở `regex`, những câu hỏi lại ngay ở bước tra tên vì thế che được một chuỗi quá hạn thật. Review tái hiện ở concurrency 1 và 2: 5 lời gọi model đều quá hạn mà bộ chạy vẫn chạy hết.
+
+- **Sửa:** chỉ câu model đã trả lời mới đặt lại bộ đếm; câu không gọi model giữ nguyên bộ đếm.
+- **Test hồi quy,** ở concurrency 1 và 2: chuỗi câu quá hạn xen câu `m1-04` (hỏi lại ở bước tra tên, 0 lời gọi model).
+  - RED: 2 failed | 18 passed, `stopped` là `false`;
+  - GREEN: `run.test.ts` 20/20; `vitest run evaluations` 394/394; typecheck `golden-v2` exit 0.
+- **Ảnh hưởng tới số đo:** đếm lại theo đúng thứ tự xong của từng câu trong log hai lượt đủ. Mỗi lượt có tối đa 2 lần quá hạn liền nhau (`regex` cả ba lượt; `llm` tối đa 1). Với quy tắc đã sửa, không lượt nào dừng, nên 89/96 và 37/96 giữ nguyên, không chạy lại.
+- **Sự cố khi kiểm:** lượt `vitest run evaluations` chạy khi container DB dev (`ati-v3-postgres-1`, volume dev) đang mở ở 55533, cũng là cổng mặc định của test. Hai file test `usable-plan/report.test.ts` và `live-app/batch.test.ts` tạo rồi xoá schema tạm ở đó. Kiểm lại chỉ đọc: chỉ còn schema `public`, 11 bảng; không đụng tới bảng nào.
+- Hai dòng trống cuối các `summary.md` mà `git diff --check` báo là output nguyên bản của bộ chạy, nên giữ nguyên.

@@ -75,7 +75,9 @@ and latency. A model call that misses the production deadline (30 s per
 attempt, one retry) is scored as a failed case, listed in the report, and the
 campaign continues, because the app fails the same request. Any other provider
 failure, or three such timeouts in a row, cancels in-flight requests and stops
-scheduling; the incomplete campaign is kept separate. Restart measurement only
+scheduling; the incomplete campaign is kept separate. Only a case the model
+answered breaks the row; a case that never calls the model (a regex
+clarification) leaves the count unchanged. Restart measurement only
 after a fresh probe following a relevant gateway/provider state change.
 Campaigns before 24/10/2026 stopped at the first timeout too.
 

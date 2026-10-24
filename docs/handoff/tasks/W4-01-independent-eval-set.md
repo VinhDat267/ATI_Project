@@ -78,6 +78,6 @@ Hai bộ đánh giá hiện có do cùng một người viết câu hỏi lẫn 
 - **Khác với task card:**
   - **người viết:** bốn thành viên, trong đó hai người đã xem hoặc sửa prompt (không ghi mã nào thuộc nhóm nào). Bộ câu không độc lập như task card yêu cầu; kết quả tách theo hai nhóm, theo quy tắc ghi trong commit đăng ký;
   - **ba câu gần câu của bộ cũ** (`m4-01`, `m2-03`, `m4-04`), dù GUIDE dặn không xem bộ cũ;
-  - **quy tắc dừng của bộ chạy** đổi ở `91cd5c1`, theo quyết định nhóm trưởng: câu quá hạn sau cả hai lần thử được chấm trượt và đo tiếp. Bốn lượt dở dang trước đó được giữ;
+  - **quy tắc dừng của bộ chạy** đổi ở `91cd5c1`, theo quyết định nhóm trưởng: câu quá hạn sau cả hai lần thử được chấm trượt và đo tiếp. Bốn lượt dở dang trước đó được giữ. Review #164 bắt 1 P2: câu không gọi model làm mất chuỗi quá hạn. Đã sửa, có test hồi quy. Đếm lại theo log, không lượt đủ nào lẽ ra phải dừng, nên số đo giữ nguyên;
   - **đo trong ba ngày thử W4-03:** nhóm trưởng xác nhận tối 24/10 không có lượt thử;
   - **báo cáo** nằm ở `docs/ai-evidence/V3-GOLDEN-V2/`, README có tóm tắt.

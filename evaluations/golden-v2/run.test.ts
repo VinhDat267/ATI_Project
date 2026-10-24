@@ -256,6 +256,19 @@ describe('service evaluation runner', () => {
     expect(result.stopReason).toBe('3 model requests in a row timed out');
     expect(result.pendingIds).toEqual(['sh04', 'sh05']);
   });
+  it.each([1, 2])('keeps counting model timeouts across cases that never call the model (concurrency %i)', async concurrency => {
+    // In regex mode m1-04 asks its clarification during gather, with no model call: it says nothing about the gateway.
+    const { file } = loadEvalFile('independent');
+    const items = ['m1-01', 'm1-04', 'm1-02', 'm1-04', 'm1-03', 'm1-04', 'm1-01', 'm1-04', 'm1-02']
+      .map((id, i) => ({ ...file.cases.find(c => c.id === id)!, id: `case-${i}` }));
+    const provider = deadlineProvider('T'.repeat(items.length));
+    const result = await runPool(items, concurrency, (c, signal) => runCase(c, file, false, 'regex', { provider, signal }));
+    expect(result.rows.filter(row => row.llmCalls === 0 && !row.providerError).length).toBeGreaterThan(0);
+    expect(result.stopped).toBe(true);
+    expect(result.stopReason).toBe('3 model requests in a row timed out');
+    expect(result.pendingIds.length).toBeGreaterThan(0);
+    if (concurrency === 1) expect(result.pendingIds).toEqual(['case-5', 'case-6', 'case-7', 'case-8']);
+  });
   it('still stops at once when a provider fault other than the deadline follows a timeout', async () => {
     const { file } = loadEvalFile('services');
     let requests = 0;

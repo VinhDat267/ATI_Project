@@ -229,7 +229,8 @@ export const MAX_TIMEOUTS_IN_ROW = 3;
 /**
  * A case whose model call misses the production deadline after its retries is scored as failed, as the app would
  * fail it, and dispatching continues. Any other provider failure, or MAX_TIMEOUTS_IN_ROW timeouts in a row (an
- * outage), cancels in-flight work and stops dispatching. No automatic campaign retry.
+ * outage), cancels in-flight work and stops dispatching. Only a case the model answered breaks the row: a case
+ * that never called the model says nothing about the gateway. No automatic campaign retry.
  */
 export async function runPool(items: GoldenCase[], limit: number, worker: (item: GoldenCase, signal: AbortSignal) => Promise<ObservedRun>) {
   const results: Array<ObservedRun | undefined> = new Array(items.length);
@@ -241,7 +242,8 @@ export async function runPool(items: GoldenCase[], limit: number, worker: (item:
       const result = await worker(items[index]!, controller.signal);
       results[index] = result;
       if (stopped) continue;
-      timeoutsInRow = result.providerError === MODEL_TIMEOUT ? timeoutsInRow + 1 : 0;
+      if (result.providerError === MODEL_TIMEOUT) timeoutsInRow++;
+      else if (result.llmCalls > 0) timeoutsInRow = 0;
       if (!result.providerError || (result.providerError === MODEL_TIMEOUT && timeoutsInRow < MAX_TIMEOUTS_IN_ROW)) continue;
       stopReason = result.providerError === MODEL_TIMEOUT ? `${MAX_TIMEOUTS_IN_ROW} model requests in a row timed out` : result.providerError;
       stopped = true;
