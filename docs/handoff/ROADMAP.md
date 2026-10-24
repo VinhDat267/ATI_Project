@@ -66,7 +66,12 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | **xong**, 18/10: bộ đo #157 (`efaafb2`): `turns` → lịch sử như `chat-service`, 12 câu đăng ký trước (6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới). Phép đo #159 (`778f22f`): 3 lượt `ag/gemini-3.8-flash` đạt **36/36**, mỗi nhóm 100%. Reviewer thi công; mỗi PR review lại Đạt |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | **khung xong** #149 (`fb38a4d`, 17/10): `PROTOCOL.md` (chỉ xem, không chạy thật; 10 tình huống), script báo cáo chỉ đọc; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3). Chờ buổi thử 23–25/10 với ≥ 5 người × 4 lượt |
 | 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | **xong**. Công cụ #151 (`ce59f4f`, 17/10): chế độ đo hàng loạt luôn bấm Hủy, 24 câu, tách thời gian server/frontend từ PostgreSQL; review độc lập Đạt sau một lượt sửa (2 P2). Phép đo live #159 (`778f22f`, 18/10): **23/24 dưới 15 s**, p50/p95/max 9,6/14,7/15,8 s, 0 bước thực thi. Đo trước mốc chốt catalog 20/10 theo yêu cầu nhóm trưởng; catalog đổi thì đo lại. Thời gian model chưa tách được khỏi planner |
-| 5 (29/10–04/11) | Ngừng thêm tính năng; môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
+| 4–5 (thêm 25/10; merge 26–29/10) | Lịch chạy workflow phần 1: kiểu dữ liệu chung, migration 0010, bộ hẹn giờ, API, cờ `SCHEDULES_ENABLED` tắt mặc định ([đặc tả](../superpowers/specs/2026-10-24-scheduled-workflows-design.md), [quy tắc chung](tasks/SCHED-common.md)) | [SCHED-01](tasks/SCHED-01-schedule-backend.md) | chờ, giao reviewer |
+| 5 (thêm 25/10; trước 30/10) | Lịch chạy phần 2: planner trả kiểu `schedule`, lưu đề xuất, lập kế hoạch cho lượt qua đường chat hiện có, sandbox `schedule` | [SCHED-02](tasks/SCHED-02-schedule-planner.md) | chờ, giao reviewer; cần SCHED-01 |
+| 5 (thêm 25/10; trước 01/11) | Lịch chạy phần 3: giao diện (thẻ lịch trong cockpit, mục Lịch chạy ở Nhật ký, số lượt chờ duyệt trên tab Nhật ký) | [SCHED-03](tasks/SCHED-03-schedule-ui.md) | chờ, giao `longnguyen005`; bắt đầu ngay, merge sau SCHED-02 |
+| 5 (thêm 25/10; trước 04/11) | Lịch chạy phần 4: bộ đo ý định, đo lại `core`/`services` khi bật cờ, nghiệm thu thật qua giao diện, PR bật cờ | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | chờ; bộ đo giao reviewer, nghiệm thu giao nhóm trưởng |
+| 5 (thêm 25/10) | OAuth cho các dịch vụ (phần còn lại của đề xuất của `longnguyen005`) | — | chưa có task card; bàn sau khi SCHED-00 merge. Mốc cắt 01/11 (đặc tả lịch chạy mục 10) |
+| 5 (29/10–04/11) → dời 05–06/11 | Ngừng thêm tính năng **từ 04/11** (dời từ 29/10, chốt 24/10); môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
 | 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
 
 W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/fencing nhiều replica chưa có. Minor `text_*` streaming của frontend được hoãn: chưa tìm thấy production emitter, reachability chưa chứng minh; cần xử lý timestamp/finalized message trước khi nối producer này. Số liệu hiện tại và giới hạn review/live xem [CURRENT-STATE](CURRENT-STATE.md).
@@ -120,6 +125,16 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - **Chờ nhóm trưởng quyết trước 29/10:** task độ trễ (model suy nghĩ quá 30 s), định tuyến `m4-07`, bước tra tên của `regex` (CURRENT-STATE mục 5).
 
 [Log merge](log/2026-10-24-reviewer-merge-164.md).
+
+**Cập nhật 25/10 (lịch chạy workflow):** ngày 24/10, nhóm trưởng quyết triển khai đề xuất "OAuth và tạo lịch workflow bằng AI" của `longnguyen005`, và **dời mốc ngừng thêm tính năng từ 29/10 sang 04/11**. Lịch chạy làm trước, OAuth làm sau. Đặc tả lịch chạy được duyệt ngày 25/10: [`2026-10-24-scheduled-workflows-design.md`](../superpowers/specs/2026-10-24-scheduled-workflows-design.md).
+- **Phạm vi:** một lần, hằng ngày, hằng tuần; giờ Việt Nam; mỗi lượt lập kế hoạch mới và **chờ duyệt** như mọi kế hoạch khác; không có chế độ tự chạy.
+- **Demo:** Google Calendar → Slack. GitHub → Slack ("issue mới từ lượt trước") không làm được với `github.search_issues` hiện tại, và sửa tool là đổi catalog đã chốt.
+- **Chia việc:** reviewer làm SCHED-01, SCHED-02 và bộ đo của SCHED-04; `longnguyen005` làm SCHED-03; nhóm trưởng nghiệm thu thật.
+- **Cờ `SCHEDULES_ENABLED`** tắt mặc định. Khi cờ tắt, prompt giữ nguyên từng byte, nên W4-01, W4-03, W4-04 vẫn đúng với hệ thống khi cờ tắt. Khi bật, SCHED-04 đo lại `core` và `services`.
+- **Mốc cắt:** 01/11 SCHED-01 hoặc SCHED-02 chưa merge thì dừng OAuth; 03/11 nghiệm thu thật chưa đạt thì giữ cờ tắt.
+- Phần ổn định demo của tuần 5 dời sang 05–06/11, nên tuần cuối còn ít thời gian hơn. Task card tuần 5 và tuần 6 lập sau.
+
+[Log](log/2026-10-25-reviewer-plan-schedules.md).
 
 **Cập nhật 19/10 (FE-12):** nhóm trưởng chốt một thanh điều hướng chung cho mọi trang sau khi đăng nhập, kể cả cockpit, sau khi xem mockup ba phương án. Các tab căn giữa thanh. Câu "Yêu cầu hiện tại" chuyển vào nội dung cockpit, không thêm dòng thứ hai dưới thanh. Đây là chỗ lệch bản mẫu có chủ đích; đặc tả giao diện mục 1.1 điểm 10 và mục 4 đã ghi theo. Nhóm trưởng giao reviewer thi công [FE-12](tasks/FE-12-shared-nav-bar.md):
 - merge trước mốc ngừng thêm tính năng 29/10;
