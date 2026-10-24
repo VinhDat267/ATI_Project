@@ -71,9 +71,13 @@ Run the same command with `EVAL_SET=core` and `EVAL_SET=freeform`.
 are rejected. Live runs reject uncommitted labels or evaluation source.
 Reports record label commits/hashes, source commit/trees, fixture/catalog
 fingerprints, served models, successful/failed read traces, completed attempts
-and latency. A provider failure cancels in-flight requests and stops scheduling;
-the incomplete campaign is kept separate. Restart measurement only after a
-fresh probe following a relevant gateway/provider state change.
+and latency. A model call that misses the production deadline (30 s per
+attempt, one retry) is scored as a failed case, listed in the report, and the
+campaign continues, because the app fails the same request. Any other provider
+failure, or three such timeouts in a row, cancels in-flight requests and stops
+scheduling; the incomplete campaign is kept separate. Restart measurement only
+after a fresh probe following a relevant gateway/provider state change.
+Campaigns before 24/10/2026 stopped at the first timeout too.
 
 Per-service tool/argument scores use only that service's labelled steps within
 each workflow, with explicit denominators. Read requests require actual

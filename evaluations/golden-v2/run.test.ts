@@ -219,6 +219,56 @@ describe('service evaluation runner', () => {
     expect(result.rows[0]!.providerError).toBeDefined();
     expect(result.stopped).toBe(true);
     expect(result.pendingIds).toEqual(['sh02', 'sh03']);
+    expect(result.stopReason).toBe('Request failed (details omitted from public evidence)');
+  });
+  // Each model request either hangs until its real deadline aborts it (T) or answers with a clarification (A).
+  const deadlineProvider = (pattern: string) => {
+    let requests = 0;
+    return new OpenAICompatibleProvider({ baseUrl: 'http://unused.test/v1', model: 'test-model', timeoutMs: 30, timeoutRetries: 0, maxRetries: 0,
+      fetch: (async (_url, init) => {
+        if (pattern[requests++] === 'T') {
+          const signal = init!.signal!;
+          return new Promise<Response>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+        }
+        return new Response(JSON.stringify({ model: 'test-model', choices: [{ message: { content: '{"kind":"clarification","question":"Bạn muốn ghi dữ liệu ở đâu?"}' } }] }));
+      }) as typeof fetch });
+  };
+  it('scores a case whose model call misses the production deadline as failed and keeps dispatching', async () => {
+    const { file } = loadEvalFile('services');
+    const provider = deadlineProvider('TTATT');
+    const result = await runPool(file.cases.slice(0, 5), 1, (c, signal) => runCase(c, file, false, 'llm', { provider, signal }));
+    expect(result.stopped).toBe(false);
+    expect(result.stopReason).toBeUndefined();
+    expect(result.pendingIds).toEqual([]);
+    expect(result.rows.map(row => row.providerError)).toEqual(['Model request timed out', 'Model request timed out', undefined,
+      'Model request timed out', 'Model request timed out']);
+    for (const row of result.rows.filter(row => row.providerError)) {
+      expect(row.score.passed).toBe(false);
+      expect(row.modelCalls[0]!.attempts).toEqual([expect.objectContaining({ outcome: 'timeout' })]);
+    }
+  });
+  it('stops dispatching after three model timeouts in a row, as a gateway outage', async () => {
+    const { file } = loadEvalFile('services');
+    const provider = deadlineProvider('TTTAA');
+    const result = await runPool(file.cases.slice(0, 5), 1, (c, signal) => runCase(c, file, false, 'llm', { provider, signal }));
+    expect(result.rows).toHaveLength(3);
+    expect(result.stopped).toBe(true);
+    expect(result.stopReason).toBe('3 model requests in a row timed out');
+    expect(result.pendingIds).toEqual(['sh04', 'sh05']);
+  });
+  it('still stops at once when a provider fault other than the deadline follows a timeout', async () => {
+    const { file } = loadEvalFile('services');
+    let requests = 0;
+    const timeouts = deadlineProvider('T');
+    const provider: LLMProvider = { name: 'test-provider', async generatePlan(input) {
+      if (requests++ === 0) return timeouts.generatePlan(input);
+      throw Object.assign(new Error('synthetic capacity fault'), { status: 503 });
+    } };
+    const result = await runPool(file.cases.slice(0, 4), 1, (c, signal) => runCase(c, file, false, 'llm', { provider, signal }));
+    expect(result.rows.map(row => row.providerError)).toEqual(['Model request timed out', 'LLM gateway returned HTTP 503']);
+    expect(result.stopped).toBe(true);
+    expect(result.stopReason).toBe('LLM gateway returned HTTP 503');
+    expect(result.pendingIds).toEqual(['sh03', 'sh04']);
   });
   it('removes credentials and query/fragment values from a gateway recorded in public evidence', () => {
     expect(safeGateway('https://user:secret@example.test/v1?token=secret#secret')).toBe('https://example.test/v1');
