@@ -224,20 +224,33 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
     servedModels: provider.servedModels, providerError: provider.providerError, modelCalls: provider.modelCalls, phases,
     score: scoreCase(golden, response, catalog.tools, [...searches, ...prefetches], { llmCalls: provider.calls, searchRounds }) };
 }
-/** Cancel in-flight work and stop dispatching after a provider failure. No automatic campaign retry. */
+export const MODEL_TIMEOUT = 'Model request timed out';
+export const MAX_TIMEOUTS_IN_ROW = 3;
+/**
+ * A case whose model call misses the production deadline after its retries is scored as failed, as the app would
+ * fail it, and dispatching continues. Any other provider failure, or MAX_TIMEOUTS_IN_ROW timeouts in a row (an
+ * outage), cancels in-flight work and stops dispatching. Only a case the model answered breaks the row: a case
+ * that never called the model says nothing about the gateway. No automatic campaign retry.
+ */
 export async function runPool(items: GoldenCase[], limit: number, worker: (item: GoldenCase, signal: AbortSignal) => Promise<ObservedRun>) {
   const results: Array<ObservedRun | undefined> = new Array(items.length);
   const controller = new AbortController();
-  let next = 0, stopped = false;
+  let next = 0, stopped = false, timeoutsInRow = 0, stopReason: string | undefined;
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (!stopped && next < items.length) {
       const index = next++;
       const result = await worker(items[index]!, controller.signal);
       results[index] = result;
-      if (result.providerError) { stopped = true; controller.abort(new Error('Evaluation stopped after provider failure')); }
+      if (stopped) continue;
+      if (result.providerError === MODEL_TIMEOUT) timeoutsInRow++;
+      else if (result.llmCalls > 0) timeoutsInRow = 0;
+      if (!result.providerError || (result.providerError === MODEL_TIMEOUT && timeoutsInRow < MAX_TIMEOUTS_IN_ROW)) continue;
+      stopReason = result.providerError === MODEL_TIMEOUT ? `${MAX_TIMEOUTS_IN_ROW} model requests in a row timed out` : result.providerError;
+      stopped = true;
+      controller.abort(new Error('Evaluation stopped after provider failure'));
     }
   }));
-  return { rows: results.filter((row): row is ObservedRun => row !== undefined), stopped,
+  return { rows: results.filter((row): row is ObservedRun => row !== undefined), stopped, stopReason,
     pendingIds: items.filter((_, index) => !results[index]).map(c => c.id) };
 }
 async function preflight(dryRun: boolean): Promise<void> {
@@ -277,6 +290,7 @@ export async function main() {
   mkdirSync(dir, { recursive: true });
   const runs: ObservedRun[][] = [];
   let stopped = false;
+  let stopReason: string | undefined;
   let pendingIds: string[] = [];
   for (let index = 0; index < runsCount; index++) {
     const result = await runPool(file.cases, concurrency, async (golden, signal) => {
@@ -286,7 +300,9 @@ export async function main() {
     });
     runs.push(result.rows);
     stopped = result.stopped;
+    stopReason = result.stopReason;
     pendingIds = result.pendingIds;
+    const timedOut = runs.flatMap((run, i) => run.filter(r => r.providerError === MODEL_TIMEOUT).map(r => ({ id: r.case.id, run: i + 1 })));
     const aggregate = aggregateRuns(runs, catalog.tools);
     const timing = summarizeTiming(runs.flat());
     const responses = summarizeResponses(runs);
@@ -310,7 +326,7 @@ export async function main() {
       catalogSha256: hash(JSON.stringify(catalog.tools)), catalog: { tools: catalog.tools.length, services: [...new Set(catalog.tools.map(t => t.service))] },
       clock: file.clock, timeZone: file.timeZone, requestedRuns: runsCount, completedRuns: runs.filter(run => run.length === file.cases.length).length,
       attemptedCaseRuns: runs.flat().length, plannedCaseRuns: runsCount * file.cases.length, concurrency, startedAt, runAt: new Date().toISOString(),
-      stopped, pendingIds, stopReason: runs.flat().find(r => r.providerError)?.providerError,
+      stopped, pendingIds, stopReason, timedOutCases: timedOut,
       scope: 'Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.',
       thresholds: THRESHOLDS, gate: { toolSelectionAccuracy: (aggregate.mean.toolSelectionAccuracy ?? 0) >= THRESHOLDS.toolSelectionAccuracy,
         argumentQuality: (aggregate.mean.argumentQuality ?? 0) >= THRESHOLDS.argumentQuality }, serviceGate,
@@ -340,6 +356,7 @@ export async function main() {
 | Latency p50 / p95 / max | ${aggregate.latencyMs.p50} / ${aggregate.latencyMs.p95} / ${aggregate.latencyMs.max} ms | <15000 ms |
 
 Model calls: ${timing.calls}; transport attempts: ${timing.attempts}; timeouts: ${timing.timeouts}.
+Cases scored as failed because the model call missed the production deadline after its retries: ${timedOut.map(t => `${t.id} (run ${t.run})`).join(', ') || 'none'}. Any other provider failure, or ${MAX_TIMEOUTS_IN_ROW} such timeouts in a row, stops the campaign.
 Model-opened search rounds (phase search): ${timing.searchRounds}; platform directory calls (phase prefetch): ${timing.directoryCalls}. searches excludes directory traces; prefetches records them separately. One search round can contain several parallel tool calls. Regex gather is not a model-opened search round.
 Attempts per call (0 means provider does not expose diagnostics): ${JSON.stringify(timing.attemptDistribution)}. Retry reasons: ${JSON.stringify(timing.retryReasons)}.
 Time share: model ${pct(timing.timeShare.model)}, directory ${pct(timing.timeShare.prefetch)}, search rounds ${pct(timing.timeShare.search)}, regex gather ${pct(timing.timeShare.gather)}, other ${pct(timing.timeShare.other)}.

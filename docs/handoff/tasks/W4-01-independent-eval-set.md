@@ -57,3 +57,27 @@ Hai bộ đánh giá hiện có do cùng một người viết câu hỏi lẫn 
     - không dùng `memory` (câu một lượt);
     - đồng hồ giữ như bộ services để dùng chung workspace giả lập;
     - câu trùng bộ cũ hoặc trùng ví dụ của GUIDE bị từ chối.
+
+### Đo bộ câu, 24/10/2026
+
+- **PR:** nhánh `test/w4-01-independent-cases`, base `a020a55`. Ngày 23/10, nhóm trưởng yêu cầu dùng bốn file `member-1.json` → `member-4.json` đã có trong thư mục làm việc, và huỷ kế hoạch để hai thành viên viết thêm. Reviewer đo trên máy nhóm trưởng. [Log](../log/2026-10-24-reviewer-W4-01-measurement.md), [báo cáo](../../ai-evidence/V3-GOLDEN-V2/2026-10-24-W4-01-REPORT.md).
+- **Commit đăng ký label:** `2cdaf90` (14:17:18Z), trước lời gọi model đầu tiên (14:25:08Z). Chỉ gồm `cases.json`. Label không sửa sau đó.
+- **Kết quả**, yêu cầu `ag/gemini-3.8-flash`, phục vụ `gemini-3.8-flash-n`, source `91cd5c1`:
+  - `llm` ×3: **89/96**; tool 93,7%, tham số 100%; p50/p95 10,8/60,0 s;
+  - `regex` ×3: **37/96**; tool 27,0%, tham số 76,7%;
+  - nhóm người đã xem prompt 47/48, nhóm chưa xem 42/48 (`llm`);
+  - bộ 50 câu sau W3-10 (08/10, không cùng ngày): 150/150, p95 18,0 s.
+- **Câu trượt ở `llm`:** 4 lượt quá hạn (`m3-03` ×2, `m1-03`, `m4-03`) và `m4-07` ×3, do định tuyến từ khoá chỉ đưa Trello. Đều do planner; không thấy label sai.
+- **Tiêu chí nghiệm thu:**
+  - `GUIDE.md` đủ cho người chưa đọc code: chưa có xác nhận của nhóm trưởng;
+  - test cấu trúc: đạt với bộ 32 câu (golden-independent và golden-v2 315/315); bộ rỗng vẫn không qua kiểm đầy đủ;
+  - commit đăng ký có trước kết quả đầu tiên: đạt;
+  - kết quả 3 lần chạy ở cả hai chế độ: đạt;
+  - không có họ tên người viết trong repo: đạt (`cases.json` chỉ có mã; quét 6 thư mục report);
+  - `npm run test:eval:v3`: chưa chạy đủ ở máy, vì Docker tắt và một số test cần PostgreSQL; chờ CI.
+- **Khác với task card:**
+  - **người viết:** bốn thành viên, trong đó hai người đã xem hoặc sửa prompt (không ghi mã nào thuộc nhóm nào). Bộ câu không độc lập như task card yêu cầu; kết quả tách theo hai nhóm, theo quy tắc ghi trong commit đăng ký;
+  - **ba câu gần câu của bộ cũ** (`m4-01`, `m2-03`, `m4-04`), dù GUIDE dặn không xem bộ cũ;
+  - **quy tắc dừng của bộ chạy** đổi ở `91cd5c1`, theo quyết định nhóm trưởng: câu quá hạn sau cả hai lần thử được chấm trượt và đo tiếp. Bốn lượt dở dang trước đó được giữ. Review #164 bắt 1 P2: câu không gọi model làm mất chuỗi quá hạn. Đã sửa, có test hồi quy. Đếm lại theo log, không lượt đủ nào lẽ ra phải dừng, nên số đo giữ nguyên;
+  - **đo trong ba ngày thử W4-03:** nhóm trưởng xác nhận tối 24/10 không có lượt thử;
+  - **báo cáo** nằm ở `docs/ai-evidence/V3-GOLDEN-V2/`, README có tóm tắt.
