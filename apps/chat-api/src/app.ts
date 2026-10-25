@@ -7,6 +7,7 @@ import { createConversationRoutes } from './routes/conversation-routes.js';
 import { createStreamRoutes } from './routes/stream-routes.js';
 import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createServicesRoutes } from './routes/services-routes.js';
+import { createScheduleRoutes, isSchedulePath, type ScheduleRoutesOptions } from './routes/schedule-routes.js';
 import { createAuthMiddleware } from './auth/jwt.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
@@ -61,6 +62,8 @@ export interface AppOptions extends AdminUsersOptions {
   sseManager?: SSEManager;
   executionService?: ExecutionService;
   gmail?: GmailAppOptions;
+  /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
+  schedules?: ScheduleRoutesOptions;
 }
 
 export function createApp(options: AppOptions): Express {
@@ -110,7 +113,8 @@ export function createApp(options: AppOptions): Express {
   app.get('/api/health', (_req, res) => {
     // With GMAIL_ENABLED off the public health answer stays exactly as before; absent means false.
     res.status(200).json({ status: 'ok', version: 'v3', runtimeMode: options.runtimeMode ?? 'sandbox',
-      ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}) });
+      ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}),
+      ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 
   // Auth routes (public login/refresh, protected /me)
@@ -143,6 +147,10 @@ export function createApp(options: AppOptions): Express {
   );
 
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
+
+  // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
+  if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? authMiddleware(req, res, next) : next(),
+    createScheduleRoutes(options.schedules));
 
   // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {

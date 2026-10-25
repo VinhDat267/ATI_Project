@@ -40,6 +40,8 @@ export interface EnvConfig {
   GMAIL_ENABLED: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   GMAIL_OAUTH?: GmailOAuthConfig;
+  /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
+  SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
   EMAIL_ENABLED: boolean;
   APP_BASE_URL: string;
@@ -164,6 +166,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.GMAIL_ENABLED && !['on', 'off'].includes(env.GMAIL_ENABLED)) throw new Error('GMAIL_ENABLED must be on or off');
   const GMAIL_ENABLED = env.GMAIL_ENABLED === 'on';
   const GMAIL_OAUTH = GMAIL_ENABLED ? gmailOAuth(env, isLive) : undefined;
+  if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
+  const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
 
   return {
     DATABASE_URL,
@@ -181,6 +185,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     GOOGLE_OAUTH,
     GMAIL_ENABLED,
     GMAIL_OAUTH,
+    SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
     SMTP_HOST: env.SMTP_HOST || '',
