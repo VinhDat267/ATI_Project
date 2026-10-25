@@ -35,7 +35,7 @@ export interface ValidatePlanOptions {
   grounding?: GroundingContext;
 }
 
-const INJECTION_PATTERNS = [
+export const INJECTION_PATTERNS = [
   /<\|im_start\|>/i,
   /<\|im_end\|>/i,
   /ignore previous instructions/i,

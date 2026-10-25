@@ -8,9 +8,13 @@ import { createSandboxAdapter } from '../sandbox/index.js';
 import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.js';
 
 export const gmailServiceRegistry = (enabled: boolean) => enabled ? [...SERVICE_REGISTRY, GMAIL_SERVICE] : SERVICE_REGISTRY;
-/** The Gmail fixture explicitly searches before planning, unlike regex canned plans. */
+/**
+ * The Gmail fixture explicitly searches before planning, unlike regex canned plans.
+ * The schedule fixture names "#ati-test", which regex gather would look up in a
+ * sandbox Slack that has no channels, asking back before the model runs.
+ */
 export function runtimePlannerSearchMode(mode: RuntimeMode, configured: 'llm' | 'regex', scenario?: string): 'llm' | 'regex' {
-  return mode === 'sandbox' && scenario === 'gmail' ? 'llm' : configured;
+  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule') ? 'llm' : configured;
 }
 export async function runtimeToolCatalog(mode: RuntimeMode, repo: CredentialRepo, key: string, options: { userId?: string; gmailEnabled: boolean }) {
   const personal = await getToolCatalogFor(repo, key, options);

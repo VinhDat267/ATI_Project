@@ -194,8 +194,10 @@ async function bootstrap() {
   if (pool && userRepo) await reconcileInterruptedExecutions(pool);
 
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
+  // A run is planned by chatService, created below; the runner starts only after listen.
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED, pool: pool && userRepo ? pool : null, timeZone: env.APP_TIME_ZONE,
+    planRun: (run, convId, signal) => chatService.planScheduledRun(run, convId, signal),
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
@@ -236,21 +238,27 @@ async function bootstrap() {
     requireGroundedResources: false,
   });
 
-  const planner = createRuntimePlanner(env.RUNTIME_MODE,
-    async (input: any) => new AIPlanner({
-      provider: env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'gmail' ? createSandboxProvider('gmail') : provider,
-      toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, { userId: input?.actor?.userId, gmailEnabled: gmailAvailable }),
-      serviceRegistry: gmailServiceRegistry(gmailAvailable),
-      gatherSearch,
-      requireGroundedResources: env.RUNTIME_MODE === 'live',
-      timeZone: env.APP_TIME_ZONE,
-      searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
-      readAnswers: env.PLANNER_READ_ANSWERS,
-    }).processMessage(input),
-    (input: any) => {
-      if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');
-      return backupPlanner.processMessage(input);
-    });
+  // One planner per call: the member's own catalog decides which services are configured.
+  const plannerFor = async (actor?: { userId: string }) => new AIPlanner({
+    provider: env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'gmail' ? createSandboxProvider('gmail') : provider,
+    toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, { userId: actor?.userId, gmailEnabled: gmailAvailable }),
+    serviceRegistry: gmailServiceRegistry(gmailAvailable),
+    gatherSearch,
+    requireGroundedResources: env.RUNTIME_MODE === 'live',
+    timeZone: env.APP_TIME_ZONE,
+    searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
+    readAnswers: env.PLANNER_READ_ANSWERS,
+    schedules: Boolean(schedules),
+  });
+  const planner = {
+    ...createRuntimePlanner(env.RUNTIME_MODE,
+      async (input: any) => (await plannerFor(input?.actor)).processMessage(input),
+      (input: any) => {
+        if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');
+        return backupPlanner.processMessage(input);
+      }),
+    routeSchedule: async (request: string, actor: { userId: string }) => (await plannerFor(actor)).routeSchedule(request),
+  };
 
   // 4. ChatService Event Bridge to SSE
   const chatEventEmitter = {
@@ -270,6 +278,7 @@ async function bootstrap() {
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
+    schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)

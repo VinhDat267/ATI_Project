@@ -25,31 +25,39 @@ export class PlanRepo {
     planHash: string;
     expiresAt: Date;
     resourceLabels?: Record<string, string>;
-  }): Promise<PlanRow> {
+  },
+  /** A client inside the caller's transaction; otherwise the plan is saved in a transaction of its own. */
+  db?: pg.PoolClient): Promise<PlanRow> {
+    if (db) return this.insertPlan(db, data);
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      // The parent conversation row serializes proposals, including when no plan exists yet.
-      const owner = await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [data.convId]);
-      if (!owner.rowCount) throw new Error('Conversation not found');
-      await client.query(
-        "UPDATE plans SET status = 'superseded' WHERE conv_id = $1 AND status = 'pending'",
-        [data.convId]
-      );
-      const res = await client.query(
-        `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at, resource_labels)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [data.convId, JSON.stringify(data.planJson), data.planText || null, data.planHash, data.expiresAt, JSON.stringify(data.resourceLabels ?? {})]
-      );
+      const plan = await this.insertPlan(client, data);
       await client.query('COMMIT');
-      return res.rows[0];
+      return plan;
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
     } finally {
       client.release();
     }
+  }
+
+  private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
+    // The parent conversation row serializes proposals, including when no plan exists yet.
+    const owner = await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [data.convId]);
+    if (!owner.rowCount) throw new Error('Conversation not found');
+    await client.query(
+      "UPDATE plans SET status = 'superseded' WHERE conv_id = $1 AND status = 'pending'",
+      [data.convId]
+    );
+    const res = await client.query(
+      `INSERT INTO plans (conv_id, plan_json, plan_text, plan_hash, expires_at, resource_labels)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [data.convId, JSON.stringify(data.planJson), data.planText || null, data.planHash, data.expiresAt, JSON.stringify(data.resourceLabels ?? {})]
+    );
+    return res.rows[0];
   }
 
   async getPlan(id: string): Promise<PlanRow | null> {

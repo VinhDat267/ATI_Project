@@ -127,6 +127,22 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo key và liên kết ticket', args: { channel: '#general', text: { $template: 'Jira: ${step_1.output.key}; ${step_1.output.url}' } }, dependsOn: ['step_1'] },
     ],
   };
+  if (scenario === 'schedule') {
+    const meeting = { name: 'Lịch họp hằng ngày', request: 'Gửi lịch họp hôm nay lên Slack #ati-test' };
+    // Select by this conversation's last request, not a global counter shared by users.
+    mockProvider.generatePlan = async input => {
+      const text = input.conversationHistory.filter(message => message.role === 'user').at(-1)?.content ?? '';
+      if (text.includes('(Lượt chạy theo lịch')) return JSON.stringify(calendarPlan);
+      if (text.startsWith('Đổi sang')) return JSON.stringify({ kind: 'schedule', action: 'update', ...meeting,
+        recurrence: { type: 'weekly', time: '08:30', days: [1, 2, 3, 4, 5] }, summary: 'Đổi sang 8 giờ 30, từ thứ Hai đến thứ Sáu.' });
+      if (text.startsWith('Tạm dừng')) return JSON.stringify({ kind: 'schedule', action: 'pause', summary: 'Tạm dừng lịch họp hằng ngày.' });
+      if (text.startsWith('Chạy tiếp')) return JSON.stringify({ kind: 'schedule', action: 'resume', summary: 'Chạy tiếp lịch họp hằng ngày.' });
+      if (text.startsWith('Hủy lịch')) return JSON.stringify({ kind: 'schedule', action: 'cancel', summary: 'Hủy lịch họp hằng ngày.' });
+      return JSON.stringify({ kind: 'schedule', action: 'create', ...meeting, recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test.' });
+    };
+    return mockProvider;
+  }
   mockProvider.setPlanResponses([scenario === 'jira_slack' ? jiraPlan : scenario === 'telegram_slack' ? telegramPlan : scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
   return mockProvider;
 }

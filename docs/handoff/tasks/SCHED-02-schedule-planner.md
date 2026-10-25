@@ -89,6 +89,30 @@ Cờ tắt vẫn nối mục lịch vào prompt; bỏ qua `scheduledRun`; không
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN, đột biến, lệnh kiểm và exit code:
-- Điều chưa làm hoặc khác với task card:
+- **PR:** nhánh `feat/sched-02-schedule-planner`, tách từ nhánh SCHED-01 tại `2480261`, vì #167 chưa merge. Reviewer thi công theo yêu cầu nhóm trưởng ngày 25/10. Cần review độc lập; merge sau #167. Chi tiết trong [log](../log/2026-10-25-reviewer-SCHED-02-schedule-planner.md).
+- **RED/GREEN:** 74 test mới (planner 62, `chat-api` 12).
+  - RED đúng lý do cho validator, planner, `ChatService` và sandbox HTTP. Mốc SHA-256 của prompt được chụp trước khi sửa, khi `packages/planner` còn giống hệt `main` `7bb752d`.
+  - Nhóm ca đi qua `ScheduleRunner` được viết sau `planScheduledRun`, nên chỉ được kiểm bằng đột biến.
+  - Đột biến **18/18 bị bắt**, gồm đủ 9 đột biến của task card.
+- **Kiểm toàn bộ** (PostgreSQL 16 tạm ở 56533, sandbox, cờ tắt):
+  - `npm run check` exit 0: **2.183 v3** (63 + 408 + 353 + 42 + 544 + 773) + **394 eval**;
+  - `npm run test:browser:v3` exit 0 ngay lượt đầu: **120 pass/1 skip, 13 nhóm**.
+- **Khác task card** (đã ghi vào đặc tả, đánh dấu "(SCHED-02)"):
+  - lý do gộp dịch vụ ở mục 5.3 không đúng với router hiện tại: câu không có từ khoá được router trả mọi dịch vụ đã cấu hình. Gộp chỉ đổi kết quả khi router chọn hẹp hơn lịch, và không gộp khi câu nêu dịch vụ chưa cấu hình;
+  - mục prompt nối vào cuối prompt;
+  - `routeSchedule` được gọi từ `ChatService` qua planner của server, dựng theo từng người;
+  - đề xuất có `replyToMessageId`;
+  - kịch bản sandbox `schedule` luôn chạy ở chế độ `llm`.
+- **Chưa làm:** giao diện (SCHED-03), đo với model thật (SCHED-04). Không gọi model hay dịch vụ thật.
+- **Sửa sau review độc lập lần 1** (tại `e390a5f`, **chưa đạt**, 3 P2, 1 P3). Chi tiết trong [log sửa](../log/2026-10-25-reviewer-SCHED-02-review-fixes.md).
+  - **P2:** lượt lỗi, quá hạn hoặc bị bỏ nay phát SSE `error` sau COMMIT, và tin kết thúc trả lời tin `schedule_run`.
+  - **P2:** trong hội thoại có lịch, chỉ dịch vụ chưa cấu hình mà câu hiện tại nêu mới làm từ chối trước model.
+  - **P2:** validator dùng chung `nextOccurrence` với bộ hẹn giờ; hàm này chuyển sang `@wap/planner`.
+  - **P3:** không tra danh mục trong hội thoại đã có lịch. Câu tạo lịch đầu tiên vẫn tra; đã ghi là giới hạn.
+
+  RED 7 ca, GREEN; đột biến **26/26 bị bắt**. `npm run check` exit 0: **2.188 v3** (63 + 408 + 357 + 42 + 545 + 773) + **394 eval**; browser exit 0 ngay lượt đầu, **120 pass/1 skip, 13 nhóm**. SCHED-03 có thêm ghi chú về `schedule_discarded`.
+- **Sửa sau review lần 2** (tại `3c2c836`, **chưa đạt**, còn 1 P2):
+  - lỗi: khi không còn dịch vụ nào được cấu hình, lượt quản lý lịch vẫn bị từ chối trước model;
+  - sửa: lượt đó nay tới model dù không có tool, và nếu model không ra kết quả hợp lệ thì vẫn trả lời từ chối như trước.
+
+  RED 4 ca, GREEN; đột biến **30/30 bị bắt**. `npm run check` exit 0: **2.192 v3** (63 + 408 + 359 + 42 + 547 + 773) + **394 eval**; browser exit 0 ngay lượt đầu, **120 pass/1 skip**.

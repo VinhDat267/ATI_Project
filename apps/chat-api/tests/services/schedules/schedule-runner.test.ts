@@ -262,10 +262,14 @@ describe('ScheduleRunner on PostgreSQL', () => {
     it('marks runs that were planning as interrupted without planning them again', async () => {
       const s = await schedule('2026-10-26T01:00:00.000Z');
       const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id;
-      await db.pool.query("INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status,conv_id) VALUES($1,1,'manual',$2,'planning',$3)", [s.id, now, convId]);
+      const runId = (await db.pool.query("INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status,conv_id) VALUES($1,1,'manual',$2,'planning',$3) RETURNING id",
+        [s.id, now, convId])).rows[0].id;
+      const started = (await db.pool.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'user','Gửi lịch họp',$2) RETURNING id",
+        [convId, JSON.stringify({ type: 'schedule_run', scheduleId: s.id, runId, name: 'Lịch họp', dueAt: now.toISOString(), trigger: 'manual' })])).rows[0].id;
       await reconcileScheduleRuns(db.pool);
       expect((await runs(s.id))[0]).toMatchObject({ status: 'interrupted', error: 'Máy chủ khởi động lại khi đang lập kế hoạch.' });
-      expect((await messages(convId)).at(-1)).toMatchObject({ role: 'system', metadata: { type: 'planning_error' } });
+      // The error answers the run's first message, so reopening the conversation ends its planning state.
+      expect((await messages(convId)).at(-1)).toMatchObject({ role: 'system', metadata: { type: 'planning_error', replyToMessageId: started } });
       await runner().tick();
       expect(calls).toEqual([]);
     });
