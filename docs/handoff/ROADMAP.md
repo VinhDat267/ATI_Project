@@ -66,8 +66,8 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 4 | Đánh giá hội thoại nhiều lượt: sửa plan, trả lời câu hỏi làm rõ | [W4-02](tasks/W4-02-multi-turn-eval.md) | **xong**, 18/10: bộ đo #157 (`efaafb2`): `turns` → lịch sử như `chat-service`, 12 câu đăng ký trước (6 sửa, 3 trả lời câu hỏi lại, 3 yêu cầu mới). Phép đo #159 (`778f22f`): 3 lượt `ag/gemini-3.8-flash` đạt **36/36**, mỗi nhóm 100%. Reviewer thi công; mỗi PR review lại Đạt |
 | 4 | Đo tỉ lệ plan dùng được với ≥ 20 lượt của người dùng thật | [W4-03](tasks/W4-03-usable-plan-study.md) | **khung xong** #149 (`fb38a4d`, 17/10): `PROTOCOL.md` (chỉ xem, không chạy thật; 10 tình huống), script báo cáo chỉ đọc; review độc lập Đạt sau một lượt sửa (2 P2, 1 P3). Chờ buổi thử 23–25/10 với ≥ 5 người × 4 lượt |
 | 4 | Đo latency qua frontend với ≥ 20 lượt | [W4-04](tasks/W4-04-frontend-latency.md) | **xong**. Công cụ #151 (`ce59f4f`, 17/10): chế độ đo hàng loạt luôn bấm Hủy, 24 câu, tách thời gian server/frontend từ PostgreSQL; review độc lập Đạt sau một lượt sửa (2 P2). Phép đo live #159 (`778f22f`, 18/10): **23/24 dưới 15 s**, p50/p95/max 9,6/14,7/15,8 s, 0 bước thực thi. Đo trước mốc chốt catalog 20/10 theo yêu cầu nhóm trưởng; catalog đổi thì đo lại. Thời gian model chưa tách được khỏi planner |
-| 4–5 (thêm 25/10; merge 26–29/10) | Lịch chạy workflow phần 1: kiểu dữ liệu chung, migration 0010, bộ hẹn giờ, API, cờ `SCHEDULES_ENABLED` tắt mặc định ([đặc tả](../superpowers/specs/2026-10-24-scheduled-workflows-design.md), [quy tắc chung](tasks/SCHED-common.md)) | [SCHED-01](tasks/SCHED-01-schedule-backend.md) | chờ, giao reviewer |
-| 5 (thêm 25/10; trước 30/10) | Lịch chạy phần 2: planner trả kiểu `schedule`, lưu đề xuất, lập kế hoạch cho lượt qua đường chat hiện có, sandbox `schedule` | [SCHED-02](tasks/SCHED-02-schedule-planner.md) | chờ, giao reviewer; cần SCHED-01 |
+| 4–5 (thêm 25/10; merge 26–29/10) | Lịch chạy workflow phần 1: kiểu dữ liệu chung, migration 0010, bộ hẹn giờ, API, cờ `SCHEDULES_ENABLED` tắt mặc định ([đặc tả](../superpowers/specs/2026-10-24-scheduled-workflows-design.md), [quy tắc chung](tasks/SCHED-common.md)) | [SCHED-01](tasks/SCHED-01-schedule-backend.md) | **xong** #167 (`95b1c46`, 25/10); review độc lập lần 2 **Đạt** sau khi sửa 2 P2 |
+| 5 (thêm 25/10; trước 30/10) | Lịch chạy phần 2: planner trả kiểu `schedule`, lưu đề xuất, lập kế hoạch cho lượt qua đường chat hiện có, sandbox `schedule` | [SCHED-02](tasks/SCHED-02-schedule-planner.md) | **xong** #168 (`46b6a5b`, 25/10); review độc lập lần 3 **Đạt**; P3 prefetch ở câu tạo lịch đầu tiên được giữ làm giới hạn |
 | 5 (thêm 25/10; trước 01/11) | Lịch chạy phần 3: giao diện (thẻ lịch trong cockpit, mục Lịch chạy ở Nhật ký, số lượt chờ duyệt trên tab Nhật ký) | [SCHED-03](tasks/SCHED-03-schedule-ui.md) | chờ, giao `longnguyen005`; bắt đầu ngay, merge sau SCHED-02 |
 | 5 (thêm 25/10; trước 04/11) | Lịch chạy phần 4: bộ đo ý định, đo lại `core`/`services` khi bật cờ, nghiệm thu thật qua giao diện, PR bật cờ | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | chờ; bộ đo giao reviewer, nghiệm thu giao nhóm trưởng |
 | 5 (thêm 25/10; trước 29/10) | OAuth phần 1: kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại và gửi lại yêu cầu ([đặc tả](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)) | [OAUTH-01](tasks/OAUTH-01-connect-from-chat.md) | chờ, giao reviewer; cần GMAIL-04 để nghiệm thu thật |
@@ -140,6 +140,13 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - **OAUTH-02**, tuỳ chọn: Google Calendar riêng của từng người. Nhóm trưởng quyết làm hay bỏ ngày 29/10; mốc cắt 01/11.
 - **Không làm:** OAuth cho Slack, GitHub, Notion, Jira, Trello, cùng chế độ tự chạy. Các phần này ghi vào báo cáo môn học là hướng phát triển.
 - **Điều kiện tiên quyết:** GMAIL-04 (nghiệm thu Google thật, PR bật cờ Gmail), do nhóm trưởng thao tác.
+
+**Cập nhật 25/10 (merge lịch chạy):**
+- SCHED-01 merge #167 (`95b1c46`) và SCHED-02 merge #168 (`46b6a5b`) tối 25/10. Nhóm trưởng cho merge sớm hơn mốc 26/10, vì toàn bộ nằm sau cờ tắt.
+- Mốc cắt "01/11 SCHED-01 hoặc SCHED-02 chưa merge thì dừng OAuth" đã qua.
+- Việc tiếp theo của lịch chạy:
+  - SCHED-03 (`longnguyen005`, trước 01/11);
+  - SCHED-04 sau SCHED-03 (bộ đo giao reviewer, nghiệm thu thật giao nhóm trưởng, PR bật cờ trước 04/11).
 
 [Log](log/2026-10-25-reviewer-plan-schedules.md).
 
