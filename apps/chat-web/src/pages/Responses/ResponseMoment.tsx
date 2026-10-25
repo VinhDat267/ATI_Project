@@ -74,9 +74,11 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
 /** "A", "A và B", "A, B và C". */
 const listOf = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(', ')} và ${names[names.length - 1]}` : names[0] ?? '';
 
-export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit, conversationId, onResend, servicesLoading, onRefreshServices }: {
+export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit, connectFromChat = false, conversationId, onResend, servicesLoading, onRefreshServices }: {
   message: ChatMessage; request: string; services: ServiceInfo[]; canConfigure: boolean;
   navigate: (path: string) => void; onEdit: (text: string) => void;
+  /** OAUTH-01, only while GMAIL_ENABLED is on. Off, the screen stays as before: no reading again, no "Gửi lại yêu cầu". */
+  connectFromChat?: boolean;
   /** The conversation on screen: connecting Gmail from here comes back to it (OAUTH-01). */
   conversationId?: string | null;
   /** Sends the request again as a new message, once every missing service can be used. */
@@ -87,7 +89,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
 }) {
   const refresh = useRef(onRefreshServices);
   refresh.current = onRefreshServices;
-  useEffect(() => { refresh.current?.(); }, [message.id]);
+  useEffect(() => { if (connectFromChat) refresh.current?.(); }, [message.id, connectFromChat]);
   const metadata = message.metadata;
   const legacy = message.content.replace(/^Từ chối yêu cầu:\s*/, '').split(/\nGợi ý:\s*/);
   const reason = metadata?.reason || legacy[0];
@@ -98,7 +100,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
   // What the refusal named may be usable by now: Gmail once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
-  const usable = (id: string) => id === 'gmail' ? current(id)?.personalStatus === 'connected' : current(id)?.configured === true;
+  const usable = (id: string) => connectFromChat && (id === 'gmail' ? current(id)?.personalStatus === 'connected' : current(id)?.configured === true);
+  const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
   const missing = unavailable.filter(row => !usable(row.id));
   const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
   const hasGmail = missing.some(row => row.id === 'gmail');
@@ -132,7 +135,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             const good = gmailConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>{gmailConnected ? `Đã kết nối${current('gmail')?.email ? ` · ${current('gmail')!.email}` : ''}` : service.id === 'gmail' && current('gmail')?.personalStatus === 'reconnect_required' ? 'Cần kết nối lại' : labels[status]}</span></span>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>{gmailConnected ? `Đã kết nối${current('gmail')?.email ? ` · ${current('gmail')!.email}` : ''}` : service.id === 'gmail' && reconnect ? 'Cần kết nối lại' : labels[status]}</span></span>
             </div>;
           })}
         </div>
@@ -143,10 +146,10 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
         {resend && <button type="button" onClick={() => onResend(request)} className={primary}>Gửi lại yêu cầu</button>}
         {/* A plain link keeps opening the settings page in a new tab; a normal click goes straight to Google and back here. */}
         {hasGmail && <a href="/settings#gmail" aria-disabled={starting || undefined} onClick={event => {
-          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
           event.preventDefault();
-          if (back) void connectGmail(back); else navigate('/settings#gmail');
-        }} className={`${primary} flex items-center gap-1.5`}>{current('gmail')?.personalStatus === 'reconnect_required' ? 'Kết nối lại Gmail' : 'Kết nối Gmail'}<span aria-hidden="true">→</span></a>}
+          if (connectFromChat && back) void connectGmail(back); else navigate('/settings#gmail');
+        }} className={`${primary} flex items-center gap-1.5`}>{reconnect ? 'Kết nối lại Gmail' : 'Kết nối Gmail'}<span aria-hidden="true">→</span></a>}
         {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>

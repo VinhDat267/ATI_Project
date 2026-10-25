@@ -30,19 +30,22 @@ describe('migration 0011 (OAUTH-01) on PostgreSQL', () => {
   });
   afterAll(async () => { await pool?.end(); await admin?.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); await admin?.end(); });
 
-  it('stores only a conversation path, in lower case', async () => {
+  it('stores a conversation path, in lower case, on a Gmail connection state only', async () => {
     const conv = randomUUID();
     await expect(state('connect_gmail', `/c/${conv}`)).resolves.toBeTruthy();
     await expect(state('connect_gmail', null)).resolves.toBeTruthy();
+    await expect(state('link', `/c/${conv}`)).rejects.toMatchObject({ code: '23514' });
+    await expect(state('login', `/c/${conv}`)).rejects.toMatchObject({ code: '23514' });
     for (const bad of ['/settings', 'https://evil.example', '//evil.example', `/c/${conv.toUpperCase()}`, `/c/${conv}?x=1`, `/c/${conv}/x`]) {
       await expect(state('connect_gmail', bad), bad).rejects.toMatchObject({ code: '23514' });
     }
   });
 
-  it('keeps the rule when every migration runs again', async () => {
+  it('keeps the rule when every migration runs again, including 0009 which drops checks on mode', async () => {
     await runAll();
     await runAll();
     await expect(state('connect_gmail', '/settings')).rejects.toMatchObject({ code: '23514' });
+    await expect(state('login', `/c/${randomUUID()}`)).rejects.toMatchObject({ code: '23514' });
     const rules = (await pool.query("SELECT count(*)::int AS n FROM pg_constraint WHERE conrelid = 'oauth_states'::regclass AND conname = 'oauth_states_return_to_check'")).rows[0].n;
     expect(rules).toBe(1);
   });

@@ -16,7 +16,7 @@ const refusal = (ids: Array<{ id: string; name: string }>): ChatMessage => ({ id
 const GMAIL_ONLY = [{ id: 'gmail', name: 'Gmail' }];
 function show(services: ServiceInfo[], options: { ids?: Array<{ id: string; name: string }>; conversationId?: string; canConfigure?: boolean } = {}) {
   const onResend = vi.fn(), navigate = vi.fn(), onEdit = vi.fn();
-  render(<RefusalMoment message={refusal(options.ids ?? GMAIL_ONLY)} request="Trả lời email mới nhất của Lan" services={services}
+  render(<RefusalMoment message={refusal(options.ids ?? GMAIL_ONLY)} request="Trả lời email mới nhất của Lan" services={services} connectFromChat
     canConfigure={options.canConfigure ?? false} navigate={navigate} onEdit={onEdit}
     {...('conversationId' in options ? { conversationId: options.conversationId } : { conversationId: CONV })} onResend={onResend} />);
   return { onResend, navigate, onEdit };
@@ -105,7 +105,7 @@ it('waits until every missing service can be used before offering to send again'
 it('reads the services again when a refusal appears, and offers to send again only on the fresh state', () => {
   const onRefreshServices = vi.fn(), onResend = vi.fn();
   const view = (message: ChatMessage, services: ServiceInfo[], servicesLoading: boolean) => <RefusalMoment message={message} request="Trả lời email mới nhất của Lan"
-    services={services} servicesLoading={servicesLoading} onRefreshServices={onRefreshServices} canConfigure={false} navigate={vi.fn()} onEdit={vi.fn()} conversationId={CONV} onResend={onResend} />;
+    services={services} connectFromChat servicesLoading={servicesLoading} onRefreshServices={onRefreshServices} canConfigure={false} navigate={vi.fn()} onEdit={vi.fn()} conversationId={CONV} onResend={onResend} />;
   // The page loaded while Gmail was still connected; it was disconnected elsewhere before this refusal.
   const { rerender } = render(view(refusal(GMAIL_ONLY), [gmail('connected')], false));
   expect(onRefreshServices).toHaveBeenCalledTimes(1);

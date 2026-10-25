@@ -58,7 +58,8 @@ function servicePrompt(service: ServiceInfo): string { return (prompts[service.i
 export function Cockpit(props: Props) {
   const state = useChatStore();
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
-  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(current && (data?.runtimeMode==='sandbox' || data?.runtimeMode==='live'))setRuntimeMode(data.runtimeMode);}).catch(()=>{});return()=>{current=false;}; }, []);
+  const [gmailEnabled, setGmailEnabled] = useState(false);
+  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setGmailEnabled(data?.gmailEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
   const actualMoment = selectMoment(state, state.executionSnapshot);
   const pending = state.planningByConversation[state.conversationId ?? '__draft__'];
   const waitingKey = pending ? `${state.conversationId}:${pending.requestId ?? pending.startedAt}` : null;
@@ -140,7 +141,7 @@ export function Cockpit(props: Props) {
     queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
   };
   const response = moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
-    : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest} conversationId={state.conversationId} onResend={send} servicesLoading={props.servicesLoading} onRefreshServices={props.onRefreshServices}/>
+    : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest} connectFromChat={gmailEnabled} conversationId={state.conversationId} onResend={send} servicesLoading={props.servicesLoading} onRefreshServices={props.onRefreshServices}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
     : slow ? <SlowPlanningMoment request={request} seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
     : planningError ? <PlanningErrorMoment request={request ?? ''} networkError={props.networkError} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>
