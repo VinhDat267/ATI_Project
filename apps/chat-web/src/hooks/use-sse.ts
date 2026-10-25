@@ -41,6 +41,8 @@ export function handleSSEEvent(
   }
 
   const source = conversationId ?? store.conversationId;
+  // A replay of a response already in history cannot settle a newer request.
+  if (['schedule_proposal', 'schedule_updated'].includes(event) && data.messageId && store.messages.some(message => message.id === data.messageId)) return;
   const pending = source ? store.planningByConversation[source] : undefined;
   if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
   if (['plan', 'plan_preview', 'clarification', 'refusal', 'answer', 'error', 'schedule_proposal'].includes(event)) store.setIsPlanning(false, source, data.requestId);
@@ -64,7 +66,6 @@ export function handleSSEEvent(
       if (data.conversationId && data.conversationId !== store.conversationId) break;
       const metadata = event === 'schedule_proposal' ? data.metadata : { type: 'schedule_state', schedule: data.schedule };
       if (!data.messageId || !metadata) break;
-      if (store.messages.some(message => message.id === data.messageId)) break;
       store.setActivePlan(null); store.setPlanStatus('idle'); store.setClarification(null); store.setIsStreaming(false);
       store.setGatherState(null);
       store.addMessage({ id: data.messageId, role: 'assistant', content: metadata.proposal?.summary ?? '', metadata: { ...metadata, replyToMessageId: data.replyToMessageId, requestId: data.requestId } });
@@ -277,7 +278,7 @@ export function handleSSEEvent(
       store.addMessage({
         id: `err_${Date.now()}`,
         role: 'system',
-        metadata: { type: 'planning_error' },
+        metadata: { type: 'planning_error', ...(typeof data.replyToMessageId === 'string' ? { replyToMessageId: data.replyToMessageId } : {}), ...(typeof data.requestId === 'string' ? { requestId: data.requestId } : {}) },
         content: `Lỗi: ${data.message || data.error || 'Có lỗi xảy ra trong quá trình xử lý'}`,
       });
       break;

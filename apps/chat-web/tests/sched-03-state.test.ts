@@ -53,3 +53,11 @@ it('does not let a replayed proposal replace a newer plan', () => {
   expect(selectMoment(useChatStore.getState(), null)).toBe(4);
   expect(useChatStore.getState().activePlan?.id).toBe('p');
 });
+it('does not settle a newer request when a proposal without requestId is replayed', () => {
+  const state = useChatStore.getState(); state.setConversationId('c');
+  const payload = JSON.stringify({ messageId: 'old', metadata: { type: 'schedule_proposal', proposal: { action: 'create' } } });
+  handleSSEEvent('schedule_proposal', payload, '1', 'c');
+  state.beginPlanning('c', 'new-request'); state.addMessage({ id: 'new-user', role: 'user', content: 'Đổi giờ mới' });
+  handleSSEEvent('schedule_proposal', payload, '2', 'c');
+  expect(useChatStore.getState().isPlanning).toBe(true);
+});

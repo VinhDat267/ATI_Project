@@ -3,6 +3,13 @@ import { apiClient } from '../services/api-client';
 import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore, type ChatStoreState } from '../store/chat-store';
+import type { ChatMessage } from '../types';
+
+// SSE plan/answer ids can differ from the persisted message id. Correlation
+// identifies the same response without moving replayed history behind new work.
+const messageKey = (message: ChatMessage) => message.metadata?.type === 'plan' && message.metadata.planId
+  ? `plan:${message.metadata.planId}`
+  : message.metadata?.replyToMessageId ? `${message.metadata.type}:${message.metadata.replyToMessageId}` : message.id;
 
 export async function loadConversationHistory(id: string, isCurrent: () => boolean, expected?: Pick<ChatStoreState, 'messages' | 'planRevision'>) {
   const store = useChatStore.getState();
@@ -19,10 +26,10 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       ['plan', 'clarification', 'refusal', 'answer', 'planning_error', 'schedule_proposal', 'schedule_discarded'].includes(message.metadata?.type ?? '') &&
       message.metadata?.replyToMessageId === acceptedId)) store.setIsPlanning(false, id, pending.requestId);
   }
-  for (const message of data.messages || []) {
-    if (message.metadata?.type === 'working_memory' && !message.content) continue;
-    store.addMessage({ ...message, role: message.role || 'user', content: message.content || '', timestamp: message.created_at || message.timestamp });
-  }
+  const saved = (data.messages || []).filter(message => message.metadata?.type !== 'working_memory' || message.content)
+    .map(message => ({ ...message, role: message.role || 'user', content: message.content || '', timestamp: message.created_at || message.timestamp }));
+  const savedKeys = new Set(saved.map(messageKey));
+  useChatStore.setState(current => ({ messages: [...saved, ...current.messages.filter(message => !savedKeys.has(messageKey(message)))] }));
   const latest = data.messages?.filter(message => message.metadata?.type !== 'working_memory').at(-1);
   if (hydrateResponse && !useChatStore.getState().isPlanning) {
     const refusal = latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:');

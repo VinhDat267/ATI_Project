@@ -110,6 +110,18 @@ it('does not append stale background history after a newer followup response', a
   finish({ messages: [scheduledMessage, { id: 'old-plan', role: 'assistant', content: 'Cũ', metadata: { type: 'plan' } }] });
   await loading; expect(useChatStore.getState().messages.at(-1)?.id).toBe('refusal');
 });
+it('keeps saved user messages before schedule responses replayed ahead of history', async () => {
+  const first = { ...proposal, id: 'proposal-1' };
+  const second = { ...proposal, id: 'proposal-2' };
+  const savedState = { id: 'state', role: 'assistant' as const, content: '', metadata: { type: 'schedule_state', schedule } };
+  const oldPlan = { id: 'saved-plan', role: 'assistant' as const, content: 'Kế hoạch cũ', metadata: { type: 'plan', planId: 'p-old' } };
+  const history = [{ id: 'user-1', role: 'user', content: 'Tạo lịch' }, oldPlan, first, { id: 'user-2', role: 'user', content: 'Đổi giờ' }, second, savedState];
+  useChatStore.setState({ messages: [{ ...oldPlan, id: 'plan-display:p-old' }, first, second, savedState] });
+  vi.mocked(apiClient.getConversation).mockResolvedValue({ messages: history } as any);
+  vi.mocked(apiClient.getActivePlan).mockResolvedValue(null as any); vi.mocked(apiClient.getLatestExecutionSnapshot).mockResolvedValue(null);
+  await loadConversationHistory('c', () => true);
+  expect(useChatStore.getState().messages.map(message => message.id)).toEqual(history.map(message => message.id));
+});
 it('shows the scheduled origin only when capability is enabled', () => {
   useChatStore.setState({ messages: [scheduledMessage] });
   const view = render(<RequestEcho request="Gửi lịch họp" />);
