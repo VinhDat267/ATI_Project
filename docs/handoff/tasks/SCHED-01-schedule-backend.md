@@ -121,3 +121,8 @@ Bỏ `SKIP LOCKED`; bỏ khoá duy nhất `schedule_runs_slot`; bỏ so `baseVer
   - router lịch chỉ kiểm phiên với đường dẫn của lịch.
 
   Sửa thêm hai ví dụ sai thứ trong SCHED-03.
+- **Sửa sau review độc lập lần 1** (tại `3a9e4b1`, **chưa đạt**, 2 P2). Chi tiết trong [log sửa](../log/2026-10-25-reviewer-SCHED-01-review-fixes.md).
+  - Deadlock giữa xác nhận và nút tạm dừng. Nay mọi đường khoá theo một thứ tự: hội thoại của lịch → lịch → `users` → lượt → hội thoại của lượt. Nhịp của bộ hẹn giờ khoá cả hội thoại bằng `SKIP LOCKED`.
+  - Bật lại lịch `completed` vượt giới hạn 10 lịch. Nay bật lại cũng kiểm giới hạn như `create`, dưới cùng khoá `users`.
+
+  RED 3 fail trên mã cũ, GREEN; thêm 2 ca chặn đột biến; đột biến **7/7 bị bắt**. `npm run check` exit 0: **2.109 v3** (63 + 408 + 291 + 42 + 532 + 773) + **394 eval**. Browser exit 0 ngay lượt đầu: **120 pass/1 skip, 13 nhóm**. Đặc tả mục 6.3 và 6.5 có ghi chú "(SCHED-01, review #167)"; SCHED-02 có thêm một dòng về thứ tự khoá.
