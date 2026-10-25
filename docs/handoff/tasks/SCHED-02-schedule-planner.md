@@ -104,3 +104,10 @@ Cờ tắt vẫn nối mục lịch vào prompt; bỏ qua `scheduledRun`; không
   - đề xuất có `replyToMessageId`;
   - kịch bản sandbox `schedule` luôn chạy ở chế độ `llm`.
 - **Chưa làm:** giao diện (SCHED-03), đo với model thật (SCHED-04). Không gọi model hay dịch vụ thật.
+- **Sửa sau review độc lập lần 1** (tại `e390a5f`, **chưa đạt**, 3 P2, 1 P3). Chi tiết trong [log sửa](../log/2026-10-25-reviewer-SCHED-02-review-fixes.md).
+  - **P2:** lượt lỗi, quá hạn hoặc bị bỏ nay phát SSE `error` sau COMMIT, và tin kết thúc trả lời tin `schedule_run`.
+  - **P2:** trong hội thoại có lịch, chỉ dịch vụ chưa cấu hình mà câu hiện tại nêu mới làm từ chối trước model.
+  - **P2:** validator dùng chung `nextOccurrence` với bộ hẹn giờ; hàm này chuyển sang `@wap/planner`.
+  - **P3:** không tra danh mục trong hội thoại đã có lịch. Câu tạo lịch đầu tiên vẫn tra; đã ghi là giới hạn.
+
+  RED 7 ca, GREEN; đột biến **26/26 bị bắt**. `npm run check` exit 0: **2.188 v3** (63 + 408 + 357 + 42 + 545 + 773) + **394 eval**; browser exit 0 ngay lượt đầu, **120 pass/1 skip, 13 nhóm**. SCHED-03 có thêm ghi chú về `schedule_discarded`.
