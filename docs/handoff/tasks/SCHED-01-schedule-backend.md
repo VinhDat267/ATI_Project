@@ -104,6 +104,20 @@ Bỏ `SKIP LOCKED`; bỏ khoá duy nhất `schedule_runs_slot`; bỏ so `baseVer
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN, đột biến, lệnh kiểm và exit code:
-- Điều chưa làm hoặc khác với task card:
+- **PR:** nhánh `feat/sched-01-schedule-backend`, base `7bb752d`; reviewer thi công theo yêu cầu nhóm trưởng ngày 25/10. Cần review độc lập; không merge trước 26/10.
+- **RED/GREEN:** mọi nhóm test viết trước và chạy fail trước khi cài đặt; 63 test mới ở `chat-api`. Đột biến **14/14 bị bắt**: 13 của script và M14. M12 lọt ở lượt đầu, đã thay test, chạy lại thì bị bắt. Bảng chi tiết trong [log](../log/2026-10-25-reviewer-SCHED-01-schedule-backend.md).
+- **Kiểm toàn bộ** (PostgreSQL 16 tạm ở 56533, sandbox, cờ tắt):
+  - `npm run check` exit 0: **2.105 v3** (63 + 408 + 291 + 42 + 528 + 773) + **394 eval**;
+  - `npm run test:browser:v3`: lượt 1 exit 1, một ca FE-12 chập chờn ở nhóm default (ghi trong log); lượt 2 exit 0, **120 pass/1 skip, 13 nhóm**;
+  - chạy thử server thật với cờ bật: xác nhận, chạy ngay, 409, 404 đúng.
+
+  `ALL_TOOLS` 33 tool, `SERVICE_REGISTRY` 8 dịch vụ, prompt và routing không đổi: PR không sửa `packages/planner` hay catalog.
+- **Khác task card** (đã ghi vào đặc tả, đánh dấu "(SCHED-01)"):
+  - xác nhận lặp trả 200 không đổi gì; thêm cột `last_proposal_id`;
+  - thêm mã `RUN_NOT_REPLANNABLE`; lỗi có dạng chung `{ error: { code, message } }`; `run-now`/`replan` trả 201;
+  - bộ hẹn giờ ghi tin trạng thái khi tự tạm dừng và khi lịch một lần chạy xong;
+  - lượt chỉ bị bỏ khi `version` đổi hoặc lịch đã hủy, vì lịch một lần chuyển `completed` ngay trong nhịp tạo lượt;
+  - `server.ts` không có bước tắt có trật tự, nên `stop()` chỉ dùng trong test;
+  - router lịch chỉ kiểm phiên với đường dẫn của lịch.
+
+  Sửa thêm hai ví dụ sai thứ trong SCHED-03.

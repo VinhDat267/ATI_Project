@@ -235,6 +235,7 @@ CREATE TABLE schedules (
   pause_reason text,
   version integer NOT NULL DEFAULT 1,
   next_run_at timestamptz,            -- chỉ có giá trị khi status = 'active'
+  last_proposal_id uuid REFERENCES messages(id),  -- (SCHED-01) đề xuất áp dụng gần nhất, mục 6.5
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((status = 'active') = (next_run_at IS NOT NULL))
@@ -327,7 +328,10 @@ Kế hoạch của lượt đi qua đúng luồng duyệt, thực thi, khôi ph�
   - `update`: lịch chưa `cancelled`; ghi đè `name`, `request`, `recurrence`, `services`, tăng `version`, tính lại `next_run_at` nếu `active`. Lịch `completed` (một lần đã chạy) được bật lại thành `active`;
   - `pause`/`resume`/`cancel`: đổi trạng thái, tăng `version`. `resume` tính `next_run_at` từ `now`; lượt đã lỡ trong lúc tạm dừng không được ghi.
   - sai điều kiện → 409 với `code` (`STALE_PROPOSAL`, `LIMIT_REACHED`, `CONVERSATION_HAS_SCHEDULE`, `SCHEDULE_CLOSED`); không đổi gì.
+  - **(SCHED-01)** xác nhận lại đúng đề xuất đã áp dụng trả 200 với lịch hiện tại và không đổi gì, không ghi tin trạng thái. `schedules.last_proposal_id` lưu đề xuất áp dụng gần nhất. Lý do: bấm Xác nhận hai lần, hoặc hai tab cùng bấm, không nên báo lỗi;
+  - **(SCHED-01)** `pause` một lịch đang tạm dừng, `resume` một lịch đang bật, `cancel` một lịch đã hủy: 200, không đổi gì.
 - Nút tạm dừng, chạy tiếp, hủy ở danh sách gửi `version` đang thấy; sai → 409 `STALE_VERSION`.
+- **(SCHED-01)** Bộ hẹn giờ cũng ghi tin `schedule_state` (và phát `schedule_updated`) khi nó tự tạm dừng lịch, hoặc khi lịch một lần chuyển `completed`. Hai việc này không tăng `version` của chủ lịch tự làm, trừ tạm dừng.
 
 ### 6.6. API
 
@@ -340,8 +344,10 @@ Mọi route cần đăng nhập, chỉ chủ lịch dùng được; ID của ng�
 | `GET /api/schedules/pending-count` | `{ count }`: số lượt `awaiting_approval` của người gọi |
 | `POST /api/conversations/:convId/schedule-proposals/:messageId/confirm` | `{ schedule: ScheduleView }` hoặc 409 |
 | `POST /api/schedules/:id/pause` · `/resume` · `/cancel`, body `{ version }` | `{ schedule: ScheduleView }` hoặc 409 |
-| `POST /api/schedules/:id/run-now` | `{ run: ScheduleRunView }`; lịch `cancelled`/`completed` → 409; đã có lượt `planning` → 409 `RUN_IN_PROGRESS` |
-| `POST /api/schedule-runs/:id/replan` | như trên, `trigger: 'replan'`; chỉ cho lượt `expired`, `planning_failed`, `interrupted`, `missed` |
+| `POST /api/schedules/:id/run-now` | 201 `{ run: ScheduleRunView }`; lịch `cancelled`/`completed` → 409 `SCHEDULE_CLOSED`; đã có lượt `planning` → 409 `RUN_IN_PROGRESS` |
+| `POST /api/schedule-runs/:id/replan` | như trên, `trigger: 'replan'`; chỉ cho lượt `expired`, `planning_failed`, `interrupted`, `missed`, ngược lại 409 `RUN_NOT_REPLANNABLE`. Lịch `completed` vẫn lập lại kế hoạch được cho lượt của nó; lịch `cancelled` thì không |
+
+**(SCHED-01)** Lỗi có dạng `{ error: { code, message } }`: 409 theo bảng mã, 404 `NOT_FOUND`, 400 `BAD_REQUEST` (thiếu `version`), 500 `SERVER_ERROR`. `message` là câu tiếng Việt, cùng câu với bảng 409 của SCHED-03.
 
 `GET /api/health` có `schedulesEnabled: true` khi cờ bật (giống `gmailEnabled`).
 
