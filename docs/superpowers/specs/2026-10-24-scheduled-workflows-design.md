@@ -168,6 +168,8 @@ export interface ScheduleRunMessageMetadata {
 - `validateEnv` đọc `SCHEDULES_ENABLED` (`on`/`off`, mặc định `off`, giá trị khác là lỗi cấu hình), như `PLANNER_READ_ANSWERS`.
 - `AIPlannerOptions` thêm `schedules?: boolean`. Khi tắt: prompt không đổi từng byte (test SHA-256 như ANS-01), validator từ chối `kind: "schedule"`.
 - Khi bật, `buildSystemPrompt` thêm một mục quy tắc lịch (5.2) và kiểu `schedule` vào danh sách kiểu phản hồi. Cả hai chế độ `regex` và `llm` đều nhận được.
+- **(SCHED-02)** Mục `### Scheduled workflows` (`prompts/schedule-rules.ts`) được nối vào **cuối** prompt, không chen vào danh sách quy tắc đánh số. Nhờ vậy, mọi phần trước nó giống từng byte với prompt khi cờ tắt. Mục này có quy tắc 5.2, các trường, một ví dụ `create` và một ví dụ `update`. Nó cũng ghi rõ rằng quy tắc 0 (chỉ đọc thì hỏi lại ngay) không áp dụng cho câu về chính lịch, và không tra cứu trước khi trả `schedule`.
+- **(SCHED-02)** Chế độ `regex` vẫn chạy bước tra tên (gather) trước model, như với mọi câu. Câu tạo lịch có `#ati-test` vẫn tra kênh đó. Chế độ live dùng `llm`, nên quy tắc "không tra cứu lúc tạo lịch" dựa vào prompt.
 
 ### 5.2. Khi nào trả `schedule`
 
@@ -186,6 +188,8 @@ Quy tắc trong prompt, theo thứ tự:
 
 `ChatService` cho planner biết lịch của hội thoại qua trường mới `ProcessMessageInput.schedule?: { services: string[] }`; có trường này nghĩa là `hasSchedule`. Khi có, planner **gộp `services` của lịch vào kết quả router** trước khi chọn tool. Lý do: câu như "tạm dừng lịch này" không có từ khoá dịch vụ, nên nếu chỉ dùng router thì planner trả từ chối `unroutable` mà không gọi model.
 
+**(SCHED-02)** Khi đo trên mã, lý do trên không đúng với router hiện tại. Câu không có từ khoá nào ("Tạm dừng lịch này", "Hủy lịch") được router trả **mọi** dịch vụ chung đã cấu hình, nên vẫn tới model; `unroutable` chỉ xảy ra khi catalog rỗng. Việc gộp vẫn được làm, nhưng chỉ đổi kết quả khi router chọn hẹp hơn lịch. Ví dụ: "Chuyển lịch này sang gửi lên Telegram" chỉ ra Telegram; sau khi gộp có thêm dịch vụ của lịch. Khi câu nêu một dịch vụ **chưa cấu hình**, planner **không gộp** và vẫn từ chối, để không lặng lẽ chuyển việc sang dịch vụ khác (quy tắc của router).
+
 `validateSchedule(raw, { enabled, now, timeZone, hasSchedule })`:
 - JSON, đúng schema mục 4; `name`, `request`, `recurrence` bắt buộc với `create`/`update`;
 - `time` khớp `HH:mm` trong 00:00–23:59;
@@ -201,6 +205,8 @@ Sai thì thử lại một lần như kế hoạch; vẫn sai thì báo lỗi l�
 Planner không để model khai dịch vụ. Với `create`/`update`, planner chạy `routeIntent(request)`:
 - dịch vụ chưa cấu hình → `refusal` với `unavailableServices`, như hiện nay;
 - `services` = dịch vụ router chọn, lưu cùng đề xuất.
+
+**(SCHED-02)** Bước này nằm ở `ChatService`, qua `planner.routeSchedule(request, actor)`. Lý do: server dựng planner cho từng lần gọi, với catalog của chính người dùng đó. `validateSchedule` bỏ mọi trường lạ, kể cả `services` do model tự khai.
 
 Lúc tạo lịch **không** tra tài nguyên (kênh, lịch). Tài nguyên được tra lúc mỗi lượt chạy; "Chạy lượt này ngay" là cách kiểm trước.
 
@@ -315,11 +321,23 @@ Test ranh giới: 23:59 sang ngày sau, Chủ nhật sang thứ Hai, cuối thá
 
 SCHED-01 dựng `ScheduleRunner` với một hàm lập kế hoạch tiêm vào (`planRun(run)`); test của SCHED-01 dùng hàm giả trả kết quả có kiểm soát. SCHED-02 nối hàm này vào `ChatService`.
 
+**(SCHED-02)** `ChatService.planScheduledRun` làm như sau:
+- gọi planner ngoài transaction;
+- chuẩn bị kết quả bằng đúng phần dùng chung với đường chat (`bindConnections`, `resourceLabels`, mã băm), chưa ghi gì;
+- `persist(client)` ghi bộ nhớ làm việc, kế hoạch và tin trong transaction của runner, đúng thứ tự khoá ở mục 6.5;
+- `afterCommit()` phát `plan_preview`/`clarification`/`refusal`/`answer`, rồi `agent_state`. Tin có `replyToMessageId` là tin `schedule_run`;
+- `agent_state: planning` và `gather_progress` phát ngay trong lúc lập kế hoạch, như ở đường chat.
+
+Các tin `persist` ghi có chung `created_at`, vì `now()` là giờ bắt đầu transaction. Mỗi lần ghi chỉ có một tin hiện cho người dùng; tin còn lại là `working_memory`, vốn bị ẩn.
+
 Kế hoạch của lượt đi qua đúng luồng duyệt, thực thi, khôi phục hiện có. Không có đường tắt.
 
 ### 6.5. Đề xuất và xác nhận
 
 - Kết quả `schedule` của planner lưu thành tin `assistant` có `ScheduleProposalMetadata`. Phát SSE `schedule_proposal` trên hội thoại đó. Lịch sử gửi lại model dạng JSON của `proposal`, như kế hoạch.
+  - **(SCHED-02)** Metadata đã lưu và payload SSE có thêm `replyToMessageId` (và `requestId` khi có), như các loại tin khác. Payload là `{ conversationId, messageId, metadata, replyToMessageId, requestId? }`; sau đó là `agent_state: idle`.
+  - `nextRuns` là 3 lần chạy tới, tính từ lúc lưu đề xuất. Với `resume`, chúng tính theo `recurrence` của lịch hiện tại; với `pause`/`cancel` thì rỗng.
+  - JSON gửi lại model theo thứ tự khoá mà JSONB giữ, không theo thứ tự model viết.
 - Mỗi lần lịch đổi trạng thái hoặc phiên bản, lưu tin `assistant` có `metadata.type = 'schedule_state'` ("Lịch "…" đang bật, phiên bản 2, lần chạy tới …"), gửi lại model dạng chữ, và phát SSE `schedule_updated`.
 - Xác nhận: một transaction khoá dòng `conversations` (tạo mới) hoặc `schedules` (các action khác):
   - đề xuất phải là tin `schedule_proposal` **mới nhất** của hội thoại, và `baseVersion` bằng `version` hiện tại;
@@ -369,6 +387,8 @@ Mọi route cần đăng nhập, chỉ chủ lịch dùng được; ID của ng�
 ### 6.7. Sandbox
 
 Kịch bản `SANDBOX_SCENARIO=schedule` (cờ bật): planner giả trả đề xuất lịch Calendar → Slack cho câu tạo lịch, đề xuất `update` cho câu "Đổi sang …", và kế hoạch Calendar → Slack soạn sẵn cho tin `schedule_run`. Runner browser bật cờ cho nhóm `schedule` và đặt `off` cho các nhóm khác.
+
+**(SCHED-02)** Kịch bản này luôn chạy planner ở chế độ `llm`, như kịch bản `gmail`. Lý do: Slack sandbox không có kênh nào, nên ở chế độ `regex`, bước tra tên sẽ hỏi lại "Không tìm thấy ati-test" trước khi tới model. Câu bắt đầu bằng `Tạm dừng`, `Chạy tiếp`, `Hủy lịch` cho ra `pause`, `resume`, `cancel`.
 
 ## 7. Giao diện (SCHED-03, `longnguyen005`)
 
