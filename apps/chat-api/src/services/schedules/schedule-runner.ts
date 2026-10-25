@@ -18,6 +18,11 @@ export interface PreparedRun {
 }
 export type PlanRun = (run: RunToPlan, convId: string, signal: AbortSignal) => Promise<PreparedRun>;
 
+/** The message a run is planned from (design 5.5), saved first in the run's conversation. */
+export function runMessage(run: Pick<RunToPlan, 'name' | 'request' | 'dueAt'>, timeZone: string): string {
+  return `${run.request}\n\n(Lượt chạy theo lịch "${run.name}" lúc ${localLabel(run.dueAt, timeZone)}.)`;
+}
+
 export interface ScheduleRunnerOptions {
   pool: pg.Pool;
   planRun: PlanRun;
@@ -214,7 +219,7 @@ export class ScheduleRunner {
       const convId = (await client.query("INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', $2) RETURNING id",
         [run.user_id, `Lịch: ${run.name} · ${label}`])).rows[0].id as string;
       const metadata: ScheduleRunMessageMetadata = { type: 'schedule_run', scheduleId: run.schedule_id, runId: run.id, name: run.name, dueAt: dueAt.toISOString(), trigger: run.trigger };
-      await this.messages.createMessage(convId, 'user', `${run.request}\n\n(Lượt chạy theo lịch "${run.name}" lúc ${label}.)`, metadata, client);
+      await this.messages.createMessage(convId, 'user', runMessage({ name: run.name, request: run.request, dueAt }, timeZone), metadata, client);
       await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
       const toPlan: RunToPlan = { runId: run.id, scheduleId: run.schedule_id, scheduleVersion: run.schedule_version, userId: run.user_id,
         name: run.name, request: run.request, dueAt, trigger: run.trigger };

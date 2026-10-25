@@ -2,7 +2,8 @@ import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type Servi
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
-import { validatePlan, validateAnswer } from './validator.js';
+import { validatePlan, validateAnswer, type ValidationResult } from './validator.js';
+import { validateSchedule } from './schedule-validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
   MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, searchEntities,
@@ -37,6 +38,8 @@ export interface AIPlannerOptions {
   prefetchDirectory?: boolean;
   /** Time allowed for that listing before planning continues without the rest (default 2500 ms). */
   directoryBudgetMs?: number;
+  /** Scheduled workflows (SCHEDULES_ENABLED): off, the prompt is unchanged and a schedule is never accepted. */
+  schedules?: boolean;
 }
 
 export interface GatherSearchRequest {
@@ -65,6 +68,10 @@ export interface ProcessMessageInput {
   timingStarted?: number;
   /** The signed-in caller. The planner never reads it; it only passes it to `gatherSearch`. */
   actor?: { userId: string };
+  /** The conversation's schedule: its services join the routed ones, and only update, pause, resume or cancel are accepted. */
+  schedule?: { services: string[] };
+  /** Planning a run of a schedule: the prompt is the one of schedules off and a schedule is refused. */
+  scheduledRun?: boolean;
 }
 
 interface GatherCandidate { id: string; name: string; [key: string]: unknown }
@@ -97,7 +104,7 @@ function asCandidates(value: unknown, nameField?: string): GatherCandidate[] {
 }
 
 // A request that names an unconfigured service is refused, never rerouted to another service.
-function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
+export function unroutable(unavailable: RoutedIntent['unavailable']): PlannerResponse {
   return { kind: 'refusal',
     reason: unavailable.length > 0 ? unavailableServiceReason(unavailable) : 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.',
     suggestion: 'Hãy kết nối dịch vụ và cấp phạm vi tài nguyên được phép trước khi lập kế hoạch.',
@@ -146,8 +153,10 @@ export class AIPlanner {
   private maxSearchRounds: number;
   private prefetchDirectory: boolean;
   private directoryBudgetMs: number;
+  private schedules: boolean;
 
   constructor(options: AIPlannerOptions) {
+    this.schedules = options.schedules ?? false;
     this.searchMode = options.searchMode ?? 'regex';
     this.maxSearchRounds = options.maxSearchRounds ?? 4;
     this.prefetchDirectory = options.prefetchDirectory ?? true;
@@ -160,6 +169,35 @@ export class AIPlanner {
     this.serviceRegistry = options.serviceRegistry ?? SERVICE_REGISTRY;
     this.requireGroundedResources = options.requireGroundedResources ?? true;
     this.readAnswers = options.readAnswers ?? false;
+  }
+
+  /** The services a schedule's request needs, by the same router as planning; the model never names them. */
+  routeSchedule(request: string): RoutedIntent {
+    return routeIntent(request, this.toolCatalog, this.serviceRegistry);
+  }
+
+  /**
+   * Routes the turn. In a conversation with a schedule, the schedule's services
+   * join the routed ones, unless the request names a service that is not configured.
+   */
+  private route(text: string, input: ProcessMessageInput): RoutedIntent {
+    const route = routeIntent(text, this.toolCatalog, this.serviceRegistry);
+    if (!input.schedule || route.unavailable.length > 0) return route;
+    return { services: [...new Set([...route.services, ...input.schedule.services])], unavailable: [] };
+  }
+
+  /** A scheduled run plans with the prompt of schedules off. */
+  private scheduling(input: ProcessMessageInput): boolean {
+    return this.schedules && !input.scheduledRun;
+  }
+
+  /** With schedules on, a schedule goes through validateSchedule; any other output keeps the plan path. */
+  private scheduleValidation(output: string, input: ProcessMessageInput): ValidationResult | null {
+    if (!this.schedules) return null;
+    let kind: unknown;
+    try { kind = JSON.parse(output)?.kind; } catch { return null; }
+    if (kind !== 'schedule') return null;
+    return validateSchedule(output, { enabled: !input.scheduledRun, now: this.now(), timeZone: this.timeZone, hasSchedule: Boolean(input.schedule) });
   }
 
   private async gather(input: ProcessMessageInput): Promise<PlannerResponse | undefined> {
@@ -358,13 +396,14 @@ export class AIPlanner {
     const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
 
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
-    const route = routeIntent(userTexts.join('\n'), this.toolCatalog, this.serviceRegistry);
+    const route = this.route(userTexts.join('\n'), input);
     const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
     if (activeTools.length === 0) return unroutable(route.unavailable);
 
     if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
 
-    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { search: Boolean(this.gatherSearch), readAnswers: this.readAnswers });
+    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone },
+      { search: Boolean(this.gatherSearch), readAnswers: this.readAnswers, schedules: this.scheduling(input) });
     let searchRounds = 0;
     let rejectedPlans = 0;
     const successfulReads: SearchOutcome[] = [];
@@ -398,9 +437,8 @@ export class AIPlanner {
       let answerOutput = false;
       try { answerOutput = this.readAnswers && JSON.parse(output)?.kind === 'answer'; } catch { /* Normal JSON validation reports this. */ }
       const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
-        hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : validatePlan(output, activeTools, this.requireGroundedResources ? { grounding: {
-        memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts,
-      } } : {});
+        hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(output, input) ?? validatePlan(output, activeTools,
+        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts } } : {});
       if (validation.valid) {
         if (validation.parsed.kind === 'answer') return { ...validation.parsed,
           lookups: successfulReads.map(answerLookup), usedDirectory };
@@ -452,12 +490,12 @@ export class AIPlanner {
       : userMessage;
 
     // 1. Hierarchical Routing: filter tool catalog by intent
-    const route = routeIntent(originalIntent ?? userMessage, this.toolCatalog, this.serviceRegistry);
+    const route = this.route(originalIntent ?? userMessage, input);
     const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
     if (activeTools.length === 0) return unroutable(route.unavailable);
 
     // 2. Prepare System Prompt & Conversation
-    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone });
+    const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { schedules: this.scheduling(input) });
     const conversationHistory: ChatMessage[] = [
       ...history,
       { role: 'user', content: planningMessage },
@@ -477,7 +515,7 @@ export class AIPlanner {
       signal,
     });
 
-    const firstValidation = validatePlan(firstOutput, activeTools, validationOptions);
+    const firstValidation = this.scheduleValidation(firstOutput, input) ?? validatePlan(firstOutput, activeTools, validationOptions);
     if (firstValidation.valid) {
       return firstValidation.parsed;
     }
@@ -501,7 +539,7 @@ export class AIPlanner {
       signal,
     });
 
-    const retryValidation = validatePlan(retryOutput, activeTools, validationOptions);
+    const retryValidation = this.scheduleValidation(retryOutput, input) ?? validatePlan(retryOutput, activeTools, validationOptions);
     if (retryValidation.valid) {
       return retryValidation.parsed;
     }
