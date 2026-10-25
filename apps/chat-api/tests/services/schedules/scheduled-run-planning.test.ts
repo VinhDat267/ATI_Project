@@ -25,7 +25,7 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
   let db: Db, owner: Person, now: Date, events: Array<{ event: string; payload: any; committedPlans: number }>, order: string[];
   const runners: ScheduleRunner[] = [];
 
-  const setup = (generatePlan: MockLLMProvider['generatePlan'], options: { toolCatalog?: ToolDefinition[]; gmail?: boolean } = {}) => {
+  const setup = (generatePlan: MockLLMProvider['generatePlan'], options: { toolCatalog?: ToolDefinition[]; gmail?: boolean; planTimeoutMs?: number } = {}) => {
     const provider = new MockLLMProvider();
     provider.generatePlan = generatePlan;
     const service = new ScheduleService({ pool: db.pool, timeZone: VN });
@@ -56,7 +56,8 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
       schedules: { repo: new ScheduleRepo(db.pool, VN), timeZone: VN, now: () => now },
     });
     const runner = new ScheduleRunner({ pool, timeZone: VN, now: () => now, planRun: (run, convId, signal) => chat.planScheduledRun(run, convId, signal),
-      recordState: (client, row, at) => service.recordState(client, row, at) });
+      recordState: (client, row, at) => service.recordState(client, row, at), planTimeoutMs: options.planTimeoutMs,
+      emit: (_convId, event, payload: any) => { order.push(event); events.push({ event, payload, committedPlans: -1 }); } });
     runners.push(runner);
     return { runner, service };
   };
@@ -117,17 +118,33 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
     expect(run.status).toBe('discarded');
     expect(await plansOf(run.conv_id)).toEqual([]);
     expect(events.some((e) => e.event === 'plan_preview')).toBe(false);
-    expect((await messagesOf(run.conv_id)).map((m) => m.metadata?.type)).toEqual(['schedule_run', 'schedule_discarded']);
+    const [started, discarded] = await messagesOf(run.conv_id);
+    expect([started.metadata.type, discarded.metadata.type]).toEqual(['schedule_run', 'schedule_discarded']);
+    // The page that showed "planning" for this run hears that it ended, after the result is saved.
+    expect(discarded.metadata.replyToMessageId).toBe(started.id);
+    expect(events.at(-1)).toMatchObject({ event: 'error', payload: { conversationId: run.conv_id, replyToMessageId: started.id,
+      message: 'Lịch đã thay đổi trong lúc lập kế hoạch. Kết quả này bị bỏ.' } });
+    expect(order.slice(-2)).toEqual(['COMMIT', 'error']);
   });
 
-  it('fails the run when the model times out, with the error in the run conversation', async () => {
+  it('fails a run whose planning outlives its limit, and tells the page the planning ended', async () => {
     const s = await schedule();
-    const { runner } = setup(async () => { throw new Error('LLM request timed out after 30000 ms'); });
+    // The model only answers when its signal is aborted: the runner's limit must cancel it.
+    const { runner } = setup((input) => new Promise((_resolve, reject) => {
+      input.signal!.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }), { planTimeoutMs: 50 });
     await runner.tick();
     const run = await runOf(s.id);
-    expect(run).toMatchObject({ status: 'planning_failed', error: 'Không lập được kế hoạch lúc này. Hãy thử lại.', plan_id: null });
-    expect((await messagesOf(run.conv_id)).at(-1)).toMatchObject({ role: 'system', metadata: { type: 'planning_error' } });
+    expect(run).toMatchObject({ status: 'planning_failed', error: 'Lập kế hoạch quá thời gian cho phép.', plan_id: null });
+    const messages = await messagesOf(run.conv_id);
+    const started = messages.find((m) => m.metadata?.type === 'schedule_run')!;
+    expect(messages.at(-1)).toMatchObject({ role: 'system', content: 'Lỗi: Lập kế hoạch quá thời gian cho phép.',
+      metadata: { type: 'planning_error', replyToMessageId: started.id } });
     expect(await plansOf(run.conv_id)).toEqual([]);
+    expect(events.filter((e) => e.event !== 'gather_progress').map((e) => [e.event, e.payload.state ?? e.payload.message])).toEqual([
+      ['agent_state', 'planning'], ['error', 'Lập kế hoạch quá thời gian cho phép.']]);
+    expect(events.at(-1)!.payload).toMatchObject({ conversationId: run.conv_id, replyToMessageId: started.id });
+    expect(order.slice(-2)).toEqual(['COMMIT', 'error']);
   });
 
   it('refuses a Gmail plan when the owner has not connected Gmail, and asks for attention', async () => {

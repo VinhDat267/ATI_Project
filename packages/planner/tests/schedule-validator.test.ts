@@ -38,6 +38,16 @@ describe('validateSchedule', () => {
     expect(check(create({ recurrence: onceAfter(366 * 24 * 60) }))).toMatchObject({ valid: false, layer: 'semantic' });
   });
 
+  it('places a repeated or skipped local time where the scheduler runs it', () => {
+    const berlin = (date: string, time: string, at: string) => check(create({ recurrence: { type: 'once', date, time } }), { timeZone: 'Europe/Berlin', now: new Date(at) });
+    // 25/10/2026: 02:30 happens twice; the scheduler takes the first (00:30Z), already past at 00:45Z.
+    expect(berlin('2026-10-25', '02:30', '2026-10-25T00:45:00Z')).toMatchObject({ valid: false, layer: 'semantic' });
+    expect(berlin('2026-10-25', '02:30', '2026-10-25T00:20:00Z').valid).toBe(true);
+    // 29/03/2026: 02:30 does not exist; the scheduler moves it to 03:00 (01:00Z).
+    expect(berlin('2026-03-29', '02:30', '2026-03-29T01:00:30Z')).toMatchObject({ valid: false, layer: 'semantic' });
+    expect(berlin('2026-03-29', '02:30', '2026-03-29T00:58:00Z').valid).toBe(true);
+  });
+
   it.each(['2026-02-30', '2026-13-01', '26-10-2026', '2026-10-5', ''])('refuses the date %s', (date) => {
     expect(check(create({ recurrence: { type: 'once', date, time: '09:00' } }))).toMatchObject({ valid: false, layer: 'schema' });
   });

@@ -68,7 +68,10 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
     const res = await client.query(
       "UPDATE schedule_runs SET status='interrupted', error=$1, updated_at=now() WHERE status='planning' RETURNING conv_id", [INTERRUPTED]);
     for (const row of res.rows) {
-      if (row.conv_id) await messages.createMessage(row.conv_id, 'system', `Lỗi: ${INTERRUPTED}`, { type: 'planning_error' }, client);
+      if (!row.conv_id) continue;
+      // Answer the run's first message, so reopening the conversation ends its planning state.
+      const first = (await client.query("SELECT id FROM messages WHERE conv_id=$1 AND metadata->>'type'='schedule_run' ORDER BY created_at, id LIMIT 1", [row.conv_id])).rows[0];
+      await messages.createMessage(row.conv_id, 'system', `Lỗi: ${INTERRUPTED}`, { type: 'planning_error', ...(first ? { replyToMessageId: first.id } : {}) }, client);
     }
   });
 }
@@ -114,13 +117,16 @@ export class ScheduleRunner {
     await this.queue;
   }
 
+  /** Called after COMMIT only. */
+  private send(convId: string, event: string, payload: unknown) {
+    try {
+      void Promise.resolve(this.options.emit?.(convId, event, payload)).catch(() => undefined);
+    } catch { /* A listener cannot undo a committed change. */ }
+  }
+
   private announce(changes: ScheduleChange[]) {
     for (const change of changes) {
-      if (!change.state) continue;
-      try {
-        void Promise.resolve(this.options.emit?.(change.convId, 'schedule_updated', { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata }))
-          .catch(() => undefined);
-      } catch { /* A listener cannot undo a committed change. */ }
+      if (change.state) this.send(change.convId, 'schedule_updated', { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata });
     }
   }
 
@@ -219,11 +225,11 @@ export class ScheduleRunner {
       const convId = (await client.query("INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', $2) RETURNING id",
         [run.user_id, `Lịch: ${run.name} · ${label}`])).rows[0].id as string;
       const metadata: ScheduleRunMessageMetadata = { type: 'schedule_run', scheduleId: run.schedule_id, runId: run.id, name: run.name, dueAt: dueAt.toISOString(), trigger: run.trigger };
-      await this.messages.createMessage(convId, 'user', runMessage({ name: run.name, request: run.request, dueAt }, timeZone), metadata, client);
+      const first = await this.messages.createMessage(convId, 'user', runMessage({ name: run.name, request: run.request, dueAt }, timeZone), metadata, client);
       await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
       const toPlan: RunToPlan = { runId: run.id, scheduleId: run.schedule_id, scheduleVersion: run.schedule_version, userId: run.user_id,
         name: run.name, request: run.request, dueAt, trigger: run.trigger };
-      return { toPlan, convId };
+      return { toPlan, convId, messageId: first.id };
     });
     if (!started) return;
 
@@ -245,27 +251,33 @@ export class ScheduleRunner {
       this.current = null;
     }
 
-    const persisted = await inTransaction(pool, async (client) => {
+    // 'planned', the text a run ended with when it has no result to announce, or null when another process ended it.
+    const ended = await inTransaction(pool, async (client): Promise<string | null> => {
       const schedule = (await client.query('SELECT version, status FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])).rows[0];
       const run = (await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
-      if (run?.status !== 'planning') return false;
+      if (run?.status !== 'planning') return null;
+      // Both endings answer the run's first message, as the error of a chat turn answers its request.
+      const replyTo = { replyToMessageId: started.messageId };
       if (failure || !prepared) {
-        await this.messages.createMessage(started.convId, 'system', `Lỗi: ${failure ?? FAILED}`, { type: 'planning_error' }, client);
+        const text = failure ?? FAILED;
+        await this.messages.createMessage(started.convId, 'system', `Lỗi: ${text}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status = $2, error=$3, updated_at=now() WHERE id=$1",
-          [runId, failure === STOPPED ? 'interrupted' : 'planning_failed', failure ?? FAILED]);
-        return false;
+          [runId, failure === STOPPED ? 'interrupted' : 'planning_failed', text]);
+        return text;
       }
       // Every change by the member bumps the version: a result planned for an older version is dropped.
       if (schedule.version !== started.toPlan.scheduleVersion || schedule.status === 'cancelled') {
-        await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded' }, client);
+        await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
-        return false;
+        return DISCARDED;
       }
       const outcome = await prepared.persist(client);
       await client.query('UPDATE schedule_runs SET status=$2, plan_id=$3, updated_at=now() WHERE id=$1',
         [runId, outcome.state, outcome.state === 'planned' ? outcome.planId : null]);
-      return true;
+      return 'planned';
     });
-    if (persisted) prepared!.afterCommit();
+    if (ended === 'planned') prepared!.afterCommit();
+    // The page that showed "planning" for this run hears that it ended, once the ending is saved.
+    else if (ended) this.send(started.convId, 'error', { conversationId: started.convId, message: ended, replyToMessageId: started.messageId });
   }
 }

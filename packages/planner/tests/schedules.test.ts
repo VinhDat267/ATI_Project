@@ -94,6 +94,31 @@ describe('SCHED-02 planner', () => {
       expect(p.provider.getCallCount()).toBe(0);
     });
 
+    it.each(MODES)('manages a schedule whose task needs a service that is no longer configured (%s)', async (mode) => {
+      const cancel = { kind: 'schedule', action: 'cancel', summary: 'Hủy lịch.' };
+      const p = planner(mode, [cancel], { schedules: true, toolCatalog: ALL_TOOLS.filter((t) => t.service !== 'calendar') });
+      // The request that created the schedule named Calendar; Calendar has since been unconfigured.
+      const history = [{ role: 'user', content: 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test' }, { role: 'assistant', content: JSON.stringify(create) }];
+      expect(await p.run('Hủy lịch này', { schedule: { services: ['calendar', 'slack'] }, history })).toEqual(cancel);
+      expect(p.provider.getCallCount()).toBe(1);
+      // A service named in this message still refuses the turn.
+      const named = planner(mode, [cancel], { schedules: true, toolCatalog: ALL_TOOLS.filter((t) => t.service !== 'telegram') });
+      expect(await named.run('Gửi thêm lên Telegram', { schedule: { services: ['calendar', 'slack'] }, history }))
+        .toMatchObject({ kind: 'refusal', unavailableServices: [{ id: 'telegram', name: 'Telegram' }] });
+      expect(named.provider.getCallCount()).toBe(0);
+    });
+
+    it('does not list the workspace before a turn about an existing schedule, but does for a run (llm)', async () => {
+      const reads: string[] = [];
+      const gatherSearch = async ({ tool }: { tool: string }) => { reads.push(tool); return []; };
+      const p = planner('llm', [pause], { schedules: true, prefetchDirectory: true, gatherSearch });
+      await p.run('Tạm dừng lịch này', { schedule: { services: ['calendar', 'slack'] } });
+      expect(reads).toEqual([]);
+      const run = planner('llm', ['{}'], { schedules: true, prefetchDirectory: true, gatherSearch });
+      await run.run(MESSAGE, { scheduledRun: true }).catch(() => undefined);
+      expect(reads.length).toBeGreaterThan(0);
+    });
+
     it.each(MODES)('refuses a schedule while planning a scheduled run, on both attempts (%s)', async (mode) => {
       const p = planner(mode, [create, create], { schedules: true });
       await expect(p.run(MESSAGE, { scheduledRun: true })).rejects.toThrow(/Validation failed after retry: \[semantic\]/);

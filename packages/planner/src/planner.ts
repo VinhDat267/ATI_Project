@@ -178,12 +178,17 @@ export class AIPlanner {
 
   /**
    * Routes the turn. In a conversation with a schedule, the schedule's services
-   * join the routed ones, unless the request names a service that is not configured.
+   * join the routed ones, and only a service this message names can refuse the
+   * turn: managing the schedule needs none of its services, which the request
+   * that created it may have named before one was unconfigured.
    */
   private route(text: string, input: ProcessMessageInput): RoutedIntent {
     const route = routeIntent(text, this.toolCatalog, this.serviceRegistry);
-    if (!input.schedule || route.unavailable.length > 0) return route;
-    return { services: [...new Set([...route.services, ...input.schedule.services])], unavailable: [] };
+    if (!input.schedule) return route;
+    const current = text === input.userMessage ? route : routeIntent(input.userMessage, this.toolCatalog, this.serviceRegistry);
+    if (current.unavailable.length > 0) return current;
+    const routed = route.unavailable.length > 0 ? current.services : route.services;
+    return { services: [...new Set([...routed, ...input.schedule.services])], unavailable: [] };
   }
 
   /** A scheduled run plans with the prompt of schedules off. */
@@ -408,7 +413,8 @@ export class AIPlanner {
     let rejectedPlans = 0;
     const successfulReads: SearchOutcome[] = [];
     let usedDirectory: string[] = [];
-    if (this.prefetchDirectory && this.gatherSearch) {
+    // Changing a schedule needs no resources: they are looked up when each run is planned.
+    if (this.prefetchDirectory && this.gatherSearch && !input.schedule) {
       usedDirectory = await this.measure('prefetch', input, () => this.listDirectory(activeTools, input));
       if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
     }

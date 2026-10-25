@@ -1,5 +1,6 @@
 import type { ScheduleRecurrence, ScheduleResponse, Weekday } from '@wap/tool-schemas';
 import { INJECTION_PATTERNS, type ValidationResult } from './validator.js';
+import { nextOccurrence } from './schedules/next-occurrence.js';
 
 export interface ValidateScheduleOptions {
   /** False when schedules are off, and while planning a scheduled run: every schedule is refused. */
@@ -25,22 +26,6 @@ function text(value: unknown, max: number): string | null {
   const trimmed = value.trim();
   const length = [...trimmed].length;
   return length >= 1 && length <= max ? trimmed : null;
-}
-
-/** Milliseconds the zone's wall clock is ahead of UTC at `at`. */
-function offsetMs(at: number, timeZone: string): number {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(at)).map((p) => [p.type, p.value]));
-  return Date.UTC(+parts.year!, +parts.month! - 1, +parts.day!, +parts.hour!, +parts.minute!, +parts.second!) - Math.floor(at / 1000) * 1000;
-}
-
-/** The instant of a local date and time; a second pass settles the offset across a daylight-saving change. */
-function zonedInstant(date: string, time: string, timeZone: string): number {
-  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  const [hour, minute] = time.split(':').map(Number) as [number, number];
-  const wall = Date.UTC(year, month - 1, day, hour, minute);
-  const first = wall - offsetMs(wall, timeZone);
-  return wall - offsetMs(first, timeZone);
 }
 
 function validDate(value: unknown): value is string {
@@ -99,7 +84,9 @@ export function validateSchedule(raw: string, options: ValidateScheduleOptions):
   const recurrence = recurrenceOf(parsed.recurrence);
   if (typeof recurrence === 'string') return fail('schema', recurrence);
   if (recurrence.type === 'once') {
-    const lead = zonedInstant(recurrence.date, recurrence.time, options.timeZone) - options.now.getTime();
+    // Where the scheduler runs it: a skipped local time moves to the next valid minute, a repeated one takes the first.
+    const at = nextOccurrence(recurrence, options.now, options.timeZone);
+    const lead = at ? at.getTime() - options.now.getTime() : -1;
     if (lead < MIN_LEAD_MS) return fail('semantic', 'A one-off time must be at least one minute in the future.');
     if (lead > MAX_LEAD_MS) return fail('semantic', 'A one-off time must be within 365 days.');
   }

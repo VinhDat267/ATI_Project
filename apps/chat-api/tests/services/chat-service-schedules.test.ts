@@ -26,9 +26,9 @@ describe('ChatService with schedules on PostgreSQL', () => {
   let db: Db, owner: Person, provider: MockLLMProvider, events: Array<{ event: string; payload: any }>;
   let messages: MessageRepo, conversations: ConversationRepo, plans: PlanRepo, schedules: ScheduleService;
 
-  const chat = (toolCatalog: ToolDefinition[] = ALL_TOOLS) => new ChatService({
+  const chat = (toolCatalog: ToolDefinition[] = ALL_TOOLS, searchMode: 'regex' | 'llm' = 'regex') => new ChatService({
     msgRepo: messages, convRepo: conversations, planRepo: plans, eventEmitter: { emit: (event, payload) => events.push({ event, payload }) },
-    planner: new AIPlanner({ provider, toolCatalog, schedules: true, now: () => NOW, timeZone: VN, requireGroundedResources: false,
+    planner: new AIPlanner({ provider, toolCatalog, schedules: true, now: () => NOW, timeZone: VN, requireGroundedResources: false, searchMode,
       gatherSearch: async () => [{ id: 'C0123456789', name: 'ati-test' }] }),
     schedules: { repo: new ScheduleRepo(db.pool, VN), timeZone: VN, now: () => NOW },
   });
@@ -115,6 +115,17 @@ describe('ChatService with schedules on PostgreSQL', () => {
       unavailableServices: [{ id: 'calendar', name: 'Google Calendar' }] }) });
     expect(await latest(convId, 'refusal')).toMatchObject({ metadata: { unavailableServices: [{ id: 'calendar', name: 'Google Calendar' }] } });
     expect(await latest(convId, 'schedule_proposal')).toBeUndefined();
+  });
+
+  it('cancels through the chat a schedule whose task needs a service that is no longer configured', async () => {
+    const { convId, schedule } = await scheduled();
+    provider.setPlanResponses([{ kind: 'schedule', action: 'cancel', summary: 'Hủy lịch.' }]);
+    // Live plans in llm mode, which routes on every request of the conversation, including the one that named Calendar.
+    const terminal = await send(convId, 'Hủy lịch này', chat(ALL_TOOLS.filter((t) => t.service !== 'calendar'), 'llm'));
+    expect(terminal.event).toBe('schedule_proposal');
+    const proposal = await latest(convId, 'schedule_proposal');
+    expect(proposal.metadata).toMatchObject({ proposal: { action: 'cancel' }, scheduleId: schedule.id, services: ['slack', 'calendar'] });
+    expect((await confirm(convId, proposal.id)).schedule.status).toBe('cancelled');
   });
 
   it('writes nothing of a run outside the transaction that persists it', async () => {
