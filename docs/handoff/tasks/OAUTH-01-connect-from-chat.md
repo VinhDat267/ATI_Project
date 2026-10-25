@@ -48,6 +48,16 @@ OAUTH-02 (Google Calendar riêng), provider mới, quay về hội thoại khi n
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- RED/GREEN, đột biến, lệnh kiểm và exit code:
-- Điều chưa làm hoặc khác với task card:
+- **PR:** PR_LINK, nhánh `feat/oauth-01-connect-from-chat` từ `main` `c760aa3`. Reviewer thi công ngày 25–26/10. Chi tiết: [log](../log/2026-10-26-reviewer-OAUTH-01-connect-from-chat.md).
+- **RED/GREEN:** PostgreSQL 16 tạm riêng ở 56533, sandbox, không dùng `.env` hay DB dev.
+  - API và migration: RED 3 fail ở route, migration fail vì chưa có file; GREEN 33/33 (cùng `gmail-migration.test.ts`);
+  - web: RED 7 fail / 21 đạt; thêm hai RED sau đó (đọc lại dịch vụ, nhãn "Cần kết nối lại"); GREEN 76/76 bốn file;
+  - browser `OAUTH-01 from chat:`: RED 4/4 trên mã web của `main` (URL về `/settings#gmail`); GREEN 4/4.
+- **Đột biến:** 20/20 bị bắt, gồm đủ 8 đột biến của task card.
+- **Kiểm toàn bộ:** `npm run check` exit 0, 63 + 408 + 359 + 42 + 554 + 789 = 2.215 v3 + 394 eval (`chat-api` thêm 7, web thêm 16). `npm run test:browser:v3` exit 0, 124 pass/1 skip có chủ đích, 13 nhóm (`gmail` 8). Cả hai chạy trên mã cuối, DB tạm dựng lại sạch.
+- **Khác với task card và đặc tả** (đã ghi "(OAUTH-01)" ở đặc tả 4.1, 5.1, 8):
+  - ràng buộc của migration không có phần `mode = 'connect_gmail'`, vì test có sẵn của 0009 đếm đúng 2 ràng buộc nhắc `mode`. Chờ nhóm trưởng xác nhận;
+  - mỗi màn từ chối mới gọi lại `GET /api/services`, vì danh sách tải lúc đăng nhập có thể cũ hơn lời từ chối; browser bắt được lỗi này ở lượt chạy thứ ba;
+  - tên ca browser bắt đầu bằng `OAUTH-01 from chat:`, vì `OAUTH-01:` khớp bộ lọc `AUTH-01:` của nhóm `default`;
+  - ba test viết sau khi đã có mã, để có test bắt đột biến O3, O4, O13; chúng không có RED.
+- **Chưa làm:** gọi Google thật (đi cùng GMAIL-04); quay về hội thoại khi người dùng huỷ ở Google (đặc tả mục 7).
