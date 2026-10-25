@@ -36,7 +36,8 @@ Khi cờ tắt, hoặc khi lập kế hoạch cho một lượt, prompt giống 
    - gọi planner với `scheduledRun: true`, `actor: { userId: run.userId }`, `userMessage` theo đặc tả mục 5.5, `history: []`, `signal`;
    - dùng **chung** phần xử lý kết quả với `executePlannerPipeline`: bỏ `connections` của model, `bindConnections`, `resourceLabels`, mã băm, hạn 30 phút, tin `plan`/`clarification`/`refusal`/`answer`, SSE. Tách phần đó thành bước "chuẩn bị" (không ghi DB) và bước "ghi" nhận `pg.PoolClient`;
    - `PlanRepo.createPlan` và `MessageRepo.createMessage` nhận thêm `client?: pg.PoolClient` tuỳ chọn; không có thì giữ transaction như cũ;
-   - `persist(client)` trả `planned` khi có kế hoạch, ngược lại `needs_attention`; `afterCommit()` phát đúng các sự kiện SSE mà đường chat thường phát.
+   - `persist(client)` trả `planned` khi có kế hoạch, ngược lại `needs_attention`; `afterCommit()` phát đúng các sự kiện SSE mà đường chat thường phát;
+   - giữ thứ tự khoá ở đặc tả mục 6.5 (thêm sau review #167). `persist` chạy trong transaction đã giữ dòng lịch, nên chỉ được ghi vào hội thoại của lượt, không ghi vào hội thoại của lịch. Đường xác nhận đề xuất giữ nguyên thứ tự: hội thoại, rồi lịch, rồi `users`.
 5. **`server.ts`:** tạo `AIPlanner` với `schedules: env.SCHEDULES_ENABLED`; truyền `schedules` cho `ChatService`; thay `planRun` tạm của SCHED-01 bằng `chatService.planScheduledRun`.
 6. **Sandbox** `SANDBOX_SCENARIO=schedule` (`apps/chat-api/src/sandbox/scenarios.ts`), theo khuôn kịch bản `gmail`: chọn phản hồi theo tin cuối của người dùng, không theo hàng đợi chung:
    - chứa `(Lượt chạy theo lịch` → kế hoạch Calendar → Slack của kịch bản `calendar_slack`;

@@ -18,6 +18,7 @@ import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
+import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
@@ -192,6 +193,14 @@ async function bootstrap() {
   // fall back to memory after failing to reconcile an available database.
   if (pool && userRepo) await reconcileInterruptedExecutions(pool);
 
+  // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
+  const schedules = createScheduleRuntime({
+    enabled: env.SCHEDULES_ENABLED, pool: pool && userRepo ? pool : null, timeZone: env.APP_TIME_ZONE,
+    emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
+  });
+  if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
+  if (schedules) await schedules.reconcile();
+
   // Gmail needs the flag, its own OAuth client and PostgreSQL; otherwise none of it exists.
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
 
@@ -323,12 +332,14 @@ async function bootstrap() {
     chatService,
     sseManager,
     executionService,
+    schedules: schedules ? { service: schedules.service, emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload) } : undefined,
   });
 
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
     console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
+    schedules?.runner.start();
   });
 }
 

@@ -20,9 +20,9 @@ Khi cờ tắt (`health.schedulesEnabled` không có), giao diện không đổi
    - `describeRecurrence(r: ScheduleRecurrence): string`:
      - `daily` → `Hằng ngày, 08:00, giờ Việt Nam`;
      - `weekly` từ 3 ngày liền trở lên → `Thứ Hai đến thứ Sáu, 08:30, giờ Việt Nam`; ngày rời → `Thứ Hai, thứ Tư, 08:30, giờ Việt Nam`; đủ 7 ngày → `Mọi ngày trong tuần, 08:30, giờ Việt Nam`;
-     - `once` → `Một lần, thứ Bảy 25/10/2026, 09:00, giờ Việt Nam`;
+     - `once` → `Một lần, thứ Bảy 31/10/2026, 09:00, giờ Việt Nam`;
      - tên ngày: 1 `thứ Hai` … 6 `thứ Bảy`, 7 `Chủ nhật`; viết hoa chữ đầu câu;
-   - `formatRunTime(iso: string): string` → `08:30 thứ Hai 27/10`, theo `Asia/Ho_Chi_Minh`.
+   - `formatRunTime(iso: string): string` → `08:30 thứ Hai 26/10`, theo `Asia/Ho_Chi_Minh`.
 3. **Khoảnh khắc `schedule`** (`services/cockpit-moment.ts`, `pages/Cockpit/ScheduleMoment.tsx`): chọn khi tin mới nhất của hội thoại có `metadata.type` là `schedule_proposal` hoặc `schedule_state`.
    - **Đề xuất** `create`/`update`: tên lịch (`h1`), `describeRecurrence`, việc sẽ làm (`request`), dịch vụ theo `servicePalette`, "Lần chạy tới:" với ba `formatRunTime`, và đúng câu "Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.";
    - `update`: mỗi trường đổi so với `previous` hiện giá trị cũ gạch ngang và giá trị mới;
@@ -62,6 +62,9 @@ Khi cờ tắt (`health.schedulesEnabled` không có), giao diện không đổi
 | `SCHEDULE_CLOSED` | Lịch đã hủy hoặc đã chạy xong. |
 | `STALE_VERSION` | Lịch vừa thay đổi ở nơi khác. Đã tải lại. |
 | `RUN_IN_PROGRESS` | Lịch đang lập kế hoạch cho một lượt. Hãy chờ lượt đó xong. |
+| `RUN_NOT_REPLANNABLE` | Lượt này không cần lập lại kế hoạch. |
+
+Mọi lỗi của route lịch có dạng `{ error: { code, message } }`; `message` đã là câu ở bảng trên, nên web hiện được ngay (thêm ở SCHED-01).
 
 Hình thức theo `docs/design/design-system.md` và các khoảnh khắc cockpit hiện có; bản mẫu không có màn lịch. Không thêm màu ngoài bảng, không thêm tab, không thêm route.
 

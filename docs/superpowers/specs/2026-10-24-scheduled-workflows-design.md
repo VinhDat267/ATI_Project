@@ -235,6 +235,7 @@ CREATE TABLE schedules (
   pause_reason text,
   version integer NOT NULL DEFAULT 1,
   next_run_at timestamptz,            -- chỉ có giá trị khi status = 'active'
+  last_proposal_id uuid REFERENCES messages(id),  -- (SCHED-01) đề xuất áp dụng gần nhất, mục 6.5
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((status = 'active') = (next_run_at IS NOT NULL))
@@ -288,7 +289,7 @@ Test ranh giới: 23:59 sang ngày sau, Chủ nhật sang thứ Hai, cuối thá
 `ScheduleRunner` trong `apps/chat-api/src/services/schedules/`, khởi động trong `bootstrap` sau `reconcileInterruptedExecutions`, chỉ khi cờ bật và có PostgreSQL. Đồng hồ và khoảng nhịp tiêm được (`now()`, `tickMs`, mặc định 30 giây); test gọi `tick()` trực tiếp, không chờ thời gian thật.
 
 **Mỗi nhịp:**
-1. Một transaction: `SELECT … FROM schedules WHERE status = 'active' AND next_run_at <= $now ORDER BY next_run_at FOR UPDATE SKIP LOCKED LIMIT 5`.
+1. Một transaction: `SELECT … FROM schedules WHERE status = 'active' AND next_run_at <= $now ORDER BY next_run_at FOR UPDATE SKIP LOCKED LIMIT 5`. **(SCHED-01, review #167)** Câu này khoá cả dòng `conversations` của lịch (`JOIN conversations c … FOR UPDATE OF c, s SKIP LOCKED`), nên nhịp bỏ qua lịch khi một trong hai dòng đang bị giữ, và không bao giờ phải chờ. Thứ tự khoá ở mục 6.5.
 2. Với mỗi lịch:
    - lịch đang có lượt `planning` (thường do "Chạy lượt này ngay") → bỏ qua lịch này ở nhịp này, không đổi gì; nhịp sau xét lại, và nếu đã trễ quá 10 phút thì thành lượt lỡ;
    - chủ lịch không còn `active` (`users.status`) → thêm lượt `blocked` ("Tài khoản không còn hoạt động"), chuyển lịch sang `paused` với lý do;
@@ -324,10 +325,26 @@ Kế hoạch của lượt đi qua đúng luồng duyệt, thực thi, khôi ph�
   - đề xuất phải là tin `schedule_proposal` **mới nhất** của hội thoại, và `baseVersion` bằng `version` hiện tại;
   - `create`: hội thoại chưa có lịch; người dùng có dưới 10 lịch `active` hoặc `paused`;
   - mọi action có `recurrence`: tính lại giờ hẹn lúc xác nhận; `once` mà giờ hẹn đã qua → 409 `SCHEDULE_IN_PAST` (đề xuất có thể được xác nhận muộn);
-  - `update`: lịch chưa `cancelled`; ghi đè `name`, `request`, `recurrence`, `services`, tăng `version`, tính lại `next_run_at` nếu `active`. Lịch `completed` (một lần đã chạy) được bật lại thành `active`;
+  - `update`: lịch chưa `cancelled`; ghi đè `name`, `request`, `recurrence`, `services`, tăng `version`, tính lại `next_run_at` nếu `active`. Lịch `completed` (một lần đã chạy) được bật lại thành `active`. **(SCHED-01, review #167)** Bật lại cần chỗ như `create`: người dùng phải có dưới 10 lịch `active` hoặc `paused`, đếm dưới cùng khoá dòng `users`, ngược lại 409 `LIMIT_REACHED`;
   - `pause`/`resume`/`cancel`: đổi trạng thái, tăng `version`. `resume` tính `next_run_at` từ `now`; lượt đã lỡ trong lúc tạm dừng không được ghi.
   - sai điều kiện → 409 với `code` (`STALE_PROPOSAL`, `LIMIT_REACHED`, `CONVERSATION_HAS_SCHEDULE`, `SCHEDULE_CLOSED`); không đổi gì.
+  - **(SCHED-01)** xác nhận lại đúng đề xuất đã áp dụng trả 200 với lịch hiện tại và không đổi gì, không ghi tin trạng thái. `schedules.last_proposal_id` lưu đề xuất áp dụng gần nhất. Lý do: bấm Xác nhận hai lần, hoặc hai tab cùng bấm, không nên báo lỗi;
+  - **(SCHED-01)** `pause` một lịch đang tạm dừng, `resume` một lịch đang bật, `cancel` một lịch đã hủy: 200, không đổi gì.
 - Nút tạm dừng, chạy tiếp, hủy ở danh sách gửi `version` đang thấy; sai → 409 `STALE_VERSION`.
+- **(SCHED-01)** Bộ hẹn giờ cũng ghi tin `schedule_state` (và phát `schedule_updated`) khi nó tự tạm dừng lịch, hoặc khi lịch một lần chuyển `completed`. Hai việc này không tăng `version` của chủ lịch tự làm, trừ tạm dừng.
+- **Thứ tự khoá (SCHED-01, review #167).** Mọi đường khoá dòng theo một thứ tự và không quay ngược lên:
+  1. hội thoại của lịch;
+  2. lịch;
+  3. chủ lịch (`users`);
+  4. lượt;
+  5. hội thoại của lượt.
+
+  Đường nào cũng có thể bỏ qua một bậc. Ghi tin (`MessageRepo.createMessage`) khoá dòng hội thoại. Vì vậy, nếu một transaction khoá lịch trước rồi mới ghi tin trạng thái, nó sẽ deadlock với một lượt xác nhận (PostgreSQL trả `40P01`, route trả 500). Áp dụng như sau:
+  - nút tạm dừng, chạy tiếp, hủy, "Chạy lượt này ngay" và "Lập lại kế hoạch" khoá hội thoại trước, qua `ScheduleRepo.ownedSchedule(…, lock)`;
+  - bộ hẹn giờ khoá cả hai dòng bằng `SKIP LOCKED` (mục 6.3);
+  - bước lưu kết quả của lượt (mục 6.4 bước 3) bắt đầu từ dòng lịch, và không ghi vào hội thoại của lịch.
+
+  SCHED-02 giữ đúng thứ tự này.
 
 ### 6.6. API
 
@@ -340,8 +357,10 @@ Mọi route cần đăng nhập, chỉ chủ lịch dùng được; ID của ng�
 | `GET /api/schedules/pending-count` | `{ count }`: số lượt `awaiting_approval` của người gọi |
 | `POST /api/conversations/:convId/schedule-proposals/:messageId/confirm` | `{ schedule: ScheduleView }` hoặc 409 |
 | `POST /api/schedules/:id/pause` · `/resume` · `/cancel`, body `{ version }` | `{ schedule: ScheduleView }` hoặc 409 |
-| `POST /api/schedules/:id/run-now` | `{ run: ScheduleRunView }`; lịch `cancelled`/`completed` → 409; đã có lượt `planning` → 409 `RUN_IN_PROGRESS` |
-| `POST /api/schedule-runs/:id/replan` | như trên, `trigger: 'replan'`; chỉ cho lượt `expired`, `planning_failed`, `interrupted`, `missed` |
+| `POST /api/schedules/:id/run-now` | 201 `{ run: ScheduleRunView }`; lịch `cancelled`/`completed` → 409 `SCHEDULE_CLOSED`; đã có lượt `planning` → 409 `RUN_IN_PROGRESS` |
+| `POST /api/schedule-runs/:id/replan` | như trên, `trigger: 'replan'`; chỉ cho lượt `expired`, `planning_failed`, `interrupted`, `missed`, ngược lại 409 `RUN_NOT_REPLANNABLE`. Lịch `completed` vẫn lập lại kế hoạch được cho lượt của nó; lịch `cancelled` thì không |
+
+**(SCHED-01)** Lỗi có dạng `{ error: { code, message } }`: 409 theo bảng mã, 404 `NOT_FOUND`, 400 `BAD_REQUEST` (thiếu `version`), 500 `SERVER_ERROR`. `message` là câu tiếng Việt, cùng câu với bảng 409 của SCHED-03.
 
 `GET /api/health` có `schedulesEnabled: true` khi cờ bật (giống `gmailEnabled`).
 

@@ -16,9 +16,11 @@ export class MessageRepo {
     convId: string,
     role: string,
     content: string,
-    metadata?: any
+    metadata?: any,
+    /** A client inside the caller's transaction; the pool otherwise. */
+    db: Pick<pg.Pool | pg.PoolClient, 'query'> = this.pool,
   ): Promise<MessageRow> {
-    const res = await this.pool.query(
+    const res = await db.query(
       `WITH locked_conversation AS (
          SELECT id FROM conversations WHERE id=$1 FOR UPDATE
        ), inserted AS (

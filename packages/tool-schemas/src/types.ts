@@ -114,6 +114,83 @@ export interface RefusalResponse {
 export interface AnswerLookup { tool: string; query?: string; resultCount: number; links: string[] }
 export interface AnswerResponse { kind: 'answer'; text: string; lookups: AnswerLookup[]; usedDirectory: string[] }
 
-export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse;
+/** ISO weekday: 1 = thứ Hai … 7 = Chủ nhật. */
+export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** Dates and times are local to APP_TIME_ZONE. */
+export type ScheduleRecurrence =
+  | { type: 'once'; date: string; time: string }   // YYYY-MM-DD, HH:mm
+  | { type: 'daily'; time: string }
+  | { type: 'weekly'; time: string; days: Weekday[] }; // non-empty, unique, ascending
+
+/** The planner returns this when the user wants to create, change, pause, resume or cancel a schedule. */
+export interface ScheduleResponse {
+  kind: 'schedule';
+  action: 'create' | 'update' | 'pause' | 'resume' | 'cancel';
+  /** Required for create/update; ignored for pause/resume/cancel. */
+  name?: string;                  // 1–80 characters
+  request?: string;               // 1–1000 characters, worded as if the user asked to run it now
+  recurrence?: ScheduleRecurrence;
+  summary: string;
+}
+
+export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
+
+export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
+
+export interface ScheduleView {
+  id: string; convId: string; version: number;
+  name: string; request: string; recurrence: ScheduleRecurrence;
+  /** Service ids chosen by the planner's router, never by the model. */
+  services: string[];
+  status: ScheduleStatus;
+  pauseReason: string | null;
+  /** ISO, at most 3; empty when no run is left. */
+  nextRuns: string[];
+  lastRun: ScheduleRunView | null;
+}
+
+/** Derived for display from schedule_runs.status and the run conversation's latest plan. */
+export type ScheduleRunState =
+  | 'planning' | 'awaiting_approval' | 'approved' | 'expired' | 'rejected'
+  | 'needs_attention' | 'planning_failed' | 'interrupted' | 'discarded' | 'missed' | 'blocked';
+
+export interface ScheduleRunView {
+  id: string; scheduleId: string;
+  trigger: 'scheduled' | 'manual' | 'replan';
+  dueAt: string; createdAt: string;
+  state: ScheduleRunState;
+  /** Above 1 when several missed times were recorded as one run. */
+  missedCount: number;
+  convId: string | null; planId: string | null;
+  /** Status of the run conversation's latest plan, when there is one. */
+  planStatus: string | null;
+  /** A Vietnamese sentence for the user. */
+  error: string | null;
+}
+
+/** Metadata of the assistant message that carries a schedule proposal. */
+export interface ScheduleProposalMetadata {
+  type: 'schedule_proposal';
+  proposal: ScheduleResponse;
+  scheduleId: string | null;      // null when creating
+  baseVersion: number | null;     // the schedule version this proposal changes; null when creating
+  services: string[];
+  nextRuns: string[];             // computed by the backend when the proposal is saved
+  previous: Pick<ScheduleView, 'name' | 'request' | 'recurrence' | 'status'> | null;
+}
+
+/** Metadata of the assistant message recording the schedule after each change. */
+export interface ScheduleStateMetadata {
+  type: 'schedule_state';
+  schedule: ScheduleView;
+}
+
+/** Metadata of the user message the scheduler saves at the start of a run conversation. */
+export interface ScheduleRunMessageMetadata {
+  type: 'schedule_run';
+  scheduleId: string; runId: string; name: string;
+  dueAt: string; trigger: 'scheduled' | 'manual' | 'replan';
+}
 
 export type AllowedScope = Partial<Record<string, string[]>>;
