@@ -822,6 +822,12 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - chia việc: reviewer làm backend và planner, `longnguyen005` làm giao diện;
   - đặc tả được duyệt ngày 25/10.
 
+- **Chốt 25/10/2026 (OAuth)** ([đặc tả OAUTH-01](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)):
+  - OAuth làm hẹp nhưng chạy thật. OAUTH-01 (kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại, gửi lại yêu cầu) là bắt buộc;
+  - OAUTH-02 (Google Calendar riêng) là tuỳ chọn, quyết ngày 29/10;
+  - OAuth cho Slack, GitHub, Notion, Jira, Trello không làm trước 04/11; Telegram giữ bot token;
+  - quay về hội thoại chỉ tới `/c/<uuid>` của chính người gọi. Không tự gửi lại yêu cầu, không tự duyệt kế hoạch.
+
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
 - Label của golden set được đăng ký trước. Chỉ sửa label trong commit riêng, có giải thích, không sửa để khớp kết quả.

@@ -70,7 +70,8 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 5 (thêm 25/10; trước 30/10) | Lịch chạy phần 2: planner trả kiểu `schedule`, lưu đề xuất, lập kế hoạch cho lượt qua đường chat hiện có, sandbox `schedule` | [SCHED-02](tasks/SCHED-02-schedule-planner.md) | chờ, giao reviewer; cần SCHED-01 |
 | 5 (thêm 25/10; trước 01/11) | Lịch chạy phần 3: giao diện (thẻ lịch trong cockpit, mục Lịch chạy ở Nhật ký, số lượt chờ duyệt trên tab Nhật ký) | [SCHED-03](tasks/SCHED-03-schedule-ui.md) | chờ, giao `longnguyen005`; bắt đầu ngay, merge sau SCHED-02 |
 | 5 (thêm 25/10; trước 04/11) | Lịch chạy phần 4: bộ đo ý định, đo lại `core`/`services` khi bật cờ, nghiệm thu thật qua giao diện, PR bật cờ | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | chờ; bộ đo giao reviewer, nghiệm thu giao nhóm trưởng |
-| 5 (thêm 25/10) | OAuth cho các dịch vụ (phần còn lại của đề xuất của `longnguyen005`) | — | chưa có task card; bàn sau khi SCHED-00 merge. Mốc cắt 01/11 (đặc tả lịch chạy mục 10) |
+| 5 (thêm 25/10; trước 29/10) | OAuth phần 1: kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại và gửi lại yêu cầu ([đặc tả](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)) | [OAUTH-01](tasks/OAUTH-01-connect-from-chat.md) | chờ, giao reviewer; cần GMAIL-04 để nghiệm thu thật |
+| 5 (thêm 25/10; tuỳ chọn, mốc cắt 01/11) | OAuth phần 2: Google Calendar "của riêng bạn", dựng trên hạ tầng Gmail | — | nhóm trưởng quyết làm hay bỏ ngày 29/10; có đặc tả riêng nếu làm. OAuth cho Slack, GitHub, Notion, Jira, Trello không làm, ghi vào báo cáo là hướng phát triển |
 | 5 (29/10–04/11) → dời 05–06/11 | Ngừng thêm tính năng **từ 04/11** (dời từ 29/10, chốt 24/10); môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
 | 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
 
@@ -133,6 +134,12 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
 - **Cờ `SCHEDULES_ENABLED`** tắt mặc định. Khi cờ tắt, prompt giữ nguyên từng byte, nên W4-01, W4-03, W4-04 vẫn đúng với hệ thống khi cờ tắt. Khi bật, SCHED-04 đo lại `core` và `services`.
 - **Mốc cắt:** 01/11 SCHED-01 hoặc SCHED-02 chưa merge thì dừng OAuth; 03/11 nghiệm thu thật chưa đạt thì giữ cờ tắt.
 - Phần ổn định demo của tuần 5 dời sang 05–06/11, nên tuần cuối còn ít thời gian hơn. Task card tuần 5 và tuần 6 lập sau.
+
+**Cập nhật 25/10 (OAuth):** nhóm trưởng duyệt phạm vi OAuth hẹp và đặc tả [OAUTH-01](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md).
+- **OAUTH-01**, bắt buộc, reviewer thi công, merge trước 29/10: từ màn từ chối vì thiếu Gmail, người dùng kết nối Gmail, quay về đúng hội thoại và gửi lại yêu cầu. Kế hoạch vẫn chờ duyệt.
+- **OAUTH-02**, tuỳ chọn: Google Calendar riêng của từng người. Nhóm trưởng quyết làm hay bỏ ngày 29/10; mốc cắt 01/11.
+- **Không làm:** OAuth cho Slack, GitHub, Notion, Jira, Trello, cùng chế độ tự chạy. Các phần này ghi vào báo cáo môn học là hướng phát triển.
+- **Điều kiện tiên quyết:** GMAIL-04 (nghiệm thu Google thật, PR bật cờ Gmail), do nhóm trưởng thao tác.
 
 [Log](log/2026-10-25-reviewer-plan-schedules.md).
 
