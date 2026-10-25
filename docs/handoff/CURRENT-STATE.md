@@ -813,6 +813,15 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - trong bộ chạy golden, câu có lời gọi model quá deadline của production sau cả hai lần thử được chấm trượt, và campaign chạy tiếp. Lỗi provider khác, hoặc 3 lần quá hạn liền nhau (chỉ câu model đã trả lời mới cắt chuỗi), vẫn dừng campaign. Deadline của app không đổi;
   - nhóm trưởng cho đo và merge #164 ngày 24/10, trong ba ngày thử W4-03, vì tối đó không có lượt thử và PR không đổi mã sản phẩm.
 
+- **Chốt 24–25/10/2026** ([đặc tả lịch chạy](../superpowers/specs/2026-10-24-scheduled-workflows-design.md), task [SCHED-common](tasks/SCHED-common.md)):
+  - nhóm trưởng quyết triển khai đề xuất "OAuth và tạo lịch workflow bằng AI" của `longnguyen005`; lịch chạy làm trước, OAuth làm sau;
+  - **mốc ngừng thêm tính năng dời từ 29/10 sang 04/11**; phần ổn định demo của tuần 5 dời sang 05–06/11;
+  - lịch chạy chỉ có chế độ chờ duyệt từng lần: mỗi lượt lập kế hoạch mới, có mã băm và lần duyệt riêng. Quy tắc "chỉ ghi khi người dùng duyệt đúng kế hoạch" giữ nguyên;
+  - demo lịch chạy dùng Google Calendar → Slack;
+  - cờ `SCHEDULES_ENABLED` tắt mặc định cho tới PR bật cờ của SCHED-04; catalog 33 tool/8 dịch vụ không đổi;
+  - chia việc: reviewer làm backend và planner, `longnguyen005` làm giao diện;
+  - đặc tả được duyệt ngày 25/10.
+
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.
 - Label của golden set được đăng ký trước. Chỉ sửa label trong commit riêng, có giải thích, không sửa để khớp kết quả.
