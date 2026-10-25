@@ -58,3 +58,39 @@ Script `.codex/sched02/mutate.mjs`. **26/26 bị bắt**: 18 đột biến S c�
   - Planner thêm 4 test: hủy lịch khi dịch vụ cũ mất cấu hình (2 chế độ), không tra danh mục, và giờ mùa hè.
   - `chat-api` thêm 1 test (hủy lịch qua `ChatService`). Ca timeout cũ được thay bằng ca dùng `AbortSignal` thật, nên số test không đổi ở chỗ đó.
 - `npm run test:browser:v3` trên DB tạm dựng lại sạch ở 56533, cổng riêng (API 3999, web 5199), cờ tắt như CI: **exit 0** ngay lượt đầu, **120 pass/1 skip có chủ đích, 13 nhóm**.
+
+Commit: `8c07c11` (mã và test), `3c2c836` (tài liệu).
+
+## Review lần 2 (tại `3c2c836`): còn 1 P2
+
+Kết quả review lần 2:
+- **P2 về SSE và P2 về giờ mùa hè đã đóng.**
+- **P3 prefetch** ở câu tạo lịch đầu tiên vẫn còn, và đã ghi là giới hạn.
+- **P2 quản lý lịch** mới sửa một phần. Khi **không còn dịch vụ nào** được cấu hình, catalog rỗng nên không có tool; cả hai chế độ dừng ở chốt "không có tool" và trả `unroutable` trước model. Reviewer tái hiện ở `regex`, `llm` và qua `ChatService` với PostgreSQL thật, và test hồi quy của reviewer fail 2/2.
+
+**Sửa:**
+- `refusedWithoutTools`: không có tool thì vẫn từ chối trước model, trừ khi hội thoại có lịch, cờ bật, không phải lượt chạy, và câu hiện tại không nêu dịch vụ chưa cấu hình.
+- Lượt được cho qua mà không có tool: nếu sau lần thử lại model vẫn không ra kết quả hợp lệ, planner trả `unroutable` như trước, không ném lỗi lập kế hoạch. Áp dụng ở cả `regex` và `llm`.
+- Đặc tả mục 5.3 có ghi chú "(SCHED-02, review lần 2 #168)".
+
+**RED → GREEN** (log `.codex/sched02/review2-red.log`, `review2-green.log`):
+
+| Test | RED trên `3c2c836` | GREEN |
+|---|---|---|
+| planner · manages a schedule when no service is configured at all (`regex`, `llm`) | `expected { kind: 'refusal' … } to deeply equal { kind: 'schedule' … }` | đạt |
+| `chat-service-schedules` · pauses through the chat a schedule after every service was unconfigured (`regex`, `llm`) | `expected 'refusal' to be 'schedule_proposal'` | đạt |
+
+Bản chép test hồi quy của reviewer (`.codex/review-pr168-r2/empty-catalog.test.ts`) chạy trên mã đã sửa: **2/2 đạt**.
+
+**Đột biến:** **30/30 bị bắt**, gồm 26 cũ chạy lại trên mã mới và 4 mới:
+
+| # | Đột biến | Test bắt |
+|---|---|---|
+| U1 | không có tool thì luôn từ chối trước model | manages a schedule when no service is configured at all |
+| U2 | bỏ qua dịch vụ mà câu hiện tại nêu khi không có tool | như trên (phần "Gửi Slack xin chào") |
+| U3 | `llm`: không có tool, model trả sai thì ném lỗi lập kế hoạch | như trên (phần "Nhắc mọi người việc này") |
+| U4 | `regex`: như U3 | như trên |
+
+**Kiểm toàn bộ:**
+- `npm run check`: **exit 0** ngay lượt đầu, 63 + 408 + **359** + 42 + **547** + 773 = **2.192 v3** + **394 eval**;
+- browser trên DB dựng lại sạch: **exit 0** ngay lượt đầu, **120 pass/1 skip, 13 nhóm**.

@@ -193,6 +193,11 @@ Quy tắc trong prompt, theo thứ tự:
 
 **(SCHED-02, review #168)** Ở chế độ `llm`, router đọc mọi câu người dùng trong hội thoại, gồm cả câu đã tạo lịch. Trong hội thoại có lịch, **chỉ dịch vụ chưa cấu hình mà câu hiện tại nêu** mới làm planner từ chối trước khi gọi model. Ví dụ: lịch Calendar → Slack, sau đó quản trị viên gỡ cấu hình Calendar; "Hủy lịch này" vẫn tới model và ra đề xuất `cancel`. Đề xuất `create`/`update` vẫn bị kiểm dịch vụ bằng `routeSchedule(request)` (mục 5.4), và mỗi lượt chạy vẫn lập kế hoạch theo catalog của lúc đó.
 
+**(SCHED-02, review lần 2 #168)** Trường hợp **không còn dịch vụ nào** được cấu hình cũng xử lý như trên.
+- Câu không nêu dịch vụ chưa cấu hình vẫn tới model, dù không có tool nào, vì tạm dừng, chạy tiếp hay hủy lịch đều không cần tool.
+- Nếu sau lần thử lại model vẫn không ra kết quả hợp lệ (ví dụ trả một kế hoạch), planner trả đúng lời từ chối `unroutable` mà lượt đó lẽ ra nhận, chứ không báo lỗi lập kế hoạch.
+- Ngoài hội thoại có lịch, hoặc ở lượt chạy, không có tool thì vẫn từ chối trước model như trước.
+
 `validateSchedule(raw, { enabled, now, timeZone, hasSchedule })`:
 - JSON, đúng schema mục 4; `name`, `request`, `recurrence` bắt buộc với `create`/`update`;
 - `time` khớp `HH:mm` trong 00:00–23:59;

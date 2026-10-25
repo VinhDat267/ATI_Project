@@ -111,3 +111,8 @@ Cờ tắt vẫn nối mục lịch vào prompt; bỏ qua `scheduledRun`; không
   - **P3:** không tra danh mục trong hội thoại đã có lịch. Câu tạo lịch đầu tiên vẫn tra; đã ghi là giới hạn.
 
   RED 7 ca, GREEN; đột biến **26/26 bị bắt**. `npm run check` exit 0: **2.188 v3** (63 + 408 + 357 + 42 + 545 + 773) + **394 eval**; browser exit 0 ngay lượt đầu, **120 pass/1 skip, 13 nhóm**. SCHED-03 có thêm ghi chú về `schedule_discarded`.
+- **Sửa sau review lần 2** (tại `3c2c836`, **chưa đạt**, còn 1 P2):
+  - lỗi: khi không còn dịch vụ nào được cấu hình, lượt quản lý lịch vẫn bị từ chối trước model;
+  - sửa: lượt đó nay tới model dù không có tool, và nếu model không ra kết quả hợp lệ thì vẫn trả lời từ chối như trước.
+
+  RED 4 ca, GREEN; đột biến **30/30 bị bắt**. `npm run check` exit 0: **2.192 v3** (63 + 408 + 359 + 42 + 547 + 773) + **394 eval**; browser exit 0 ngay lượt đầu, **120 pass/1 skip**.
