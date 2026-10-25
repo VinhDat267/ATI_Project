@@ -48,7 +48,7 @@ OAUTH-02 (Google Calendar riêng), provider mới, quay về hội thoại khi n
 
 ## Kết quả (agent thi công điền)
 
-- **PR:** PR_LINK, nhánh `feat/oauth-01-connect-from-chat` từ `main` `c760aa3`. Reviewer thi công ngày 25–26/10. Chi tiết: [log](../log/2026-10-26-reviewer-OAUTH-01-connect-from-chat.md).
+- **PR:** [#172](https://github.com/VinhDat267/ATI_Project/pull/172), nhánh `feat/oauth-01-connect-from-chat` từ `main` `c760aa3`. Reviewer thi công ngày 25–26/10. Chi tiết: [log](../log/2026-10-26-reviewer-OAUTH-01-connect-from-chat.md).
 - **RED/GREEN:** PostgreSQL 16 tạm riêng ở 56533, sandbox, không dùng `.env` hay DB dev.
   - API và migration: RED 3 fail ở route, migration fail vì chưa có file; GREEN 33/33 (cùng `gmail-migration.test.ts`);
   - web: RED 7 fail / 21 đạt; thêm hai RED sau đó (đọc lại dịch vụ, nhãn "Cần kết nối lại"); GREEN 76/76 bốn file;
