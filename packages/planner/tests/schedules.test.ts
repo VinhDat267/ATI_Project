@@ -108,6 +108,30 @@ describe('SCHED-02 planner', () => {
       expect(named.provider.getCallCount()).toBe(0);
     });
 
+    it.each(MODES)('manages a schedule when no service is configured at all (%s)', async (mode) => {
+      const cancel = { kind: 'schedule', action: 'cancel', summary: 'Hủy lịch.' };
+      const history = [{ role: 'user', content: 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test' }, { role: 'assistant', content: JSON.stringify(create) }];
+      const p = planner(mode, [cancel], { schedules: true, toolCatalog: [] });
+      expect(await p.run('Hủy lịch này', { schedule: { services: ['calendar', 'slack'] }, history })).toEqual(cancel);
+      expect(p.provider.getCallCount()).toBe(1);
+      // A message naming an unconfigured service is still refused before the model.
+      const named = planner(mode, [cancel], { schedules: true, toolCatalog: [] });
+      expect(await named.run('Gửi Slack xin chào', { schedule: { services: ['calendar', 'slack'] }, history }))
+        .toMatchObject({ kind: 'refusal', reason: 'Slack chưa được kết nối hoặc chưa có tài nguyên được phép.' });
+      expect(named.provider.getCallCount()).toBe(0);
+      // Any other answer ends in the refusal such a turn always got, not in a planning error.
+      const plan = { kind: 'plan', thinking: 't', summary: 's', warnings: [], steps: [
+        { id: 'send', tool: 'slack.send_message', description: 'Gửi', args: { channel: 'C0123456789', text: 'Xin chào' }, dependsOn: [] }] };
+      const other = planner(mode, [plan, plan], { schedules: true, toolCatalog: [] });
+      expect(await other.run('Nhắc mọi người việc này', { schedule: { services: ['calendar', 'slack'] }, history }))
+        .toMatchObject({ kind: 'refusal', reason: 'Dịch vụ được yêu cầu chưa khả dụng hoặc chưa được cấp quyền trong kết nối này.' });
+      expect(other.provider.getCallCount()).toBe(2);
+      // Without a schedule nothing reaches the model, as before.
+      const none = planner(mode, [cancel], { schedules: true, toolCatalog: [] });
+      expect(await none.run('Hủy lịch này')).toMatchObject({ kind: 'refusal' });
+      expect(none.provider.getCallCount()).toBe(0);
+    });
+
     it('does not list the workspace before a turn about an existing schedule, but does for a run (llm)', async () => {
       const reads: string[] = [];
       const gatherSearch = async ({ tool }: { tool: string }) => { reads.push(tool); return []; };

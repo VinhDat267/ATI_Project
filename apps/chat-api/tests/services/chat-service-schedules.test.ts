@@ -128,6 +128,16 @@ describe('ChatService with schedules on PostgreSQL', () => {
     expect((await confirm(convId, proposal.id)).schedule.status).toBe('cancelled');
   });
 
+  it.each(['regex', 'llm'] as const)('pauses through the chat a schedule after every service was unconfigured (%s)', async (mode) => {
+    const { convId, schedule } = await scheduled();
+    provider.setPlanResponses([{ kind: 'schedule', action: 'pause', summary: 'Tạm dừng lịch.' }]);
+    const terminal = await send(convId, 'Tạm dừng lịch này', chat([], mode));
+    expect(terminal.event).toBe('schedule_proposal');
+    const proposal = await latest(convId, 'schedule_proposal');
+    expect(proposal.metadata).toMatchObject({ proposal: { action: 'pause' }, scheduleId: schedule.id, services: ['slack', 'calendar'] });
+    expect((await confirm(convId, proposal.id)).schedule.status).toBe('paused');
+  });
+
   it('writes nothing of a run outside the transaction that persists it', async () => {
     const { schedule } = await scheduled();
     provider.setPlanResponses([slackPlan]);

@@ -191,6 +191,16 @@ export class AIPlanner {
     return { services: [...new Set([...routed, ...input.schedule.services])], unavailable: [] };
   }
 
+  /**
+   * A turn with no service tool is refused before the model, except in a
+   * conversation with a schedule when the message names no unconfigured
+   * service: pausing, resuming or cancelling the schedule needs no tool.
+   */
+  private refusedWithoutTools(activeTools: ToolDefinition[], route: RoutedIntent, input: ProcessMessageInput): boolean {
+    if (activeTools.length > 0) return false;
+    return !(input.schedule && this.scheduling(input) && route.unavailable.length === 0);
+  }
+
   /** A scheduled run plans with the prompt of schedules off. */
   private scheduling(input: ProcessMessageInput): boolean {
     return this.schedules && !input.scheduledRun;
@@ -403,7 +413,7 @@ export class AIPlanner {
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
     const route = this.route(userTexts.join('\n'), input);
     const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
-    if (activeTools.length === 0) return unroutable(route.unavailable);
+    if (this.refusedWithoutTools(activeTools, route, input)) return unroutable(route.unavailable);
 
     if (signal?.aborted) throw signal.reason ?? new Error('Planning was aborted');
 
@@ -453,6 +463,8 @@ export class AIPlanner {
       if (validation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
 
       if (++rejectedPlans > 1) {
+        // A turn let through without tools for its schedule ends as it would have without one.
+        if (activeTools.length === 0) return unroutable(route.unavailable);
         if (answerOutput) return readOnlyQuestion();
         if (validation.layer === 'grounding' && validation.ungrounded) {
           const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
@@ -498,7 +510,7 @@ export class AIPlanner {
     // 1. Hierarchical Routing: filter tool catalog by intent
     const route = this.route(originalIntent ?? userMessage, input);
     const activeTools = this.toolCatalog.filter((tool) => route.services.includes(tool.service));
-    if (activeTools.length === 0) return unroutable(route.unavailable);
+    if (this.refusedWithoutTools(activeTools, route, input)) return unroutable(route.unavailable);
 
     // 2. Prepare System Prompt & Conversation
     const systemPrompt = buildSystemPrompt(activeTools, { now: this.now(), timeZone: this.timeZone }, { schedules: this.scheduling(input) });
@@ -550,6 +562,8 @@ export class AIPlanner {
       return retryValidation.parsed;
     }
     if (retryValidation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
+    // A turn let through without tools for its schedule ends as it would have without one.
+    if (activeTools.length === 0) return unroutable(route.unavailable);
 
     // Never preview a plan built on invented IDs; ask for the resources and
     // keep the original request so the answer resumes the same workflow.
