@@ -172,6 +172,26 @@ describe('schedule routes over HTTP and PostgreSQL', () => {
       const r = await confirm(alice, convId, await propose(convId, create({ action: 'update', recurrence: { type: 'once', date: '2026-10-25', time: '17:00' } }), schedule.id, 1));
       expect(r.body.schedule).toMatchObject({ status: 'active', version: 2, nextRuns: ['2026-10-25T10:00:00.000Z'] });
     });
+
+    it('refuses to turn a finished schedule back on when ten others are open', async () => {
+      const { convId, schedule } = await scheduled(alice, create({ recurrence: { type: 'once', date: '2026-10-25', time: '10:00' } }));
+      await db.pool.query("UPDATE schedules SET status='completed', next_run_at=NULL WHERE id=$1", [schedule.id]);
+      const others = [];
+      for (let i = 0; i < 10; i++) others.push((await scheduled(alice, create({ name: `Lịch ${i}` }))).schedule);
+      const later = create({ action: 'update', recurrence: { type: 'once', date: '2026-10-25', time: '17:00' } });
+      let r = await confirm(alice, convId, await propose(convId, later, schedule.id, 1));
+      expect(r.status).toBe(409);
+      expect(r.body.error.code).toBe('LIMIT_REACHED');
+      expect((await db.pool.query('SELECT status, version FROM schedules WHERE id=$1', [schedule.id])).rows[0]).toEqual({ status: 'completed', version: 1 });
+      expect(await stateMessages(convId)).toHaveLength(1);
+      // An open schedule already has its place.
+      const open = (await db.pool.query('SELECT conv_id FROM schedules WHERE id=$1', [others[1].id])).rows[0].conv_id;
+      expect((await confirm(alice, open, await propose(open, create({ action: 'update', name: 'Đổi tên' }), others[1].id, 1))).status).toBe(200);
+      // A cancelled schedule frees its place.
+      await api(alice).post(`/api/schedules/${others[0].id}/cancel`, { version: 1 });
+      r = await confirm(alice, convId, await propose(convId, later, schedule.id, 1));
+      expect(r.body.schedule).toMatchObject({ status: 'active', version: 2 });
+    });
   });
 
   describe('buttons', () => {

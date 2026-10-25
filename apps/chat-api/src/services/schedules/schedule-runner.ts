@@ -150,10 +150,13 @@ export class ScheduleRunner {
     const toPlan: string[] = [];
     const changes = await inTransaction(this.options.pool, async (client) => {
       const changes: ScheduleChange[] = [];
+      // Claim the conversation with the schedule, skipping both when either is held: a confirmation
+      // holds the conversation while it waits for the schedule (lock order in ScheduleRepo.ownedSchedule).
       const due = await client.query(
-        `SELECT s.*, u.status AS owner_status FROM schedules s JOIN users u ON u.id = s.user_id
+        `SELECT s.*, u.status AS owner_status FROM schedules s
+         JOIN conversations c ON c.id = s.conv_id JOIN users u ON u.id = s.user_id
          WHERE s.status = 'active' AND s.next_run_at <= $1
-         ORDER BY s.next_run_at, s.id FOR UPDATE OF s SKIP LOCKED LIMIT ${DUE_PER_TICK}`, [now]);
+         ORDER BY s.next_run_at, s.id FOR UPDATE OF c, s SKIP LOCKED LIMIT ${DUE_PER_TICK}`, [now]);
       for (const row of due.rows as Array<ScheduleRow & { owner_status: string }>) {
         // A run started by hand is still planning; look again next tick.
         if ((await client.query("SELECT 1 FROM schedule_runs WHERE schedule_id=$1 AND status='planning'", [row.id])).rowCount) continue;

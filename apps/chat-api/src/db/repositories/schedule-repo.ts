@@ -75,8 +75,21 @@ export class ScheduleRepo {
     return res.rows.map((row) => this.view(row, row.last_run, now));
   }
 
+  /**
+   * With `lock`, locks the schedule's conversation first. Every path takes row
+   * locks in one order and never goes back up: the schedule's conversation, the
+   * schedule, its owner, its runs, then a run's conversation. Writing a message
+   * locks its conversation, so locking the schedule and then writing its state
+   * message would deadlock with a confirmation.
+   */
   async ownedSchedule(id: string, userId: string, db: Queryable = this.pool, lock = false): Promise<ScheduleRow | null> {
     if (!isUuid(id)) return null;
+    if (lock) {
+      // conv_id never changes, so it can be read before the locks.
+      const found = await db.query('SELECT conv_id FROM schedules WHERE id = $1 AND user_id = $2', [id, userId]);
+      if (!found.rowCount) return null;
+      await db.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [found.rows[0].conv_id]);
+    }
     const res = await db.query(`SELECT * FROM schedules WHERE id = $1 AND user_id = $2${lock ? ' FOR UPDATE' : ''}`, [id, userId]);
     return res.rows[0] ?? null;
   }

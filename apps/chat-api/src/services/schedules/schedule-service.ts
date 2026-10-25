@@ -45,6 +45,8 @@ export interface ScheduleServiceOptions {
 }
 
 const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed']);
+/** Schedules that count toward the limit. */
+const OPEN = new Set(['active', 'paused']);
 
 export class ScheduleService {
   readonly repo: ScheduleRepo;
@@ -125,6 +127,13 @@ export class ScheduleService {
     return { schedule: this.repo.view(row, await this.repo.lastRun(row.id, client), now), convId: row.conv_id, state: null };
   }
 
+  /** The owner row serializes the count across the member's conversations; it comes after the conversation and schedule locks. */
+  private async ensureRoom(client: pg.PoolClient, userId: string): Promise<void> {
+    await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    const open = await client.query("SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')", [userId]);
+    if (open.rows[0].n >= this.maxSchedules) throw new ScheduleConflict('LIMIT_REACHED');
+  }
+
   async confirmProposal(input: { userId: string; convId: string; messageId: string; now: Date }): Promise<ScheduleChange> {
     const { userId, convId, messageId, now } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
@@ -146,9 +155,7 @@ export class ScheduleService {
       const proposal = metadata.proposal;
       if (proposal.action === 'create') {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
-        await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-        const open = await client.query("SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')", [userId]);
-        if (open.rows[0].n >= this.maxSchedules) throw new ScheduleConflict('LIMIT_REACHED');
+        await this.ensureRoom(client, userId);
         const next = this.next({ recurrence: proposal.recurrence! }, now);
         const created = await client.query(
           `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id)
@@ -163,6 +170,8 @@ export class ScheduleService {
         await client.query('UPDATE schedules SET last_proposal_id=$2 WHERE id=$1', [existing.id, messageId]);
         return this.unchanged(client, existing, now);
       }
+      // Turning a finished schedule back on takes a place again.
+      if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId);
       return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId), now);
     });
   }
