@@ -1,6 +1,34 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 24/10/2026 (Asia/Saigon), sau merge [#164](https://github.com/VinhDat267/ATI_Project/pull/164) (`1df2d35`): **W4-01 đo xong** trên 32 câu do bốn thành viên viết, mỗi người 8, mã `member-1` → `member-4`. Hai trong bốn người đã xem hoặc sửa prompt, nên bộ câu **không độc lập** như task card yêu cầu. Kết quả tách theo hai nhóm; repo không ghi mã nào thuộc nhóm nào.
+**Cập nhật lần cuối:** 25/10/2026 (Asia/Saigon), sau merge [#166](https://github.com/VinhDat267/ATI_Project/pull/166) (`7bb752d`), [#169](https://github.com/VinhDat267/ATI_Project/pull/169) (`bd02c9d`), [#167](https://github.com/VinhDat267/ATI_Project/pull/167) (`95b1c46`) và [#168](https://github.com/VinhDat267/ATI_Project/pull/168) (`46b6a5b`). **Lịch chạy workflow phần 1–2 xong**: backend và planner, sau cờ `SCHEDULES_ENABLED` tắt mặc định. Cùng đợt có kế hoạch lịch chạy và kế hoạch OAuth.
+- **#166**, kế hoạch lịch chạy, chỉ tài liệu: đặc tả, SCHED-common, SCHED-01 → 04. Mốc ngừng thêm tính năng dời sang 04/11 (mục 7 "Chốt 24–25/10").
+- **#167, SCHED-01:**
+  - migration 0010 (`schedules`, `schedule_runs`); tính giờ hẹn theo `APP_TIME_ZONE`;
+  - bộ hẹn giờ nhịp 30 s: `SKIP LOCKED`, gộp lượt lỡ, tự tạm dừng sau 3 lượt quá hạn, lập kế hoạch tuần tự với hạn 180 s;
+  - API `/api/schedules…`, đối soát lúc khởi động.
+
+  Review độc lập lần 1 tại `3a9e4b1` **chưa đạt**, 2 P2: deadlock giữa xác nhận và nút tạm dừng; bật lại lịch đã xong vượt giới hạn 10 lịch. Sửa ở `2480261` (thứ tự khoá chung, kiểm giới hạn khi bật lại); review lại **Đạt**.
+- **#168, SCHED-02:**
+  - planner trả kiểu `schedule` khi cờ bật. Prompt khi cờ tắt, và ở lượt chạy, giống từng byte `main` trước đó;
+  - `validateSchedule`; đề xuất lịch trong chat, với dịch vụ do router xác định;
+  - lập kế hoạch cho lượt qua đúng đường chat; sandbox `schedule`.
+
+  Review lần 1 tại `e390a5f` **chưa đạt** (3 P2, 1 P3); lần 2 tại `3c2c836` **chưa đạt** (1 P2: catalog rỗng); lần 3 tại `29fe222` **Đạt**. P3 prefetch ở câu tạo lịch đầu tiên được giữ làm giới hạn (mục 5).
+- **#169**, kế hoạch OAuth, chỉ tài liệu: phạm vi hẹp, đặc tả và task card OAUTH-01 (mục 7 "Chốt 25/10/2026 (OAuth)").
+- **Merge:**
+  - reviewer thi công #167, #168 theo yêu cầu nhóm trưởng;
+  - nhóm trưởng cho merge tối 25/10, sớm hơn mốc 26/10 ghi trong PR, vì toàn bộ nằm sau cờ tắt;
+  - cây merge của #167 và #168 khác cây head đã review đúng bằng diff tài liệu của #169 (patch-id trùng).
+
+Việc tiếp theo:
+- SCHED-03 (giao diện, `longnguyen005`) trước 01/11. Xem đặc tả mục 6.4, 6.5, 6.7 và ghi chú trong task card về SSE `schedule_proposal` và tin `schedule_discarded`;
+- OAUTH-01 (reviewer) trước 29/10; ngày 29/10 nhóm trưởng quyết OAUTH-02;
+- SCHED-04 sau SCHED-03: bộ đo ý định, đo lại `core`/`services` khi bật cờ, nghiệm thu thật, PR bật cờ trước 04/11;
+- GMAIL-04 (nhóm trưởng); W4-03: chạy `report.ts` khi có phiếu; quyết có làm task độ trễ không; task card tuần 5–6.
+
+[Log merge](log/2026-10-25-reviewer-merge-166-169.md).
+
+**Cập nhật trước đó:** 24/10/2026 (Asia/Saigon), sau merge [#164](https://github.com/VinhDat267/ATI_Project/pull/164) (`1df2d35`): **W4-01 đo xong** trên 32 câu do bốn thành viên viết, mỗi người 8, mã `member-1` → `member-4`. Hai trong bốn người đã xem hoặc sửa prompt, nên bộ câu **không độc lập** như task card yêu cầu. Kết quả tách theo hai nhóm; repo không ghi mã nào thuộc nhóm nào.
 - **Đăng ký:** label `2cdaf90` được commit trước lời gọi model đầu tiên. Không sửa label sau đó.
 - **Kết quả** (yêu cầu `ag/gemini-3.8-flash`, phục vụ `gemini-3.8-flash-n`, hai cờ tắt, source `91cd5c1`):
   - `llm` ×3: **89/96**; tool 93,7%, tham số 100%; p50/p95 10,8/60,0 s; 74% dưới 15 s;
@@ -26,7 +54,7 @@ Việc tiếp theo:
 
 [Log merge](log/2026-10-24-reviewer-merge-164.md), [báo cáo đo](../ai-evidence/V3-GOLDEN-V2/2026-10-24-W4-01-REPORT.md).
 
-**Cập nhật trước đó:** 20/10/2026 (Asia/Saigon), sau merge [#161](https://github.com/VinhDat267/ATI_Project/pull/161) (`729577f`) và [#162](https://github.com/VinhDat267/ATI_Project/pull/162) (`6307962`): **FE-12 xong**. Mọi trang sau khi đăng nhập, kể cả cockpit, dùng một thanh điều hướng chung.
+Trước đó, 20/10/2026 (Asia/Saigon), sau merge [#161](https://github.com/VinhDat267/ATI_Project/pull/161) (`729577f`) và [#162](https://github.com/VinhDat267/ATI_Project/pull/162) (`6307962`): **FE-12 xong**. Mọi trang sau khi đăng nhập, kể cả cockpit, dùng một thanh điều hướng chung.
 - **Thanh:**
   - logo bên trái;
   - 5 tab căn giữa: Không gian làm việc, Nhật ký, Kết nối dịch vụ, Cẩm nang, và Người dùng (chỉ admin thấy). Tab đang mở có `aria-current="page"` và gạch chân cam;
@@ -79,7 +107,7 @@ Trước đó, 18/10/2026 (Asia/Saigon), sau merge [#159](https://github.com/Vin
 - FE-04 #88 (`89d1999`) và UI-API-01 #86 (`210d3b6`): token/theme/shell và API cho giao diện mới;
 - #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01).
 
-Agent cập nhật: reviewer (sau merge #164, 24/10). Lần trước: reviewer (sau merge #161 và #162, 20/10; sau merge #159, 18/10; sau merge #156 và #157, 18/10; sau merge #154, 18/10; sau merge #147, 18/10; sau merge #149, #150, #151, 17/10; sau merge #146, 16/10; sau merge #142, 16/10; sau merge #143, 16/10; sau merge #140, 14/10; sau merge #138 và #137, 14/10); Codex, reviewer độc lập W4-00 (sau merge #133, 13/10); Claude Code (sau merge #129, 11/10; sau merge #128, 10/10).
+Agent cập nhật: reviewer (sau merge #166, #169, #167, #168, 25/10). Lần trước: reviewer (sau merge #164, 24/10; sau merge #161 và #162, 20/10; sau merge #159, 18/10; sau merge #156 và #157, 18/10; sau merge #154, 18/10; sau merge #147, 18/10; sau merge #149, #150, #151, 17/10; sau merge #146, 16/10; sau merge #142, 16/10; sau merge #143, 16/10; sau merge #140, 14/10; sau merge #138 và #137, 14/10); Codex, reviewer độc lập W4-00 (sau merge #133, 13/10); Claude Code (sau merge #129, 11/10; sau merge #128, 10/10).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -128,17 +156,31 @@ Agent cập nhật: reviewer (sau merge #164, 24/10). Lần trước: reviewer (
 | Thư mục | Vai trò |
 |---|---|
 | `apps/chat-web` | Frontend React 19, Vite, Tailwind, Zustand. Trang giới thiệu, đăng nhập, chat, plan preview, execution progress. Khi Gmail bật: nhóm "Của riêng bạn" ở `/settings`, callback `/connections/gmail/callback`, "Gửi từ" và nguồn người nhận ở màn duyệt; tool tra qua `services/tool-definitions.ts` (gồm `GMAIL_TOOLS`) |
-| `apps/chat-api` | Backend Express 5: JWT, hội thoại, approval (hash SHA-256, hạn 30 phút), thực thi, SSE |
-| `packages/planner` | Router (keyword rule), prefetch resource directory, model tự gọi search tool, validator 5 lớp (JSON, schema, semantic, an toàn, grounding). Khi Gmail bật: người nhận phải là chuỗi viết thẳng, có trong câu người dùng hoặc trong người tham gia của luồng đã tra; tiêu đề thư giữ ở `__labels`, không gửi cho model. Khi `PLANNER_READ_ANSWERS=on` (chế độ `llm`): câu chỉ đọc được tra cứu rồi trả `kind: "answer"`; chỉ nhận khi lượt đó có ít nhất một lần đọc thành công hoặc một danh mục prefetch thành công |
+| `apps/chat-api` | Backend Express 5: JWT, hội thoại, approval (hash SHA-256, hạn 30 phút), thực thi, SSE. Khi `SCHEDULES_ENABLED=on` và có PostgreSQL: lịch chạy (`services/schedules/`: bộ hẹn giờ, xác nhận đề xuất, trạng thái lượt suy ra từ kế hoạch), API `/api/schedules`, `ChatService` lưu đề xuất lịch và lập kế hoạch cho từng lượt (`planScheduledRun`) |
+| `packages/planner` | Router (keyword rule), prefetch resource directory, model tự gọi search tool, validator 5 lớp (JSON, schema, semantic, an toàn, grounding). Khi Gmail bật: người nhận phải là chuỗi viết thẳng, có trong câu người dùng hoặc trong người tham gia của luồng đã tra; tiêu đề thư giữ ở `__labels`, không gửi cho model. Khi `PLANNER_READ_ANSWERS=on` (chế độ `llm`): câu chỉ đọc được tra cứu rồi trả `kind: "answer"`; chỉ nhận khi lượt đó có ít nhất một lần đọc thành công hoặc một danh mục prefetch thành công. Khi `schedules` bật: mục prompt `### Scheduled workflows` (không có ở lượt chạy theo lịch), kiểu `schedule` qua `validateSchedule`, `routeSchedule`; `nextOccurrence` dùng chung với bộ hẹn giờ |
 | `packages/executor` | Resolve `$ref`/`$template`, chạy tuần tự, timeout qua AbortSignal, trạng thái `unknown` cho lệnh ghi không rõ kết quả; lỗi lệnh ghi có `details.requestSent === false` (chưa gửi request) là `failed` |
 | `packages/tool-schemas` | Catalog 33 tool/8 service: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3, Notion 4, Telegram 2, Jira 4 (19 read, 14 write). `GMAIL_TOOLS` (10 tool) và `GMAIL_SERVICE` export riêng, ngoài catalog, chỉ dùng khi `GMAIL_ENABLED=on` |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi. Adapter Gmail (`src/gmail/`) dùng token của từng người, không có allowlist chung |
-| `db/v3` | 11 bảng nghiệp vụ PostgreSQL, gồm phiên đăng nhập, lịch sử hash refresh token, auth token, outbox và oauth_states; migrations 0001–0009 (0009: Gmail riêng của từng người) |
+| `db/v3` | 13 bảng nghiệp vụ PostgreSQL, gồm phiên đăng nhập, lịch sử hash refresh token, auth token, outbox, oauth_states, `schedules` và `schedule_runs`; migrations 0001–0010 (0009: Gmail riêng của từng người; 0010: lịch chạy) |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do + 44 câu services, cùng các bộ Gmail, trả lời, nhiều lượt), bộ W4-01 32 câu do thành viên viết (`golden-independent/`), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
 
 Mã và tài liệu v1/v2 (`apps/api`, `apps/web`, `apps/mcp-task-hub`, `packages/dsl`, `packages/engine`, `packages/db`, `db/migrations` và báo cáo/bằng chứng đi kèm) đã xoá khỏi `main` ngày 05/10 qua #80. Ảnh chụp trước khi xoá là tag `archive/v2-final` (`badccb3`); đọc lại bằng `git show archive/v2-final:<đường dẫn>`.
 
 ## 3. Số liệu mới nhất
+
+Sau #166 → #169 (merge 25/10/2026):
+- **CI trên PR:**
+  - [CI #167](https://github.com/VinhDat267/ATI_Project/actions/runs/40179724562) SUCCESS đúng head `2480261`;
+  - [CI #168](https://github.com/VinhDat267/ATI_Project/actions/runs/40195801762) SUCCESS đúng head `29fe222`;
+  - [CI #169](https://github.com/VinhDat267/ATI_Project/actions/runs/40191700027) SUCCESS đúng head `8d57d43`.
+
+  Mỗi run gồm check và browser. Sau #168: **2.192 v3** (63 + 408 + **359** + 42 + **547** + 773 web) **+ 394 eval**; browser **120 pass/1 skip, 13 nhóm**. Planner thêm 68 test, `chat-api` thêm 82; web, eval và browser không đổi, vì cờ tắt và không có giao diện mới.
+- **CI `main`:** sau #166 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40170087714) đúng `7bb752d`; sau #169 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40196830229) đúng `bd02c9d`, sau #167 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40197054015) đúng `95b1c46`, sau #168 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40197072743) đúng `46b6a5b`, gồm check và browser.
+- **Bên thi công** (reviewer), PostgreSQL 16 tạm riêng ở 56533, sandbox; browser chạy ở cổng riêng (API 3999, web 5199):
+  - SCHED-01, lần cuối tại `2480261`: check 2.109 + 394, browser 120/1; đột biến 14/14 khi thi công, 7/7 cho phần sửa;
+  - SCHED-02, lần cuối tại `29fe222`: check 2.192 + 394, browser 120/1; đột biến 30/30. Mốc SHA-256 của prompt được chụp trên mã chưa sửa, khi planner còn giống hệt `main`.
+- **Review độc lập:** chạy ở worktree riêng của người review, mỗi lượt đều chạy check và browser, có probe trên PostgreSQL thật. Lượt check đầu của #167 lần 2 gặp timeout ở `evaluations/generic-plumbing/static-guard.test.ts` (mục 5); chạy lại thì đạt.
+- **Cây merge:** cây `95b1c46` và `46b6a5b` khác cây head đã review đúng bằng diff tài liệu của #169 (patch-id trùng); cây `bd02c9d` bằng cây head `8d57d43`. Không gọi model hay dịch vụ thật.
 
 Sau #164 (merge 24/10/2026): [CI #164](https://github.com/VinhDat267/ATI_Project/actions/runs/40108857431) SUCCESS đúng head `1e3db0b`, gồm check và browser: **2.042 v3** (không đổi) **+ 394 eval** (thêm 5 test của quy tắc dừng: 3 ở `91cd5c1`, 2 ở `1e3db0b`); browser **120 pass/1 skip**. [CI `main` sau #164](https://github.com/VinhDat267/ATI_Project/actions/runs/40109633906) SUCCESS đúng `1df2d35`, cùng số.
 - **Bên thi công** (reviewer), ở worktree riêng:
@@ -264,7 +306,7 @@ Mỗi số liệu ghi kèm ngày đo và commit. Số liệu lịch sử trướ
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 2.042/2.042 = 63 schema + 408 adapters + 291 planner + 42 executor + 465 API + 773 web (FE-12 thêm 28 web) | 20/10, CI #162 SUCCESS trên `ffc8952`; reviewer chạy ở máy cùng số | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 2.192/2.192 = 63 schema + 408 adapters + 359 planner + 42 executor + 547 API + 773 web (SCHED-01 thêm 67 API; SCHED-02 thêm 68 planner, 15 API) | 25/10, CI #168 SUCCESS trên `29fe222`; reviewer độc lập chạy ở máy cùng số | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 394/394 = 173 cũ + 28 W4-03 + 48 W4-01 + 26 W4-04 + 57 GMAIL-04 + 57 W4-02 + 5 quy tắc dừng của runner (gồm test trên PostgreSQL thật) | 24/10, CI #164 SUCCESS trên `1e3db0b`; reviewer độc lập chạy ở máy cùng số | `npm run test:eval:v3` (trong `npm run check`) |
 | Browser E2E (sandbox, PostgreSQL thật) | 120 ca pass, 13 nhóm; default 93 (FE-12 thêm 5), auth02 2, auth04 6, clarification 3, partial_failure 2, sáu nhóm service mỗi nhóm 1, answer 4 (`PLANNER_READ_ANSWERS=on`, chế độ `llm`), gmail 4 (`GMAIL_ENABLED=on`, OAuth và Gmail giả, 1440/375 sáng/tối) | 20/10, CI #162 trên `ffc8952`; trước đó 115 ca ở CI #147 trên `5f3bb2f`; reviewer chạy ở máy cùng số; Google dùng OIDC giả; một ca Google skip có chủ đích ở default và chạy trong auth04 | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
@@ -299,6 +341,44 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **SCHED-02 xong #168** (`46b6a5b`), merge 25/10/2026 lúc 20:19:19 Việt Nam. Reviewer thi công theo yêu cầu nhóm trưởng ("Chia đôi": reviewer làm backend và planner).
+  - **Planner:**
+    - `schedules`, `ProcessMessageInput.schedule`/`scheduledRun`;
+    - mục prompt `prompts/schedule-rules.ts` nối vào cuối prompt, chỉ khi cờ bật và không phải lượt chạy;
+    - `validateSchedule` (giờ, ngày, thứ, hạn 1 phút–365 ngày, lớp an toàn), thử lại một lần ở cả `regex` và `llm`;
+    - `routeSchedule`; `nextOccurrence` chuyển sang `@wap/planner`, dùng chung với bộ hẹn giờ.
+  - **`ChatService`:**
+    - đọc lịch của hội thoại;
+    - lưu đề xuất `ScheduleProposalMetadata` và phát SSE `schedule_proposal`. Dịch vụ do router xác định; dịch vụ chưa cấu hình thì từ chối;
+    - lịch sử gửi lại JSON của đề xuất;
+    - `planScheduledRun` dùng chung phần xử lý kết quả với đường chat (`prepareResponse` → `write(client?)` → `announce()`), ghi trong transaction của bộ hẹn giờ. `PlanRepo.createPlan` nhận client tuỳ chọn.
+  - **`server.ts`:** planner dựng theo từng người, có `routeSchedule`; `planRun` thật. Sandbox `schedule` luôn chạy ở chế độ `llm`.
+  - **Mốc SHA-256 của prompt** (`regex`, `llm`, kiểu trả lời tắt và bật) chụp trên mã chưa sửa. Cờ tắt và lượt chạy đều giữ đúng các mốc này.
+  - **Review:**
+    - lần 1 tại `e390a5f` **chưa đạt**: P2 lượt lỗi hoặc quá hạn để trang kẹt ở "đang lập kế hoạch"; P2 không hủy được lịch khi dịch vụ cũ mất cấu hình; P2 validator và bộ hẹn giờ đặt giờ mùa hè khác nhau; P3 vẫn tra danh mục khi tạo đề xuất;
+    - sửa ở `3c2c836`: SSE `error` sau COMMIT và `replyToMessageId`; chỉ dịch vụ câu hiện tại nêu mới làm từ chối; dùng chung `nextOccurrence`; không tra danh mục trong hội thoại đã có lịch;
+    - lần 2 **chưa đạt**: 1 P2, catalog rỗng vẫn chặn hủy lịch. Sửa ở `29fe222`;
+    - lần 3 **Đạt**.
+  - **Còn lại:** câu tạo lịch đầu tiên vẫn prefetch (mục 5); SCHED-03 cần coi `schedule_discarded` là tin kết thúc khi nạp lịch sử.
+  - Xem [log thi công](log/2026-10-25-reviewer-SCHED-02-schedule-planner.md) và [log sửa](log/2026-10-25-reviewer-SCHED-02-review-fixes.md). Log review độc lập nằm ở worktree của người review, không commit.
+- **SCHED-01 xong #167** (`95b1c46`), merge 25/10/2026 lúc 20:19:04 Việt Nam. Reviewer thi công theo yêu cầu nhóm trưởng ("bắt đầu SCHED-01 đi").
+  - **Kiểu dữ liệu** của đặc tả mục 4 trong `tool-schemas`; cờ `SCHEDULES_ENABLED`; migration 0010.
+  - **`services/schedules/`:** tính giờ hẹn, trạng thái lượt suy ra, `ScheduleService` (xác nhận đề xuất, nút, danh sách, đếm, chạy ngay, lập lại kế hoạch).
+  - **Bộ hẹn giờ:**
+    - nhịp 30 s, `SKIP LOCKED`, khoá duy nhất cho mỗi giờ hẹn;
+    - gộp lượt lỡ quá 10 phút, tự tạm dừng sau 3 lượt quá hạn;
+    - lập kế hoạch tuần tự với hạn 180 s qua `AbortSignal`; đối soát lúc khởi động.
+  - **Route** `/api/schedules…`, lỗi `{ error: { code, message } }`. Khi cờ tắt thì không mount, không chạy bộ hẹn giờ.
+  - **Review:** lần 1 tại `3a9e4b1` **chưa đạt**, 2 P2 (deadlock xác nhận/tạm dừng; bật lại lịch đã xong vượt giới hạn). Sửa ở `2480261`: thứ tự khoá chung (hội thoại của lịch → lịch → `users` → lượt → hội thoại của lượt), `ensureRoom` khi bật lại. Review lại **Đạt**.
+  - Xem [log thi công](log/2026-10-25-reviewer-SCHED-01-schedule-backend.md) và [log sửa](log/2026-10-25-reviewer-SCHED-01-review-fixes.md).
+- **#169** (`bd02c9d`), merge 25/10 lúc 20:16:03 Việt Nam: kế hoạch OAuth, chỉ tài liệu.
+  - Nhóm trưởng nhờ reviewer đề xuất phạm vi rồi duyệt: OAUTH-01 bắt buộc, OAUTH-02 tuỳ chọn, các provider khác không làm.
+  - Gồm [đặc tả OAUTH-01](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md), task card, ROADMAP, mục 7.
+  - Chưa có review độc lập riêng. [Log](log/2026-10-25-reviewer-plan-oauth-01.md).
+- **#166** (`7bb752d`), merge 25/10 lúc 13:43:03 Việt Nam: kế hoạch lịch chạy, chỉ tài liệu.
+  - Gồm đặc tả, SCHED-common, SCHED-01 → 04, ROADMAP, mục 7 "Chốt 24–25/10".
+  - Nhóm trưởng duyệt đặc tả ngày 25/10 sau khi reviewer tự review; không có review độc lập riêng. [Log](log/2026-10-25-reviewer-plan-schedules.md).
+- **#165** (`7cf4f3e`): ghi #164 vào CURRENT-STATE và ROADMAP.
 - **W4-01 đo xong #164** (`1df2d35`), merge 24/10/2026 lúc 23:01:28 Việt Nam. Nhóm trưởng yêu cầu ngày 23/10 dùng bốn file `member-1.json` → `member-4.json` đã có, và huỷ kế hoạch để hai thành viên viết thêm; reviewer thi công và đo trên máy nhóm trưởng.
   - **Bộ câu:** 32 câu, 4 người × 8 câu: single_step 7, multi_step 7, cross_service 7, clarification 6, refusal 5; 19 câu tiếng Việt, 13 câu tiếng Anh.
     - Hai người viết đã xem hoặc sửa prompt, nên bộ câu không độc lập;
@@ -724,6 +804,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | Latency chưa đạt mục tiêu; parity ff15 chưa đạt | evaluations / W3-10 | Sau #102: services p95 20,138 s (mục tiêu < 15 s), 117/132 lượt dưới 15 s; model chiếm 99,96% thời gian, 2 lần quá hạn có retry, 13 lượt chậm còn lại thành công ngay lần đầu. Core p95 13,1 → 18,0 s so với W3-06, nhưng đối chứng cùng ngày code cũ cũng 19,0 s, nên nhiều khả năng do model `-n`/gateway. **Freeform** p95 24,7 s, 77,8% dưới 15 s, **không có đối chứng cùng ngày**, chưa tách được nguyên nhân. ff15=1/3 lượt đúng (giữ label cũ). **W4-04 qua giao diện** (#159, 18/10, 24 câu, hai cờ tắt): 23/24 lượt dưới 15 s, p95 14,7 s, max 15,8 s (`s2-06`, Jira + Sheets). Server chiếm 96,8% thời gian; thời gian model chưa tách được khỏi planner. Cùng ngày, golden `services` cờ tắt p95 14,7 s; bật kiểu trả lời p95 25,4 s (1 lần quá hạn rồi thử lại thành công). Nên lập task latency riêng có đối chứng freeform. Usable-plan rate vẫn chưa đo |
 | Legacy Trello member fixture sai output schema | evaluations/golden-v2/fixtures.ts | 531trace thiếu fullName nhưng có name, đã tồn tại ở base; service mới zero schema mismatch. Sửa fixture cần documented rerun, không sửa ngầm context |
 | Phục hồi startup chưa có lease/fencing cho nhiều replica | startup reconciliation / recovery | Chỉ một API instance, executor cũ đã dừng; W2-01/W2-02 không cung cấp bảo đảm nhiều instance |
+| Lịch chạy (SCHED-01/02): giới hạn đã biết khi bật cờ | `apps/chat-api/src/services/schedules/`, `packages/planner` | **Chỉ một API instance:** bộ hẹn giờ không có lease, giống W2-01. **Prefetch:** ở chế độ `llm`, câu tạo lịch đầu tiên vẫn tra danh mục, vì planner chưa biết model sẽ trả lịch hay kế hoạch (đặc tả mục 5.1; P3 của review #168 được giữ làm giới hạn). **Rơi về kế hoạch soạn sẵn:** ở sandbox, planner chính ném lỗi thì runtime trả kế hoạch Trello soạn sẵn, kể cả với lượt chạy; live không rơi về. **Chưa đo:** prompt lịch chưa đo với model thật (SCHED-04). **Chưa có giao diện:** web chưa hiện đề xuất hay trạng thái lịch (SCHED-03) |
 | Các ca lỗi của service thật: 429, timeout, ngoài scope và token hết hạn mới test bằng dữ liệu giả | adapters | W3-07 đã chạy ca token/key sai thật cho năm service mới (Telegram 401, Notion 401, Jira 401/404, Google `invalid_grant`). W2-03 (ba service cũ) vẫn chờ người dùng duyệt plan ghi |
 | Notion query/create chưa chọn được data source trong database đa nguồn; relation/rollup là snapshot có giới hạn; page có thể bị di chuyển sau kiểm cha, trước PATCH | `packages/tool-adapters/src/notion/` | Ambiguous source trả VALIDATION; `[incomplete]` khi provider báo thiếu; không tuyên bố kiểm quyền nguyên tử tại API ngoài. Provider thật đã chạy ở W3-07 với database một nguồn; database đa nguồn chưa thử thật |
 | Nhánh frontend streaming `text_*` chưa có timestamp và chưa giữ message khi `text_end` | `apps/chat-web` | Minor hoãn sau review W2-04; chưa tìm thấy production emitter, reachability chưa chứng minh (NOT_RUN); xử lý trước khi nối producer này |
@@ -747,7 +828,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 | FE-10 chưa làm tiêu chí "Rà soát cuối": chụp lại mọi route và khoảnh khắc của FE-05b → FE-09 cạnh bản mẫu ở 1440/375 sáng/tối | `docs/handoff/tasks/FE-10-guide-privacy-and-audit.md` | Ghi rõ là chưa làm trong task card và log #128. **Chờ người dùng quyết** tách thành task riêng hay bỏ. Bộ browser chỉ kiểm hành vi, không thay được việc đặt ảnh cạnh bản mẫu |
 | Gmail: bản sửa P2 số 3 của review #140 chỉ có kiểm của bên thi công; chưa gọi Google thật | `apps/chat-api/src/services/execution-service.ts`; GMAIL-04 | Lỗi 3 (`7849f43`): test fail trên mã cũ, đạt trên mã mới; chưa có reviewer độc lập xem. Từ #143, khi cờ bật Gmail đã vào planner, executor và sandbox; từ #147 có giao diện kết nối, xem trước và trang công khai; từ #154 có bộ đo riêng, đo trên fixture ở #159 (`gmail` 59/60, injection 9/9). Mọi kiểm thử dùng OAuth và Gmail giả; Google thật và PR bật cờ thuộc GMAIL-04 |
 | P3 sau review #143: kết quả của `send_message`, `trash_thread`, `create_label` là response thô của Google, chưa chuẩn hoá theo `outputSchema` như `modify_thread_labels` và `create_draft`; response 401 có body không phải JSON ở lệnh ghi thành `UNKNOWN`, không làm mới token một lần | `packages/tool-adapters/src/gmail/gmail-adapter.ts` | Không ảnh hưởng an toàn. `$ref` và biên nhận thấy thêm các trường như `labelIds`. 401 không phải JSON hiếm gặp vì Google thường trả JSON, và `UNKNOWN` nghiêng về an toàn (`response.json()` chạy trước khi kiểm status) |
-| Test unit/integration và browser chập chờn ghi nhận 18/10, đều ngoài diff của PR đang chạy, chạy riêng thì đạt | `apps/chat-api/tests/db/gmail-migration.test.ts:68`, `apps/chat-api/tests/integration/memory-execution-snapshot.test.ts`, `apps/chat-web/tests/fe-04-shell.test.tsx` | CI #157 lần đầu (`4fe8fb4`) fail `gmail-migration.test.ts:68` (`could not open relation with OID 20506`), chạy lại đạt. Reviewer #157 chạy check ở máy: timeout khởi động server ở `memory-execution-snapshot.test.ts`, chạy riêng 6/6. Bên sửa #157: timeout 5 s ở `fe-04-shell.test.tsx` ca `/settings`, chạy riêng 10/10. Reviewer #156 cũng gặp lỗi timeout/OID ở các test ngoài diff khi chạy check tổng ở máy. Test GMAIL-01 (`orders %s after the save…`, 9 lần fail) đã sửa ở #156. Test browser GMAIL-03 tiêu đề dài (race SSE sau khi sửa DB rồi tải lại) đã sửa ở #157. Nếu lặp lại, nên lập task riêng: OID gợi ý migration/DDL của test chạy song song trên cùng DB. **Lặp lại 24/10:** lượt chạy song song đầu của reviewer độc lập #164 gặp lỗi OID ở `gmail-migration.test.ts`; chạy lại chat-api tuần tự 465/465 |
+| Test unit/integration và browser chập chờn ghi nhận 18/10, đều ngoài diff của PR đang chạy, chạy riêng thì đạt | `apps/chat-api/tests/db/gmail-migration.test.ts:68`, `apps/chat-api/tests/integration/memory-execution-snapshot.test.ts`, `apps/chat-web/tests/fe-04-shell.test.tsx` | CI #157 lần đầu (`4fe8fb4`) fail `gmail-migration.test.ts:68` (`could not open relation with OID 20506`), chạy lại đạt. Reviewer #157 chạy check ở máy: timeout khởi động server ở `memory-execution-snapshot.test.ts`, chạy riêng 6/6. Bên sửa #157: timeout 5 s ở `fe-04-shell.test.tsx` ca `/settings`, chạy riêng 10/10. Reviewer #156 cũng gặp lỗi timeout/OID ở các test ngoài diff khi chạy check tổng ở máy. Test GMAIL-01 (`orders %s after the save…`, 9 lần fail) đã sửa ở #156. Test browser GMAIL-03 tiêu đề dài (race SSE sau khi sửa DB rồi tải lại) đã sửa ở #157. Nếu lặp lại, nên lập task riêng: OID gợi ý migration/DDL của test chạy song song trên cùng DB. **Lặp lại 24/10:** lượt chạy song song đầu của reviewer độc lập #164 gặp lỗi OID ở `gmail-migration.test.ts`; chạy lại chat-api tuần tự 465/465. **25/10, có thêm hai ca:**<br>• review độc lập #167 lần 2: lượt check đầu exit 1 vì `evaluations/generic-plumbing/static-guard.test.ts` hết 5 s (chạy mất 8,2 s). Chạy riêng 2/2 (708 ms); chạy lại toàn bộ thì đạt;<br>• bên thi công SCHED-01: browser lượt 1 fail ca `FE-12: the bar fits without overlap…` (`fe-12-nav.spec.ts:103`), không thấy `[data-main-nav]` sau 10 s. Lượt 2 trên DB sạch đạt 120/1 |
 | P3 sau #157: matcher chỉ có `excludes` và `excludeExceptions` gặp tham số vắng mặt thì bị chấm trượt; quy ước của `excludes` là tham số vắng thì đạt | `evaluations/golden-v2/scorer.ts` (`checkMatcher`) | Dòng kiểm tham số vắng chỉ chấp nhận khoá `excludes`. Label hiện có không bị ảnh hưởng: `mt_reply02` còn `includesAll`, nên tham số vắng đằng nào cũng trượt. Sửa nhỏ khi có PR scorer tiếp theo |
 | Kiểu trả lời (ANS-01): kiểm "có dữ liệu đọc" đạt chỉ nhờ một danh mục prefetch | `packages/planner/src/planner.ts`, GMAIL-04 | Ở live, prefetch bật mặc định nên `usedDirectory` gần như luôn có dịch vụ được định tuyến. Một danh mục (ví dụ danh sách project Jira) đã đủ để câu trả lời được nhận, kể cả khi câu hỏi về dữ liệu ngoài danh mục (issue tuần này, lịch, thư); validator không chặn được model trả lời bằng trí nhớ trong trường hợp này. Màn ghi đúng nguồn ("Danh mục Jira"), nên không nói sai. Đặc tả mục 5.3 cho phép. Đo 18/10 (#159): 30/30 câu trả lời của bộ `answers` đều có ít nhất một tra cứu do model mở, chưa gặp câu nào chỉ dựa vào danh mục; validator vẫn không chặn trường hợp này |
 | Planner lập khung "cả ngày" bằng `timeMax` 23:59:59, nên bỏ sót sự kiện bắt đầu ở giây cuối ngày | planner (prompt) hoặc adapter Calendar; golden `an_ca01` | Calendar `events.list` coi `timeMax` là cận trên loại trừ của giờ bắt đầu sự kiện ([tài liệu](https://developers.google.com/workspace/calendar/api/v3/reference/events/list)). Model dùng 23:59:59 ở cả 3 lượt `an_ca01` (#159, 18/10); câu trả lời vẫn đúng chỉ vì fixture không có sự kiện ở giây đó, và review #159 tái hiện được việc bỏ sót. **Đề xuất backlog**, chờ nhóm trưởng đồng ý: dùng 00:00 hôm sau làm `timeMax`, rồi đo lại `answers` và `services` |
@@ -758,7 +839,7 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 ## 6. Môi trường chạy
 
 - Database: `npm run db:up:v3` (PostgreSQL 16 tại `127.0.0.1:55533`, user/db `ati_v3`). **Ngày 09/10, sau khi Docker khởi động lại, Windows giữ dải cổng 55448–56047 (gồm 55533)**: dùng `V3_LOCAL_DB_PORT` khác (ví dụ 56533), hoặc giải phóng bằng khởi động lại máy / `net stop winnat` rồi `net start winnat` (quyền admin); máy Windows nhóm trưởng đang dùng override ignored `.codex/` tại port15433 và giữ volume dev. Migration: `npm run db:migrate:v3`. **Chú ý (24/10):** khi DB dev được bật bằng `compose.v3.yaml` (như `npm run db:up:v3`), container `ati-v3-postgres-1` gắn volume dev mở ở 55533, trùng cổng mặc định của test; `.env` vẫn trỏ 15433 nên `npm run up` báo `ECONNREFUSED`. Bật DB dev bằng `.codex/db-up.ps1` (15433). Trước khi chạy test có PostgreSQL, kiểm `docker ps` xem ai đang giữ 55533.
-- `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `PLANNER_READ_ANSWERS`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LIVE_SHEETS_SPREADSHEET_IDS`, `LIVE_CALENDAR_IDS`, `NOTION_TOKEN`, `LIVE_NOTION_DATABASE_IDS`, `TELEGRAM_BOT_TOKEN`, `LIVE_TELEGRAM_CHAT_IDS`, `JIRA_SITE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `LIVE_JIRA_PROJECT_KEYS`, `AUTH_SIGNUP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_BASE_URL`, `V3_WEB_PORT`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `GMAIL_ENABLED`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REDIRECT_URI`.
+- `.env` (không commit, không in giá trị ra log): `RUNTIME_MODE` (`sandbox` mặc định), `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `CHAT_ADMIN_EMAIL`, `CHAT_ADMIN_PASSWORD`, `SERVICE_ADMIN_USER_IDS`, `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `PLANNER_SEARCH_MODE`, `PLANNER_READ_ANSWERS`, `APP_TIME_ZONE`, `TRELLO_API_KEY`, `TRELLO_TOKEN`, `SLACK_BOT_TOKEN`, `GITHUB_TOKEN`, `LIVE_TRELLO_BOARD_IDS`, `LIVE_SLACK_CHANNELS`, `LIVE_GITHUB_REPOS`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LIVE_SHEETS_SPREADSHEET_IDS`, `LIVE_CALENDAR_IDS`, `NOTION_TOKEN`, `LIVE_NOTION_DATABASE_IDS`, `TELEGRAM_BOT_TOKEN`, `LIVE_TELEGRAM_CHAT_IDS`, `JIRA_SITE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `LIVE_JIRA_PROJECT_KEYS`, `AUTH_SIGNUP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_BASE_URL`, `V3_WEB_PORT`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `GMAIL_ENABLED`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REDIRECT_URI`, `SCHEDULES_ENABLED`.
 - LLM: model `ag/gemini-3.8-flash` qua 9router chạy ở máy nhóm trưởng (`LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL=http://localhost:20128/v1`). 9router gom nhiều tài khoản Gemini chạy song song.
   - **Dự phòng (W4-00 #133, kiểm 12/10):** đổi `LLM_MODEL` sang **`cx/gpt-6.1-sol`**, served `gpt-6.1-sol`, trong cùng 9router; chuyển thủ công rồi khởi động lại, đã kiểm app live tới preview rồi Hủy. Quay lại `ag/gemini-3.8-flash` bằng environment; `.env` chính giữ nguyên. [Runbook PowerShell/bash](../../evaluations/README.md#w4-00-manual-codex-fallback-through-9router). Core còn partial, quota chưa rõ; chưa chạy ghi live bằng Codex.
   - Không dùng Gemini API chính thức: quota miễn phí 20 request/ngày và 503 liên tục khi thử ngày 29–30/09.
@@ -766,6 +847,11 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 - Chạy app: `npm run up` (API cổng 3000, web cổng 5174). Chế độ live: `RUNTIME_MODE=live npm run up`, xem mục "Through the app" trong `evaluations/README.md`. Live không có biến SMTP nào vẫn chạy, nhưng đăng ký bằng email và các chức năng gửi email tắt (503); cấu hình SMTP thiếu một phần là lỗi khởi động.
 - Gmail (GMAIL-01): chỉ bật khi `GMAIL_ENABLED=on`, đủ ba biến `GMAIL_OAUTH_*` và có PostgreSQL; dùng client OAuth của Google Cloud project riêng, không dùng client đăng nhập. Live thiếu biến thì không khởi động. Sandbox cần đủ bốn endpoint giả (`GMAIL_OAUTH_AUTH_URL`, `GMAIL_OAUTH_TOKEN_URL`, `GMAIL_OAUTH_REVOKE_URL`, `GMAIL_API_BASE_URL`, máy chủ `scripts/fake-google-gmail.mjs`); thiếu thì route trả 503. Từ GMAIL-02 (#143), cờ bật thì Gmail vào catalog và registry của người gọi; sandbox dùng adapter Gmail giả nhưng vẫn cần kết nối riêng qua OAuth giả. Kịch bản `SANDBOX_SCENARIO=gmail` tự chuyển planner sang chế độ `llm` để tra cứu rồi lập kế hoạch trả lời thư. Không bật cờ trên máy chạy buổi thử 23–25/10.
 - Kiểu trả lời (ANS-01): `PLANNER_READ_ANSWERS=on` chỉ có tác dụng ở chế độ tra cứu `llm` (mặc định ở live; sandbox mặc định `regex`). Kịch bản `SANDBOX_SCENARIO=answer` cần thêm `PLANNER_SEARCH_MODE=llm`; runner browser tự đặt cả hai cho nhóm `answer` và đặt `off` cho mọi nhóm khác. Cờ vẫn tắt ở buổi thử 23–25/10.
+- Lịch chạy (SCHED-01/02): `SCHEDULES_ENABLED=on` chỉ có tác dụng khi có PostgreSQL. Khi đó server chạy đối soát lượt dở, mount `/api/schedules…`, chạy bộ hẹn giờ sau `listen`, và `/api/health` có `schedulesEnabled: true`. Thiếu PostgreSQL thì server cảnh báo và tắt lịch.
+  - Trước khi bật, chạy `npm run db:migrate:v3` để có migration 0010.
+  - Giờ hẹn theo `APP_TIME_ZONE`.
+  - Kịch bản `SANDBOX_SCENARIO=schedule` tự chuyển planner sang chế độ `llm`, nhưng không tự bật cờ.
+  - Cờ tắt mặc định cho tới PR bật cờ của SCHED-04.
 - Google login cần đủ `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` và PostgreSQL; thiếu thì ẩn nút và route Google trả 503. Google signup theo `AUTH_SIGNUP_ENABLED`, không phụ thuộc việc SMTP đã bật; Callback web `/auth/google/callback`; Google OAuth và Gmail SMTP thật đã cấu hình/kiểm ở AUTH-06 ngày04–05/10; xem hướng dẫn AUTH-06 trong `evaluations/README.md`.
 - Tài nguyên thử nghiệm thật: Trello board "To Do", Slack `#ati-test`, GitHub `VinhDat267/ati-test`. Chỉ ghi ra service thật khi người dùng đã duyệt đúng plan đó.
 
@@ -820,7 +906,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - demo lịch chạy dùng Google Calendar → Slack;
   - cờ `SCHEDULES_ENABLED` tắt mặc định cho tới PR bật cờ của SCHED-04; catalog 33 tool/8 dịch vụ không đổi;
   - chia việc: reviewer làm backend và planner, `longnguyen005` làm giao diện;
-  - đặc tả được duyệt ngày 25/10.
+  - đặc tả được duyệt ngày 25/10;
+  - nhóm trưởng cho merge #167 và #168 tối 25/10, sớm hơn mốc 26/10, vì toàn bộ nằm sau cờ `SCHEDULES_ENABLED` tắt.
 
 - **Chốt 25/10/2026 (OAuth)** ([đặc tả OAUTH-01](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)):
   - OAuth làm hẹp nhưng chạy thật. OAUTH-01 (kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại, gửi lại yêu cầu) là bắt buộc;
