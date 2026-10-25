@@ -74,6 +74,7 @@ export function createApp(options: AppOptions): Express {
     repo: options.gmail.repo, oauth: options.gmail.oauth, encryptionKey: options.encryptionKey, fetchFn: options.gmail.fetchFn,
     clock: options.authClock, googleTimeoutMs: options.gmail.googleTimeoutMs, revokeTimeoutMs: options.gmail.revokeTimeoutMs,
     onConnectionChanged: options.gmail.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
   } : undefined;
 
   app.use(express.json());

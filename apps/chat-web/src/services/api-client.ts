@@ -176,12 +176,14 @@ export class ApiClient {
   completeGoogleAuth(code: string, state: string) {
     return this.googleAuthAction<{ accessToken: string; refreshToken: string; user: User } | { success: true }>('callback', { code, state });
   }
-  startGmailConnection() {
-    return this.request<{ url: string }>('/api/connections/gmail/start', { method: 'POST', credentials: 'include' });
+  /** `returnTo`: the conversation to come back to after Google, `/c/<id>` (OAUTH-01). */
+  startGmailConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/gmail/start', { method: 'POST', credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}) });
   }
   completeGmailConnection(code: string, state: string) {
     // OAuth state is one-use. Never replay this request, including on a 401.
-    return this.request<{ email: string }>('/api/connections/gmail/callback', {
+    return this.request<{ email: string; returnTo?: string }>('/api/connections/gmail/callback', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ code, state }),
     }, true);
   }

@@ -249,7 +249,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
         {(disconnected || network.offline) && <OfflineBanner busy={network.busy} onRetry={() => { void network.retry(); reconnect?.(); }} />}
         {actionError && <p role="alert" className="px-4 py-2 text-danger-text">{actionError}</p>}
         <div className="contents">
-          <Cockpit user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError}
+          <Cockpit user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError} onRefreshServices={loadServices}
             networkError={disconnected || network.offline}
             contentOverride={history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6">Đang tải hội thoại...</p> : undefined}
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}

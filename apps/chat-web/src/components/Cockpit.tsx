@@ -31,7 +31,7 @@ const errorMeta = { ...meta, id: 'errors', css: meta.css + errorCss };
 
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
-  services: ServiceInfo[]; servicesLoading: boolean; servicesError: string | null;
+  services: ServiceInfo[]; servicesLoading: boolean; servicesError: string | null; onRefreshServices?: () => void;
   onSendMessage: (text: string) => void; onNewConversation: () => void;
   onSelectConversation: (id: string) => void; onSettings: () => void;
   onApprove: () => void; onCancel: () => void; recovery: RecoveryControls | null;
@@ -140,7 +140,7 @@ export function Cockpit(props: Props) {
     queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
   };
   const response = moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
-    : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest}/>
+    : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest} conversationId={state.conversationId} onResend={send} servicesLoading={props.servicesLoading} onRefreshServices={props.onRefreshServices}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
     : slow ? <SlowPlanningMoment request={request} seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
     : planningError ? <PlanningErrorMoment request={request ?? ''} networkError={props.networkError} onRetry={() => send(request ?? '')} onEdit={() => editRequest(request ?? '')}/>

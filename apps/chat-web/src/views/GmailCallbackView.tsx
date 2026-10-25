@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { GoogleCallbackInput } from '../routes';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
-import { gmailSessionOwner, gmailCallbackError, gmailConnectionNotice } from '../services/gmail-connection';
+import { gmailSessionOwner, gmailCallbackError, gmailConnectionNotice, conversationReturnPath } from '../services/gmail-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
 const meta = { id: 'gmail-callback', title: 'Kết nối Gmail — ATI', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
 
@@ -10,7 +10,7 @@ export function GmailCallbackView({ navigate, input }: { navigate: (path: string
   usePrototypePage(meta);
   const [error, setError] = useState('');
   const callback = useRef(input), owns = useRef(gmailSessionOwner()), invalidated = useRef(false);
-  const completion = useRef<Promise<{ email: string }> | null>(null);
+  const completion = useRef<Promise<{ email: string; returnTo?: string }> | null>(null);
   useEffect(() => {
     let mounted = true;
     const unsubscribe = subscribeAuthTokens(tokens => { if (!tokens.accessToken || !owns.current()) invalidated.current = true; });
@@ -26,6 +26,9 @@ export function GmailCallbackView({ navigate, input }: { navigate: (path: string
       completion.current ??= apiClient.completeGmailConnection(data.code, data.state);
       completion.current.then(result => {
         if (!live()) return;
+        // Started from a conversation: go back to it; its refusal now offers to send the request again.
+        const back = conversationReturnPath(result.returnTo);
+        if (back) { navigate(back, true); return; }
         gmailConnectionNotice.set(result.email);
         navigate('/settings#gmail', true);
       }).catch(reason => { if (live()) setError(gmailCallbackError(reason?.data?.code)); });
