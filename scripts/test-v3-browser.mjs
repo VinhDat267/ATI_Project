@@ -12,7 +12,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
-  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|FE-06A:|FE-06B:|FE-07:|FE-08:|FE-09:|FE-10:|FE-11:|FE-12:|AUTH-05:|GMAIL-03 off:|W4-04:' },
+  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|FE-06A:|FE-06B:|FE-07:|FE-08:|FE-09:|FE-10:|FE-11:|FE-12:|AUTH-05:|GMAIL-03 off:|W4-04:|SCHED-03 off:' },
   { name: 'auth02', grep: 'AUTH-02:' },
   { name: 'auth04', grep: 'AUTH-04:|AUTH-05 Google:' },
   { name: 'clarification', grep: 'clarification before plan|W4-04 clarification' },
@@ -25,6 +25,7 @@ const scenarios = [
   { name: 'jira_slack', grep: 'approved Jira workflow carries key and url to Slack' },
   { name: 'answer', grep: 'ANS-01:' },
   { name: 'gmail', grep: 'GMAIL-03:' },
+  { name: 'schedule', grep: 'SCHED-03:' },
 ];
 
 for (const scenario of scenarios) {
@@ -37,6 +38,7 @@ for (const scenario of scenarios) {
   // Keep every existing group on the old read-only policy regardless of the invoking shell.
   env.PLANNER_READ_ANSWERS = scenario.name === 'answer' ? 'on' : 'off';
   env.GMAIL_ENABLED = scenario.name === 'gmail' ? 'on' : 'off';
+  env.SCHEDULES_ENABLED = scenario.name === 'schedule' ? 'on' : 'off';
   if (scenario.name === 'answer') env.PLANNER_SEARCH_MODE = 'llm';
   if (scenario.name === 'auth02') env.AUTH_SIGNUP_ENABLED = 'true';
   let stopFixture;

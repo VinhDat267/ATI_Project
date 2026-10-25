@@ -43,7 +43,7 @@ export function handleSSEEvent(
   const source = conversationId ?? store.conversationId;
   const pending = source ? store.planningByConversation[source] : undefined;
   if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
-  if (['plan', 'plan_preview', 'clarification', 'refusal', 'answer', 'error'].includes(event)) store.setIsPlanning(false, source, data.requestId);
+  if (['plan', 'plan_preview', 'clarification', 'refusal', 'answer', 'error', 'schedule_proposal'].includes(event)) store.setIsPlanning(false, source, data.requestId);
   if (event === 'agent_state' && data.state === 'planning') {
     store.setIsPlanning(true, source, data.requestId);
     if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
@@ -59,6 +59,18 @@ export function handleSSEEvent(
     ? store.executionSnapshot : null;
 
   switch (event) {
+    case 'schedule_proposal':
+    case 'schedule_updated': {
+      if (data.conversationId && data.conversationId !== store.conversationId) break;
+      const metadata = event === 'schedule_proposal' ? data.metadata : { type: 'schedule_state', schedule: data.schedule };
+      if (!data.messageId || !metadata) break;
+      if (store.messages.some(message => message.id === data.messageId)) break;
+      store.setActivePlan(null); store.setPlanStatus('idle'); store.setClarification(null); store.setIsStreaming(false);
+      store.setGatherState(null);
+      store.addMessage({ id: data.messageId, role: 'assistant', content: metadata.proposal?.summary ?? '', metadata: { ...metadata, replyToMessageId: data.replyToMessageId, requestId: data.requestId } });
+      window.dispatchEvent(new Event('schedules:changed'));
+      break;
+    }
     case 'answer':
       if (typeof data.text !== 'string') break;
       store.setActivePlan(null); store.setPlanStatus('idle'); store.setClarification(null); store.setIsStreaming(false);
@@ -89,6 +101,7 @@ export function handleSSEEvent(
 
     case 'plan':
     case 'plan_preview': {
+      window.dispatchEvent(new Event('schedules:changed'));
       const planObj = data.plan || data;
       const planId = data.planId || planObj.id;
       if (planId && store.executionSnapshot?.plan.id === planId) break;
@@ -224,6 +237,7 @@ export function handleSSEEvent(
       break;
 
     case 'exec_done': {
+      window.dispatchEvent(new Event('schedules:changed'));
       const status = (['completed', 'partial', 'reconciliation_required', 'stopped', 'failed'].includes(data.status) ? data.status : 'completed') as PlanStatus;
       if (savedExecution) {
         store.setExecutionSnapshot({ ...savedExecution, plan: { ...savedExecution.plan, status },
