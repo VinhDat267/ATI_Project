@@ -8,6 +8,47 @@ async function login(page: Page) {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
 
+/** Tabs through the refusal actions from the title; each one must be on screen, not under the fixed composer. */
+async function tabThroughActions(page: Page) {
+  await page.locator('#response-card-title').focus();
+  const seen: string[] = [];
+  for (;;) {
+    await page.keyboard.press('Tab');
+    const stop = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element?.closest('#s1-action-area')) return null;
+      const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return { name: element.textContent?.trim() ?? '', top: rect.top, bottom: rect.bottom, viewport: innerHeight,
+        unobscured: rect.top >= 0 && rect.bottom <= innerHeight && (hit === element || element.contains(hit)), blocker: hit?.id || hit?.tagName };
+    });
+    if (!stop) return seen;
+    expect(stop.unobscured, JSON.stringify(stop)).toBe(true);
+    seen.push(stop.name);
+  }
+}
+
+for (const width of [1440, 375]) {
+  test(`OAUTH-01 from chat: actions reached with Tab stay above the composer ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await login(page);
+    const token = await page.evaluate(() => localStorage.getItem('wap_access_token'));
+    await page.request.delete('/api/connections/gmail', { headers: { Authorization: `Bearer ${token}` } });
+    await page.getByRole('textbox').fill('Trả lời email mới nhất trong luồng Họp nhóm ATI');
+    await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
+    const connect = page.getByRole('link', { name: /Kết nối Gmail/ });
+    await expect(connect).toBeVisible();
+    expect(await tabThroughActions(page)).toEqual(['Kết nối Gmail→', 'Sửa yêu cầu']);
+
+    // Connected, a status line above the actions pushes them down. Only the keyboard moves focus here,
+    // so Playwright does not scroll the page the way it does before a click.
+    await connect.click();
+    await expect(page.getByText('Gmail đã được kết nối. Bạn có thể gửi lại yêu cầu.')).toBeVisible();
+    await page.evaluate(() => scrollTo(0, 0));
+    expect(await tabThroughActions(page)).toEqual(['Gửi lại yêu cầu', 'Sửa yêu cầu']);
+  });
+}
+
 for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
   test(`OAUTH-01 from chat: connect Gmail from the refusal, come back to the conversation and send again ${width} ${theme}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });
