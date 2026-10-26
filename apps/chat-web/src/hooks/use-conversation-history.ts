@@ -4,6 +4,7 @@ import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore, type ChatStoreState } from '../store/chat-store';
 import type { ChatMessage } from '../types';
+import { normalizeConversationMessages } from '../services/conversation-messages';
 
 // SSE plan/answer ids can differ from the persisted message id. Correlation
 // identifies the same response without moving replayed history behind new work.
@@ -26,8 +27,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       ['plan', 'clarification', 'refusal', 'answer', 'planning_error', 'schedule_proposal', 'schedule_discarded'].includes(message.metadata?.type ?? '') &&
       message.metadata?.replyToMessageId === acceptedId)) store.setIsPlanning(false, id, pending.requestId);
   }
-  const saved = (data.messages || []).filter(message => message.metadata?.type !== 'working_memory' || message.content)
-    .map(message => ({ ...message, role: message.role || 'user', content: message.content || '', timestamp: message.created_at || message.timestamp }));
+  const saved = normalizeConversationMessages(data.messages || []);
   const savedKeys = new Set(saved.map(messageKey));
   useChatStore.setState(current => ({ messages: [...saved, ...current.messages.filter(message => !savedKeys.has(messageKey(message)))] }));
   const latest = data.messages?.filter(message => message.metadata?.type !== 'working_memory').at(-1);

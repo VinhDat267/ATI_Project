@@ -5,6 +5,7 @@ import type { GatherStep, StepState, PlanStatus } from '../types';
 import { authStorage } from '../services/auth-storage';
 import { apiClient } from '../services/api-client';
 import { refreshExecutionSnapshot } from '../services/execution-snapshot';
+import { scheduleLabel } from '../services/schedule-text';
 
 const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
 const fallbackConversationKey = '__no_conversation__';
@@ -68,7 +69,7 @@ export function handleSSEEvent(
       if (!data.messageId || !metadata) break;
       store.setActivePlan(null); store.setPlanStatus('idle'); store.setClarification(null); store.setIsStreaming(false);
       store.setGatherState(null);
-      store.addMessage({ id: data.messageId, role: 'assistant', content: metadata.proposal?.summary ?? '', metadata: { ...metadata, replyToMessageId: data.replyToMessageId, requestId: data.requestId } });
+      store.addMessage({ id: data.messageId, role: 'assistant', content: event === 'schedule_updated' && metadata.schedule ? scheduleLabel(metadata.schedule) : metadata.proposal?.summary ?? '', metadata: { ...metadata, replyToMessageId: data.replyToMessageId, requestId: data.requestId } });
       window.dispatchEvent(new Event('schedules:changed'));
       break;
     }

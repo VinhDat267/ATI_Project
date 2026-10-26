@@ -108,10 +108,42 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
       await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
       await expect(page.getByRole('alert')).toHaveText('Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.');
       await expect(page.getByRole('heading', { name: 'Đề xuất mới nhất', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Xem hội thoại', exact: true }).click();
+      const log = page.getByRole('log', { name: 'Hội thoại' });
+      await expect(log).toContainText('Đề xuất mới');
+      expect(await log.locator('p').allTextContents()).not.toContain('');
+      const visibleMessages = (await db.query("SELECT count(*)::int AS n FROM messages WHERE conv_id=$1 AND (metadata->>'type' IS DISTINCT FROM 'working_memory' OR content<>'')", [old.conv_id])).rows[0].n;
+      await expect(log.locator('p')).toHaveCount(visibleMessages);
+      await expect(log.locator('time')).toHaveCount(visibleMessages);
       expect((await db.query('SELECT count(*)::int AS n FROM schedules WHERE user_id=$1', [owner])).rows[0].n).toBe(0);
     } finally { await db.end(); }
   });
 }
+test('SCHED-03: schedule status SSE stays readable in the conversation drawer', async ({ page }) => {
+  test.skip(!enabled); const db = pool();
+  try {
+    await login(page, db); await create(page);
+    const openAndCheck = async (text: string) => {
+      await page.getByRole('button', { name: 'Xem hội thoại', exact: true }).click();
+      const log = page.getByRole('log', { name: 'Hội thoại' });
+      await expect(log.locator('p').last()).toContainText(text);
+      expect(await log.locator('p').allTextContents()).not.toContain('');
+      await page.getByRole('button', { name: 'Đóng Nhật ký hội thoại' }).click();
+    };
+    await openAndCheck('Đang bật');
+    await page.getByRole('button', { name: 'Tạm dừng', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Đã tạm dừng' })).toBeVisible();
+    await openAndCheck('Đã tạm dừng');
+    await page.getByRole('button', { name: 'Chạy tiếp', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Đang bật' })).toBeVisible();
+    await openAndCheck('Đang bật');
+    await page.getByRole('button', { name: 'Hủy lịch', exact: true }).click();
+    await page.getByRole('button', { name: 'Xác nhận hủy lịch' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Đã hủy' })).toBeVisible();
+    await openAndCheck('Đã hủy');
+  } finally { await db.end(); }
+});
+
 test('SCHED-03: long names and requests fit 375 pixels and ignore remains local', async ({ page }) => {
   test.skip(!enabled); const db = pool();
   try {

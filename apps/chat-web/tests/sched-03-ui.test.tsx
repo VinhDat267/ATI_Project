@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { ScheduleMoment, reloadScheduleConversation } from '../src/pages/Cockpit/ScheduleMoment';
 import { ScheduleRunRecovery } from '../src/pages/Cockpit/ScheduleRunRecovery';
 import { RequestEcho } from '../src/pages/Cockpit/RequestEcho';
+import { ConversationDrawer } from '../src/pages/Cockpit/ConversationDrawer';
+import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 import { loadConversationHistory } from '../src/hooks/use-conversation-history';
 import { ScheduleActions } from '../src/pages/Cockpit/ScheduleActions';
 import { PlanningErrorMoment } from '../src/pages/Errors/PlanningErrors';
@@ -71,6 +73,43 @@ it('announces pending runs on the history tab and the mobile avatar entry', asyn
   expect(screen.getByRole('menuitem', { name: /Nhật ký điều phối, 1 lượt chờ duyệt/ })).toBeInTheDocument();
 });
 const scheduledMessage = { id: 'run-message', role: 'user' as const, content: 'Gửi lịch họp', metadata: { type: 'schedule_run', name: 'Lịch họp', dueAt: '2026-10-26T01:00:00Z', scheduleId: 's', runId: 'run' } };
+const showDrawer = (enabled = true) => render(<SchedulesCapabilityContext.Provider value={enabled}><ConversationDrawer messages={useChatStore.getState().messages} isStreaming={false} composer={null} onClose={vi.fn()} /></SchedulesCapabilityContext.Provider>);
+it.each([
+  ['active', 'Đang bật · lần chạy tới 08:00 thứ Hai 26/10'],
+  ['paused', 'Đã tạm dừng: Bạn đã tạm dừng'],
+  ['cancelled', 'Đã hủy'],
+  ['completed', 'Đã chạy xong'],
+] as const)('shows a readable %s schedule state in the drawer immediately after SSE', (status, label) => {
+  resetSSEState();
+  handleSSEEvent('schedule_updated', JSON.stringify({ conversationId: 'c', messageId: 'state', schedule: { ...schedule, status, pauseReason: status === 'paused' ? 'Bạn đã tạm dừng' : null } }), undefined, 'c');
+  showDrawer();
+  expect(screen.getByRole('log')).toHaveTextContent(label);
+  expect(screen.getByRole('log').querySelector('p')).toHaveTextContent(label);
+});
+it('filters internal messages and restores timestamps before showing a conflict reload in the drawer', async () => {
+  const created_at = '2026-10-26T01:00:00Z';
+  vi.mocked(apiClient.getConversation).mockResolvedValue({ messages: [
+    { id: 'memory', role: 'system', content: '', metadata: { type: 'working_memory' } },
+    { id: 'request', role: 'user', content: 'Tạo lịch', created_at },
+    { ...proposal, content: 'Đổi giờ', created_at },
+    { id: 'note', role: 'system', content: 'Ghi chú hữu ích', metadata: { type: 'working_memory' }, created_at },
+  ] } as any);
+  await reloadScheduleConversation('c');
+  expect(useChatStore.getState().messages.map(message => message.id)).toEqual(['request', proposal.id, 'note']);
+  expect(useChatStore.getState().messages.every(message => message.timestamp === created_at)).toBe(true);
+  showDrawer();
+  const log = screen.getByRole('log');
+  expect([...log.querySelectorAll('p')].map(p => p.textContent)).toEqual(['Tạo lịch', 'Đổi giờ', 'Ghi chú hữu ích']);
+  expect(log.querySelectorAll('time')).toHaveLength(3);
+});
+it.each([true, false])('renders the schedule run source and sender in the drawer with capability %s', enabled => {
+  useChatStore.setState({ messages: [scheduledMessage] });
+  showDrawer(enabled);
+  const log = screen.getByRole('log');
+  expect(log).toHaveTextContent(enabled ? 'Lịch "Lịch họp" tự gửi lúc 08:00 26/10' : scheduledMessage.content);
+  expect(log.querySelector('span')).toHaveTextContent(enabled ? 'ATI' : 'Bạn');
+  expect(log.querySelector('p')).toHaveTextContent(enabled ? 'Lịch "Lịch họp" tự gửi lúc 08:00 26/10' : scheduledMessage.content);
+});
 it('keeps newer SSE messages when a conflict reload returns late', async () => {
   let finish!: (value: any) => void;
   vi.mocked(apiClient.getConversation).mockImplementation(() => new Promise(resolve => { finish = resolve; }));

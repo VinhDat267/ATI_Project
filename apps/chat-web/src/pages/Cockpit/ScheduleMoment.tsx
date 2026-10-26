@@ -8,12 +8,13 @@ import { useChatStore } from '../../store/chat-store';
 import { serviceName, servicePalette } from './presentation';
 import { ScheduleActions, scheduleButton, primaryScheduleButton } from './ScheduleActions';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { normalizeConversationMessages } from '../../services/conversation-messages';
 
 export async function reloadScheduleConversation(id: string) {
   const before = useChatStore.getState();
   const { messages } = await apiClient.getConversation(id);
   const current = useChatStore.getState();
-  if (current.conversationId === id && current.messages === before.messages && current.planRevision === before.planRevision) useChatStore.setState({ messages });
+  if (current.conversationId === id && current.messages === before.messages && current.planRevision === before.planRevision) useChatStore.setState({ messages: normalizeConversationMessages(messages) });
 }
 export function ScheduleMoment({ message, convId, navigate, onEdit }: { message: ChatMessage; convId: string; navigate: (path: string) => void; onEdit: () => void }) {
   const [ignored, setIgnored] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
