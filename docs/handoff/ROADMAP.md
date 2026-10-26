@@ -71,9 +71,13 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 5 (thêm 25/10; trước 01/11) | Lịch chạy phần 3: giao diện (thẻ lịch trong cockpit, mục Lịch chạy ở Nhật ký, số lượt chờ duyệt trên tab Nhật ký) | [SCHED-03](tasks/SCHED-03-schedule-ui.md) | chờ, giao `longnguyen005`; bắt đầu ngay, merge sau SCHED-02 |
 | 5 (thêm 25/10; trước 04/11) | Lịch chạy phần 4: bộ đo ý định, đo lại `core`/`services` khi bật cờ, nghiệm thu thật qua giao diện, PR bật cờ | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | chờ; bộ đo giao reviewer, nghiệm thu giao nhóm trưởng |
 | 5 (thêm 25/10; trước 29/10) | OAuth phần 1: kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại và gửi lại yêu cầu ([đặc tả](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)) | [OAUTH-01](tasks/OAUTH-01-connect-from-chat.md) | chờ, giao reviewer; cần GMAIL-04 để nghiệm thu thật |
-| 5 (thêm 25/10; tuỳ chọn, mốc cắt 01/11) | OAuth phần 2: Google Calendar "của riêng bạn", dựng trên hạ tầng Gmail | — | nhóm trưởng quyết làm hay bỏ ngày 29/10; có đặc tả riêng nếu làm. OAuth cho Slack, GitHub, Notion, Jira, Trello không làm, ghi vào báo cáo là hướng phát triển |
-| 5 (29/10–04/11) → dời 05–06/11 | Ngừng thêm tính năng **từ 04/11** (dời từ 29/10, chốt 24/10); môi trường demo dựng lại được theo hướng dẫn; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | — | chưa có task card |
-| 6 (05–11/11) | Báo cáo cuối kỳ, slide, video demo dự phòng, diễn tập bảo vệ | — | chưa có task card |
+| 5 (thêm 25/10; tuỳ chọn, mốc cắt 01/11) | OAuth phần 2: Google Calendar "của riêng bạn", dựng trên hạ tầng Gmail | — | nhóm trưởng quyết làm hay bỏ ngày 29/10; có đặc tả riêng nếu làm. **Mặc định bỏ** ([FINISH-PLAN](FINISH-PLAN.md) mục 4). OAuth cho Slack, GitHub, Notion, Jira, Trello không làm, ghi vào báo cáo là hướng phát triển |
+| 5 (thêm 26/10; tuỳ chọn, trước 04/11) | Model suy nghĩ quá deadline 30 s: tăng deadline qua biến môi trường hoặc giảm thời gian suy nghĩ ở gateway, đo lại cùng ngày | [LAT-01](tasks/LAT-01-planning-deadline.md) | chờ quyết định của nhóm trưởng ngày 29/10; **mặc định không làm**, ghi giới hạn vào báo cáo |
+| 5 (29/10–04/11) → dời 05–06/11 | Ngừng thêm tính năng **từ 04/11** (dời từ 29/10, chốt 24/10), tag `demo-2026-11-04`; môi trường demo dựng lại được theo runbook; diễn tập chuyển sang LLM dự phòng theo runbook W4-00; 3 kịch bản demo chạy 3 lần liên tiếp không lỗi | [DEMO-01](tasks/DEMO-01-demo-stability.md) | chờ; nhóm trưởng thao tác, agent viết runbook và ghi bằng chứng |
+| 6 (05–11/11) | Báo cáo cuối kỳ (bắt đầu từ 27/10, song song với code) | [REPORT-01](tasks/REPORT-01-final-report.md) | chờ; nhóm trưởng và thành viên |
+| 6 (05–08/11) | Slide bảo vệ | [SLIDES-01](tasks/SLIDES-01-defense-slides.md) | chờ |
+| 6 (07/11) | Video demo dự phòng | [VIDEO-01](tasks/VIDEO-01-backup-demo-video.md) | chờ; sau DEMO-01 |
+| 6 (09–10/11) | Diễn tập bảo vệ (hai lần), checklist ngày bảo vệ 11/11 | [REHEARSAL-01](tasks/REHEARSAL-01-defense-rehearsal.md) | chờ |
 
 W2-01/W2-02 áp dụng cho một API instance, executor cũ đã dừng; lease/fencing nhiều replica chưa có. Minor `text_*` streaming của frontend được hoãn: chưa tìm thấy production emitter, reachability chưa chứng minh; cần xử lý timestamp/finalized message trước khi nối producer này. Số liệu hiện tại và giới hạn review/live xem [CURRENT-STATE](CURRENT-STATE.md).
 
@@ -149,6 +153,19 @@ Nếu cổng ngừng trước khi W4-00 xong thì dừng mọi phép đo model, 
   - SCHED-04 sau SCHED-03 (bộ đo giao reviewer, nghiệm thu thật giao nhóm trưởng, PR bật cờ trước 04/11).
 
 [Log](log/2026-10-25-reviewer-plan-schedules.md).
+
+**Cập nhật 26/10 (kế hoạch hoàn thành):** nhóm trưởng yêu cầu một kế hoạch chi tiết cho phần còn lại, để vẫn làm theo được khi không còn reviewer cũ. Kết quả là [FINISH-PLAN](FINISH-PLAN.md):
+- lịch từng ngày 26/10 → 11/11, mốc cứng và mốc cắt;
+- các quyết định chờ nhóm trưởng, mỗi quyết định có mặc định;
+- quy trình hai phiên agent: A-thi công và A-review. A-review thay vai reviewer, gồm cả việc ghi bàn giao sau merge;
+- câu lệnh dán sẵn trong `PROMPTS.md`.
+
+Task card mới:
+- tuần 5: [DEMO-01](tasks/DEMO-01-demo-stability.md);
+- tuần 6: [REPORT-01](tasks/REPORT-01-final-report.md), [SLIDES-01](tasks/SLIDES-01-defense-slides.md), [VIDEO-01](tasks/VIDEO-01-backup-demo-video.md), [REHEARSAL-01](tasks/REHEARSAL-01-defense-rehearsal.md);
+- tuỳ chọn: [LAT-01](tasks/LAT-01-planning-deadline.md).
+
+Phần việc của SCHED-04 trước đây giao reviewer (bộ đo, đo, báo cáo) nay giao A-thi công, và A-review review.
 
 **Cập nhật 19/10 (FE-12):** nhóm trưởng chốt một thanh điều hướng chung cho mọi trang sau khi đăng nhập, kể cả cockpit, sau khi xem mockup ba phương án. Các tab căn giữa thanh. Câu "Yêu cầu hiện tại" chuyển vào nội dung cockpit, không thêm dòng thứ hai dưới thanh. Đây là chỗ lệch bản mẫu có chủ đích; đặc tả giao diện mục 1.1 điểm 10 và mục 4 đã ghi theo. Nhóm trưởng giao reviewer thi công [FE-12](tasks/FE-12-shared-nav-bar.md):
 - merge trước mốc ngừng thêm tính năng 29/10;

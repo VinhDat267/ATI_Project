@@ -6,6 +6,7 @@ Dự án được làm bởi nhiều agent (Claude Code, Codex, Antigravity, Cur
 |---|---|---|
 | [CURRENT-STATE.md](CURRENT-STATE.md) | Dự án đang ở đâu: đã làm gì, số liệu mới nhất, lỗi đã biết, quy tắc đã chốt | **Chỉ reviewer**, sau khi merge một PR (hoặc người lập kế hoạch) |
 | [ROADMAP.md](ROADMAP.md) | Kế hoạch đến hết kỳ, mỗi việc trỏ tới một task card | Người lập kế hoạch (thường là Claude Code) |
+| [FINISH-PLAN.md](FINISH-PLAN.md) | Kế hoạch từ 26/10 tới buổi bảo vệ 11/11: lịch từng ngày, quyết định chờ nhóm trưởng, quy trình khi không còn reviewer cũ | Nhóm trưởng; phiên A-review đánh dấu việc đã xong |
 | [tasks/](tasks/) | Task card: mục tiêu, file liên quan, tiêu chí nghiệm thu, lệnh kiểm tra | Người lập kế hoạch; agent thi công chỉ điền phần "Kết quả" của card mình làm |
 | [log/](log/) | Nhật ký: mỗi phiên làm việc thêm **một file riêng** | Mọi agent, cuối mỗi phiên |
 | [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md) | Danh sách kiểm tra khi review một PR | Reviewer |
