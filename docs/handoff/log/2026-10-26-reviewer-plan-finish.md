@@ -25,6 +25,20 @@
 - **`README.md` của handoff:** thêm FINISH-PLAN vào bảng file.
 - **`.gitignore`:** thêm `docs/ai-evidence/DEMO-LIVE/`.
 
+## Thêm cùng ngày: đặc tả và task card OAUTH-02
+
+Theo yêu cầu của nhóm trưởng ("2": viết sẵn OAUTH-02 để dùng nếu ngày 29/10 chọn làm):
+- [đặc tả](../../superpowers/specs/2026-10-26-oauth-02-personal-calendar-design.md);
+- [task card](../tasks/OAUTH-02-personal-calendar.md).
+
+Các quyết định thiết kế, lý do ở đặc tả mục 1:
+- **Dịch vụ riêng `mycalendar`**, tool riêng, sau cờ `MYCALENDAR_ENABLED`, không thay `calendar.*`. Lịch chung, các phép đo và kịch bản demo Calendar → Slack giữ nguyên; không rơi về service account.
+- **Client OAuth thứ hai** trong cùng Google Cloud project của Gmail. Google gom quyền theo cặp (người dùng, client OAuth), nên dùng chung client thì ngắt kết nối Gmail (`revoke`) sẽ thu hồi luôn quyền Calendar.
+- **Chỉ lịch chính**, hai tool (`list_events`, `create_event`), không có `calendarId`, không mời ai.
+- **Tổng quát hoá phần kết nối riêng của Gmail theo mã dịch vụ.** Bộ test Gmail phải đạt không sửa assertion; nếu không được thì chép route và ghi lý do.
+
+Ước lượng 3 ngày công cộng review; mốc cắt 01/11; mặc định vẫn là bỏ. ROADMAP và FINISH-PLAN (mục 4, mục 8) trỏ tới hai file mới.
+
 ## Chưa biết, đã để chỗ cho nhóm trưởng điền
 
 - Thời lượng và hình thức buổi bảo vệ, hạn nộp báo cáo và slide (SLIDES-01, REHEARSAL-01). Kế hoạch giả định 15 phút trình bày và 5 phút demo.
