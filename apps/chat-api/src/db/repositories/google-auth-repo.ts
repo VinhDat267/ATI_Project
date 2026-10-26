@@ -8,6 +8,8 @@ export interface OAuthState {
   id?: string;
   state_hash: string; browser_binding_hash: string; code_verifier: string; nonce: string;
   mode: OAuthMode; user_id: string | null; session_id: string | null;
+  /** connect_gmail only: the caller's own conversation, `/c/<uuid>`, to return to (OAUTH-01). */
+  return_to?: string | null;
 }
 export class GoogleAccountError extends Error {
   constructor(readonly code: 'GOOGLE_LINK_CONFLICT' | 'SIGNUP_DISABLED' | 'INVALID_SESSION' | 'PASSWORD_REQUIRED' | 'PASSWORD_CHANGED_ELSEWHERE') {
@@ -18,8 +20,8 @@ export class GoogleAuthRepo {
   constructor(private pool: pg.Pool) {}
   async createState(data: OAuthState, now: number): Promise<void> {
     await this.pool.query('DELETE FROM oauth_states WHERE expires_at<=$1', [new Date(now)]);
-    await this.pool.query(`INSERT INTO oauth_states(state_hash,browser_binding_hash,code_verifier,nonce,mode,user_id,session_id,expires_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [data.state_hash, data.browser_binding_hash, data.code_verifier, data.nonce, data.mode, data.user_id, data.session_id, new Date(now + 600000)]);
+    await this.pool.query(`INSERT INTO oauth_states(state_hash,browser_binding_hash,code_verifier,nonce,mode,user_id,session_id,expires_at,return_to)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [data.state_hash, data.browser_binding_hash, data.code_verifier, data.nonce, data.mode, data.user_id, data.session_id, new Date(now + 600000), data.return_to ?? null]);
   }
   /** `modes` names the flows the calling callback serves; a state of another flow is never visible to it. */
   async findState(state: string, binding: string, now: number, modes: OAuthMode[]): Promise<OAuthState | null> {

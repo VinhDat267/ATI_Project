@@ -71,6 +71,7 @@ Lý do không làm các provider khác trong đợt này:
 - Thêm cột `oauth_states.return_to TEXT NULL`.
 - Thêm ràng buộc có tên: `return_to IS NULL OR (mode = 'connect_gmail' AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')`.
 - Chạy lại được, như các migration khác.
+- **(OAUTH-01)** Ràng buộc đúng như trên, tên `oauth_states_return_to_check`. Test có sẵn của 0009 trước đây đếm đúng 2 ràng buộc CHECK của `oauth_states` có chữ `mode`; sau review #172, test đó kiểm đúng tập tên `oauth_states_mode_check`, `oauth_states_mode_owner_check`, `oauth_states_return_to_check`. Việc sửa assertion cũ này chờ nhóm trưởng xác nhận.
 - Số 0011 là vì 0010 thuộc SCHED-01 (#167). Nếu #167 chưa merge khi OAUTH-01 merge, bộ chạy migration vẫn chạy được vì nó chạy mọi file theo thứ tự tên.
 
 ### 4.2. `POST /api/connections/gmail/start`
@@ -108,6 +109,10 @@ Bấm nút kết nối thì gọi `startGmailConnection({ returnTo: '/c/<id hộ
 - lỗi mạng thì báo ngay trên màn: "Không thể bắt đầu kết nối Gmail. Hãy kiểm tra mạng và thử lại.".
 
 Dịch vụ chung giữ hành vi hiện nay (quản trị viên tới `/settings#<id>`, thành viên được nhắc báo quản trị viên). Riêng trạng thái trong danh sách lấy theo dữ liệu hiện tại: dịch vụ đã cấu hình lại thì không còn ghi "chưa thiết lập".
+
+**(OAUTH-01)** Khi làm:
+- hàng `not_connected` dùng nhãn có sẵn của màn từ chối, "Chưa kết nối", như mọi dịch vụ khác;
+- danh sách dịch vụ của trang chỉ được tải lúc đăng nhập, nên có thể cũ hơn lời từ chối (Gmail bị ngắt ở tab khác, hoặc chuyển sang `reconnect_required` phía server). Vì vậy mỗi màn từ chối mới gọi lại `GET /api/services` một lần, và nút "Gửi lại yêu cầu" chỉ hiện khi đã có dữ liệu mới.
 
 ### 5.2. "Gửi lại yêu cầu"
 
@@ -155,7 +160,7 @@ Dịch vụ chung giữ hành vi hiện nay (quản trị viên tới `/settings
   - `reconnect_required` hiện "Kết nối lại Gmail";
   - còn dịch vụ thiếu thì không có "Gửi lại";
   - màn callback điều hướng tới `returnTo` hợp lệ, và về `/settings#gmail` khi `returnTo` sai mẫu.
-- **Browser** (nhóm `gmail`):
+- **Browser** (nhóm `gmail`; tên ca bắt đầu bằng `OAUTH-01 from chat:`, vì `OAUTH-01:` khớp bộ lọc `AUTH-01:` của nhóm `default`):
   - trong hội thoại, gửi yêu cầu Gmail khi chưa kết nối → màn từ chối → "Kết nối Gmail" → OAuth giả → URL là đúng `/c/<id>` → "Gửi lại yêu cầu" → kế hoạch Gmail chờ duyệt;
   - chạy ở 1440 và 375, sáng và tối;
   - ca `GMAIL-03 off` ở nhóm default không đổi.

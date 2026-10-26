@@ -5,6 +5,7 @@ import { decryptCredentials } from '@wap/tool-adapters';
 import { startFakeGoogleGmail, type FakeGoogleGmail } from '../../../../scripts/fake-google-gmail.mjs';
 import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
+import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { GmailConnectionRepo } from '../../src/db/repositories/gmail-connection-repo.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -377,6 +378,89 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       await connect(app, bob);
       expect(record(await request(app).delete('/api/connections/gmail').set('Authorization', bearer(alice))).body).toEqual({ success: true });
       expect((await stored(bob))?.status).toBe('active');
+    });
+  });
+
+  describe('returning to the conversation it started from (OAUTH-01)', () => {
+    const withConversations = () => build({}, { convRepo: new ConversationRepo(db.pool) });
+    const conversation = async (who: Person) => (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [who.id])).rows[0].id as string;
+    const states = async (who: Person) => (await db.pool.query("SELECT return_to FROM oauth_states WHERE user_id=$1 AND mode='connect_gmail'", [who.id])).rows;
+    const startFrom = async (app: ReturnType<typeof build>, who: Person, body: unknown) =>
+      record(await request(app).post('/api/connections/gmail/start').set('Authorization', bearer(who)).send(body as object));
+
+    it("keeps the caller's own conversation with the state and returns it after a successful callback", async () => {
+      const app = withConversations();
+      const conv = await conversation(alice);
+      const r = await startFrom(app, alice, { returnTo: `/c/${conv.toUpperCase()}` });
+      expect(r.status).toBe(200);
+      expect(await states(alice)).toEqual([{ return_to: `/c/${conv}` }]);
+      const cookie = (r.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+      const done = await callback(app, alice, cookie, await authorize(new URL(r.body.url)));
+      expect(done.status).toBe(200);
+      expect(done.body).toEqual({ email: 'owner.mailbox@example.test', returnTo: `/c/${conv}` });
+    });
+
+    it('starts as before without one, and the callback then has no return path', async () => {
+      const app = withConversations();
+      const done = await connect(app, alice);
+      expect(done.body).toEqual({ email: 'owner.mailbox@example.test' });
+    });
+
+    it('refuses every other return path without creating a state', async () => {
+      const app = withConversations();
+      const own = await conversation(alice);
+      const others = await conversation(bob);
+      const invalid = [`/c/${others}`, '/c/00000000-0000-4000-8000-000000000000', 'https://evil.example', '//evil.example', '/settings',
+        `/c/${own}?x=1`, `/c/${own}#x`, `/c/${own}/`, `/c/${own}`.padEnd(200, 'x'), 42, null, { path: `/c/${own}` }];
+      for (const returnTo of invalid) {
+        const r = await startFrom(app, alice, { returnTo });
+        expect(r.status, JSON.stringify(returnTo)).toBe(400);
+        expect(r.body, JSON.stringify(returnTo)).toEqual({ error: 'Không mở được kết nối từ hội thoại này.', code: 'RETURN_TO_INVALID' });
+      }
+      expect(await states(alice)).toEqual([]);
+    });
+
+    it('gives a failed callback no return path, and each flow only its own', async () => {
+      const app = withConversations();
+      const first = await conversation(alice), second = await conversation(alice);
+      const cookieOf = (r: Awaited<ReturnType<typeof startFrom>>) => (r.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+      // The flow started first may finish, or the one started last: each gets its own conversation back.
+      for (const finish of ['earlier', 'later'] as const) {
+        const a = await startFrom(app, alice, { returnTo: `/c/${first}` });
+        const b = await startFrom(app, alice, { returnTo: `/c/${second}` });
+        const wrong = await callback(app, alice, cookieOf(a), { code: 'any-code', state: new URL(b.body.url).searchParams.get('state') });
+        expect(wrong.status).toBe(400);
+        expect(wrong.body).not.toHaveProperty('returnTo');
+        const [done, other, path] = finish === 'earlier' ? [a, b, first] : [b, a, second];
+        expect((await callback(app, alice, cookieOf(done), await authorize(new URL(done.body.url)))).body, finish).toMatchObject({ returnTo: `/c/${path}` });
+        // The saved connection ends every other flow of this person, its return path with it.
+        const late = await callback(app, alice, cookieOf(other), await authorize(new URL(other.body.url)));
+        expect(late.status, finish).toBe(400);
+        expect(late.body, finish).not.toHaveProperty('returnTo');
+      }
+    });
+
+    it('gives no return path when Google fails after the state was used, or the session ended', async () => {
+      const app = withConversations();
+      const conv = await conversation(alice);
+      const cookieOf = (r: { headers: Record<string, unknown> }) => (r.headers['set-cookie'] as string[])[0]!.split(';')[0]!;
+      const healthy = { grantedScopes: ['https://www.googleapis.com/auth/gmail.modify'], issueRefreshToken: true, exchange: 'ok', profile: 'ok' };
+      const faults: Array<[Record<string, unknown>, string]> = [[{ issueRefreshToken: false }, 'GMAIL_REFRESH_TOKEN_MISSING'],
+        [{ grantedScopes: ['openid'] }, 'GMAIL_SCOPE_MISSING'], [{ exchange: 'server_error' }, 'GMAIL_CONNECT_FAILED'], [{ profile: 'server_error' }, 'GMAIL_CONNECT_FAILED']];
+      for (const [fault, code] of faults) {
+        Object.assign(google.settings, healthy, fault);
+        const s = await startFrom(app, alice, { returnTo: `/c/${conv}` });
+        const r = await callback(app, alice, cookieOf(s), await authorize(new URL(s.body.url)));
+        expect(r.body, code).toEqual({ error: expect.any(String), code });
+      }
+      Object.assign(google.settings, healthy);
+      const s = await startFrom(app, alice, { returnTo: `/c/${conv}` });
+      const grant = await authorize(new URL(s.body.url));
+      await db.pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE id=$1', [alice.sid]);
+      const r = await callback(app, alice, cookieOf(s), grant);
+      expect(r.status).toBe(401);
+      expect(r.body).not.toHaveProperty('returnTo');
+      expect(await stored(alice)).toBeNull();
     });
   });
 });

@@ -18,6 +18,7 @@ const valid = (value: unknown): value is string => typeof value === 'string' && 
 function binding(req: Request): string | undefined {
   return req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
 }
+const CONVERSATION_PATH = /^\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
 export interface GmailConnectionsOptions {
   jwtSecret: string;
@@ -35,6 +36,8 @@ export interface GmailConnectionsOptions {
   revokeTimeoutMs?: number;
   /** Drops cached access tokens and adapters of this person. */
   onConnectionChanged?: (userId: string) => void;
+  /** The owner of a conversation, or null; without it no flow may return to a conversation (OAUTH-01). */
+  conversationOwner?: (conversationId: string) => Promise<string | null>;
 }
 
 export function isGmailAvailable(options: Pick<GmailConnectionsOptions, 'oauth' | 'repo' | 'states' | 'sessionRepo' | 'credentialRepo' | 'encryptionKey'>): boolean {
@@ -91,13 +94,25 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
     });
   };
 
+  /** `/c/<uuid>` of a conversation the caller owns, in lower case; anything else is refused alike. */
+  const ownConversation = async (value: unknown, userId: string): Promise<string | null> => {
+    const id = typeof value === 'string' ? CONVERSATION_PATH.exec(value)?.[1]?.toLowerCase() : undefined;
+    if (!id || !options.conversationOwner) return null;
+    return (await options.conversationOwner(id)) === userId ? `/c/${id}` : null;
+  };
+
   router.post('/start', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
+      let returnTo: string | null = null;
+      if (req.body?.returnTo !== undefined) {
+        returnTo = await ownConversation(req.body.returnTo, user.id);
+        if (!returnTo) { res.status(400).json({ error: 'Không mở được kết nối từ hội thoại này.', code: 'RETURN_TO_INVALID' }); return; }
+      }
       const state = random(), verifier = random();
       const browser = valid(binding(req)) ? binding(req)! : random();
       await options.states!.createState({ state_hash: hash(state), browser_binding_hash: hash(browser), code_verifier: verifier, nonce: random(),
-        mode: 'connect_gmail', user_id: user.id, session_id: user.sid! }, clock());
+        mode: 'connect_gmail', user_id: user.id, session_id: user.sid!, return_to: returnTo }, clock());
       const url = client!.authorizationUrl({ state, scope: GMAIL_MODIFY_SCOPE, codeChallenge: createHash('sha256').update(verifier).digest('base64url') });
       res.cookie(COOKIE, browser, { httpOnly: true, sameSite: 'lax', secure: new URL(options.oauth!.redirectUri).protocol === 'https:', maxAge: 600_000, path: COOKIE_PATH });
       res.setHeader('Cache-Control', 'no-store');
@@ -141,7 +156,8 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
         fail(res, 'GMAIL_STATE_INVALID'); return;
       }
       options.onConnectionChanged?.(user.id);
-      res.json({ email });
+      // Only the state this callback used tells where to go back to.
+      res.json({ email, ...(consumed.return_to ? { returnTo: consumed.return_to } : {}) });
     } catch {
       fail(res, 'GMAIL_CONNECT_FAILED');
     }

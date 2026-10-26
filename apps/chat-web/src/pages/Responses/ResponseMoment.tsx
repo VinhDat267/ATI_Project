@@ -1,6 +1,8 @@
 // Structure and classes from PROTO-01 ResponsesPage; demo controls are omitted.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { apiClient } from '../../services/api-client';
+import { conversationReturnPath, gmailSessionOwner, redirectToGmail } from '../../services/gmail-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 
 const secondary = 'px-4 py-2 bg-white hover:bg-neutral-50 text-[#111827] border border-[#E7E7E2] text-xs sm:text-sm font-medium rounded-xl transition-colors';
@@ -69,10 +71,25 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
     </div>
   </section>;
 }
-export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit }: {
+/** "A", "A và B", "A, B và C". */
+const listOf = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(', ')} và ${names[names.length - 1]}` : names[0] ?? '';
+
+export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit, connectFromChat = false, conversationId, onResend, servicesLoading, onRefreshServices }: {
   message: ChatMessage; request: string; services: ServiceInfo[]; canConfigure: boolean;
   navigate: (path: string) => void; onEdit: (text: string) => void;
+  /** OAUTH-01, only while GMAIL_ENABLED is on. Off, the screen stays as before: no reading again, no "Gửi lại yêu cầu". */
+  connectFromChat?: boolean;
+  /** The conversation on screen: connecting Gmail from here comes back to it (OAUTH-01). */
+  conversationId?: string | null;
+  /** Sends the request again as a new message, once every missing service can be used. */
+  onResend?: (text: string) => void;
+  servicesLoading?: boolean;
+  /** Reads the services again: the list loaded with the page may be older than this refusal. */
+  onRefreshServices?: () => void;
 }) {
+  const refresh = useRef(onRefreshServices);
+  refresh.current = onRefreshServices;
+  useEffect(() => { if (connectFromChat) refresh.current?.(); }, [message.id, connectFromChat]);
   const metadata = message.metadata;
   const legacy = message.content.replace(/^Từ chối yêu cầu:\s*/, '').split(/\nGợi ý:\s*/);
   const reason = metadata?.reason || legacy[0];
@@ -81,9 +98,28 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const ids = new Set(unavailable.map(row => row.id));
   const relevant = services.filter(service => ids.has(service.id) || new RegExp(`(^|[^\\p{L}\\p{N}])${service.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(request));
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
-  const hasGmail = unavailable.some(row => row.id === 'gmail');
-  const shared = unavailable.filter(row => row.id !== 'gmail');
+  // What the refusal named may be usable by now: Gmail once this person connected it, a shared service once configured.
+  const current = (id: string) => services.find(service => service.id === id);
+  const usable = (id: string) => connectFromChat && (id === 'gmail' ? current(id)?.personalStatus === 'connected' : current(id)?.configured === true);
+  const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
+  const missing = unavailable.filter(row => !usable(row.id));
+  const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
+  const hasGmail = missing.some(row => row.id === 'gmail');
+  const shared = missing.filter(row => row.id !== 'gmail');
   const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
+  const back = conversationId ? conversationReturnPath(`/c/${conversationId}`) : null;
+  const [starting, setStarting] = useState(false), [startError, setStartError] = useState('');
+  const pending = useRef(false), mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const connectGmail = async (returnTo: string) => {
+    if (pending.current) return;
+    const owns = gmailSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { url } = await apiClient.startGmailConnection({ returnTo });
+      if (mounted.current && owns()) redirectToGmail(url);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Gmail. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -94,16 +130,26 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
         <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-2">Trạng thái các dịch vụ trong yêu cầu này</p>
         <div id="s1-services-list" aria-label="Trạng thái các dịch vụ trong yêu cầu này" className="v3-space-y-2">
           {rows.map(service => {
-            const status = ids.has(service.id) ? 'unconfigured' : service.connectionStatus ?? (service.configured ? 'unchecked' : 'unconfigured');
+            const status = ids.has(service.id) && !usable(service.id) ? 'unconfigured' : service.connectionStatus ?? (service.configured ? 'unchecked' : 'unconfigured');
+            const gmailConnected = service.id === 'gmail' && usable('gmail');
+            const good = gmailConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status === 'healthy' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full ${status === 'healthy' ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>{labels[status]}</span></span>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>{gmailConnected ? `Đã kết nối${current('gmail')?.email ? ` · ${current('gmail')!.email}` : ''}` : service.id === 'gmail' && reconnect ? 'Cần kết nối lại' : labels[status]}</span></span>
             </div>;
           })}
         </div>
       </div>}
+      {resend && <p role="status" className="text-sm text-[#111827] break-words">{listOf(unavailable.map(row => row.name))} đã được kết nối. Bạn có thể gửi lại yêu cầu.</p>}
+      {startError && <p role="alert" className="text-sm text-danger-text break-words">{startError}</p>}
       <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3" id="s1-action-area">
-        {hasGmail && <a href="/settings#gmail" onClick={event => { event.preventDefault(); navigate('/settings#gmail'); }} className={`${primary} flex items-center gap-1.5`}>Kết nối Gmail<span aria-hidden="true">→</span></a>}
+        {resend && <button type="button" onClick={() => onResend(request)} className={primary}>Gửi lại yêu cầu</button>}
+        {/* A plain link keeps opening the settings page in a new tab; a normal click goes straight to Google and back here. */}
+        {hasGmail && <a href="/settings#gmail" aria-disabled={starting || undefined} onClick={event => {
+          if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+          event.preventDefault();
+          if (connectFromChat && back) void connectGmail(back); else navigate('/settings#gmail');
+        }} className={`${primary} flex items-center gap-1.5`}>{reconnect ? 'Kết nối lại Gmail' : 'Kết nối Gmail'}<span aria-hidden="true">→</span></a>}
         {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>

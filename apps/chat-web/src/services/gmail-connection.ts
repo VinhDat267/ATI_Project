@@ -10,6 +10,10 @@ export function gmailSessionOwner() {
         sharesAuthSession(initial.accessToken, latest.accessToken));
   };
 }
+/** A conversation of this app, `/c/<uuid>`, or null: the only place a connection may return to (OAUTH-01). */
+export function conversationReturnPath(value: unknown): string | null {
+  return typeof value === 'string' && /^\/c\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value) ? value : null;
+}
 export function redirectToGmail(url: string) {
   const target = new URL(url);
   if (target.protocol !== 'https:' && !(target.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(target.hostname))) {
