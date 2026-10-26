@@ -58,7 +58,7 @@ OAUTH-02 (Google Calendar riêng), provider mới, quay về hội thoại khi n
 - **Đột biến:** 26/26 bị bắt ở vitest trên mã sau review lần 1, cùng O19 ở browser; gồm đủ 8 đột biến của task card. Lần 2 thêm một đột biến (bỏ `scroll-padding-bottom`), bị ca Tab bắt.
 - **Kiểm toàn bộ** (mã sau review lần 2, DB tạm dựng lại sạch): `npm run check` exit 0, 63 + 408 + 359 + 42 + 554 + 792 = 2.218 v3 + 394 eval (`chat-api` thêm 7, web thêm 19). `npm run test:browser:v3` exit 0, 126 pass/1 skip có chủ đích, 13 nhóm (`gmail` 10).
 - **Khác với task card và đặc tả** (đã ghi "(OAUTH-01)" ở đặc tả 4.1, 5.1, 8):
-  - assertion cũ của `gmail-migration.test.ts` ("đúng 2 ràng buộc có chữ `mode`") đổi sang kiểm đúng tập tên ba ràng buộc, theo đề xuất của review, để ràng buộc mới giữ đúng đặc tả 4.1. Chờ nhóm trưởng xác nhận;
+  - assertion cũ của `gmail-migration.test.ts` ("đúng 2 ràng buộc có chữ `mode`") đổi sang kiểm đúng tập tên ba ràng buộc, theo đề xuất của review, để ràng buộc mới giữ đúng đặc tả 4.1. Nhóm trưởng xác nhận ngày 26/10;
   - mỗi màn từ chối mới gọi lại `GET /api/services`, vì danh sách tải lúc đăng nhập có thể cũ hơn lời từ chối; browser bắt được lỗi này ở lượt chạy thứ ba;
   - tên ca browser bắt đầu bằng `OAUTH-01 from chat:`, vì `OAUTH-01:` khớp bộ lọc `AUTH-01:` của nhóm `default`;
   - ba test viết sau khi đã có mã, để có test bắt đột biến O3, O4, O13; chúng không có RED.
