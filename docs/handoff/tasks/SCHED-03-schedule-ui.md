@@ -104,6 +104,7 @@ Bỏ câu "Chưa có gì được ghi lên công cụ nào."; "Bỏ qua" gọi A
 
 ## Kết quả (agent thi công điền)
 
+- Sửa ba P3 theo [review tại `490c6ae`](https://github.com/VinhDat267/ATI_Project/pull/171#issuecomment-6415384685), commit `a661344`: nội dung tin trạng thái SSE, lọc/chuẩn hóa lịch sử sau 409, test nguồn và người gửi `schedule_run` trong ngăn hội thoại ở cả hai trạng thái cờ. RED **5 fail/38 pass** → GREEN **43/43** test lịch; **5/5** đột biến mới bị bắt. Web **816/816**, typecheck/build/quét build exit 0; browser lịch **22/22** và cờ tắt **1/1**, PostgreSQL tmpfs riêng ở 56533. Chi tiết và giới hạn: [log sửa review](../log/2026-10-26-codex-SCHED-03-review-fixes.md).
 - PR: [#171](https://github.com/VinhDat267/ATI_Project/pull/171), nhánh `codex/feat-sched-03-ui`; mã `4b825ab`, sửa replay/hydration `c966c2e`.
 - RED/GREEN, đột biến, lệnh kiểm và exit code:
   - 36 test mới; RED thiếu module và RED hành vi cho mất pending, GET nền cũ, replay thiếu `requestId`, thứ tự lịch sử. GREEN toàn bộ; reviewer chạy độc lập 106/106 test hồi quy, exit 0, đạt phần mã nguồn.
