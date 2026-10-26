@@ -71,7 +71,7 @@ Lý do không làm các provider khác trong đợt này:
 - Thêm cột `oauth_states.return_to TEXT NULL`.
 - Thêm ràng buộc có tên: `return_to IS NULL OR (mode = 'connect_gmail' AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')`.
 - Chạy lại được, như các migration khác.
-- **(OAUTH-01)** Ràng buộc đúng như trên, tên `oauth_states_return_to_check`. Test có sẵn của 0009 trước đây đếm đúng 2 ràng buộc CHECK của `oauth_states` có chữ `mode`; sau review #172, test đó kiểm đúng tập tên `oauth_states_mode_check`, `oauth_states_mode_owner_check`, `oauth_states_return_to_check`. Việc sửa assertion cũ này chờ nhóm trưởng xác nhận.
+- **(OAUTH-01)** Ràng buộc đúng như trên, tên `oauth_states_return_to_check`. Test có sẵn của 0009 trước đây đếm đúng 2 ràng buộc CHECK của `oauth_states` có chữ `mode`; sau review #172, test đó kiểm đúng tập tên `oauth_states_mode_check`, `oauth_states_mode_owner_check`, `oauth_states_return_to_check`. Nhóm trưởng xác nhận việc sửa assertion cũ này ngày 26/10.
 - Số 0011 là vì 0010 thuộc SCHED-01 (#167). Nếu #167 chưa merge khi OAUTH-01 merge, bộ chạy migration vẫn chạy được vì nó chạy mọi file theo thứ tự tên.
 
 ### 4.2. `POST /api/connections/gmail/start`
