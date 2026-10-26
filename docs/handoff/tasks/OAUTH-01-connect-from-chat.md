@@ -54,8 +54,9 @@ OAUTH-02 (Google Calendar riêng), provider mới, quay về hội thoại khi n
   - web: RED 7 fail / 21 đạt; thêm hai RED sau đó (đọc lại dịch vụ, nhãn "Cần kết nối lại"); GREEN 76/76 bốn file;
   - browser `OAUTH-01 from chat:`: RED 4/4 trên mã web của `main` (URL về `/settings#gmail`); GREEN 4/4.
 - **Review độc lập lần 1** tại `2c57d35`: chưa đạt, 1 P2 (luồng mới vẫn bật khi `GMAIL_ENABLED=off`) và 1 P3 (ràng buộc DB thiếu phần `mode`). Cả hai đã sửa, có RED trước; sửa thêm lỗi OID chập chờn của `gmail-migration.test.ts`. Xem [log sửa](../log/2026-10-26-reviewer-OAUTH-01-review-fixes.md).
-- **Đột biến:** 26/26 bị bắt ở vitest trên mã sau review, cùng O19 ở browser; gồm đủ 8 đột biến của task card.
-- **Kiểm toàn bộ** (mã sau review, DB tạm dựng lại sạch): `npm run check` exit 0, 63 + 408 + 359 + 42 + 554 + 792 = 2.218 v3 + 394 eval (`chat-api` thêm 7, web thêm 19). `npm run test:browser:v3` exit 0, 124 pass/1 skip có chủ đích, 13 nhóm (`gmail` 8).
+- **Review độc lập lần 2** tại `da32e65`: chưa đạt, 1 P2. Ở 375 px, nhấn Tab tới nút "Gửi lại yêu cầu" thì nút nhận focus nhưng bị ô soạn tin cố định che. Đã sửa ở `index.css`: ba trang của cockpit (`app-stage`, `responses`, `errors`) chừa chỗ dưới `body` và đặt `scroll-padding-bottom` theo chiều cao ô soạn tin. Thêm ca browser đi bằng Tab, có RED trước. Xem [log sửa lần 2](../log/2026-10-26-reviewer-OAUTH-01-review-2-fixes.md).
+- **Đột biến:** 26/26 bị bắt ở vitest trên mã sau review lần 1, cùng O19 ở browser; gồm đủ 8 đột biến của task card. Lần 2 thêm một đột biến (bỏ `scroll-padding-bottom`), bị ca Tab bắt.
+- **Kiểm toàn bộ** (mã sau review lần 2, DB tạm dựng lại sạch): `npm run check` exit 0, 63 + 408 + 359 + 42 + 554 + 792 = 2.218 v3 + 394 eval (`chat-api` thêm 7, web thêm 19). `npm run test:browser:v3` exit 0, 126 pass/1 skip có chủ đích, 13 nhóm (`gmail` 10).
 - **Khác với task card và đặc tả** (đã ghi "(OAUTH-01)" ở đặc tả 4.1, 5.1, 8):
   - assertion cũ của `gmail-migration.test.ts` ("đúng 2 ràng buộc có chữ `mode`") đổi sang kiểm đúng tập tên ba ràng buộc, theo đề xuất của review, để ràng buộc mới giữ đúng đặc tả 4.1. Chờ nhóm trưởng xác nhận;
   - mỗi màn từ chối mới gọi lại `GET /api/services`, vì danh sách tải lúc đăng nhập có thể cũ hơn lời từ chối; browser bắt được lỗi này ở lượt chạy thứ ba;
