@@ -17,7 +17,7 @@ Người sửa cũng là người viết review, nên phần sửa cần **một
    - xoá `readPlanMyCalendarConnection`, `planUsesMyCalendar`, `planUsesGmail`, `attachPlanConnections` (`connection-reference.ts`), cùng import không còn dùng;
    - xoá `isGmailEnabled`, `isMyCalendarEnabled`, `filterToolCatalogForRuntime`, `filterToolCatalogForGmail` (`gmail-tools-runtime.ts`), cùng import `ToolDefinition`;
    - xoá `sandbox/fake-results/mycalendar.ts` và trả `sandbox/index.ts` về đúng bản trước PR. Sandbox chuyển `mycalendar` sang adapter HTTP riêng, nên bộ giả trong bộ nhớ không đường nào chạy tới. Bản trả về cũng lấy lại câu lỗi Gmail cũ, "Gmail sandbox đã huỷ." / "Tool Gmail sandbox không hợp lệ.", mà PR đã đổi thành chữ thường theo tên dịch vụ;
-   - ghi chú ở `runtimeMyCalendarAdapter`: mọi chế độ dùng adapter HTTP, vì khi không chạy live `env.ts` chỉ nhận cấu hình có đủ endpoint giả.
+   - ghi chú ở `runtimeMyCalendarAdapter` vì sao mọi chế độ dùng adapter HTTP. Bản đầu của ghi chú nói sai, xem mục "Kiểm lại" bên dưới.
 
    Trước khi xoá, đã `grep` toàn bộ `apps`, `packages`, `scripts`, `evaluations`: mỗi tên chỉ xuất hiện ở chính chỗ định nghĩa.
 
@@ -27,6 +27,19 @@ PostgreSQL 16 tmpfs riêng ở 56533, dựng lại sạch trước mỗi lượt
 - `npm run check` (`VITEST_MAX_WORKERS=2`): **exit 0**; 65 + 425 + 378 + 42 + **616** + 860 = **2.386 v3** + **406 eval**. `chat-api` thêm 2 test; web 860 là con số sau khi gộp `main` (SCHED-03).
 - `npm run test:browser:v3`: **exit 0 ngay lượt đầu**, **157 pass/1 skip có chủ đích, 15 nhóm**: default 95, `gmail` 10, `mycalendar` 7, `schedule` 22.
 - `tsc` của `chat-api` exit 0 sau khi xoá mã thừa.
+
+## Kiểm lại phần sửa
+
+Một reviewer khác kiểm lại tại `e9f1dc3` ([bình luận](https://github.com/VinhDat267/ATI_Project/pull/176#issuecomment-6447099752)): **Đạt sau khi sửa nhỏ**. Ba P3 gốc đã đóng:
+- ca `$ref` bắt được M6;
+- câu gợi ý khớp `2888a9f`;
+- mã đã xoá không còn nơi gọi, và `sandbox/index.ts` trùng từng byte với `2888a9f`.
+
+Còn **một P3 mới** ở chính ghi chú vừa thêm. Ghi chú viết rằng ngoài live, `env.ts` chỉ nhận `MYCALENDAR_OAUTH` khi mọi endpoint trỏ tới máy chủ giả, nên sandbox "never Google". Điều đó sai: `env.ts` chỉ bắt buộc có đủ bốn biến `MYCALENDAR_*` override, và không kiểm URL là máy chủ giả. Đặt URL Google thật vào đó thì sandbox vẫn gọi Google. Reviewer chứng minh bằng một probe cấu hình, không gọi mạng.
+
+Review độc lập lần 1 của #176 cũng nói quá như vậy ("sandbox không thể gọi Google").
+
+**Sửa:** ghi chú nay chỉ nói đúng điều `env.ts` làm. Việc trỏ các biến này tới máy chủ giả cục bộ (`scripts/fake-google-gmail.mjs`, như runner browser đang làm) là trách nhiệm của bên cấu hình. Chỉ đổi chú thích, không đổi mã.
 
 ## Chưa làm
 

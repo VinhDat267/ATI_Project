@@ -39,9 +39,11 @@ export function runtimeGmailAdapter(mode: RuntimeMode, tokens: GmailAccessTokenP
 }
 
 /**
- * Unlike Gmail, every mode uses the HTTP adapter: outside live, env.ts accepts
- * MYCALENDAR_OAUTH only with every endpoint pointing at a fake, so a sandbox
- * reaches the fake Calendar server (scripts/fake-google-gmail.mjs), never Google.
+ * Unlike Gmail, every mode uses the HTTP adapter. Outside live, env.ts accepts
+ * MYCALENDAR_OAUTH only when all four MYCALENDAR_* endpoint overrides are set,
+ * and calls go wherever they point; it does not check that they are fakes.
+ * Pointing them at a local fake (scripts/fake-google-gmail.mjs, as the browser
+ * runner does) is the caller's job.
  */
 export function runtimeMyCalendarAdapter(
   _mode: RuntimeMode,
