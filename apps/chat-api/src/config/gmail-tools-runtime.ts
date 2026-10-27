@@ -66,13 +66,16 @@ export function runtimeGmailAdapter(mode: RuntimeMode, tokens: GmailAccessTokenP
 }
 
 export function runtimeMyCalendarAdapter(
-  mode: RuntimeMode,
+  _mode: RuntimeMode,
   input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope },
   baseUrl?: string,
 ) {
-  return mode === 'live'
-    ? createPersonalCalendarAdapter({ userId: input.userId, tokens: input.tokens, allowedScope: input.allowedScope, apiBaseUrl: baseUrl })
-    : createPersonalCalendarAdapter({ userId: input.userId, tokens: input.tokens, allowedScope: input.allowedScope, apiBaseUrl: baseUrl });
+  return createPersonalCalendarAdapter({
+    userId: input.userId,
+    tokens: input.tokens,
+    allowedScope: input.allowedScope,
+    apiBaseUrl: baseUrl,
+  });
 }
 
 export function createToolRuntimeFactory(

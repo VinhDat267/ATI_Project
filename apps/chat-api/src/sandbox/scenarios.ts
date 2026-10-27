@@ -31,7 +31,7 @@ export function createSandboxProvider(scenario?: string) {
             tool: 'mycalendar.create_event',
             description: 'Tạo sự kiện họp',
             args: {
-              calendarId: 'primary',
+              calendarId: 'user@example.com',
               summary: 'Họp việc riêng',
               start: '2026-10-28T09:00:00+07:00',
               end: '2026-10-28T10:00:00+07:00',

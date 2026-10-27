@@ -4,7 +4,7 @@ export const MYCALENDAR_FAKE: FakeService = {
   id: 'mycalendar',
   tools: {
     'mycalendar.list_calendars': () => [
-      { id: 'primary', title: 'Lịch cá nhân', timeZone: 'Asia/Ho_Chi_Minh' },
+      { id: 'user@example.com', title: 'Lịch cá nhân', timeZone: 'Asia/Ho_Chi_Minh' },
     ],
     'mycalendar.list_events': () => ({
       events: [

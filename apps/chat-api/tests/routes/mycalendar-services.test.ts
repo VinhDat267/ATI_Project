@@ -10,7 +10,7 @@ import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { AdapterFactory, type AdapterContext } from '../../src/services/adapter-factory.js';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { ChatService } from '../../src/services/chat-service.js';
-import { createMyCalendarConnectionLookup } from '../../src/services/gmail/connection-reference.js';
+import { createGmailConnectionLookup, createMyCalendarConnectionLookup } from '../../src/services/gmail/connection-reference.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { WorkingMemory } from '@wap/planner';
 
@@ -266,6 +266,66 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
         credentialId: saved.id,
         email: 'alice@example.com',
         allowedCalendars: ['alice@example.com', 'c_work_123'],
+      });
+    });
+
+    it('ChatService.bindConnections attaches both gmail and mycalendar when both are present in the same plan', async () => {
+      const selected = [{ id: 'alice@example.com', summary: 'Lịch chính', timeZone: 'Asia/Ho_Chi_Minh', primary: true }];
+      const calSaved = await connectMyCalendar(alice, 'alice@example.com', selected);
+      const gmailSaved = await credentials.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            refreshToken: `1//fake-gmail-${alice.id}`,
+            email: 'alice.gmail@example.test',
+            connectedAt: '2026-10-27T08:00:00.000Z',
+          },
+          key,
+        ),
+        alice.id,
+      );
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        gmailConnection: createGmailConnectionLookup(credentials, key),
+        mycalendarConnection: createMyCalendarConnectionLookup(credentials, key),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tạo lịch và gửi email',
+        summary: 'Tạo lịch họp và thông báo qua Gmail',
+        steps: [
+          {
+            id: 's1',
+            tool: 'mycalendar.create_event',
+            description: 'Tạo sự kiện',
+            args: { calendarId: 'alice@example.com', summary: 'Họp', start: '2026-10-28T09:00:00Z', end: '2026-10-28T10:00:00Z' },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'gmail.send_message',
+            description: 'Gửi email xác nhận',
+            args: { to: ['bob@example.test'], subject: 'Thông báo họp', body: 'Đã tạo lịch họp.' },
+            dependsOn: ['s1'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('plan');
+      expect(result.connections?.mycalendar).toEqual({
+        credentialId: calSaved.id,
+        email: 'alice@example.com',
+        allowedCalendars: ['alice@example.com'],
+      });
+      expect(result.connections?.gmail).toEqual({
+        credentialId: gmailSaved.id,
+        email: 'alice.gmail@example.test',
       });
     });
 
