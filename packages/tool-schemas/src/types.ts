@@ -84,6 +84,14 @@ export interface PlanStep {
 /** The personal connections a plan was previewed with. */
 export interface PlanConnections {
   gmail?: { credentialId: string; email: string };
+  mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
+}
+
+export interface PersonalCalendarItem {
+  id: string;
+  summary: string;
+  timeZone: string;
+  primary?: boolean;
 }
 
 export interface PlanResponse {
