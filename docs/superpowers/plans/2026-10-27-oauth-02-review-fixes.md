@@ -30,30 +30,30 @@
 
 Files: `apps/chat-api/src/config/env.ts`, new config tests, `scripts/fake-google-gmail.mjs`, fake-server tests, `.env.example`, MyCalendar specification and task configuration instructions.
 
-- [ ] Write and run failing tests for live project configuration and project-wide revocation with real fixture HTTP/token refresh.
-- [ ] Implement explicit project identity validation, project-aware fixture grants, and corrected configuration documentation.
-- [ ] Run the new tests and existing Gmail/MyCalendar suites without changing old assertions.
+- [x] Write and run failing tests for live project configuration and project-wide revocation with real fixture HTTP/token refresh.
+- [x] Implement explicit project identity validation, project-aware fixture grants, and corrected configuration documentation.
+- [x] Run the new tests and existing Gmail/MyCalendar suites without changing old assertions.
 
 ## Task 2 — Routing, evaluation fixtures and labels (AI Engineer ownership)
 
 Files: `packages/tool-schemas/src/registry/mycalendar.ts`, `packages/planner/tests/evaluation/golden.test.ts`, `evaluations/golden*/cases-mycalendar.json`, `evaluations/golden-v2/fixtures.ts`, new focused evaluation tests; minimal runner/scorer changes only if required.
 
-- [ ] Add failing routing cases for English personal calendar, connected/unavailable, and shared Calendar.
-- [ ] Add failing fixture/runner tests for personal discovery, event reads, grounding, and injected event titles.
-- [ ] Fix fixtures and register corrected mc04/injection labels in a separate label commit before any model calls.
-- [ ] Make tests pass and verify old evaluation sets and schema/catalog invariants.
+- [x] Add failing routing cases for English personal calendar, connected/unavailable, and shared Calendar.
+- [x] Add failing fixture/runner tests for personal discovery, event reads, grounding, and injected event titles.
+- [x] Fix fixtures and register corrected mc04/injection labels in a separate label commit before any model calls.
+- [x] Make tests pass and verify old evaluation sets and schema/catalog invariants.
 
 ## Task 3 — Callback cleanup and receipt account (Frontend ownership)
 
 Files: `apps/chat-web/src/views/MyCalendarCallbackView.tsx`, `apps/chat-web/src/components/Cockpit.tsx`, `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx`, focused web tests and optional scoped browser tests.
 
-- [ ] Preserve the two reviewer reproductions as regression tests and observe their failures.
-- [ ] Fix effect cleanup while keeping the OAuth callback single-use; cover pending save and session invalidation.
-- [ ] Pass the approved personal Calendar connection into receipts and assert its email with a secondary calendar and a different current connection.
-- [ ] Run focused web tests and typecheck.
+- [x] Preserve the two reviewer reproductions as regression tests and observe their failures.
+- [x] Fix effect cleanup while keeping the OAuth callback single-use; cover pending save and session invalidation.
+- [x] Pass the approved personal Calendar connection into receipts and assert its email with a secondary calendar and a different current connection.
+- [x] Run focused web tests and typecheck.
 
 ## Task 4 — Integration, handoff and independent review
 
-- [ ] Run full workspace tests, evaluation tests, typecheck, build, launcher/security checks and MyCalendar/default-off browser tests using isolated migrated PostgreSQL.
-- [ ] Request a fresh reviewer for the fixes, resolve material findings and rerun affected checks.
-- [ ] Fill the OAUTH-02 results section, add a new handoff log with exact commands/counts/limits, and preserve NOT_RUN status for live acceptance and CI.
+- [x] Run full workspace tests, evaluation tests, typecheck, build, launcher/security checks and MyCalendar/default-off browser tests using isolated migrated PostgreSQL.
+- [x] Request a fresh reviewer for the fixes, resolve material findings and rerun affected checks.
+- [x] Fill the OAUTH-02 results section, add a new handoff log with exact commands/counts/limits, and preserve NOT_RUN status for live acceptance and CI.

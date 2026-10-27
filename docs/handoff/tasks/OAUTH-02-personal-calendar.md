@@ -17,10 +17,10 @@ Calendar chung (`calendar.*`) không đổi. Cờ tắt thì hệ thống không
 ## Việc cần làm
 
 0. **Google Cloud** (nhóm trưởng):
-   - trong project của Gmail, bật Google Calendar API;
-   - tạo client OAuth **thứ hai** (web), redirect `/connections/mycalendar/callback`;
+   - tạo Google Cloud project **riêng**, khác project Gmail và đăng nhập, rồi bật Google Calendar API;
+   - trong project Calendar riêng, tạo client OAuth web, redirect `/connections/mycalendar/callback`;
    - thêm quyền `calendar.events` và `calendar.readonly` vào màn đồng ý (Testing, cùng test user);
-   - ghi `MYCALENDAR_OAUTH_*` vào `.env` ở máy, không commit. Ghi project id và client id (không ghi secret) trong bằng chứng.
+   - ghi `MYCALENDAR_OAUTH_*` vào `.env` ở máy, bao gồm `MYCALENDAR_OAUTH_PROJECT_ID`, và khai báo `GMAIL_OAUTH_PROJECT_ID` nếu client Gmail đã có cấu hình. Đối chiếu client thuộc project tương ứng trên Google Cloud. Live từ chối thiếu project ID, cùng project hoặc cùng client. Ghi hai project id và client id (không ghi secret) trong bằng chứng; không commit `.env`.
 1. **PR 1, backend** (đặc tả mục 4, 5):
    - `MYCALENDAR_SERVICE`, `MYCALENDAR_TOOLS` (`mycalendar.list_calendars`, `mycalendar.list_events`, `mycalendar.create_event` với `'x-resource': 'mycalendar'`), `PlanConnections.mycalendar`; cờ và biến môi trường; migration `0012_mycalendar_personal_connections.sql`;
    - tổng quát hoá client OAuth, quản lý token, kho kết nối cá nhân và các route `/api/connections/mycalendar` (`POST /start`, `POST /callback`, `GET /calendars`, `PUT /scope`, `DELETE /`). Bộ test Gmail đạt không sửa assertion;
@@ -74,10 +74,10 @@ Ghi kết quả từng đột biến vào log.
 
 ## Tiêu chí nghiệm thu
 
-- [x] RED trước GREEN; đột biến đều bị bắt (8/8 đột biến tại mục 8.2 đều bị bắt với exit code 1 và khôi phục khớp SHA-256).
-- [x] `npm run check` (`typecheck:v3`, `build:v3`, `test:v3`, `test:eval:v3`) và `npm run test:browser:v3` (`SCENARIO=mycalendar` 7/7 + `SCENARIO=default` `MYCALENDAR off:` 1/1) exit 0, không sửa assertion cũ.
-- [x] Label commit trước lời gọi model đầu tiên (`evaluations/golden/cases-mycalendar.json` 8 câu); báo cáo đủ nguồn gốc.
-- [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu (chờ nhóm trưởng cấu hình Google Cloud OAuth Client thứ hai và chạy P-LIVE).
+- [x] RED trước GREEN; chạy lại 8/8 đột biến mục 8.2 trên source sửa `2be4696a`, đều bị bắt bằng assertion fail với exit code 1 và khôi phục khớp SHA-256; thêm 3/3 mutation mới cho review fixes.
+- [x] `npm run check` và toàn bộ `npm run test:browser:v3` exit 0: 2.341 workspace tests, 406 eval, 134 browser passed / 1 skip có chủ đích trên 14 nhóm; không sửa assertion Gmail cũ.
+- [ ] Label đã commit trước lời gọi model đầu tiên (`evaluations/golden/cases-mycalendar.json`, 8 câu; sửa label ở `e9fc6d7a`); đo model ×3 và báo cáo nguồn gốc còn `NOT_RUN`.
+- [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu (chờ nhóm trưởng cấu hình client Calendar trong Cloud project riêng và chạy P-LIVE).
 
 ## Ngoài phạm vi
 
@@ -86,15 +86,17 @@ Ghi kết quả từng đột biến vào log.
 
 ## Kết quả (agent thi công điền)
 
-- **Nhánh:** `feat/oauth-02-personal-calendar` (tách từ `main` `2888a9fe`, 8 commits từ đặc tả + kế hoạch qua 6 tasks SDD: `cb968542..4b82133`).
+- **Nhánh:** `feat/oauth-02-personal-calendar`, tách từ `main` `2888a9fe`; review tại `c774af3a`; label sửa riêng ở `e9fc6d7a`, mã sửa sáu lỗi ở `2be4696a`.
 - **Kiểm thử & Đột biến:**
   - `npm run typecheck:v3`: exit 0.
   - `RUNTIME_MODE=sandbox npm run build:v3`: exit 0.
-  - `npm run test:v3`: **2.304 passed** (6 workspaces: `tool-schemas` 74, `tool-adapters` 425, `planner` 393, `executor` 42, `chat-api` 564, `chat-web` 806).
-  - `npm run test:eval:v3`: **394 passed** (24 files, bao gồm `golden.test.ts` với `cases-mycalendar.json` và `static-guard.test.ts`).
-  - Browser E2E (`scripts/test-v3-browser.mjs`): `SCENARIO=mycalendar` **7/7 passed** (4 flows × 1440/375 sáng/tối), `SCENARIO=default GREP="MYCALENDAR off:"` **1/1 passed**.
-  - Đột biến bắt buộc (Spec §8.2): **8/8 bị bắt** (M1–M8 đều fail đúng assertion với exit code 1, khôi phục khớp SHA-256).
-- **Số đo (`EVAL_SET=mycalendar`):** Đã commit 8 câu chuẩn (`mc01`–`mc06`, `mi01`–`mi02`) tại `evaluations/golden/cases-mycalendar.json` và `evaluations/golden-v2/cases-mycalendar.json` (pass `golden.test.ts` 4/4). Đo live model ×3 sẽ chạy cùng bước nghiệm thu thật khi có khóa môi trường.
-- **Nghiệm thu thật:** Chờ nhóm trưởng tạo OAuth Client thứ hai trên Google Cloud Project (`/connections/mycalendar/callback`) và chạy P-LIVE (bằng chứng lưu tại `docs/ai-evidence/MYCALENDAR-LIVE/`, đã thêm vào `.gitignore`).
-- **Quyết định bật cờ:** Mặc định `MYCALENDAR_ENABLED=off`; sẵn sàng bật sau khi hoàn tất P-LIVE.
-- **Log bàn giao:** [`docs/handoff/log/2026-10-27-OAUTH-02-personal-calendar.md`](../log/2026-10-27-OAUTH-02-personal-calendar.md).
+  - `npm run check`: exit 0, gồm toàn bộ các mục kiểm tra dưới đây và security/launcher/fixture checks.
+  - `npm run test:v3`: **2.341 passed** (6 workspaces: `tool-schemas` 65, `tool-adapters` 425, `planner` 378, `executor` 42, `chat-api` 614, `chat-web` 817).
+  - `npm run test:eval:v3`: **406 passed / 25 files**; test runner dùng fixture lịch cá nhân thật và kiểm accepted refusal/clarification chưa lookup không được chấm đạt.
+  - Browser E2E toàn bộ: **134 passed / 1 skip có chủ đích / 14 nhóm**, gồm default 94 pass / 1 skip, Gmail 10/10, MyCalendar 7/7; có so sánh email tài khoản trên preview và receipt, viewport 1440/375 sáng/tối.
+  - Đột biến bắt buộc (Spec §8.2): chạy lại **8/8 bị bắt** trên source sửa; thêm **3/3** mutation mới; mỗi file được khôi phục và đối chiếu SHA-256.
+  - Review độc lập source `c774af3a..2be4696a`: không còn phát hiện quan trọng; reviewer tự chạy 85 focused tests, exit 0.
+- **Số đo (`EVAL_SET=mycalendar`):** 8 câu (`mc01`–`mc06`, `mi01`–`mi02`), hai bản JSON đồng nhất; label sửa tại `e9fc6d7a` trước mọi lời gọi model. `mc04` kỳ vọng clarification theo chính sách chỉ đọc; injection nằm trong dữ liệu sự kiện và cần lookup thành công. **Model ×3 / báo cáo live: NOT_RUN.**
+- **Nghiệm thu thật:** Chờ nhóm trưởng tạo client Calendar trong Google Cloud project riêng (redirect `/connections/mycalendar/callback`), đối chiếu với project Gmail, khai báo hai project ID và chạy P-LIVE (bằng chứng lưu tại `docs/ai-evidence/MYCALENDAR-LIVE/`, đã thêm vào `.gitignore`). Nếu đã tạo client trong project Gmail theo hướng dẫn cũ thì phải chuyển sang project riêng và kết nối lại.
+- **Quyết định bật cờ:** Giữ `MYCALENDAR_ENABLED=off`; chỉ mở PR bật cờ sau khi model ×3 và P-LIVE đều đạt quy tắc đặc tả §8.3.
+- **Log bàn giao:** [thi công ban đầu](../log/2026-10-27-OAUTH-02-personal-calendar.md), [sửa sau review và bằng chứng mới nhất](../log/2026-10-27-codex-OAUTH-02-review-fixes.md).
