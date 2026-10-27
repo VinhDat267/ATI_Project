@@ -13,7 +13,7 @@ import {
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
 import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
-import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -23,7 +23,7 @@ import { AdapterFactory, type AdapterContext } from './services/adapter-factory.
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
-import { createGmailConnectionLookup } from './services/gmail/connection-reference.js';
+import { createGmailConnectionLookup, createMyCalendarConnectionLookup } from './services/gmail/connection-reference.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -203,8 +203,9 @@ async function bootstrap() {
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
   if (schedules) await schedules.reconcile();
 
-  // Gmail needs the flag, its own OAuth client and PostgreSQL; otherwise none of it exists.
+  // Gmail and MyCalendar need the flag, their own OAuth client and PostgreSQL; otherwise none of it exists.
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
+  const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -240,9 +241,13 @@ async function bootstrap() {
 
   // One planner per call: the member's own catalog decides which services are configured.
   const plannerFor = async (actor?: { userId: string }) => new AIPlanner({
-    provider: env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'gmail' ? createSandboxProvider('gmail') : provider,
-    toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, { userId: actor?.userId, gmailEnabled: gmailAvailable }),
-    serviceRegistry: gmailServiceRegistry(gmailAvailable),
+    provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
+    toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
+      userId: actor?.userId,
+      gmailEnabled: gmailAvailable,
+      mycalendarEnabled: mycalendarAvailable,
+    }),
+    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable),
     gatherSearch,
     requireGroundedResources: env.RUNTIME_MODE === 'live',
     timeZone: env.APP_TIME_ZONE,
@@ -254,7 +259,7 @@ async function bootstrap() {
     ...createRuntimePlanner(env.RUNTIME_MODE,
       async (input: any) => (await plannerFor(input?.actor)).processMessage(input),
       (input: any) => {
-        if (!mayFallbackToShared(input, gmailAvailable)) throw new Error('Gmail planning failed');
+        if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable)) throw new Error('Personal service planning failed');
         return backupPlanner.processMessage(input);
       }),
     routeSchedule: async (request: string, actor: { userId: string }) => (await plannerFor(actor)).routeSchedule(request),
@@ -278,20 +283,30 @@ async function bootstrap() {
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
+    mycalendarConnection: mycalendarAvailable ? createMyCalendarConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
     schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
+  if (env.MYCALENDAR_ENABLED && !mycalendarAvailable) console.warn('\x1b[33m[chat-api] MYCALENDAR_ENABLED=on nhưng thiếu cấu hình MyCalendar hoặc PostgreSQL: kết nối MyCalendar tạm tắt (503).\x1b[0m');
   const realAdapterFactory: AdapterFactory = new AdapterFactory({
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailTokens: gmailAvailable ? new GmailTokenManager({
       client: new GmailOAuthClient(env.GMAIL_OAUTH!),
       credentials: credRepo,
+      service: 'gmail',
       onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
     }) : undefined,
     createGmailAdapter: gmailAvailable ? ({ tokens }) => runtimeGmailAdapter(env.RUNTIME_MODE, tokens, env.GMAIL_OAUTH!.apiBaseUrl) : undefined,
+    mycalendarTokens: mycalendarAvailable ? new GmailTokenManager({
+      client: new GmailOAuthClient(env.MYCALENDAR_OAUTH!),
+      credentials: credRepo,
+      service: 'mycalendar',
+      onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    }) : undefined,
+    createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
@@ -336,6 +351,12 @@ async function bootstrap() {
       enabled: true,
       oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,
       repo: gmailAvailable && pool ? new GmailConnectionRepo(pool) : undefined,
+      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
+    } : undefined,
+    mycalendar: env.MYCALENDAR_ENABLED ? {
+      enabled: true,
+      oauth: mycalendarAvailable ? env.MYCALENDAR_OAUTH : undefined,
+      repo: mycalendarAvailable && pool ? new GmailConnectionRepo(pool, 'mycalendar', 'connect_mycalendar') : undefined,
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
     } : undefined,
     chatService,

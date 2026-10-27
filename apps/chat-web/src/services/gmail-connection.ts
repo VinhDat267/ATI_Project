@@ -33,3 +33,23 @@ export const gmailCallbackError = (code?: string) => ({
   GMAIL_CONNECT_FAILED: 'Không thể hoàn tất kết nối Gmail. Hãy thử kết nối lại từ trang dịch vụ.',
   INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Gmail.',
 }[code ?? ''] ?? 'Không thể hoàn tất kết nối Gmail. Hãy trở về trang dịch vụ để kết nối lại.');
+
+export const mycalendarSessionOwner = gmailSessionOwner;
+export const redirectToMyCalendar = redirectToGmail;
+
+let mycalNotice: { userId?: string; email: string } | undefined;
+export const mycalendarConnectionNotice = {
+  set(email: string) { mycalNotice = { userId: authStorage.getStoredTokens().user?.id, email }; },
+  take(userId?: string) { const own = mycalNotice; mycalNotice = undefined; return own?.userId === userId ? own?.email : undefined; },
+};
+
+export const mycalendarCallbackError = (code?: string) => ({
+  MYCALENDAR_STATE_INVALID: 'Yêu cầu kết nối Google Calendar đã hết hạn hoặc không còn hợp lệ. Hãy bắt đầu kết nối lại.',
+  MYCALENDAR_SCOPE_MISSING: 'Google chưa cấp quyền quản lý sự kiện lịch cho ATI. Hãy kết nối lại và đồng ý quyền Google Calendar.',
+  MYCALENDAR_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
+  MYCALENDAR_CONNECT_FAILED: 'Không thể hoàn tất kết nối Google Calendar. Hãy thử kết nối lại từ trang dịch vụ.',
+  MYCALENDAR_FETCH_FAILED: 'Không tải được danh sách lịch từ Google Calendar. Hãy thử lại.',
+  MYCALENDAR_SCOPE_INVALID: 'Vui lòng chọn ít nhất một lịch hợp lệ.',
+  MYCALENDAR_NOT_CONNECTED: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
+  INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Google Calendar.',
+}[code ?? ''] ?? 'Không thể hoàn tất kết nối Google Calendar. Hãy trở về trang dịch vụ để kết nối lại.');

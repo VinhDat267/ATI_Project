@@ -192,6 +192,50 @@ export class ApiClient {
   disconnectGmail() {
     return this.request<{ success: true }>('/api/connections/gmail', { method: 'DELETE', credentials: 'include' });
   }
+  /** `returnTo`: the conversation to come back to after Google, `/c/<id>` (OAUTH-02). */
+  startMyCalendarConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/mycalendar/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeMyCalendarConnection(code: string, state: string) {
+    // OAuth state is one-use. Never replay this request, including on a 401.
+    return this.request<{
+      status?: 'scope_required';
+      email: string;
+      calendars: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean; accessRole?: 'owner' | 'writer' }>;
+      selectedCalendars?: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean }>;
+      returnTo?: string;
+    }>('/api/connections/mycalendar/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  listMyCalendarCalendars() {
+    return this.request<{
+      email: string;
+      calendars: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean; accessRole?: 'owner' | 'writer' }>;
+      selectedCalendarIds: string[];
+    }>('/api/connections/mycalendar/calendars', { credentials: 'include' });
+  }
+  saveMyCalendarScope(calendarIds: string[]) {
+    return this.request<{
+      status?: 'connected';
+      email: string;
+      selectedCalendars: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean }>;
+      allowedScope: string[];
+    }>('/api/connections/mycalendar/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ calendarIds }),
+    });
+  }
+  disconnectMyCalendar() {
+    return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
@@ -311,7 +355,7 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; schedulesEnabled?: boolean }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; schedulesEnabled?: boolean }> {
     return this.request('/api/health');
   }
 

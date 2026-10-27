@@ -9,11 +9,11 @@ import type { AdapterExecutor } from '@wap/executor';
 import { getRegisteredService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 
-/** Who an adapter is for. Shared services ignore it; Gmail requires it (GMAIL-common 4.4). */
+/** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
   userId?: string;
   phase: 'planning' | 'execution';
-  /** Required when phase is 'execution' and the service is Gmail: the connection the plan was previewed with. */
+  /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
 }
 
@@ -23,15 +23,21 @@ export interface AdapterFactoryOptions {
   /** Builds the Gmail adapter of one member; absent until GMAIL-02 wires the real and sandbox adapters. */
   createGmailAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider }) => AdapterExecutor;
   gmailTokens?: GmailTokenManager;
+  /** Builds the MyCalendar adapter of one member with explicit scope allowlist. */
+  createMyCalendarAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
+  mycalendarTokens?: GmailTokenManager;
 }
 
-const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) => new StepError({ category, message, retryable: false });
+const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const mycalendarError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
   private credentialRepo: CredentialRepo;
   private encryptionKey: string;
   private adapterCache = new Map<string, any>();
-  private personalCache = new Map<string, { credentialId: string; adapter: AdapterExecutor }>();
+  private personalCache = new Map<string, { credentialId: string; adapter: AdapterExecutor; scopeKey?: string }>();
 
   constructor(private options: AdapterFactoryOptions) {
     this.credentialRepo = options.credentialRepo;
@@ -42,14 +48,17 @@ export class AdapterFactory {
     this.adapterCache.delete(serviceName);
   }
 
-  /** Forget the Gmail adapter and access tokens of one member (connect, disconnect, reconnect_required). */
+  /** Forget the Gmail & MyCalendar adapters and access tokens of one member (connect, disconnect, reconnect_required). */
   clearPersonal(userId: string): void {
     this.personalCache.delete(`gmail:${userId}`);
+    this.personalCache.delete(`mycalendar:${userId}`);
     this.options.gmailTokens?.clear(userId);
+    this.options.mycalendarTokens?.clear(userId);
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
     if (serviceName === 'gmail') return this.gmailAdapter(context);
+    if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     const cached = this.adapterCache.get(serviceName);
     if (cached) return cached;
 
@@ -100,6 +109,63 @@ export class AdapterFactory {
     if (typeof refreshToken !== 'string' || !refreshToken) throw gmailError('AUTH_ERROR', 'Gmail cần được kết nối lại.');
     const adapter = this.options.createGmailAdapter({ userId, tokens: this.options.gmailTokens.forConnection(userId, record.id, refreshToken) });
     this.personalCache.set(key, { credentialId: record.id, adapter });
+    return adapter;
+  }
+
+  /** Only the member's own active connection; at execution, credentialId match and allowedCalendars subset match. */
+  private async mycalendarAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw mycalendarError('AUTH_ERROR', 'Google Calendar cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    const record = await this.credentialRepo.getPersonalCredentials('mycalendar', userId);
+    if (!record || record.status !== 'active') throw mycalendarError('AUTH_ERROR', 'Google Calendar chưa được kết nối hoặc cần kết nối lại.');
+
+    let config: any;
+    try {
+      config = decryptCredentials(record.config, this.encryptionKey);
+    } catch {
+      throw mycalendarError('AUTH_ERROR', 'Google Calendar cần được kết nối lại.');
+    }
+
+    const allowedCalendars: string[] = Array.isArray(config.allowedScope?.calendars)
+      ? config.allowedScope.calendars
+      : Array.isArray(config.selectedCalendars)
+        ? config.selectedCalendars.map((c: any) => c.id)
+        : [];
+    if (!allowedCalendars.length) {
+      throw mycalendarError('AUTH_ERROR', 'Bạn chưa chọn lịch Google Calendar được phép sử dụng.');
+    }
+
+    if (context.phase === 'execution') {
+      const previewed = context.connections?.mycalendar;
+      if (!previewed || record.id !== previewed.credentialId) {
+        throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
+      }
+      const currentSet = new Set(allowedCalendars);
+      if (!Array.isArray(previewed.allowedCalendars) || !previewed.allowedCalendars.every((id) => currentSet.has(id))) {
+        throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    const key = `mycalendar:${userId}`;
+    const scopeKey = [...allowedCalendars].sort().join(',');
+    const cached = this.personalCache.get(key);
+    if (cached?.credentialId === record.id && cached.scopeKey === scopeKey) return cached.adapter;
+
+    if (!this.options.createMyCalendarAdapter || !this.options.mycalendarTokens) {
+      throw mycalendarError('VALIDATION', 'Google Calendar chưa sẵn sàng trên máy chủ này.');
+    }
+
+    const refreshToken = config.refreshToken;
+    if (typeof refreshToken !== 'string' || !refreshToken) {
+      throw mycalendarError('AUTH_ERROR', 'Google Calendar cần được kết nối lại.');
+    }
+
+    const adapter = this.options.createMyCalendarAdapter({
+      userId,
+      tokens: this.options.mycalendarTokens.forConnection(userId, record.id, refreshToken),
+      allowedScope: { calendars: allowedCalendars },
+    });
+    this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
     return adapter;
   }
 }

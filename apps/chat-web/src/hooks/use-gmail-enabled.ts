@@ -11,3 +11,13 @@ export function useGmailEnabled() {
   }, []);
   return enabled;
 }
+
+export function useMyCalendarEnabled() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let current = true;
+    apiClient.getRuntime().then(data => { if (current) setEnabled(data.mycalendarEnabled === true); }).catch(() => {});
+    return () => { current = false; };
+  }, []);
+  return enabled;
+}

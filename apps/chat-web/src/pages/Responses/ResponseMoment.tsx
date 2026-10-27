@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { apiClient } from '../../services/api-client';
-import { conversationReturnPath, gmailSessionOwner, redirectToGmail } from '../../services/gmail-connection';
+import { conversationReturnPath, gmailSessionOwner, redirectToGmail, mycalendarSessionOwner, redirectToMyCalendar } from '../../services/gmail-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
 
@@ -100,14 +100,20 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const ids = new Set(unavailable.map(row => row.id));
   const relevant = services.filter(service => ids.has(service.id) || new RegExp(`(^|[^\\p{L}\\p{N}])${service.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(request));
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
-  // What the refusal named may be usable by now: Gmail once this person connected it, a shared service once configured.
+  // What the refusal named may be usable by now: Gmail/MyCalendar once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
-  const usable = (id: string) => connectFromChat && (id === 'gmail' ? current(id)?.personalStatus === 'connected' : current(id)?.configured === true);
+  const usable = (id: string) => connectFromChat && (
+    id === 'gmail' || id === 'mycalendar'
+      ? current(id)?.personalStatus === 'connected'
+      : current(id)?.configured === true
+  );
   const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
+  const mycalStatus = current('mycalendar')?.personalStatus;
   const missing = unavailable.filter(row => !usable(row.id));
   const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
   const hasGmail = missing.some(row => row.id === 'gmail');
-  const shared = missing.filter(row => row.id !== 'gmail');
+  const hasMyCalendar = missing.some(row => row.id === 'mycalendar');
+  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar');
   const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
   const back = conversationId ? conversationReturnPath(`/c/${conversationId}`) : null;
   const [starting, setStarting] = useState(false), [startError, setStartError] = useState('');
@@ -122,6 +128,15 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Gmail. Hãy kiểm tra mạng và thử lại.'); }
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
+  const connectMyCalendar = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = mycalendarSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { url } = await apiClient.startMyCalendarConnection(returnTo ? { returnTo } : {});
+      if (mounted.current && owns()) redirectToMyCalendar(url);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Google Calendar. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -134,10 +149,23 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
           {rows.map(service => {
             const status = ids.has(service.id) && !usable(service.id) ? 'unconfigured' : service.connectionStatus ?? (service.configured ? 'unchecked' : 'unconfigured');
             const gmailConnected = service.id === 'gmail' && usable('gmail');
-            const good = gmailConnected || status === 'healthy';
+            const mycalConnected = service.id === 'mycalendar' && usable('mycalendar');
+            const good = gmailConnected || mycalConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>{gmailConnected ? `Đã kết nối${current('gmail')?.email ? ` · ${current('gmail')!.email}` : ''}` : service.id === 'gmail' && reconnect ? 'Cần kết nối lại' : labels[status]}</span></span>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>
+                {gmailConnected
+                  ? `Đã kết nối${current('gmail')?.email ? ` · ${current('gmail')!.email}` : ''}`
+                  : service.id === 'gmail' && reconnect
+                  ? 'Cần kết nối lại'
+                  : mycalConnected
+                  ? `Đã kết nối${current('mycalendar')?.email ? ` · ${current('mycalendar')!.email}` : ''}`
+                  : service.id === 'mycalendar' && mycalStatus === 'scope_required'
+                  ? `Đã cấp quyền · Chưa chọn lịch${current('mycalendar')?.email ? ` · ${current('mycalendar')!.email}` : ''}`
+                  : service.id === 'mycalendar' && mycalStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : labels[status]}
+              </span></span>
             </div>;
           })}
         </div>
@@ -152,6 +180,20 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
           event.preventDefault();
           if (connectFromChat && back) void connectGmail(back); else navigate('/settings#gmail');
         }} className={`${primary} flex items-center gap-1.5`}>{reconnect ? 'Kết nối lại Gmail' : 'Kết nối Gmail'}<span aria-hidden="true">→</span></a>}
+        {hasMyCalendar && (mycalStatus === 'scope_required' ? (
+          <a href="/settings#mycalendar" aria-disabled={starting || undefined} onClick={event => {
+            if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+            event.preventDefault();
+            const selectPath = back ? `/connections/mycalendar/callback?mode=select&returnTo=${encodeURIComponent(back)}` : '/connections/mycalendar/callback?mode=select';
+            navigate(selectPath);
+          }} className={`${primary} flex items-center gap-1.5`}>Chọn lịch Google Calendar<span aria-hidden="true">→</span></a>
+        ) : (
+          <a href="/settings#mycalendar" aria-disabled={starting || undefined} onClick={event => {
+            if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+            event.preventDefault();
+            if (connectFromChat && back) void connectMyCalendar(back); else navigate('/settings#mycalendar');
+          }} className={`${primary} flex items-center gap-1.5`}>{mycalStatus === 'reconnect_required' ? 'Kết nối lại Google Calendar' : 'Kết nối Google Calendar'}<span aria-hidden="true">→</span></a>
+        ))}
         {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>

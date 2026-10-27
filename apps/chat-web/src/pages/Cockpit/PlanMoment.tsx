@@ -17,6 +17,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
             </p>
           </div>
           {plan.steps.some(step => step.tool.startsWith('gmail.')) && plan.connections?.gmail && <p className="text-sm text-brand-text break-words">Gửi từ: {plan.connections.gmail.email}</p>}
+          {plan.connections?.mycalendar?.email && <p className="text-sm text-brand-text break-words">Tài khoản: {plan.connections.mycalendar.email} (Google Calendar của bạn)</p>}
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
           <div className="v3-space-y-3" id="plan-cards-container">
             {plan.steps.map((step,index) => { const service=serviceId(step.tool), palette=servicePalette(service); return (

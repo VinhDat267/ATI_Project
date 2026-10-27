@@ -17,10 +17,12 @@ export * from './calendar.js';
 export * from './notion.js';
 export * from './telegram.js';
 export * from './jira.js';
-// Gmail is opt-in per user and behind GMAIL_ENABLED, so it stays out of ALL_TOOLS and SERVICE_REGISTRY.
+// Gmail and MyCalendar are opt-in per user and personal connections, so they stay out of ALL_TOOLS and SERVICE_REGISTRY.
 export * from './gmail.js';
+export * from './mycalendar.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
+export * from './registry/mycalendar.js';
 
 export const ALL_TOOLS: ToolDefinition[] = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS, ...SHEETS_TOOLS, ...CALENDAR_TOOLS, ...NOTION_TOOLS, ...TELEGRAM_TOOLS, ...JIRA_TOOLS];
 

@@ -114,6 +114,19 @@
         "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
         "name": "text-blue-600"
       }
+    },
+    "mycalendar": {
+      "logoPath": "M4 4h16v16H4zm2 4v10h12V8zm2 2h3v2h-1v4H8zm5 0h3v6h-3v-2h1v-2h-1z",
+      "color": "#1a73e8",
+      "prompt": "Tạo sự kiện trên {service}",
+      "suggestion": {
+        "icon": "bg-blue-50 border-blue-100",
+        "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
+        "name": "text-blue-600"
+      },
+      "badge": "bg-blue-50 text-blue-700",
+      "receiptHover": "hover:border-blue-300",
+      "previewBadge": "bg-blue-100 text-blue-800"
     }
   },
   "resourceNames": {
@@ -127,6 +140,7 @@
     "spreadsheet": "Bảng tính",
     "sheet": "Trang tính",
     "calendar": "Lịch",
+    "mycalendar": "Lịch",
     "page": "Trang",
     "database": "Cơ sở dữ liệu",
     "chat": "Cuộc trò chuyện",
@@ -252,6 +266,28 @@
       "receipt": "Đã tạo nhãn",
       "kind": "Nhãn",
       "link": "Mở kết quả"
+    },
+    "mycalendar.list_calendars": {
+      "action": "Xem danh sách lịch",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách lịch",
+      "kind": "Danh sách lịch",
+      "link": "Mở kết quả"
+    },
+    "mycalendar.list_events": {
+      "action": "Xem sự kiện lịch",
+      "done": "Đã xem",
+      "receipt": "Đã xem sự kiện",
+      "kind": "Sự kiện",
+      "link": "Mở kết quả"
+    },
+    "mycalendar.create_event": {
+      "action": "Tạo sự kiện",
+      "done": "Đã tạo",
+      "receipt": "Đã tạo sự kiện",
+      "kind": "Sự kiện",
+      "link": "Mở sự kiện trên Google Calendar",
+      "titleField": "title"
     }
   }
 }

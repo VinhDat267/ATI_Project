@@ -6,29 +6,30 @@ import { CALENDAR_MAX_TITLE_CHARS, clipText } from '../bounds.js';
 
 export interface CalendarAdapterConfig extends BaseAdapterConfig { credentials: GoogleServiceAccountCredentials; fetchFn?: typeof fetch }
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-const apiBase = 'https://www.googleapis.com/calendar/v3/calendars/';
-const sharedLimiter = new GlobalRateLimiter({ maxRequests: 60, windowMs: 60_000 });
-const MAX_RETRY_AFTER_WAIT_MS = 30_000;
-const timePattern = new RegExp(CALENDAR_TIME_PATTERN);
-function invalid(message: string): never { throw new StepError({ message: 'Calendar ' + message, category: 'VALIDATION' }); }
-function badResponse(writing = false): never { throw new StepError({ message: 'Calendar returned an invalid response', category: writing ? 'UNKNOWN' : 'SERVER_ERROR' }); }
-function retryAfterDelayMs(header: string | null): number {
+export const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/calendars/';
+const apiBase = CALENDAR_API_BASE;
+export const sharedLimiter = new GlobalRateLimiter({ maxRequests: 60, windowMs: 60_000 });
+export const MAX_RETRY_AFTER_WAIT_MS = 30_000;
+export const timePattern = new RegExp(CALENDAR_TIME_PATTERN);
+export function invalid(message: string): never { throw new StepError({ message: 'Calendar ' + message, category: 'VALIDATION' }); }
+export function badResponse(writing = false): never { throw new StepError({ message: 'Calendar returned an invalid response', category: writing ? 'UNKNOWN' : 'SERVER_ERROR' }); }
+export function retryAfterDelayMs(header: string | null): number {
   if (header == null) return 1000;
   const trimmed = header.trim();
   const seconds = /^\d+(?:\.\d+)?$/u.test(trimmed) ? Number(trimmed) * 1000 : Number.NaN;
   const delay = Number.isFinite(seconds) ? seconds : Date.parse(trimmed) - Date.now();
   return Number.isFinite(delay) ? Math.max(0, delay) : 1000;
 }
-function text(value: unknown, max: number, nonempty = false): string {
+export function text(value: unknown, max: number, nonempty = false): string {
   if (typeof value !== 'string' || value.length > max || (nonempty && !value.trim())) invalid('text is outside its allowed size');
   return value;
 }
-function limit(value: unknown, maximum: number): number {
+export function limit(value: unknown, maximum: number): number {
   if (value === undefined) return maximum;
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > maximum) invalid('limit is outside its allowed range');
   return value;
 }
-function instant(value: unknown): number {
+export function instant(value: unknown): number {
   if (typeof value !== 'string' || !timePattern.test(value)) invalid('time requires an explicit ISO timezone');
   // Date.parse alone normalizes impossible dates (e.g. February 30) and 24:00.
   const local = new Date(value.slice(0, 19) + 'Z');
@@ -36,17 +37,17 @@ function instant(value: unknown): number {
   if (!Number.isFinite(stamp) || !Number.isFinite(local.getTime()) || local.toISOString().slice(0, 19) !== value.slice(0, 19) || value.startsWith('0000-')) invalid('time is not a valid calendar instant');
   return stamp;
 }
-function windowSize(start: unknown, end: unknown, days: number): void {
+export function windowSize(start: unknown, end: unknown, days: number): void {
   const duration = instant(end) - instant(start);
   if (duration <= 0 || duration > days * 86_400_000) invalid('end must follow start within the allowed duration');
 }
-function only(args: Record<string, any>, keys: string[]): void {
+export function only(args: Record<string, any>, keys: string[]): void {
   if (Object.keys(args).some(key => !keys.includes(key))) invalid('unexpected argument');
 }
-function plainDescription(value: string): string {
+export function plainDescription(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-function normalizedEvent(value: any, writing = false) {
+export function normalizedEvent(value: any, writing = false) {
   const start = value?.start?.dateTime ?? value?.start?.date;
   const end = value?.end?.dateTime ?? value?.end?.date;
   if (typeof value?.id !== 'string' || !value.id || typeof value.htmlLink !== 'string' || !value.htmlLink || typeof start !== 'string' || typeof end !== 'string') badResponse(writing);

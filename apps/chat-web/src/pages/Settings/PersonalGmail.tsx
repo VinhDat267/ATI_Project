@@ -8,7 +8,7 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 
 const button = 'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50';
 const secondary = 'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50';
-export function PersonalGmail({ service, refresh, selected }: { service: ServiceInfo; refresh: () => Promise<void>; selected: string | null }) {
+export function PersonalGmail({ service, refresh, selected, standalone = true }: { service: ServiceInfo; refresh: () => Promise<void>; selected: string | null; standalone?: boolean }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
   const mounted = useRef(false), pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
@@ -36,8 +36,7 @@ export function PersonalGmail({ service, refresh, selected }: { service: Service
     finally { pending.current = false; if (mounted.current) setBusy(false); }
   };
   const status = service.personalStatus ?? 'not_connected';
-  return <section aria-labelledby="heading-personal-services" className="mb-8">
-    <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
+  const rowContent = (
     <div ref={row} id="service-row-gmail" tabIndex={-1} className="bg-white border border-[#E7E7E2] rounded-xl p-4 sm:p-5 v3-space-y-3 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none">
       <h3 className="font-display font-semibold text-base text-[#111827] flex items-center gap-3"><ServiceLogo service="gmail" className="w-6 h-6" />Gmail</h3>
       <p className="text-xs text-[#6B7280]">Chỉ bạn dùng được hộp thư này. ATI được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
@@ -48,8 +47,16 @@ export function PersonalGmail({ service, refresh, selected }: { service: Service
       {busy && <p role="status" className="text-xs text-[#6B7280]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
       {error && <p role="alert" className="text-xs text-[#DC2626]">{error}</p>}
     </div>
+  );
+  return <>
+    {standalone ? (
+      <section aria-labelledby="heading-personal-services" className="mb-8">
+        <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
+        {rowContent}
+      </section>
+    ) : rowContent}
     {confirm && createPortal(<CockpitDialog title="Ngắt kết nối Gmail?" returnFocusId="gmail-action" onClose={() => { if (!busy) setConfirm(false); }}>
       <div className="p-5 v3-space-y-4"><p className="text-sm">ATI sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không thể dùng kết nối đã ngắt.</p><button className={secondary} disabled={busy} onClick={() => setConfirm(false)}>Giữ kết nối</button>{' '}<button className={button} disabled={busy} onClick={() => void act(true)}>Xác nhận ngắt kết nối</button>{error && <p role="alert">{error}</p>}</div>
     </CockpitDialog>, document.body)}
-  </section>;
+  </>;
 }

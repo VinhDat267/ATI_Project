@@ -23,11 +23,12 @@ export interface FakeGoogleGmail {
   settings: FakeGoogleGmailSettings;
   stats: { authorizations: number; exchanges: number; refreshes: number; revocations: number; profiles: number; writes: number; apiRequests: { method: string; path: string; query: Record<string, string>; body?: any }[] };
   endpoints: { authorizationUrl: string; tokenUrl: string; revokeUrl: string; apiBaseUrl: string };
-  mintRefreshToken(email?: string): string;
+  mintRefreshToken(email?: string, scopes?: string[], clientId?: string): string;
   isRevoked(token: string): boolean;
   close(): Promise<void>;
 }
 export function startFakeGoogleGmail(options?: {
   port?: number; now?: () => number; clientId?: string; clientSecret?: string; redirectUri?: string; email?: string;
+  clientIds?: string[]; clientProjects?: Record<string, string>; redirectUris?: string[];
   settings?: Partial<FakeGoogleGmailSettings>;
 }): Promise<FakeGoogleGmail>;

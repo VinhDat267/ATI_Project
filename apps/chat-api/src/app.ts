@@ -25,9 +25,21 @@ import type { GoogleOAuthConfig } from './auth/google-oidc.js';
 import type { GmailOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { createGmailConnectionRoutes, isGmailAvailable } from './routes/connections/gmail.js';
+import { createMyCalendarConnectionRoutes, isMyCalendarAvailable } from './routes/connections/mycalendar.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
+  enabled: boolean;
+  oauth?: GmailOAuthConfig;
+  repo?: GmailConnectionRepo;
+  fetchFn?: typeof fetch;
+  googleTimeoutMs?: number;
+  revokeTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+}
+
+/** MyCalendar as each member's own connection (MYCALENDAR_ENABLED). Absent or disabled: the routes do not exist. */
+export interface MyCalendarAppOptions {
   enabled: boolean;
   oauth?: GmailOAuthConfig;
   repo?: GmailConnectionRepo;
@@ -62,6 +74,7 @@ export interface AppOptions extends AdminUsersOptions {
   sseManager?: SSEManager;
   executionService?: ExecutionService;
   gmail?: GmailAppOptions;
+  mycalendar?: MyCalendarAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
 }
@@ -74,6 +87,13 @@ export function createApp(options: AppOptions): Express {
     repo: options.gmail.repo, oauth: options.gmail.oauth, encryptionKey: options.encryptionKey, fetchFn: options.gmail.fetchFn,
     clock: options.authClock, googleTimeoutMs: options.gmail.googleTimeoutMs, revokeTimeoutMs: options.gmail.revokeTimeoutMs,
     onConnectionChanged: options.gmail.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+  } : undefined;
+  const mycalendarRoutes = options.mycalendar?.enabled ? {
+    jwtSecret: options.jwtSecret, sessionRepo, states: options.userRepo?.googleAuth, credentialRepo: options.credentialRepo,
+    repo: options.mycalendar.repo, oauth: options.mycalendar.oauth, encryptionKey: options.encryptionKey, fetchFn: options.mycalendar.fetchFn,
+    clock: options.authClock, googleTimeoutMs: options.mycalendar.googleTimeoutMs, revokeTimeoutMs: options.mycalendar.revokeTimeoutMs,
+    onConnectionChanged: options.mycalendar.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
   } : undefined;
 
@@ -92,8 +112,8 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail'))) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar'))) {
+      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -112,9 +132,10 @@ export function createApp(options: AppOptions): Express {
 
   // Health check
   app.get('/api/health', (_req, res) => {
-    // With GMAIL_ENABLED off the public health answer stays exactly as before; absent means false.
+    // With GMAIL_ENABLED / MYCALENDAR_ENABLED off the public health answer stays exactly as before; absent means false.
     res.status(200).json({ status: 'ok', version: 'v3', runtimeMode: options.runtimeMode ?? 'sandbox',
       ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}),
+      ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 
@@ -144,10 +165,12 @@ export function createApp(options: AppOptions): Express {
     '/api/services',
     authMiddleware,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
-      gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)) })
+      gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
+      mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)) })
   );
 
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
+  if (mycalendarRoutes) app.use('/api/connections/mycalendar', createMyCalendarConnectionRoutes(mycalendarRoutes));
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
   if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? authMiddleware(req, res, next) : next(),

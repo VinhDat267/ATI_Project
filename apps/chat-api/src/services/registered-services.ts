@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -65,12 +65,37 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
 /**
  * The catalog one caller may plan with: the shared services exactly as
  * getConfiguredToolCatalog, plus Gmail only when Gmail is enabled and this
- * caller has an active connection of their own.
+ * caller has an active connection of their own, plus MyCalendar only when
+ * MyCalendar is enabled and this caller has selected at least 1 calendar.
  */
-export async function getToolCatalogFor(credentialRepo: CredentialRepo, encryptionKey: string,
-  options: { userId?: string; gmailEnabled: boolean }): Promise<ToolDefinition[]> {
-  const catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
-  if (!options.gmailEnabled || !options.userId) return catalog;
-  const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
-  return gmail ? [...catalog, ...GMAIL_TOOLS] : catalog;
+export async function getToolCatalogFor(
+  credentialRepo: CredentialRepo,
+  encryptionKey: string,
+  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean },
+): Promise<ToolDefinition[]> {
+  let catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
+  if (!options.userId) return catalog;
+  if (options.gmailEnabled) {
+    const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
+    if (gmail && gmail.status === 'active') catalog = [...catalog, ...GMAIL_TOOLS];
+  }
+  if (options.mycalendarEnabled) {
+    const mycal = await credentialRepo.getPersonalCredentials('mycalendar', options.userId);
+    if (mycal && mycal.status === 'active') {
+      try {
+        const config = decryptCredentials(mycal.config, encryptionKey);
+        const calendars: string[] = Array.isArray(config.allowedScope?.calendars)
+          ? config.allowedScope.calendars
+          : Array.isArray(config.selectedCalendars)
+            ? config.selectedCalendars.map((c: any) => c.id)
+            : [];
+        if (calendars.length > 0) {
+          catalog = [...catalog, ...MYCALENDAR_TOOLS];
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  return catalog;
 }
