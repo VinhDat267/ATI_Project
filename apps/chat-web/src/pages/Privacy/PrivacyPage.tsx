@@ -1,5 +1,5 @@
 // Chuyển từ docs/design/prototypes/privacy.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
-import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
+import { useGmailEnabled, useMyCalendarEnabled } from '../../hooks/use-gmail-enabled';
 import { MainNav } from '../../components/layout/MainNav';
 import type { MouseEvent } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
@@ -27,6 +27,7 @@ export const meta: PageMeta = {
 export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('/') }: { navigate: Navigate; user?: User | null; onLogout?: () => void }) {
   usePrototypePage(meta);
   const gmailEnabled = useGmailEnabled();
+  const mycalendarEnabled = useMyCalendarEnabled();
   return (
     <>
       {/* FE-12: đã đăng nhập thì dùng thanh điều hướng chung; chưa đăng nhập giữ thanh của bản mẫu. */}
@@ -463,6 +464,12 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               <p>Nội dung và tiêu đề thư đi qua 9router tới tài khoản model bên thứ ba để lập kế hoạch hoặc trả lời.</p>
               <p>Token được mã hoá trong cơ sở dữ liệu. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư ATI gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
               <p>Ngắt kết nối chỉ xoá token và thu hồi quyền Google; hội thoại, câu trả lời và kế hoạch cũ vẫn còn. Hiện chưa có chức năng xoá hội thoại. ATI không xoá vĩnh viễn thư.</p>
+            </section>}
+          {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
+              <h3 className="font-semibold text-[#111827]">Dữ liệu Google Calendar của bạn</h3>
+              <p>ATI chỉ đọc danh sách lịch và các sự kiện trong khoảng thời gian truy vấn của những lịch mà bạn đã tick chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
+              <p>Phạm vi quyền truy cập bao gồm xem danh sách lịch (calendar.calendarlist.readonly) và quản lý sự kiện (calendar.events). ATI chỉ tạo sự kiện mới sau khi bạn bấm phê duyệt. ATI không sửa, không xoá sự kiện có sẵn và không gửi lời mời cho người khác.</p>
+              <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi hoàn toàn.</p>
             </section>}
             {/* Quy định duyệt tài khoản Google mới */}
           <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">

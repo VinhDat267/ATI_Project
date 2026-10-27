@@ -25,8 +25,25 @@ export interface PlanStep {
   dependsOn?: string[];
 }
 
+export type PersonalStatus = 'not_connected' | 'scope_required' | 'connected' | 'reconnect_required';
+
+export interface PersonalCalendarSummary {
+  id: string;
+  summary: string;
+  timeZone?: string;
+  primary?: boolean;
+  accessRole?: 'owner' | 'writer';
+}
+
 export interface ActivePlan {
-  connections?: { gmail?: { credentialId: string; email: string } };
+  connections?: {
+    gmail?: { credentialId: string; email: string };
+    mycalendar?: {
+      credentialId: string;
+      email: string;
+      allowedCalendars: string[] | PersonalCalendarSummary[];
+    };
+  };
   resourceLabels?: Record<string, string>;
   id?: string;
   status?: PlanStatus | 'pending' | 'approved';
@@ -117,9 +134,11 @@ export interface GatherState {
 
 export interface ServiceInfo {
   connection?: 'shared' | 'personal';
-  personalStatus?: 'connected' | 'reconnect_required' | 'not_connected';
+  personalStatus?: PersonalStatus;
   email?: string;
   connectedAt?: string;
+  selectedCalendars?: PersonalCalendarSummary[];
+  statusReason?: string;
   id: string;
   name: string;
   connected: boolean;
