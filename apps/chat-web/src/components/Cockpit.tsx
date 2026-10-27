@@ -6,6 +6,8 @@ import { selectMoment } from '../services/cockpit-moment';
 import type { PlanStep, ServiceInfo, User } from '../types';
 import { RecoveryMoment, type RecoveryControls } from '../pages/Cockpit/RecoveryMoment';
 import { apiClient } from '../services/api-client';
+import { ScheduleMoment } from '../pages/Cockpit/ScheduleMoment';
+import { ScheduleRunRecovery } from '../pages/Cockpit/ScheduleRunRecovery';
 
 import { usePrototypePage } from '../prototype/usePrototypePage';
 import { meta } from '../pages/Cockpit/meta';
@@ -58,15 +60,16 @@ function servicePrompt(service: ServiceInfo): string { return (prompts[service.i
 export function Cockpit(props: Props) {
   const state = useChatStore();
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
+  const [schedulesEnabled, setSchedulesEnabled] = useState(false);
   const [gmailEnabled, setGmailEnabled] = useState(false);
-  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setGmailEnabled(data?.gmailEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
+  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;setSchedulesEnabled(data?.schedulesEnabled === true);if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setGmailEnabled(data?.gmailEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
   const actualMoment = selectMoment(state, state.executionSnapshot);
   const pending = state.planningByConversation[state.conversationId ?? '__draft__'];
   const waitingKey = pending ? `${state.conversationId}:${pending.requestId ?? pending.startedAt}` : null;
   const [dismissedWait, setDismissedWait] = useState<string | null>(null);
   const [editingResponse, setEditingResponse] = useState<string | null>(null);
   const milliseconds = usePlanningWait(pending?.startedAt, state.isPlanning);
-  const moment = actualMoment === 2 && waitingKey && dismissedWait === waitingKey ? 1 : actualMoment;
+  const moment = actualMoment === 'schedule' && !schedulesEnabled ? 1 : actualMoment === 2 && waitingKey && dismissedWait === waitingKey ? 1 : actualMoment;
   const [drawer, setDrawer] = useState<'history' | 'conversation' | null>(null);
   const [preview, setPreview] = useState<PlanStep | null>(null);
   const [draft, setDraft] = useState('');
@@ -126,7 +129,8 @@ export function Cockpit(props: Props) {
   const total = started.length && ended.length ? Math.max(0, Math.max(...ended) - Math.min(...started)) / 1000 : null;
   const request = [...state.messages].reverse().find(message => message.role === 'user')?.content;
   const latestMessage = state.messages.at(-1);
-  const terminalError = latestMessage?.metadata?.type === 'planning_error' ||
+  const runMessage = [...state.messages].reverse().find(message => message.metadata?.type === 'schedule_run');
+  const terminalError = ['planning_error', 'schedule_discarded'].includes(latestMessage?.metadata?.type ?? '') ||
     (latestMessage?.role === 'system' && /^(\[Lỗi|Lỗi:)/.test(latestMessage.content)) ? latestMessage : null;
   const responseKey = `${state.conversationId}:${latestMessage?.id}:${state.activeClarification?.question}`;
   const responseEditing = editingResponse === responseKey;
@@ -140,7 +144,8 @@ export function Cockpit(props: Props) {
     setDraft(text); setSelected(null); setDrawer(null); setEditingResponse(responseKey);
     queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
   };
-  const response = moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
+  const response = moment === 'schedule' && latestMessage && state.conversationId ? <ScheduleMoment key={state.conversationId} message={latestMessage} convId={state.conversationId} navigate={navigate} onEdit={() => input.current?.focus()} />
+    : moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
     : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest} connectFromChat={gmailEnabled} conversationId={state.conversationId} onResend={send} servicesLoading={props.servicesLoading} onRefreshServices={props.onRefreshServices}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
     : slow ? <SlowPlanningMoment request={request} seconds={Math.floor(milliseconds / 1000)} gather={state.gatherState} services={props.services} onDismiss={() => { setDraft(request ?? ''); setDismissedWait(waitingKey); }}/>
@@ -152,6 +157,7 @@ export function Cockpit(props: Props) {
       <CockpitHeader runtimeMode={runtimeMode} historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
       <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 ${moment === 'refusal' || expanded || slow || planningError ? 'sm:py-8' : 'sm:py-10'} flex flex-col ${moment === 'refusal' || expanded ? '' : 'justify-center'} min-w-0`}>
         {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
+        {schedulesEnabled && runMessage && <ScheduleRunRecovery key={`${state.conversationId}:${runMessage.id}`} message={runMessage} navigate={navigate} />}
         {moment === 6 && <span role="status" className="sr-only">Quy trình đã hoàn thành.</span>}
         {props.contentOverride ?? response ?? (moment === 1 ? <RequestMoment feedback={dismissedWait === waitingKey && waitingKey ? <p role="status" className="text-sm text-brand-muted">{latePlanNotice}</p> : terminalError?.metadata?.type !== 'planning_error' && terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment request={request} question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment request={request} runtimeMode={runtimeMode} key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment request={request} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 || moment === 'unsuccessful' ? <ReceiptMoment request={request} terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : [7,8,9].includes(moment as number) ? <RecoveryMoment request={request} key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`} moment={moment as 7|8|9} snapshot={snapshot} steps={executionSteps} services={props.services} controls={props.recovery}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
           <p className="text-sm uppercase tracking-widest text-text-secondary mb-3">ATI · Điều phối công việc</p>

@@ -6,6 +6,7 @@ import type { MouseEvent as ReactMouseEvent, KeyboardEvent as ReactKeyboardEvent
 import type { Conversation } from '../../types';
 import { formatConversationTime } from '../../services/conversation-time';
 import { useHistory } from './useHistory';
+import { ScheduleSection } from './ScheduleSection';
 function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryRow; isEditing: boolean; actions: CardActions; title: string; saving: boolean }) {
   const rawTitle = req.title || 'Hội thoại mới';
   const displayTitle = rawTitle.length > 60 ? rawTitle.slice(0, 60) + '…' : rawTitle;
@@ -149,6 +150,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             {" ATI chỉ ghi khi bạn duyệt kế hoạch. Trang này chỉ hiển thị hội thoại của chính bạn; mở hội thoại để xem kế hoạch và kết quả đã lưu."}
           </div>
         </div>
+        <ScheduleSection user={user} navigate={navigate} />
         {/* THANH TÌM KIẾM VÀ BỘ LỌC ĐA NĂNG */}
         <div className="bg-white p-4 rounded-2xl border border-[#E7E7E2] shadow-soft v3-space-y-3.5">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">

@@ -1,4 +1,5 @@
 import { authStorage } from './auth-storage';
+import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
   ChatMessage,
@@ -126,11 +127,12 @@ export class ApiClient {
         authStorage.clearStoredTokens();
       }
       const error: any = new Error(
-        data?.error ||
+        (typeof data?.error === 'object' ? data.error?.message : data?.error) ||
           data?.message ||
           `Request failed with status ${response.status}`
       );
       error.status = response.status;
+      error.code = data?.error?.code;
       error.data = data;
       error.response = response;
       throw error;
@@ -309,9 +311,17 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; schedulesEnabled?: boolean }> {
     return this.request('/api/health');
   }
+
+  getSchedules() { return this.request<{ schedules: ScheduleView[] }>('/api/schedules'); }
+  getScheduleRuns(id: string, limit = 10) { return this.request<{ runs: ScheduleRunView[] }>(`/api/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`); }
+  getSchedulePendingCount() { return this.request<{ count: number }>('/api/schedules/pending-count'); }
+  confirmSchedule(convId: string, messageId: string) { return this.request<{ schedule: ScheduleView }>(`/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`, { method: 'POST' }); }
+  changeSchedule(id: string, action: 'pause' | 'resume' | 'cancel', version: number) { return this.request<{ schedule: ScheduleView }>(`/api/schedules/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ version }) }); }
+  runScheduleNow(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedules/${encodeURIComponent(id)}/run-now`, { method: 'POST' }); }
+  replanScheduleRun(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedule-runs/${encodeURIComponent(id)}/replan`, { method: 'POST' }); }
 
   async getAdminUsers(options: { status?: 'pending' | 'active' | 'disabled'; search?: string; page?: number; limit?: number } = {}): Promise<AdminUserPage> {
     const query = new URLSearchParams();
