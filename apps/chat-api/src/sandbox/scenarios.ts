@@ -17,6 +17,38 @@ export function createSandboxProvider(scenario?: string) {
       : fallback(input);
     return mockProvider;
   }
+  if (scenario === 'mycalendar') {
+    const responses = [
+      { kind: 'search', calls: [{ tool: 'mycalendar.list_calendars', args: { query: '' } }] },
+      {
+        kind: 'plan',
+        thinking: 'Tạo sự kiện trong lịch cá nhân.',
+        summary: 'Tạo sự kiện lịch cá nhân',
+        warnings: [],
+        steps: [
+          {
+            id: 'create_event',
+            tool: 'mycalendar.create_event',
+            description: 'Tạo sự kiện họp',
+            args: {
+              calendarId: 'primary',
+              summary: 'Họp việc riêng',
+              start: '2026-10-28T09:00:00+07:00',
+              end: '2026-10-28T10:00:00+07:00',
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    ];
+    mockProvider.setPlanResponses(responses);
+    const fallback = mockProvider.generatePlan.bind(mockProvider);
+    mockProvider.generatePlan = async (input) =>
+      Array.isArray(input.conversationHistory)
+        ? JSON.stringify(responses[input.conversationHistory.at(-1)?.content.includes('<search_results>') ? 1 : 0])
+        : fallback(input);
+    return mockProvider;
+  }
   if (scenario === 'answer') {
     // Select by this conversation's context, not a global counter shared by users.
     mockProvider.generatePlan = async input => {

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, type PersonalCalendarItem } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { getRegisteredServices, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
@@ -14,9 +14,12 @@ export interface ServicesRoutesOptions {
   adminUserIds?: string[];
   /** Gmail is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   gmailAvailable?: boolean;
+  /** MyCalendar is enabled and usable (flag on, OAuth and PostgreSQL configured). */
+  mycalendarAvailable?: boolean;
 }
 
 const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
+const MYCALENDAR_PERSONAL_ONLY = 'Google Calendar cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 
 async function verifyService(service: string, config: Record<string, unknown>, fetchFn: typeof fetch): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
   const registration = getRegisteredService(service);
@@ -62,9 +65,101 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       personalStatus, ...details,
     };
   };
+
+  /** The caller's own MyCalendar row; another person's connection is never read. */
+  const personalMyCalendar = async (userId: string) => {
+    const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = MYCALENDAR_SERVICE;
+    const record = await credentialRepo!.getPersonalConnectionStatus('mycalendar', userId);
+    let details: {
+      email?: string;
+      connectedAt?: string;
+      selectedCalendars?: PersonalCalendarItem[];
+      allowedScope?: string[];
+      statusReason?: string;
+    } = {};
+    let personalStatus: 'connected' | 'scope_required' | 'reconnect_required' | 'not_connected' = 'not_connected';
+
+    if (!record) {
+      personalStatus = 'not_connected';
+      details.statusReason = 'Chưa kết nối tài khoản Google Calendar cá nhân.';
+    } else if (record.status === 'reconnect_required') {
+      personalStatus = 'reconnect_required';
+      details.statusReason = 'Phiên Google Calendar đã hết hạn hoặc bị thu hồi — cần kết nối lại.';
+      try {
+        const config = decryptCredentials(record.config, encryptionKey!);
+        details.email = config.email ? String(config.email) : undefined;
+        details.connectedAt = config.connectedAt ? String(config.connectedAt) : undefined;
+      } catch {
+        // cannot decrypt
+      }
+    } else {
+      // record.status === 'active'
+      try {
+        const config = decryptCredentials(record.config, encryptionKey!);
+        const email = config.email ? String(config.email) : undefined;
+        const connectedAt = config.connectedAt ? String(config.connectedAt) : undefined;
+        const selectedCalendars: PersonalCalendarItem[] = Array.isArray(config.selectedCalendars) ? config.selectedCalendars : [];
+        const allowedScope: string[] = Array.isArray(config.allowedScope?.calendars)
+          ? config.allowedScope.calendars
+          : selectedCalendars.map((c: any) => c.id);
+
+        if (selectedCalendars.length === 0 && allowedScope.length === 0) {
+          personalStatus = 'scope_required';
+          details = {
+            email,
+            connectedAt,
+            selectedCalendars: [],
+            allowedScope: [],
+            statusReason: 'Đã xác thực Google nhưng chưa chọn lịch được phép dùng.',
+          };
+        } else {
+          personalStatus = 'connected';
+          details = {
+            email,
+            connectedAt,
+            selectedCalendars,
+            allowedScope,
+          };
+        }
+      } catch {
+        personalStatus = 'reconnect_required';
+        details.statusReason = 'Phiên Google Calendar đã hết hạn hoặc bị thu hồi — cần kết nối lại.';
+      }
+    }
+
+    const connected = personalStatus === 'connected';
+    return {
+      id,
+      name,
+      description,
+      scopes,
+      scopeKey,
+      scopeLabel,
+      credentialFields,
+      connection: 'personal' as const,
+      tools: MYCALENDAR_TOOLS.map((tool) => tool.name),
+      configured: connected,
+      connected,
+      connectionStatus: connected ? 'unchecked' : 'unconfigured',
+      lastCheckedAt: null,
+      allowedScope: details.allowedScope ?? [],
+      personalStatus,
+      email: details.email,
+      connectedAt: details.connectedAt,
+      selectedCalendars: details.selectedCalendars,
+      statusReason: details.statusReason,
+    };
+  };
+
   // Shared-key administration never applies to the personal Gmail connection.
   router.use('/gmail', (_req, res, next) => {
     if (options.gmailAvailable) { res.status(400).json({ error: PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
+    next();
+  });
+
+  // Shared-key administration never applies to the personal MyCalendar connection.
+  router.use('/mycalendar', (_req, res, next) => {
+    if (options.mycalendarAvailable) { res.status(400).json({ error: MYCALENDAR_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
     next();
   });
 
@@ -91,6 +186,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         };
       }));
       if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));
+      if (options.mycalendarAvailable && credentialRepo && encryptionKey) services.push(await personalMyCalendar((req as any).user.id));
       res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds) });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });

@@ -45,6 +45,8 @@ export interface ChatServiceOptions {
   };
   /** The caller's active Gmail connection; absent when Gmail is off, so a Gmail plan is refused. */
   gmailConnection?: (userId: string) => Promise<NonNullable<PlanConnections['gmail']> | null>;
+  /** The caller's active MyCalendar connection; absent when MyCalendar is off or not connected, so a MyCalendar plan is refused. */
+  mycalendarConnection?: (userId: string) => Promise<NonNullable<PlanConnections['mycalendar']> | null>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
 }
@@ -66,10 +68,12 @@ export class ChatService {
   private planner: ChatPlanner;
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
+  private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private schedules?: ChatServiceOptions['schedules'];
 
   constructor(options: ChatServiceOptions) {
     this.gmailConnection = options.gmailConnection;
+    this.mycalendarConnection = options.mycalendarConnection;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -106,19 +110,70 @@ export class ChatService {
 
   /**
    * After validation, before labels, hash and storage: drop any connections
-   * the model wrote and record the connection a Gmail step will use, so the
-   * integrity check covers it. Without one the plan is refused, not saved.
+   * the model wrote and record the connection a Gmail or MyCalendar step will use,
+   * so the integrity check covers it. Without one the plan is refused, not saved.
    */
   private async bindConnections(plan: PlanResponse, userId: string): Promise<PlannerResponse> {
     const bound = withoutConnections(plan);
-    if (!bound.steps.some((step) => step.tool.startsWith('gmail.'))) return bound;
-    const gmail = await this.gmailConnection?.(userId);
-    if (!gmail) {
-      return { kind: 'refusal', reason: 'Gmail chưa được kết nối hoặc cần kết nối lại.',
-        suggestion: 'Hãy kết nối Gmail ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
-        unavailableServices: [{ id: 'gmail', name: 'Gmail' }] };
+    const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
+    const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
+
+    if (!usesGmail && !usesMyCalendar) return bound;
+
+    const unavailableServices: Array<{ id: string; name: string }> = [];
+    const reasons: string[] = [];
+    let gmailConn: NonNullable<PlanConnections['gmail']> | undefined;
+    let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
+
+    if (usesGmail) {
+      const gmail = await this.gmailConnection?.(userId);
+      if (!gmail) {
+        unavailableServices.push({ id: 'gmail', name: 'Gmail' });
+        reasons.push('Gmail chưa được kết nối hoặc cần kết nối lại.');
+      } else {
+        gmailConn = gmail;
+      }
     }
-    return { ...bound, connections: { gmail } };
+
+    if (usesMyCalendar) {
+      const mycal = await this.mycalendarConnection?.(userId);
+      if (!mycal) {
+        unavailableServices.push({ id: 'mycalendar', name: 'Google Calendar của bạn' });
+        reasons.push('Google Calendar của bạn chưa được kết nối hoặc chưa chọn lịch.');
+      } else {
+        const allowedSet = new Set(mycal.allowedCalendars);
+        const forbiddenStep = bound.steps.find((step) => {
+          if (!step.tool.startsWith('mycalendar.')) return false;
+          const calId = step.args?.calendarId;
+          return typeof calId === 'string' && !allowedSet.has(calId);
+        });
+        if (forbiddenStep) {
+          const calId = String(forbiddenStep.args.calendarId);
+          return {
+            kind: 'refusal',
+            reason: `Lịch "${calId}" không nằm trong danh sách lịch Google Calendar bạn đã cho phép ATI sử dụng.`,
+            suggestion: 'Hãy chọn thêm lịch này trong phần Cài đặt hoặc chọn một trong các lịch đã được cấp quyền.',
+            unavailableServices: [{ id: 'mycalendar', name: 'Google Calendar của bạn' }],
+          };
+        }
+        mycalConn = mycal;
+      }
+    }
+
+    if (unavailableServices.length > 0) {
+      return {
+        kind: 'refusal',
+        reason: reasons.join(' '),
+        suggestion: 'Hãy kết nối dịch vụ ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
+        unavailableServices,
+      };
+    }
+
+    const connections: PlanConnections = {};
+    if (gmailConn) connections.gmail = gmailConn;
+    if (mycalConn) connections.mycalendar = mycalConn;
+
+    return { ...bound, connections };
   }
 
   /**
