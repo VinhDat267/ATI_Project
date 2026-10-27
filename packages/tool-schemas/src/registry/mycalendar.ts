@@ -15,6 +15,7 @@ export const MYCALENDAR_SERVICE: ServiceDefinition = {
     'lịch của mình',
     'lịch cá nhân',
     'lịch riêng',
+    'lịch việc riêng',
     'my calendar',
     'calendar của tôi',
     'lịch google của tôi',

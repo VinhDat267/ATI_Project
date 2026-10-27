@@ -12,7 +12,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
-  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|FE-06A:|FE-06B:|FE-07:|FE-08:|FE-09:|FE-10:|FE-11:|FE-12:|AUTH-05:|GMAIL-03 off:|W4-04:' },
+  { name: 'default', grep: 'login, chat, approval and execution|cancel a pending plan|edit a pending plan|AUTH-01:|AUTH-03:|FE-02:|FE-03:|FE-03b:|FE-04:|FE-04b:|FE-05:|FE-06A:|FE-06B:|FE-07:|FE-08:|FE-09:|FE-10:|FE-11:|FE-12:|AUTH-05:|GMAIL-03 off:|MYCALENDAR off:|W4-04:' },
   { name: 'auth02', grep: 'AUTH-02:' },
   { name: 'auth04', grep: 'AUTH-04:|AUTH-05 Google:' },
   { name: 'clarification', grep: 'clarification before plan|W4-04 clarification' },
@@ -25,9 +25,13 @@ const scenarios = [
   { name: 'jira_slack', grep: 'approved Jira workflow carries key and url to Slack' },
   { name: 'answer', grep: 'ANS-01:' },
   { name: 'gmail', grep: 'GMAIL-03:|OAUTH-01 from chat:' },
+  { name: 'mycalendar', grep: 'MYCALENDAR:' },
 ];
 
-for (const scenario of scenarios) {
+const selectedScenario = process.env.SCENARIO;
+const runScenarios = selectedScenario ? scenarios.filter(s => s.name === selectedScenario) : scenarios;
+
+for (const scenario of runScenarios) {
   process.stdout.write(`Running v3 browser scenario: ${scenario.name}\n`);
   // The API child and native HTTP fixtures must verify the same browser bearer.
   // Generate a shared private key before spawning when no key was supplied.
@@ -37,6 +41,7 @@ for (const scenario of scenarios) {
   // Keep every existing group on the old read-only policy regardless of the invoking shell.
   env.PLANNER_READ_ANSWERS = scenario.name === 'answer' ? 'on' : 'off';
   env.GMAIL_ENABLED = scenario.name === 'gmail' ? 'on' : 'off';
+  env.MYCALENDAR_ENABLED = scenario.name === 'mycalendar' ? 'on' : 'off';
   if (scenario.name === 'answer') env.PLANNER_SEARCH_MODE = 'llm';
   if (scenario.name === 'auth02') env.AUTH_SIGNUP_ENABLED = 'true';
   let stopFixture;
@@ -47,6 +52,14 @@ for (const scenario of scenarios) {
       Object.assign(env, {
         GMAIL_OAUTH_CLIENT_ID: 'gmail-test.apps.googleusercontent.com', GMAIL_OAUTH_CLIENT_SECRET: 'fake-gmail-secret', GMAIL_OAUTH_REDIRECT_URI: redirectUri,
         GMAIL_OAUTH_AUTH_URL: `${fixture.origin}/o/oauth2/v2/auth`, GMAIL_OAUTH_TOKEN_URL: `${fixture.origin}/token`, GMAIL_OAUTH_REVOKE_URL: `${fixture.origin}/revoke`, GMAIL_API_BASE_URL: fixture.origin,
+      });
+    }
+    if (scenario.name === 'mycalendar') {
+      const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/mycalendar/callback`;
+      const fixture = await startGmailBrowserFixture({ redirectUri }); stopFixture = fixture.stop;
+      Object.assign(env, {
+        MYCALENDAR_OAUTH_CLIENT_ID: 'mycalendar-test.apps.googleusercontent.com', MYCALENDAR_OAUTH_CLIENT_SECRET: 'fake-mycalendar-secret', MYCALENDAR_OAUTH_REDIRECT_URI: redirectUri,
+        MYCALENDAR_OAUTH_AUTH_URL: `${fixture.origin}/o/oauth2/v2/auth`, MYCALENDAR_OAUTH_TOKEN_URL: `${fixture.origin}/token`, MYCALENDAR_OAUTH_REVOKE_URL: `${fixture.origin}/revoke`, MYCALENDAR_API_BASE_URL: fixture.origin,
       });
     }
     if (scenario.name === 'auth04') {
@@ -62,7 +75,8 @@ for (const scenario of scenarios) {
         GOOGLE_OAUTH_JWKS_URL: `${fixture.origin}/jwks`,
       });
     }
-    const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', '--grep', scenario.grep], {
+    const grepPattern = process.env.GREP ?? scenario.grep;
+    const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', '--grep', grepPattern], {
       env, stdio: 'inherit',
     });
     if (result.error) throw result.error;

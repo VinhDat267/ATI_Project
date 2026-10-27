@@ -156,7 +156,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
           browser_binding_hash: hash(browser),
           code_verifier: verifier,
           nonce: random(),
-          mode: 'connect_mycalendar' as any,
+          mode: 'connect_mycalendar',
           user_id: user.id,
           session_id: user.sid!,
           return_to: returnTo,
@@ -197,7 +197,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         state,
         browser,
         clock(),
-        ['connect_mycalendar' as any],
+        ['connect_mycalendar'],
         user.id,
         user.sid
       );

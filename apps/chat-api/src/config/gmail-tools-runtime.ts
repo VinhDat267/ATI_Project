@@ -48,7 +48,7 @@ export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRunt
  * sandbox Slack that has no channels, asking back before the model runs.
  */
 export function runtimePlannerSearchMode(mode: RuntimeMode, configured: 'llm' | 'regex', scenario?: string): 'llm' | 'regex' {
-  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule') ? 'llm' : configured;
+  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule' || scenario === 'mycalendar') ? 'llm' : configured;
 }
 
 export async function runtimeToolCatalog(

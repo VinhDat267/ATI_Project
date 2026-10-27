@@ -41,7 +41,10 @@ export class PersonalCalendarAdapter extends BaseAdapter {
     }
     this.userId = config.userId;
     this.tokens = config.tokens;
-    this.apiBase = (config.apiBaseUrl ?? CALENDAR_API_BASE).replace(/\/+$/, '') + '/';
+    const rawBase = config.apiBaseUrl ?? CALENDAR_API_BASE;
+    this.apiBase = rawBase.includes('/calendar/v3/calendars')
+      ? rawBase.replace(/\/+$/, '') + '/'
+      : `${rawBase.replace(/\/+$/, '')}/calendar/v3/calendars/`;
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
   }
 

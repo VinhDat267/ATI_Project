@@ -12,6 +12,7 @@ import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup } from '../../src/services/gmail/connection-reference.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
+import { mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
 import { WorkingMemory } from '@wap/planner';
 
 const secret = 'mycal_services_test_secret_at_least_32_characters';
@@ -476,6 +477,12 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
   });
 
   describe('5. Shared administration route protection', () => {
+    it('mayFallbackToShared prevents shared fallback when mycalendar intent is routed', () => {
+      expect(mayFallbackToShared({ userMessage: 'Thêm vào lịch việc riêng', memory: {} as any }, false, true)).toBe(false);
+      expect(mayFallbackToShared({ userMessage: 'Tạo sự kiện trong lịch cá nhân của tôi', memory: {} as any }, false, true)).toBe(false);
+      expect(mayFallbackToShared({ userMessage: 'Tạo thẻ Trello', memory: {} as any }, false, true)).toBe(true);
+    });
+
     it('refuses mycalendar on shared-key routes even for an administrator', async () => {
       const app = buildApp(true);
       for (const [method, path, body] of [

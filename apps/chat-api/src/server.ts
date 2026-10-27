@@ -241,7 +241,7 @@ async function bootstrap() {
 
   // One planner per call: the member's own catalog decides which services are configured.
   const plannerFor = async (actor?: { userId: string }) => new AIPlanner({
-    provider: env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'gmail' ? createSandboxProvider('gmail') : provider,
+    provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
       gmailEnabled: gmailAvailable,
@@ -356,7 +356,7 @@ async function bootstrap() {
     mycalendar: env.MYCALENDAR_ENABLED ? {
       enabled: true,
       oauth: mycalendarAvailable ? env.MYCALENDAR_OAUTH : undefined,
-      repo: mycalendarAvailable && pool ? new GmailConnectionRepo(pool, 'mycalendar') : undefined,
+      repo: mycalendarAvailable && pool ? new GmailConnectionRepo(pool, 'mycalendar', 'connect_mycalendar') : undefined,
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
     } : undefined,
     chatService,

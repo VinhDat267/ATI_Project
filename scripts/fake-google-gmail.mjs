@@ -57,7 +57,7 @@ async function form(request) {
 export async function startFakeGoogleGmail(options = {}) {
   const { port = 0, now = Date.now, clientId, clientSecret, redirectUri, email } = { ...defaults, ...options };
   const settings = {
-    email, grantedScopes: [GMAIL_MODIFY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
+    email, grantedScopes: [GMAIL_MODIFY_SCOPE, CALENDAR_EVENTS_SCOPE, CALENDAR_READONLY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
     accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
     threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], apiResponses: [], ...options.settings,
   };
@@ -72,9 +72,9 @@ export async function startFakeGoogleGmail(options = {}) {
     accessTokens.set(token, { email: account, expiresAt: now() + settings.accessTokenTtlSeconds * 1000 });
     return token;
   };
-  const mintRefreshToken = (account = settings.email) => {
+  const mintRefreshToken = (account = settings.email, scopes = settings.grantedScopes) => {
     const token = `1//fake-${random()}`;
-    refreshTokens.set(token, { email: account, revoked: false });
+    refreshTokens.set(token, { email: account, revoked: false, scopes });
     return token;
   };
   const isAllowedRedirect = (uri) => {
@@ -104,11 +104,13 @@ export async function startFakeGoogleGmail(options = {}) {
           return json(response, 400, { error: 'invalid_request' });
         }
         const code = random();
-        codes.set(code, { challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000, redirectUri: reqRedirectUri });
+        const granted = scopes.filter((s) => (settings.grantedScopes ?? []).includes(s));
+        const finalScopes = granted.length > 0 ? granted : (settings.grantedScopes ?? scopes);
+        codes.set(code, { challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000, redirectUri: reqRedirectUri, scopes: finalScopes });
         const callback = new URL(reqRedirectUri);
         callback.searchParams.set('state', params.get('state'));
         callback.searchParams.set('code', code);
-        callback.searchParams.set('scope', (settings.grantedScopes ?? scopes).join(' '));
+        callback.searchParams.set('scope', finalScopes.join(' '));
         response.writeHead(302, { Location: callback.href, 'Cache-Control': 'no-store' });
         return response.end();
       }
@@ -134,9 +136,10 @@ export async function startFakeGoogleGmail(options = {}) {
             return json(response, 400, { error: 'invalid_grant' });
           }
           codes.delete(params.get('code'));
+          const granted = entry.scopes?.length ? entry.scopes : settings.grantedScopes;
           const body = { access_token: issueAccessToken(entry.email), expires_in: settings.accessTokenTtlSeconds,
-            scope: settings.grantedScopes.join(' '), token_type: 'Bearer' };
-          if (settings.issueRefreshToken) body.refresh_token = mintRefreshToken(entry.email);
+            scope: granted.join(' '), token_type: 'Bearer' };
+          if (settings.issueRefreshToken) body.refresh_token = mintRefreshToken(entry.email, granted);
           return json(response, 200, body);
         }
         if (params.get('grant_type') === 'refresh_token') {
@@ -146,8 +149,9 @@ export async function startFakeGoogleGmail(options = {}) {
           if (settings.refresh === 'server_error') return json(response, 503, { error: 'backend_error' });
           const entry = refreshTokens.get(params.get('refresh_token'));
           if (settings.refresh === 'invalid_grant' || !entry || entry.revoked) return json(response, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
+          const granted = entry.scopes?.length ? entry.scopes : settings.grantedScopes;
           return json(response, 200, { access_token: issueAccessToken(entry.email), expires_in: settings.accessTokenTtlSeconds,
-            scope: settings.grantedScopes.join(' '), token_type: 'Bearer' });
+            scope: granted.join(' '), token_type: 'Bearer' });
         }
         return json(response, 400, { error: 'unsupported_grant_type' });
       }

@@ -15,10 +15,10 @@ export class GmailConnectionRepo {
   constructor(
     private pool: pg.Pool,
     service: 'gmail' | 'mycalendar' = 'gmail',
-    mode: 'connect_gmail' | 'connect_mycalendar' = 'connect_gmail'
+    mode?: 'connect_gmail' | 'connect_mycalendar'
   ) {
     this.service = service;
-    this.mode = mode;
+    this.mode = mode ?? (service === 'mycalendar' ? 'connect_mycalendar' : 'connect_gmail');
   }
 
   /**

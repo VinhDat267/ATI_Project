@@ -48,11 +48,24 @@ export function routeIntent(
   const explicitlyNamed = services.filter((service) =>
     mentionsKeyword(intent, service.id) || mentionsKeyword(intent, service.name)
   );
-  const matched = services.filter((service) =>
+  let matched = services.filter((service) =>
     explicitlyNamed.includes(service) ||
     service.intentKeywords.some((keyword) => mentionsKeyword(intent, keyword)) ||
     service.intentPatterns?.some((pattern) => pattern.test(intent))
   );
+  const hasPersonalCalendar = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
+  const hasSharedCalendar = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'calendars');
+  if (hasPersonalCalendar && hasSharedCalendar) {
+    const mentionsSharedCalendar =
+      mentionsKeyword(intent, 'lịch chung') ||
+      mentionsKeyword(intent, 'lịch nhóm') ||
+      mentionsKeyword(intent, 'lịch team') ||
+      mentionsKeyword(intent, 'calendar chung') ||
+      mentionsKeyword(intent, 'google calendar chung');
+    if (!mentionsSharedCalendar) {
+      matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'calendars'));
+    }
+  }
   const fallback = matched.length > 0 ? matched : services.filter((service) =>
     service.fallbackIntentKeywords?.some((keyword) => mentionsKeyword(intent, keyword))
   );

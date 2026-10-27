@@ -43,10 +43,42 @@ export function createSandboxProvider(scenario?: string) {
     ];
     mockProvider.setPlanResponses(responses);
     const fallback = mockProvider.generatePlan.bind(mockProvider);
-    mockProvider.generatePlan = async (input) =>
-      Array.isArray(input.conversationHistory)
-        ? JSON.stringify(responses[input.conversationHistory.at(-1)?.content.includes('<search_results>') ? 1 : 0])
-        : fallback(input);
+    mockProvider.generatePlan = async (input) => {
+      if (!Array.isArray(input.conversationHistory)) return fallback(input);
+      const last = input.conversationHistory.at(-1)?.content ?? '';
+      if (last.includes('<search_results>')) {
+        let calId = 'c_work@group.calendar.google.com';
+        if (last.includes('c_work@group.calendar.google.com')) {
+          calId = 'c_work@group.calendar.google.com';
+        } else if (last.includes('user@example.com')) {
+          calId = 'user@example.com';
+        } else {
+          const match = last.match(/"id":\s*"([^"]+)"/);
+          if (match?.[1]) calId = match[1];
+        }
+        return JSON.stringify({
+          kind: 'plan',
+          thinking: 'Tạo sự kiện trong lịch cá nhân.',
+          summary: 'Tạo sự kiện lịch cá nhân',
+          warnings: [],
+          steps: [
+            {
+              id: 'create_event',
+              tool: 'mycalendar.create_event',
+              description: 'Tạo sự kiện họp',
+              args: {
+                calendarId: calId,
+                summary: 'Họp việc riêng',
+                start: '2026-10-28T09:00:00+07:00',
+                end: '2026-10-28T10:00:00+07:00',
+              },
+              dependsOn: [],
+            },
+          ],
+        });
+      }
+      return JSON.stringify(responses[0]);
+    };
     return mockProvider;
   }
   if (scenario === 'answer') {
