@@ -1,43 +1,47 @@
-# OAUTH-02 · Google Calendar của riêng bạn (tuỳ chọn)
+# OAUTH-02 · Google Calendar của riêng bạn kèm chọn phạm vi lịch
 
-**Trạng thái:** **chờ nhóm trưởng quyết ngày 29/10**; mặc định bỏ ([FINISH-PLAN](../FINISH-PLAN.md) mục 4) · **Nhánh gợi ý:** `feat/oauth-02-backend`, `feat/oauth-02-web`, `eval/oauth-02-measure` · **Phụ thuộc:** OAUTH-01 (#172), PR bật cờ GMAIL-04, SCHED-03 (#171), xem đặc tả mục 1.1 · **Mốc:** mã merge **trước 01/11** (mốc cắt); đo, nghiệm thu, bật cờ trước 04/11/2026
+**Trạng thái:** đã chốt thiết kế qua `/brainstorming` ngày 27/10/2026 (Phương án 2 + Option A chọn lịch ngay trên màn callback) · **Nhánh gợi ý:** `feat/oauth-02-backend`, `feat/oauth-02-web`, `eval/oauth-02-measure` · **Phụ thuộc:** OAUTH-01 (#172), SCHED-03 (#171) · **Mốc:** mã merge **trước 01/11** (mốc cắt); đo, nghiệm thu, bật cờ trước 04/11/2026
 **Đặc tả:** [`2026-10-26-oauth-02-personal-calendar-design.md`](../../superpowers/specs/2026-10-26-oauth-02-personal-calendar-design.md), đọc hết trước khi làm. Quy tắc của dịch vụ riêng: [GMAIL-common](GMAIL-common.md).
 **Có phần việc của con người:** cấu hình Google Cloud (bước 0), nghiệm thu thật (bước 4).
 
 ## Mục tiêu
 
 Khi `MYCALENDAR_ENABLED=on`, mỗi người kết nối Google Calendar của chính mình:
-- từ `/settings` hoặc ngay trong hội thoại;
-- lập kế hoạch đọc sự kiện và tạo sự kiện trong **lịch chính** của mình;
-- duyệt rồi chạy.
+- từ `/settings` hoặc ngay trong hội thoại (`RefusalMoment` kèm `returnTo`);
+- ngay sau khi Google redirect về `/connections/mycalendar/callback`, chọn các lịch trong tài khoản được phép sử dụng (`allowedCalendars`, gợi ý chọn sẵn lịch chính `primary`); trước khi lưu phạm vi lịch, kết nối ở trạng thái `scope_required`;
+- lập kế hoạch đọc danh sách lịch (`mycalendar.list_calendars`), đọc sự kiện (`mycalendar.list_events`) và tạo sự kiện (`mycalendar.create_event`) trên đúng những lịch đã chọn;
+- duyệt kế hoạch (hiển thị rõ tên lịch đích và `<email>`) rồi chạy.
 
 Calendar chung (`calendar.*`) không đổi. Cờ tắt thì hệ thống không đổi từng byte.
 
 ## Việc cần làm
 
-0. **Google Cloud** (nhóm trưởng, sáng 29/10):
+0. **Google Cloud** (nhóm trưởng):
    - trong project của Gmail, bật Google Calendar API;
    - tạo client OAuth **thứ hai** (web), redirect `/connections/mycalendar/callback`;
-   - thêm quyền `calendar.events` vào màn đồng ý (Testing, cùng test user);
+   - thêm quyền `calendar.events` và `calendar.readonly` vào màn đồng ý (Testing, cùng test user);
    - ghi `MYCALENDAR_OAUTH_*` vào `.env` ở máy, không commit. Ghi project id và client id (không ghi secret) trong bằng chứng.
 1. **PR 1, backend** (đặc tả mục 4, 5):
-   - `MYCALENDAR_SERVICE`, `MYCALENDAR_TOOLS`, `PlanConnections.mycalendar`; cờ và biến môi trường; migration 0012;
-   - tổng quát hoá client OAuth, quản lý token, route kết nối theo mã dịch vụ. Bộ test Gmail đạt không sửa assertion; nếu không được thì chép route, theo đặc tả 5.1;
-   - `PersonalCalendarAdapter` cùng adapter giả cho sandbox; máy chủ giả của Gmail thêm danh tính Calendar;
-   - `AdapterFactory.personalAdapter`, catalog và registry của người gọi, `bindConnections`, executor và recovery, `GET /api/services`, `/api/health`.
+   - `MYCALENDAR_SERVICE`, `MYCALENDAR_TOOLS` (`mycalendar.list_calendars`, `mycalendar.list_events`, `mycalendar.create_event` với `'x-resource': 'mycalendar'`), `PlanConnections.mycalendar`; cờ và biến môi trường; migration `0012_mycalendar_personal_connections.sql`;
+   - tổng quát hoá client OAuth, quản lý token, kho kết nối cá nhân và các route `/api/connections/mycalendar` (`POST /start`, `POST /callback`, `GET /calendars`, `PUT /scope`, `DELETE /`). Bộ test Gmail đạt không sửa assertion;
+   - `PersonalCalendarAdapter` kiểm tra `allowedScope.calendars` cùng adapter giả cho sandbox; máy chủ giả `scripts/fake-google-gmail.mjs` thêm `/calendar/v3/users/me/calendarList` và các endpoint sự kiện;
+   - `AdapterFactory`, catalog và registry của người gọi, `ChatService.bindConnections`, `resourceLabels`, executor và recovery, `GET /api/services` (`not_connected | scope_required | connected | reconnect_required`), `/api/health`.
 2. **PR 2, giao diện** (đặc tả mục 6):
-   - hàng ở `/settings`; callback; nút ở màn từ chối; nhãn ở màn duyệt và biên nhận; `/privacy`;
+   - màn callback `/connections/mycalendar/callback` hiển thị ngay bộ chọn lịch (tick gợi ý sẵn lịch chính, nút *"Lưu lịch được dùng & quay lại hội thoại"* hoặc *"Lưu lịch được dùng"*), hỗ trợ cả `?mode=select` khi đang ở `scope_required`;
+   - hàng "Google Calendar của bạn" ở `/settings#mycalendar` kèm hiển thị badge các lịch đã chọn và nút *"Chọn lại lịch được dùng"*;
+   - nút ở `RefusalMoment` (`Kết nối Google Calendar` khi `not_connected`, `Chọn lịch Google Calendar` khi `scope_required`, `Kết nối lại Google Calendar` khi `reconnect_required`, `Gửi lại yêu cầu` khi `connected`);
+   - nhãn tên lịch đích và `<email>` ở `PlanMoment` và `ReceiptMoment`; `/privacy`;
    - nhóm browser `mycalendar` trong `scripts/test-v3-browser.mjs` (đặt `MYCALENDAR_ENABLED=on` chỉ cho nhóm này), cùng ca `MYCALENDAR off:` ở nhóm default.
-3. **Đo** (đặc tả mục 8):
+3. **Đo** (đặc tả mục 8.3):
    - `cases-mycalendar.json`, 8 câu, commit và push label **trước mọi lời gọi model**;
    - `EVAL_SET=mycalendar` ×3;
    - báo cáo ở `docs/ai-evidence/V3-GOLDEN-V2/<ngày>-OAUTH-02-REPORT.md`.
 4. **Nghiệm thu thật** (nhóm trưởng thao tác, agent ghi theo câu lệnh P-LIVE):
-   - kết nối; tạo một sự kiện trong lịch chính của tài khoản thử; đọc lại;
+   - kết nối và chọn phạm vi lịch; tạo một sự kiện trong lịch đã chọn của tài khoản thử; đọc lại;
    - ngắt kết nối, kiểm token đã thu hồi và **Gmail vẫn kết nối**.
 
    Bằng chứng ở `docs/ai-evidence/MYCALENDAR-LIVE/`, không commit; thêm thư mục này vào `.gitignore` ở PR 1.
-5. **PR bật cờ** nếu đạt quy tắc ở đặc tả mục 8, trước 04/11.
+5. **PR bật cờ** nếu đạt quy tắc ở đặc tả mục 8.3, trước 04/11.
 
 ## Test tối thiểu
 
@@ -45,17 +49,21 @@ Calendar chung (`calendar.*`) không đổi. Cờ tắt thì hệ thống không
 - **Gmail, OAUTH-01:** các test hiện có đạt, không sửa assertion.
 - **PostgreSQL thật:**
   - state một lần;
+  - callback lưu trạng thái `scope_required` (`selectedCalendars: []`), chưa mở `MYCALENDAR_TOOLS`;
+  - `GET /calendars` và `PUT /scope` xác minh danh sách lịch ghi được từ Google và chuyển sang `connected`;
   - callback cũ không ghi đè kết nối mới;
   - đăng xuất giữa chừng → `401 INVALID_SESSION`;
   - `invalid_grant` → `reconnect_required` của đúng `mycalendar`;
   - ngắt Calendar không đổi dòng Gmail;
-  - thực thi với `credentialId` khác → từ chối.
-- **Adapter:** 401 → làm mới một lần; lỗi trước khi gửi → `requestSent: false`; treo sau khi gửi → `UNKNOWN`; huỷ bằng `AbortSignal` thật.
-- **Browser** nhóm `mycalendar`: kết nối từ `/settings`; kết nối trong hội thoại rồi quay về và gửi lại yêu cầu; duyệt tạo sự kiện; 1440/375 sáng/tối.
+  - thực thi với `credentialId` khác hoặc `calendarId` đã bị bỏ khỏi `allowedCalendars` → từ chối.
+- **Adapter:** chặn mọi `calendarId` ngoài `allowedScope.calendars`; 401 → làm mới một lần; lỗi trước khi gửi → `requestSent: false`; treo sau khi gửi → `UNKNOWN`; huỷ bằng `AbortSignal` thật.
+- **Browser** nhóm `mycalendar`: kết nối từ `/settings` + chọn lịch + đổi lại lịch; kết nối trong hội thoại → chọn lịch trên callback → quay về hội thoại → gửi lại yêu cầu → duyệt tạo sự kiện; xử lý trạng thái `scope_required` từ `RefusalMoment`; 1440/375 sáng/tối.
 
 ## Đột biến
 
 - Rơi về service account chung khi chưa kết nối riêng.
+- Cho phép `mycalendar.*` khi kết nối còn ở `scope_required` (`selectedCalendars` rỗng).
+- Bỏ kiểm tra `calendarId ∈ allowedCalendars` ở `PUT /scope`, `bindConnections`, `AdapterFactory` hoặc `PersonalCalendarAdapter`.
 - Bỏ kiểm `connections.mycalendar.credentialId` khi thực thi.
 - Ngắt Calendar thu hồi cả Gmail.
 - Cờ tắt vẫn thêm `MYCALENDAR_TOOLS` vào catalog.
@@ -73,7 +81,7 @@ Ghi kết quả từng đột biến vào log.
 
 ## Ngoài phạm vi
 
-- Lịch khác ngoài `primary`; sửa hoặc xoá sự kiện; mời người tham dự.
+- Sửa hoặc xoá sự kiện; mời người tham dự.
 - OAuth cho Slack, GitHub, Notion, Jira, Trello.
 
 ## Kết quả (agent thi công điền)
