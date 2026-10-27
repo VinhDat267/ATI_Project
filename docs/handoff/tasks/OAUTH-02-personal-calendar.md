@@ -74,10 +74,10 @@ Ghi kết quả từng đột biến vào log.
 
 ## Tiêu chí nghiệm thu
 
-- [ ] RED trước GREEN; đột biến đều bị bắt.
-- [ ] `npm run check` và `npm run test:browser:v3` exit 0, không sửa assertion cũ.
-- [ ] Label commit trước lời gọi model đầu tiên; báo cáo đủ nguồn gốc.
-- [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu.
+- [x] RED trước GREEN; đột biến đều bị bắt (8/8 đột biến tại mục 8.2 đều bị bắt với exit code 1 và khôi phục khớp SHA-256).
+- [x] `npm run check` (`typecheck:v3`, `build:v3`, `test:v3`, `test:eval:v3`) và `npm run test:browser:v3` (`SCENARIO=mycalendar` 7/7 + `SCENARIO=default` `MYCALENDAR off:` 1/1) exit 0, không sửa assertion cũ.
+- [x] Label commit trước lời gọi model đầu tiên (`evaluations/golden/cases-mycalendar.json` 8 câu); báo cáo đủ nguồn gốc.
+- [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu (chờ nhóm trưởng cấu hình Google Cloud OAuth Client thứ hai và chạy P-LIVE).
 
 ## Ngoài phạm vi
 
@@ -86,7 +86,15 @@ Ghi kết quả từng đột biến vào log.
 
 ## Kết quả (agent thi công điền)
 
-- PR:
-- Số đo:
-- Nghiệm thu thật:
-- Quyết định bật cờ:
+- **Nhánh:** `feat/oauth-02-personal-calendar` (tách từ `main` `2888a9fe`, 8 commits từ đặc tả + kế hoạch qua 6 tasks SDD: `cb968542..4b82133`).
+- **Kiểm thử & Đột biến:**
+  - `npm run typecheck:v3`: exit 0.
+  - `RUNTIME_MODE=sandbox npm run build:v3`: exit 0.
+  - `npm run test:v3`: **2.304 passed** (6 workspaces: `tool-schemas` 74, `tool-adapters` 425, `planner` 393, `executor` 42, `chat-api` 564, `chat-web` 806).
+  - `npm run test:eval:v3`: **394 passed** (24 files, bao gồm `golden.test.ts` với `cases-mycalendar.json` và `static-guard.test.ts`).
+  - Browser E2E (`scripts/test-v3-browser.mjs`): `SCENARIO=mycalendar` **7/7 passed** (4 flows × 1440/375 sáng/tối), `SCENARIO=default GREP="MYCALENDAR off:"` **1/1 passed**.
+  - Đột biến bắt buộc (Spec §8.2): **8/8 bị bắt** (M1–M8 đều fail đúng assertion với exit code 1, khôi phục khớp SHA-256).
+- **Số đo (`EVAL_SET=mycalendar`):** Đã commit 8 câu chuẩn (`mc01`–`mc06`, `mi01`–`mi02`) tại `evaluations/golden/cases-mycalendar.json` và `evaluations/golden-v2/cases-mycalendar.json` (pass `golden.test.ts` 4/4). Đo live model ×3 sẽ chạy cùng bước nghiệm thu thật khi có khóa môi trường.
+- **Nghiệm thu thật:** Chờ nhóm trưởng tạo OAuth Client thứ hai trên Google Cloud Project (`/connections/mycalendar/callback`) và chạy P-LIVE (bằng chứng lưu tại `docs/ai-evidence/MYCALENDAR-LIVE/`, đã thêm vào `.gitignore`).
+- **Quyết định bật cờ:** Mặc định `MYCALENDAR_ENABLED=off`; sẵn sàng bật sau khi hoàn tất P-LIVE.
+- **Log bàn giao:** [`docs/handoff/log/2026-10-27-OAUTH-02-personal-calendar.md`](../log/2026-10-27-OAUTH-02-personal-calendar.md).
