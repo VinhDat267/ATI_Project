@@ -16,12 +16,14 @@
 
 Trong ATI v3 hiện tại, dịch vụ `calendar` ("Google Calendar" chung) dùng một Google Service Account dùng chung cho toàn nhóm với danh sách lịch do quản trị viên cấu hình. Tuy nhiên, nhu cầu thực tế của từng thành viên là đọc và tạo lịch họp trên **tài khoản Google Calendar cá nhân của chính mình** (ví dụ: *"Thêm lịch họp 3 giờ chiều mai vào lịch việc riêng của tôi"*, hoặc *"Xem lịch cá nhân tuần tới rồi báo lên Slack"*), và mỗi người thường có nhiều lịch con trong cùng tài khoản Google (lịch chính, lịch việc riêng, lịch dự án) mà họ muốn kiểm soát rõ ATI được phép đụng tới lịch nào.
 
-### 1.2. Vì sao tách dịch vụ riêng `mycalendar` và dùng client OAuth thứ hai
+### 1.2. Vì sao tách dịch vụ riêng `mycalendar` và dùng project OAuth riêng
 
 | Quyết định | Phương án không chọn | Phương án được chọn | Lý do |
 |---|---|---|---|
 | Mô hình dịch vụ | Thay nguồn khoá của `calendar.*` (ai kết nối thì dùng OAuth cá nhân, chưa thì rơi về Service Account chung) | **Dịch vụ cá nhân riêng `mycalendar`** ("Google Calendar của bạn"), đặt sau cờ `MYCALENDAR_ENABLED` | Giữ nguyên từng byte của `calendar.*` (33 tool / 8 dịch vụ, bộ đo golden 116 câu, kịch bản demo nhóm); tuân thủ bất biến "dịch vụ cá nhân không bao giờ rơi về khoá chung"; màn duyệt cho biết rõ ghi vào lịch nào của tài khoản nào |
-| Client OAuth Google | Dùng chung OAuth Client ID với Gmail | **Client OAuth Web thứ hai** trong cùng Google Cloud Project của Gmail | Google gộp grant theo cặp `(user, client_id)`. Nếu dùng chung client, khi người dùng ngắt kết nối Gmail và gọi `revoke`, Google sẽ thu hồi toàn bộ grant của client đó khiến Calendar mất quyền theo (và ngược lại) |
+| Client OAuth Google | Dùng chung project với Gmail, kể cả tạo client khác | **Client OAuth Web trong Google Cloud project riêng**, khác project Gmail và đăng nhập | Google thu hồi các access/refresh token của mọi client trong cùng project cho người dùng khi gọi `revoke`. Tách client trong cùng project không bảo đảm ngắt kết nối độc lập |
+
+**Sửa sau review ngày 27/10/2026:** Google xác nhận phạm vi thu hồi ở cấp project trong [Token revocation](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke). Yêu cầu sửa sáu lỗi review của nhóm trưởng thay quyết định dùng chung project trước đó. Nếu đã cấu hình hai client cùng project, phải chuyển client Calendar sang project riêng và kết nối lại trước nghiệm thu; không dùng revoke để thử trên grant Gmail đang cần giữ.
 
 ### 1.3. So sánh các phương án phạm vi lịch và luồng giao diện (đã chốt trong Brainstorming)
 
@@ -139,9 +141,10 @@ Trên `GET /api/services` (và trên giao diện `/settings#mycalendar` cũng nh
 
 - `MYCALENDAR_ENABLED`: `'on' | 'off'`, mặc định `'off'`, giá trị khác ném lỗi cấu hình lúc khởi động.
 - `MYCALENDAR_OAUTH_CLIENT_ID`, `MYCALENDAR_OAUTH_CLIENT_SECRET`, `MYCALENDAR_OAUTH_REDIRECT_URI` (ví dụ `http://localhost:5173/connections/mycalendar/callback`).
+- `MYCALENDAR_OAUTH_PROJECT_ID`: project ID thật của client Calendar; khi client Gmail có cấu hình (kể cả cờ Gmail tắt), khai báo thêm `GMAIL_OAUTH_PROJECT_ID`. Hai project ID và hai client ID phải khác nhau. Đây là khai báo cấu hình; người cấu hình phải đối chiếu client thuộc đúng project trong Google Cloud, không suy ra project từ chuỗi client ID.
 - Ở chế độ `sandbox`, cho phép cấu hình thêm `MYCALENDAR_OAUTH_AUTH_URL`, `MYCALENDAR_OAUTH_TOKEN_URL`, `MYCALENDAR_OAUTH_REVOKE_URL`, `MYCALENDAR_API_BASE_URL` trỏ tới máy chủ giả cục bộ.
 - Quy tắc kiểm tra khi khởi động (giống `GMAIL_ENABLED`):
-  - Khi `RUNTIME_MODE=live` và `MYCALENDAR_ENABLED=on`: bắt buộc có đủ `MYCALENDAR_OAUTH_CLIENT_ID`, `MYCALENDAR_OAUTH_CLIENT_SECRET`, `MYCALENDAR_OAUTH_REDIRECT_URI` (URL hợp lệ) và `CREDENTIAL_ENCRYPTION_KEY`; thiếu biến thì báo lỗi khởi động. Nếu không có `DATABASE_URL` thì ghi cảnh báo và tắt `mycalendar`.
+  - Khi `RUNTIME_MODE=live` và `MYCALENDAR_ENABLED=on`: bắt buộc có đủ `MYCALENDAR_OAUTH_CLIENT_ID`, `MYCALENDAR_OAUTH_CLIENT_SECRET`, `MYCALENDAR_OAUTH_REDIRECT_URI` (URL hợp lệ), `MYCALENDAR_OAUTH_PROJECT_ID`, `ENCRYPTION_KEY` và `DATABASE_URL`; thiếu biến thì báo lỗi khởi động. Nếu có client/project Gmail được khai báo hoặc cờ Gmail bật, bắt buộc `GMAIL_OAUTH_PROJECT_ID`; cùng project hoặc cùng client thì từ chối khởi động. Cờ Calendar tắt và sandbox giữ chính sách cũ.
   - Khi `RUNTIME_MODE=sandbox` và `MYCALENDAR_ENABLED=on`: nếu chưa truyền các URL giả thì server vẫn khởi động và các route `/api/connections/mycalendar/*` trả `503`.
 - Quyền OAuth yêu cầu (`MYCALENDAR_SCOPE`):
   - `'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly'` (đồng nhất với `CALENDAR_SCOPE` trong `packages/tool-adapters/src/calendar/calendar-adapter.ts`: `calendar.readonly` cho phép đọc danh sách lịch của người dùng qua `/users/me/calendarList` và `calendar.events` cho phép đọc/tạo sự kiện trên các lịch đã chọn).
@@ -235,7 +238,7 @@ Chỉ gắn khi `MYCALENDAR_ENABLED=on`. Cookie ràng buộc trình duyệt: `at
 | `POST /api/connections/mycalendar/callback` | Body `{ code, state }` + cookie `ati_mycalendar_browser` | Dùng `consumeState` một lần; đổi `code` lấy token; kiểm tra đủ cả 2 scope trong `MYCALENDAR_SCOPE` và có `refreshToken`; gọi `calendarList` lấy `email` + danh sách lịch ghi được `calendars`; lưu `service_credentials` với `selectedCalendars: []` (`scope_required`); xoá cache của người dùng; trả `200 { email, calendars, ...(returnTo ? { returnTo } : {}) }` | `400 MYCALENDAR_STATE_INVALID`, `MYCALENDAR_SCOPE_MISSING`, `MYCALENDAR_REFRESH_TOKEN_MISSING`, `MYCALENDAR_CONNECT_FAILED` |
 | `GET /api/connections/mycalendar/calendars` | Phiên đăng nhập hợp lệ | Đọc dòng `mycalendar` hiện tại của người gọi (`status = 'active'`); dùng `mycalendarTokens` lấy `accessToken` và gọi Google `calendarList` để lấy danh sách lịch ghi được mới nhất; trả `200 { email, calendars, selectedCalendarIds }` | `409 MYCALENDAR_NOT_CONNECTED` (khi chưa kết nối hoặc `reconnect_required`), `502 MYCALENDAR_FETCH_FAILED` |
 | `PUT /api/connections/mycalendar/scope` | Body `{ calendarIds: string[] }` | Kiểm tra `calendarIds` là mảng 1..20 chuỗi khớp `CALENDAR_ID_PATTERN` (loại trùng); đọc dòng `mycalendar` active hiện tại; gọi Google `calendarList` bằng token của dòng đó để xác minh **mọi `calendarId` đều thuộc danh sách lịch ghi được thực tế của người dùng** và lấy `{ id, summary, timeZone, primary }` chính xác từ Google (không tin tên lịch do client gửi lên); lưu vào `config` qua `updateConfigIfActive` (so khớp `record.id`); xoá cache adapter của người dùng; trả `200 { email, selectedCalendars, allowedScope: selectedCalendars.map(c => c.id) }` | `400 MYCALENDAR_SCOPE_INVALID` (mảng rỗng, sai kiểu, hoặc chứa ID không thuộc lịch ghi được của người dùng), `409 MYCALENDAR_NOT_CONNECTED` |
-| `DELETE /api/connections/mycalendar` | Phiên đăng nhập hợp lệ | Thu hồi `refreshToken` trên client OAuth thứ hai của `mycalendar` (không ảnh hưởng Gmail), xoá dòng `mycalendar` và các state `connect_mycalendar` của người gọi, xoá cache; trả `200 { success: true }` | `500` nếu lỗi DB |
+| `DELETE /api/connections/mycalendar` | Phiên đăng nhập hợp lệ | Thu hồi `refreshToken` trong project OAuth riêng của `mycalendar` (không ảnh hưởng Gmail ở project khác), xoá dòng `mycalendar` và các state `connect_mycalendar` của người gọi, xoá cache; trả `200 { success: true }` | `500` nếu lỗi DB |
 
 > **Quyết định kỹ thuật (Our Call — xác minh `calendarIds` ở `PUT /scope`):** Server không nhận `summary` hay `timeZone` từ trình duyệt khi lưu `PUT /scope`, mà chỉ nhận mảng `calendarIds: string[]` rồi đối chiếu trực tiếp với danh sách lịch ghi được lấy từ Google Calendar API của đúng người dùng đó (và kiểm tra `expectedCredentialId` trong `updateConfigIfActive`). Điều này vừa chống giả mạo tên lịch (label spoofing trên màn duyệt), vừa đảm bảo người dùng không thể tự chèn một `calendarId` bất kỳ mà họ không sở hữu.
 
@@ -391,7 +394,7 @@ Khi `/api/health` báo `mycalendarEnabled: true`, hiển thị thêm mục **"D�
    - `GET /calendars` trả danh sách lịch ghi được từ Google và `selectedCalendarIds` hiện tại;
    - `PUT /scope` từ chối mảng rỗng hoặc `calendarId` không thuộc lịch ghi được của người dùng (`400 MYCALENDAR_SCOPE_INVALID`), và khi hợp lệ thì lưu `selectedCalendars` + `allowedScope.calendars`, chuyển `personalStatus` sang `connected`;
    - State dùng một lần, callback muộn không ghi đè kết nối mới, đăng xuất giữa chừng trả `401 INVALID_SESSION`, `invalid_grant` chuyển đúng dòng `mycalendar` sang `reconnect_required`;
-   - `DELETE /api/connections/mycalendar` thu hồi token trên client OAuth thứ hai và xoá dòng `mycalendar`, **dòng `gmail` của cùng người dùng vẫn giữ nguyên `active`** (và ngược lại);
+   - Fake Google mô hình hoá thu hồi theo `(Google account, Cloud project)`, vô hiệu cả token của client khác trong cùng project. `DELETE /api/connections/mycalendar` thu hồi token trong project Calendar riêng và xoá dòng `mycalendar`; **dòng `gmail` của cùng người dùng vẫn giữ nguyên `active` và refresh token Gmail vẫn dùng được qua HTTP** (và ngược lại);
    - Thực thi kế hoạch khi `credentialId` đã đổi hoặc khi `calendarId` trong kế hoạch đã bị người dùng bỏ chọn khỏi `allowedCalendars` → bị từ chối với `AUTH_ERROR`.
 3. **Adapter (`packages/tool-adapters`):**
    - `mycalendar.list_calendars`, `mycalendar.list_events`, `mycalendar.create_event` chặn mọi `calendarId` ngoài `allowedScope.calendars`;
@@ -429,7 +432,7 @@ Mỗi đột biến dưới đây bắt buộc phải làm ít nhất một bài
   - 2 câu tiêm lệnh (prompt injection) qua tiêu đề sự kiện trong lịch cá nhân.
   - Chạy `EVAL_SET=mycalendar` ×3 với `searchMode: 'llm'` trên model chính. Yêu cầu đạt ≥ 20/24 lượt, trong đó 6/6 lượt chống tiêm lệnh và 0/6 lượt lịch nhóm bị ghi nhầm sang lịch cá nhân.
 - **Nghiệm thu thật với Google (`docs/ai-evidence/MYCALENDAR-LIVE/`, nằm trong `.gitignore`):**
-  - Kết nối tài khoản Google thử nghiệm thật với Client OAuth thứ hai;
+  - Kết nối tài khoản Google thử nghiệm thật với client OAuth Calendar trong project riêng đã đối chiếu với project Gmail;
   - Chọn phạm vi lịch trên màn callback;
   - Tạo một sự kiện thật trên lịch đã chọn và đọc lại;
   - Ngắt kết nối `mycalendar`, xác nhận token đã bị thu hồi ở Google và kết nối `gmail` của cùng tài khoản vẫn hoạt động bình thường.

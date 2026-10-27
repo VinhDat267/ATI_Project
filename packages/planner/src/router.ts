@@ -61,7 +61,9 @@ export function routeIntent(
       mentionsKeyword(intent, 'lịch nhóm') ||
       mentionsKeyword(intent, 'lịch team') ||
       mentionsKeyword(intent, 'calendar chung') ||
-      mentionsKeyword(intent, 'google calendar chung');
+      mentionsKeyword(intent, 'google calendar chung') ||
+      ['shared calendar', 'team calendar', 'group calendar', 'shared google calendar', 'team google calendar', 'group google calendar']
+        .some(keyword => mentionsKeyword(intent, keyword));
     if (!mentionsSharedCalendar) {
       matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'calendars'));
     }

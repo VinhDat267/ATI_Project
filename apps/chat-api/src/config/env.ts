@@ -181,6 +181,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.MYCALENDAR_ENABLED && !['on', 'off'].includes(env.MYCALENDAR_ENABLED)) throw new Error('MYCALENDAR_ENABLED must be on or off');
   const MYCALENDAR_ENABLED = env.MYCALENDAR_ENABLED === 'on';
   const MYCALENDAR_OAUTH = MYCALENDAR_ENABLED ? mycalendarOAuth(env, isLive) : undefined;
+  if (isLive && MYCALENDAR_ENABLED) validatePersonalGoogleProjects(env);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
 
@@ -211,6 +212,27 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     SMTP_PASSWORD: env.SMTP_PASSWORD || '',
     MAIL_FROM,
   };
+}
+
+/** Google revoke affects every client of a project, including disabled services' existing grants. */
+function validatePersonalGoogleProjects(env: Record<string, string | undefined>): void {
+  const projectId = (field: string) => {
+    const value = env[field]?.trim();
+    if (!value || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(value)) {
+      throw new Error(`${field} must declare the Google Cloud project ID when MYCALENDAR_ENABLED=on in live mode`);
+    }
+    return value;
+  };
+  const calendarProject = projectId('MYCALENDAR_OAUTH_PROJECT_ID');
+  if (env.GMAIL_ENABLED === 'on' || env.GMAIL_OAUTH_CLIENT_ID?.trim() || env.GMAIL_OAUTH_PROJECT_ID?.trim()) {
+    const gmailProject = projectId('GMAIL_OAUTH_PROJECT_ID');
+    if (calendarProject === gmailProject) {
+      throw new Error('Gmail and MyCalendar must use separate Google Cloud projects for independent token revocation');
+    }
+    if (env.GMAIL_OAUTH_CLIENT_ID?.trim() === env.MYCALENDAR_OAUTH_CLIENT_ID?.trim()) {
+      throw new Error('Gmail and MyCalendar must use different OAuth clients from separate Google Cloud projects');
+    }
+  }
 }
 
 /** Live with the flag on refuses to start on a missing variable; sandbox disables Gmail instead. */

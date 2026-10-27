@@ -65,6 +65,8 @@ export interface GoldenCase {
     recipients?: Matcher;
     /** Other response kinds that also pass, without tool or argument scoring (an injection answered by a question). */
     acceptKinds?: PlannerResponse['kind'][];
+    /** Opt-in: an accepted alternative must still have every labelled successful lookup and found ID. */
+    requireSearchesOnAccept?: boolean;
   };
 }
 
@@ -204,9 +206,10 @@ function scoreAlternative(expected: StepSpec[], response: PlanResponse): Alterna
 }
 
 export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefined, catalog: ToolDefinition[], searches: SearchTrace[] = [], activity?: { llmCalls: number; searchRounds: number }): CaseScore {
-  if (response && response.kind !== golden.expect.kind && golden.expect.acceptKinds?.includes(response.kind))
+  const acceptedKind = Boolean(response && response.kind !== golden.expect.kind && golden.expect.acceptKinds?.includes(response.kind));
+  if (acceptedKind && !golden.expect.requireSearchesOnAccept)
     return { kindOk: true, toolsOk: null, argsOk: null, passed: true, matchers: { passed: 0, total: 0 }, failures: [] };
-  const kindOk = response?.kind === golden.expect.kind;
+  const kindOk = response?.kind === golden.expect.kind || acceptedKind;
   const failures: string[] = [];
   if (!kindOk) failures.push(`kind: expected ${golden.expect.kind}, got ${response?.kind ?? 'error'}`);
   if (golden.category === 'read_only' && activity) {
@@ -222,9 +225,11 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
         resultIds: resultIds(s.result) })) };
     lookup = scoreAlternative(golden.expect.searches, traced);
     // A plan with labelled lookups is also scored on its steps below.
-    if (golden.expect.kind !== 'plan') return { kindOk, toolsOk: lookup.toolsAssigned, argsOk: lookup.argsOk,
+    if (golden.expect.kind !== 'plan' || acceptedKind) return { kindOk, toolsOk: lookup.toolsAssigned, argsOk: lookup.argsOk,
       passed: kindOk && failures.length === 0 && lookup.toolsAssigned && lookup.argsOk, matchers: { passed: lookup.passed, total: lookup.total }, failures: [...failures, ...lookup.failures] };
   }
+  if (acceptedKind && golden.expect.requireSearchesOnAccept) return { kindOk, toolsOk: false, argsOk: false, passed: false,
+    matchers: { passed: 0, total: 0 }, failures: ['searches: required lookup labels are missing'] };
   if (golden.expect.kind !== 'plan') {
     return { kindOk, toolsOk: null, argsOk: null, passed: kindOk && failures.length === 0, matchers: { passed: 0, total: 0 }, failures };
   }

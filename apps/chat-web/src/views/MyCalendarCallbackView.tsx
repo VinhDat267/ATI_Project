@@ -71,11 +71,16 @@ export function MyCalendarCallbackView({
       }
     };
     window.addEventListener('storage', onStorage);
+    const cleanup = () => {
+      mounted.current = false;
+      unsubscribe();
+      window.removeEventListener('storage', onStorage);
+    };
 
     const live = () => mounted.current && !invalidated.current && owns.current();
     const data = callback.current;
 
-    if (executionStarted.current) return;
+    if (executionStarted.current) return cleanup;
     executionStarted.current = true;
 
     if (data?.mode === 'select') {
@@ -133,11 +138,7 @@ export function MyCalendarCallbackView({
       }
     }
 
-    return () => {
-      mounted.current = false;
-      unsubscribe();
-      window.removeEventListener('storage', onStorage);
-    };
+    return cleanup;
   }, []);
 
   const toggleCalendar = (id: string) => {
@@ -147,7 +148,7 @@ export function MyCalendarCallbackView({
   };
 
   const handleSave = async () => {
-    if (selectedIds.length === 0 || saving) return;
+    if (!mounted.current || invalidated.current || !owns.current() || selectedIds.length === 0 || saving) return;
     setSaving(true);
     setSaveError('');
     try {
@@ -157,7 +158,7 @@ export function MyCalendarCallbackView({
       const target = returnToRef.current ?? '/settings#mycalendar';
       navigate(target, true);
     } catch (err: any) {
-      if (mounted.current) {
+      if (mounted.current && !invalidated.current && owns.current()) {
         setSaveError(
           err?.data?.error ||
             err?.message ||

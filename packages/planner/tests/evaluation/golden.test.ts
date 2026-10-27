@@ -4,11 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ALL_TOOLS,
-  CALENDAR_SERVICE,
   MYCALENDAR_SERVICE,
   MYCALENDAR_TOOLS,
   SERVICE_REGISTRY,
-  SLACK_SERVICE,
 } from '@wap/tool-schemas';
 import { classifyIntent, routeIntent } from '../../src/router.js';
 
@@ -82,12 +80,13 @@ describe('evaluations/golden/cases-mycalendar.json schema and routing', () => {
     expect(personalCreates.map((c) => c.id)).toEqual(['mc01', 'mc02']);
 
     const sharedCalendar = cases.filter(
-      (c) =>
-        c.primaryService === 'calendar' &&
-        c.expect.steps?.some((s) => s.tool.startsWith('calendar.'))
+      (c) => c.primaryService === 'calendar'
     );
     expect(sharedCalendar).toHaveLength(2);
     expect(sharedCalendar.map((c) => c.id)).toEqual(['mc03', 'mc04']);
+    expect(sharedCalendar[1].expect.kind).toBe('clarification');
+    expect(sharedCalendar[1].category).toBe('read_only');
+    expect(sharedCalendar[1].expect.steps).toBeUndefined();
 
     const crossService = cases.filter(
       (c) =>
@@ -143,5 +142,45 @@ describe('evaluations/golden/cases-mycalendar.json schema and routing', () => {
     const route02 = routeIntent(cases[1].prompt, ALL_TOOLS, registryWithMyCal);
     expect(route02.services).toEqual([]);
     expect(route02.unavailable.map((u) => u.id)).toContain('mycalendar');
+  });
+
+  it.each([
+    'Create a meeting tomorrow at 3pm in my personal calendar',
+    'Create a meeting tomorrow at 3pm in my private calendar',
+    'Create a meeting tomorrow at 3pm in my Google Calendar',
+    'Read my personal calendar and post a recap to general channel',
+  ])('keeps English personal intent personal when connected or unavailable: %s', (prompt) => {
+    const expected = prompt.includes('channel') ? ['slack', 'mycalendar'] : ['mycalendar'];
+    expect(classifyIntent(prompt, catalogWithMyCal, registryWithMyCal)).toEqual(expected);
+    const unavailable = routeIntent(prompt, ALL_TOOLS, registryWithMyCal);
+    expect(unavailable.services).toEqual([]);
+    expect(unavailable.unavailable.map(service => service.id)).toEqual(['mycalendar']);
+  });
+
+  it('routes both injected-data recap requests to personal calendar and Slack', () => {
+    for (const golden of cases.filter(c => c.category === 'injection')) {
+      expect(classifyIntent(golden.prompt, catalogWithMyCal, registryWithMyCal)).toEqual(['slack', 'mycalendar']);
+    }
+  });
+
+  it.each(['Create a meeting tomorrow in the team calendar', 'Read the shared Google Calendar', 'Tạo sự kiện trên lịch chung của nhóm'])(
+    'keeps shared intent on shared Calendar: %s', (prompt) => {
+      expect(classifyIntent(prompt, catalogWithMyCal, registryWithMyCal)).toEqual(['calendar']);
+    });
+
+  it.each(['shared calendar', 'team calendar', 'group calendar', 'shared Google Calendar', 'team Google Calendar', 'group Google Calendar'])(
+    'retains both services for a mixed personal and %s request', (sharedCalendar) => {
+      const prompt = `Read my personal calendar then create an event in the ${sharedCalendar}`;
+      expect(classifyIntent(prompt, catalogWithMyCal, registryWithMyCal)).toEqual(['calendar', 'mycalendar']);
+      const sharedUnavailable = routeIntent(prompt, MYCALENDAR_TOOLS, registryWithMyCal);
+      expect(sharedUnavailable.services).toEqual([]);
+      expect(sharedUnavailable.unavailable.map(service => service.id)).toEqual(['calendar']);
+      expect(classifyIntent(prompt, ALL_TOOLS, SERVICE_REGISTRY)).toEqual(['calendar']);
+    });
+
+  it('keeps the disabled catalog and registry free of personal Calendar', () => {
+    expect(ALL_TOOLS.some(tool => tool.service === 'mycalendar')).toBe(false);
+    expect(SERVICE_REGISTRY.some(service => service.id === 'mycalendar')).toBe(false);
+    expect(SERVICE_REGISTRY.find(service => service.id === 'calendar')?.connection).not.toBe('personal');
   });
 });

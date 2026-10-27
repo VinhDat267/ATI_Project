@@ -67,14 +67,17 @@ export async function startFakeGoogleGmail(options = {}) {
   const accessTokens = new Map();
   const hanging = new Set();
   const hang = (response) => { hanging.add(response); response.on('close', () => hanging.delete(response)); };
-  const issueAccessToken = (account) => {
+  // Clients in the same project share revocation, as Google's real OAuth endpoint does.
+  const projectFor = (id) => options.clientProjects?.[id]
+    ?? (id === 'mycalendar-test.apps.googleusercontent.com' ? 'fake-calendar-project' : 'fake-gmail-project');
+  const issueAccessToken = (account, tokenClientId = clientId) => {
     const token = `${settings.accessTokenPrefix}-${random()}`;
-    accessTokens.set(token, { email: account, expiresAt: now() + settings.accessTokenTtlSeconds * 1000 });
+    accessTokens.set(token, { email: account, clientId: tokenClientId, projectId: projectFor(tokenClientId), expiresAt: now() + settings.accessTokenTtlSeconds * 1000 });
     return token;
   };
-  const mintRefreshToken = (account = settings.email, scopes = settings.grantedScopes) => {
+  const mintRefreshToken = (account = settings.email, scopes = settings.grantedScopes, tokenClientId = clientId) => {
     const token = `1//fake-${random()}`;
-    refreshTokens.set(token, { email: account, revoked: false, scopes });
+    refreshTokens.set(token, { email: account, clientId: tokenClientId, projectId: projectFor(tokenClientId), revoked: false, scopes });
     return token;
   };
   const isAllowedRedirect = (uri) => {
@@ -106,7 +109,7 @@ export async function startFakeGoogleGmail(options = {}) {
         const code = random();
         const granted = scopes.filter((s) => (settings.grantedScopes ?? []).includes(s));
         const finalScopes = granted.length > 0 ? granted : (settings.grantedScopes ?? scopes);
-        codes.set(code, { challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000, redirectUri: reqRedirectUri, scopes: finalScopes });
+        codes.set(code, { clientId: params.get('client_id'), challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000, redirectUri: reqRedirectUri, scopes: finalScopes });
         const callback = new URL(reqRedirectUri);
         callback.searchParams.set('state', params.get('state'));
         callback.searchParams.set('code', code);
@@ -131,15 +134,15 @@ export async function startFakeGoogleGmail(options = {}) {
           if (settings.exchange === 'hang') return hang(response);
           const entry = codes.get(params.get('code'));
           const verifier = params.get('code_verifier') ?? '';
-          if (!entry || entry.expiresAt <= now() || (entry.redirectUri && params.get('redirect_uri') !== entry.redirectUri)
+          if (!entry || entry.clientId !== reqClientId || entry.expiresAt <= now() || (entry.redirectUri && params.get('redirect_uri') !== entry.redirectUri)
             || !equal(createHash('sha256').update(verifier).digest('base64url'), entry.challenge)) {
             return json(response, 400, { error: 'invalid_grant' });
           }
           codes.delete(params.get('code'));
           const granted = entry.scopes?.length ? entry.scopes : settings.grantedScopes;
-          const body = { access_token: issueAccessToken(entry.email), expires_in: settings.accessTokenTtlSeconds,
+          const body = { access_token: issueAccessToken(entry.email, reqClientId), expires_in: settings.accessTokenTtlSeconds,
             scope: granted.join(' '), token_type: 'Bearer' };
-          if (settings.issueRefreshToken) body.refresh_token = mintRefreshToken(entry.email, granted);
+          if (settings.issueRefreshToken) body.refresh_token = mintRefreshToken(entry.email, granted, reqClientId);
           return json(response, 200, body);
         }
         if (params.get('grant_type') === 'refresh_token') {
@@ -148,9 +151,9 @@ export async function startFakeGoogleGmail(options = {}) {
           if (settings.refresh === 'hang') return hang(response);
           if (settings.refresh === 'server_error') return json(response, 503, { error: 'backend_error' });
           const entry = refreshTokens.get(params.get('refresh_token'));
-          if (settings.refresh === 'invalid_grant' || !entry || entry.revoked) return json(response, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
+          if (settings.refresh === 'invalid_grant' || !entry || entry.revoked || entry.clientId !== reqClientId) return json(response, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
           const granted = entry.scopes?.length ? entry.scopes : settings.grantedScopes;
-          return json(response, 200, { access_token: issueAccessToken(entry.email), expires_in: settings.accessTokenTtlSeconds,
+          return json(response, 200, { access_token: issueAccessToken(entry.email, reqClientId), expires_in: settings.accessTokenTtlSeconds,
             scope: granted.join(' '), token_type: 'Bearer' });
         }
         return json(response, 400, { error: 'unsupported_grant_type' });
@@ -161,10 +164,14 @@ export async function startFakeGoogleGmail(options = {}) {
         if (settings.revoke === 'server_error') return json(response, 503, { error: 'backend_error' });
         const params = await form(request);
         const token = params?.get('token') ?? '';
-        const entry = refreshTokens.get(token);
-        if (entry) entry.revoked = true;
-        else if (accessTokens.has(token)) accessTokens.delete(token);
-        else return json(response, 400, { error: 'invalid_token' });
+        const entry = refreshTokens.get(token) ?? accessTokens.get(token);
+        if (!entry) return json(response, 400, { error: 'invalid_token' });
+        for (const grant of refreshTokens.values()) {
+          if (grant.email === entry.email && grant.projectId === entry.projectId) grant.revoked = true;
+        }
+        for (const [accessToken, grant] of accessTokens) {
+          if (grant.email === entry.email && grant.projectId === entry.projectId) accessTokens.delete(accessToken);
+        }
         return json(response, 200, {});
       }
       if (request.method === 'GET' && url.pathname === '/gmail/v1/users/me/profile') {

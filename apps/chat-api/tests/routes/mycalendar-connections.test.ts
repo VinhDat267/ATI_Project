@@ -13,6 +13,7 @@ import { GmailConnectionRepo } from '../../src/db/repositories/gmail-connection-
 import { GmailTokenManager } from '../../src/services/gmail/token-manager.js';
 import { GmailOAuthClient } from '../../src/services/gmail/oauth-client.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
+import { createGmailConnectionRoutes } from '../../src/routes/connections/gmail.js';
 import {
   createMyCalendarConnectionRoutes,
   isMyCalendarAvailable,
@@ -150,6 +151,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
   describe('validateEnv rules for MYCALENDAR_ENABLED', () => {
     const base = {
       MYCALENDAR_ENABLED: 'on',
+      MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar-test',
       MYCALENDAR_OAUTH_CLIENT_ID: 'cal-client',
       MYCALENDAR_OAUTH_CLIENT_SECRET: 'cal-secret',
       MYCALENDAR_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/mycalendar/callback',
@@ -550,6 +552,37 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
   });
 
   describe('DELETE / and cross-service isolation with Gmail', () => {
+    it.each(['gmail', 'mycalendar'] as const)('disconnecting %s preserves a refreshable grant of the other service for the same Google account', async (disconnecting) => {
+      google.settings.grantedScopes = ['https://www.googleapis.com/auth/gmail.modify', ...MYCALENDAR_SCOPE.split(' ')];
+      const gmailOAuth = {
+        clientId: 'gmail-test.apps.googleusercontent.com', clientSecret: 'fake-gmail-secret',
+        redirectUri: 'http://127.0.0.1:5174/connections/gmail/callback', ...google.endpoints,
+      };
+      const app = build();
+      app.use('/api/connections/gmail', createGmailConnectionRoutes({
+        jwtSecret: secret, sessionRepo: db.users.sessions, states: db.users.googleAuth,
+        credentialRepo: credentials, repo: gmailRepo, oauth: gmailOAuth, encryptionKey: key, clock: () => now,
+      }));
+      for (const service of ['gmail', 'mycalendar']) {
+        const begun = await request(app).post(`/api/connections/${service}/start`).set('Authorization', bearer(alice));
+        expect(begun.status).toBe(200);
+        const cookie = (begun.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+        const grant = await authorize(new URL(begun.body.url));
+        const connected = await request(app).post(`/api/connections/${service}/callback`)
+          .set('Authorization', bearer(alice)).set('Cookie', cookie).send(grant);
+        expect(connected.status).toBe(200);
+      }
+      const remaining = disconnecting === 'gmail' ? 'mycalendar' : 'gmail';
+      const before = (await credentials.getPersonalConnectionStatus(remaining, alice.id))!;
+      const beforeConfig = decryptCredentials(before.config, key);
+      expect(beforeConfig.email).toBe(google.settings.email);
+      expect((await request(app).delete(`/api/connections/${disconnecting}`).set('Authorization', bearer(alice))).status).toBe(200);
+      expect(await credentials.getPersonalConnectionStatus(disconnecting, alice.id)).toBeNull();
+      expect(await credentials.getPersonalConnectionStatus(remaining, alice.id)).toEqual(before);
+      const survivingClient = new GmailOAuthClient(remaining === 'gmail' ? gmailOAuth : oauth());
+      await expect(survivingClient.refresh(String(beforeConfig.refreshToken), AbortSignal.timeout(2000))).resolves.toHaveProperty('accessToken');
+    });
+
     it('revokes the mycalendar token, deletes the mycalendar row, leaving gmail row active and untouched', async () => {
       const app = build();
       await connect(app, alice);

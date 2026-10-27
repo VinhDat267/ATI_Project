@@ -141,6 +141,7 @@ test('MYCALENDAR: Flow 2 - disconnect, connect from chat refusal, plan and recei
   // PlanMoment displays plan with resolved calendar and connected account
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
   await expect(page.getByText(/Google Calendar của bạn\)/i)).toBeVisible();
+  const approvedAccount = await page.getByText(/^Tài khoản: .+ \(Google Calendar của bạn\)$/).innerText();
   await expect(page.locator('#plan-cards-container p').filter({ hasText: 'Đích đến:' })).toContainText('Lịch việc riêng');
 
   // Approve plan
@@ -148,6 +149,7 @@ test('MYCALENDAR: Flow 2 - disconnect, connect from chat refusal, plan and recei
 
   // ReceiptMoment renders
   await expect(page.locator('#moment-6')).toBeVisible();
+  await expect(page.locator('#moment-6').getByText(approvedAccount, { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Mở sự kiện trên Google Calendar' })).toBeVisible();
 
   expect(pageErrors).toEqual([]);
