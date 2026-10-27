@@ -3,10 +3,25 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
 export const GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
+export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const defaults = {
   clientId: 'gmail-test.apps.googleusercontent.com', clientSecret: 'fake-gmail-secret',
   redirectUri: 'http://127.0.0.1:5174/connections/gmail/callback', email: 'gmail-owner@example.test',
 };
+const defaultRedirectUris = [
+  'http://127.0.0.1:5174/connections/gmail/callback',
+  'http://127.0.0.1:5174/connections/mycalendar/callback',
+  'http://localhost:5174/connections/gmail/callback',
+  'http://localhost:5174/connections/mycalendar/callback',
+];
+function defaultCalendars(email = defaults.email) {
+  return [
+    { id: email, summary: 'Lịch chính', timeZone: 'Asia/Ho_Chi_Minh', primary: true, accessRole: 'owner' },
+    { id: 'c_work@group.calendar.google.com', summary: 'Lịch việc riêng', timeZone: 'Asia/Ho_Chi_Minh', accessRole: 'writer' },
+    { id: 'vi.vietnamese@holiday.calendar.google.com', summary: 'Ngày lễ Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', accessRole: 'reader' },
+  ];
+}
 const equal = (a, b) => typeof a === 'string' && typeof b === 'string'
   && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const json = (response, status, body) => {
@@ -44,7 +59,7 @@ export async function startFakeGoogleGmail(options = {}) {
   const settings = {
     email, grantedScopes: [GMAIL_MODIFY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
     accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
-    threads: defaultThreads(), apiResponses: [], ...options.settings,
+    threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], apiResponses: [], ...options.settings,
   };
   const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0, apiRequests: [], writes: 0 };
   const codes = new Map();
@@ -62,6 +77,13 @@ export async function startFakeGoogleGmail(options = {}) {
     refreshTokens.set(token, { email: account, revoked: false });
     return token;
   };
+  const isAllowedRedirect = (uri) => {
+    if (!uri) return false;
+    if (uri === redirectUri) return true;
+    if (Array.isArray(options.redirectUris) && options.redirectUris.includes(uri)) return true;
+    return defaultRedirectUris.includes(uri);
+  };
+  const isAllowedClient = (id) => id === clientId || id === 'mycalendar-test.apps.googleusercontent.com' || (Array.isArray(options.clientIds) && options.clientIds.includes(id));
 
   const server = createServer(async (request, response) => {
     try {
@@ -71,24 +93,33 @@ export async function startFakeGoogleGmail(options = {}) {
         stats.authorizations++;
         const params = url.searchParams;
         const scopes = (params.get('scope') ?? '').split(' ');
-        if (params.get('client_id') !== clientId || params.get('redirect_uri') !== redirectUri || params.get('response_type') !== 'code'
+        const reqRedirectUri = params.get('redirect_uri');
+        const hasValidScope = scopes.includes(GMAIL_MODIFY_SCOPE)
+          || (scopes.includes(CALENDAR_EVENTS_SCOPE) && scopes.includes(CALENDAR_READONLY_SCOPE))
+          || scopes.some(s => s.includes('calendar'));
+        if (!isAllowedClient(params.get('client_id')) || !isAllowedRedirect(reqRedirectUri) || params.get('response_type') !== 'code'
           || params.get('code_challenge_method') !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(params.get('code_challenge') ?? '')
-          || !scopes.includes(GMAIL_MODIFY_SCOPE) || params.get('access_type') !== 'offline' || params.get('prompt') !== 'consent'
+          || !hasValidScope || params.get('access_type') !== 'offline' || params.get('prompt') !== 'consent'
           || !params.get('state') || params.get('state').length > 1024) {
           return json(response, 400, { error: 'invalid_request' });
         }
         const code = random();
-        codes.set(code, { challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000 });
-        const callback = new URL(redirectUri);
+        codes.set(code, { challenge: params.get('code_challenge'), email: settings.email, expiresAt: now() + 600_000, redirectUri: reqRedirectUri });
+        const callback = new URL(reqRedirectUri);
         callback.searchParams.set('state', params.get('state'));
         callback.searchParams.set('code', code);
-        callback.searchParams.set('scope', settings.grantedScopes.join(' '));
+        callback.searchParams.set('scope', (settings.grantedScopes ?? scopes).join(' '));
         response.writeHead(302, { Location: callback.href, 'Cache-Control': 'no-store' });
         return response.end();
       }
       if (request.method === 'POST' && url.pathname === '/token') {
         const params = await form(request);
-        if (!params || !equal(params.get('client_id'), clientId) || !equal(params.get('client_secret'), clientSecret)) {
+        const reqClientId = params?.get('client_id');
+        const reqClientSecret = params?.get('client_secret');
+        const clientValid = (equal(reqClientId, clientId) && equal(reqClientSecret, clientSecret))
+          || (reqClientId === 'mycalendar-test.apps.googleusercontent.com' && equal(reqClientSecret, 'fake-mycalendar-secret'))
+          || (isAllowedClient(reqClientId) && equal(reqClientSecret, clientSecret));
+        if (!params || !clientValid) {
           return json(response, 401, { error: 'invalid_client' });
         }
         if (params.get('grant_type') === 'authorization_code') {
@@ -98,7 +129,7 @@ export async function startFakeGoogleGmail(options = {}) {
           if (settings.exchange === 'hang') return hang(response);
           const entry = codes.get(params.get('code'));
           const verifier = params.get('code_verifier') ?? '';
-          if (!entry || entry.expiresAt <= now() || params.get('redirect_uri') !== redirectUri
+          if (!entry || entry.expiresAt <= now() || (entry.redirectUri && params.get('redirect_uri') !== entry.redirectUri)
             || !equal(createHash('sha256').update(verifier).digest('base64url'), entry.challenge)) {
             return json(response, 400, { error: 'invalid_grant' });
           }
@@ -171,6 +202,55 @@ export async function startFakeGoogleGmail(options = {}) {
             labelIds: [...new Set([...(message.labelIds ?? []).filter(id => !body.removeLabelIds?.includes(id)), ...(body.addLabelIds ?? [])])],
           })) });
           return json(response, 200, match[2] === 'trash' ? { id: thread.id } : thread);
+        }
+      }
+      if (url.pathname === '/calendar/v3/users/me/calendarList') {
+        stats.apiRequests.push({ method: request.method, path: 'calendarList', query: Object.fromEntries(url.searchParams) });
+        if (settings.calendarList === 'server_error') return json(response, 500, { error: { code: 500 } });
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, status: 'UNAUTHENTICATED' } });
+        const email = entry.email || settings.email;
+        const items = settings.calendars.map(c => c.primary ? { ...c, id: email } : c);
+        return json(response, 200, { kind: 'calendar#calendarList', items });
+      }
+      if (url.pathname.startsWith('/calendar/v3/calendars/')) {
+        const sub = url.pathname.slice('/calendar/v3/calendars/'.length);
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, status: 'UNAUTHENTICATED' } });
+
+        const eventsMatch = /^([^/]+)\/events(?:\/(.+))?$/.exec(sub);
+        if (eventsMatch) {
+          const calId = decodeURIComponent(eventsMatch[1]);
+          if (request.method === 'GET' && !eventsMatch[2]) {
+            stats.apiRequests.push({ method: 'GET', path: `calendars/${calId}/events`, query: Object.fromEntries(url.searchParams) });
+            return json(response, 200, { kind: 'calendar#events', items: settings.calendarEvents ?? [] });
+          }
+          if (request.method === 'POST' && !eventsMatch[2]) {
+            let raw = ''; for await (const chunk of request) raw += chunk;
+            const body = JSON.parse(raw || '{}');
+            stats.writes++;
+            stats.apiRequests.push({ method: 'POST', path: `calendars/${calId}/events`, query: Object.fromEntries(url.searchParams), body });
+            const id = `event-${stats.writes}`;
+            return json(response, 200, {
+              id,
+              summary: body.summary,
+              description: body.description,
+              start: body.start,
+              end: body.end,
+              location: body.location,
+              htmlLink: `https://calendar.google.com/event?eid=${id}`,
+            });
+          }
+        } else {
+          const calId = decodeURIComponent(sub);
+          stats.apiRequests.push({ method: request.method, path: `calendars/${calId}`, query: Object.fromEntries(url.searchParams) });
+          const email = entry.email || settings.email;
+          const items = settings.calendars.map(c => c.primary ? { ...c, id: email } : c);
+          const found = items.find(c => c.id === calId || (c.primary && (calId === 'primary' || calId === email)));
+          if (!found) return json(response, 404, { error: { code: 404, message: 'Not Found' } });
+          return json(response, 200, { id: found.id, summary: found.summary, timeZone: found.timeZone, ...(found.primary ? { primary: true } : {}) });
         }
       }
       return json(response, 404, { error: 'not_found' });

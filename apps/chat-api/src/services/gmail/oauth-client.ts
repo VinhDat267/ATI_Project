@@ -1,3 +1,4 @@
+import { CALENDAR_ID_PATTERN, type PersonalCalendarItem } from '@wap/tool-schemas';
 import type { GmailOAuthConfig } from '../../config/env.js';
 
 /** Failure kinds of a Google request. Messages never contain tokens, codes or verifiers. */
@@ -45,6 +46,51 @@ export class GmailOAuthClient {
     const email = typeof body?.emailAddress === 'string' ? body.emailAddress.trim().toLowerCase() : '';
     if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email) || email.length > 320) throw new GmailOAuthError('server');
     return email;
+  }
+
+  /** Discovers writable Google Calendars and the owner's primary email address (OAUTH-02). */
+  async writableCalendars(accessToken: string, signal: AbortSignal): Promise<{ email: string; calendars: PersonalCalendarItem[] }> {
+    const body = await this.send(`${this.config.apiBaseUrl}/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    });
+    const items = Array.isArray(body?.items) ? body.items : [];
+    const writable: PersonalCalendarItem[] = [];
+    let primaryEmail = '';
+
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const role = item.accessRole;
+      if (role !== 'owner' && role !== 'writer') continue;
+      const id = typeof item.id === 'string' ? item.id.trim() : '';
+      const summary = typeof item.summary === 'string' ? item.summary.trim() : '';
+      const timeZone = typeof item.timeZone === 'string' ? item.timeZone.trim() : '';
+      if (!id || !CALENDAR_ID_PATTERN.test(id) || !summary || !timeZone) continue;
+      const isPrimary = item.primary === true;
+      if (isPrimary && !primaryEmail) {
+        const lower = id.toLowerCase();
+        if (/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(lower) && lower.length <= 320) {
+          primaryEmail = lower;
+        }
+      }
+      writable.push({
+        id,
+        summary,
+        timeZone,
+        ...(isPrimary ? { primary: true } : {}),
+      });
+    }
+
+    if (!primaryEmail) throw new GmailOAuthError('server');
+
+    writable.sort((a, b) => {
+      if (a.primary && !b.primary) return -1;
+      if (!a.primary && b.primary) return 1;
+      return a.summary.localeCompare(b.summary, 'vi');
+    });
+
+    return { email: primaryEmail, calendars: writable };
   }
 
   private post(url: string, fields: Record<string, string>, signal: AbortSignal) {

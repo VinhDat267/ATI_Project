@@ -19,6 +19,14 @@ export const GMAIL_ENDPOINTS = {
 };
 const GMAIL_ENDPOINT_OVERRIDES = { authorizationUrl: 'GMAIL_OAUTH_AUTH_URL', tokenUrl: 'GMAIL_OAUTH_TOKEN_URL', revokeUrl: 'GMAIL_OAUTH_REVOKE_URL', apiBaseUrl: 'GMAIL_API_BASE_URL' } as const;
 
+export const MYCALENDAR_ENDPOINTS = {
+  authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  revokeUrl: 'https://oauth2.googleapis.com/revoke',
+  apiBaseUrl: 'https://www.googleapis.com',
+};
+const MYCALENDAR_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYCALENDAR_OAUTH_AUTH_URL', tokenUrl: 'MYCALENDAR_OAUTH_TOKEN_URL', revokeUrl: 'MYCALENDAR_OAUTH_REVOKE_URL', apiBaseUrl: 'MYCALENDAR_API_BASE_URL' } as const;
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -40,6 +48,10 @@ export interface EnvConfig {
   GMAIL_ENABLED: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   GMAIL_OAUTH?: GmailOAuthConfig;
+  /** The MYCALENDAR_ENABLED flag (default off). Personal Calendar is usable only with MYCALENDAR_OAUTH and PostgreSQL as well. */
+  MYCALENDAR_ENABLED: boolean;
+  /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
+  MYCALENDAR_OAUTH?: GmailOAuthConfig;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -166,6 +178,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.GMAIL_ENABLED && !['on', 'off'].includes(env.GMAIL_ENABLED)) throw new Error('GMAIL_ENABLED must be on or off');
   const GMAIL_ENABLED = env.GMAIL_ENABLED === 'on';
   const GMAIL_OAUTH = GMAIL_ENABLED ? gmailOAuth(env, isLive) : undefined;
+  if (env.MYCALENDAR_ENABLED && !['on', 'off'].includes(env.MYCALENDAR_ENABLED)) throw new Error('MYCALENDAR_ENABLED must be on or off');
+  const MYCALENDAR_ENABLED = env.MYCALENDAR_ENABLED === 'on';
+  const MYCALENDAR_OAUTH = MYCALENDAR_ENABLED ? mycalendarOAuth(env, isLive) : undefined;
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
 
@@ -185,6 +200,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     GOOGLE_OAUTH,
     GMAIL_ENABLED,
     GMAIL_OAUTH,
+    MYCALENDAR_ENABLED,
+    MYCALENDAR_OAUTH,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -225,4 +242,35 @@ function gmailOAuth(env: Record<string, string | undefined>, isLive: boolean): G
   }
   if (missing || !redirectUri) return undefined;
   return { clientId: env.GMAIL_OAUTH_CLIENT_ID!.trim(), clientSecret: env.GMAIL_OAUTH_CLIENT_SECRET!.trim(), redirectUri, ...endpoints };
+}
+
+/** Live with the flag on refuses to start on a missing variable; sandbox disables MyCalendar instead. */
+function mycalendarOAuth(env: Record<string, string | undefined>, isLive: boolean): GmailOAuthConfig | undefined {
+  const required = ['MYCALENDAR_OAUTH_CLIENT_ID', 'MYCALENDAR_OAUTH_CLIENT_SECRET', 'MYCALENDAR_OAUTH_REDIRECT_URI'];
+  const missing = required.find((field) => !env[field]?.trim());
+  if (missing && isLive) throw new Error(`${missing} is required when MYCALENDAR_ENABLED=on in live mode`);
+  let redirectUri: string | undefined;
+  if (env.MYCALENDAR_OAUTH_REDIRECT_URI?.trim()) {
+    try {
+      const url = new URL(env.MYCALENDAR_OAUTH_REDIRECT_URI.trim());
+      const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+      if (!['http:', 'https:'].includes(url.protocol) || (isLive && url.protocol !== 'https:' && !loopback)
+        || url.username || url.password || url.pathname !== '/connections/mycalendar/callback' || url.search || url.hash) throw new Error();
+      redirectUri = url.href;
+    } catch { throw new Error('MYCALENDAR_OAUTH_REDIRECT_URI must be the web /connections/mycalendar/callback URL without query, fragment or credentials (HTTPS in live, or loopback HTTP)'); }
+  }
+  // Live always talks to Google; elsewhere every endpoint must point at a stand-in, so a sandbox never reaches Google.
+  const endpoints = { ...MYCALENDAR_ENDPOINTS };
+  if (!isLive) {
+    for (const [key, field] of Object.entries(MYCALENDAR_ENDPOINT_OVERRIDES)) {
+      if (!env[field]?.trim()) return undefined;
+      try {
+        const url = new URL(env[field]!.trim());
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
+      } catch { throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`); }
+    }
+  }
+  if (missing || !redirectUri) return undefined;
+  return { clientId: env.MYCALENDAR_OAUTH_CLIENT_ID!.trim(), clientSecret: env.MYCALENDAR_OAUTH_CLIENT_SECRET!.trim(), redirectUri, ...endpoints };
 }

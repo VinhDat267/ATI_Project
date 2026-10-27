@@ -9,7 +9,17 @@ const SERVICE = 'gmail';
  * finishes after "disconnect" or after logout cannot bring the connection back.
  */
 export class GmailConnectionRepo {
-  constructor(private pool: pg.Pool) {}
+  readonly service: 'gmail' | 'mycalendar';
+  readonly mode: 'connect_gmail' | 'connect_mycalendar';
+
+  constructor(
+    private pool: pg.Pool,
+    service: 'gmail' | 'mycalendar' = 'gmail',
+    mode: 'connect_gmail' | 'connect_mycalendar' = 'connect_gmail'
+  ) {
+    this.service = service;
+    this.mode = mode;
+  }
 
   /**
    * Saves only while the consumed state still exists and its session is active.
@@ -21,7 +31,7 @@ export class GmailConnectionRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [SERVICE, userId]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [this.service, userId]);
       const owner = await client.query("SELECT id FROM users WHERE id=$1 AND status='active' FOR UPDATE", [userId]);
       if (!owner.rows.length) {
         await client.query('ROLLBACK');
@@ -29,14 +39,14 @@ export class GmailConnectionRepo {
       }
       const live = await client.query<{ expires_at: Date }>(`SELECT s.expires_at FROM oauth_states o
         JOIN auth_sessions s ON s.id = o.session_id AND s.user_id = o.user_id
-        WHERE o.id = $1 AND o.user_id = $2 AND o.mode = 'connect_gmail' AND o.used_at IS NOT NULL
-          AND s.revoked_at IS NULL FOR UPDATE OF s`, [stateId, userId]);
+        WHERE o.id = $1 AND o.user_id = $2 AND o.mode = $3 AND o.used_at IS NOT NULL
+          AND s.revoked_at IS NULL FOR UPDATE OF s`, [stateId, userId, this.mode]);
       if (!live.rows.length) {
         await client.query('ROLLBACK');
         return null;
       }
-      await client.query("DELETE FROM oauth_states WHERE user_id = $1 AND mode = 'connect_gmail'", [userId]);
-      await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2', [SERVICE, userId]);
+      await client.query('DELETE FROM oauth_states WHERE user_id = $1 AND mode = $2', [userId, this.mode]);
+      await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2', [this.service, userId]);
       // Any row lock, including the credential DELETE, can cross expiry. Check
       // just before INSERT; rollback also restores the old credential and states.
       const checkedAt = typeof now === 'function' ? now() : now;
@@ -45,7 +55,7 @@ export class GmailConnectionRepo {
         return null;
       }
       const row = (await client.query<ServiceCredentialRow>(
-        'INSERT INTO service_credentials (service, user_id, config) VALUES ($1, $2, $3) RETURNING *', [SERVICE, userId, config])).rows[0]!;
+        'INSERT INTO service_credentials (service, user_id, config) VALUES ($1, $2, $3) RETURNING *', [this.service, userId, config])).rows[0]!;
       await client.query('COMMIT');
       return row;
     } catch (error) {
@@ -62,14 +72,14 @@ export class GmailConnectionRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [SERVICE, userId]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [this.service, userId]);
       // The OAuth-state user FK takes a key-share lock on INSERT, so this also
       // prevents a new flow from beginning during the grant cleanup decision.
       await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
       const current = (await client.query<ServiceCredentialRow>(
-        'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2 FOR UPDATE', [SERVICE, userId])).rows[0] ?? null;
-      const otherFlows = (await client.query(`SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode='connect_gmail'
-        AND id IS DISTINCT FROM $2::uuid LIMIT 1`, [userId, ignoredStateId ?? null])).rows.length > 0;
+        'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2 FOR UPDATE', [this.service, userId])).rows[0] ?? null;
+      const otherFlows = (await client.query(`SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode=$2
+        AND id IS DISTINCT FROM $3::uuid LIMIT 1`, [userId, this.mode, ignoredStateId ?? null])).rows.length > 0;
       await action(current, otherFlows);
       await client.query('COMMIT');
     } catch (error) {
@@ -80,17 +90,58 @@ export class GmailConnectionRepo {
     }
   }
 
-  /** Deletes the connection and every connect_gmail state of the owner; returns the removed row for token revocation. */
+  /** Deletes the connection and every state of the owner in this mode; returns the removed row for token revocation. */
   async disconnect(userId: string): Promise<ServiceCredentialRow | null> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [SERVICE, userId]);
-      await client.query("DELETE FROM oauth_states WHERE user_id = $1 AND mode = 'connect_gmail'", [userId]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [this.service, userId]);
+      await client.query('DELETE FROM oauth_states WHERE user_id = $1 AND mode = $2', [userId, this.mode]);
       const removed = (await client.query<ServiceCredentialRow>(
-        'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2 RETURNING *', [SERVICE, userId])).rows[0] ?? null;
+        'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2 RETURNING *', [this.service, userId])).rows[0] ?? null;
       await client.query('COMMIT');
       return removed;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Updates an active credential's config under the service advisory lock, verifying
+   * expectedCredentialId so concurrent reconnect or disconnect returns null.
+   */
+  async updateConfigIfActive(
+    userId: string,
+    expectedCredentialId: string,
+    transform: (config: string) => string
+  ): Promise<ServiceCredentialRow | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [this.service, userId]);
+      const owner = await client.query("SELECT id FROM users WHERE id=$1 AND status='active' FOR UPDATE", [userId]);
+      if (!owner.rows.length) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const current = (await client.query<ServiceCredentialRow>(
+        'SELECT * FROM service_credentials WHERE id = $1 AND service = $2 AND user_id = $3 AND status = $4 FOR UPDATE',
+        [expectedCredentialId, this.service, userId, 'active']
+      )).rows[0];
+      if (!current) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const newConfig = transform(current.config);
+      const updated = (await client.query<ServiceCredentialRow>(
+        'UPDATE service_credentials SET config = $1 WHERE id = $2 RETURNING *',
+        [newConfig, expectedCredentialId]
+      )).rows[0] ?? null;
+      await client.query('COMMIT');
+      return updated;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
