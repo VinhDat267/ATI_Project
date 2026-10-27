@@ -164,7 +164,8 @@ export class ChatService {
       return {
         kind: 'refusal',
         reason: reasons.join(' '),
-        suggestion: 'Hãy kết nối dịch vụ ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
+        // Gmail alone keeps the sentence it had before MyCalendar.
+        suggestion: `Hãy kết nối ${unavailableServices.length === 1 && unavailableServices[0]!.id === 'gmail' ? 'Gmail' : 'dịch vụ'} ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.`,
         unavailableServices,
       };
     }

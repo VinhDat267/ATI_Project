@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, SERVICE_REGISTRY, type AllowedScope, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -6,33 +6,6 @@ import type { AdapterContext } from '../services/adapter-factory.js';
 import { getToolCatalogFor } from '../services/registered-services.js';
 import { createSandboxAdapter } from '../sandbox/index.js';
 import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.js';
-
-export const isGmailEnabled = (env: { GMAIL_ENABLED?: string | boolean } = process.env) =>
-  env.GMAIL_ENABLED === 'on' || env.GMAIL_ENABLED === true;
-
-export const isMyCalendarEnabled = (env: { MYCALENDAR_ENABLED?: string | boolean } = process.env) =>
-  env.MYCALENDAR_ENABLED === 'on' || env.MYCALENDAR_ENABLED === true;
-
-export function filterToolCatalogForRuntime(
-  catalog: ToolDefinition[],
-  env: { GMAIL_ENABLED?: string | boolean; MYCALENDAR_ENABLED?: string | boolean } = process.env,
-): ToolDefinition[] {
-  let filtered = catalog;
-  if (!isGmailEnabled(env)) {
-    filtered = filtered.filter((tool) => !tool.name.startsWith('gmail.'));
-  }
-  if (!isMyCalendarEnabled(env)) {
-    filtered = filtered.filter((tool) => !tool.name.startsWith('mycalendar.'));
-  }
-  return filtered;
-}
-
-export function filterToolCatalogForGmail(
-  catalog: ToolDefinition[],
-  env: { GMAIL_ENABLED?: string | boolean; MYCALENDAR_ENABLED?: string | boolean } = process.env,
-): ToolDefinition[] {
-  return filterToolCatalogForRuntime(catalog, env);
-}
 
 export const serviceRegistryForRuntime = (gmailEnabled: boolean, mycalendarEnabled: boolean = false) => [
   ...SERVICE_REGISTRY,
@@ -65,6 +38,11 @@ export function runtimeGmailAdapter(mode: RuntimeMode, tokens: GmailAccessTokenP
   return mode === 'live' ? createGmailToolAdapter({ tokens, baseUrl }) : createSandboxAdapter('gmail');
 }
 
+/**
+ * Unlike Gmail, every mode uses the HTTP adapter: outside live, env.ts accepts
+ * MYCALENDAR_OAUTH only with every endpoint pointing at a fake, so a sandbox
+ * reaches the fake Calendar server (scripts/fake-google-gmail.mjs), never Google.
+ */
 export function runtimeMyCalendarAdapter(
   _mode: RuntimeMode,
   input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope },

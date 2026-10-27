@@ -191,6 +191,65 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(result.kind).toBe('refusal');
       expect(result.unavailableServices).toEqual([{ id: 'mycalendar', name: 'Google Calendar của bạn' }]);
     });
+
+    // A calendarId from an earlier step is not a literal, so the out-of-scope check cannot catch it; only the lookup can.
+    it('ChatService.bindConnections refuses a scope_required connection even when calendarId comes from a $ref', async () => {
+      await connectMyCalendar(alice, 'alice@example.com', []);
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mycalendarConnection: createMyCalendarConnectionLookup(credentials, key),
+      });
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tạo sự kiện',
+        summary: 'Tạo sự kiện lịch cá nhân',
+        steps: [
+          { id: 's1', tool: 'mycalendar.list_calendars', description: 'Tìm lịch', args: { query: '' }, dependsOn: [] },
+          {
+            id: 's2',
+            tool: 'mycalendar.create_event',
+            description: 'Tạo sự kiện',
+            args: { calendarId: { $ref: 's1.output[0].id' }, summary: 'Họp', start: '2026-10-28T09:00:00Z', end: '2026-10-28T10:00:00Z' },
+            dependsOn: ['s1'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result).toEqual({
+        kind: 'refusal',
+        reason: 'Google Calendar của bạn chưa được kết nối hoặc chưa chọn lịch.',
+        suggestion: 'Hãy kết nối dịch vụ ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
+        unavailableServices: [{ id: 'mycalendar', name: 'Google Calendar của bạn' }],
+      });
+    });
+
+    it('ChatService.bindConnections keeps the Gmail-only refusal exactly as before MyCalendar', async () => {
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        gmailConnection: async () => null,
+      });
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Gửi thư',
+        summary: 'Gửi thư',
+        steps: [{ id: 's1', tool: 'gmail.send_message', description: 'Gửi thư', args: { to: ['a@example.com'], subject: 'Chào', body: 'Chào' }, dependsOn: [] }],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result).toEqual({
+        kind: 'refusal',
+        reason: 'Gmail chưa được kết nối hoặc cần kết nối lại.',
+        suggestion: 'Hãy kết nối Gmail ở mục "Của riêng bạn" trong trang Kết nối dịch vụ, rồi gửi lại yêu cầu.',
+        unavailableServices: [{ id: 'gmail', name: 'Gmail' }],
+      });
+    });
   });
 
   describe('3. connected state (after calendars selected)', () => {
