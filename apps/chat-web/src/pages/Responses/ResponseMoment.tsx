@@ -4,6 +4,7 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import { apiClient } from '../../services/api-client';
 import { conversationReturnPath, gmailSessionOwner, redirectToGmail, mycalendarSessionOwner, redirectToMyCalendar } from '../../services/gmail-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
+import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
 
 const secondary = 'px-4 py-2 bg-white hover:bg-neutral-50 text-[#111827] border border-[#E7E7E2] text-xs sm:text-sm font-medium rounded-xl transition-colors';
 const primary = 'px-4 py-2 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors';
@@ -50,14 +51,15 @@ export function AnswerMoment({ message, request, services }: { message: ChatMess
   </ResponseCard>;
 }
 function ResponseCard({ request, title, children, moment }: { request: string; title: string; children: ReactNode; moment: string }) {
+  const origin = useScheduledOrigin();
   return <section id={`moment-${moment}`} data-moment={moment} aria-label="Cockpit" className="v3-space-y-6">
-    <div className="flex items-start justify-end gap-3">
+    {origin ? <RequestEcho request={request} /> : <div className="flex items-start justify-end gap-3">
       <div className="max-w-xl bg-white border border-[#E7E7E2] rounded-2xl rounded-tr-sm p-4 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between gap-4 mb-1.5 text-xs text-[#6B7280]"><span className="font-semibold text-[#111827]">Bạn</span><span className="text-[11px] text-[#9CA3AF]">Yêu cầu đã gửi</span></div>
         <p id="user-request-bubble-text" className="text-sm sm:text-base font-medium text-[#111827] leading-relaxed break-words">{request}</p>
       </div>
       <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm mt-0.5">B</div>
-    </div>
+    </div>}
     <div className="flex items-start gap-3">
       <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm flex-shrink-0 mt-0.5">A</div>
       <div className="flex-1 bg-white border border-[#E7E7E2] rounded-2xl rounded-tl-sm p-5 sm:p-7 shadow-sm v3-space-y-5 min-w-0">

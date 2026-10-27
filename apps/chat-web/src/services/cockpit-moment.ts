@@ -1,12 +1,13 @@
 import type { ChatStoreState } from '../store/chat-store';
 import type { ExecutionSnapshot } from '../types';
-export type CockpitMoment = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 'refusal' | 'unsuccessful' | 'answer';
+export type CockpitMoment = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 'refusal' | 'unsuccessful' | 'answer' | 'schedule';
 export type MomentState = Pick<ChatStoreState, 'planStatus' | 'stepStatuses' | 'activeClarification' | 'messages' | 'isPlanning'>;
 /** Ordered by the approved section 5 table; persisted and live failures both matter. */
 export function selectMoment(state: MomentState, snapshot: ExecutionSnapshot | null): CockpitMoment {
   const latest = state.messages.at(-1);
   const refusal = latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:');
   const unsafeSaved = snapshot && !['stopped','failed','rejected'].includes(snapshot.execution.status) && (snapshot.execution.status==='reconciliation_required' || snapshot.steps.some(step=>step.status==='unknown' || step.status==='failed'));
+  if (!unsafeSaved && !state.isPlanning && ['schedule_proposal', 'schedule_state'].includes(latest?.metadata?.type ?? '')) return 'schedule';
   if (!unsafeSaved && state.planStatus === 'rejected' && refusal) return 'refusal';
   if (!unsafeSaved && ['stopped','rejected','failed'].includes(state.planStatus)) return state.isPlanning ? 2 : 'unsuccessful';
   // Durable reads mark uncertainty as reconciliation_required even without a restart.

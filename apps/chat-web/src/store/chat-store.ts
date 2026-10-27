@@ -89,7 +89,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   setConversations: (conversations) => set({ conversations }),
 
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, { ...message, timestamp: message.timestamp || message.created_at || new Date().toISOString() }] })),
+    set((state) => {
+      const value = { ...message, timestamp: message.timestamp || message.created_at || new Date().toISOString() };
+      return { messages: state.messages.some(row => row.id === message.id) ? state.messages.map(row => row.id === message.id ? value : row) : [...state.messages, value] };
+    }),
 
   addOptimisticMessage: ({ id, content }) =>
     set((state) => ({
@@ -181,7 +184,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     // On reload there is no in-memory retired owner. A newer planner response still
     // owns the stage; keep safe terminal execution evidence as history.
     const hasNewResponse = ['idle', 'rejected'].includes(state.planStatus) &&
-      (state.activeClarification !== null || ['refusal', 'answer', 'planning_error'].includes(latest?.metadata?.type ?? '') || latest?.content.startsWith('Từ chối yêu cầu:'));
+      (state.activeClarification !== null || ['refusal', 'answer', 'planning_error', 'schedule_proposal', 'schedule_state', 'schedule_discarded'].includes(latest?.metadata?.type ?? '') || latest?.content.startsWith('Từ chối yêu cầu:'));
     const hasNewRequest = (state.isPlanning || hasNewResponse || state.retiredExecutionPlanId === snapshot.plan.id) &&
       ['completed', 'stopped', 'failed', 'rejected'].includes(snapshot.execution.status) &&
       (snapshot.execution.status !== 'completed' || !snapshot.steps.some(step => step.status === 'unknown' || step.status === 'failed'));

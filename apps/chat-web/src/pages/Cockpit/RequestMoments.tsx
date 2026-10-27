@@ -5,6 +5,7 @@ import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
+import { RequestEcho, useScheduledOrigin } from './RequestEcho';
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -276,6 +277,7 @@ export function DiscoveryMoment({
   gather: GatherState | null;
   services: ServiceInfo[];
 }) {
+  const origin = useScheduledOrigin();
   return (
     <section
       id="moment-2"
@@ -287,12 +289,13 @@ export function DiscoveryMoment({
         <div className="text-xs font-semibold uppercase tracking-wider text-brand-primary">
           Đang phân tích yêu cầu
         </div>
+        {origin && <RequestEcho request={request} />}
         <h1
           id="heading-moment-2"
           className="font-display text-2xl sm:text-3xl text-brand-text font-normal leading-snug"
           tabIndex={-1}
         >
-          <span id="moment-2-query-display">{`“${request}”`}</span>
+          <span id="moment-2-query-display">{origin ? 'ATI đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
         </h1>
       </div>
       <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-soft-card v3-space-y-4">

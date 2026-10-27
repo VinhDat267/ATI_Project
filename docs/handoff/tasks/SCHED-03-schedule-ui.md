@@ -104,6 +104,15 @@ Bỏ câu "Chưa có gì được ghi lên công cụ nào."; "Bỏ qua" gọi A
 
 ## Kết quả (agent thi công điền)
 
-- PR:
+- Sửa ba P3 theo [review tại `490c6ae`](https://github.com/VinhDat267/ATI_Project/pull/171#issuecomment-6415384685), commit `a661344`: nội dung tin trạng thái SSE, lọc/chuẩn hóa lịch sử sau 409, test nguồn và người gửi `schedule_run` trong ngăn hội thoại ở cả hai trạng thái cờ. RED **5 fail/38 pass** → GREEN **43/43** test lịch; **5/5** đột biến mới bị bắt. Web **816/816**, typecheck/build/quét build exit 0; browser lịch **22/22** và cờ tắt **1/1**, PostgreSQL tmpfs riêng ở 56533. Chi tiết và giới hạn: [log sửa review](../log/2026-10-26-codex-SCHED-03-review-fixes.md).
+- PR: [#171](https://github.com/VinhDat267/ATI_Project/pull/171), nhánh `codex/feat-sched-03-ui`; mã `4b825ab`, sửa replay/hydration `c966c2e`.
 - RED/GREEN, đột biến, lệnh kiểm và exit code:
+  - 36 test mới; RED thiếu module và RED hành vi cho mất pending, GET nền cũ, replay thiếu `requestId`, thứ tự lịch sử. GREEN toàn bộ; reviewer chạy độc lập 106/106 test hồi quy, exit 0, đạt phần mã nguồn.
+  - 11/11 đột biến bị bắt, mỗi lượt khôi phục và so SHA-256.
+  - `VITEST_MAX_WORKERS=4 npm run check`: exit 0; **2.228 v3 + 394 eval**, web **809/809**; typecheck/build/kiểm build/launcher/10 test Node đạt.
+  - Browser: 13 nhóm ngoài lịch **121 pass/1 skip** ở lượt tổng hợp 2; nhóm lịch sau sửa **21/21**, exit 0. Cổng tổng hợp `npm run test:browser:v3` trên head cuối xem [CI #171](https://github.com/VinhDat267/ATI_Project/pull/171/checks) và kết quả trong mô tả PR; không coi các lượt trượt trước sửa là full pass.
+  - 20 ảnh 1440/375 sáng/tối và log tại `D:/ATI_Project/ATI_Project/.codex/sched03/`; không commit ảnh. Chi tiết: [log bàn giao](../log/2026-10-25-codex-SCHED-03-schedule-ui.md).
 - Điều chưa làm hoặc khác với task card:
+  - Không bật cờ hoặc gọi model/dịch vụ thật; nghiệm thu thật thuộc SCHED-04.
+  - API hiện chỉ trả tối đa 50 lượt; màn phục hồi tra trong cửa sổ này, mở hàng Nhật ký xem 10 lượt. Không đổi hợp đồng backend.
+  - Capability đọc chung ở gốc App để không thêm health request vào từng trang; mọi API/giao diện lịch vẫn sau cờ.

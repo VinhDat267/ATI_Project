@@ -1,4 +1,4 @@
-import type { AnswerLookup } from '@wap/tool-schemas';
+import type { AnswerLookup, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse { message: string }
 export type MessageStatus = 'sending' | 'sent' | 'failed';
@@ -12,7 +12,9 @@ export interface ChatMessage {
   created_at?: string;
   metadata?: { type?: string; planId?: string; plan?: ActivePlan; resourceLabels?: Record<string, string>; requestId?: string; replyToMessageId?: string;
     reason?: string; suggestion?: string; unavailableServices?: Array<{ id: string; name: string }>;
-    options?: string[]; context?: string; lookups?: AnswerLookup[]; usedDirectory?: string[] };
+    options?: string[]; context?: string; lookups?: AnswerLookup[]; usedDirectory?: string[];
+    proposal?: ScheduleResponse; schedule?: ScheduleView; previous?: ScheduleProposalMetadata['previous']; services?: string[]; nextRuns?: string[];
+    scheduleId?: string | null; baseVersion?: number | null; runId?: string; name?: string; dueAt?: string; trigger?: string };
 }
 
 export type StepState = 'pending' | 'running' | 'succeeded' | 'failed' | 'paused' | 'skipped' | 'unknown';

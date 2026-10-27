@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { User } from '../../types';
 export interface UserNavMenuProps {
+  pendingScheduleCount?: number;
   user: User | null; onOpenSettings: () => void; onLogout: () => void;
   onManageUsers?: () => void; onOpenAccount?: () => void; navigate?: (path: string) => void;
   variant?: 'prototype';
@@ -10,7 +11,7 @@ export function avatarInitials(user: User | null) {
   const words = user?.name?.trim().split(/\s+/).filter(Boolean) ?? [];
   return words.length ? `${words[0][0]}${words.length > 1 ? words.at(-1)![0] : ''}`.toLocaleUpperCase('vi-VN') : user?.email?.[0]?.toUpperCase() || 'AO';
 }
-export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onOpenAccount, navigate, variant, triggerClassName, menuItemClassName }: UserNavMenuProps) {
+export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onOpenAccount, navigate, variant, triggerClassName, menuItemClassName, pendingScheduleCount = 0 }: UserNavMenuProps) {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
@@ -24,7 +25,7 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
   }, [open]);
   const select = (action?: () => void) => { setOpen(false); action?.(); };
   const entries: [string, (() => void) | undefined][] = [
-    ['Nhật ký điều phối', () => navigate?.('/history')], ['Kết nối dịch vụ', onOpenSettings], ['Cẩm nang', () => navigate?.('/guide')], ['Tài khoản', onOpenAccount],
+    [pendingScheduleCount > 0 ? `Nhật ký điều phối, ${pendingScheduleCount} lượt chờ duyệt` : 'Nhật ký điều phối', () => navigate?.('/history')], ['Kết nối dịch vụ', onOpenSettings], ['Cẩm nang', () => navigate?.('/guide')], ['Tài khoản', onOpenAccount],
     ...(user?.role === 'admin' ? [['Quản lý người dùng', onManageUsers] as [string, (() => void) | undefined]] : []),
     ['Chính sách an toàn', () => navigate?.('/privacy')], ['Đăng xuất', onLogout],
   ];

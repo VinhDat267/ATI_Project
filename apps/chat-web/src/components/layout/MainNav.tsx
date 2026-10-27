@@ -7,6 +7,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import type { User } from '../../types';
 import { UserNavMenu } from './UserNavMenu';
+import { useSchedulePendingCount } from '../../hooks/use-schedules';
 
 export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users';
 const TABS: { id: NavTab; path: string; name: string; short: string; adminOnly?: boolean }[] = [
@@ -37,6 +38,7 @@ export interface MainNavProps {
 }
 
 export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, children }: MainNavProps) {
+  const pendingCount = useSchedulePendingCount(user);
   // Bấm kèm phím bổ trợ hoặc chuột giữa thì để trình duyệt mở tab mới như link thường.
   const follow = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -60,16 +62,17 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
         </div>
         <nav aria-label="Điều hướng chính" className="col-start-2 hidden min-[900px]:flex items-center gap-1 justify-self-center">
           {tabs.map(tab => (
-            <a key={tab.id} href={tab.path} onClick={follow(tab.path)} aria-label={tab.name} aria-current={current === tab.id ? 'page' : undefined} className={current === tab.id ? TAB_ON : TAB_OFF}>
+            <a key={tab.id} href={tab.path} onClick={follow(tab.path)} aria-label={tab.id === 'history' && pendingCount > 0 ? `Nhật ký, ${pendingCount} lượt chờ duyệt` : tab.name} aria-current={current === tab.id ? 'page' : undefined} className={current === tab.id ? TAB_ON : TAB_OFF}>
               <span className="xl:hidden">{tab.short}</span>
               <span className="hidden xl:inline">{tab.name}</span>
+              {tab.id === 'history' && pendingCount > 0 && <span aria-hidden="true" data-schedule-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-[10px] font-bold">{pendingCount}</span>}
             </a>
           ))}
         </nav>
         <div className="col-start-3 flex items-center gap-2 flex-shrink-0 justify-self-end">
           {actions}
           <ThemeToggle />
-          <UserNavMenu user={user} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
+          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
         </div>
       </div>
       {children}
