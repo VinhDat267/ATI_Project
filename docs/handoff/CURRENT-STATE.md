@@ -15,9 +15,9 @@
 
 Việc tiếp theo:
 - GMAIL-04 (nhóm trưởng): nghiệm thu Google thật, rồi PR bật cờ trước 28/10;
-- SCHED-04: bộ đo ý định, label commit trước mọi lời gọi model, merge trước 30/10; đo 01/11; nghiệm thu thật 03/11; PR bật cờ trước 04/11;
+- SCHED-04: bộ đo ý định, label commit trước mọi lời gọi model, merge ngày 30/10 (trước 31/10 theo task card); đo 01/11; nghiệm thu thật 03/11; PR bật cờ trước 04/11;
 - W4-03: chạy `report.ts` khi có phiếu;
-- ngày 29/10 nhóm trưởng quyết OAUTH-02 và LAT-01. Có một worktree `ATI_Project-oauth02` (nhánh `feat/oauth-02-personal-calendar`) ở máy nhóm trưởng; chưa có PR;
+- OAUTH-02 đang review tại [#176](https://github.com/VinhDat267/ATI_Project/pull/176), mở ngày 27/10, nhánh `feat/oauth-02-personal-calendar`, worktree `ATI_Project-oauth02`; chưa merge. Mốc quyết định đưa OAUTH-02 và LAT-01 vào phạm vi bảo vệ vẫn là 29/10 theo FINISH-PLAN;
 - REPORT-01 bắt đầu từ 27/10.
 
 [Log merge](log/2026-10-27-reviewer-merge-171.md).
@@ -218,7 +218,7 @@ Sau #171 (merge 27/10/2026):
   - `npm run check` exit 0: 63 + 408 + 359 + 42 + 554 + **835** web = **2.261 v3** + **394 eval**. Web thêm 43 test lịch chạy;
   - browser lượt 1 exit 1 ở nhóm `auth04`: ca chập chờn `AUTH-04: Google signup…` (mục 5). Chạy lại từ `auth04` trên DB mới thì exit 0. Gộp hai lượt: **149 pass/1 skip, 14 nhóm** (default 94, có ca `SCHED-03 off:`; `schedule` 22, `SCHEDULES_ENABLED=on`).
 - **Bên thi công** tại `91642f4`: web 816/816; browser `schedule` 22/22, cờ tắt 1/1; 5/5 đột biến mới.
-- Cây merge `f4ff636` bằng cây head `ec2df5a`. Không gọi model hay dịch vụ thật.
+- Cây merge `f4ff636` bằng cây head `ec2df5a`. Các phép kiểm dùng planner sandbox; Google OIDC và Gmail dùng fixture HTTP. Bộ browser đầy đủ vẫn có ca FE-07 kiểm tra kết nối Notion thật bằng token giả (giới hạn mục 5). Nghiệm thu lịch chạy với model và dịch vụ thật thuộc SCHED-04, chưa chạy.
 
 Sau #172 (merge 26/10/2026):
 - **CI:** [CI #172](https://github.com/VinhDat267/ATI_Project/actions/runs/40326352126) SUCCESS đúng head `fc287ec`, gồm check và browser: **2.218 v3** (63 + 408 + 359 + 42 + **554** + **792** web) **+ 394 eval**; browser **126 pass/1 skip, 13 nhóm** (nhóm `gmail` từ 4 lên 10: 4 GMAIL-03 và 6 OAUTH-01). `chat-api` thêm 7 test, web thêm 19; eval không đổi. CI `main` sau #172 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40357282987) đúng `13430d9`; sau #173 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40358587698) đúng `907a2f0`, cùng số. #173 chỉ sửa tài liệu.
