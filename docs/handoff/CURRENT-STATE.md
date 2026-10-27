@@ -1,6 +1,28 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 25/10/2026 (Asia/Saigon), sau merge [#166](https://github.com/VinhDat267/ATI_Project/pull/166) (`7bb752d`), [#169](https://github.com/VinhDat267/ATI_Project/pull/169) (`bd02c9d`), [#167](https://github.com/VinhDat267/ATI_Project/pull/167) (`95b1c46`) và [#168](https://github.com/VinhDat267/ATI_Project/pull/168) (`46b6a5b`). **Lịch chạy workflow phần 1–2 xong**: backend và planner, sau cờ `SCHEDULES_ENABLED` tắt mặc định. Cùng đợt có kế hoạch lịch chạy và kế hoạch OAuth.
+**Cập nhật lần cuối:** 26/10/2026 (Asia/Saigon), sau merge [#172](https://github.com/VinhDat267/ATI_Project/pull/172) (`13430d9`) và [#173](https://github.com/VinhDat267/ATI_Project/pull/173) (`907a2f0`). **#173**, chỉ tài liệu: [kế hoạch hoàn thành](FINISH-PLAN.md) tới 11/11, task card tuần 5–6 (DEMO-01, REPORT-01, SLIDES-01, VIDEO-01, REHEARSAL-01, LAT-01), đặc tả và task card OAUTH-02, và câu lệnh dán sẵn trong `PROMPTS.md` cho lúc không còn reviewer cũ. **#172: OAUTH-01 xong**, sau cờ `GMAIL_ENABLED` (vẫn tắt mặc định). Ở màn từ chối vì Gmail chưa kết nối, người dùng bấm "Kết nối Gmail", cấp quyền ở Google, quay về **đúng hội thoại đó**, rồi bấm "Gửi lại yêu cầu". Hệ thống không tự gửi lại; kế hoạch mới vẫn phải duyệt như thường.
+- **Mã:**
+  - migration 0011: cột `oauth_states.return_to`, chỉ cho state `connect_gmail`, chỉ dạng `/c/<uuid>` chữ thường;
+  - `POST /api/connections/gmail/start` nhận `returnTo` tuỳ chọn, chỉ là hội thoại của chính người gọi; sai thì `400 RETURN_TO_INVALID` và không tạo state. Callback chỉ trả `returnTo` khi thành công, và lấy từ đúng state vừa dùng;
+  - web: `RefusalMoment` bắt đầu kết nối với `returnTo` của hội thoại, đọc lại `GET /api/services` mỗi khi có màn từ chối mới, và hiện "Gửi lại yêu cầu" khi mọi dịch vụ còn thiếu đã dùng được. Trang callback kiểm lại mẫu `/c/<uuid>`; sai thì về `/settings#gmail` như cũ;
+  - cờ tắt thì màn từ chối như bản trước.
+- **Review độc lập** (log ở worktree của người review, không commit):
+  - lần 1 tại `2c57d35` **chưa đạt**: P2, luồng mới vẫn bật khi `GMAIL_ENABLED=off`; P3, ràng buộc DB thiếu phần `mode = 'connect_gmail'`. Sửa ở `e04b5d8`, cùng lỗi OID chập chờn của `gmail-migration.test.ts`;
+  - lần 2 tại `da32e65` **chưa đạt**: P2, ở 375 px nút "Gửi lại yêu cầu" nhận focus bằng Tab nhưng bị ô soạn tin cố định che. Sửa ở `7152540`: ba trang của cockpit (`app-stage`, `responses`, `errors`) chừa chỗ dưới `body` và đặt `scroll-padding-bottom` theo chiều cao ô soạn tin;
+  - lần 3 tại `fc287ec` **Đạt**.
+- **Merge:** reviewer thi công #172 và lập #173 theo yêu cầu nhóm trưởng; nhóm trưởng cho merge cả hai tối 26/10. Cây merge của #172 bằng cây head đã review; diff của merge #173 bằng diff của PR. #173 chưa có review độc lập.
+- **Nhóm trưởng đã xác nhận (26/10):** PR sửa một assertion cũ của `gmail-migration.test.ts`, từ "đúng 2 ràng buộc có chữ `mode`" sang "đúng tập tên ba ràng buộc". Mục đích là để ràng buộc mới giữ đúng đặc tả 4.1. Review lần 2 thấy chỗ sửa phù hợp và không nới kiểm tra.
+
+Việc tiếp theo:
+- GMAIL-04 (nhóm trưởng): nghiệm thu Google thật, gồm cả luồng OAUTH-01 qua Google thật, rồi PR bật cờ trước 28/10;
+- SCHED-03 #171 (`longnguyen005`): review độc lập lần 1 **Đạt sau khi sửa nhỏ**, còn 3 P3, chờ Long sửa rồi kiểm lại;
+- ngày 29/10 nhóm trưởng quyết OAUTH-02 và LAT-01; mặc định bỏ cả hai ([FINISH-PLAN](FINISH-PLAN.md) mục 4);
+- báo cáo cuối kỳ bắt đầu từ 27/10 (REPORT-01); thời lượng và hình thức buổi bảo vệ chờ nhóm trưởng điền ở SLIDES-01 và REHEARSAL-01;
+- SCHED-04 sau SCHED-03; W4-03 chạy `report.ts` khi có phiếu.
+
+[Log merge](log/2026-10-26-reviewer-merge-172-173.md).
+
+**Cập nhật trước đó:** 25/10/2026 (Asia/Saigon), sau merge [#166](https://github.com/VinhDat267/ATI_Project/pull/166) (`7bb752d`), [#169](https://github.com/VinhDat267/ATI_Project/pull/169) (`bd02c9d`), [#167](https://github.com/VinhDat267/ATI_Project/pull/167) (`95b1c46`) và [#168](https://github.com/VinhDat267/ATI_Project/pull/168) (`46b6a5b`). **Lịch chạy workflow phần 1–2 xong**: backend và planner, sau cờ `SCHEDULES_ENABLED` tắt mặc định. Cùng đợt có kế hoạch lịch chạy và kế hoạch OAuth.
 - **#166**, kế hoạch lịch chạy, chỉ tài liệu: đặc tả, SCHED-common, SCHED-01 → 04. Mốc ngừng thêm tính năng dời sang 04/11 (mục 7 "Chốt 24–25/10").
 - **#167, SCHED-01:**
   - migration 0010 (`schedules`, `schedule_runs`); tính giờ hẹn theo `APP_TIME_ZONE`;
@@ -28,7 +50,7 @@ Việc tiếp theo:
 
 [Log merge](log/2026-10-25-reviewer-merge-166-169.md).
 
-**Cập nhật trước đó:** 24/10/2026 (Asia/Saigon), sau merge [#164](https://github.com/VinhDat267/ATI_Project/pull/164) (`1df2d35`): **W4-01 đo xong** trên 32 câu do bốn thành viên viết, mỗi người 8, mã `member-1` → `member-4`. Hai trong bốn người đã xem hoặc sửa prompt, nên bộ câu **không độc lập** như task card yêu cầu. Kết quả tách theo hai nhóm; repo không ghi mã nào thuộc nhóm nào.
+Trước đó, 24/10/2026 (Asia/Saigon), sau merge [#164](https://github.com/VinhDat267/ATI_Project/pull/164) (`1df2d35`): **W4-01 đo xong** trên 32 câu do bốn thành viên viết, mỗi người 8, mã `member-1` → `member-4`. Hai trong bốn người đã xem hoặc sửa prompt, nên bộ câu **không độc lập** như task card yêu cầu. Kết quả tách theo hai nhóm; repo không ghi mã nào thuộc nhóm nào.
 - **Đăng ký:** label `2cdaf90` được commit trước lời gọi model đầu tiên. Không sửa label sau đó.
 - **Kết quả** (yêu cầu `ag/gemini-3.8-flash`, phục vụ `gemini-3.8-flash-n`, hai cờ tắt, source `91cd5c1`):
   - `llm` ×3: **89/96**; tool 93,7%, tham số 100%; p50/p95 10,8/60,0 s; 74% dưới 15 s;
@@ -107,7 +129,7 @@ Trước đó, 18/10/2026 (Asia/Saigon), sau merge [#159](https://github.com/Vin
 - FE-04 #88 (`89d1999`) và UI-API-01 #86 (`210d3b6`): token/theme/shell và API cho giao diện mới;
 - #84 (`ab0817e`) thêm kế hoạch giao diện mới (bản mẫu 12 trang, đặc tả, task card FE-04 → FE-10 và UI-API-01).
 
-Agent cập nhật: reviewer (sau merge #166, #169, #167, #168, 25/10). Lần trước: reviewer (sau merge #164, 24/10; sau merge #161 và #162, 20/10; sau merge #159, 18/10; sau merge #156 và #157, 18/10; sau merge #154, 18/10; sau merge #147, 18/10; sau merge #149, #150, #151, 17/10; sau merge #146, 16/10; sau merge #142, 16/10; sau merge #143, 16/10; sau merge #140, 14/10; sau merge #138 và #137, 14/10); Codex, reviewer độc lập W4-00 (sau merge #133, 13/10); Claude Code (sau merge #129, 11/10; sau merge #128, 10/10).
+Agent cập nhật: reviewer (sau merge #172 và #173, 26/10). Lần trước: reviewer (sau merge #166, #169, #167, #168, 25/10; sau merge #164, 24/10; sau merge #161 và #162, 20/10; sau merge #159, 18/10; sau merge #156 và #157, 18/10; sau merge #154, 18/10; sau merge #147, 18/10; sau merge #149, #150, #151, 17/10; sau merge #146, 16/10; sau merge #142, 16/10; sau merge #143, 16/10; sau merge #140, 14/10; sau merge #138 và #137, 14/10); Codex, reviewer độc lập W4-00 (sau merge #133, 13/10); Claude Code (sau merge #129, 11/10; sau merge #128, 10/10).
 
 > Đọc file này trước khi làm bất cứ việc gì. **Chỉ reviewer sửa file này**, sau khi merge một PR; agent thi công ghi kết quả vào task card và `log/`.
 > `docs/PROJECT-REPORT.md` có số liệu cũ (ngày 29/09); khi hai file mâu thuẫn, tin file này và mã nguồn.
@@ -161,12 +183,26 @@ Agent cập nhật: reviewer (sau merge #166, #169, #167, #168, 25/10). Lần tr
 | `packages/executor` | Resolve `$ref`/`$template`, chạy tuần tự, timeout qua AbortSignal, trạng thái `unknown` cho lệnh ghi không rõ kết quả; lỗi lệnh ghi có `details.requestSent === false` (chưa gửi request) là `failed` |
 | `packages/tool-schemas` | Catalog 33 tool/8 service: Trello 9, Slack 2, GitHub 5, Sheets 4, Calendar 3, Notion 4, Telegram 2, Jira 4 (19 read, 14 write). `GMAIL_TOOLS` (10 tool) và `GMAIL_SERVICE` export riêng, ngoài catalog, chỉ dùng khi `GMAIL_ENABLED=on` |
 | `packages/tool-adapters` | Adapter gọi API thật, allowed scope, rate limit, chuẩn hóa lỗi. Adapter Gmail (`src/gmail/`) dùng token của từng người, không có allowlist chung |
-| `db/v3` | 13 bảng nghiệp vụ PostgreSQL, gồm phiên đăng nhập, lịch sử hash refresh token, auth token, outbox, oauth_states, `schedules` và `schedule_runs`; migrations 0001–0010 (0009: Gmail riêng của từng người; 0010: lịch chạy) |
+| `db/v3` | 13 bảng nghiệp vụ PostgreSQL, gồm phiên đăng nhập, lịch sử hash refresh token, auth token, outbox, oauth_states, `schedules` và `schedule_runs`; migrations 0001–0011 (0009: Gmail riêng của từng người; 0010: lịch chạy; 0011: `oauth_states.return_to` của OAUTH-01) |
 | `evaluations/` | Golden set v2 (50 câu + 18 câu tự do + 44 câu services, cùng các bộ Gmail, trả lời, nhiều lượt), bộ W4-01 32 câu do thành viên viết (`golden-independent/`), công cụ chạy thật có kiểm soát (`live-execution/`, `live-app/`) |
 
 Mã và tài liệu v1/v2 (`apps/api`, `apps/web`, `apps/mcp-task-hub`, `packages/dsl`, `packages/engine`, `packages/db`, `db/migrations` và báo cáo/bằng chứng đi kèm) đã xoá khỏi `main` ngày 05/10 qua #80. Ảnh chụp trước khi xoá là tag `archive/v2-final` (`badccb3`); đọc lại bằng `git show archive/v2-final:<đường dẫn>`.
 
 ## 3. Số liệu mới nhất
+
+Sau #172 (merge 26/10/2026):
+- **CI:** [CI #172](https://github.com/VinhDat267/ATI_Project/actions/runs/40326352126) SUCCESS đúng head `fc287ec`, gồm check và browser: **2.218 v3** (63 + 408 + 359 + 42 + **554** + **792** web) **+ 394 eval**; browser **126 pass/1 skip, 13 nhóm** (nhóm `gmail` từ 4 lên 10: 4 GMAIL-03 và 6 OAUTH-01). `chat-api` thêm 7 test, web thêm 19; eval không đổi. CI `main` sau #172 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40357282987) đúng `13430d9`; sau #173 [SUCCESS](https://github.com/VinhDat267/ATI_Project/actions/runs/40358587698) đúng `907a2f0`, cùng số. #173 chỉ sửa tài liệu.
+- **Bên thi công** (reviewer), PostgreSQL 16 tạm riêng ở 56533, sandbox, browser ở cổng riêng (API 3999, web 5199):
+  - mỗi lượt sửa có RED trước;
+  - lần cuối tại `fc287ec`: check 2.218 + 394, browser exit 0 ngay lượt đầu, 126/1;
+  - đột biến 26/26 ở vitest, O19 ở browser, và 1 đột biến CSS của lần sửa 2.
+- **Review độc lập lần 3** tại `fc287ec`:
+  - probe Tab của lượt trước đạt 1/1; nhóm Gmail/OAuth 10/10;
+  - màn trả lời, hai dạng hỏi lại mở rộng và lỗi lập kế hoạch đạt 16/16 tổ hợp ở 1440/375, sáng/tối, với ô soạn tin rỗng và nhiều dòng;
+  - web 792/792; typecheck và build exit 0; 2/2 đột biến CSS bị bắt.
+
+  Một lượt probe bổ sung gặp trang trống lúc tải; chạy lại thì đạt 4/4, có ghi trong báo cáo review.
+- **Cây merge** `13430d9` bằng cây head `fc287ec`. Không gọi Google hay model thật.
 
 Sau #166 → #169 (merge 25/10/2026):
 - **CI trên PR:**
@@ -306,9 +342,9 @@ Mỗi số liệu ghi kèm ngày đo và commit. Số liệu lịch sử trướ
 
 | Kiểm tra | Kết quả | Đo lúc | Lệnh |
 |---|---|---|---|
-| Unit + integration v3 | 2.192/2.192 = 63 schema + 408 adapters + 359 planner + 42 executor + 547 API + 773 web (SCHED-01 thêm 67 API; SCHED-02 thêm 68 planner, 15 API) | 25/10, CI #168 SUCCESS trên `29fe222`; reviewer độc lập chạy ở máy cùng số | `npm run test:v3` (trong `npm run check`) |
+| Unit + integration v3 | 2.218/2.218 = 63 schema + 408 adapters + 359 planner + 42 executor + 554 API + 792 web (SCHED-01 thêm 67 API; SCHED-02 thêm 68 planner, 15 API; OAUTH-01 thêm 7 API, 19 web) | 26/10, CI #172 SUCCESS trên `fc287ec`; reviewer độc lập chạy web ở máy cùng số | `npm run test:v3` (trong `npm run check`) |
 | Test của bộ đánh giá (offline) | 394/394 = 173 cũ + 28 W4-03 + 48 W4-01 + 26 W4-04 + 57 GMAIL-04 + 57 W4-02 + 5 quy tắc dừng của runner (gồm test trên PostgreSQL thật) | 24/10, CI #164 SUCCESS trên `1e3db0b`; reviewer độc lập chạy ở máy cùng số | `npm run test:eval:v3` (trong `npm run check`) |
-| Browser E2E (sandbox, PostgreSQL thật) | 120 ca pass, 13 nhóm; default 93 (FE-12 thêm 5), auth02 2, auth04 6, clarification 3, partial_failure 2, sáu nhóm service mỗi nhóm 1, answer 4 (`PLANNER_READ_ANSWERS=on`, chế độ `llm`), gmail 4 (`GMAIL_ENABLED=on`, OAuth và Gmail giả, 1440/375 sáng/tối) | 20/10, CI #162 trên `ffc8952`; trước đó 115 ca ở CI #147 trên `5f3bb2f`; reviewer chạy ở máy cùng số; Google dùng OIDC giả; một ca Google skip có chủ đích ở default và chạy trong auth04 | `npm run test:browser:v3` |
+| Browser E2E (sandbox, PostgreSQL thật) | 126 ca pass, 13 nhóm; default 93 (FE-12 thêm 5), auth02 2, auth04 6, clarification 3, partial_failure 2, sáu nhóm service mỗi nhóm 1, answer 4 (`PLANNER_READ_ANSWERS=on`, chế độ `llm`), gmail 10 (`GMAIL_ENABLED=on`, OAuth và Gmail giả; 4 GMAIL-03 và 4 OAUTH-01 ở 1440/375 sáng/tối, 2 ca OAUTH-01 đi bằng Tab ở 1440/375) | 26/10, CI #172 trên `fc287ec`; trước đó 120 ca ở CI #162 trên `ffc8952`; reviewer chạy ở máy cùng số; Google dùng OIDC giả; một ca Google skip có chủ đích ở default và chạy trong auth04 | `npm run test:browser:v3` |
 | Typecheck, build | đạt | như trên | `npm run typecheck:v3`, `npm run build:v3` (trong `npm run check`) |
 | Gmail SMTP và Google OAuth thật | Email xác minh/duyệt/reset, login mật khẩu mới, link một lần; Google mới pending/approve/login và tài khoản mật khẩu unlink/link/relogin đạt; SMTP535 và Google redirect mismatch đạt | 04–05/10, mã sản phẩm `198fe6d`, handoff merge #75 `bfd824f` | Native Gmail/Google/ATI UI + DB/API và xác nhận người dùng; [task AUTH-06](tasks/AUTH-06-auth-live-setup.md) |
 | Golden W4-01, model thật, 3 lần mỗi chế độ | 32 câu, 4 người viết (2 đã xem prompt, nên không độc lập). `llm` **89/96**: tool 93,7%, tham số 100%, p50/p95/max 10,8/60,0/76,6 s, 71/96 dưới 15 s, 17/124 lần thử quá hạn. Nhóm đã xem prompt 47/48, nhóm chưa xem 42/48. `regex` **37/96**: tool 27,0%, tham số 76,7%. Câu quá hạn sau cả hai lần thử được chấm trượt (4 ở `llm`, 15 ở `regex`); bốn lượt dở dang trước đó được giữ | 24/10, label `2cdaf90`, source `91cd5c1`, yêu cầu `ag/gemini-3.8-flash`, phản hồi `gemini-3.8-flash-n`, hai cờ tắt, concurrency 2 | `EVAL_SET=independent … run.ts`; [báo cáo](../ai-evidence/V3-GOLDEN-V2/2026-10-24-W4-01-REPORT.md) |
@@ -341,6 +377,33 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
 
 ## 4. Đã làm gần đây (PR đã merge)
 
+- **#173 kế hoạch hoàn thành** (`907a2f0`), merge 26/10/2026 lúc 23:23:01 Việt Nam. Chỉ tài liệu; reviewer lập theo yêu cầu nhóm trưởng ("lên plan chi tiết cho các phần còn lại", để vẫn làm theo được khi không còn reviewer cũ). Chưa có review độc lập.
+  - [`FINISH-PLAN.md`](FINISH-PLAN.md): trạng thái, mốc cứng, lịch từng ngày tới 11/11, quyết định chờ nhóm trưởng kèm mặc định, thứ tự cắt, quy trình hai phiên agent (A-thi công, A-review; A-review thay vai reviewer, gồm cả ghi bàn giao sau merge), môi trường kiểm và runbook khi 9router hỏng;
+  - task card [DEMO-01](tasks/DEMO-01-demo-stability.md), [REPORT-01](tasks/REPORT-01-final-report.md), [SLIDES-01](tasks/SLIDES-01-defense-slides.md), [VIDEO-01](tasks/VIDEO-01-backup-demo-video.md), [REHEARSAL-01](tasks/REHEARSAL-01-defense-rehearsal.md), [LAT-01](tasks/LAT-01-planning-deadline.md) (tuỳ chọn);
+  - [đặc tả](../superpowers/specs/2026-10-26-oauth-02-personal-calendar-design.md) và [task card](tasks/OAUTH-02-personal-calendar.md) OAUTH-02, viết sẵn cho quyết định 29/10. Đây là dịch vụ riêng `mycalendar`, sau cờ `MYCALENDAR_ENABLED`, chỉ lịch chính, hai tool, client OAuth thứ hai (dùng chung client với Gmail thì ngắt Gmail sẽ thu hồi luôn quyền Calendar). Mặc định bỏ; mốc cắt 01/11;
+  - `PROMPTS.md` mục "Khi không còn reviewer cũ" (P-START → P-PLAN); `.gitignore` thêm `docs/ai-evidence/DEMO-LIVE/`.
+  - [CI #173](https://github.com/VinhDat267/ATI_Project/actions/runs/40323521085) SUCCESS đúng head `05447bb`. Xem [log](log/2026-10-26-reviewer-plan-finish.md).
+- **OAUTH-01 xong #172** (`13430d9`), merge 26/10/2026 lúc 23:15:01 Việt Nam. Reviewer thi công theo yêu cầu nhóm trưởng (đặc tả [`2026-10-25-oauth-connect-from-chat-design.md`](../superpowers/specs/2026-10-25-oauth-connect-from-chat-design.md)).
+  - **DB và API:**
+    - `0011_oauth_return_to.sql`: cột `return_to` và ràng buộc `oauth_states_return_to_check`. Chỉ state `connect_gmail` có cột này, và chỉ ở dạng `/c/<uuid>` chữ thường. Migration chạy lại được;
+    - `routes/connections/gmail.ts`: `start` kiểm mẫu và chủ hội thoại trước khi tạo state; `callback` chỉ trả `returnTo` khi thành công, lấy từ state vừa dùng;
+    - `app.ts` nối `conversationOwner` từ `ConversationRepo`.
+  - **Web:**
+    - `RefusalMoment` (`ResponseMoment.tsx`): "Kết nối Gmail"/"Kết nối lại Gmail" bắt đầu kết nối với `returnTo`. Có chặn bấm hai lần, kiểm phiên, báo lỗi mạng; bấm kèm phím bổ trợ vẫn mở `/settings#gmail`;
+    - trạng thái từng dịch vụ lấy theo dữ liệu hiện tại. "Gửi lại yêu cầu" chỉ hiện khi đã có dữ liệu mới và mọi dịch vụ còn thiếu đã dùng được;
+    - `GmailCallbackView` kiểm lại mẫu `/c/<uuid>` rồi quay về hội thoại; sai mẫu thì về `/settings#gmail`;
+    - `Cockpit` lấy `gmailEnabled` từ `/api/health`. Cờ tắt thì màn từ chối như bản trước;
+    - `index.css`: ba trang của cockpit chừa chỗ dưới `body` và đặt `scroll-padding-bottom` theo chiều cao ô soạn tin. Thay đổi này áp cho mọi phần tử nhận focus trên ba trang đó.
+  - **Test:**
+    - `gmail-connections.test.ts` 5 ca mới, `oauth-return-to-migration.test.ts` 2;
+    - `oauth-01-refusal.test.tsx` 10, `oauth-01-flag.test.tsx` 3 (cờ bật/tắt trên `Cockpit` thật), `gmail-callback.test.tsx` 6;
+    - browser `oauth-01.spec.ts` 6 ca trong nhóm `gmail`. Tên ca bắt đầu bằng `OAUTH-01 from chat:`, vì `OAUTH-01:` khớp bộ lọc `AUTH-01:` của nhóm default.
+  - **Review:** ba lượt (mục đầu file). Lượt 2 bắt lỗi mà test click không thấy, vì Playwright tự cuộn trước khi click; ca mới đi bằng Tab và kiểm `elementFromPoint`.
+  - **Còn lại:**
+    - chưa gọi Google thật (thuộc GMAIL-04);
+    - chưa làm việc quay về hội thoại khi người dùng huỷ ở Google (đặc tả mục 7).
+  - Xem [log thi công](log/2026-10-26-reviewer-OAUTH-01-connect-from-chat.md), [log sửa lần 1](log/2026-10-26-reviewer-OAUTH-01-review-fixes.md), [log sửa lần 2](log/2026-10-26-reviewer-OAUTH-01-review-2-fixes.md) và [log merge](log/2026-10-26-reviewer-merge-172-173.md).
+- **#170** (`c760aa3`): ghi #166 → #169 vào CURRENT-STATE và ROADMAP.
 - **SCHED-02 xong #168** (`46b6a5b`), merge 25/10/2026 lúc 20:19:19 Việt Nam. Reviewer thi công theo yêu cầu nhóm trưởng ("Chia đôi": reviewer làm backend và planner).
   - **Planner:**
     - `schedules`, `ProcessMessageInput.schedule`/`scheduledRun`;
@@ -913,7 +976,8 @@ Chỉ tiêu "tỉ lệ plan dùng được ≥ 70%" **chưa đo** (cần ngườ
   - OAuth làm hẹp nhưng chạy thật. OAUTH-01 (kết nối Gmail ngay trong hội thoại, quay về đúng hội thoại, gửi lại yêu cầu) là bắt buộc;
   - OAUTH-02 (Google Calendar riêng) là tuỳ chọn, quyết ngày 29/10;
   - OAuth cho Slack, GitHub, Notion, Jira, Trello không làm trước 04/11; Telegram giữ bot token;
-  - quay về hội thoại chỉ tới `/c/<uuid>` của chính người gọi. Không tự gửi lại yêu cầu, không tự duyệt kế hoạch.
+  - quay về hội thoại chỉ tới `/c/<uuid>` của chính người gọi. Không tự gửi lại yêu cầu, không tự duyệt kế hoạch;
+  - ngày 26/10, nhóm trưởng xác nhận việc #172 sửa assertion cũ của `gmail-migration.test.ts`: test kiểm đúng tập tên ba ràng buộc (`oauth_states_mode_check`, `oauth_states_mode_owner_check`, `oauth_states_return_to_check`) thay vì đếm 2 ràng buộc có chữ `mode`.
 
 - TDD: viết test fail trước, rồi mới sửa. Không mock hình thức; timeout phải test bằng `AbortSignal` thật; logic database phải test trên PostgreSQL thật.
 - Không tuyên bố "xong" nếu chưa có output lệnh thật (test, exit code). Ghi rõ cái gì đã kiểm, cái gì chưa.

@@ -8,13 +8,13 @@ import { useRoute } from '../src/hooks/use-route';
 import { authStorage } from '../src/services/auth-storage';
 import { ApiClient } from '../src/services/api-client';
 
-let server: Server, callbacks: unknown[], statuses: number, errorCode: string, release: () => void, hold: boolean;
+let server: Server, callbacks: unknown[], statuses: number, errorCode: string, release: () => void, hold: boolean, extra: Record<string, unknown>;
 const nativeFetch = globalThis.fetch;
 const user = { id: 'a', email: 'ati@example.test', name: 'A' };
 const navigate = vi.fn();
 let responses: Promise<Response>[];
 beforeEach(async () => {
-  callbacks = []; responses = []; statuses = 200; errorCode = 'GMAIL_STATE_INVALID'; hold = false; navigate.mockReset();
+  callbacks = []; responses = []; statuses = 200; errorCode = 'GMAIL_STATE_INVALID'; hold = false; extra = {}; navigate.mockReset();
   authStorage.setStoredTokens({ accessToken: 'initial-token', refreshToken: 'initial-refresh', user });
   const gate = new Promise<void>(resolve => { release = resolve; });
   server = createServer(async (req, res) => {
@@ -22,7 +22,7 @@ beforeEach(async () => {
     if (req.url !== '/api/connections/gmail/callback') { res.writeHead(404); res.end('{}'); return; }
     callbacks.push({ method: req.method, body: JSON.parse(body), url: window.location.href, authorization: req.headers.authorization });
     if (hold) await gate;
-    res.writeHead(statuses, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(statuses === 200 ? { email: 'different@gmail.test' } : { code: errorCode }));
+    res.writeHead(statuses, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(statuses === 200 ? { email: 'different@gmail.test', ...extra } : { code: errorCode }));
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -70,3 +70,14 @@ it.each(['code=one&code=two&state=state', 'error=access_denied&state=state', 'st
   window.history.replaceState({}, '', '/connections/gmail/callback?' + query); mount();
   await screen.findByRole('alert'); expect(callbacks).toHaveLength(0); expect(navigate).not.toHaveBeenCalled();
 });
+it('returns to the conversation the connection started from (OAUTH-01)', async () => {
+  extra = { returnTo: '/c/11111111-2222-4333-8444-555555555555' }; mount();
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith('/c/11111111-2222-4333-8444-555555555555', true));
+  expect(navigate).toHaveBeenCalledTimes(1);
+});
+it.each(['https://evil.example/c/11111111-2222-4333-8444-555555555555', '//evil.example', '/settings', '/c/11111111-2222-4333-8444-555555555555?x=1', 42])(
+  'goes to the settings page when the return path is not a conversation: %s', async returnTo => {
+    extra = { returnTo }; mount();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings#gmail', true));
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });

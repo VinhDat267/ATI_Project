@@ -65,8 +65,10 @@ describe('migration 0009 on PostgreSQL with 0001-0008 data', () => {
     expect((await pool.query('SELECT status FROM service_credentials WHERE id=$1', [sharedId])).rows[0].status).toBe('reconnect_required');
     await expect(state('connect_gmail', userId, null)).rejects.toMatchObject({ code: '23514' });
     await expect(pool.query("INSERT INTO service_credentials(service,user_id,config) VALUES('gmail',NULL,'v1:x')")).rejects.toMatchObject({ code: '23514' });
-    const checks = (await pool.query(`SELECT conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
-      WHERE n.nspname=$1 AND t.relname='oauth_states' AND c.contype='c' AND pg_get_constraintdef(c.oid) LIKE '%mode%'`, [schema])).rows;
-    expect(checks).toHaveLength(2);
+    // OFFSET 0 keeps pg_get_constraintdef on this schema's rows: other test files drop their schemas meanwhile.
+    const checks = (await pool.query(`SELECT conname FROM (SELECT c.oid, c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+      WHERE n.nspname=$1 AND t.relname='oauth_states' AND c.contype='c' OFFSET 0) own WHERE pg_get_constraintdef(own.oid) LIKE '%mode%'`, [schema])).rows;
+    // Exactly the named checks on mode, once each: the two of 0009 and the return path of 0011 (OAUTH-01).
+    expect(checks.map((c) => c.conname).sort()).toEqual(['oauth_states_mode_check', 'oauth_states_mode_owner_check', 'oauth_states_return_to_check']);
   });
 });

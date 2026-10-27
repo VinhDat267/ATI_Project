@@ -142,8 +142,11 @@ html.dark svg[fill="#0052cc"], html.dark svg[fill="#0052CC"] { fill: #60A5FA; }
 :root[data-proto-page="app-stage"] .workspace, :root[data-proto-page="app-stage"] .workspace > div { display: contents; }
 :root[data-proto-page="app-stage"] :is(button, a, textarea, input, summary):not(#prompt-input, #custom-sheet-input):focus-visible { outline: 2px solid #FF5701; outline-offset: 2px; }
 :root[data-proto-page="app-stage"] button:disabled { opacity: .5; cursor: not-allowed; }
-/* Multiline replacements for the prototype's inputs, and space for their fixed footer. */
-:root[data-proto-page="app-stage"] body { padding-bottom: var(--cockpit-bottom-space, 96px); }
+/* Multiline replacements for the prototype's inputs, and space for their fixed footer.
+   The cockpit's refusal, answer and error screens (responses, errors) keep the same footer. */
+:root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) body { padding-bottom: var(--cockpit-bottom-space, 96px); }
+/* Focus moved by the keyboard scrolls clear of that footer too, not just into the viewport behind it. */
+:root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) { scroll-padding-bottom: var(--cockpit-bottom-space, 96px); }
 :root[data-proto-page="app-stage"] :is(#bottom-chat-input, #drawer-chat-input, #moment-4-chat-input) { min-width: 0; width: 100%; resize: none; max-height: 144px; }
 :root[data-proto-page="app-stage"] :is(#bottom-chat-input, #moment-4-chat-input):focus-visible { outline: 2px solid transparent; outline-offset: 0; }
 :root[data-proto-page="app-stage"] [data-receipt-connector] span { white-space: normal; overflow-wrap: anywhere; text-align: center; }

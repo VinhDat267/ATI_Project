@@ -24,7 +24,7 @@ const scenarios = [
   { name: 'telegram_slack', grep: 'approved Telegram workflow carries messageId to Slack' },
   { name: 'jira_slack', grep: 'approved Jira workflow carries key and url to Slack' },
   { name: 'answer', grep: 'ANS-01:' },
-  { name: 'gmail', grep: 'GMAIL-03:' },
+  { name: 'gmail', grep: 'GMAIL-03:|OAUTH-01 from chat:' },
   { name: 'schedule', grep: 'SCHED-03:' },
 ];
 
