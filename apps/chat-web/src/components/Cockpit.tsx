@@ -62,7 +62,7 @@ export function Cockpit(props: Props) {
   const [runtimeMode, setRuntimeMode] = useState<'sandbox' | 'live' | null>(null);
   const [schedulesEnabled, setSchedulesEnabled] = useState(false);
   const [personalEnabled, setPersonalEnabled] = useState(false);
-  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;setSchedulesEnabled(data?.schedulesEnabled === true);if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setPersonalEnabled(data?.gmailEnabled===true || data?.mycalendarEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
+  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;setSchedulesEnabled(data?.schedulesEnabled === true);if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setPersonalEnabled(data?.gmailEnabled===true || data?.mycalendarEnabled===true || data?.mysheetsEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
   const actualMoment = selectMoment(state, state.executionSnapshot);
   const pending = state.planningByConversation[state.conversationId ?? '__draft__'];
   const waitingKey = pending ? `${state.conversationId}:${pending.requestId ?? pending.startedAt}` : null;

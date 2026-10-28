@@ -83,7 +83,7 @@ export function createSandboxProvider(scenario?: string) {
   }
   if (scenario === 'mysheets') {
     const responses = [
-      { kind: 'search', calls: [{ tool: 'mysheets.list_spreadsheets', args: {} }] },
+      { kind: 'search', calls: [{ tool: 'mysheets.list_spreadsheets', args: { query: '' } }] },
       {
         kind: 'plan',
         thinking: 'Thêm dòng vào bảng tính cá nhân.',
@@ -96,8 +96,8 @@ export function createSandboxProvider(scenario?: string) {
             description: 'Thêm dòng mới vào bảng tính',
             args: {
               spreadsheetId: 'sheet-personal-1',
-              range: 'Sheet1!A:B',
-              values: [['Slide bảo vệ', '05/11']],
+              sheet: 'Sheet1',
+              rows: [['Slide bảo vệ', '05/11']],
             },
             dependsOn: [],
           },
@@ -125,8 +125,8 @@ export function createSandboxProvider(scenario?: string) {
               description: 'Thêm dòng mới vào bảng tính',
               args: {
                 spreadsheetId: sheetId,
-                range: 'Sheet1!A:B',
-                values: [['Slide bảo vệ', '05/11']],
+                sheet: 'Sheet1',
+                rows: [['Slide bảo vệ', '05/11']],
               },
               dependsOn: [],
             },

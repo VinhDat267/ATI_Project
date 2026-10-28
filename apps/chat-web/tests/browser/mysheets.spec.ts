@@ -116,7 +116,7 @@ test('MYSHEETS: Flow 1 - connect from settings, select scope with fake picker, r
 
   const reportCheckbox = pickerModal.getByRole('checkbox', { name: 'Báo cáo tuần' });
   await reportCheckbox.check();
-  await pickerModal.getByRole('button', { name: /Chọn/i }).click();
+  await pickerModal.getByRole('button', { name: /^Chọn/ }).click();
   await expect(pickerModal).not.toBeVisible();
 
   await expect(page.getByText('Báo cáo tuần')).toBeVisible();
@@ -140,7 +140,7 @@ test('MYSHEETS: Flow 2 - disconnect, connect from chat refusal, plan and receipt
 
   // Go to chat and request personal spreadsheet write while disconnected
   await page.goto('/');
-  await page.getByRole('textbox').fill("Thêm việc 'Chuẩn bị slide bảo vệ', hạn 05/11, vào bảng tính Việc của tôi.");
+  await page.getByRole('textbox').fill("Ghi một dòng vào bảng tính riêng của tôi: Chuẩn bị slide bảo vệ, hạn 05/11");
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
 
   await page.waitForURL(/\/c\/[0-9a-f-]{36}/);
@@ -210,7 +210,7 @@ test('MYSHEETS: Flow 3 - scope_required state recovery from refusal without re-r
 
   // Initiate conversation to get refusal
   await page.goto('/');
-  await page.getByRole('textbox').fill("Thêm việc 'Chuẩn bị slide bảo vệ', hạn 05/11, vào bảng tính Việc của tôi.");
+  await page.getByRole('textbox').fill("Ghi một dòng vào bảng tính riêng của tôi: Chuẩn bị slide bảo vệ, hạn 05/11");
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
   await page.waitForURL(/\/c\/[0-9a-f-]{36}/);
   const conversationUrl = page.url();
@@ -234,10 +234,12 @@ test('MYSHEETS: Flow 3 - scope_required state recovery from refusal without re-r
   await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
 
   // Select spreadsheet and save
-  await page.getByRole('button', { name: 'Chọn bảng tính trong Google Drive', exact: true }).click();
+  const openPickerBtn = page.getByRole('button', { name: /Chọn bảng tính trong Google Drive|Thêm bảng tính/i });
+  await expect(openPickerBtn).toBeVisible();
+  await openPickerBtn.click();
   const pickerModal = page.getByRole('dialog', { name: /Chọn bảng tính/i });
   await pickerModal.getByRole('checkbox', { name: 'Việc của tôi' }).check();
-  await pickerModal.getByRole('button', { name: /Chọn \(1\)/i }).click();
+  await pickerModal.getByRole('button', { name: /^Chọn/ }).click();
 
   await page.getByRole('button', { name: 'Xong, quay lại hội thoại', exact: true }).click();
 
@@ -256,10 +258,13 @@ test('MYSHEETS: Flow 4 - cancel picker leaves list unchanged', async ({ page }) 
   await page.goto('/connections/mysheets/callback?mode=select');
   await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
 
+  // Wait for loading to finish and picker button to be visible
+  const pickerBtn = page.getByRole('button', { name: /Chọn bảng tính trong Google Drive|Thêm bảng tính/i });
+  await expect(pickerBtn).toBeVisible();
+
   const countBefore = await page.locator('[role="group"][aria-label="Danh sách bảng tính đã chọn"] > div').count();
 
   // Open picker
-  const pickerBtn = page.getByRole('button', { name: /Chọn bảng tính|Thêm bảng tính/i });
   await pickerBtn.click();
 
   const pickerModal = page.getByRole('dialog', { name: /Chọn bảng tính/i });
@@ -279,6 +284,12 @@ test('MYSHEETS: Flow 5 - /guide?service=mysheets and Landing card', async ({ pag
   const pageErrors: Error[] = [];
   page.on('pageerror', (err) => pageErrors.push(err));
 
+  // Landing page displays personal Google Sheets card when unauthenticated
+  await page.goto('/');
+  await expect(page.getByText('Google Sheets · Của riêng bạn')).toBeVisible();
+  const guideCardLink = page.getByRole('link', { name: 'Cách kết nối và mẫu câu Google Sheets' });
+  await expect(guideCardLink).toBeVisible();
+
   await login(page);
 
   // /guide?service=mysheets selects mysheets
@@ -287,12 +298,6 @@ test('MYSHEETS: Flow 5 - /guide?service=mysheets and Landing card', async ({ pag
   const connectGuideLink = page.getByRole('link', { name: 'Kết nối Google Sheets →' });
   await expect(connectGuideLink).toBeVisible();
   expect(await connectGuideLink.getAttribute('href')).toBe('/settings#mysheets');
-
-  // Landing page displays personal Google Sheets card
-  await page.goto('/');
-  await expect(page.getByText('Google Sheets · Của riêng bạn')).toBeVisible();
-  const guideCardLink = page.getByRole('link', { name: 'Cách kết nối và mẫu câu Google Sheets' });
-  await expect(guideCardLink).toBeVisible();
 
   expect(pageErrors).toEqual([]);
 });
