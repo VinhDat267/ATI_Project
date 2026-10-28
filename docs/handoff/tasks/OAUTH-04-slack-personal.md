@@ -1,6 +1,6 @@
 # OAUTH-04 · Slack cá nhân và trợ lý công việc trong ATI
 
-**Trạng thái:** đã đồng ý hướng sửa F1–F4, cập nhật và kiểm tra bản sửa; chờ duyệt toàn văn; chưa triển khai.
+**Trạng thái:** thiết kế đã chốt để chuyển sang triển khai; đã có kế hoạch SLACK-01, chưa code.
 **Nhánh tài liệu:** `docs/slack-oauth-design` · **Nền:** `b437f985` (28/10/2026).
 **Thiết kế:** [Slack cá nhân và trợ lý công việc](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md).
 
@@ -26,11 +26,11 @@ Không code sản phẩm, tạo Slack app, cấp quyền, chạy live/model ho�
 - [x] Kiểm tra bản đầu: ba file UTF-8, bảy liên kết tương đối và diff; exit 0.
 - [x] Chủ dự án đồng ý bốn hướng xử lý F1–F4; đã bổ sung mục 4.4, 4.5, 9.1, 9.2 và ca nghiệm thu.
 - [x] Fresh builder check: F1–F4 đủ ở mức thiết kế, `nothing important left`; kiểm UTF-8/liên kết/diff trên bản cuối theo log sửa.
-- [ ] Chủ dự án duyệt toàn văn thiết kế sau sửa.
+- [x] Sau khi nhận bản sửa `d479b098`, chủ dự án cho chuyển sang triển khai (“có thể bắt đầu triển rồi đúng không”); đã dùng writing-plans tạo kế hoạch phần nền.
 
 ## Kết quả
 
-- Đã viết bản thiết kế ngày 28/10/2026. Sau review, chủ dự án trả lời `ok` cho bốn hướng sửa đã đề xuất; đã cập nhật theo quyết định đó. Chưa ghi nhận duyệt toàn văn bản sửa hoặc cho phép triển khai/live.
+- Đã viết bản thiết kế ngày 28/10/2026. Sau review, chủ dự án trả lời `ok` cho bốn hướng sửa, rồi cho chuyển sang triển khai sau bản `d479b098`. Chấp thuận này không phải quyền gửi/xóa Slack thật hoặc bật live.
 - Đối chiếu code/docs tại `b437f985`; các thông tin Slack dẫn nguồn trực tiếp trong thiết kế.
 - Builder check độc lập nêu ba câu hỏi; đã nhận quyết định người dùng về mức liên quan, ghi đề xuất rõ cho phân phối app và nguồn bản tổng hợp. Đọc lại: `nothing important left`.
 - Kiểm tra tài liệu: ba file UTF-8 hợp lệ, bảy liên kết tương đối tồn tại, `git diff --cached --check` exit 0. [Log](../log/2026-10-28-slack-oauth-brainstorm.md).
@@ -38,3 +38,4 @@ Không code sản phẩm, tạo Slack app, cấp quyền, chạy live/model ho�
 - Không sửa `CURRENT-STATE.md`/`ROADMAP.md`; không thay trạng thái các feature đang mở.
 - Review chi tiết: [F1–F4 trên bản đầu](../log/2026-10-28-slack-oauth-design-review.md). Bản sửa và kiểm tra mới theo [log xử lý review](../log/2026-10-28-slack-oauth-design-fixes.md); không dùng kết quả builder check cũ để tự kết luận bản sửa đạt.
 - Fresh builder check sau sửa: **F1–F4 được trả lời ở mức thiết kế**, không thấy mâu thuẫn trọng yếu, `nothing important left`. Kết quả này không thay cho kiểm thử triển khai/live.
+- Kế hoạch tiếp theo: [Slack Foundation](../../superpowers/plans/2026-10-28-slack-foundation.md), card [SLACK-01](SLACK-01-foundation.md), [log lập kế hoạch](../log/2026-10-28-slack-foundation-plan.md). Các phần còn lại giữ trong lộ trình, chưa triển khai.
