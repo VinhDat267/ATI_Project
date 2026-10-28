@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import { validateEnv } from '../../src/config/env.js';
+import { runtimeMySheetsEndpoints } from '../../src/config/gmail-tools-runtime.js';
 
 const liveBase = {
   RUNTIME_MODE: 'live',
@@ -103,11 +105,10 @@ describe('MYSHEETS configuration and live project isolation', () => {
 
   it('proves live mode isolates driveApiBaseUrl and omits fakePickerBaseUrl', () => {
     const liveConfig = validateEnv(liveSheets);
-    // In live mode, fake picker override must NOT be passed to routes, preserving google mode
-    const fakePickerBaseUrl = liveConfig.RUNTIME_MODE === 'sandbox' ? liveConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
-    const driveApiBaseUrl = liveConfig.RUNTIME_MODE === 'sandbox' ? liveConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
-    expect(fakePickerBaseUrl).toBeUndefined();
-    expect(driveApiBaseUrl).toBeUndefined();
+    // Uses the actual runtime wiring function that server.ts calls
+    const liveEndpoints = runtimeMySheetsEndpoints(liveConfig.RUNTIME_MODE, liveConfig.MYSHEETS_OAUTH?.apiBaseUrl);
+    expect(liveEndpoints.fakePickerBaseUrl).toBeUndefined();
+    expect(liveEndpoints.driveApiBaseUrl).toBeUndefined();
 
     // In sandbox mode, fake picker base URL and drive override are passed
     const sandboxConfig = validateEnv({
@@ -125,9 +126,16 @@ describe('MYSHEETS configuration and live project isolation', () => {
       MYSHEETS_OAUTH_REVOKE_URL: 'http://127.0.0.1:55534/revoke',
       MYSHEETS_API_BASE_URL: 'http://127.0.0.1:55534',
     });
-    const sandboxFakePicker = sandboxConfig.RUNTIME_MODE === 'sandbox' ? sandboxConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
-    const sandboxDriveApi = sandboxConfig.RUNTIME_MODE === 'sandbox' ? sandboxConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
-    expect(sandboxFakePicker).toBe('http://127.0.0.1:55534');
-    expect(sandboxDriveApi).toBe('http://127.0.0.1:55534');
+    const sandboxEndpoints = runtimeMySheetsEndpoints(sandboxConfig.RUNTIME_MODE, sandboxConfig.MYSHEETS_OAUTH?.apiBaseUrl);
+    expect(sandboxEndpoints.fakePickerBaseUrl).toBe('http://127.0.0.1:55534');
+    expect(sandboxEndpoints.driveApiBaseUrl).toBe('http://127.0.0.1:55534');
+  });
+
+  it('proves server.ts wires mysheets endpoints through runtimeMySheetsEndpoints', async () => {
+    const serverSrc = await readFile(new URL('../../src/server.ts', import.meta.url), 'utf-8');
+    expect(serverSrc).toContain('runtimeMySheetsEndpoints');
+    // Ensure raw unisolated apiBaseUrl is not passed directly to fakePickerBaseUrl or driveApiBaseUrl in server.ts
+    expect(serverSrc).not.toMatch(/fakePickerBaseUrl:\s*env\.MYSHEETS_OAUTH\?\.apiBaseUrl(?!\s*:)/);
+    expect(serverSrc).not.toMatch(/driveApiBaseUrl:\s*env\.MYSHEETS_OAUTH\?\.apiBaseUrl(?!\s*:)/);
   });
 });

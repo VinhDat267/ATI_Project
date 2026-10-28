@@ -72,6 +72,13 @@ export function runtimeMySheetsAdapter(
   });
 }
 
+export function runtimeMySheetsEndpoints(mode: RuntimeMode, apiBaseUrl?: string) {
+  return {
+    fakePickerBaseUrl: mode === 'sandbox' ? apiBaseUrl : undefined,
+    driveApiBaseUrl: mode === 'sandbox' ? apiBaseUrl : undefined,
+  };
+}
+
 export function createToolRuntimeFactory(
   mode: RuntimeMode,
   personal: (name: string, context?: AdapterContext) => Promise<any>,

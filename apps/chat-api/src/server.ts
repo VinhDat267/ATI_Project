@@ -13,7 +13,7 @@ import {
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
 import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
-import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, runtimeMySheetsEndpoints, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -382,8 +382,7 @@ async function bootstrap() {
       oauth: mysheetsAvailable ? env.MYSHEETS_OAUTH : undefined,
       repo: mysheetsAvailable && pool ? new GmailConnectionRepo(pool, 'mysheets', 'connect_mysheets') : undefined,
       picker: env.MYSHEETS_PICKER,
-      fakePickerBaseUrl: env.RUNTIME_MODE === 'sandbox' ? env.MYSHEETS_OAUTH?.apiBaseUrl : undefined,
-      driveApiBaseUrl: env.RUNTIME_MODE === 'sandbox' ? env.MYSHEETS_OAUTH?.apiBaseUrl : undefined,
+      ...runtimeMySheetsEndpoints(env.RUNTIME_MODE, env.MYSHEETS_OAUTH?.apiBaseUrl),
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
     } : undefined,
     mysheetsTokens,

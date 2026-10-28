@@ -9,6 +9,7 @@ import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanRes
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
+import { resolveRef } from '@wap/executor';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -16,7 +17,7 @@ function withoutConnections(plan: PlanResponse): PlanResponse {
   return rest;
 }
 
-function resolveTargetSpreadsheet(
+export function resolveTargetSpreadsheet(
   sId: unknown,
   steps: PlanStep[],
   selected: PersonalSpreadsheetItem[]
@@ -25,29 +26,39 @@ function resolveTargetSpreadsheet(
     return selected.find((item) => item.id === sId) ?? null;
   }
   if (sId && typeof sId === 'object' && '$ref' in sId && typeof (sId as any).$ref === 'string') {
-    const ref = (sId as any).$ref as string;
-    const refStepId = ref.split('.')[0];
+    const rawRef = (sId as any).$ref as string;
+    const normalizedRef = rawRef.replace(/\[(\d+)\]/g, '.$1');
+    const dotIndex = normalizedRef.indexOf('.');
+    const refStepId = dotIndex === -1 ? normalizedRef : normalizedRef.slice(0, dotIndex);
     const refStep = steps.find((s) => s.id === refStepId);
 
     if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
       const q = typeof refStep.args?.query === 'string' ? refStep.args.query.trim().toLowerCase() : '';
-      if (q) {
-        const matchedByQuery = selected.filter((item) =>
-          item.title.toLowerCase().includes(q) || item.id.toLowerCase() === q
-        );
-        if (matchedByQuery.length > 0) {
-          const readOnly = matchedByQuery.find((item) => item.canEdit === false);
-          return readOnly ?? matchedByQuery[0] ?? null;
+      const limitRaw = refStep.args?.limit;
+      const limit = typeof limitRaw === 'number' && Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 10
+        ? limitRaw
+        : 10;
+
+      const matches: PersonalSpreadsheetItem[] = [];
+      for (const item of selected) {
+        if (!q || item.title.toLowerCase().includes(q)) {
+          matches.push(item);
         }
+        if (matches.length >= limit) break;
+      }
+
+      try {
+        const resolved = resolveRef(normalizedRef, new Map([[refStepId, matches]]));
+        const resolvedId = typeof resolved === 'string' ? resolved : (resolved && typeof resolved === 'object' ? resolved.id : undefined);
+        if (typeof resolvedId === 'string') {
+          return selected.find((item) => item.id === resolvedId) ?? null;
+        }
+      } catch {
+        return null;
       }
     }
 
-    const allReadOnly = selected.length > 0 && selected.every((item) => item.canEdit === false);
-    if (allReadOnly && selected[0]) {
-      return selected[0];
-    }
-
-    if (selected.length === 1 && selected[0]?.canEdit === false) {
+    if (selected.length > 0 && selected.every((item) => item.canEdit === false)) {
       return selected[0] ?? null;
     }
   }

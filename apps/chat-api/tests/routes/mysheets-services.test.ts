@@ -9,7 +9,7 @@ import { GmailConnectionRepo } from '../../src/db/repositories/gmail-connection-
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { AdapterFactory, type AdapterContext } from '../../src/services/adapter-factory.js';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
-import { ChatService } from '../../src/services/chat-service.js';
+import { ChatService, resolveTargetSpreadsheet } from '../../src/services/chat-service.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from '../../src/services/gmail/connection-reference.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
@@ -431,9 +431,57 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
     });
 
-    it('ChatService.bindConnections refuses a plan targeting a read-only spreadsheet via $ref', async () => {
+    it('resolveTargetSpreadsheet accurately respects query, limit, and output index from $ref', () => {
+      const selected: PersonalSpreadsheetItem[] = [
+        { id: 'sheet_w', title: 'Report writable', canEdit: true },
+        { id: 'sheet_r', title: 'Report read only', canEdit: false },
+      ];
+
+      // Case 1: query "", limit 10, ref to index 1 -> resolves to R
+      const step1: PlanStep = {
+        id: 'find',
+        tool: 'mysheets.list_spreadsheets',
+        description: 'Tìm',
+        args: { query: '', limit: 10 },
+        dependsOn: [],
+      };
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.1.id' }, [step1], selected)).toEqual(selected[1]);
+
+      // Case 2: query "Report", limit 1, ref to index 0 -> resolves to W (limit slices before index 1)
+      const step2: PlanStep = {
+        id: 'find',
+        tool: 'mysheets.list_spreadsheets',
+        description: 'Tìm',
+        args: { query: 'Report', limit: 1 },
+        dependsOn: [],
+      };
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.0.id' }, [step2], selected)).toEqual(selected[0]);
+      // And index 1 is out of bounds for limit 1 -> returns null
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.1.id' }, [step2], selected)).toBeNull();
+
+      // Case 3: query "Report", limit 10 -> index 0 resolves to W, index 1 resolves to R
+      const step3: PlanStep = {
+        id: 'find',
+        tool: 'mysheets.list_spreadsheets',
+        description: 'Tìm',
+        args: { query: 'Report', limit: 10 },
+        dependsOn: [],
+      };
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.0.id' }, [step3], selected)).toEqual(selected[0]);
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.1.id' }, [step3], selected)).toEqual(selected[1]);
+
+      // Supports brackets normalization find.output[1].id
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output[1].id' }, [step3], selected)).toEqual(selected[1]);
+
+      // Direct string literal
+      expect(resolveTargetSpreadsheet('sheet_r', [step3], selected)).toEqual(selected[1]);
+      expect(resolveTargetSpreadsheet('sheet_unknown', [step3], selected)).toBeNull();
+    });
+
+    it('ChatService.bindConnections refuses append_rows when $ref points to index 1 (read-only) in mixed list with limit 10', async () => {
       await connectMySheets(alice, 'alice@example.com', [
-        { id: 'sheet_alice_ro', title: 'Bảng Điểm Danh (Chỉ xem)', canEdit: false },
+        { id: 'sheet_w', title: 'Report writable', canEdit: true },
+        { id: 'sheet_r', title: 'Report read only', canEdit: false },
       ]);
 
       const chatService = new ChatService({
@@ -445,21 +493,21 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const plan: any = {
         kind: 'plan',
-        title: 'Thêm dòng bằng tham chiếu',
+        title: 'Thêm dòng bằng tham chiếu tới bảng chỉ xem',
         summary: 'Thêm dòng',
         steps: [
           {
             id: 'find',
             tool: 'mysheets.list_spreadsheets',
             description: 'Tìm bảng tính',
-            args: { query: 'Điểm Danh' },
+            args: { query: '', limit: 10 },
             dependsOn: [],
           },
           {
             id: 's2',
             tool: 'mysheets.append_rows',
             description: 'Thêm dòng',
-            args: { spreadsheetId: { $ref: 'find.output[0].id' }, range: 'Sheet1!A:B', rows: [['Alice', 'Present']] },
+            args: { spreadsheetId: { $ref: 'find.output.1.id' }, sheet: 'Sheet1', rows: [['Dữ liệu mới']] },
             dependsOn: ['find'],
           },
         ],
@@ -468,8 +516,53 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
-      expect(result.reason).toBe('Bảng tính "Bảng Điểm Danh (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, ATI không thêm dòng được.');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
+    });
+
+    it('ChatService.bindConnections accepts append_rows when $ref points to index 0 (writable) in mixed list with limit 1', async () => {
+      const saved = await connectMySheets(alice, 'alice@example.com', [
+        { id: 'sheet_w', title: 'Report writable', canEdit: true },
+        { id: 'sheet_r', title: 'Report read only', canEdit: false },
+      ]);
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+      });
+
+      const plan: any = {
+        kind: 'plan',
+        title: 'Thêm dòng vào bảng writable',
+        summary: 'Thêm dòng',
+        steps: [
+          {
+            id: 'find',
+            tool: 'mysheets.list_spreadsheets',
+            description: 'Tìm bảng tính',
+            args: { query: 'Report', limit: 1 },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng',
+            args: { spreadsheetId: { $ref: 'find.output.0.id' }, sheet: 'Sheet1', rows: [['Dữ liệu hợp lệ']] },
+            dependsOn: ['find'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('plan');
+      expect(result.connections?.mysheets).toEqual({
+        credentialId: saved.id,
+        email: 'alice@example.com',
+        allowedSpreadsheets: ['sheet_w', 'sheet_r'],
+      });
     });
 
     it('ChatService.bindConnections refuses append_rows via $ref when query specifically matches a read-only spreadsheet', async () => {
@@ -501,7 +594,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
             id: 's2',
             tool: 'mysheets.append_rows',
             description: 'Thêm dòng',
-            args: { spreadsheetId: { $ref: 'find.output[0].id' }, range: 'Sheet1!A:B', rows: [['Dòng mới']] },
+            args: { spreadsheetId: { $ref: 'find.output.0.id' }, sheet: 'Sheet1', rows: [['Dòng mới']] },
             dependsOn: ['find'],
           },
         ],

@@ -82,7 +82,7 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
   - `npm run check`: **PASS** (exit code 0; unit/integration tests, 406 evaluation tests, 11 launcher/env tests, typecheck sạch, web build bảo mật sạch).
   - Browser E2E: **PASS** (9/9 passed ở `SCENARIO=mysheets`, 1/1 passed ở `MYSHEETS off:`).
   - Đột biến: **13/13 đột biến bắt buộc** (§8.2) bị bắt với exit code 1, tự động hóa qua `scripts/test-mysheets-mutations.mjs`, khôi phục 100% SHA-256 (M2 được chuẩn hoá và bắt đúng).
-  - Review Round 1: Đã giải quyết triệt để 4 findings (P1 live isolation, P2 scope removal guard, P2 $ref read-only validation, P2 M2 mutation runner) cùng test tích hợp Schedules+MySheets.
+  - Review Round 1 & 2: Đã giải quyết triệt để 4 findings vòng 1 và 2 findings vòng 2 (P2 $ref semantic resolver với query/limit/indices, P3 live endpoint runtime wiring regression-proof test) cùng test tích hợp Schedules+MySheets.
 - **Số đo (`EVAL_SET=mysheets`):** Chưa đo (thuộc Bước 2, thực hiện trên nhánh `eval/oauth-03-measure` sau khi merge PR code).
 - **Nghiệm thu thật:** Chưa nghiệm thu P-LIVE (nhóm trưởng thao tác ở Bước 4 với Google Cloud Project thứ ba).
 - **Quyết định bật cờ:** Giữ `MYSHEETS_ENABLED=off` trong PR này; chỉ bật cờ khi hoàn thành Bước 2 và Bước 4.

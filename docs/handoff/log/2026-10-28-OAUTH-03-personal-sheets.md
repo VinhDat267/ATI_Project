@@ -145,7 +145,31 @@ Tất cả 13 đột biến được kiểm tra tự động qua runner `scripts
 
 ---
 
-## 5. Việc còn lại (cần thao tác của nhóm trưởng)
+## 5. Cập nhật sau Review Vòng 2 (PR #180)
+
+Đã xử lý dứt điểm 2 findings từ reviewer (`https://github.com/VinhDat267/ATI_Project/pull/180#issuecomment-6462036541`):
+
+1. **[P2] Xác định đích bảng tính chính xác từ ngữ nghĩa `$ref`, chỉ số mảng và giới hạn `limit`:**
+   - Sửa `apps/chat-api/src/services/chat-service.ts`:
+     - Tái hiện đúng cơ chế của `PersonalSheetsAdapter.list_spreadsheets`: lọc theo `query` (nếu có, không phân biệt hoa thường), áp dụng giới hạn `limit` (1..10, mặc định 10).
+     - Sử dụng hàm `resolveRef` chuẩn của `@wap/executor` giải quyết biểu thức tham chiếu (ví dụ: `find.output.1.id` hoặc `find.output.0.id`, hỗ trợ chuẩn hoá cú pháp ngoặc vuông `[1]`), lấy ra ID bảng tính cụ thể được trỏ tới thay vì ưu tiên bất kỳ bảng chỉ xem nào trùng tên.
+     - Kiểm tra quyền hạn ghi: Nếu bảng tính được giải quyết qua tham chiếu có `canEdit: false`, từ chối với lý do rõ ràng; nếu là bảng cho phép chỉnh sửa (`canEdit: true`), kế hoạch được chấp thuận (`plan`).
+   - Kiểm thử: Bổ sung bộ ca kiểm thử toàn diện trong `apps/chat-api/tests/routes/mysheets-services.test.ts` (26/26 pass):
+     - Test unit `resolveTargetSpreadsheet` kiểm tra chính xác các tổ hợp query, limit, chỉ số 0 và 1, và trường hợp vượt giới hạn.
+     - Tái hiện ca 1: Allowlist hỗn hợp `[W (Report writable), R (Report read only)]`, `query: "", limit: 10`, `$ref: "find.output.1.id"` trỏ tới R -> trả về **refusal**.
+     - Tái hiện ca 2: Allowlist hỗn hợp `[W, R]`, `query: "Report", limit: 1`, `$ref: "find.output.0.id"` trỏ tới W -> trả về **plan** (chấp thuận, không bị chặn nhầm).
+     - Allowlist hỗn hợp với `query: "Report", limit: 10`: `$ref: "find.output.0.id"` chấp thuận, `$ref: "find.output.1.id"` từ chối.
+
+2. **[P3] Bảo vệ wiring live endpoints bằng hàm runtime và kiểm thử bắt hồi quy:**
+   - Trích xuất hàm `runtimeMySheetsEndpoints(mode, apiBaseUrl)` trong `apps/chat-api/src/config/gmail-tools-runtime.ts`.
+   - Cập nhật `apps/chat-api/src/server.ts` sử dụng trực tiếp hàm wiring này khi cấu hình `mysheets` app options thay vì biểu thức lặp lại cục bộ.
+   - Kiểm thử: Cập nhật `apps/chat-api/tests/config/mysheets-config.test.ts` (10/10 pass):
+     - Kiểm tra trực tiếp hàm `runtimeMySheetsEndpoints` cho cả 2 chế độ live và sandbox. Đã chứng minh nếu bỏ guard sandbox trong hàm này thì test lập tức FAIL (exit code 1).
+     - Kiểm tra tĩnh mã nguồn `server.ts` bảo đảm server thực sự gọi `runtimeMySheetsEndpoints` và không truyền trực tiếp `apiBaseUrl` chưa cách ly.
+
+---
+
+## 6. Việc còn lại (cần thao tác của nhóm trưởng)
 
 - Tạo OAuth Client thứ ba trên Google Cloud Project riêng biệt (redirect URI `/connections/mysheets/callback`, scope `https://www.googleapis.com/auth/drive.file`), tạo API Key cho Google Picker và điền các biến `MYSHEETS_OAUTH_*`, `MYSHEETS_PICKER_*` vào `.env` máy local.
 - Thực hiện đo model độc lập trên nhánh `eval/oauth-03-measure` (`EVAL_SET=mysheets` ×3) sau khi PR code này được review và merge.
