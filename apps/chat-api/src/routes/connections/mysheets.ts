@@ -291,7 +291,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
 
     try {
       const record = await options.credentialRepo!.getPersonalCredentials('mysheets', user.id);
-      if (!record || (record.status !== 'active' && record.status !== 'scope_required')) {
+      if (!record) {
         res.status(409).json({
           error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
           code: 'MYSHEETS_NOT_CONNECTED',
@@ -360,7 +360,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
     const user = (req as any).user as AuthUser;
     try {
       const record = await options.credentialRepo!.getPersonalCredentials('mysheets', user.id);
-      if (!record || (record.status !== 'active' && record.status !== 'scope_required')) {
+      if (!record) {
         res.status(409).json({
           error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
           code: 'MYSHEETS_NOT_CONNECTED',
@@ -400,7 +400,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
         return;
       }
       const record = await options.credentialRepo!.getPersonalCredentials('mysheets', user.id);
-      if (!record || (record.status !== 'active' && record.status !== 'scope_required')) {
+      if (!record) {
         res.status(409).json({
           error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
           code: 'MYSHEETS_NOT_CONNECTED',
