@@ -10,6 +10,7 @@ import type {
   AdminUser, AdminUserPage,
   AuthMessageResponse,
   AccountProfile, AccountSession,
+  PersonalSpreadsheetItem, MySheetsPickerSession,
 } from '../types';
 
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
@@ -236,6 +237,52 @@ export class ApiClient {
   disconnectMyCalendar() {
     return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
   }
+  startMySheetsConnection(body?: { returnTo?: string }) {
+    return this.request<{ url: string }>('/api/connections/mysheets/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(body?.returnTo ? { body: JSON.stringify({ returnTo: body.returnTo }) } : {}),
+    });
+  }
+  completeMySheetsConnection(body: { code: string; state: string }) {
+    // OAuth state is one-use. Never replay this request, including on a 401.
+    return this.request<{
+      email: string;
+      returnTo?: string;
+    }>('/api/connections/mysheets/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(body),
+    }, true);
+  }
+  createMySheetsPickerSession() {
+    return this.request<MySheetsPickerSession>('/api/connections/mysheets/picker-session', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
+  getMySheetsSpreadsheets() {
+    return this.request<{
+      email: string;
+      selectedSpreadsheets: PersonalSpreadsheetItem[];
+    }>('/api/connections/mysheets/spreadsheets', { credentials: 'include' });
+  }
+  saveMySheetsScope(body: { spreadsheetIds: string[] }) {
+    return this.request<{
+      email: string;
+      selectedSpreadsheets: PersonalSpreadsheetItem[];
+    }>('/api/connections/mysheets/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+  }
+  disconnectMySheets() {
+    return this.request<{ ok: boolean }>('/api/connections/mysheets', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
@@ -355,7 +402,7 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; schedulesEnabled?: boolean }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean; schedulesEnabled?: boolean }> {
     return this.request('/api/health');
   }
 

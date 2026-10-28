@@ -5,7 +5,7 @@ export function useRoute(initialView?: 'landing' | 'login') {
   const [route, setRoute] = useState<AppRoute>(() => initialView
     ? { kind: initialView === 'login' ? 'login' : 'home' } : readRoute());
   useLayoutEffect(() => {
-    if (route.kind === 'gmail-callback' || route.kind === 'mycalendar-callback') {
+    if (route.kind === 'gmail-callback' || route.kind === 'mycalendar-callback' || route.kind === 'mysheets-callback') {
       window.history.replaceState(window.history.state, '', window.location.pathname);
       return;
     }
