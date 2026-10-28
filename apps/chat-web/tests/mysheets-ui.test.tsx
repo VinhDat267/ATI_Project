@@ -125,9 +125,13 @@ describe('MySheetsCallbackView', () => {
     expect(navigate).toHaveBeenCalledWith(`/c/${CONV_ID}`, true);
   });
 
-  it('allows removing spreadsheets and disables done button when 0 items remain', async () => {
+  it('allows removing spreadsheets when multiple remain and prevents removing the last one', async () => {
     const navigate = vi.fn();
     vi.spyOn(apiClient, 'getMySheetsSpreadsheets').mockResolvedValue({
+      email: 'user@gmail.com',
+      selectedSpreadsheets: [sampleSpreadsheets[0], sampleSpreadsheets[1]],
+    });
+    const saveScopeSpy = vi.spyOn(apiClient, 'saveMySheetsScope').mockResolvedValue({
       email: 'user@gmail.com',
       selectedSpreadsheets: [sampleSpreadsheets[0]],
     });
@@ -140,14 +144,21 @@ describe('MySheetsCallbackView', () => {
     );
 
     expect(await screen.findByText('Việc của tôi')).toBeTruthy();
-    const removeBtn = screen.getByRole('button', { name: /Bỏ/i });
-    fireEvent.click(removeBtn);
+    expect(screen.getByText('KPI quý 4')).toBeTruthy();
 
-    // After removing, list is empty and done button is disabled
-    expect(screen.queryByText('Việc của tôi')).toBeNull();
-    const doneBtn = screen.getByRole('button', { name: 'Xong' });
-    expect(doneBtn).toBeDisabled();
-    expect(screen.getByText('Hãy chọn ít nhất 1 bảng tính để tiếp tục.')).toBeTruthy();
+    // Remove the second spreadsheet
+    const removeBtns = screen.getAllByRole('button', { name: /Bỏ/i });
+    expect(removeBtns).toHaveLength(2);
+    fireEvent.click(removeBtns[1]);
+
+    expect(saveScopeSpy).toHaveBeenCalledWith({
+      spreadsheetIds: [sampleSpreadsheets[0].id],
+    });
+
+    // After removing, only 1 remains, and its remove button is disabled
+    expect(await screen.findByText(/Cần giữ lại ít nhất 1 bảng tính/)).toBeTruthy();
+    const lastRemoveBtn = screen.getByRole('button', { name: /Bỏ/i });
+    expect(lastRemoveBtn).toBeDisabled();
   });
 
   it('strictly validates returnTo and falls back to /settings?mysheets=connected#mysheets on open redirect', async () => {

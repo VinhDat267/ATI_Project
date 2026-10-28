@@ -23,8 +23,8 @@ const mutations = [
     id: 'M2',
     name: 'Cho mysheets.* vào catalog khi đang scope_required',
     file: 'apps/chat-api/src/services/registered-services.ts',
-    target: "if (mysheets && mysheets.status === 'active') {",
-    mutated: "if (mysheets && (mysheets.status === 'active' || mysheets.status === 'scope_required')) {",
+    target: "if (spreadsheets.length > 0) {\n          catalog = [...catalog, ...MYSHEETS_TOOLS];\n        }",
+    mutated: "if (true) {\n          catalog = [...catalog, ...MYSHEETS_TOOLS];\n        }",
     command: ['test', '-w', '@wap/chat-api', '--', 'tests/routes/mysheets-services.test.ts', '-t', 'excludes MYSHEETS_TOOLS in getToolCatalogFor when in scope_required state'],
   },
   {

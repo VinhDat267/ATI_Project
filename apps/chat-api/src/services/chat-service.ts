@@ -5,7 +5,7 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { PlanConnections, PlannerResponse, PlanResponse, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
@@ -14,6 +14,44 @@ import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedu
 function withoutConnections(plan: PlanResponse): PlanResponse {
   const { connections: _ignored, ...rest } = plan;
   return rest;
+}
+
+function resolveTargetSpreadsheet(
+  sId: unknown,
+  steps: PlanStep[],
+  selected: PersonalSpreadsheetItem[]
+): PersonalSpreadsheetItem | null {
+  if (typeof sId === 'string') {
+    return selected.find((item) => item.id === sId) ?? null;
+  }
+  if (sId && typeof sId === 'object' && '$ref' in sId && typeof (sId as any).$ref === 'string') {
+    const ref = (sId as any).$ref as string;
+    const refStepId = ref.split('.')[0];
+    const refStep = steps.find((s) => s.id === refStepId);
+
+    if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
+      const q = typeof refStep.args?.query === 'string' ? refStep.args.query.trim().toLowerCase() : '';
+      if (q) {
+        const matchedByQuery = selected.filter((item) =>
+          item.title.toLowerCase().includes(q) || item.id.toLowerCase() === q
+        );
+        if (matchedByQuery.length > 0) {
+          const readOnly = matchedByQuery.find((item) => item.canEdit === false);
+          return readOnly ?? matchedByQuery[0] ?? null;
+        }
+      }
+    }
+
+    const allReadOnly = selected.length > 0 && selected.every((item) => item.canEdit === false);
+    if (allReadOnly && selected[0]) {
+      return selected[0];
+    }
+
+    if (selected.length === 1 && selected[0]?.canEdit === false) {
+      return selected[0] ?? null;
+    }
+  }
+  return null;
 }
 
 export interface HandleUserMessageInput {
@@ -188,16 +226,19 @@ export class ChatService {
           };
         }
 
-        const readOnlyAppendStep = bound.steps.find((step) => {
-          if (step.tool !== 'mysheets.append_rows') return false;
-          const sId = step.args?.spreadsheetId;
-          const matched = mysheets.selectedSpreadsheets?.find((item) => item.id === sId);
-          return matched && matched.canEdit === false;
-        });
-        if (readOnlyAppendStep) {
-          const sId = String(readOnlyAppendStep.args.spreadsheetId);
-          const matched = mysheets.selectedSpreadsheets?.find((item) => item.id === sId);
-          const title = matched?.title ?? sId;
+        const readOnlyAppendInfo = bound.steps.reduce<{ step: PlanStep; sheet: PersonalSpreadsheetItem } | null>(
+          (acc, step) => {
+            if (acc || step.tool !== 'mysheets.append_rows') return acc;
+            const target = resolveTargetSpreadsheet(step.args?.spreadsheetId, bound.steps, mysheets.selectedSpreadsheets ?? []);
+            if (target && target.canEdit === false) {
+              return { step, sheet: target };
+            }
+            return null;
+          },
+          null
+        );
+        if (readOnlyAppendInfo) {
+          const title = readOnlyAppendInfo.sheet.title;
           return {
             kind: 'refusal',
             reason: `Bảng tính "${title}" chỉ cho xem, ATI không thêm dòng được.`,

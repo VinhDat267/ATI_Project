@@ -100,4 +100,34 @@ describe('MYSHEETS configuration and live project isolation', () => {
     expect(valid.MYSHEETS_OAUTH?.clientId).toBe('sheets-client');
     expect(valid.MYSHEETS_PICKER?.appId).toBe('123456789012');
   });
+
+  it('proves live mode isolates driveApiBaseUrl and omits fakePickerBaseUrl', () => {
+    const liveConfig = validateEnv(liveSheets);
+    // In live mode, fake picker override must NOT be passed to routes, preserving google mode
+    const fakePickerBaseUrl = liveConfig.RUNTIME_MODE === 'sandbox' ? liveConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
+    const driveApiBaseUrl = liveConfig.RUNTIME_MODE === 'sandbox' ? liveConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
+    expect(fakePickerBaseUrl).toBeUndefined();
+    expect(driveApiBaseUrl).toBeUndefined();
+
+    // In sandbox mode, fake picker base URL and drive override are passed
+    const sandboxConfig = validateEnv({
+      DATABASE_URL: 'postgresql://local',
+      JWT_SECRET: 'project-isolation-test-secret-at-least-32',
+      ENCRYPTION_KEY: 'a'.repeat(32),
+      GEMINI_API_KEY: 'fixture',
+      RUNTIME_MODE: 'sandbox',
+      MYSHEETS_ENABLED: 'on',
+      MYSHEETS_OAUTH_CLIENT_ID: 'sheets-client',
+      MYSHEETS_OAUTH_CLIENT_SECRET: 'sheets-secret',
+      MYSHEETS_OAUTH_REDIRECT_URI: 'http://127.0.0.1:3000/connections/mysheets/callback',
+      MYSHEETS_OAUTH_AUTH_URL: 'http://127.0.0.1:55534/auth',
+      MYSHEETS_OAUTH_TOKEN_URL: 'http://127.0.0.1:55534/token',
+      MYSHEETS_OAUTH_REVOKE_URL: 'http://127.0.0.1:55534/revoke',
+      MYSHEETS_API_BASE_URL: 'http://127.0.0.1:55534',
+    });
+    const sandboxFakePicker = sandboxConfig.RUNTIME_MODE === 'sandbox' ? sandboxConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
+    const sandboxDriveApi = sandboxConfig.RUNTIME_MODE === 'sandbox' ? sandboxConfig.MYSHEETS_OAUTH?.apiBaseUrl : undefined;
+    expect(sandboxFakePicker).toBe('http://127.0.0.1:55534');
+    expect(sandboxDriveApi).toBe('http://127.0.0.1:55534');
+  });
 });

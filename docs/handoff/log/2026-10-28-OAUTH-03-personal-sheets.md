@@ -13,7 +13,7 @@
 1. **Task 1 — Tool Schemas, Registry, Executor Write Catalog & DB Migration `0013` (`e8de063d`):**
    - Thêm `packages/tool-schemas/src/mysheets.ts` và `packages/tool-schemas/src/registry/mysheets.ts`:
      - `MYSHEETS_SERVICE` (`connection: 'personal'`, `scopeKey: 'spreadsheets'`, `authType: 'oauth2'`).
-     - 4 công cụ `mysheets.list_spreadsheets` (`discovers: 'myspreadsheet'`), `mysheets.read_range`, `mysheets.list_sheet_tabs` (`discovers: 'mysheet'`), và `mysheets.append_rows` (`'x-resource': 'myspreadsheet'`).
+     - 4 công cụ `mysheets.list_spreadsheets` (`discovers: 'myspreadsheet'`), `mysheets.read_range`, `mysheets.list_sheets` (`discovers: 'mysheet'`), và `mysheets.append_rows` (`'x-resource': 'myspreadsheet'`).
    - Cập nhật `packages/executor/src/runner.ts` phân loại `'mysheets.append_rows'` vào `WRITE_TOOLS`.
    - Tạo migration idempotent `db/v3/0013_mysheets_personal_connections.sql` mở rộng `service_credentials_personal_check` cho `'mysheets'` và `oauth_states_mode_check` cho `'connect_mysheets'`.
 
@@ -117,7 +117,35 @@ Tất cả 13 đột biến được kiểm tra tự động qua runner `scripts
 
 ---
 
-## 4. Việc còn lại (cần thao tác của nhóm trưởng)
+## 4. Cập nhật sau Review Vòng 1 (PR #180)
+
+Đã xử lý dứt điểm 4 findings từ reviewer (`https://github.com/VinhDat267/ATI_Project/pull/180#issuecomment-6461437330`) và bổ sung test tích hợp:
+
+1. **[P1] Cấu hình live tách biệt hoàn toàn fakePickerBaseUrl và Drive endpoint:**
+   - Sửa `apps/chat-api/src/server.ts`: chỉ truyền `fakePickerBaseUrl` và `driveApiBaseUrl` khi `RUNTIME_MODE === 'sandbox'`. Trong chế độ live, để `undefined` fallback về Drive API chuẩn (`https://www.googleapis.com`) và Google Picker SDK chính thức (`POST /picker-session` trả `mode: 'google'`).
+   - Kiểm thử: Bổ sung ca test `proves live mode isolates driveApiBaseUrl and omits fakePickerBaseUrl` trong `apps/chat-api/tests/config/mysheets-config.test.ts` (9/9 pass).
+
+2. **[P2] Chặn bỏ bảng cuối trên UI khi server chưa thay đổi quyền:**
+   - Sửa `apps/chat-web/src/views/MySheetsCallbackView.tsx`: Khi `spreadsheets.length <= 1`, disable nút "Bỏ", hiển thị thông báo lỗi rõ ràng hướng dẫn người dùng ngắt kết nối tại Cài đặt thay vì để xoá mồ côi trên UI trong khi server vẫn giữ quyền. Bổ sung link điều hướng sang `/settings#mysheets`.
+   - Kiểm thử: Cập nhật `apps/chat-web/tests/mysheets-ui.test.tsx` kiểm tra vô hiệu hoá nút "Bỏ" khi còn 1 bảng tính và hiển thị thông báo hướng dẫn (19/19 pass).
+
+3. **[P2] Kiểm tra quyền hạn "Chỉ xem" (read-only) cả khi ID bảng tính là tham chiếu `$ref`:**
+   - Sửa `apps/chat-api/src/services/chat-service.ts`: Xây dựng hàm `resolveTargetSpreadsheet` hỗ trợ giải quyết ID từ cả dạng chuỗi trực tiếp lẫn tham chiếu `$ref` (dựa trên kết quả danh sách bảng tính được kết nối hoặc bước liệt kê trước đó). Bắt và từ chối kế hoạch ghi vào bảng chỉ xem ngay tại tầng thẩm định trước khi người dùng duyệt.
+   - Kiểm thử: Bổ sung 2 ca test trong `apps/chat-api/tests/routes/mysheets-services.test.ts` kiểm tra từ chối append_rows nhắm vào bảng read-only qua `$ref` (24/24 pass).
+
+4. **[P2] Đột biến M2 chuẩn xác và bằng chứng 13/13 đột biến bắt thành công:**
+   - Sửa `scripts/test-mysheets-mutations.mjs`: Đột biến M2 được sửa từ việc gán sai điều kiện sang trực tiếp bypass kiểm tra `spreadsheets.length > 0` thành `true`.
+   - Kết quả: Runner bắt trọn vẹn 13/13 đột biến (100% exit code 1, khôi phục 100% SHA-256).
+
+5. **Bổ sung kiểm thử tích hợp Lịch trình (Schedules) + MySheets:**
+   - Thêm ca test `attaches connections.mysheets and saves pending plan when schedule task uses mysheets` trong `apps/chat-api/tests/services/schedules/scheduled-run-planning.test.ts` xác thực khi cờ lịch trình và MySheets đều bật, lượt chạy định kỳ lập kế hoạch với MySheets lưu đầy đủ `connections.mysheets` vào bảng `plans` (5/5 pass).
+
+6. **Chuẩn hoá thuật ngữ tài liệu:**
+   - Sửa lỗi chính tả `mysheets.list_sheet_tabs` thành `mysheets.list_sheets` cho khớp 100% tên tool thực tế.
+
+---
+
+## 5. Việc còn lại (cần thao tác của nhóm trưởng)
 
 - Tạo OAuth Client thứ ba trên Google Cloud Project riêng biệt (redirect URI `/connections/mysheets/callback`, scope `https://www.googleapis.com/auth/drive.file`), tạo API Key cho Google Picker và điền các biến `MYSHEETS_OAUTH_*`, `MYSHEETS_PICKER_*` vào `.env` máy local.
 - Thực hiện đo model độc lập trên nhánh `eval/oauth-03-measure` (`EVAL_SET=mysheets` ×3) sau khi PR code này được review và merge.

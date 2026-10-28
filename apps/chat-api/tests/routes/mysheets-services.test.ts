@@ -430,6 +430,88 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(result.reason).toBe('Bảng tính "Bảng Điểm Danh (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
     });
+
+    it('ChatService.bindConnections refuses a plan targeting a read-only spreadsheet via $ref', async () => {
+      await connectMySheets(alice, 'alice@example.com', [
+        { id: 'sheet_alice_ro', title: 'Bảng Điểm Danh (Chỉ xem)', canEdit: false },
+      ]);
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+      });
+
+      const plan: any = {
+        kind: 'plan',
+        title: 'Thêm dòng bằng tham chiếu',
+        summary: 'Thêm dòng',
+        steps: [
+          {
+            id: 'find',
+            tool: 'mysheets.list_spreadsheets',
+            description: 'Tìm bảng tính',
+            args: { query: 'Điểm Danh' },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng',
+            args: { spreadsheetId: { $ref: 'find.output[0].id' }, range: 'Sheet1!A:B', rows: [['Alice', 'Present']] },
+            dependsOn: ['find'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('refusal');
+      expect(result.reason).toBe('Bảng tính "Bảng Điểm Danh (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
+    });
+
+    it('ChatService.bindConnections refuses append_rows via $ref when query specifically matches a read-only spreadsheet', async () => {
+      await connectMySheets(alice, 'alice@example.com', [
+        { id: 'sheet_writable', title: 'Việc của tôi', canEdit: true },
+        { id: 'sheet_ro', title: 'Báo cáo mật (Chỉ xem)', canEdit: false },
+      ]);
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+      });
+
+      const plan: any = {
+        kind: 'plan',
+        title: 'Thêm dòng vào báo cáo mật',
+        summary: 'Thêm dòng',
+        steps: [
+          {
+            id: 'find',
+            tool: 'mysheets.list_spreadsheets',
+            description: 'Tìm bảng tính',
+            args: { query: 'Báo cáo mật' },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng',
+            args: { spreadsheetId: { $ref: 'find.output[0].id' }, range: 'Sheet1!A:B', rows: [['Dòng mới']] },
+            dependsOn: ['find'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('refusal');
+      expect(result.reason).toBe('Bảng tính "Báo cáo mật (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+    });
   });
 
   describe('4. reconnect_required state', () => {

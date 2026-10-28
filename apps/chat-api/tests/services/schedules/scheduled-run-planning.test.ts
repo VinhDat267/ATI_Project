@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, SERVICE_REGISTRY, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYSHEETS_SERVICE, MYSHEETS_TOOLS, SERVICE_REGISTRY, type ToolDefinition } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider } from '@wap/planner';
 import { ChatService } from '../../../src/services/chat-service.js';
 import { MessageRepo } from '../../../src/db/repositories/message-repo.js';
@@ -25,7 +25,7 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
   let db: Db, owner: Person, now: Date, events: Array<{ event: string; payload: any; committedPlans: number }>, order: string[];
   const runners: ScheduleRunner[] = [];
 
-  const setup = (generatePlan: MockLLMProvider['generatePlan'], options: { toolCatalog?: ToolDefinition[]; gmail?: boolean; planTimeoutMs?: number } = {}) => {
+  const setup = (generatePlan: MockLLMProvider['generatePlan'], options: { toolCatalog?: ToolDefinition[]; gmail?: boolean; mysheets?: any; planTimeoutMs?: number } = {}) => {
     const provider = new MockLLMProvider();
     provider.generatePlan = generatePlan;
     const service = new ScheduleService({ pool: db.pool, timeZone: VN });
@@ -50,9 +50,10 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
         const entry = events.at(-1)!;
         void db.pool.query('SELECT count(*)::int AS n FROM plans WHERE conv_id=$1', [payload.conversationId]).then((r) => { entry.committedPlans = r.rows[0].n; }); } },
       planner: new AIPlanner({ provider, toolCatalog: options.toolCatalog ?? ALL_TOOLS, schedules: true, now: () => now, timeZone: VN,
-        requireGroundedResources: false, serviceRegistry: options.gmail ? [...SERVICE_REGISTRY, GMAIL_SERVICE] : SERVICE_REGISTRY,
+        requireGroundedResources: false, serviceRegistry: options.gmail ? [...SERVICE_REGISTRY, GMAIL_SERVICE] : options.mysheets ? [...SERVICE_REGISTRY, MYSHEETS_SERVICE] : SERVICE_REGISTRY,
         gatherSearch: async () => [{ id: 'C0123456789', name: 'ati-test' }] }),
       gmailConnection: options.gmail ? async () => null : undefined,
+      mysheetsConnection: options.mysheets ? async () => options.mysheets : undefined,
       schedules: { repo: new ScheduleRepo(db.pool, VN), timeZone: VN, now: () => now },
     });
     const runner = new ScheduleRunner({ pool, timeZone: VN, now: () => now, planRun: (run, convId, signal) => chat.planScheduledRun(run, convId, signal),
@@ -158,5 +159,49 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
     expect((await messagesOf(run.conv_id)).find((m) => m.metadata?.type === 'refusal')).toMatchObject({ role: 'assistant',
       metadata: { unavailableServices: [{ id: 'gmail', name: 'Gmail' }] } });
     expect(await plansOf(run.conv_id)).toEqual([]);
+  });
+
+  it('attaches connections.mysheets and saves pending plan when schedule task uses mysheets', async () => {
+    const s = await schedule('Ghi báo cáo vào bảng tính cá nhân Việc của tôi');
+    const sheetsPlan = {
+      kind: 'plan',
+      thinking: 'Ghi thêm dòng vào bảng tính cá nhân.',
+      summary: 'Thêm dòng báo cáo vào bảng tính Việc của tôi',
+      warnings: [],
+      steps: [
+        {
+          id: 'append',
+          tool: 'mysheets.append_rows',
+          description: 'Thêm dòng vào bảng Việc của tôi',
+          args: {
+            spreadsheetId: 'sheet_123',
+            sheet: 'Sheet1',
+            rows: [['2026-10-25', 'Báo cáo', 'Hoàn thành']],
+          },
+          dependsOn: [],
+        },
+      ],
+    };
+    const { runner } = setup(async () => JSON.stringify(sheetsPlan), {
+      toolCatalog: [...ALL_TOOLS, ...MYSHEETS_TOOLS],
+      mysheets: {
+        credentialId: 'cred_mysheets_1',
+        email: 'alice.sheets@example.test',
+        allowedSpreadsheets: ['sheet_123'],
+        selectedSpreadsheets: [{ id: 'sheet_123', title: 'Việc của tôi', canEdit: true }],
+      },
+    });
+    await runner.tick();
+    const run = await runOf(s.id);
+    expect(run).toMatchObject({ status: 'planned' });
+    expect(run.plan_id).toBeTruthy();
+    const plans = await plansOf(run.conv_id);
+    expect(plans).toHaveLength(1);
+    expect(plans[0].status).toBe('pending');
+    expect(plans[0].plan_json.connections?.mysheets).toEqual({
+      credentialId: 'cred_mysheets_1',
+      email: 'alice.sheets@example.test',
+      allowedSpreadsheets: ['sheet_123'],
+    });
   });
 });

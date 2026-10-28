@@ -199,11 +199,12 @@ export function MySheetsCallbackView({
   };
 
   const handleRemoveSpreadsheet = async (id: string) => {
-    const remaining = spreadsheets.filter((s) => s.id !== id);
-    if (remaining.length === 0) {
-      setSpreadsheets([]);
+    if (spreadsheets.length <= 1) {
+      setSaveError('Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy ngắt kết nối tại Cài đặt.');
       return;
     }
+    const remaining = spreadsheets.filter((s) => s.id !== id);
+    if (remaining.length === 0) return;
 
     setSaving(true);
     setSaveError('');
@@ -332,15 +333,31 @@ export function MySheetsCallbackView({
                   </div>
                   <button
                     type="button"
-                    disabled={saving}
+                    disabled={saving || spreadsheets.length <= 1}
                     onClick={() => handleRemoveSpreadsheet(sheet.id)}
                     aria-label={`Bỏ bảng tính ${sheet.title}`}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    title={spreadsheets.length <= 1 ? 'Không thể bỏ bảng tính cuối cùng. Cần giữ lại ít nhất 1 bảng tính.' : `Bỏ ${sheet.title}`}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
                   >
                     Bỏ
                   </button>
                 </div>
               ))}
+              {spreadsheets.length === 1 && (
+                <p className="text-xs text-[#6B7280] pt-1">
+                  Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy{' '}
+                  <a
+                    href="/settings#mysheets"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/settings#mysheets', true);
+                    }}
+                    className="text-[#FF5701] underline font-medium"
+                  >
+                    ngắt kết nối tại Cài đặt
+                  </a>.
+                </p>
+              )}
             </div>
           )}
 
