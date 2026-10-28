@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Mous
 import { flushSync } from 'react-dom';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { LoginViewProps } from '../../components/LoginView';
-import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
+import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabled';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import css from './page.css?inline';
@@ -89,6 +89,7 @@ export interface LandingPageProps extends Partial<LoginViewProps> {
 export function LandingPage({ navigate, initialMode, email = '', setEmail = () => {}, password = '', setPassword = () => {},
   isLoggingIn = false, authError, onLogin, authConfig }: LandingPageProps) {
   const gmailEnabled = useGmailEnabled();
+  const mysheetsEnabled = useMySheetsEnabled();
   usePrototypePage(meta);
   const model = useRef({ moment: 1, isTyping: false });
   const [moment, setMoment] = useState(1), [switched, setSwitched] = useState(false);
@@ -1625,6 +1626,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
                 <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
+              </div>}
+              {/* 10. Google Sheets, của riêng từng người */}
+              {mysheetsEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group v3-space-y-3">
+                <h3 className="font-display text-lg font-semibold text-[#111827]">Google Sheets · Của riêng bạn</h3>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chọn bảng tính trong cửa sổ của Google, ATI chỉ thêm dòng sau khi bạn duyệt.</p>
+                <a href="/guide?service=mysheets" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Google Sheets</a>
               </div>}
             </div>
           </div>
