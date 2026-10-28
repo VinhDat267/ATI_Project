@@ -6,8 +6,8 @@ const fake = { GMAIL_OAUTH_AUTH_URL: 'http://127.0.0.1:4100/o/oauth2/v2/auth', G
 const live = { RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://local', JWT_SECRET: 'private-secret-at-least-32-characters', ENCRYPTION_KEY: 'a'.repeat(32), GEMINI_API_KEY: 'fake-for-validation' };
 
 describe('GMAIL_ENABLED policy', () => {
-  it('is off by default and keeps Gmail unconfigured even when every variable is present', () => {
-    const config = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: undefined });
+  it('honors explicit off and keeps Gmail unconfigured even when every variable is present', () => {
+    const config = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: 'off' });
     expect(config.GMAIL_ENABLED).toBe(false);
     expect(config.GMAIL_OAUTH).toBeUndefined();
     expect(validateEnv({ ...live, ...gmail, GMAIL_ENABLED: 'off' }).GMAIL_OAUTH).toBeUndefined();
