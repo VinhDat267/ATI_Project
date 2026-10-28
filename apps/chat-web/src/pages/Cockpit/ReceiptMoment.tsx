@@ -6,8 +6,8 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
-interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
-function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
+function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,mysheetsConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -28,6 +28,7 @@ function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,
                         {destination(planSteps.find(row=>row.id===step.id) ?? {id:step.id,tool:step.tool,description:step.description,args:{}}, labels)}
                       </p>
                       {service==='mycalendar' && mycalendarConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mycalendarConnection.email} (Google Calendar của bạn)</p>}
+                      {service==='mysheets' && mysheetsConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mysheetsConnection.email} (Google Sheets của bạn)</p>}
                     </div>
                   </div>
                   <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
@@ -87,10 +88,10 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
+export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
- const cardProps={services,planSteps,labels,mycalendarConnection,destination};
+ const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,destination};
  return (<section id={terminalStatus?"moment-unsuccessful":"moment-6"} className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment={terminalStatus?"unsuccessful":"6"} aria-labelledby="heading-moment-6">
           <div className="v3-space-y-3">
             <div className={`w-14 h-14 rounded-2xl ${terminalStatus?'bg-neutral-100 border-neutral-300 text-neutral-600':'bg-emerald-50 border-emerald-200 text-emerald-600'} flex items-center justify-center shadow-sm`}>

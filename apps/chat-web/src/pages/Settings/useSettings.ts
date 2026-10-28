@@ -22,6 +22,7 @@ export function useSettings(user: User | null) {
   const routeHash = window.location.hash;
   const personal = services.find(s => s.id === 'gmail' && s.connection === 'personal');
   const personalMyCalendar = services.find(s => s.id === 'mycalendar' && s.connection === 'personal');
+  const personalMySheets = services.find(s => s.id === 'mysheets' && s.connection === 'personal');
   const list = services.filter(s => s.connection !== 'personal').map(serviceView);
   const active = list.find(s => s.id === selected);
   const draft = active ? drafts[active.id] ?? { credentials: {}, scopes: active.allowedScope ?? [], newScope: '' } : null;
@@ -118,7 +119,7 @@ export function useSettings(user: User | null) {
       if (owner === epoch.current) { pending.current.delete(id); setBusy(b => { const next = { ...b }; delete next[id]; return next; }); }
     }
   };
-  return { list, personal, personalMyCalendar, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
+  return { list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
     actions: { openServiceDrawer, closeServiceDrawer, toggleKeyHelp: () => setKeyHelpOpen(o => !o), addNewScopeItem,
       removeScopeItem: (index: number) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, scopes: d.scopes.filter((_, i) => i !== index) })); },
       onKeyInputChanged: (key: string, value: string) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, credentials: { ...d.credentials, [key]: value } })); },

@@ -18,6 +18,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
           </div>
           {plan.steps.some(step => step.tool.startsWith('gmail.')) && plan.connections?.gmail && <p className="text-sm text-brand-text break-words">Gửi từ: {plan.connections.gmail.email}</p>}
           {plan.connections?.mycalendar?.email && <p className="text-sm text-brand-text break-words">Tài khoản: {plan.connections.mycalendar.email} (Google Calendar của bạn)</p>}
+          {plan.connections?.mysheets?.email && <p className="text-sm text-brand-text break-words">Tài khoản: {plan.connections.mysheets.email} (Google Sheets của bạn)</p>}
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
           <div className="v3-space-y-3" id="plan-cards-container">
             {plan.steps.map((step,index) => { const service=serviceId(step.tool), palette=servicePalette(service); return (
@@ -38,7 +39,9 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                       </span>
                     </div>
                     <h2 className="text-base font-semibold text-brand-text mt-1.5 leading-snug">
-                      {step.description}
+                      {step.tool === 'mysheets.read_range'
+                        ? `Đọc từ bảng tính của bạn: ${plan.resourceLabels?.[String(step.args.spreadsheetId)] ?? step.description}`
+                        : step.description}
                     </h2>
                     <p className="text-xs text-brand-muted mt-1 break-words">
                       Đích đến: {destination(step, plan.resourceLabels)}

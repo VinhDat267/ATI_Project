@@ -127,6 +127,19 @@
       "badge": "bg-blue-50 text-blue-700",
       "receiptHover": "hover:border-blue-300",
       "previewBadge": "bg-blue-100 text-blue-800"
+    },
+    "mysheets": {
+      "logoPath": "M5 2h10l4 4v16H5zm2 8v9h10v-9zm2 2h6v2H9zm0 4h6v1H9z",
+      "color": "#188038",
+      "prompt": "Thêm một dòng vào {service}",
+      "suggestion": {
+        "icon": "bg-green-50 border-green-100",
+        "decoration": "bg-emerald-500/5 group-hover:bg-emerald-500/10",
+        "name": "text-emerald-600"
+      },
+      "badge": "bg-green-50 text-green-800",
+      "receiptHover": "hover:border-green-300",
+      "previewBadge": "bg-green-100 text-green-800"
     }
   },
   "resourceNames": {
@@ -138,7 +151,9 @@
     "repository": "Kho mã",
     "issue": "Issue",
     "spreadsheet": "Bảng tính",
+    "myspreadsheet": "Bảng tính",
     "sheet": "Trang tính",
+    "mysheet": "Trang tính",
     "calendar": "Lịch",
     "mycalendar": "Lịch",
     "page": "Trang",
@@ -288,6 +303,34 @@
       "kind": "Sự kiện",
       "link": "Mở sự kiện trên Google Calendar",
       "titleField": "title"
+    },
+    "mysheets.list_spreadsheets": {
+      "action": "Xem danh sách bảng tính",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách bảng tính",
+      "kind": "Danh sách bảng tính",
+      "link": "Mở kết quả"
+    },
+    "mysheets.list_sheets": {
+      "action": "Xem danh sách trang tính",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách trang tính",
+      "kind": "Danh sách trang tính",
+      "link": "Mở kết quả"
+    },
+    "mysheets.read_range": {
+      "action": "Đọc bảng tính",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc dữ liệu",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính"
+    },
+    "mysheets.append_rows": {
+      "action": "Thêm dòng vào bảng tính của bạn",
+      "done": "Đã thêm dòng",
+      "receipt": "Đã thêm dòng",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính"
     }
   }
 }

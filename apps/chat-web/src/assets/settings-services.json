@@ -7,5 +7,6 @@
   "notion": { "text": "Tạo internal integration tại trang quản lý integration của Notion để lấy token. Kết nối database với integration này và lấy database ID từ URL.", "url": "https://www.notion.so/profile/integrations" },
   "telegram": { "text": "Nhắn @BotFather để tạo bot và lấy bot token. Thêm bot vào nhóm rồi gửi /start@<tên_bot>; lấy chat ID từ getUpdates theo hướng dẫn chính thức.", "url": "https://core.telegram.org/bots/tutorial", "hint": "Bot ở chế độ privacy mặc định không nhận tin thường trong nhóm." },
   "jira": { "text": "Tạo API token tại trang quản lý tài khoản Atlassian; dùng cùng email Atlassian và site URL dạng https://ten-site.atlassian.net.", "url": "https://id.atlassian.com/manage-profile/security/api-tokens", "fieldHints": { "siteUrl": { "placeholder": "https://ten-site.atlassian.net", "pattern": "^https://[a-zA-Z0-9-]+\\.atlassian\\.net/?$", "message": "Định dạng hợp lệ: https://ten-site.atlassian.net" }, "email": { "placeholder": "user@company.com" } } },
-  "mycalendar": { "text": "Google Calendar của bạn được kết nối bằng OAuth cá nhân.", "url": "https://calendar.google.com" }
+  "mycalendar": { "text": "Google Calendar của bạn được kết nối bằng OAuth cá nhân.", "url": "https://calendar.google.com" },
+  "mysheets": { "text": "Google Sheets của bạn được kết nối bằng OAuth cá nhân.", "url": "https://docs.google.com/spreadsheets" }
 }
