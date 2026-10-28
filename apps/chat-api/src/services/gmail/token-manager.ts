@@ -7,7 +7,7 @@ const REFRESH_SKEW_MS = 60_000;
 export interface GmailTokenManagerOptions {
   client: Pick<GmailOAuthClient, 'refresh'>;
   credentials: Pick<CredentialRepo, 'markReconnectRequired'>;
-  service?: 'gmail' | 'mycalendar';
+  service?: 'gmail' | 'mycalendar' | 'mysheets';
   serviceLabel?: string;
   clock?: () => number;
   /** Deadline of the shared refresh, independent of any caller's signal. */
@@ -24,7 +24,7 @@ interface Cached { accessToken: string; expiresAt: number }
  * without cancelling the refresh other callers share.
  */
 export class GmailTokenManager {
-  readonly service: 'gmail' | 'mycalendar';
+  readonly service: 'gmail' | 'mycalendar' | 'mysheets';
   readonly serviceLabel: string;
   private cache = new Map<string, Cached>();
   private inflight = new Map<string, Promise<Cached>>();
@@ -34,7 +34,13 @@ export class GmailTokenManager {
 
   constructor(private options: GmailTokenManagerOptions) {
     this.service = options.service ?? 'gmail';
-    this.serviceLabel = options.serviceLabel ?? (this.service === 'mycalendar' ? 'Google Calendar' : 'Gmail');
+    this.serviceLabel = options.serviceLabel ?? (
+      this.service === 'mysheets'
+        ? 'Google Sheets'
+        : this.service === 'mycalendar'
+        ? 'Google Calendar'
+        : 'Gmail'
+    );
     this.clock = options.clock ?? Date.now;
     this.refreshTimeoutMs = options.refreshTimeoutMs ?? 10_000;
   }

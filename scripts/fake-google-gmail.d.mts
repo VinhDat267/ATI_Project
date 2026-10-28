@@ -1,6 +1,9 @@
 import type { Server } from 'node:http';
 
 export const GMAIL_MODIFY_SCOPE: string;
+export const CALENDAR_EVENTS_SCOPE: string;
+export const CALENDAR_READONLY_SCOPE: string;
+export const DRIVE_FILE_SCOPE: string;
 export type FakeOutcome = 'ok' | 'server_error' | 'hang';
 export interface FakeGoogleGmailSettings {
   email: string;
