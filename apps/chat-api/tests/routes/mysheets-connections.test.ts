@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { decryptCredentials } from '@wap/tool-adapters';
+import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
 import { MYSHEETS_SCOPE } from '@wap/tool-schemas';
 import { createApp, type AppOptions } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
@@ -413,6 +413,32 @@ describe('Routes: /api/connections/mysheets', () => {
       expect(await stored(alice)).toBeNull();
       const states = (await db.pool.query("SELECT * FROM oauth_states WHERE user_id=$1 AND mode='connect_mysheets'", [alice.id])).rows;
       expect(states).toHaveLength(0);
+    });
+
+    it('revokes the mysheets token, deletes the mysheets row, leaving gmail row active and untouched', async () => {
+      const app = build();
+      await connect(app, alice);
+
+      // Also create an active Gmail connection for Alice
+      const gmailConfig = encryptCredentials(
+        { refreshToken: '1//fake-gmail-token-alice', email: 'alice.gmail@example.test', scopes: ['https://www.googleapis.com/auth/gmail.modify'], connectedAt: new Date().toISOString() },
+        key
+      );
+      await credentials.saveCredentials('gmail', gmailConfig, alice.id);
+      expect((await credentials.getPersonalConnectionStatus('gmail', alice.id))?.status).toBe('active');
+
+      const r = await request(app)
+        .delete('/api/connections/mysheets')
+        .set('Authorization', bearer(alice));
+      expect(r.status).toBe(200);
+
+      // Verify mysheets is disconnected
+      expect(await stored(alice)).toBeNull();
+
+      // Verify gmail remains active and untouched
+      const gmailStatus = await credentials.getPersonalConnectionStatus('gmail', alice.id);
+      expect(gmailStatus?.status).toBe('active');
+      expect(decryptCredentials(gmailStatus!.config, key).email).toBe('alice.gmail@example.test');
     });
   });
 });
