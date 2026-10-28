@@ -14,6 +14,7 @@ const exceptions = [
   { file: 'apps/chat-web/src/components/LandingPage.tsx', pattern: /^(trello|slack|github)$/, reason: 'Introduction display strings, permitted by task.' },
   { file: 'apps/chat-web/src/components/LoginPage.tsx', pattern: /^(trello|slack|github)$/, reason: 'Login display strings, permitted by task.' },
   { file: 'apps/chat-web/src/pages/Guide/data.tsx', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'FE-10 presentation content; every declared tool is checked against the live catalog.' },
+  { file: 'apps/chat-web/src/pages/Guide/mysheets-data.tsx', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'OAUTH-03 presentation content; sample prompts for personal sheets workflows.' },
 ];
 
 function literals(source: string, ids: string[]) {

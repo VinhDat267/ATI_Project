@@ -21,7 +21,7 @@ export const MYSHEETS_GUIDE: ServiceGuide = {
 export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
   {
     id: 'mysheets-append-todo',
-    category: 'sheets',
+    category: 'mysheets',
     categoryLabel: 'Bảng tính',
     title: 'Thêm việc vào bảng tính cá nhân',
     prompt: "Thêm việc 'Chuẩn bị slide bảo vệ', hạn 05/11, vào bảng tính Việc của tôi.",
@@ -31,7 +31,7 @@ export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
   },
   {
     id: 'mysheets-jira-sync',
-    category: 'sheets',
+    category: 'mysheets',
     categoryLabel: 'Bảng tính',
     title: 'Lưu issue Jira vào bảng tính',
     prompt: 'Lấy các issue Jira giao cho tôi tuần này rồi ghi từng cái thành một dòng trong bảng Báo cáo tuần của tôi.',
@@ -41,7 +41,7 @@ export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
   },
   {
     id: 'mysheets-slack-summary',
-    category: 'sheets',
+    category: 'mysheets',
     categoryLabel: 'Bảng tính',
     title: 'Tóm tắt bảng tính lên Slack',
     prompt: 'Đọc 5 dòng cuối trong bảng Tiến độ cá nhân của tôi rồi gửi tóm tắt lên Slack #ati-test.',
@@ -53,7 +53,7 @@ export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
 
 export const MYSHEETS_SCHEDULE_PROMPT: SamplePrompt = {
   id: 'mysheets-schedule-telegram',
-  category: 'sheets',
+  category: 'mysheets',
   categoryLabel: 'Bảng tính',
   title: 'Lịch nhắc việc từ bảng tính qua Telegram',
   prompt: 'Mỗi sáng thứ Hai, đọc bảng Việc của tôi và nhắn Telegram những việc sắp tới hạn.',

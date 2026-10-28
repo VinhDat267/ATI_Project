@@ -487,7 +487,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               {/* Các nút lọc nhóm nghiệp vụ */}
               <div className="flex flex-wrap gap-1.5 sm:gap-2" id="prompt-category-filter">
                 {gmailEnabled && <button type="button" className={catClass('email')} onClick={() => actions.setPromptCategory('email')}>Email ({GMAIL_PROMPTS.length})</button>}
-                {mysheetsEnabled && <button type="button" className={catClass('sheets')} onClick={() => actions.setPromptCategory('sheets')}>Bảng tính ({mysheetsPrompts.length})</button>}
+                {mysheetsEnabled && <button type="button" className={catClass('mysheets')} onClick={() => actions.setPromptCategory('mysheets')}>Bảng tính ({mysheetsPrompts.length})</button>}
                 <button type="button" onClick={() => actions.setPromptCategory('all')} id="btn-cat-all" className={catClass('all')}>
                   {`Tất cả (${SAMPLE_PROMPTS.length})`}
                 </button>
