@@ -59,6 +59,7 @@ export async function runFixtureProbes({ baseUrl, tokens, signal, requestTimeout
       if (!Array.isArray(data[field]) || typeof data.response_metadata?.next_cursor !== 'string') throw new ProbeFailure();
       items.push(...data[field]);
       cursor = data.response_metadata.next_cursor;
+      if (data.has_more === true && !cursor) throw new ProbeFailure();
       if (!cursor) return items;
       if (seen.has(cursor)) throw new ProbeFailure();
       seen.add(cursor);
@@ -89,7 +90,8 @@ export async function runFixtureProbes({ baseUrl, tokens, signal, requestTimeout
   if (!await check('sources:visibility', async () => {
     const free = await pages('conversations.history', tokens.a, { channel: 'C_GENERAL' }, 'messages');
     const pro = await pages('conversations.history', tokens.b, { channel: 'C_GENERAL' }, 'messages');
-    if (!free.some(message => message.text === 'Free root') || pro.length !== 1 || pro[0].text !== 'Pro root') return false;
+    const freeSeeds = [['1000.000001', 'Free root'], ['1000.000002', 'Free reply one'], ['1000.000003', 'Free reply two']];
+    if (!freeSeeds.every(([ts, text]) => free.filter(message => message.ts === ts && message.text === text).length === 1) || pro.length !== 1 || pro[0].text !== 'Pro root') return false;
     for (const channel of ['G_PRIVATE', 'D_PRIVATE']) {
       const own = await request('conversations.history', tokens.a, { channel });
       if (!Array.isArray(own.messages) || !own.messages.length) return false;

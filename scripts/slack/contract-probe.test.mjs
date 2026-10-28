@@ -82,6 +82,34 @@ test('missing pages fail exact resource coverage rather than accepting the first
   assert.equal(report.checks.find(check => check.name === 'channels:a').status, 'fail');
   assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
 });
+test('history with has_more but no continuation cursor fails before writes', async t => {
+  const p = await fixture(t);
+  let truncated = 0;
+  const relay = await gateway(t, p, async entry => {
+    if (entry.path !== '/api/conversations.history' || entry.token !== p.tokens.a) return;
+    const response = await fetch(p.origin + entry.path, { method: 'POST', headers: { authorization: `Bearer ${entry.token}`, 'content-type': 'application/json' }, body: JSON.stringify(entry.args) });
+    const data = await response.json();
+    if (data.has_more) { data.response_metadata.next_cursor = ''; truncated++; }
+    return { body: data };
+  });
+  const report = await run(p, { baseUrl: relay.origin });
+  assert.ok(truncated > 0);
+  assert.equal(report.checks.find(check => check.name === 'sources:visibility').status, 'fail');
+  assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
+});
+test('history that falsely claims completion still fails missing fixture seed coverage', async t => {
+  const p = await fixture(t);
+  const relay = await gateway(t, p, async entry => {
+    if (entry.path !== '/api/conversations.history' || entry.token !== p.tokens.a) return;
+    const response = await fetch(p.origin + entry.path, { method: 'POST', headers: { authorization: `Bearer ${entry.token}`, 'content-type': 'application/json' }, body: JSON.stringify(entry.args) });
+    const data = await response.json();
+    data.has_more = false; data.response_metadata.next_cursor = '';
+    return { body: data };
+  });
+  const report = await run(p, { baseUrl: relay.origin });
+  assert.equal(report.checks.find(check => check.name === 'sources:visibility').status, 'fail');
+  assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
+});
 test('an error response that nevertheless wrote cannot pass the read-only permission check', async t => {
   const p = await fixture(t);
   const relay = await gateway(t, p, async entry => {

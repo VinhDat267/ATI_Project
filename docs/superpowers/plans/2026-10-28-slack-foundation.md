@@ -7,7 +7,7 @@
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript hiện có, Vitest, `node:test`, HTTP/crypto/fetch có sẵn; không thêm dependency.
 **Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md), bản sửa `d479b098`.
 **Task card:** [SLACK-01](../../handoff/tasks/SLACK-01-foundation.md).
-**Status:** chủ dự án đã chọn Native; thi công trên `feat/slack-01-foundation`, local checks đạt, review độc lập và CI là gate trước tích hợp. Kết quả chi tiết ở task card.
+**Status:** năm task Native đã thi công trên `feat/slack-01-foundation`; review độc lập đã chạy, Important được sửa và toàn suite local đạt. CI đúng head/owner review còn là gate trước tích hợp. Kết quả chi tiết ở task card.
 
 ## Global Constraints
 
@@ -66,7 +66,7 @@ Schema thuộc Integration/AI theo team-workflow; script/provider fixture thuộ
 **Files:** create `packages/tool-schemas/src/myslack-context.ts`, `packages/tool-schemas/tests/myslack-context.test.ts`; modify `packages/tool-schemas/src/index.ts`.
 **Interfaces:** produce `SlackBinding { atiUserId:string; connectionId:string; workspaceId:string; slackUserId:string; identityVersion:number }`, `SlackSourceRef { binding:SlackBinding; resourceType:'conversation'|'message'|'file'; resourceId:string; revision:string }`, `sameSlackBinding(a:SlackBinding,b:SlackBinding):boolean`. No credential/token fields; version is positive safe integer, IDs nonempty; export `validateSlackBinding(value:unknown):SlackBinding` throwing `TypeError` on invalid input.
 
-- [ ] **Step 1:** Write tests including the assertions below and each individual field mismatch. Invalid versions include 0, -1, fractional, Infinity and unsafe integer; reject empty IDs and absent fields.
+- [x] **Step 1:** Write tests including the assertions below and each individual field mismatch. Invalid versions include 0, -1, fractional, Infinity and unsafe integer; reject empty IDs and absent fields.
   ```ts
   expect(sameSlackBinding(a, { ...a })).toBe(true);
   expect(sameSlackBinding(a, { ...a, workspaceId: 'T_OTHER' })).toBe(false);
@@ -75,10 +75,10 @@ Schema thuộc Integration/AI theo team-workflow; script/provider fixture thuộ
   expect(ALL_TOOLS.some(t => t.service === 'myslack')).toBe(false);
   expect(SERVICE_REGISTRY.some(s => s.id === 'myslack')).toBe(false);
   ```
-- [ ] **Step 2:** Run `npm test -w @wap/tool-schemas -- tests/myslack-context.test.ts`; expected FAIL on missing exports/module.
-- [ ] **Step 3:** Implement the two exact functions and export contract from index. Compare every identity field; do not compare only names/resource ID. No service registration or changes to existing PlanConnections yet.
-- [ ] **Step 4:** Re-run that command; expected PASS with all invalid/mismatch cases covered.
-- [ ] **Step 5:** Commit only the three task files: `feat(slack): add personal workspace identity contracts`.
+- [x] **Step 2:** Run `npm test -w @wap/tool-schemas -- tests/myslack-context.test.ts`; expected FAIL on missing exports/module.
+- [x] **Step 3:** Implement the two exact functions and export contract from index. Compare every identity field; do not compare only names/resource ID. No service registration or changes to existing PlanConnections yet.
+- [x] **Step 4:** Re-run that command; expected PASS with all invalid/mismatch cases covered.
+- [x] **Step 5:** Commit only the three task files: `feat(slack): add personal workspace identity contracts`.
 
 ### Task 2: Policy contract cho dữ liệu nguồn vào model
 
@@ -86,11 +86,11 @@ Schema thuộc Integration/AI theo team-workflow; script/provider fixture thuộ
 **Consumes:** Task 1 `SlackBinding`, `sameSlackBinding`.
 **Produces:** `SlackModelPolicy { binding:SlackBinding; connectionActive:boolean; consent:{status:'pending'|'granted'|'revoked'; policyVersion:string; providerId:string; retentionDays:number}; provider:{id:string; verified:boolean; noTraining:boolean; maxRetentionDays:number} }`; `SlackModelRequest { binding:SlackBinding; policyVersion:string; requestedRetentionDays:number }`; `decideSlackModelUse(policy:SlackModelPolicy,request:SlackModelRequest):{allowed:true}|{allowed:false;reason:'connection_inactive'|'identity_changed'|'consent_missing'|'policy_changed'|'provider_unverified'|'retention_exceeded'}`.
 
-- [ ] **Step 1:** Write table tests: inactive connection; any binding mismatch; pending/revoked consent; mismatched policy version; wrong provider ID, not verified or noTraining false; request retention above either approved cap; finite nonnegative retention validation. Valid boundary exactly at both caps returns `{allowed:true}`. When multiple reasons apply, priority follows the reason list above.
-- [ ] **Step 2:** Run `npm test -w @wap/tool-schemas -- tests/myslack-policy.test.ts`; expected FAIL because decision function does not exist.
-- [ ] **Step 3:** Implement decision in that priority; invalid numeric values fail closed as `retention_exceeded`. Function does not infer organization authority from OAuth/user scopes. Trusted backend constructs policy only after its own evidence checks in SLACK-02; this helper is not that evidence or an already-enforced API gate.
-- [ ] **Step 4:** Re-run the test command; expected PASS. Contract does not accept a mode-based exemption; actual enforcement in rule-planner/manual/classifier consumers is tested in 02–06, not claimed by these pure-function tests.
-- [ ] **Step 5:** Commit only these files: `feat(slack): define source model authorization policy`.
+- [x] **Step 1:** Write table tests: inactive connection; any binding mismatch; pending/revoked consent; mismatched policy version; wrong provider ID, not verified or noTraining false; request retention above either approved cap; finite nonnegative retention validation. Valid boundary exactly at both caps returns `{allowed:true}`. When multiple reasons apply, priority follows the reason list above.
+- [x] **Step 2:** Run `npm test -w @wap/tool-schemas -- tests/myslack-policy.test.ts`; expected FAIL because decision function does not exist.
+- [x] **Step 3:** Implement decision in that priority; invalid numeric values fail closed as `retention_exceeded`. Function does not infer organization authority from OAuth/user scopes. Trusted backend constructs policy only after its own evidence checks in SLACK-02; this helper is not that evidence or an already-enforced API gate.
+- [x] **Step 4:** Re-run the test command; expected PASS. Contract does not accept a mode-based exemption; actual enforcement in rule-planner/manual/classifier consumers is tested in 02–06, not claimed by these pure-function tests.
+- [x] **Step 5:** Commit only these files: `feat(slack): define source model authorization policy`.
 
 ### Task 3: Kiểm kê toàn bộ danh mục phương thức có nguồn
 
@@ -99,13 +99,13 @@ Schema thuộc Integration/AI theo team-workflow; script/provider fixture thuộ
 `MethodFacts`: `method, sourceUrl, fetchedAt, sourceSha256, httpMethod, rateLimit, userScopes:string[]|null, userToken:'documented'|'undetermined'`.
 `Inventory`: `schemaVersion:1, collectedAt, index:{url,sha256,methods:string[]}, methods:Array<MethodFacts & {planRequirement:string;roleRequirement:string;sideEffect:'read'|'write'|'undetermined';risk:'low'|'medium'|'high'|'undetermined';disposition:'candidate'|'excluded'|'probe_required';reason:string;evidenceUrls:string[];atiMapping:string|null;deliveryStatus:'not_implemented';reviewState:'unreviewed'|'reviewed'|'source_changed'}>`.
 
-- [ ] **Step 1:** Write Node tests using small synthetic XML/frontmatter: dedup/sort canonical URLs; reject foreign host or off-method paths; matching `method_name`; parse `scopes.user`; absent user scopes stays `undetermined`; malformed/unrecognized metadata throws instead of inventing facts. Validation rejects duplicate/missing/extra rows relative to index, missing provenance/reason/evidence or any `deliveryStatus` claiming implemented.
-- [ ] **Step 2:** Run `node --test scripts/slack/inventory.test.mjs`; expected FAIL importing missing module.
-- [ ] **Step 3:** Implement strict extraction/parser and validator. Source is `https://docs.slack.dev/sitemap.xml`, filtered to canonical method URLs; per-method markdown is the canonical URL without trailing slash plus `.md`, as Slack's llms.txt documents. Parse only supported frontmatter scalar/JSON-array forms; unsupported forms become explicit collection errors needing review, never an empty successful row. User field absent does not mean bot-only. No automatic read/write inference from GET/POST.
-- [ ] **Step 4:** Re-run Node tests; expected PASS. Add CLI `node scripts/slack/inventory.mjs collect --output docs/slack/method-inventory.json`: docs.slack.dev HTTPS allowlist, reject foreign redirects, 10 s/request, at most 2 in flight, Retry-After on 429 and at most 2 retries. Store extracted metadata/hashes only, not full provider documentation.
-- [ ] **Step 5:** Collect public docs, then inspect/annotate every row using its official method page. New rows start `reviewState:unreviewed`; initialize unproven eligibility as `probe_required`, not as unsupported/supported. Record the exact unknown and evidence; requirements may state “not specified by docs; live probe required”. After review mark `reviewed`, including cases requiring future native proof. Safe retry preserves annotations for matching hashes; changed hashes mark `source_changed` until reviewed again.
-- [ ] **Step 6:** Add `node scripts/slack/inventory.mjs verify --input docs/slack/method-inventory.json`; expected exit 0 only when row count equals frozen index and every row is `reviewed`; print disposition and unresolved probe counts. Duplicate/omitted row or unreviewed/source_changed mutation must exit 1. Verify is offline and never silently fetches a new index. Write reading guide: candidates are not implemented and reviewed probe-required rows still remain open in full-feature acceptance.
-- [ ] **Step 7:** Commit the four files: `docs(slack): inventory public API capabilities with provenance`. A collection failure cannot be reported as complete inventory; stop the task with exact error if the source cannot be read after bounded retries.
+- [x] **Step 1:** Write Node tests using small synthetic XML/frontmatter: dedup/sort canonical URLs; reject foreign host or off-method paths; matching `method_name`; parse `scopes.user`; absent user scopes stays `undetermined`; malformed/unrecognized metadata throws instead of inventing facts. Validation rejects duplicate/missing/extra rows relative to index, missing provenance/reason/evidence or any `deliveryStatus` claiming implemented.
+- [x] **Step 2:** Run `node --test scripts/slack/inventory.test.mjs`; expected FAIL importing missing module.
+- [x] **Step 3:** Implement strict extraction/parser and validator. Source is `https://docs.slack.dev/sitemap.xml`, filtered to canonical method URLs; per-method markdown is the canonical URL without trailing slash plus `.md`, as Slack's llms.txt documents. Parse only supported frontmatter scalar/JSON-array forms; unsupported forms become explicit collection errors needing review, never an empty successful row. User field absent does not mean bot-only. No automatic read/write inference from GET/POST.
+- [x] **Step 4:** Re-run Node tests; expected PASS. Add CLI `node scripts/slack/inventory.mjs collect --output docs/slack/method-inventory.json`: docs.slack.dev HTTPS allowlist, reject foreign redirects, 10 s/request, at most 2 in flight, Retry-After on 429 and at most 2 retries. Store extracted metadata/hashes only, not full provider documentation.
+- [x] **Step 5:** Collect public docs, then inspect/annotate every row using its official method page. New rows start `reviewState:unreviewed`; initialize unproven eligibility as `probe_required`, not as unsupported/supported. Record the exact unknown and evidence; requirements may state “not specified by docs; live probe required”. After review mark `reviewed`, including cases requiring future native proof. Safe retry preserves annotations for matching hashes; changed hashes mark `source_changed` until reviewed again.
+- [x] **Step 6:** Add `node scripts/slack/inventory.mjs verify --input docs/slack/method-inventory.json`; expected exit 0 only when row count equals frozen index and every row is `reviewed`; print disposition and unresolved probe counts. Duplicate/omitted row or unreviewed/source_changed mutation must exit 1. Verify is offline and never silently fetches a new index. Write reading guide: candidates are not implemented and reviewed probe-required rows still remain open in full-feature acceptance.
+- [x] **Step 7:** Commit the four files: `docs(slack): inventory public API capabilities with provenance`. A collection failure cannot be reported as complete inventory; stop the task with exact error if the source cannot be read after bounded retries.
 
 ### Task 4: HTTP Slack fixture với state và phân quyền
 
@@ -116,24 +116,24 @@ Seed values are fixed for Task 5: tokens a/b/colleague identify `(T_FREE,U_FREE_
 
 Token a/b scopes are `channels:read,groups:read,im:read,channels:history,groups:history,im:history,chat:write`; colleague scopes are `channels:read,channels:history`, so posting with colleague proves the missing_scope path. Invalid/unknown tokens return invalid_auth; resource access outside visible set returns channel_not_found. No OAuth exchange, app-level token or event signing API in this fixture version; those belong to 02/04.
 
-- [ ] **Step 1:** Node HTTP tests: `auth.test` gives exact user/team; `conversations.list/history/replies` enforce scope/visibility and pagination; `chat.postMessage` stores a message with token owner's identity; another workspace cannot read it; insufficient scope returns HTTP 200 with `{ok:false,error:'missing_scope'}`. Add real fetch AbortSignal timeout against delayed server and after-commit delay proving a timed-out write can still exist once.
-- [ ] **Step 2:** Run `node --test scripts/fake-slack-personal.test.mjs`; expected FAIL missing module.
-- [ ] **Step 3:** Implement those five methods with state; API paths `/api/<method>`, Authorization header, Slack-shaped JSON. Default list page size 1; cursor encodes fixture collection/offset and rejects invalid cursor. Fault only applies to named method; afterCommit delay stores write before delaying response. No fabricated database locking claims and no additional fake method advertised as supported.
-- [ ] **Step 4:** Re-run HTTP tests; expected PASS, including actual client abort and readback of one timed-out write. Close all servers after each test; no port/process left running.
-- [ ] **Step 5:** Commit the two files: `test(slack): add stateful personal Slack HTTP fixture`.
+- [x] **Step 1:** Node HTTP tests: `auth.test` gives exact user/team; `conversations.list/history/replies` enforce scope/visibility and pagination; `chat.postMessage` stores a message with token owner's identity; another workspace cannot read it; insufficient scope returns HTTP 200 with `{ok:false,error:'missing_scope'}`. Add real fetch AbortSignal timeout against delayed server and after-commit delay proving a timed-out write can still exist once.
+- [x] **Step 2:** Run `node --test scripts/fake-slack-personal.test.mjs`; expected FAIL missing module.
+- [x] **Step 3:** Implement those five methods with state; API paths `/api/<method>`, Authorization header, Slack-shaped JSON. Default list page size 1; cursor encodes fixture collection/offset and rejects invalid cursor. Fault only applies to named method; afterCommit delay stores write before delaying response. No fabricated database locking claims and no additional fake method advertised as supported.
+- [x] **Step 4:** Re-run HTTP tests; expected PASS, including actual client abort and readback of one timed-out write. Close all servers after each test; no port/process left running.
+- [x] **Step 5:** Commit the two files: `test(slack): add stateful personal Slack HTTP fixture`.
 
 ### Task 5: Probe offline và tích hợp lệnh kiểm tra
 
 **Files:** create `scripts/slack/contract-probe.mjs`, `contract-probe.test.mjs`; modify `package.json`.
 **Consumes:** fixed seed of fixture Task 4. **Produces:** `runFixtureProbes({baseUrl:string,tokens:{a:string;b:string;colleague:string},signal?:AbortSignal,requestTimeoutMs?:number}):Promise<{mode:'fixture';verifiedLive:false;checks:Array<{name:string;status:'pass'|'fail'|'unknown'}>}>`; default per-request timeout 1000 ms. CLI `node scripts/slack/contract-probe.mjs --fixture` starts/closes own fixture and prints only that report.
 
-- [ ] **Step 1:** Node tests: reject HTTPS/public host/userinfo before network I/O; reject a foreign redirect after only the allowed loopback request, without following it. Allow only literal 127.0.0.1 or IPv6 loopback HTTP. Check exact fixed actor/team/list counts from Task 4; token errors/ok:false or a missing page fails. External cancellation rejects with AbortError, while a per-request deadline after sending a write reports unknown without retry. Verify mode fixture, verifiedLive false and no tokens/body in output; invalid CLI args including `--live` are rejected.
-- [ ] **Step 2:** Run `node --test scripts/slack/contract-probe.test.mjs`; expected FAIL missing module.
-- [ ] **Step 3:** Implement checks for actor/team, pagination, per-user/workspace visibility and write identity/readback using the five fixture methods; reject redirects (`redirect:'error'`). A per-request deadline after sending a write reports unknown and never re-sends; external cancellation follows Step 1 and rejects with AbortError. A read-only verification cannot turn an unrelated or absent message into proof of the write. CLI exits 0 only if all normal checks pass; tests fault scenarios individually.
-- [ ] **Step 4:** Re-run Node tests and CLI; expected PASS and `verifiedLive:false`. Tests demonstrating behavior against a fixture are recorded as offline only.
-- [ ] **Step 5:** Add `test:slack:foundation` running the three new Node test files followed by the two tool-schemas tests. Extend the existing final `node --test` list in `check` with the three new Node files, preserving every existing command. Existing `test:v3` already runs schema tests, so do not duplicate them in the main check command.
-- [ ] **Step 6:** Run `npm run test:slack:foundation`, `npm run typecheck:v3` and `npm run check`; expected all exit 0. Use the project's real PostgreSQL/local runner setup for existing integration suites; missing setup is NOT_RUN/blocker, not permission to mock DB or weaken assertions. Record actual outputs and immutable snapshot/probe mode.
-- [ ] **Step 7:** Review exact diff for no tool registration, app routes, feature flags or live calls; update SLACK-01 results and add a new handoff log with commands/RED→GREEN/remaining probes. Commit only task files: `test(slack): verify foundation contracts without live effects`. Independent review and exact-head CI precede integration; no automatic merge or live enable.
+- [x] **Step 1:** Node tests: reject HTTPS/public host/userinfo before network I/O; reject a foreign redirect after only the allowed loopback request, without following it. Allow only literal 127.0.0.1 or IPv6 loopback HTTP. Check exact fixed actor/team/list counts from Task 4; token errors/ok:false or a missing page fails. External cancellation rejects with AbortError, while a per-request deadline after sending a write reports unknown without retry. Verify mode fixture, verifiedLive false and no tokens/body in output; invalid CLI args including `--live` are rejected.
+- [x] **Step 2:** Run `node --test scripts/slack/contract-probe.test.mjs`; expected FAIL missing module.
+- [x] **Step 3:** Implement checks for actor/team, pagination, per-user/workspace visibility and write identity/readback using the five fixture methods; reject redirects (`redirect:'error'`). A per-request deadline after sending a write reports unknown and never re-sends; external cancellation follows Step 1 and rejects with AbortError. A read-only verification cannot turn an unrelated or absent message into proof of the write. CLI exits 0 only if all normal checks pass; tests fault scenarios individually.
+- [x] **Step 4:** Re-run Node tests and CLI; expected PASS and `verifiedLive:false`. Tests demonstrating behavior against a fixture are recorded as offline only.
+- [x] **Step 5:** Add `test:slack:foundation` running the three new Node test files followed by the two tool-schemas tests. Extend the existing final `node --test` list in `check` with the three new Node files, preserving every existing command. Existing `test:v3` already runs schema tests, so do not duplicate them in the main check command.
+- [x] **Step 6:** Run `npm run test:slack:foundation`, `npm run typecheck:v3` and `npm run check`; expected all exit 0. Use the project's real PostgreSQL/local runner setup for existing integration suites; missing setup is NOT_RUN/blocker, not permission to mock DB or weaken assertions. Record actual outputs and immutable snapshot/probe mode.
+- [x] **Step 7:** Review exact diff for no tool registration, app routes, feature flags or live calls; update SLACK-01 results and add a new handoff log with commands/RED→GREEN/remaining probes. Commit only task files: `test(slack): verify foundation contracts without live effects`. Independent review and exact-head CI precede integration; no automatic merge or live enable.
 
 ## Self-review và handoff
 
