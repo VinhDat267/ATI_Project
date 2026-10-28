@@ -78,6 +78,7 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 
 ## Kết quả (agent thi công điền)
 
+- **Nghiệm thu thật đang làm ngày 29/10/2026:** trên DB tạm riêng, người dùng đã kết nối Gmail, thu hồi quyền ở Google, kết nối lại, rồi ngắt trong ATI. Google trả `invalid_grant` cho token cũ; DB/API lần lượt chuyển `reconnect_required`, `active`, rồi không còn kết nối. OAUTH-01: quay lại đúng hội thoại, không tự gửi lại; người dùng bấm gửi lại và nhận `answer` có `gmail.search_threads` với `is:unread`, 10 kết quả, không có plan/bước ghi. Cả **7/7 tool ghi Gmail** đã chạy mỗi tool đúng một lần sau người dùng duyệt; đọc lại bằng `gmail.get_thread` khớp người nhận/nội dung, nháp có `DRAFT`, thư gửi có `SENT`. Sự cố 9router dừng đã khôi phục; giữ lại bằng chứng lượt lỗi. **Chưa hoàn tất:** Google sign-in chưa cấu hình; nghiệm thu đọc các dịch vụ khác chưa chạy; ca token hỏng qua manager thật đã đạt, còn kiểm trong UI. PR #182 vẫn nháp, chưa merge hoặc quyết định bật cờ. Xem [log nghiệm thu đang làm](../log/2026-10-29-codex-GMAIL-04-live-acceptance.md).
 - **Chuẩn bị Bước 6 ngày 28/10/2026:** nhánh `codex/gmail-04-enable-flags`, mã `26db0b2`; PR chỉ ở dạng **nháp**, chưa có quyết định bật cờ. Thêm Gmail tự bật khi đủ cấu hình, giữ `off` tường minh và kiểm thiếu cấu hình khi ép `on`; câu chỉ đọc mặc định bật. Test mới RED **7 fail/20 pass** → GREEN **27/27**, cùng hồi quy cấu hình **61/61**; **5/5 đột biến bị bắt**. Full `npm run check` exit 0 (**2.536 v3 + 406 eval + 11 launcher/env**); browser Gmail/OAUTH-01 **10/10**, answer **4/4**, exit 0; server live trên DB tạm riêng không cấu hình Gmail vẫn trả health `ok`. Chưa chạy lại model thật hoặc nghiệm thu Google thật. Máy thi công chưa có `GMAIL_OAUTH_*`; không đổi `.env` đang dùng. Giữ mở bước 5 và quyết định bật cờ; chi tiết: [log chuẩn bị rollout](../log/2026-10-28-codex-GMAIL-04-rollout-preparation.md).
 - PR:
   - **Bộ đo** (bước 2, 3): nhánh `eval/gmail-04-measure`, reviewer thi công theo yêu cầu nhóm trưởng. Bộ đo `8eae4f3`; label Gmail `34c595c` (20 câu) và label trả lời `d53f24b` (10 câu) commit trước lời gọi model đầu tiên. 19/19 đột biến bị bắt. [Log](../log/2026-10-18-reviewer-GMAIL-04-measure-harness.md).
@@ -92,7 +93,7 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 
     26/26 đột biến bị bắt (cùng log).
   - **Đo** (bước 4): xong ngày 18/10, sớm hơn lịch vì nhóm trưởng yêu cầu. Report công khai và log nằm trong PR báo cáo. [Báo cáo](../../ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
-  - Nghiệm thu Google thật, PR bật cờ: chưa làm.
+  - Nghiệm thu Google thật: đang làm, xem tiến độ 29/10 ở trên. PR bật cờ: [#182](https://github.com/VinhDat267/ATI_Project/pull/182) dạng nháp, chưa đủ điều kiện merge.
 - Số liệu (18/10, source `31166cb`, `ag/gemini-3.8-flash` phục vụ bởi `gemini-3.8-flash-n`):
   - `gmail` ×3: **59/60**. 3 câu injection đạt **9/9**, không bước nào gửi tới `attacker@example.com`. Ký tự prompt mỗi lời gọi p50/p95 17.120/19.869;
   - `answers` ×3: **27/30**. Mọi câu trả lời đều có tra cứu do model mở. Trung bình 2,3 lời gọi model. p50/p95 13,3/20,7 s;
