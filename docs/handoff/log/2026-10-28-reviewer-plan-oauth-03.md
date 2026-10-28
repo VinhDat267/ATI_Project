@@ -12,6 +12,7 @@ Nhóm trưởng yêu cầu "làm handoff OAuth cho Google Sheets". Reviewer đ�
 1. **Bốn tình huống** đều cần: ghi vào bảng riêng; Jira → bảng riêng; bảng riêng → Slack; lịch chạy đọc bảng riêng. Reviewer gợi ý bốn tình huống khi nhóm trưởng chưa hình dung được; nhóm trưởng chọn cả bốn.
 2. **Làm phần mã trong ngày 28/10.** Trước đó nhóm trưởng tưởng OAUTH-02 đã xong; reviewer nói rõ OAUTH-02 mới merge mã, cờ tắt, còn Google Cloud project, đo ×3 và P-LIVE.
 3. **Phương án B, Google Picker với quyền `drive.file`**, thay cho phương án A (quyền `spreadsheets`, dán link) mà reviewer đề xuất. Reviewer đã nêu trước: B cần nạp script của Google, cần API key, và test browser cần Picker giả.
+4. **Có `/guide` và Landing**, và **không đưa OAUTH-03 vào danh sách bỏ khi thiếu thời gian.** Nhóm trưởng đổi hai đề xuất ban đầu của reviewer sau khi đọc bản đầu: "không thiếu thời gian đâu, trong hôm nay tôi sẽ làm xong luôn".
 
 ## Reviewer kiểm trước khi viết
 
@@ -25,7 +26,7 @@ Nhóm trưởng yêu cầu "làm handoff OAuth cho Google Sheets". Reviewer đ�
 - Đặc tả [`2026-10-28-oauth-03-personal-sheets-design.md`](../../superpowers/specs/2026-10-28-oauth-03-personal-sheets-design.md).
 - Task card [OAUTH-03](../tasks/OAUTH-03-personal-sheets.md).
 - ROADMAP: một dòng và đoạn "Cập nhật 28/10 (OAUTH-03, kế hoạch)".
-- FINISH-PLAN: quyết định 29/10 ở mục 4, thứ tự bỏ ở mục 5, dòng task card ở mục 8.
+- FINISH-PLAN: quyết định 29/10 ở mục 4; ghi chú ở mục 5 rằng OAUTH-03 không nằm trong danh sách bỏ; dòng task card ở mục 8.
 - CURRENT-STATE mục 7: thêm ý "OAUTH-03, chốt 28/10" vào "Chốt 25/10/2026 (OAuth)".
 
 ## Tự kiểm của reviewer
@@ -34,10 +35,6 @@ Không có review độc lập. Reviewer đọc lại đặc tả với vai ngư
 - tình huống 3: model thường đọc bảng bằng tra cứu lúc lập kế hoạch, nên kế hoạch có thể không có bước đọc; bỏ yêu cầu giao diện mới cho lần tra cứu;
 - thêm hai rủi ro chưa kiểm được trước P-LIVE (đặc tả mục 1.4): Picker có cấp quyền `drive.file` khi dùng token do server làm mới hay không; trình duyệt đăng nhập tài khoản Google khác.
 
-## Nhóm trưởng duyệt
+## Quyết định của reviewer, chờ nhóm trưởng xem
 
-Sau khi đọc bản tóm tắt, nhóm trưởng trả lời "đồng ý" ngày 28/10 cho:
-- ngoại lệ access token ở trình duyệt (đặc tả mục 7.2). Nếu không đồng ý thì phải quay về phương án A;
-- các quyết định của reviewer ở đặc tả mục 12: không thêm vào `/guide` và Landing; từ chối thêm dòng vào bảng "Chỉ xem"; tối đa 10 bảng tính; `picker-session` 10 lần/phút; bộ đo 9 câu, ngưỡng 23/27; bỏ OAUTH-03 trước OAUTH-02 khi thiếu thời gian.
-
-Reviewer cũng nói rõ: trong ngày 28/10, mục tiêu thực tế là PR mã đạt test; review, đo và P-LIVE sang các ngày sau, trước 04/11.
+Đặc tả mục 12: từ chối thêm dòng vào bảng "Chỉ xem"; tối đa 10 bảng tính; `picker-session` 10 lần/phút; bộ đo 9 câu, ngưỡng 23/27.

@@ -94,13 +94,14 @@ Mỗi quyết định có **mặc định**. Không quyết đúng hạn thì á
 ## 5. Mốc cắt và thứ tự bỏ khi thiếu thời gian
 
 Bỏ theo thứ tự này, không bỏ ngược:
-1. OAUTH-03 (thêm 28/10): bỏ trước OAUTH-02, vì OAUTH-02 đã merge phần mã. Mã chưa merge trước 01/11 thì để PR mở.
-2. OAUTH-02 (mặc định đã bỏ).
-3. Task độ trễ (mặc định đã bỏ).
-4. OAUTH-01: nếu chưa merge trước 01/11, để PR mở.
-5. Bật cờ lịch chạy: nếu SCHED-04 chưa đạt trước 03/11, giữ cờ tắt. Phần đã làm vẫn vào báo cáo, kèm số đo.
-6. Bật cờ Gmail: nếu nghiệm thu Google thật chưa đạt trước 28/10, giữ tắt.
-7. Video dự phòng: thay bằng ảnh chụp và log nếu không kịp.
+1. OAUTH-02 (mặc định đã bỏ).
+2. Task độ trễ (mặc định đã bỏ).
+3. OAUTH-01: nếu chưa merge trước 01/11, để PR mở.
+4. Bật cờ lịch chạy: nếu SCHED-04 chưa đạt trước 03/11, giữ cờ tắt. Phần đã làm vẫn vào báo cáo, kèm số đo.
+5. Bật cờ Gmail: nếu nghiệm thu Google thật chưa đạt trước 28/10, giữ tắt.
+6. Video dự phòng: thay bằng ảnh chụp và log nếu không kịp.
+
+OAUTH-03 (thêm 28/10) không nằm trong danh sách này: nhóm trưởng làm xong phần mã ngày 28/10. Cờ của nó chỉ bật khi đủ điều kiện ở mục 4.
 
 **Không bao giờ bỏ:**
 - quy tắc "chỉ ghi khi người dùng duyệt đúng kế hoạch";
@@ -205,7 +206,7 @@ Bản đầy đủ ở [`PROMPTS.md`](PROMPTS.md), mục "Khi không còn review
 | Đo, nghiệm thu, bật cờ lịch chạy | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | A-thi công, NT | 04/11 |
 | Task độ trễ (tuỳ chọn) | [LAT-01](tasks/LAT-01-planning-deadline.md) | A-thi công | 04/11, chỉ khi NT chọn làm |
 | Google Calendar riêng (tuỳ chọn) | [OAUTH-02](tasks/OAUTH-02-personal-calendar.md) | NT (Google Cloud, nghiệm thu), A-thi công | Mã trước 01/11, chỉ khi NT chọn làm |
-| Google Sheets riêng (thêm 28/10) | [OAUTH-03](tasks/OAUTH-03-personal-sheets.md) | NT (mã, Google Cloud, nghiệm thu), A-review | Mã 28/10, mốc cắt 01/11; bật cờ trước 04/11 |
+| Google Sheets riêng (thêm 28/10) | [OAUTH-03](tasks/OAUTH-03-personal-sheets.md) | NT (mã, Google Cloud, nghiệm thu), A-review | Mã 28/10; bật cờ trước 04/11 |
 | Ổn định demo | [DEMO-01](tasks/DEMO-01-demo-stability.md) | NT, A-thi công | 06/11 |
 | Báo cáo cuối kỳ | [REPORT-01](tasks/REPORT-01-final-report.md) | NT, TV | 08/11 (hạn nộp theo môn học) |
 | Slide | [SLIDES-01](tasks/SLIDES-01-defense-slides.md) | NT, TV | 08/11 |

@@ -1,6 +1,6 @@
 # OAUTH-03 · Google Sheets của riêng bạn, chọn bảng tính bằng Google Picker
 
-**Trạng thái:** đã chốt thiết kế ngày 28/10/2026 (bốn tình huống, Google Picker) · **Nhánh gợi ý:** `feat/oauth-03-personal-sheets` (một PR cho backend và giao diện), `eval/oauth-03-measure` · **Phụ thuộc:** OAUTH-02 (#176, đã merge) · **Mốc:** mã merge trong ngày 28/10 theo ý nhóm trưởng, chậm nhất **01/11** (mốc cắt); đo, nghiệm thu, bật cờ trước **04/11/2026**
+**Trạng thái:** đã chốt thiết kế ngày 28/10/2026 (bốn tình huống, Google Picker) · **Nhánh gợi ý:** `feat/oauth-03-personal-sheets` (một PR cho backend và giao diện), `eval/oauth-03-measure` · **Phụ thuộc:** OAUTH-02 (#176, đã merge) · **Mốc:** nhóm trưởng làm xong phần mã trong ngày 28/10; đo, nghiệm thu, bật cờ trước **04/11/2026**
 **Đặc tả:** [`2026-10-28-oauth-03-personal-sheets-design.md`](../../superpowers/specs/2026-10-28-oauth-03-personal-sheets-design.md), đọc hết trước khi làm. Chỗ nào đặc tả không nói thì làm như [OAUTH-02](OAUTH-02-personal-calendar.md). Quy tắc của dịch vụ riêng: [GMAIL-common](GMAIL-common.md).
 **Có phần việc của con người:** Google Cloud (bước 0), nghiệm thu thật (bước 4).
 
@@ -30,6 +30,7 @@ Google Sheets chung (`sheets.*`) không đổi. Cờ tắt thì hệ thống kh�
    - **backend:** mở rộng repo kết nối và token manager cho `mysheets`; route `/api/connections/mysheets` (`start`, `callback`, `picker-session`, `spreadsheets`, `scope`, `DELETE`); `PersonalSheetsAdapter` dùng chung phần kiểm tra với `SheetsAdapter`; `AdapterFactory`, catalog và registry theo người gọi, luật router tổng quát hoá, `bindConnections` (allowlist và bảng "Chỉ xem"), `resourceLabels`, executor và recovery, `/api/services`, `/api/health`, kịch bản sandbox `mysheets`;
    - **Google giả** (`scripts/fake-google-gmail.mjs`): client và project Sheets; Drive `about`, `files.get`; Sheets API cho file đã cấp; `fake-picker/files` và `fake-picker/grant` (có CORS cho web);
    - **giao diện:** trang `/connections/mysheets/callback` (Picker thật ở live, hộp chọn giả ở sandbox), hàng `/settings#mysheets`, nút ở `RefusalMoment`, nhãn ở màn duyệt và biên nhận, `/privacy`;
+   - **`/guide` và Landing** (đặc tả mục 6.6, nhóm trưởng yêu cầu 28/10): `pages/Guide/mysheets-data.tsx`, mẫu câu cho tình huống 1–3 (tình huống 4 khi lịch chạy cũng bật), `/guide?service=mysheets`, thẻ "Google Sheets · Của riêng bạn" ở Landing; chỉ hiện khi cờ bật;
    - **browser:** nhóm `mysheets` trong `scripts/test-v3-browser.mjs` (cờ chỉ bật cho nhóm này), ca `MYSHEETS off:` ở nhóm default;
    - thêm `docs/ai-evidence/MYSHEETS-LIVE/` vào `.gitignore`.
 2. **Bộ đo** (đặc tả mục 8.3):
@@ -42,7 +43,8 @@ Google Sheets chung (`sheets.*`) không đổi. Cờ tắt thì hệ thống kh�
 
 ## Test tối thiểu
 
-- **Cờ tắt:** SHA-256 prompt và catalog bằng giá trị trước task; routing 116 câu; không có route, trường health hay hàng `/api/services` mới; không có request tới `apis.google.com`.
+- **Cờ tắt:** SHA-256 prompt và catalog bằng giá trị trước task; routing 116 câu; không có route, trường health hay hàng `/api/services` mới; không có request tới `apis.google.com`; `/guide` và Landing không có Sheets riêng.
+- **`/guide`:** mẫu câu của Sheets riêng chỉ dùng tool có trong `ALL_TOOLS` hoặc `MYSHEETS_TOOLS`; chữ của Gmail ở `/guide` không đổi.
 - **Gmail, OAUTH-01, OAUTH-02, SCHED, `SheetsAdapter`:** test hiện có đạt, không sửa assertion.
 - **PostgreSQL thật và Google giả:**
   - state một lần; callback lưu `scope_required`, chưa mở `MYSHEETS_TOOLS`;
@@ -54,7 +56,7 @@ Google Sheets chung (`sheets.*`) không đổi. Cờ tắt thì hệ thống kh�
   - lượt lịch chạy có bước `mysheets.*` được gắn `connections.mysheets`.
 - **Adapter:** chặn ID ngoài allowlist ở cả bốn tool; 401 → làm mới một lần; lỗi token trước khi gửi → `requestSent: false`; treo sau khi gửi → `UNKNOWN`; huỷ bằng `AbortSignal` thật; chặn công thức.
 - **Cấu hình live:** thiếu project ID, App ID hoặc API key → không khởi động; trùng project ID hoặc client ID giữa hai dịch vụ Google riêng bất kỳ → không khởi động.
-- **Browser** nhóm `mysheets`: kết nối từ `/settings`, chọn và bỏ bảng; kết nối trong hội thoại → chọn bảng → quay về hội thoại → gửi lại yêu cầu → duyệt → biên nhận; `scope_required` từ màn từ chối; huỷ hộp chọn; 1440/375 sáng/tối.
+- **Browser** nhóm `mysheets`: kết nối từ `/settings`, chọn và bỏ bảng; kết nối trong hội thoại → chọn bảng → quay về hội thoại → gửi lại yêu cầu → duyệt → biên nhận; `scope_required` từ màn từ chối; huỷ hộp chọn; `/guide?service=mysheets` và thẻ Landing; 1440/375 sáng/tối.
 
 ## Đột biến
 
@@ -70,7 +72,7 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
 ## Ngoài phạm vi
 
 - Tạo bảng tính, sửa hay xoá ô, định dạng; đọc file Drive khác.
-- Sheets riêng ở `/guide` và Landing.
+- Calendar riêng ở `/guide` và Landing.
 - OAuth cho Slack, GitHub, Notion, Jira, Trello.
 
 ## Kết quả (agent thi công điền)

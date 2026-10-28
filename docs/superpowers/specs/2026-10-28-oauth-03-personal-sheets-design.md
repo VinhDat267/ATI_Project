@@ -1,7 +1,7 @@
 # OAuth phần 3: Google Sheets của riêng bạn, chọn bảng tính bằng Google Picker (OAUTH-03)
 
 **Ngày:** 28/10/2026
-**Trạng thái:** thiết kế sau phiên brainstorm với nhóm trưởng ngày 28/10. Nhóm trưởng chọn phủ cả bốn tình huống ở mục 1.2 và chọn Google Picker (phương án B ở mục 1.3). Nhóm trưởng muốn làm xong phần mã trong ngày 28/10. Nhóm trưởng duyệt đặc tả ngày 28/10, gồm cả ngoại lệ access token ở trình duyệt (mục 7.2) và các quyết định ở mục 12.
+**Trạng thái:** thiết kế sau phiên brainstorm với nhóm trưởng ngày 28/10. Nhóm trưởng chọn phủ cả bốn tình huống ở mục 1.2 và chọn Google Picker (phương án B ở mục 1.3). Nhóm trưởng muốn làm xong phần mã trong ngày 28/10.
 **Dựa trên:**
 - [OAUTH-02](2026-10-26-oauth-02-personal-calendar-design.md), Google Calendar của riêng bạn (mã đã merge #176, cờ tắt). OAUTH-03 chép khuôn này; chỗ nào đặc tả này không nói thì làm như OAUTH-02;
 - [OAUTH-01](2026-10-25-oauth-connect-from-chat-design.md): kết nối ngay trong hội thoại, `returnTo`;
@@ -63,13 +63,14 @@ Tình huống 4 chỉ chạy được khi `SCHEDULES_ENABLED` cũng bật (SCHED
 3. Khi đã `connected`, planner lập kế hoạch với bốn tool `mysheets.*` trên đúng những bảng tính đã chọn, và gắn `connections.mysheets` (`credentialId`, `email`, `allowedSpreadsheets`) trước khi băm.
 4. Màn duyệt và biên nhận ghi rõ bảng tính, tab và tài khoản Google.
 5. Bốn tình huống ở mục 1.2 chạy được, trong sandbox và với Google thật.
+6. `/guide` và Landing giới thiệu Sheets riêng khi cờ bật (nhóm trưởng yêu cầu 28/10), như Gmail đang làm (mục 6.6).
 
 ### 2.2. Không làm
 
 - Không tạo bảng tính mới, không sửa hay xoá ô, không định dạng. Quyền `drive.file` cho phép tạo file, nhưng ATI không dùng.
 - Không đọc file Drive khác (Docs, Slides, PDF). Picker chỉ hiện bảng tính.
 - Không đổi `sheets.*` chung, không đổi `mycalendar.*`, không đổi Gmail.
-- Không thêm Sheets riêng vào `/guide` và Landing (quyết định của reviewer, để kịp trong ngày; làm sau nếu cần).
+- Không thêm Calendar riêng vào `/guide` và Landing (OAUTH-02 chưa có; ngoài phạm vi task này).
 - Không làm OAuth cho Slack, GitHub, Notion, Jira, Trello (chốt 25/10).
 
 ### 2.3. Những điều không được xảy ra
@@ -78,6 +79,7 @@ Tình huống 4 chỉ chạy được khi `SCHEDULES_ENABLED` cũng bật (SCHED
    - `ALL_TOOLS` 33 tool, `SERVICE_REGISTRY` 8 dịch vụ; SHA-256 của system prompt và catalog không đổi; routing offline 116 câu không đổi;
    - không có route `/api/connections/mysheets/*` (404), `/api/health` không có `mysheetsEnabled`, `/api/services` không có `mysheets`;
    - trang không bao giờ nạp script từ `apis.google.com`;
+   - `/guide` và Landing không có Sheets riêng;
    - mọi test hiện có của Gmail, OAUTH-01, OAUTH-02 và SCHED đạt **mà không sửa assertion**.
 2. **Không bao giờ rơi về service account chung.** Khi `mysheets` chưa kết nối, đang `scope_required` hoặc `reconnect_required`, yêu cầu nhắm tới bảng tính của tôi bị từ chối (`refusal`), không chuyển sang `sheets.*`.
 3. **Cô lập:**
@@ -287,6 +289,17 @@ Như OAUTH-02 mục 6.3 với nhãn "Kết nối Google Sheets", "Chọn bảng 
 
 Khi `/api/health` có `mysheetsEnabled: true`, thêm mục "Bảng tính Google Sheets của bạn": ATI chỉ thấy các bảng tính bạn chọn trong cửa sổ của Google; nội dung ô được đọc sẽ đi qua nhà cung cấp mô hình (9router) để lập kế hoạch; ATI chỉ thêm dòng sau khi bạn duyệt; ngắt kết nối thì ATI thu hồi quyền ở Google.
 
+### 6.6. `/guide` và Landing
+
+Chép đúng cách Gmail đang làm (`pages/Guide/gmail-data.tsx`, `GuidePage.tsx`, thẻ Gmail ở `LandingPage.tsx`); chỉ hiện khi `/api/health` có `mysheetsEnabled: true`:
+- **`/guide`:**
+  - thêm `pages/Guide/mysheets-data.tsx` với `MYSHEETS_GUIDE` (nhóm "Của riêng bạn", không có khoá, các bước: mở Kết nối dịch vụ → cấp quyền Google → chọn bảng tính trong cửa sổ của Google), `MYSHEETS_PROMPTS` và `MYSHEETS_CAPABILITY`;
+  - mẫu câu là ba tình huống 1–3 ở mục 1.2; tình huống 4 chỉ hiện khi lịch chạy cũng bật. Mỗi mẫu khai báo tool, và test đối chiếu tool với `ALL_TOOLS` cộng `MYSHEETS_TOOLS`;
+  - nút của dịch vụ ghi "Kết nối Google Sheets →", tới `/settings#mysheets`; dòng cách kết nối ghi "Google OAuth · không nhập khoá". Các chỗ đang so `s.id === 'gmail'` đổi thành kiểm dịch vụ riêng, để Gmail giữ nguyên chữ;
+  - `/guide?service=mysheets` mở thẳng mục Sheets riêng.
+- **Landing:** thêm thẻ "Google Sheets · Của riêng bạn" sau thẻ Gmail trong lưới dịch vụ, một câu mô tả (chọn bảng tính trong cửa sổ của Google, ATI chỉ thêm dòng sau khi bạn duyệt) và link "Cách kết nối và mẫu câu Google Sheets" tới `/guide?service=mysheets`.
+- Câu chữ không được hứa điều hệ thống không làm. Quét bản build (`scripts/test-v3-web-build-security.mjs`) vẫn đạt.
+
 ---
 
 ## 7. An toàn
@@ -314,7 +327,7 @@ Khi `/api/health` có `mysheetsEnabled: true`, thêm mục "Bảng tính Google 
 
 ### 8.1. Test tự động
 
-1. **Cờ tắt:** các bất biến ở mục 2.3 điểm 1, gồm một ca browser `MYSHEETS off:` ở nhóm default kiểm không có hàng `mysheets` và không có request tới `apis.google.com`.
+1. **Cờ tắt:** các bất biến ở mục 2.3 điểm 1, gồm một ca browser `MYSHEETS off:` ở nhóm default kiểm không có hàng `mysheets`, `/guide` và Landing không có Sheets riêng, và không có request tới `apis.google.com`.
 2. **PostgreSQL thật và Google giả** (`scripts/fake-google-gmail.mjs` mở rộng):
    - Google giả mô hình hoá `drive.file`: Drive và Sheets chỉ phục vụ file đã được cấp cho cặp (tài khoản, project); `fake-picker/grant` ghi nhận việc cấp; thu hồi theo project như hiện có;
    - migration `0013` chạy lại được; từ chối `mysheets` không có `user_id`; nhận `connect_mysheets` với `return_to` hợp lệ;
@@ -333,6 +346,7 @@ Khi `/api/health` có `mysheetsEnabled: true`, thêm mục "Bảng tính Google 
    - trong hội thoại: từ chối → kết nối → chọn bảng → quay về đúng `/c/<id>` → "Gửi lại yêu cầu" → màn duyệt có tên bảng, tab, email → Duyệt → biên nhận có link "Mở bảng tính";
    - rời trang ở `scope_required` → màn từ chối hiện "Chọn bảng tính" và mở thẳng màn chọn;
    - huỷ hộp chọn giữ nguyên màn;
+   - `/guide?service=mysheets` mở đúng mục, nút tới `/settings#mysheets`; Landing có thẻ Sheets riêng;
    - 1440/375, sáng và tối.
 
 ### 8.2. Đột biến bắt buộc
@@ -344,7 +358,7 @@ Mỗi đột biến phải làm ít nhất một test fail:
 4. `PUT /scope` không gọi Drive `files.get`, hoặc lấy tên bảng từ trình duyệt.
 5. Bỏ kiểm `connections.mysheets.credentialId` khi thực thi.
 6. Ngắt Sheets riêng thu hồi luôn Gmail hoặc Calendar riêng.
-7. Cờ tắt vẫn thêm `MYSHEETS_TOOLS`, hoặc vẫn nạp script `apis.google.com`.
+7. Cờ tắt vẫn thêm `MYSHEETS_TOOLS`, vẫn nạp script `apis.google.com`, hoặc vẫn hiện Sheets riêng ở `/guide` hay Landing.
 8. `picker-session` trả token khi không có dòng `active`, hoặc thiếu `no-store`.
 9. `PersonalSheetsAdapter` bỏ chặn công thức.
 10. Lỗi sau khi đã gửi `append_rows` bị xếp `failed` thay vì `UNKNOWN`.
@@ -386,10 +400,10 @@ Nhóm trưởng thao tác, agent ghi theo câu lệnh P-LIVE. Bằng chứng ở
 
 ## 10. Thứ tự làm và mốc
 
-- **28/10:** PR mã (backend và giao diện có thể chung một PR để bớt một vòng review), cờ tắt. Nhóm trưởng tạo project Google ở mục 9 song song.
+- **28/10:** nhóm trưởng làm xong phần mã trong ngày (backend và giao diện có thể chung một PR để bớt một vòng review), cờ tắt, và tạo project Google ở mục 9. Nhóm trưởng xác nhận 28/10 là đủ thời gian; OAUTH-03 không nằm trong danh sách bỏ khi thiếu thời gian.
 - **Sau merge:** label `cases-mysheets.json` commit trước, rồi đo ×3; P-LIVE; PR bật cờ trước **04/11** (mốc ngừng thêm tính năng).
 - **29/10:** nhóm trưởng quyết đưa OAUTH-03 vào phạm vi bảo vệ cùng lúc với OAUTH-02.
-- **Mốc cắt:** mã chưa merge trước 01/11 thì để PR mở và ghi vào báo cáo là hướng phát triển. Khi thiếu thời gian, bỏ OAUTH-03 trước OAUTH-02 (quyết định của reviewer: OAUTH-02 đã merge mã, OAUTH-03 chưa).
+- **Bật cờ** chỉ khi đo đạt ngưỡng ở mục 8.3 và P-LIVE đạt; thiếu một điều kiện thì giữ cờ tắt và ghi vào báo cáo.
 
 ## 11. Để lại cho người thi công
 
@@ -398,11 +412,11 @@ Nhóm trưởng thao tác, agent ghi theo câu lệnh P-LIVE. Bằng chứng ở
 - Chữ trên giao diện được chỉnh nhỏ cho gọn, giữ ý.
 - Tách hay gộp PR backend và giao diện.
 
-## 12. Các quyết định của reviewer (nhóm trưởng đồng ý 28/10)
+## 12. Các quyết định của reviewer (nhóm trưởng xem lại)
 
-1. Không thêm Sheets riêng vào `/guide` và Landing.
-2. Từ chối kế hoạch thêm dòng vào bảng "Chỉ xem" ngay khi lập kế hoạch.
-3. Tối đa 10 bảng tính mỗi người.
-4. `picker-session` tối đa 10 lần/phút/người.
-5. Bộ đo 9 câu, ngưỡng 23/27.
-6. Khi thiếu thời gian, bỏ OAUTH-03 trước OAUTH-02.
+1. Từ chối kế hoạch thêm dòng vào bảng "Chỉ xem" ngay khi lập kế hoạch.
+2. Tối đa 10 bảng tính mỗi người.
+3. `picker-session` tối đa 10 lần/phút/người.
+4. Bộ đo 9 câu, ngưỡng 23/27.
+
+Ngày 28/10 nhóm trưởng đổi hai đề xuất ban đầu của reviewer: **có** thêm Sheets riêng vào `/guide` và Landing (mục 6.6); **không** đưa OAUTH-03 vào danh sách bỏ khi thiếu thời gian.
