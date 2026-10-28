@@ -1,6 +1,18 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 27/10/2026 (Asia/Saigon), sau merge [#176](https://github.com/VinhDat267/ATI_Project/pull/176) (`f616d01`) và [#177](https://github.com/VinhDat267/ATI_Project/pull/177) (`ae07723`). **#176: mã OAUTH-02 vào `main`**, Google Calendar "của riêng bạn" (`mycalendar`), sau cờ `MYCALENDAR_ENABLED` (**vẫn tắt**). Chưa đo bằng model thật, chưa nghiệm thu với Google thật. **#177** ghi #171, #174, #175 vào bàn giao; một reviewer khác sửa 1 P2 (câu "chưa có PR" của OAUTH-02 sai) và 2 P3.
+**Cập nhật lần cuối:** 28/10/2026 (Asia/Saigon), sau merge [#180](https://github.com/VinhDat267/ATI_Project/pull/180) (`3948007`): **mã Bước 1 của OAUTH-03 đã vào `main`**. Google Sheets "của riêng bạn" (`mysheets`), Google Picker và quyền `drive.file`, sau cờ `MYSHEETS_ENABLED` (**vẫn tắt**). **OAUTH-03 chưa hoàn tất:** chưa đo model thật ×3, chưa nghiệm thu Google thật/P-LIVE, chưa có PR bật cờ.
+- **Mã:** migration 0013; bốn tool `mysheets.*`; OAuth project riêng, chọn tối đa 10 bảng qua Picker; allowlist và kiểm quyền "Chỉ xem"; binding/hash/nhãn của kế hoạch và lượt lịch; màn kết nối, duyệt, biên nhận, `/guide` và Landing khi cờ bật.
+- **Review và sửa:** chuỗi review đã sửa wiring live, giới hạn chọn bảng, phân giải tham chiếu theo query/limit/index và tên hiện tại từ Google. Hai P2 cuối (lookup lỗi quay về tên cũ, lookup không hủy/quá hạn) sửa ở `58d4570`; delta cuối có review độc lập không có finding P1/P2/P3 cần sửa. Kết luận tích hợp [Đạt cho phần mã Bước 1](https://github.com/VinhDat267/ATI_Project/pull/180#issuecomment-6464579781).
+- **Bằng chứng:** [CI #40655033663](https://github.com/VinhDat267/ATI_Project/actions/runs/40655033663) xanh đúng head `58d4570`, cả `npm run check` và toàn bộ browser. Check: 2.509 test v3 + 406 eval + 11 launcher/env; 13/13 đột biến gốc và 4/4 hồi quy mới bị bắt. Browser local có bốn lỗi ở lượt tổng, cả bốn pass khi chạy lại riêng; không coi lượt local đó là xanh. Chi tiết ở log sửa review và log merge.
+- **Merge:** nhóm trưởng yêu cầu merge ngày 28/10. Merge commit `3948007645687d0c209794ce54b82140cbb560d1`; cây merge bằng cây head đã qua CI (`752025a3d093c622de0c877bc9df600360cc0de4`).
+
+Việc tiếp theo:
+- **OAUTH-03:** xác nhận Google Cloud project riêng cho Sheets; commit/push label 9 câu trước lời gọi model đầu tiên, chạy `EVAL_SET=mysheets` ×3, viết báo cáo; nhóm trưởng làm P-LIVE; PR bật cờ chỉ khi cả số đo và P-LIVE đạt, trước 04/11. Việc đưa vào phạm vi bảo vệ vẫn quyết ngày 29/10.
+- **SCHED-04:** bộ đo merge ngày 30/10; đo 01/11, nghiệm thu thật 03/11; PR bật cờ trước 04/11 nếu đạt. GMAIL-04, phần đo/nghiệm thu OAUTH-02 và REPORT-01 tiếp tục theo task card, không được coi là đã xong vì merge #180.
+
+[Log merge](log/2026-10-28-reviewer-merge-180.md), [task OAUTH-03](tasks/OAUTH-03-personal-sheets.md).
+
+**Cập nhật trước đó:** 27/10/2026 (Asia/Saigon), sau merge [#176](https://github.com/VinhDat267/ATI_Project/pull/176) (`f616d01`) và [#177](https://github.com/VinhDat267/ATI_Project/pull/177) (`ae07723`). **#176: mã OAUTH-02 vào `main`**, Google Calendar "của riêng bạn" (`mycalendar`), sau cờ `MYCALENDAR_ENABLED` (**vẫn tắt**). Chưa đo bằng model thật, chưa nghiệm thu với Google thật. **#177** ghi #171, #174, #175 vào bàn giao; một reviewer khác sửa 1 P2 (câu "chưa có PR" của OAUTH-02 sai) và 2 P3.
 - **Thiết kế** (đặc tả viết lại ngày 27/10 sau phiên brainstorm với nhóm trưởng, mục 7 "Chốt 27/10/2026 (OAUTH-02)"):
   - người dùng chọn những lịch ATI được dùng ngay trên màn callback; trước khi chọn, kết nối ở trạng thái `scope_required` và planner chưa có tool `mycalendar.*`;
   - 3 tool `mycalendar.list_calendars`, `list_events`, `create_event`, ngoài `ALL_TOOLS`; `calendarId` phải thuộc các lịch đã chọn; `create_event` luôn `sendUpdates=none`, không mời ai;
