@@ -1,6 +1,6 @@
-# 29/10/2026 · GMAIL-04 · Nghiệm thu Google thật (đang làm)
+# 29/10/2026 · GMAIL-04 · Nghiệm thu Google thật và sửa lỗi phát hiện
 
-Task: [GMAIL-04](../tasks/GMAIL-04-measure-and-live.md). Nhánh `codex/gmail-04-enable-flags`, source `ecf3c61bd82b65a3b5f6ad8ee51e0f54274b24cf`, [PR #182](https://github.com/VinhDat267/ATI_Project/pull/182) vẫn nháp. Đây là checkpoint đang nghiệm thu, không phải kết luận hoàn thành hay review độc lập.
+Task: [GMAIL-04](../tasks/GMAIL-04-measure-and-live.md). Nhánh `codex/gmail-04-enable-flags`, source `ecf3c61bd82b65a3b5f6ad8ee51e0f54274b24cf`, [PR #182](https://github.com/VinhDat267/ATI_Project/pull/182) vẫn nháp. Đây là bằng chứng thi công/nghiệm thu trong phạm vi chỉ Gmail đã kết nối thật; không thay thế review độc lập hoặc quyết định bật cờ.
 
 ## Môi trường và cách làm
 
@@ -47,11 +47,23 @@ Task: [GMAIL-04](../tasks/GMAIL-04-measure-and-live.md). Nhánh `codex/gmail-04-
 
 21. Sau kiểm thử, đối chiếu chính xác ID container `ati-gmail04-google-ui-pg` rồi xóa container thử cổng 56537. Không dừng DB nghiệm thu cổng 56536, API 3000/web 5174 hoặc 9router. Bản sửa frontend được phục vụ bởi Vite đang chạy. Chưa tự đăng xuất, liên kết lại hay bấm Google consent thay người dùng.
 
-## Chưa đạt hoặc chưa chạy
+22. Phần 1 hoàn tất: watcher sau lần ngắt Gmail tiếp theo trả PASS, token cũ invalid_grant và row Gmail đã bị xóa. Người dùng đăng xuất rồi đăng nhập ATI bằng Google. Helper chỉ đọc `verify-google-login-after-disconnect` exit 0: baseline đã liên kết Google trước ngắt; disconnect proof lúc 18:40:51.658Z; state mode login tạo 18:40:55.281Z và consume 18:40:58.867Z; phiên browser mới tạo 18:40:59.085Z cho đúng user ATI đang active, Google email khớp tài khoản thử, binding Google giữ nguyên, Gmail vẫn không có row. Probe này không tự tạo phiên hay gọi callback thay người dùng. Không có thao tác gửi thư trong chuỗi kiểm signin sau ngắt này.
 
-- Phần 1: **chưa hoàn tất**; chưa kiểm đăng nhập ATI bằng Google vẫn hoạt động sau thu hồi/ngắt Gmail, cấu hình sign-in và liên kết Google thật đã đạt ở mục 18–19; còn kiểm đăng nhập sau revoke Gmail.
-- Phần 2: cả 7/7 tool ghi đã đạt, đúng một lần/tool và có đọc lại thật. Đã chứng minh grant hỏng qua manager thật và qua chat thật: DB/API cần kết nối lại, không ghi; UI chat chỉ báo planning_error chung, cần reviewer xem xét trước khi kết luận toàn bộ phần 2 đạt.
-- Phần 3: câu Gmail chỉ đọc có bằng chứng; các dịch vụ khác chưa được cấu hình/kiểm trong DB nghiệm thu này. Không suy diễn từ lời người dùng rằng Calendar/Sheets/Slack đã xong sang kết quả đo/nghiệm thu của GMAIL-04.
+23. Người dùng xác nhận rõ: **chỉ Gmail đang kết nối thật**. Vì vậy phần 3 nghiệm thu trong phạm vi một dịch vụ đã kết nối, đúng đặc tả 6.4; câu chỉ đọc Gmail đã PASS ở mục 7. Không yêu cầu cấu hình thêm dịch vụ chưa dùng và không tuyên bố các dịch vụ khác/nền tảng đa dịch vụ đã đạt. Ghi campaign-scope.json. Đã tìm thử cấu hình cũ: chỉ đọc DB gốc 55533, thấy ba cấu hình shared nhưng không nhập/copy vào DB nghiệm thu. Container gốc trước đó dừng đã được trả về trạng thái dừng, không migrate hoặc cập nhật bảng gốc.
+
+24. Sửa thông báo sau token hỏng trong chat: ChatService ghi nhận tool Gmail thực sự được tra cứu, sau planner đọc lại kết nối riêng của đúng user. Nếu kết nối đã mất/reconnect_required, trả structured refusal có unavailableServices Gmail và hướng dẫn kết nối lại, dù model ném lỗi hoặc hỏi lại. Lỗi dịch vụ khác, lỗi Google 5xx hoặc model lỗi trong khi Gmail còn active vẫn giữ lỗi chung; lỗi đọc DB không đủ chứng minh quyền đã mất. Không đổi planner/prompt/catalog, không thực thi lại tool hoặc tự kết nối tài khoản.
+
+25. Hồi quy backend dùng AIPlanner thật với provider kiểm soát, fake Google HTTP, Gmail adapter/token manager/CredentialRepo và PostgreSQL thật. RED 2 fail/3 pass: trạng thái DB thực sự chuyển reconnect_required sau 1 refresh invalid_grant nhưng terminal là error hoặc clarification. Không dùng lỗi setup làm RED: đã chờ DB sẵn sàng và sửa fixture dùng SERVICE_REGISTRY export. GREEN 4 file 17/17 exit 0; chứng minh correlation, refusal lưu DB, SSE idle, 0 plan, 0 request ghi Google, không lộ refresh token; đối chứng refresh 5xx/ok còn active và lỗi Slack không bị gán nhầm cho Gmail. Browser Gmail/OAUTH-01 10/10 exit 0. Full check cuối exit 0: **2.542 v3 = 67 schemas + 443 adapters + 381 planner + 42 executor + 725 chat-api + 884 chat-web; 406 eval; 11 launcher/env**, typecheck/build/security scan đạt. Lần đầu typecheck exit 2 vì thuộc tính model không thuộc LLMProvider trong fixture, đã bỏ thuộc tính không đổi assertion. Bằng chứng Google thật mục 16 giữ nguyên; việc hiển thị mới được kiểm qua hồi quy/integration/browser, chưa bắt người dùng lặp lại revoke Google lần nữa.
+
+26. Kết luận bàn giao: phần 1 Google thật PASS; phần 2 đủ 7/7 tool ghi, đọc lại và ca token hỏng không ghi; lỗi thông báo đã được sửa/kiểm bằng integration và browser, không tuyên bố đã lặp lại UI Google thật sau sửa. Phần 3 PASS chỉ cho Gmail theo xác nhận trực tiếp của người dùng. Hai đợt sửa có TDD và full check xanh; rollout defaults vẫn chỉ nằm ở PR nháp, chưa có quyết định bật cờ hoặc review độc lập. Không sửa CURRENT-STATE/ROADMAP. Giữ nguyên kết quả model campaign 18/10. Không coi đây là nghiệm thu toàn bộ nền tảng.
+
+27. Đã dọn đúng container thử `ati-gmail04-reconnect-pg` cổng 56537 sau full check. Kiểm cây tiến trình riêng sở hữu 3000/5174 rồi khởi động lại API/web từ mã đã kiểm; không dừng DB live 56536. `verify-final-runtime` PASS: API live healthy, Gmail enabled nhưng đang not_connected theo bước ngắt chủ động, Google enabled/linked đúng tài khoản thử, chính browser session Google đã kiểm vẫn active, 9router /models 200 và có model cấu hình. runtime-final.json ghi SHA-256 ba file production đã sửa. Không tạo phiên đăng nhập mới trong probe. Các phần nguyên vẹn được giữ và PR vẫn chưa merge.
+
+## Kết luận và việc còn mở
+
+- Phần 1: **PASS** trong nghiệm thu thật, gồm Google login sau Gmail disconnect/revoke (mục 22).
+- Phần 2: cả 7/7 tool ghi đã đạt, đúng một lần/tool và có đọc lại thật. Đã chứng minh grant hỏng qua manager thật và qua chat thật: DB/API cần kết nối lại, không ghi; UI chat ban đầu báo planning_error chung; mã sửa và hồi quy ở mục 24–25, full check đã đạt, chờ review độc lập trước khi chốt PR.
+- Phần 3: **PASS cho phạm vi người dùng xác nhận chỉ Gmail kết nối thật** (mục 23); các dịch vụ khác không được nghiệm thu và không có tuyên bố hoàn thành nền tảng.
 - Chưa chạy lại model campaign, không thay label/scorer. CI trước đó xanh đúng `ecf3c61`; chưa có review độc lập cho PR rollout. Không merge, không quyết định bật cờ.
 - Runtime và DB tạm còn chạy để người dùng tiếp tục. 9router do phiên này khởi động; không dừng khi chưa xong nghiệm thu. Sau cùng cập nhật checkpoint này và task card trong cùng PR; không sửa CURRENT-STATE/ROADMAP.
 
@@ -64,6 +76,7 @@ Danh sách dưới đây được lấy từ file thật; dữ liệu gốc nằ
 027938692cef633973c0cb30706b88065a94a3a82071471f5d3f3da64afc0411  AUTH05-Google-linked-1440-light.png
 7c0c5d5a0885fb9d8354a23403bb3ce295ca0517a66f4091b10c097246d27e81  AUTH05-Google-linked-375-dark.png
 87d79d1ddf17b22833f4ad0ba8361007c9046a5bb8cb991edbcb9295692b9ce0  AUTH05-Google-linked-375-light.png
+aaefca4adc11c396f97c89071c50f43a4cec5b663ad77453f06a31bb98f90435  campaign-scope.json
 b011e04a5ee6cbb85726858576556c8171205218e3d5f1350718f5de77c2d270  chat-no-retry-1793209506068.json
 0ffeef6fcbf50c53943c06afb5621ca7bae7a9a1d373777a2971b3e4e1ceda87  connection-1793208969072.json
 a1f9d5af99f41594be889f2530ef69319ea68a83c0887864a8da1614416b2160  connection-1793209285022.json
@@ -71,11 +84,18 @@ a1f9d5af99f41594be889f2530ef69319ea68a83c0887864a8da1614416b2160  connection-179
 94da275ee2411862b813224cf94c93164fe34677d1282454c701d44e72761c29  connection-1793209636042.json
 8a48c9b88cf78b43e4b31cf93b645f9aeb435408cf5f201db379eb994fbd8141  connection-1793211078495.json
 2f0b7d6cab1a4f9f0bad94dd2bd10d379e2befd23cb1aba9bf4584e58fc61c07  disconnect-1793209356836.json
+99b0bd5e79bcfb0c30db173937b1e78c70172c5fc511d0f3254629cbe2d3db86  disconnect-1793212851658.json
 975033702b419a57373cf607ab0477d74423ac8c5906f93f62ffa13f3e211ff7  draft-created-1793209883723.json
 c4c41ff773d652a598fa5687552694b6857c6757367a73f5f2699bd425c46a63  draft-preview-1793209810295.json
 da89ec3a7c4ed07d0725e560a272f99a805eeca234c502972599598b3e98384e  forward-created-1793210254275.json
 71ed3a6e85a94b30a1c4290a01a4f83be9b0bf03068d40c1a74930fdf35710d7  gateway-incident.json
 e70dcfc6173ae22900d4509e7d6b178c3868d8cd071199c957c5d0ea3bf45458  gateway-recovery.json
+4aa9d221b9030f27001953e58ec46399846a7bd6bd32f4a570ddb9f12010f922  gmail-reconnect-browser.log
+33fc9beaa8edab10e2c311f4731e1a50cb206eb58ac445d3cd67fb5f8bc7d77b  gmail-reconnect-check-initial-type-error.log
+de21fb6f17dbbcc10a6a8f0032ad6eeb3881e9baea0446a3cddd8a397e564fc2  gmail-reconnect-check.log
+65ed048c393e62f47e8c8e51d3f58898bb75e87aa79503c2fb53e85a5bdc7795  gmail-reconnect-fix.json
+f9f70070b2faf02855f9dee1d4053f2b75de9f4589efbfdaa87e09f23fab8865  gmail-reconnect-green.log
+0ed0b66280d5c40fcc24a07ea54c08ba1f14030cb1903ead7467bd6275c71da7  gmail-reconnect-red.log
 64e530d5aa8688808123e4a6bb8520b2f3a2b5cf0d75a4ddd82097543908a311  google-link-browser.log
 6dcd6d3fef1a4eff0909ad8085616ebbcbc6e1f3a3746187465e3a966bf59b69  google-link-check-initial-type-errors.log
 6cde0c4ab698e9b5ef72c6bcb5b2735f0b42383afae3f2ce040669c1442fa261  google-link-check.log
@@ -83,6 +103,7 @@ e70dcfc6173ae22900d4509e7d6b178c3868d8cd071199c957c5d0ea3bf45458  gateway-recove
 ebef208922c649abe66178459f796a86009745063a5c68a6026b9648d88a3d0c  google-link-red.log
 b34b4faa659d852dd22356b08bb1a7897e60165f9233b2b86874c9fd376eb54f  google-link-source.sha256
 7b68a468de5ad1ac1059a9d7e76b32d83862c8adffd6e6b4a574d499338c9fc5  google-link-ui-fix.json
+bbebdc3b3dcc188d9b176c37125a8d896bf694a926a62ed51c51491cf5213e5c  google-login-after-disconnect-1793213018463.json
 fad1af7dc4e5f945a4f34a4c62e88dc8f34985ee66e3513f008dc210950c05f6  google-login-config.json
 5a55658f87a3e4d05ee9e3f8e3c5e84175831b9229477ff410387810218d1c2c  google-ready-1793211637823.json
 3f19cf3a136b166ac952b2962b6bb33488bc62b0f3ef1cff943d490526aaa24e  google-ready-1793211832786.json
@@ -92,13 +113,15 @@ fe7e7f0f827a0d318a6527147671448b12b88803783d1411bca5a2907e3e9d2e  google-ready-1
 4a1087ced86dda272faa3feff9f3d2022d90d1d0629c079f1080f9be4991c9f3  read-answer-1793209705438.json
 39dac673275363513461919795df7c55ecbd16d4ea036cc192de49b8ae736c72  read-answer-1793209725124.json
 44bfbdca923a6b0d45f97b4ab61366759c7e150d8a5e52e84106190c6aae99f1  reconnection-1793209326478.json
+6b36c22b860826874d18630042110c3634657746037f19411bd2f10e9266aca0  reconnection-1793212801151.json
 7d64d0c15f1fa75314bebec242ada6dd076a6a5db5f361dda3edde5b8857a208  reply-created-1793210168773.json
 4d75e8a2907435e6af01583e03305ad28168873344088bd2ec9c8e9499371eae  revocation-1793209148973.json
+ecd93849d951545e9c175c7a59ed34d0f88a075abc18a8cca2cd87fee05a0f4d  runtime-final.json
 f1a5f531b329c191a615882b809754b2578cc4871837291a4d882f7da0d24732  send-created-1793210053745.json
 61eb94c80919c7aca23672ff65f16e860fd4ab6334554943f48880fd057171ba  setup.json
 a97d18a2e8c84e278a22218784ac21985662cc4a673cdc5c0e3d8f87dec6aba6  status-latest.json
 0bfa9e452055cced69de24a77091c5239a362025edc66274579b59c4ebb78a72  thread-trashed-1793210646621.json
 b05999e90c54f556aa3a5b3ad82a78d506ce7432b54baae3a34a9406c3e41596  ui-revocation-1793210936054.json
 b3c5f1d9e6327df89a3f4cbfe72c77524ad11171336a873097dcdda6a68bdc7f  ui-revocation-1793210980646.json
-9c2e0ea4934085eb067a13909ce2efa06eb5ea94c1f09ae6c6fb6427ede2ac1e  write-matrix.json
+c6a2fd2f7d3dec3f02af7e29989d94adb57c36dbb0fba8a3f3f80dcd355e0ab7  write-matrix.json
 ```
