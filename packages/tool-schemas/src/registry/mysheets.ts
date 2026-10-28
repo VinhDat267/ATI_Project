@@ -23,7 +23,4 @@ export const MYSHEETS_SERVICE: ServiceDefinition = {
     'my google sheet',
     'spreadsheet của tôi',
   ],
-  commonMistakes: [
-    'Dùng mysheets.list_spreadsheets để lấy ID trong các bảng tính người dùng đã chọn cho ATI; không dùng ID của sheets.* chung; không đoán ID từ tên.',
-  ],
 };
