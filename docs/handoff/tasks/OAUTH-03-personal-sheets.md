@@ -1,0 +1,86 @@
+# OAUTH-03 · Google Sheets của riêng bạn, chọn bảng tính bằng Google Picker
+
+**Trạng thái:** đã chốt thiết kế ngày 28/10/2026 (bốn tình huống, Google Picker) · **Nhánh gợi ý:** `feat/oauth-03-personal-sheets` (một PR cho backend và giao diện), `eval/oauth-03-measure` · **Phụ thuộc:** OAUTH-02 (#176, đã merge) · **Mốc:** nhóm trưởng làm xong phần mã trong ngày 28/10; đo, nghiệm thu, bật cờ trước **04/11/2026**
+**Đặc tả:** [`2026-10-28-oauth-03-personal-sheets-design.md`](../../superpowers/specs/2026-10-28-oauth-03-personal-sheets-design.md), đọc hết trước khi làm. Chỗ nào đặc tả không nói thì làm như [OAUTH-02](OAUTH-02-personal-calendar.md). Quy tắc của dịch vụ riêng: [GMAIL-common](GMAIL-common.md).
+**Có phần việc của con người:** Google Cloud (bước 0), nghiệm thu thật (bước 4).
+
+## Mục tiêu
+
+Khi `MYSHEETS_ENABLED=on`, mỗi người kết nối Google của chính mình (quyền `drive.file`), chọn bảng tính trong Google Picker, rồi nhờ ATI đọc và thêm dòng vào đúng những bảng đó. Bốn tình huống phải chạy được (đặc tả mục 1.2):
+1. ghi một dòng vào bảng riêng;
+2. Jira → bảng riêng;
+3. bảng riêng → Slack;
+4. lịch chạy đọc bảng riêng, mỗi lượt chờ duyệt (cần `SCHEDULES_ENABLED`).
+
+Google Sheets chung (`sheets.*`) không đổi. Cờ tắt thì hệ thống không đổi từng byte.
+
+## Việc cần làm
+
+0. **Google Cloud** (nhóm trưởng, đặc tả mục 9):
+   - tạo project **thứ ba**, khác project Gmail, Calendar riêng và đăng nhập;
+   - bật Sheets API, Drive API, Picker API;
+   - màn đồng ý ở chế độ Testing, quyền `drive.file`, cùng test user;
+   - client OAuth web, redirect `/connections/mysheets/callback`, JavaScript origin là origin của web;
+   - API key chỉ cho Picker API, giới hạn website `<web origin>/*` và `https://docs.google.com/*`;
+   - ghi `MYSHEETS_OAUTH_*`, `MYSHEETS_OAUTH_PROJECT_ID`, `MYSHEETS_PICKER_API_KEY`, `MYSHEETS_PICKER_APP_ID` (project number) vào `.env` ở máy; khai thêm project ID của Gmail và Calendar riêng nếu đã có client. Không commit `.env`.
+1. **PR mã** (đặc tả mục 4–7), cờ tắt:
+   - **schema:** `MYSHEETS_SERVICE`, `MYSHEETS_TOOLS` (bốn tool như `SHEETS_TOOLS`, `'x-resource': 'myspreadsheet'` và `'mysheet'`), `PlanConnections.mysheets`, `PersonalSpreadsheetItem`;
+   - **cấu hình:** cờ và biến môi trường; `validatePersonalGoogleProjects` cho ba dịch vụ, giữ nguyên thông báo của cặp Gmail–MyCalendar; `.env.example`;
+   - **DB:** migration `0013_mysheets_personal_connections.sql`;
+   - **backend:** mở rộng repo kết nối và token manager cho `mysheets`; route `/api/connections/mysheets` (`start`, `callback`, `picker-session`, `spreadsheets`, `scope`, `DELETE`); `PersonalSheetsAdapter` dùng chung phần kiểm tra với `SheetsAdapter`; `AdapterFactory`, catalog và registry theo người gọi, luật router tổng quát hoá, `bindConnections` (allowlist và bảng "Chỉ xem"), `resourceLabels`, executor và recovery, `/api/services`, `/api/health`, kịch bản sandbox `mysheets`;
+   - **Google giả** (`scripts/fake-google-gmail.mjs`): client và project Sheets; Drive `about`, `files.get`; Sheets API cho file đã cấp; `fake-picker/files` và `fake-picker/grant` (có CORS cho web);
+   - **giao diện:** trang `/connections/mysheets/callback` (Picker thật ở live, hộp chọn giả ở sandbox), hàng `/settings#mysheets`, nút ở `RefusalMoment`, nhãn ở màn duyệt và biên nhận, `/privacy`;
+   - **`/guide` và Landing** (đặc tả mục 6.6, nhóm trưởng yêu cầu 28/10): `pages/Guide/mysheets-data.tsx`, mẫu câu cho tình huống 1–3 (tình huống 4 khi lịch chạy cũng bật), `/guide?service=mysheets`, thẻ "Google Sheets · Của riêng bạn" ở Landing; chỉ hiện khi cờ bật;
+   - **browser:** nhóm `mysheets` trong `scripts/test-v3-browser.mjs` (cờ chỉ bật cho nhóm này), ca `MYSHEETS off:` ở nhóm default;
+   - thêm `docs/ai-evidence/MYSHEETS-LIVE/` vào `.gitignore`.
+2. **Bộ đo** (đặc tả mục 8.3):
+   - fixture bảng riêng, gồm ô chứa câu tiêm lệnh; `evalCatalog` thêm `MYSHEETS_TOOLS` cho `EVAL_SET=mysheets`, các bộ cũ giữ catalog và mã băm cũ;
+   - `cases-mysheets.json`, 9 câu, commit và push label **trước mọi lời gọi model**;
+   - `EVAL_SET=mysheets` ×3; báo cáo ở `docs/ai-evidence/V3-GOLDEN-V2/<ngày>-OAUTH-03-REPORT.md`.
+3. Ghi kết quả vào card này và một file log mới.
+4. **Nghiệm thu thật** (nhóm trưởng thao tác, agent ghi theo câu lệnh P-LIVE; đặc tả mục 8.4): Picker thật chọn hai bảng (một bảng "Chỉ xem"); tình huống 1 và 3 với Google thật; yêu cầu ghi vào bảng không được chọn bị chặn; ngắt kết nối, kiểm token đã thu hồi và Gmail, Calendar riêng vẫn kết nối.
+5. **PR bật cờ** nếu đạt ngưỡng ở đặc tả mục 8.3 và bước 4 đạt, trước 04/11.
+
+## Test tối thiểu
+
+- **Cờ tắt:** SHA-256 prompt và catalog bằng giá trị trước task; routing 116 câu; không có route, trường health hay hàng `/api/services` mới; không có request tới `apis.google.com`; `/guide` và Landing không có Sheets riêng.
+- **`/guide`:** mẫu câu của Sheets riêng chỉ dùng tool có trong `ALL_TOOLS` hoặc `MYSHEETS_TOOLS`; chữ của Gmail ở `/guide` không đổi.
+- **Gmail, OAUTH-01, OAUTH-02, SCHED, `SheetsAdapter`:** test hiện có đạt, không sửa assertion.
+- **PostgreSQL thật và Google giả:**
+  - state một lần; callback lưu `scope_required`, chưa mở `MYSHEETS_TOOLS`;
+  - `picker-session`: 409 khi chưa có dòng `active`, 401 khi không có phiên, có `no-store`;
+  - `PUT /scope` từ chối mảng rỗng, quá 10, ID chưa được cấp, file không phải bảng tính, file đã xoá; tên và `canEdit` lấy từ Google;
+  - callback cũ không ghi đè kết nối mới; đăng xuất giữa chừng → `401 INVALID_SESSION`; `invalid_grant` → `reconnect_required` của đúng `mysheets`;
+  - ngắt Sheets riêng không đổi dòng Gmail và Calendar riêng, token của hai dịch vụ đó vẫn dùng được; và ngược lại;
+  - thực thi với `credentialId` khác hoặc bảng đã bị bỏ → `AUTH_ERROR`; thêm dòng vào bảng "Chỉ xem" → từ chối;
+  - lượt lịch chạy có bước `mysheets.*` được gắn `connections.mysheets`.
+- **Adapter:** chặn ID ngoài allowlist ở cả bốn tool; 401 → làm mới một lần; lỗi token trước khi gửi → `requestSent: false`; treo sau khi gửi → `UNKNOWN`; huỷ bằng `AbortSignal` thật; chặn công thức.
+- **Cấu hình live:** thiếu project ID, App ID hoặc API key → không khởi động; trùng project ID hoặc client ID giữa hai dịch vụ Google riêng bất kỳ → không khởi động.
+- **Browser** nhóm `mysheets`: kết nối từ `/settings`, chọn và bỏ bảng; kết nối trong hội thoại → chọn bảng → quay về hội thoại → gửi lại yêu cầu → duyệt → biên nhận; `scope_required` từ màn từ chối; huỷ hộp chọn; `/guide?service=mysheets` và thẻ Landing; 1440/375 sáng/tối.
+
+## Đột biến
+
+Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn chỗ kiểm allowlist, mỗi chỗ một lần). Ghi kết quả từng đột biến vào log.
+
+## Tiêu chí nghiệm thu
+
+- [ ] RED trước GREEN; mọi đột biến ở đặc tả mục 8.2 bị bắt.
+- [ ] `npm run check` và toàn bộ `npm run test:browser:v3` exit 0; không sửa assertion cũ.
+- [ ] Label commit trước lời gọi model đầu tiên; đo ×3, báo cáo nguồn gốc.
+- [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu.
+
+## Ngoài phạm vi
+
+- Tạo bảng tính, sửa hay xoá ô, định dạng; đọc file Drive khác.
+- Calendar riêng ở `/guide` và Landing.
+- OAuth cho Slack, GitHub, Notion, Jira, Trello.
+
+## Kết quả (agent thi công điền)
+
+- **Nhánh, commit:**
+- **Kiểm thử và đột biến:**
+- **Số đo (`EVAL_SET=mysheets`):**
+- **Nghiệm thu thật:**
+- **Quyết định bật cờ:**
+- **Khác với đặc tả:**
+- **Log bàn giao:**
