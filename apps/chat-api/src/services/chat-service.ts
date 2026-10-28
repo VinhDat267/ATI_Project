@@ -47,6 +47,8 @@ export interface ChatServiceOptions {
   gmailConnection?: (userId: string) => Promise<NonNullable<PlanConnections['gmail']> | null>;
   /** The caller's active MyCalendar connection; absent when MyCalendar is off or not connected, so a MyCalendar plan is refused. */
   mycalendarConnection?: (userId: string) => Promise<NonNullable<PlanConnections['mycalendar']> | null>;
+  /** The caller's active MySheets connection; absent when MySheets is off or not connected, so a MySheets plan is refused. */
+  mysheetsConnection?: (userId: string) => Promise<(NonNullable<PlanConnections['mysheets']> & { selectedSpreadsheets?: Array<{ id: string; title: string; canEdit: boolean }> }) | null>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
 }
@@ -69,11 +71,13 @@ export class ChatService {
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
+  private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private schedules?: ChatServiceOptions['schedules'];
 
   constructor(options: ChatServiceOptions) {
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
+    this.mysheetsConnection = options.mysheetsConnection;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -110,20 +114,22 @@ export class ChatService {
 
   /**
    * After validation, before labels, hash and storage: drop any connections
-   * the model wrote and record the connection a Gmail or MyCalendar step will use,
+   * the model wrote and record the connection a Gmail, MyCalendar or MySheets step will use,
    * so the integrity check covers it. Without one the plan is refused, not saved.
    */
   private async bindConnections(plan: PlanResponse, userId: string): Promise<PlannerResponse> {
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
+    const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
 
-    if (!usesGmail && !usesMyCalendar) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
     let gmailConn: NonNullable<PlanConnections['gmail']> | undefined;
     let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
+    let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -160,6 +166,54 @@ export class ChatService {
       }
     }
 
+    if (usesMySheets) {
+      const mysheets = await this.mysheetsConnection?.(userId);
+      if (!mysheets) {
+        unavailableServices.push({ id: 'mysheets', name: 'Google Sheets của bạn' });
+        reasons.push('Google Sheets của bạn chưa được kết nối hoặc chưa chọn bảng tính.');
+      } else {
+        const allowedSet = new Set(mysheets.allowedSpreadsheets);
+        const forbiddenStep = bound.steps.find((step) => {
+          if (!step.tool.startsWith('mysheets.')) return false;
+          const sId = step.args?.spreadsheetId;
+          return typeof sId === 'string' && !allowedSet.has(sId);
+        });
+        if (forbiddenStep) {
+          const sId = String(forbiddenStep.args.spreadsheetId);
+          return {
+            kind: 'refusal',
+            reason: `Bảng tính "${sId}" không nằm trong danh sách bảng tính Google Sheets bạn đã cho phép ATI sử dụng.`,
+            suggestion: 'Hãy chọn thêm bảng tính này bằng Google Picker hoặc chọn một trong các bảng tính đã được cấp quyền.',
+            unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
+          };
+        }
+
+        const readOnlyAppendStep = bound.steps.find((step) => {
+          if (step.tool !== 'mysheets.append_rows') return false;
+          const sId = step.args?.spreadsheetId;
+          const matched = mysheets.selectedSpreadsheets?.find((item) => item.id === sId);
+          return matched && matched.canEdit === false;
+        });
+        if (readOnlyAppendStep) {
+          const sId = String(readOnlyAppendStep.args.spreadsheetId);
+          const matched = mysheets.selectedSpreadsheets?.find((item) => item.id === sId);
+          const title = matched?.title ?? sId;
+          return {
+            kind: 'refusal',
+            reason: `Bảng tính "${title}" chỉ cho xem, ATI không thêm dòng được.`,
+            suggestion: 'Hãy chọn bảng tính bạn có quyền chỉnh sửa, hoặc cấp quyền chỉnh sửa cho tài khoản Google của bạn rồi chọn lại.',
+            unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
+          };
+        }
+
+        mysheetsConn = {
+          credentialId: mysheets.credentialId,
+          email: mysheets.email,
+          allowedSpreadsheets: mysheets.allowedSpreadsheets,
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -173,6 +227,7 @@ export class ChatService {
     const connections: PlanConnections = {};
     if (gmailConn) connections.gmail = gmailConn;
     if (mycalConn) connections.mycalendar = mycalConn;
+    if (mysheetsConn) connections.mysheets = mysheetsConn;
 
     return { ...bound, connections };
   }

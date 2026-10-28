@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -71,7 +71,7 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
 export async function getToolCatalogFor(
   credentialRepo: CredentialRepo,
   encryptionKey: string,
-  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean },
+  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean },
 ): Promise<ToolDefinition[]> {
   let catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
   if (!options.userId) return catalog;
@@ -91,6 +91,24 @@ export async function getToolCatalogFor(
             : [];
         if (calendars.length > 0) {
           catalog = [...catalog, ...MYCALENDAR_TOOLS];
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.mysheetsEnabled) {
+    const mysheets = await credentialRepo.getPersonalCredentials('mysheets', options.userId);
+    if (mysheets && mysheets.status === 'active') {
+      try {
+        const config = decryptCredentials(mysheets.config, encryptionKey);
+        const spreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
+          ? config.allowedScope.spreadsheets
+          : Array.isArray(config.selectedSpreadsheets)
+            ? config.selectedSpreadsheets.map((s: any) => s.id)
+            : [];
+        if (spreadsheets.length > 0) {
+          catalog = [...catalog, ...MYSHEETS_TOOLS];
         }
       } catch {
         // stale or unreadable connection does not add tools

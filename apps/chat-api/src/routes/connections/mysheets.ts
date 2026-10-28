@@ -442,7 +442,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
       // Check each spreadsheet with Drive files.get
       const items: PersonalSpreadsheetItem[] = [];
       for (const id of deduplicated) {
-        let driveRes: Response;
+        let driveRes: globalThis.Response;
         try {
           driveRes = await fetchFn(
             `${driveBase}/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,trashed,capabilities(canEdit)&supportsAllDrives=true`,

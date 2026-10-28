@@ -1,4 +1,4 @@
-import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { groundingMemory, normalizedRecipient, observedThreads, userEmailAddresses, type WorkingMemory } from '@wap/planner';
 
 /** Display-only projection of actual lookups; never part of the approved payload. */
@@ -15,7 +15,7 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory, userTe
   const typed = userEmailAddresses(userTexts);
   const threads = observedThreads(memory.getAll());
   for (const step of plan.steps) {
-    const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool) ?? MYCALENDAR_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
+    const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool) ?? MYCALENDAR_TOOLS.find(t => t.name === step.tool) ?? MYSHEETS_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries(properties)) {
       const annotation = schema as Record<string, any>;
       if (annotation['x-recipient'] && Array.isArray(step.args[argument])) for (const value of step.args[argument]) {

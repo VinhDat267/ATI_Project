@@ -81,6 +81,62 @@ export function createSandboxProvider(scenario?: string) {
     };
     return mockProvider;
   }
+  if (scenario === 'mysheets') {
+    const responses = [
+      { kind: 'search', calls: [{ tool: 'mysheets.list_spreadsheets', args: {} }] },
+      {
+        kind: 'plan',
+        thinking: 'Thêm dòng vào bảng tính cá nhân.',
+        summary: 'Thêm dòng vào bảng tính cá nhân',
+        warnings: [],
+        steps: [
+          {
+            id: 'append_row',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng mới vào bảng tính',
+            args: {
+              spreadsheetId: 'sheet-personal-1',
+              range: 'Sheet1!A:B',
+              values: [['Slide bảo vệ', '05/11']],
+            },
+            dependsOn: [],
+          },
+        ],
+      },
+    ];
+    mockProvider.setPlanResponses(responses);
+    const fallback = mockProvider.generatePlan.bind(mockProvider);
+    mockProvider.generatePlan = async (input) => {
+      if (!Array.isArray(input.conversationHistory)) return fallback(input);
+      const last = input.conversationHistory.at(-1)?.content ?? '';
+      if (last.includes('<search_results>')) {
+        let sheetId = 'sheet-personal-1';
+        const match = last.match(/"id":\s*"([^"]+)"/);
+        if (match?.[1]) sheetId = match[1];
+        return JSON.stringify({
+          kind: 'plan',
+          thinking: 'Thêm dòng vào bảng tính cá nhân.',
+          summary: 'Thêm dòng vào bảng tính cá nhân',
+          warnings: [],
+          steps: [
+            {
+              id: 'append_row',
+              tool: 'mysheets.append_rows',
+              description: 'Thêm dòng mới vào bảng tính',
+              args: {
+                spreadsheetId: sheetId,
+                range: 'Sheet1!A:B',
+                values: [['Slide bảo vệ', '05/11']],
+              },
+              dependsOn: [],
+            },
+          ],
+        });
+      }
+      return JSON.stringify(responses[0]);
+    };
+    return mockProvider;
+  }
   if (scenario === 'answer') {
     // Select by this conversation's context, not a global counter shared by users.
     mockProvider.generatePlan = async input => {
