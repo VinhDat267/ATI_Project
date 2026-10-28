@@ -1,7 +1,7 @@
 # Slack cá nhân và trợ lý công việc trong ATI
 
 **Ngày:** 28/10/2026 · **Task:** [OAUTH-04](../../handoff/tasks/OAUTH-04-slack-personal.md)
-**Trạng thái:** chủ dự án đã cho chuyển sang triển khai sau bản sửa `d479b098`; bước hiện tại là [kế hoạch SLACK-01](../plans/2026-10-28-slack-foundation.md), chưa code hay bật live.
+**Trạng thái:** chủ dự án đã cho chuyển sang triển khai sau bản sửa `d479b098`; phần nền SLACK-01 đã được thi công Native trên nhánh riêng theo [kế hoạch](../plans/2026-10-28-slack-foundation.md). OAuth và bật live chưa được nghiệm thu.
 **Nền đối chiếu:** `origin/main b437f985d479d3a9d413ddd3fb2361eceedf6d5e`.
 **Bản sửa sau review:** chủ dự án đã đồng ý bốn hướng xử lý F1–F4: quyền xử lý dữ liệu, workspace từ lượt đọc đầu, vòng đời các bản sao nguồn và ingress độc lập với automation; sau khi nhận bản sửa đã cho bắt đầu triển khai. Tài liệu chưa phải nghiệm thu hay quyền bật live.
 

@@ -7,7 +7,7 @@
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript hiện có, Vitest, `node:test`, HTTP/crypto/fetch có sẵn; không thêm dependency.
 **Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md), bản sửa `d479b098`.
 **Task card:** [SLACK-01](../../handoff/tasks/SLACK-01-foundation.md).
-**Status:** kế hoạch mới để người dùng review và chọn cách thực thi; chưa có product code trong đợt lập kế hoạch.
+**Status:** chủ dự án đã chọn Native; thi công trên `feat/slack-01-foundation`, local checks đạt, review độc lập và CI là gate trước tích hợp. Kết quả chi tiết ở task card.
 
 ## Global Constraints
 

@@ -1,6 +1,7 @@
 # SLACK-01 · Contract nền, kiểm kê API và HTTP fixture
 
-**Trạng thái:** có kế hoạch, chờ review kế hoạch/chọn cách thực thi; chưa code.
+**Trạng thái:** đã thi công Native và kiểm tra local; chờ review độc lập/CI trước tích hợp.
+**Nhánh mã:** `feat/slack-01-foundation` · **Nền:** `2bf87b74`.
 **Phụ thuộc:** thiết kế OAUTH-04 bản sửa `d479b098` đã được chủ dự án cho chuyển sang triển khai.
 **Thiết kế:** [Slack cá nhân](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md).
 **Kế hoạch:** [Slack Personal Foundation](../../superpowers/plans/2026-10-28-slack-foundation.md), đọc hết cùng thiết kế trước khi làm.
@@ -13,16 +14,18 @@ Không route/API/UI Slack cá nhân, DB/OAuth/refresh thật, model, app install
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Binding/source contract giữ đủ actor/workspace/generation; invalid/mismatch bị chặn.
-- [ ] Policy dùng nguồn/model kiểm chấp thuận, provider và retention; không suy quyền từ OAuth.
-- [ ] Inventory đủ row so với snapshot index, có provenance/requirements/disposition; chưa chứng minh thì ghi probe_required và reason.
-- [ ] Fixture thật HTTP chứng minh scope, workspace/user, cursor và AbortSignal; timeout sau ghi không bị hiểu là chưa ghi.
-- [ ] Probe chỉ loopback, từ chối redirect/live, không retry write UNKNOWN và không log token/body; report ghi verifiedLive false.
-- [ ] RED→GREEN, test:slack:foundation/typecheck/check đạt; catalog và service cũ không thêm myslack.
+- [x] Binding/source contract giữ đủ actor/workspace/generation; invalid/mismatch bị chặn.
+- [x] Policy dùng nguồn/model kiểm chấp thuận, provider và retention; không suy quyền từ OAuth. Đây là helper thuần, chưa gate các consumer ở 02–06.
+- [x] Inventory đủ row so với snapshot index, có provenance/requirements/disposition; chưa chứng minh thì ghi probe_required và reason.
+- [x] Fixture thật HTTP chứng minh scope, workspace/user, cursor và AbortSignal; timeout sau ghi không bị hiểu là chưa ghi.
+- [x] Probe chỉ loopback, từ chối redirect/live, không retry write UNKNOWN và không log token/body; report ghi verifiedLive false.
+- [x] RED→GREEN, test:slack:foundation/typecheck/check đạt; catalog và service cũ không thêm myslack.
 - [ ] Reviewer độc lập, CI đúng head, log bàn giao và kết quả đầy đủ trước tích hợp.
 
 ## Kết quả
 
-- Hiện chỉ có kế hoạch; tất cả tiêu chí triển khai ở trên **NOT_RUN**.
-- Chưa chọn executor/method; đề xuất Native cho card nhỏ có interface liên quan chặt.
-- Không có live credential, provider/model calls, app install hay thay đổi cấu hình.
+- Chủ dự án chọn **Native**; bốn task đầu đã commit `ef744195`, `69e3577e`, `5add886d`, `a6c87687`; task 5 thêm probe và tích hợp check. [Log thực thi](../log/2026-10-28-slack-01-native.md).
+- `npm run test:slack:foundation`: **37 Node + 49 schema = 86 test**, exit 0. `npm run typecheck:v3`: exit 0. `npm run check`: **2.558 test v3 + 406 test eval fixture + 48 Node**, typecheck/build/quét build đạt, exit 0; PostgreSQL thật trên Docker project riêng.
+- Inventory: **343** phương thức, **97** loại khỏi user-tool Free/Pro, **246** cần native probe; metadata user scopes được khai báo ở 254 trang. `verify` exit 0; bốn mutation omitted/duplicate/unreviewed/source_changed đều exit 1. Review metadata không phải native eligibility.
+- Probe CLI: **11/11 checks**, `mode:fixture`, `verifiedLive:false`. Có hồi quy UTF-8 bị chia chunk, write đã commit trước timeout và phản hồi lỗi thiếu `ok:false` không được coi là bằng chứng từ chối.
+- Browser UI/model evaluation thật, OAuth/Slack live, app install và bật cờ: **NOT_RUN**, ngoài phạm vi card này. Root package không thêm dependency, không đăng ký tool/service.

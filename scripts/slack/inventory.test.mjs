@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { extractMethodLinks, parseMethodFacts, validateInventory, fetchDocumentation, collectInventory } from './inventory.mjs';
 
 const url = 'https://docs.slack.dev/reference/methods/chat.postMessage';
@@ -53,6 +54,10 @@ test('malformed, unsupported or mismatched facts never become a successful empty
 });
 test('offline inventory verification accepts reviewed probe-required rows without pretending live support', () => {
   assert.deepEqual(validateInventory(snapshot()), []);
+});
+test('the checked-in snapshot satisfies the frozen-index coverage contract in CI', async () => {
+  const data = JSON.parse(await readFile(new URL('../../docs/slack/method-inventory.json', import.meta.url), 'utf8'));
+  assert.deepEqual(validateInventory(data), []);
 });
 test('offline verification catches omitted, extra and duplicate rows against the frozen index', () => {
   const missing = snapshot(); missing.methods = [];
