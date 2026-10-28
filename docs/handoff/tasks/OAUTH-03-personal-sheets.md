@@ -77,10 +77,13 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
 
 ## Kết quả (agent thi công điền)
 
-- **Nhánh, commit:**
+- **Nhánh, commit:** `feat/oauth-03-personal-sheets`, chuỗi commits từ `e8de063d` đến `cd55c9e1` (trên nền `origin/main` `155e99de`).
 - **Kiểm thử và đột biến:**
-- **Số đo (`EVAL_SET=mysheets`):**
-- **Nghiệm thu thật:**
-- **Quyết định bật cờ:**
-- **Khác với đặc tả:**
-- **Log bàn giao:**
+  - `npm run check`: **PASS** (exit code 0; 2.491 unit/integration tests, 406 evaluation tests, 11 launcher/env tests, typecheck sạch, web build bảo mật sạch).
+  - Browser E2E: **PASS** (9/9 passed ở `SCENARIO=mysheets`, 1/1 passed ở `MYSHEETS off:`).
+  - Đột biến: **13/13 đột biến bắt buộc** (§8.2) bị bắt với exit code 1, tự động hóa qua `scripts/test-mysheets-mutations.mjs`, khôi phục 100% SHA-256.
+- **Số đo (`EVAL_SET=mysheets`):** Chưa đo (thuộc Bước 2, thực hiện trên nhánh `eval/oauth-03-measure` sau khi merge PR code).
+- **Nghiệm thu thật:** Chưa nghiệm thu P-LIVE (nhóm trưởng thao tác ở Bước 4 với Google Cloud Project thứ ba).
+- **Quyết định bật cờ:** Giữ `MYSHEETS_ENABLED=off` trong PR này; chỉ bật cờ khi hoàn thành Bước 2 và Bước 4.
+- **Khác với đặc tả:** Không có (tuân thủ 100% đặc tả thiết kế và 4 quyết định của reviewer).
+- **Log bàn giao:** [`docs/handoff/log/2026-10-28-OAUTH-03-personal-sheets.md`](../log/2026-10-28-OAUTH-03-personal-sheets.md).
