@@ -4,7 +4,7 @@
 
 **Goal:** Xây hợp đồng danh tính/quyền dữ liệu, kiểm kê phương thức Slack có nguồn và HTTP fixture/probe để bắt đầu OAuth nhiều workspace mà chưa tác động Slack thật.
 **Architecture:** Thêm contract thuần vào tool-schemas, không đăng ký dịch vụ/tool. Script chỉ đọc docs công khai để tạo inventory; HTTP fixture có state và probe giới hạn loopback cung cấp kiểm chứng offline cho các đợt sau.
-**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript hiện có, Vitest, `node:test`, HTTP/crypto/fetch có sẵn; không thêm dependency.
+**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript hiện có, Vitest, `node:test`, HTTP/crypto/fetch. Sau fix review 29/10, collector khai báo trực tiếp devDependency `saxes@6.0.0` đã có trong lockfile; không thêm package/version vào cây dependency. Xem [log sửa P2](../../handoff/log/2026-10-29-slack-01-p2-fixes.md) về ngoại lệ này với kế hoạch ban đầu.
 **Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md), bản sửa `d479b098`.
 **Task card:** [SLACK-01](../../handoff/tasks/SLACK-01-foundation.md).
 **Status:** năm task Native đã thi công trên `feat/slack-01-foundation`; review độc lập đã chạy, Important được sửa và toàn suite local đạt. CI đúng head/owner review còn là gate trước tích hợp. Kết quả chi tiết ở task card.

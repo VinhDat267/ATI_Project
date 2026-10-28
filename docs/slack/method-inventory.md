@@ -32,8 +32,12 @@ node --test scripts/slack/inventory.test.mjs
 
 Collection reads only the HTTPS docs.slack.dev sitemap and method markdown, at most two requests in flight, with a 10-second request signal and at most two retries. It never reads Slack credentials or calls the Slack Web API. A Retry-After beyond the bounded wait budget stops collection rather than retrying too early.
 
+Run the collector with root development dependencies installed (`npm ci`). It uses the explicitly declared, already locked `saxes@6.0.0` XML parser. Invalid XML or misplaced sitemap urlset/url/loc elements fail collection before an existing snapshot can be overwritten; valid namespaced extension metadata is preserved as irrelevant to method extraction.
+
 New rows start `unreviewed`. Recollection preserves annotations only as reviewed when their source hash matches; a changed page becomes `source_changed` and needs review. Verify is entirely offline, rejects omitted/duplicate/extra methods, missing provenance and any unreviewed/changed row. It does not fetch a newer index or promote rows to supported.
 
 For the first snapshot the exported collector also retained method markdown temporarily in the ignored execution workspace for review. Only extracted metadata, hashes and annotations are committed. The cached documentation is not needed for offline verify.
 
 SLACK-02–07 must resolve the applicable probes and record native readback for each implemented capability. Full Slack acceptance remains open; passing this verifier only establishes inventory coverage and recorded decisions for this snapshot.
+
+On 29/10/2026 a parser compatibility check of the current public sitemap returned 354 methods, with all 343 frozen methods still present and 11 additional slackbot.skills/admin.slackbot.skills methods. Both the old and corrected parser returned 354 for that same document. This fix retains the reviewed 343-row artifact; the 11 additions require a separate inventory refresh/review before any capability claim.
