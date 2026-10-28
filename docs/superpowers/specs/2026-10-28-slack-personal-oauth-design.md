@@ -3,6 +3,7 @@
 **Ngày:** 28/10/2026 · **Task:** [OAUTH-04](../../handoff/tasks/OAUTH-04-slack-personal.md)
 **Trạng thái:** BẢN THIẾT KẾ CHỜ CHỦ DỰ ÁN DUYỆT; chưa cho phép triển khai.
 **Nền đối chiếu:** `origin/main b437f985d479d3a9d413ddd3fb2361eceedf6d5e`.
+**Bản sửa sau review:** chủ dự án đã đồng ý bốn hướng xử lý F1–F4: quyền xử lý dữ liệu, workspace từ lượt đọc đầu, vòng đời các bản sao nguồn và ingress độc lập với automation. Đây là chấp thuận các hướng sửa; tài liệu chưa phải nghiệm thu hay quyền bật live.
 
 ## 1. Mục đích và các lựa chọn đã thống nhất
 
@@ -77,7 +78,7 @@ Cache adapter, truy vấn credential, job, plan và audit đều phải có ch�
 
 Không sao chép mặc định PKCE của Google. Việc bật PKCE ở Slack làm thay đổi loại client và có hệ quả vận hành; thiết kế này chọn confidential web client, không tự bật PKCE. [Slack PKCE](https://docs.slack.dev/authentication/using-pkce/)
 
-**Đề xuất mô hình phân phối:** một app cho người dùng ATI cài bằng OAuth ở nhiều workspace, phân phối ngoài Marketplace. Chuẩn bị cấu hình distribution, URL privacy và yêu cầu phê duyệt của từng workspace trong phần setup; chưa làm hồ sơ phát hành Marketplace. Không giả định đây là app nội bộ được miễn các hạn chế history/replies; inventory/probe phải xác minh quota cho đúng cách phân phối đã chọn. Nếu cần Marketplace hoặc app tách riêng từng tổ chức thì phải duyệt thay đổi đó trước khi lập kế hoạch tương ứng.
+**Mô hình nghiệm thu đã thống nhất sau review:** một app OAuth, bắt đầu với workspace Free/Pro của chủ dự án hoặc nhóm ATI có quyền cho phép thử nghiệm. Khả năng phục vụ nhiều tổ chức vẫn nằm trong phạm vi đích, đi kèm điều kiện xử lý dữ liệu ở mục 4.4. Đợt pilot chưa làm hồ sơ Marketplace; trước phân phối rộng phải xác định mô hình phát hành và điều kiện Slack tương ứng. Không coi lựa chọn ngoài Marketplace là quyền phân phối thương mại; Slack có điều kiện riêng cho trường hợp đó. Không giả định app được miễn hạn chế history/replies vì gọi là pilot; inventory/probe xác minh quota thực. [API Terms, Commercial Distribution](https://slack.com/terms-of-service/api)
 
 Trạng thái callback lưu một lần bằng giao dịch/CAS thật; callback lặp, hai lần connect chạy đua, phiên hết hạn, hủy cấp quyền và tài khoản sai đều có kết quả xác định. Thiếu scope thì hiển thị tính năng chưa được cấp, yêu cầu cấp bổ sung có chủ đích. Không mở rộng quyền âm thầm.
 
@@ -89,11 +90,29 @@ Các quyền được xin từ bảng kiểm kê; không có wildcard “full Sl
 
 Không có allowlist kênh ở connector cá nhân. Vẫn kiểm tra quyền native khi đọc và trước khi ghi; loại tài nguyên khỏi catalog khả dụng khi mất quyền. Có thể dùng điều kiện luật chọn tín hiệu quan tâm; đó là cấu hình xử lý, không phải cơ chế cấp quyền.
 
+### 4.4. Quyền xử lý dữ liệu và điều kiện dùng model (F1)
+
+User OAuth chứng minh quyền gọi API của thành viên; không tự chứng minh quyền xử lý/lưu dữ liệu của tổ chức cài app. Slack yêu cầu tổ chức ủy quyền rõ cho app bên ngoài và cấm dùng dữ liệu huấn luyện LLM. [API Terms, Data Usage by Third Parties](https://slack.com/terms-of-service/api), [Developer Policy, Use of Data](https://docs.slack.dev/developer-policy/)
+
+Backend lưu trạng thái cho phép xử lý theo workspace/tổ chức: phạm vi sử dụng/lưu trữ, provider model được phép, phiên bản chính sách, người đại diện có thẩm quyền và tham chiếu bằng chứng chấp thuận. Pilot cũng ghi căn cứ chủ dự án/nhóm có quyền cho phép thử. Chấp thuận không được tự suy ra từ việc một thành viên bấm OAuth hay một checkbox không xác định thẩm quyền. Thay provider, mục đích hoặc retention vượt phạm vi đã cho phép thì kiểm lại điều kiện trước khi tiếp tục; thu hồi chấp thuận làm dừng xử lý và vô hiệu dữ liệu phụ thuộc.
+
+Trước thu thập/lưu nội dung nguồn phải có quyền xử lý phù hợp. Trước mỗi lần nội dung nguồn hoặc bản tóm tắt đi vào model, server còn kiểm provider/configuration đã được xác minh không dùng dữ liệu huấn luyện, chính sách lưu trữ phù hợp và chấp thuận còn hiệu lực. Áp dụng cho tra cứu thủ công, phân loại, lập plan ở cả ba mode, bản tổng hợp, lịch chạy và retry; không chỉ worker AI chủ động. Nhãn cấu hình do người dùng tự đặt không phải bằng chứng provider đáp ứng điều kiện.
+
+Chưa đủ điều kiện thì kết nối chỉ hiển thị metadata thiết lập cần thiết và trạng thái chờ cho phép xử lý; không đọc/lưu nội dung hội thoại hoặc đưa nguồn vào model. Ingress xử lý theo mục 9.2: có thể xác thực raw body trong bộ nhớ để ACK và bỏ nội dung, không lưu body để chờ được cấp phép. Việc bật xử lý sau đó bắt đầu từ mốc bật, không tự truy hồi thời gian trước. Chính sách công khai phải mô tả đúng nguồn dữ liệu, mục đích, provider, retention và cách thu hồi; không mặc định dùng dữ liệu giữa các tổ chức chỉ vì cùng một tài khoản ATI kết nối chúng.
+
+### 4.5. Workspace của lượt đọc, dữ liệu nhớ và grounding (F2)
+
+Mọi gather/search/lookup mang binding do server xác nhận gồm `ATI user`, `connectionId`, `workspaceId`, `Slack user`, `identityVersion`. Adapter planning dùng binding này; tuyệt đối không chọn token đầu tiên hoặc chỉ chọn theo `userId + service`. Binding được kiểm lại trước gọi provider, trước đưa kết quả vào model và trước gắn vào plan. Các lớp hiện chỉ mang actor `{userId}` phải được mở rộng trong task schema/integration.
+
+Tin đến từ Slack có workspace/connection nguồn đã map theo quyền. Với yêu cầu thủ công chỉ có một kết nối phù hợp thì dùng kết nối đó; có nhiều kết nối và thiếu workspace thì hỏi lại trước tra cứu. Chỉ fanout khi người dùng chỉ rõ các workspace hoặc yêu cầu tìm trên tất cả workspace được phép. Kết quả giữ nhãn và binding riêng; không gom thành danh sách tài nguyên mất nguồn.
+
+Mỗi thực thể được quan sát và mỗi khối dữ liệu nguồn mang binding trên cùng loại/ID tài nguyên, `sourceRef` và revision khi có nội dung tin. Working memory, kết quả tra cứu, nhãn preview và grounding giữ các thông tin này qua từng lượt. Hai tài nguyên trùng tên hoặc ID ở hai workspace không tương đương. Tham chiếu dùng tài nguyên ở workspace A phải giữ binding A; không được đổi thành B chỉ vì tên/ID khớp. Plan liên workspace khai báo rõ nguồn/đích của từng bước. Mất quyền hoặc đổi identityVersion làm stale dữ liệu cũ, không tái gắn sang kết nối mới.
+
 ## 5. Nhận tin mới và phân phối đúng người
 
 **Đề xuất:** dùng Events API qua HTTP công khai của backend, không cần máy người dùng luôn mở. Đăng ký sự kiện user cho `message.channels`, `message.groups`, `message.im`, `message.mpim` cùng các sự kiện vòng đời cần thiết; scope và quyền của user quyết định những gì Slack gửi. [Events API](https://docs.slack.dev/apis/events-api/)
 
-Kiểm chữ ký trên raw body, kiểm timestamp chống phát lại trước khi nhận. Endpoint chỉ xác thực và ghi receipt/job bền vững, ACK trong 3 giây; không gọi LLM ở request này. Unique key receipt theo app + `event_id`; retry HTTP không tạo lại công việc. Nếu DB không lưu được thì trả lỗi để Slack retry. URL verification là nhánh riêng không tạo proposal.
+Kiểm chữ ký trên raw body, kiểm timestamp chống phát lại trước khi nhận. Nhánh xử lý đang bật và đủ quyền ghi receipt/job bền vững rồi ACK trong 3 giây; không gọi LLM ở request này. Unique key receipt theo app + `event_id`; retry HTTP không tạo lại công việc. Nếu DB không lưu được công việc cần nhận thì trả lỗi để Slack retry. Nhánh automation tắt/chưa đủ quyền ACK và bỏ nội dung theo mục 9.2, không tạo job phân tích. URL verification là nhánh riêng không tạo proposal.
 
 Một event có thể nhìn thấy bởi nhiều installation. Không coi người gửi tin là chủ ATI, không chỉ dùng phần tử đầu của `authorizations`. Với event có `event_context`, lấy toàn bộ authorizations, phân trang, rồi map đúng app/workspace/Slack user sang kết nối đang hoạt động. Cần **app-level token với `authorizations:read`**, chỉ phục vụ phân phối event; mọi thao tác nghiệp vụ vẫn dùng user token. [apps.event.authorizations.list](https://docs.slack.dev/reference/methods/apps.event.authorizations.list/)
 
@@ -151,7 +170,7 @@ Gom nhiều tin cùng ý định/thread thành một proposal đang chờ, lưu 
 
 ## 8. Plan, thực thi và chống lặp
 
-Mỗi bước `myslack.*` được server gắn connection ID + workspace ID + Slack user ID + phiên bản danh tính trong plan metadata; có thể có nhiều workspace trong cùng plan. **Đề xuất:** `PlanConnections.myslack` là map theo connection ID, còn từng step chỉ tham chiếu khóa đã được server xác nhận. Không chọn một token Slack toàn cục cho cả plan.
+Mỗi bước `myslack.*` được server gắn connection ID + workspace ID + Slack user ID + phiên bản danh tính trong plan metadata; binding phải khớp lượt đọc ở mục 4.5, không chọn lại actor sau khi model đã dùng kết quả. Có thể có nhiều workspace trong cùng plan. **Đề xuất:** `PlanConnections.myslack` là map theo connection ID, còn từng step chỉ tham chiếu khóa đã được server xác nhận. Plan/proposal luôn giữ `sourceRefs` và binding nguồn Slack, kể cả khi chỉ ghi Trello/Jira/Sheets và không có step Slack. Không chọn một token Slack toàn cục cho cả plan.
 
 Preview hiển thị nguồn, danh tính, workspace/channel hoặc người nhận, nội dung và đích ngoài Slack. Sửa nội dung, actor, đích hoặc nguồn quan trọng → lập plan mới, hash mới và duyệt lại. Read có thể chạy để lập plan; mọi write phải được duyệt theo v3, gồm xác nhận riêng cho hành động rủi ro cao. Nội dung riêng tư được đưa sang nơi khác phải nhìn thấy trong preview.
 
@@ -175,9 +194,33 @@ Xóa token local sau khi hoàn tất hoặc kết thúc retry revoke hữu hạn
 
 **Đề xuất:** nội dung receipt/context phục vụ xử lý giữ tối đa 7 ngày; proposal đang chờ hết hạn sau 7 ngày; đoạn trích của proposal giữ tối đa 30 ngày rồi chỉ còn nhãn/link và kết quả đã rút gọn. Không lưu file đính kèm nguyên bản để lập chỉ mục toàn workspace. Các artifact công việc đã được người dùng duyệt tạo là dữ liệu đầu ra riêng, tuân theo chính sách lưu trữ hội thoại ATI; không hứa xóa các bản sao đã gửi sang Jira/Sheets.
 
-Ngắt kết nối xóa nội dung nguồn đã lưu và token, giữ audit tối thiểu không chứa nội dung/token để chống replay và truy vết thao tác. Sửa/xóa tin nguồn cập nhật hoặc ẩn đoạn trích, làm stale proposal liên quan; log vận hành không chứa body, DM, token hay refresh token. Chỉ metadata an toàn xuất hiện trong SSE, UI và model context tối thiểu cần thiết. Trang privacy và mô tả OAuth phải nêu việc gửi dữ liệu cho model của ATI.
+Ngắt kết nối xóa nội dung nguồn đã lưu và token, giữ audit tối thiểu không chứa nội dung/token để chống replay và truy vết thao tác. Sửa/xóa tin nguồn cập nhật hoặc ẩn đoạn trích, làm stale proposal liên quan. Ngoại lệ retention cho artifact đã duyệt chỉ giữ metadata kết quả tối thiểu trong ATI; không giữ vô thời hạn bản sao nội dung Slack bằng cách gọi nó là artifact. Các bản sao ở dịch vụ đích là dữ liệu đã được người dùng duyệt ghi; thao tác xóa bên đó là yêu cầu nghiệp vụ riêng.
 
-**Đề xuất:** `MYSLACK_ENABLED=off` và `MYSLACK_AUTOMATION_ENABLED=off` mặc định; cờ thứ hai phụ thuộc cờ thứ nhất. Tắt cờ phải chặn cả endpoint và worker liên quan. Catalog/router/prompt của đường cũ khi cờ tắt giữ baseline, connector Slack chung không đổi. Không thay cờ OAUTH-02/03 hay đánh dấu chúng đã nghiệm thu.
+### 9.1. Theo dõi nguồn và xóa mọi bản sao trong ATI (F3)
+
+Nội dung nguyên bản lưu trong kho nguồn được bảo vệ, các nơi khác dùng `sourceRef` thay vì chép plaintext tùy ý. Khóa nguồn có chủ ATI/connection/identityVersion/workspace/resource/revision; kho có ACL theo từng người. Receipt thô phục vụ phân phối chỉ dùng tạm trong backend, không có API đọc body cho UI, và bỏ payload sớm nhất sau fanout hoặc khi hết nhu cầu; thời hạn 7 ngày là trần, không phải lý do giữ mọi payload đủ 7 ngày.
+
+Câu trả lời/tóm tắt, plan args, nhãn có nội dung nguồn, history và working memory vẫn có thể chứa nội dung suy ra hoặc được trích. Những khối này bắt buộc mang danh sách nguồn phụ thuộc để che/xóa được. Trước đưa history/memory vào model hoặc hiển thị lại, server lọc mọi nguồn đã thu hồi/hết hạn/mất quyền và kiểm điều kiện mục 4.4; không chỉ kiểm khi mở proposal. Không thể tách phần phụ thuộc an toàn thì che toàn bộ khối tương ứng. Source edit tạo revision mới, không làm bản cũ hợp lệ trở lại.
+
+Quy trình thu hồi ghi tombstone/phiên bản trước để chặn đọc ngay, đánh dấu plan/proposal phụ thuộc là stale, hủy xử lý chưa dispatch; sau đó purge payload và các khối phụ thuộc khỏi receipt, source store, proposal, chat messages, plan metadata/args và mọi snapshot memory/cache. Purge là công việc bền vững có retry và trạng thái, vẫn chạy khi feature/automation tắt. Nội dung trong job/model đang chạy phải bị loại trước công bố hoặc lưu kết quả khi phiên bản/quyền đã đổi; không hứa thu hồi được dữ liệu đã gửi tới provider trước thời điểm thu hồi. Bản sao backup, nếu có, phải có retention hữu hạn phù hợp chấp thuận và áp dụng tombstone trước phục hồi phục vụ người dùng/model.
+
+Khi nhiều người được thấy cùng một event, quyền và tham chiếu là riêng từng người. Ngắt kết nối của A xóa quyền/bản sao của A, không xóa dữ liệu vẫn được B sử dụng hợp lệ; blob vật lý chung chỉ giữ khi còn nhu cầu/quyền hợp lệ và không truy cập được qua tham chiếu đã thu hồi. Một source bị xóa ở Slack làm mất hiệu lực các bản sao tương ứng cho mọi người. Biên nhận sau purge chỉ giữ ID thao tác/đích, trạng thái, thời điểm và thông tin tối thiểu cần thiết; không giữ nội dung nguồn, tóm tắt hay plan args cũ như đường đọc vòng.
+
+Log vận hành không chứa body, DM, token hay refresh token. SSE/UI chỉ trả nội dung đã kiểm quyền cùng metadata cần thiết; model chỉ nhận ngữ cảnh còn hợp lệ và tối thiểu cho tác vụ. Trang privacy và mô tả OAuth phải nêu việc gửi dữ liệu cho model của ATI.
+
+### 9.2. Feature flags, ingress và tạm dừng (F4)
+
+**Đề xuất:** `MYSLACK_ENABLED=off` và `MYSLACK_AUTOMATION_ENABLED=off` mặc định; cờ thứ hai phụ thuộc cờ thứ nhất. Cờ dịch vụ chặn OAuth start/API nghiệp vụ, catalog, planning và execution mới; cờ automation chặn nhận công việc phân tích mới. Ingress xác thực, xử lý vòng đời/quyền riêng tư và purge là hạ tầng riêng còn hoạt động khi app vẫn được cài. Giữ signing secret và cấu hình ingress cần thiết đến khi dừng subscriptions có kiểm soát; không trả lỗi hàng loạt chỉ vì tắt feature flag. Catalog/router/prompt cũ khi cờ tắt giữ baseline; connector Slack chung không đổi.
+
+| Trạng thái | Tin mới thông thường | Lifecycle và nguồn đã lưu |
+|---|---|---|
+| Hai cờ bật, đủ điều kiện quyền | Ghi receipt/job bền vững, ACK; worker kiểm quyền/config trước xử lý | Nhận revoke/uninstall; sửa/xóa nguồn làm stale/purge |
+| Automation tắt, workspace pause hoặc chưa đủ điều kiện xử lý | Xác thực rồi ACK/bỏ nội dung; không lưu body hay tạo job AI; chỉ metadata bỏ qua tối thiểu nếu cần | Vẫn xử lý revoke/uninstall và vô hiệu nguồn do edit/delete; không lưu nội dung mới của tin sửa |
+| Cờ dịch vụ tắt nhưng app còn được cài | Như hàng trên; API nghiệp vụ/OAuth start và mọi lập/thực thi mới bị chặn | Ingress lifecycle và purge vẫn chạy; không hồi sinh kết nối/công việc |
+
+Tin không qua chữ ký/timestamp/app ID hợp lệ vẫn bị từ chối. Lifecycle cần lưu thay đổi bền vững trước ACK; lỗi lưu thì để Slack retry, không ACK giả như đã áp dụng. Điều kiện quyền quyết định việc xử lý nguồn, không dùng làm lý do bỏ qua một yêu cầu xóa/thu hồi hợp lệ.
+
+Bật lại automation ghi mốc nhận mới và trạng thái gap trong thời gian tắt; các tin đã ACK/bỏ qua không tự chạy bù. Sự kiện delayed/retry có thời điểm nguồn trước mốc bật không tạo proposal mới, nhưng edit/delete/lifecycle của nguồn đã lưu vẫn được áp dụng. Người dùng có thể yêu cầu truy hồi giới hạn theo mục 5. Nếu Slack đã vô hiệu subscriptions vì lỗi khác, UI giữ trạng thái chưa nhận sự kiện đến khi thao tác bật lại ở Slack app management và probe xác nhận đường nhận hoạt động; cờ ATI bật không được đồng nghĩa subscription đã phục hồi. [Events API, failure limits and resuming deliveries](https://docs.slack.dev/apis/events-api/#failure-limits)
 
 Metric cần có: event nhận/retry/không map được, backlog/độ trễ/gap, AI calls và token theo workspace/người, proposal theo mode, lỗi quyền/refresh, write UNKNOWN, echo cách ly và lỗi revoke. Không đưa nội dung tin vào nhãn metric.
 
@@ -195,6 +238,15 @@ Metric cần có: event nhận/retry/không map được, backlog/độ trễ/ga
 | UI | Settings nhiều workspace, chọn mode từng workspace, trạng thái thiếu quyền/budget/revoke; hộp đề xuất → sửa → duyệt → receipt; 1440/375, sáng/tối |
 | Tương thích | Cờ tắt giữ baseline catalog/router/prompt và hành vi Slack chung; bộ test v3 thích hợp và CI đúng head |
 
+Các ca bắt buộc để chứng minh bốn điểm review đã được xử lý trong triển khai:
+
+| Finding | Kiểm chứng hành vi bắt buộc |
+|---|---|
+| F1 | Chưa có/đã thu hồi chấp thuận hoặc đổi provider chưa xác minh → không đọc/lưu nội dung ngoài quyền và không gửi nguồn/bản tóm tắt vào model; bao gồm mode luật dùng planner, tra cứu thủ công và lịch chạy |
+| F2 | Hai workspace có kênh trùng tên/ID; lookup/grounding/step giữ đúng binding; thiếu lựa chọn thì hỏi; fanout có nhãn; đổi identityVersion giữa lookup và bind bị chặn |
+| F3 | Sau lookup → answer/plan/memory, disconnect hoặc source delete rồi mở/nhắn tiếp không làm nguồn xuất hiện lại; purge mọi snapshot và plan chỉ ghi Trello/Jira; race worker/model và purge; A disconnect không phá nguồn B còn có quyền |
+| F4 | Bật → tắt → bật trong khi Slack tiếp tục gửi: chữ ký vẫn bắt buộc, ACK tin bị bỏ qua không tạo body/job mới, lifecycle/edit/delete vẫn hiệu lực, không replay khoảng tắt; cờ off vẫn chạy purge và nhận biết subscription chưa phục hồi |
+
 Fake Slack phải là HTTP server có state và fixtures phân quyền theo token/workspace; không mock boolean để giả vờ kiểm tra transaction. Timeout/hủy phải quan sát AbortSignal thực. Có mutation bắt lỗi bỏ kiểm chủ, bỏ generation, bỏ dedup, bỏ version CAS, bỏ chặn write trước duyệt và bỏ echo guard.
 
 Evaluation: chốt và commit fixture/label trước lần gọi model đầu, gồm tiếng Việt, paraphrase, deadline mơ hồ, hội thoại không có việc, tin lặp, prompt injection, câu hỏi thiếu nguồn và nguồn riêng tư. Chạy ba lượt độc lập cho mỗi mode. **Đề xuất ngưỡng:** precision đề xuất hữu ích ≥90%, recall intent phải đề xuất ≥85%; chặn mọi ca write không duyệt và mọi ca lộ chéo người dùng. Báo riêng số mẫu, loại lỗi, chi phí, timeout và kết quả luật/AI/kết hợp; không đổi label để làm đẹp kết quả. Các ngưỡng thống kê là tiêu chí đề xuất để phê duyệt thiết kế, không phải số liệu đã đạt.
@@ -208,9 +260,9 @@ Trước live phải có probe cho: danh tính user-token, mức bao phủ sự 
 Đây là nhiều đợt thay đổi liên quan nhau, không phải mở rộng một adapter. Sau khi duyệt thiết kế mới lập kế hoạch chi tiết, ước lượng và task card riêng cho từng phần:
 
 1. Kiểm kê API/quyền/gói; probe có phạm vi được duyệt để chốt các rủi ro provider.
-2. OAuth user, repository nhiều workspace, refresh/disconnect và Settings.
-3. Catalog/schema/binding và tool Slack theo từng nhóm; đầy đủ review quyền/approval cho mỗi nhóm.
-4. HTTP events, phân phối theo quyền, queue, chống lặp và vòng đời nguồn.
+2. OAuth user, repository nhiều workspace, quyền xử lý dữ liệu/provider, refresh/disconnect và Settings.
+3. Catalog/schema/binding từ lượt đọc qua memory tới step, truy vết nguồn và tool Slack theo từng nhóm; đầy đủ review quyền/approval cho mỗi nhóm.
+4. HTTP ingress/lifecycle độc lập, phân phối theo quyền, queue, chống lặp, purge và vòng đời mọi bản sao nguồn.
 5. Ba mode cùng cấu hình, ngân sách, giải thích và đánh giá.
 6. Hộp đề xuất trong ATI, các workflow liên dịch vụ và bản tổng hợp.
 7. Evaluation, nghiệm thu từng nhóm/provider và quyết định bật cờ.
