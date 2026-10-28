@@ -29,6 +29,8 @@ test('sitemap extraction preserves exact methods, normalizes, deduplicates and e
 test('sitemap extraction decodes XML character references and respects namespace prefixes', () => {
   const namespaced = '<?xml version="1.0"?><s:urlset xmlns:s="http://www.sitemaps.org/schemas/sitemap/0.9"><s:url><s:loc>https://docs.slack.dev/reference/methods/auth&#46;test</s:loc></s:url></s:urlset>';
   assert.deepEqual(extractMethodLinks(namespaced), ['https://docs.slack.dev/reference/methods/auth.test']);
+  const extended = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="urn:image"><url><loc>' + url + '</loc><image:image><image:loc>https://docs.slack.dev/image.png</image:loc></image:image></url></urlset>';
+  assert.deepEqual(extractMethodLinks(extended), [url]);
 });
 test('malformed XML and invalid sitemap structure never become partial successful indexes', async t => {
   const first = '<url><loc>' + url + '</loc></url>';
@@ -41,6 +43,9 @@ test('malformed XML and invalid sitemap structure never become partial successfu
     'missing location': '<urlset>' + first + '<url><lastmod>2026-10-29</lastmod></url></urlset>',
     'duplicate location': '<urlset><url><loc>' + url + '</loc><loc>' + url + '</loc></url></urlset>',
     'nested location markup': '<urlset>' + first + '<url><loc><b>https://docs.slack.dev/</b></loc></url></urlset>',
+    'nested url entry': '<urlset><url><loc>' + url + '</loc><url><loc>https://docs.slack.dev/reference/methods/auth.test</loc></url></url></urlset>',
+    'nested urlset': '<urlset><url><loc>' + url + '</loc><urlset><url><loc>https://docs.slack.dev/reference/methods/auth.test</loc></url></urlset></url></urlset>',
+    'misplaced sitemap location': '<urlset><url><loc>' + url + '</loc><metadata><loc>https://docs.slack.dev/reference/methods/auth.test</loc></metadata></url></urlset>',
   };
   for (const [name, invalid] of Object.entries(cases)) await t.test(name, () => assert.throws(() => extractMethodLinks(invalid), /sitemap|XML/i));
 });
@@ -50,12 +55,11 @@ test('CLI collection rejects a malformed HTTP sitemap without overwriting the pr
   const output = join(directory, 'inventory.json');
   const preload = join(directory, 'relay.mjs');
   const auth = 'https://docs.slack.dev/reference/methods/auth.test';
-  let malformed = false;
+  let invalidSitemap;
   const server = createServer((request, response) => {
     response.writeHead(200);
-    if (request.url === '/sitemap.xml') return response.end(malformed
-      ? '<urlset><url><loc>' + auth + '</loc></url><url><loc>' + url + '</urlset>'
-      : '<urlset><url><loc>' + auth + '</loc></url><url><loc>' + url + '</loc></url></urlset>');
+    if (request.url === '/sitemap.xml') return response.end(invalidSitemap
+      ?? '<urlset><url><loc>' + auth + '</loc></url><url><loc>' + url + '</loc></url></urlset>');
     response.end(request.url.endsWith('auth.test.md') ? markdown.replaceAll('chat.postMessage', 'auth.test') : markdown);
   });
   await new Promise((done, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', done); });
@@ -67,16 +71,21 @@ test('CLI collection rejects a malformed HTTP sitemap without overwriting the pr
   const original = Buffer.from(JSON.stringify(before) + '\n');
   await writeFile(output, original);
   await writeFile(preload, 'const nativeFetch=globalThis.fetch;globalThis.fetch=(url,options)=>nativeFetch(' + JSON.stringify(origin) + '+new URL(url).pathname,options);');
-  malformed = true;
-  const result = await new Promise((done, fail) => {
-    const child = spawn(process.execPath, ['--import', pathToFileURL(preload).href, 'scripts/slack/inventory.mjs', 'collect', '--output', output], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    child.stdout.resume(); child.stderr.setEncoding('utf8'); child.stderr.on('data', chunk => { stderr += chunk; });
-    child.once('error', fail); child.once('close', code => done({ code, stderr }));
-  });
-  assert.equal(result.code, 1, result.stderr);
-  assert.match(result.stderr, /sitemap|XML/i);
-  assert.deepEqual(await readFile(output), original);
+  for (const invalid of [
+    '<urlset><url><loc>' + auth + '</loc><url><loc>' + url + '</loc></url></url></urlset>',
+    '<urlset><url><loc>' + auth + '</loc></url><url><loc>' + url + '</urlset>',
+  ]) {
+    invalidSitemap = invalid;
+    const result = await new Promise((done, fail) => {
+      const child = spawn(process.execPath, ['--import', pathToFileURL(preload).href, 'scripts/slack/inventory.mjs', 'collect', '--output', output], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stderr = '';
+      child.stdout.resume(); child.stderr.setEncoding('utf8'); child.stderr.on('data', chunk => { stderr += chunk; });
+      child.once('error', fail); child.once('close', code => done({ code, stderr }));
+    });
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, /sitemap|XML/i);
+    assert.deepEqual(await readFile(output), original);
+  }
 });
 test('method facts record actual source hash and documented user scopes', () => {
   const facts = parseMethodFacts(markdown, url);

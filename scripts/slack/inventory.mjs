@@ -25,6 +25,7 @@ export function extractMethodLinks(xml) {
   if (typeof xml !== 'string') invalid();
   const urls = new Set();
   const stack = [];
+  const depths = { urlset: 0, url: 1, loc: 2 };
   let namespace;
   const parser = new SaxesParser({ xmlns: true });
   parser.on('doctype', invalid);
@@ -33,6 +34,7 @@ export function extractMethodLinks(xml) {
       if (tag.local !== 'urlset' || !['', 'http://www.sitemaps.org/schemas/sitemap/0.9'].includes(tag.uri)) invalid();
       namespace = tag.uri;
     } else if (stack.length === 1 && (tag.local !== 'url' || tag.uri !== namespace)) invalid();
+    if (tag.uri === namespace && Object.hasOwn(depths, tag.local) && stack.length !== depths[tag.local]) invalid();
     if (stack.at(-1)?.location) invalid();
     const frame = { local: tag.local, uri: tag.uri, locations: 0 };
     if (stack.length === 2 && tag.local === 'loc' && tag.uri === namespace) {
