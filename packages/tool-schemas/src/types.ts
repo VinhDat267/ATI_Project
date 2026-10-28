@@ -85,6 +85,7 @@ export interface PlanStep {
 export interface PlanConnections {
   gmail?: { credentialId: string; email: string };
   mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
+  mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };
 }
 
 export interface PersonalCalendarItem {
@@ -92,6 +93,12 @@ export interface PersonalCalendarItem {
   summary: string;
   timeZone: string;
   primary?: boolean;
+}
+
+export interface PersonalSpreadsheetItem {
+  id: string;
+  title: string;
+  canEdit: boolean;
 }
 
 export interface PlanResponse {

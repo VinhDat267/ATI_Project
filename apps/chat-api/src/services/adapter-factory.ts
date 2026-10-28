@@ -26,11 +26,16 @@ export interface AdapterFactoryOptions {
   /** Builds the MyCalendar adapter of one member with explicit scope allowlist. */
   createMyCalendarAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
   mycalendarTokens?: GmailTokenManager;
+  /** Builds the MySheets adapter of one member with explicit scope allowlist. */
+  createMySheetsAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
+  mysheetsTokens?: GmailTokenManager;
 }
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 const mycalendarError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const mysheetsError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
@@ -48,17 +53,20 @@ export class AdapterFactory {
     this.adapterCache.delete(serviceName);
   }
 
-  /** Forget the Gmail & MyCalendar adapters and access tokens of one member (connect, disconnect, reconnect_required). */
+  /** Forget the Gmail, MyCalendar & MySheets adapters and access tokens of one member (connect, disconnect, reconnect_required). */
   clearPersonal(userId: string): void {
     this.personalCache.delete(`gmail:${userId}`);
     this.personalCache.delete(`mycalendar:${userId}`);
+    this.personalCache.delete(`mysheets:${userId}`);
     this.options.gmailTokens?.clear(userId);
     this.options.mycalendarTokens?.clear(userId);
+    this.options.mysheetsTokens?.clear(userId);
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
+    if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
     const cached = this.adapterCache.get(serviceName);
     if (cached) return cached;
 
@@ -164,6 +172,63 @@ export class AdapterFactory {
       userId,
       tokens: this.options.mycalendarTokens.forConnection(userId, record.id, refreshToken),
       allowedScope: { calendars: allowedCalendars },
+    });
+    this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
+    return adapter;
+  }
+
+  /** Only the member's own active connection; at execution, credentialId match and allowedSpreadsheets subset match. */
+  private async mysheetsAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw mysheetsError('AUTH_ERROR', 'Google Sheets cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    const record = await this.credentialRepo.getPersonalCredentials('mysheets', userId);
+    if (!record || record.status !== 'active') throw mysheetsError('AUTH_ERROR', 'Google Sheets chưa được kết nối hoặc cần kết nối lại.');
+
+    let config: any;
+    try {
+      config = decryptCredentials(record.config, this.encryptionKey);
+    } catch {
+      throw mysheetsError('AUTH_ERROR', 'Google Sheets cần được kết nối lại.');
+    }
+
+    const allowedSpreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
+      ? config.allowedScope.spreadsheets
+      : Array.isArray(config.selectedSpreadsheets)
+        ? config.selectedSpreadsheets.map((s: any) => s.id)
+        : [];
+    if (!allowedSpreadsheets.length) {
+      throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho ATI.');
+    }
+
+    if (context.phase === 'execution') {
+      const previewed = context.connections?.mysheets;
+      if (!previewed || record.id !== previewed.credentialId) {
+        throw mysheetsError('AUTH_ERROR', 'Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
+      }
+      const currentSet = new Set(allowedSpreadsheets);
+      if (!Array.isArray(previewed.allowedSpreadsheets) || !previewed.allowedSpreadsheets.every((id) => currentSet.has(id))) {
+        throw mysheetsError('AUTH_ERROR', 'Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    const key = `mysheets:${userId}`;
+    const scopeKey = [...allowedSpreadsheets].sort().join(',');
+    const cached = this.personalCache.get(key);
+    if (cached?.credentialId === record.id && cached.scopeKey === scopeKey) return cached.adapter;
+
+    if (!this.options.createMySheetsAdapter || !this.options.mysheetsTokens) {
+      throw mysheetsError('VALIDATION', 'Google Sheets chưa sẵn sàng trên máy chủ này.');
+    }
+
+    const refreshToken = config.refreshToken;
+    if (typeof refreshToken !== 'string' || !refreshToken) {
+      throw mysheetsError('AUTH_ERROR', 'Google Sheets cần được kết nối lại.');
+    }
+
+    const adapter = this.options.createMySheetsAdapter({
+      userId,
+      tokens: this.options.mysheetsTokens.forConnection(userId, record.id, refreshToken),
+      allowedScope: { spreadsheets: allowedSpreadsheets },
     });
     this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
     return adapter;

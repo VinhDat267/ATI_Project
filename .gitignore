@@ -73,6 +73,7 @@ docs/ai-evidence/AUTH-LIVE/
 # Real Gmail acceptance evidence contains private addresses and mail content (GMAIL-04)
 docs/ai-evidence/GMAIL-LIVE/
 docs/ai-evidence/MYCALENDAR-LIVE/
+docs/ai-evidence/MYSHEETS-LIVE/
 docs/ai-evidence/SCHEDULE-LIVE/
 # Demo rehearsal runs carry real resource names and links (DEMO-01)
 docs/ai-evidence/DEMO-LIVE/

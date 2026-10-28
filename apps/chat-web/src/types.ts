@@ -37,6 +37,16 @@ export interface PersonalCalendarSummary {
   accessRole?: 'owner' | 'writer';
 }
 
+export interface PersonalSpreadsheetItem {
+  id: string;
+  title: string;
+  canEdit: boolean;
+}
+
+export type MySheetsPickerSession =
+  | { mode: 'google'; accessToken: string; expiresAt: string; developerKey: string; appId: string }
+  | { mode: 'fake'; accessToken: string; expiresAt: string; fakePickerBaseUrl: string };
+
 export interface ActivePlan {
   connections?: {
     gmail?: { credentialId: string; email: string };
@@ -44,6 +54,11 @@ export interface ActivePlan {
       credentialId: string;
       email: string;
       allowedCalendars: string[] | PersonalCalendarSummary[];
+    };
+    mysheets?: {
+      credentialId: string;
+      email: string;
+      allowedSpreadsheets: string[] | PersonalSpreadsheetItem[];
     };
   };
   resourceLabels?: Record<string, string>;
@@ -140,6 +155,7 @@ export interface ServiceInfo {
   email?: string;
   connectedAt?: string;
   selectedCalendars?: PersonalCalendarSummary[];
+  selectedSpreadsheets?: PersonalSpreadsheetItem[];
   statusReason?: string;
   id: string;
   name: string;
@@ -153,3 +169,5 @@ export interface ServiceInfo {
   scopeKey?: string;
   scopeLabel?: string;
 }
+
+export type ServiceStatus = ServiceInfo;

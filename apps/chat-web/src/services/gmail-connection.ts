@@ -53,3 +53,23 @@ export const mycalendarCallbackError = (code?: string) => ({
   MYCALENDAR_NOT_CONNECTED: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
   INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Google Calendar.',
 }[code ?? ''] ?? 'Không thể hoàn tất kết nối Google Calendar. Hãy trở về trang dịch vụ để kết nối lại.');
+
+export const mysheetsSessionOwner = gmailSessionOwner;
+export const redirectToMySheets = redirectToGmail;
+
+let mysheetsNotice: { userId?: string; email: string } | undefined;
+export const mysheetsConnectionNotice = {
+  set(email: string) { mysheetsNotice = { userId: authStorage.getStoredTokens().user?.id, email }; },
+  take(userId?: string) { const own = mysheetsNotice; mysheetsNotice = undefined; return own?.userId === userId ? own?.email : undefined; },
+};
+
+export const mysheetsCallbackError = (code?: string) => ({
+  MYSHEETS_STATE_INVALID: 'Yêu cầu kết nối Google Sheets đã hết hạn hoặc không còn hợp lệ. Hãy bắt đầu kết nối lại.',
+  MYSHEETS_SCOPE_MISSING: 'Google chưa cấp quyền quản lý bảng tính cho ATI. Hãy kết nối lại và đồng ý quyền Google Drive / Sheets.',
+  MYSHEETS_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
+  MYSHEETS_CONNECT_FAILED: 'Không thể hoàn tất kết nối Google Sheets. Hãy thử kết nối lại từ trang dịch vụ.',
+  MYSHEETS_FETCH_FAILED: 'Không tải được thông tin bảng tính từ Google. Hãy thử lại.',
+  MYSHEETS_SCOPE_INVALID: 'Vui lòng chọn ít nhất một bảng tính hợp lệ.',
+  MYSHEETS_NOT_CONNECTED: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
+  INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Google Sheets.',
+}[code ?? ''] ?? 'Không thể hoàn tất kết nối Google Sheets. Hãy trở về trang dịch vụ để kết nối lại.');

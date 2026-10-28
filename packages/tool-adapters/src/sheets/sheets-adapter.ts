@@ -1,42 +1,26 @@
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
-import { GlobalRateLimiter } from '../rate-limiter.js';
 import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../google/service-account.js';
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
+import {
+  a1,
+  badResponse,
+  bounded,
+  invalid,
+  queryText,
+  safeRows,
+  sharedLimiter,
+  SHEETS_API_BASE,
+  spreadsheetPattern,
+  spreadsheetUrl,
+  titleText,
+} from './sheets-shared.js';
 
 export interface SheetsAdapterConfig extends BaseAdapterConfig {
   credentials: GoogleServiceAccountCredentials;
   fetchFn?: typeof fetch;
 }
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
-const apiBase = 'https://sheets.googleapis.com/v4/spreadsheets/';
-const spreadsheetPattern = /^[A-Za-z0-9_-]{20,}$/;
-const sharedLimiter = new GlobalRateLimiter({ maxRequests: 60, windowMs: 60_000 });
-function invalid(message: string): never { throw new StepError({ message: 'Sheets ' + message, category: 'VALIDATION' }); }
-const badResponse = (writing = false): never => { throw new StepError({ message: 'Sheets returned an invalid response', category: writing ? 'UNKNOWN' : 'SERVER_ERROR' }); };
-function bounded(value: unknown, max: number): number {
-  if (value === undefined) return max;
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > max) invalid('limit is outside its allowed range');
-  return value;
-}
-function queryText(value: unknown): string {
-  if (typeof value !== 'string') invalid('query must be a string');
-  return value.trim().toLowerCase();
-}
-function a1(value: unknown): string {
-  // Only cell addresses in this document. Quoted titles use doubled apostrophes.
-  if (typeof value !== 'string' || value.length > 200 ||
-    !/^(?:(?:'(?:[^'\[\]\/?#\u0000-\u001f]|'')*'|[\p{L}\p{N}_ -]+)!)?[A-Za-z]{1,3}[1-9]\d*(?::[A-Za-z]{1,3}[1-9]\d*)?$/u.test(value)) invalid('range must be a local A1 cell range');
-  return value;
-}
-function titleText(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > 100 || /[\[\]:*?/\\\u0000-\u001f]/.test(value)) invalid('tab title is invalid');
-  return value;
-}
-function safeRows(value: unknown): string[][] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 20 || value.some(row =>
-    !Array.isArray(row) || row.length < 1 || row.length > 20 || row.some(cell => typeof cell !== 'string' || cell.length > 1000))) invalid('rows exceed the allowed shape or size');
-  return value.map(row => row.map((cell: string) => /^\s*[=+\-@]/u.test(cell) ? "'" + cell : cell));
-}
+const apiBase = SHEETS_API_BASE;
 
 /** Fixed Sheets v4 endpoints and allowlist. Only a definite 429 permits one write retry. */
 export class SheetsAdapter extends BaseAdapter {

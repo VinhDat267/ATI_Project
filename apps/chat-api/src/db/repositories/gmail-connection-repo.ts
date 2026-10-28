@@ -9,16 +9,22 @@ const SERVICE = 'gmail';
  * finishes after "disconnect" or after logout cannot bring the connection back.
  */
 export class GmailConnectionRepo {
-  readonly service: 'gmail' | 'mycalendar';
-  readonly mode: 'connect_gmail' | 'connect_mycalendar';
+  readonly service: 'gmail' | 'mycalendar' | 'mysheets';
+  readonly mode: 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets';
 
   constructor(
     private pool: pg.Pool,
-    service: 'gmail' | 'mycalendar' = 'gmail',
-    mode?: 'connect_gmail' | 'connect_mycalendar'
+    service: 'gmail' | 'mycalendar' | 'mysheets' = 'gmail',
+    mode?: 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets'
   ) {
     this.service = service;
-    this.mode = mode ?? (service === 'mycalendar' ? 'connect_mycalendar' : 'connect_gmail');
+    this.mode = mode ?? (
+      service === 'mysheets'
+        ? 'connect_mysheets'
+        : service === 'mycalendar'
+        ? 'connect_mycalendar'
+        : 'connect_gmail'
+    );
   }
 
   /**

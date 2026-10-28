@@ -67,6 +67,9 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const mycalendarEmail = snapshot?.plan.connections?.mycalendar?.email;
   const calendarCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mycalendar.create_event' && mycalendarEmail
     ? `https://calendar.google.com/calendar/r?authuser=${encodeURIComponent(mycalendarEmail)}` : undefined;
+  const mysheetsEmail = snapshot?.plan.connections?.mysheets?.email;
+  const spreadsheetCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mysheets.append_rows'
+    ? (typeof planStep.args.spreadsheetId === 'string' && planStep.args.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(planStep.args.spreadsheetId)}/edit` : 'https://docs.google.com/spreadsheets') : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
@@ -101,6 +104,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     </div>
     {sentFolder && <p className="text-sm text-brand-text">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở thư mục Đã gửi</a></p>}
     {calendarCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Calendar của {mycalendarEmail} rồi chọn Bỏ qua hoặc Dừng. <a href={calendarCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Calendar</a></p>}
+    {spreadsheetCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Sheets</a></p>}
     {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
     <div className="flex flex-wrap items-center gap-3">
       {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}

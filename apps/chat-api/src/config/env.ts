@@ -27,6 +27,14 @@ export const MYCALENDAR_ENDPOINTS = {
 };
 const MYCALENDAR_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYCALENDAR_OAUTH_AUTH_URL', tokenUrl: 'MYCALENDAR_OAUTH_TOKEN_URL', revokeUrl: 'MYCALENDAR_OAUTH_REVOKE_URL', apiBaseUrl: 'MYCALENDAR_API_BASE_URL' } as const;
 
+export const MYSHEETS_ENDPOINTS = {
+  authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  revokeUrl: 'https://oauth2.googleapis.com/revoke',
+  apiBaseUrl: 'https://sheets.googleapis.com',
+};
+const MYSHEETS_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYSHEETS_OAUTH_AUTH_URL', tokenUrl: 'MYSHEETS_OAUTH_TOKEN_URL', revokeUrl: 'MYSHEETS_OAUTH_REVOKE_URL', apiBaseUrl: 'MYSHEETS_API_BASE_URL' } as const;
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -52,6 +60,11 @@ export interface EnvConfig {
   MYCALENDAR_ENABLED: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   MYCALENDAR_OAUTH?: GmailOAuthConfig;
+  /** The MYSHEETS_ENABLED flag (default off). Personal Sheets is usable only with MYSHEETS_OAUTH and PostgreSQL as well. */
+  MYSHEETS_ENABLED: boolean;
+  /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
+  MYSHEETS_OAUTH?: GmailOAuthConfig;
+  MYSHEETS_PICKER?: { apiKey: string; appId: string };
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -181,7 +194,11 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (env.MYCALENDAR_ENABLED && !['on', 'off'].includes(env.MYCALENDAR_ENABLED)) throw new Error('MYCALENDAR_ENABLED must be on or off');
   const MYCALENDAR_ENABLED = env.MYCALENDAR_ENABLED === 'on';
   const MYCALENDAR_OAUTH = MYCALENDAR_ENABLED ? mycalendarOAuth(env, isLive) : undefined;
-  if (isLive && MYCALENDAR_ENABLED) validatePersonalGoogleProjects(env);
+  if (env.MYSHEETS_ENABLED && !['on', 'off'].includes(env.MYSHEETS_ENABLED)) throw new Error('MYSHEETS_ENABLED must be on or off');
+  const MYSHEETS_ENABLED = env.MYSHEETS_ENABLED === 'on';
+  const MYSHEETS_OAUTH = MYSHEETS_ENABLED ? mysheetsOAuth(env, isLive) : undefined;
+  const MYSHEETS_PICKER = MYSHEETS_ENABLED ? mysheetsPicker(env, isLive) : undefined;
+  if (isLive && (MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
 
@@ -203,6 +220,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     GMAIL_OAUTH,
     MYCALENDAR_ENABLED,
     MYCALENDAR_OAUTH,
+    MYSHEETS_ENABLED,
+    MYSHEETS_OAUTH,
+    MYSHEETS_PICKER,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -216,21 +236,52 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
 
 /** Google revoke affects every client of a project, including disabled services' existing grants. */
 function validatePersonalGoogleProjects(env: Record<string, string | undefined>): void {
-  const projectId = (field: string) => {
+  const projectId = (field: string, triggerFlag: string = 'MYCALENDAR_ENABLED') => {
     const value = env[field]?.trim();
     if (!value || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(value)) {
-      throw new Error(`${field} must declare the Google Cloud project ID when MYCALENDAR_ENABLED=on in live mode`);
+      throw new Error(`${field} must declare the Google Cloud project ID when ${triggerFlag}=on in live mode`);
     }
     return value;
   };
-  const calendarProject = projectId('MYCALENDAR_OAUTH_PROJECT_ID');
-  if (env.GMAIL_ENABLED === 'on' || env.GMAIL_OAUTH_CLIENT_ID?.trim() || env.GMAIL_OAUTH_PROJECT_ID?.trim()) {
-    const gmailProject = projectId('GMAIL_OAUTH_PROJECT_ID');
-    if (calendarProject === gmailProject) {
-      throw new Error('Gmail and MyCalendar must use separate Google Cloud projects for independent token revocation');
+
+  const services: Array<{ name: string; prefix: string; on: boolean; hasClient: boolean }> = [
+    { name: 'Gmail', prefix: 'GMAIL', on: env.GMAIL_ENABLED === 'on', hasClient: Boolean(env.GMAIL_OAUTH_CLIENT_ID?.trim() || env.GMAIL_OAUTH_PROJECT_ID?.trim()) },
+    { name: 'MyCalendar', prefix: 'MYCALENDAR', on: env.MYCALENDAR_ENABLED === 'on', hasClient: Boolean(env.MYCALENDAR_OAUTH_CLIENT_ID?.trim() || env.MYCALENDAR_OAUTH_PROJECT_ID?.trim()) },
+    { name: 'MySheets', prefix: 'MYSHEETS', on: env.MYSHEETS_ENABLED === 'on', hasClient: Boolean(env.MYSHEETS_OAUTH_CLIENT_ID?.trim() || env.MYSHEETS_OAUTH_PROJECT_ID?.trim()) },
+  ];
+
+  const activeServices = services.filter((s) => s.on || s.hasClient);
+  if (activeServices.length === 0) return;
+
+  const projectMap = new Map<string, string>();
+  const clientMap = new Map<string, string>();
+
+  for (const s of activeServices) {
+    const trigger = s.on ? `${s.prefix}_ENABLED` : (env.MYCALENDAR_ENABLED === 'on' ? 'MYCALENDAR_ENABLED' : `${s.prefix}_ENABLED`);
+    const pId = projectId(`${s.prefix}_OAUTH_PROJECT_ID`, trigger);
+    projectMap.set(s.name, pId);
+
+    const cId = env[`${s.prefix}_OAUTH_CLIENT_ID`]?.trim();
+    if (cId) {
+      clientMap.set(s.name, cId);
     }
-    if (env.GMAIL_OAUTH_CLIENT_ID?.trim() === env.MYCALENDAR_OAUTH_CLIENT_ID?.trim()) {
-      throw new Error('Gmail and MyCalendar must use different OAuth clients from separate Google Cloud projects');
+  }
+
+  const names = ['Gmail', 'MyCalendar', 'MySheets'];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const nameA = names[i]!;
+      const nameB = names[j]!;
+      const projA = projectMap.get(nameA);
+      const projB = projectMap.get(nameB);
+      if (projA && projB && projA === projB) {
+        throw new Error(`${nameA} and ${nameB} must use separate Google Cloud projects for independent token revocation`);
+      }
+      const clientA = clientMap.get(nameA);
+      const clientB = clientMap.get(nameB);
+      if (clientA && clientB && clientA === clientB) {
+        throw new Error(`${nameA} and ${nameB} must use different OAuth clients from separate Google Cloud projects`);
+      }
     }
   }
 }
@@ -295,4 +346,49 @@ function mycalendarOAuth(env: Record<string, string | undefined>, isLive: boolea
   }
   if (missing || !redirectUri) return undefined;
   return { clientId: env.MYCALENDAR_OAUTH_CLIENT_ID!.trim(), clientSecret: env.MYCALENDAR_OAUTH_CLIENT_SECRET!.trim(), redirectUri, ...endpoints };
+}
+
+/** Live with the flag on refuses to start on a missing variable; sandbox disables MySheets instead. */
+function mysheetsOAuth(env: Record<string, string | undefined>, isLive: boolean): GmailOAuthConfig | undefined {
+  const required = ['MYSHEETS_OAUTH_CLIENT_ID', 'MYSHEETS_OAUTH_CLIENT_SECRET', 'MYSHEETS_OAUTH_REDIRECT_URI'];
+  const missing = required.find((field) => !env[field]?.trim());
+  if (missing && isLive) throw new Error(`${missing} is required when MYSHEETS_ENABLED=on in live mode`);
+  let redirectUri: string | undefined;
+  if (env.MYSHEETS_OAUTH_REDIRECT_URI?.trim()) {
+    try {
+      const url = new URL(env.MYSHEETS_OAUTH_REDIRECT_URI.trim());
+      const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+      if (!['http:', 'https:'].includes(url.protocol) || (isLive && url.protocol !== 'https:' && !loopback)
+        || url.username || url.password || url.pathname !== '/connections/mysheets/callback' || url.search || url.hash) throw new Error();
+      redirectUri = url.href;
+    } catch { throw new Error('MYSHEETS_OAUTH_REDIRECT_URI must be the web /connections/mysheets/callback URL without query, fragment or credentials (HTTPS in live, or loopback HTTP)'); }
+  }
+  // Live always talks to Google; elsewhere every endpoint must point at a stand-in, so a sandbox never reaches Google.
+  const endpoints = { ...MYSHEETS_ENDPOINTS };
+  if (!isLive) {
+    for (const [key, field] of Object.entries(MYSHEETS_ENDPOINT_OVERRIDES)) {
+      if (!env[field]?.trim()) return undefined;
+      try {
+        const url = new URL(env[field]!.trim());
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
+      } catch { throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`); }
+    }
+  }
+  if (missing || !redirectUri) return undefined;
+  return { clientId: env.MYSHEETS_OAUTH_CLIENT_ID!.trim(), clientSecret: env.MYSHEETS_OAUTH_CLIENT_SECRET!.trim(), redirectUri, ...endpoints };
+}
+
+function mysheetsPicker(env: Record<string, string | undefined>, isLive: boolean): { apiKey: string; appId: string } | undefined {
+  const apiKey = env.MYSHEETS_PICKER_API_KEY?.trim();
+  const appId = env.MYSHEETS_PICKER_APP_ID?.trim();
+  if (isLive) {
+    if (!apiKey) throw new Error('MYSHEETS_PICKER_API_KEY is required when MYSHEETS_ENABLED=on in live mode');
+    if (!appId || !/^\d+$/.test(appId)) throw new Error('MYSHEETS_PICKER_APP_ID must be a numeric project number when MYSHEETS_ENABLED=on in live mode');
+    return { apiKey, appId };
+  }
+  if (apiKey || appId) {
+    return { apiKey: apiKey || 'fake-picker-api-key', appId: appId && /^\d+$/.test(appId) ? appId : '1234567890' };
+  }
+  return undefined;
 }

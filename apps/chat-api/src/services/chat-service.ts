@@ -5,15 +5,98 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { PlanConnections, PlannerResponse, PlanResponse, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
+import { resolveRef } from '@wap/executor';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
   const { connections: _ignored, ...rest } = plan;
   return rest;
+}
+
+export function resolveTargetSpreadsheet(
+  sId: unknown,
+  steps: PlanStep[],
+  selected: PersonalSpreadsheetItem[],
+  lookupResults?: Array<{ id: string; title: string; url?: string }>
+): PersonalSpreadsheetItem | null {
+  if (typeof sId === 'string') {
+    return selected.find((item) => item.id === sId) ?? null;
+  }
+  if (sId && typeof sId === 'object' && '$ref' in sId && typeof (sId as any).$ref === 'string') {
+    const rawRef = (sId as any).$ref as string;
+    const normalizedRef = rawRef.replace(/\[(\d+)\]/g, '.$1');
+    const dotIndex = normalizedRef.indexOf('.');
+    const refStepId = dotIndex === -1 ? normalizedRef : normalizedRef.slice(0, dotIndex);
+    const refStep = steps.find((s) => s.id === refStepId);
+
+    if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
+      let matches: Array<{ id: string; title: string; url?: string }>;
+
+      if (Array.isArray(lookupResults)) {
+        matches = lookupResults;
+      } else {
+        const q = typeof refStep.args?.query === 'string' ? refStep.args.query.trim().toLowerCase() : '';
+        const limitRaw = refStep.args?.limit;
+        const limit = typeof limitRaw === 'number' && Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 10
+          ? limitRaw
+          : 10;
+
+        matches = [];
+        for (const item of selected) {
+          if (!q || item.title.toLowerCase().includes(q)) {
+            matches.push(item);
+          }
+          if (matches.length >= limit) break;
+        }
+      }
+
+      try {
+        const resolved = resolveRef(normalizedRef, new Map([[refStepId, matches]]));
+        const resolvedId = typeof resolved === 'string' ? resolved : (resolved && typeof resolved === 'object' ? resolved.id : undefined);
+        if (typeof resolvedId === 'string') {
+          const item = selected.find((item) => item.id === resolvedId);
+          if (item) {
+            const liveMatch = matches.find((m) => m.id === resolvedId);
+            return liveMatch?.title ? { ...item, title: liveMatch.title } : item;
+          }
+          return null;
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    if (selected.length > 0 && selected.every((item) => item.canEdit === false)) {
+      return selected[0] ?? null;
+    }
+  }
+  return null;
+}
+
+export async function resolveTargetSpreadsheetAsync(
+  sId: unknown,
+  steps: PlanStep[],
+  selected: PersonalSpreadsheetItem[],
+  lookup?: (tool: string, args: Record<string, any>) => Promise<unknown>
+): Promise<PersonalSpreadsheetItem | null> {
+  let lookupResults: Array<{ id: string; title: string; url?: string }> | undefined;
+  if (lookup && sId && typeof sId === 'object' && '$ref' in sId && typeof (sId as any).$ref === 'string') {
+    const rawRef = (sId as any).$ref as string;
+    const normalizedRef = rawRef.replace(/\[(\d+)\]/g, '.$1');
+    const dotIndex = normalizedRef.indexOf('.');
+    const refStepId = dotIndex === -1 ? normalizedRef : normalizedRef.slice(0, dotIndex);
+    const refStep = steps.find((s) => s.id === refStepId);
+    if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
+      const res = await lookup(refStep.tool, refStep.args ?? {});
+      if (!Array.isArray(res)) throw new Error('MySheets planning lookup returned an invalid result');
+      lookupResults = res;
+    }
+  }
+  return resolveTargetSpreadsheet(sId, steps, selected, lookupResults);
 }
 
 export interface HandleUserMessageInput {
@@ -47,8 +130,19 @@ export interface ChatServiceOptions {
   gmailConnection?: (userId: string) => Promise<NonNullable<PlanConnections['gmail']> | null>;
   /** The caller's active MyCalendar connection; absent when MyCalendar is off or not connected, so a MyCalendar plan is refused. */
   mycalendarConnection?: (userId: string) => Promise<NonNullable<PlanConnections['mycalendar']> | null>;
+  /** The caller's active MySheets connection; absent when MySheets is off or not connected, so a MySheets plan is refused. */
+  mysheetsConnection?: (userId: string) => Promise<(NonNullable<PlanConnections['mysheets']> & {
+    selectedSpreadsheets?: Array<{ id: string; title: string; canEdit: boolean }>;
+    lookupSpreadsheets?: (query?: string, limit?: number, context?: { signal?: AbortSignal }) => Promise<Array<{ id: string; title: string; url?: string }>>;
+    getAdapter?: () => Promise<any> | any;
+  }) | null>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
+  /** Optional adapter retriever or tool executor for live resource validation in planning. */
+  getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
+  lookupTool?: (userId: string, tool: string, args: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown>;
+  /** Bounds each MySheets discovery used to validate an append target, including ordinary chat. Default: 10 seconds. */
+  mysheetsLookupTimeoutMs?: number;
 }
 
 type Correlation = { replyToMessageId?: string; requestId?: string };
@@ -69,11 +163,19 @@ export class ChatService {
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
+  private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private schedules?: ChatServiceOptions['schedules'];
+  private getAdapter?: ChatServiceOptions['getAdapter'];
+  private lookupTool?: ChatServiceOptions['lookupTool'];
+  private mysheetsLookupTimeoutMs: number;
 
   constructor(options: ChatServiceOptions) {
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
+    this.mysheetsConnection = options.mysheetsConnection;
+    this.getAdapter = options.getAdapter;
+    this.lookupTool = options.lookupTool;
+    this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -110,20 +212,23 @@ export class ChatService {
 
   /**
    * After validation, before labels, hash and storage: drop any connections
-   * the model wrote and record the connection a Gmail or MyCalendar step will use,
+   * the model wrote and record the connection a Gmail, MyCalendar or MySheets step will use,
    * so the integrity check covers it. Without one the plan is refused, not saved.
    */
-  private async bindConnections(plan: PlanResponse, userId: string): Promise<PlannerResponse> {
+  private async bindConnections(plan: PlanResponse, userId: string, signal?: AbortSignal): Promise<PlannerResponse> {
+    signal?.throwIfAborted();
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
+    const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
 
-    if (!usesGmail && !usesMyCalendar) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
     let gmailConn: NonNullable<PlanConnections['gmail']> | undefined;
     let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
+    let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -160,6 +265,99 @@ export class ChatService {
       }
     }
 
+    if (usesMySheets) {
+      const mysheets = await this.mysheetsConnection?.(userId);
+      if (!mysheets) {
+        unavailableServices.push({ id: 'mysheets', name: 'Google Sheets của bạn' });
+        reasons.push('Google Sheets của bạn chưa được kết nối hoặc chưa chọn bảng tính.');
+      } else {
+        const allowedSet = new Set(mysheets.allowedSpreadsheets);
+        const forbiddenStep = bound.steps.find((step) => {
+          if (!step.tool.startsWith('mysheets.')) return false;
+          const sId = step.args?.spreadsheetId;
+          return typeof sId === 'string' && !allowedSet.has(sId);
+        });
+        if (forbiddenStep) {
+          const sId = String(forbiddenStep.args.spreadsheetId);
+          return {
+            kind: 'refusal',
+            reason: `Bảng tính "${sId}" không nằm trong danh sách bảng tính Google Sheets bạn đã cho phép ATI sử dụng.`,
+            suggestion: 'Hãy chọn thêm bảng tính này bằng Google Picker hoặc chọn một trong các bảng tính đã được cấp quyền.',
+            unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
+          };
+        }
+
+        // Static resolution is only for callers without a runtime lookup. A configured
+        // provider's error must stop validation instead of guessing from Picker titles.
+        const hasLookup = this.lookupTool || mysheets.lookupSpreadsheets || mysheets.getAdapter || this.getAdapter;
+        const lookup = hasLookup ? async (tool: string, args: Record<string, any>) => {
+          const deadline = AbortSignal.timeout(this.mysheetsLookupTimeoutMs);
+          const lookupSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+          lookupSignal.throwIfAborted();
+          let onAbort!: () => void;
+          const aborted = new Promise<never>((_, reject) => {
+            onAbort = () => reject(lookupSignal.reason);
+            lookupSignal.addEventListener('abort', onAbort, { once: true });
+          });
+          const execute = async () => {
+            let result: unknown;
+            if (this.lookupTool) {
+              result = await this.lookupTool(userId, tool, args, { signal: lookupSignal });
+            } else if (mysheets.lookupSpreadsheets && tool === 'mysheets.list_spreadsheets') {
+              result = await mysheets.lookupSpreadsheets(args.query, args.limit, { signal: lookupSignal });
+            } else {
+              const adapter = mysheets.getAdapter
+                ? await mysheets.getAdapter()
+                : await this.getAdapter?.('mysheets', { userId, phase: 'planning' });
+              // Adapter acquisition may finish after cancellation; do not dispatch then.
+              lookupSignal.throwIfAborted();
+              if (!adapter || typeof adapter.execute !== 'function') throw new Error('MySheets planning lookup is unavailable');
+              result = await adapter.execute(tool, args, { signal: lookupSignal });
+            }
+            lookupSignal.throwIfAborted();
+            return result;
+          };
+          try {
+            // Hooks should honor the signal; the race also bounds a hook that does not.
+            return await Promise.race([execute(), aborted]);
+          } finally {
+            lookupSignal.removeEventListener('abort', onAbort);
+          }
+        } : undefined;
+
+        let readOnlyAppendInfo: { step: PlanStep; sheet: PersonalSpreadsheetItem } | null = null;
+        for (const step of bound.steps) {
+          if (step.tool !== 'mysheets.append_rows') continue;
+          const target = await resolveTargetSpreadsheetAsync(
+            step.args?.spreadsheetId,
+            bound.steps,
+            mysheets.selectedSpreadsheets ?? [],
+            lookup
+          );
+          signal?.throwIfAborted();
+          if (target && target.canEdit === false) {
+            readOnlyAppendInfo = { step, sheet: target };
+            break;
+          }
+        }
+        if (readOnlyAppendInfo) {
+          const title = readOnlyAppendInfo.sheet.title;
+          return {
+            kind: 'refusal',
+            reason: `Bảng tính "${title}" chỉ cho xem, ATI không thêm dòng được.`,
+            suggestion: 'Hãy chọn bảng tính bạn có quyền chỉnh sửa, hoặc cấp quyền chỉnh sửa cho tài khoản Google của bạn rồi chọn lại.',
+            unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
+          };
+        }
+
+        mysheetsConn = {
+          credentialId: mysheets.credentialId,
+          email: mysheets.email,
+          allowedSpreadsheets: mysheets.allowedSpreadsheets,
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -173,6 +371,7 @@ export class ChatService {
     const connections: PlanConnections = {};
     if (gmailConn) connections.gmail = gmailConn;
     if (mycalConn) connections.mycalendar = mycalConn;
+    if (mysheetsConn) connections.mysheets = mysheetsConn;
 
     return { ...bound, connections };
   }
@@ -207,10 +406,11 @@ export class ChatService {
    */
   private async prepareResponse(
     target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown },
-    planned: PlannerResponse, memory: WorkingMemory, userTexts: string[],
+    planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId) : planned;
+    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
+    signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
       const prepared = await this.prepareProposal(response, target.userId, target.schedule ?? null);
@@ -338,6 +538,7 @@ export class ChatService {
    * connections. Nothing is written before the runner's transaction.
    */
   async planScheduledRun(run: RunToPlan, convId: string, signal: AbortSignal): Promise<PreparedRun> {
+    signal.throwIfAborted();
     if (!this.schedules) throw new Error('Schedules are off');
     const userMessage = runMessage(run, this.schedules.timeZone);
     const first = (await this.msgRepo.listMessages(convId)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
@@ -348,11 +549,13 @@ export class ChatService {
       userMessage, history: [], memory, signal, actor: { userId: run.userId }, scheduledRun: true,
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }),
     });
+    signal.throwIfAborted();
     if (response.kind === 'schedule') throw new Error('A scheduled run must be planned, not scheduled again');
     const prepared = await this.prepareResponse({ conversationId: convId, userId: run.userId, correlation, memoryState: memory.toJSON() },
-      response, memory, [userMessage]);
+      response, memory, [userMessage], signal);
     return {
       persist: async (client) => {
+        signal.throwIfAborted();
         const { planId } = await prepared.write(client);
         return planId ? { state: 'planned', planId } : { state: 'needs_attention' };
       },

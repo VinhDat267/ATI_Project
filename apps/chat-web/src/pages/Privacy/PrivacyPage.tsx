@@ -1,5 +1,5 @@
 // Chuyển từ docs/design/prototypes/privacy.html bằng scripts/html-to-jsx.mjs, sau đó sửa tay.
-import { useGmailEnabled, useMyCalendarEnabled } from '../../hooks/use-gmail-enabled';
+import { useGmailEnabled, useMyCalendarEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabled';
 import { MainNav } from '../../components/layout/MainNav';
 import type { MouseEvent } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
@@ -28,6 +28,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
   usePrototypePage(meta);
   const gmailEnabled = useGmailEnabled();
   const mycalendarEnabled = useMyCalendarEnabled();
+  const mysheetsEnabled = useMySheetsEnabled();
   return (
     <>
       {/* FE-12: đã đăng nhập thì dùng thanh điều hướng chung; chưa đăng nhập giữ thanh của bản mẫu. */}
@@ -470,6 +471,12 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               <p>ATI chỉ đọc danh sách lịch và các sự kiện trong khoảng thời gian truy vấn của những lịch mà bạn đã tick chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
               <p>Phạm vi quyền truy cập bao gồm xem danh sách lịch (calendar.calendarlist.readonly) và quản lý sự kiện (calendar.events). ATI chỉ tạo sự kiện mới sau khi bạn bấm phê duyệt. ATI không sửa, không xoá sự kiện có sẵn và không gửi lời mời cho người khác.</p>
               <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi hoàn toàn.</p>
+            </section>}
+          {mysheetsEnabled && <section aria-label="Bảng tính Google Sheets của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
+              <h3 className="font-semibold text-[#111827]">Bảng tính Google Sheets của bạn</h3>
+              <p>ATI chỉ truy cập các bảng tính mà bạn chủ động chọn trong cửa sổ Google Picker (phạm vi drive.file và spreadsheets). Dữ liệu ô tính được đọc đi qua 9router để model lập kế hoạch và trả lời.</p>
+              <p>ATI chỉ thêm dòng mới sau khi bạn xem trước và phê duyệt kế hoạch. ATI không tự ý sửa các ô sẵn có, không xoá bảng tính và không truy cập vào bất kỳ tệp Drive nào khác của bạn.</p>
+              <p>Bạn có thể thay đổi danh sách bảng tính hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mysheets" onClick={appLink(navigate, '/settings#mysheets')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a> hoặc thu hồi quyền trực tiếp tại Google. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi.</p>
             </section>}
             {/* Quy định duyệt tài khoản Google mới */}
           <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">

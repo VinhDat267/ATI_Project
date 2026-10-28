@@ -8,6 +8,7 @@ import { type Service } from './data';
 import { useSettings } from './useSettings';
 import { PersonalGmail } from './PersonalGmail';
 import { PersonalMyCalendar } from './PersonalMyCalendar';
+import { PersonalMySheets } from './PersonalMySheets';
 import { gmailConnectionNotice } from '../../services/gmail-connection';
 import { meta } from './meta';
 
@@ -89,7 +90,7 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
 export interface SettingsPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void; authToken?: string | null }
 export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
-  const { list, personal, personalMyCalendar, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
+  const { list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
   useEffect(() => { const email = gmailConnectionNotice.take(user?.id); if (email) setConnectedEmail(email); }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -168,14 +169,20 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
-        {personal && !personalMyCalendar && <PersonalGmail key={user?.id} selected={selected} service={personal} refresh={refresh} />}
-        {!personal && personalMyCalendar && <PersonalMyCalendar key={user?.id} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} />}
-        {personal && personalMyCalendar && (
+        {((personal ? 1 : 0) + (personalMyCalendar ? 1 : 0) + (personalMySheets ? 1 : 0)) === 1 && (
+          <>
+            {personal && <PersonalGmail key={user?.id} selected={selected} service={personal} refresh={refresh} />}
+            {personalMyCalendar && <PersonalMyCalendar key={user?.id} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} />}
+            {personalMySheets && <PersonalMySheets key={user?.id} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} />}
+          </>
+        )}
+        {((personal ? 1 : 0) + (personalMyCalendar ? 1 : 0) + (personalMySheets ? 1 : 0)) > 1 && (
           <section aria-labelledby="heading-personal-services" className="mb-8">
             <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
             <div className="v3-space-y-4">
-              <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />
-              <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />
+              {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
+              {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
+              {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
             </div>
           </section>
         )}

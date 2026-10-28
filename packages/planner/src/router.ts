@@ -68,6 +68,20 @@ export function routeIntent(
       matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'calendars'));
     }
   }
+  const hasPersonalSheets = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'spreadsheets');
+  const hasSharedSheets = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'spreadsheets');
+  if (hasPersonalSheets && hasSharedSheets) {
+    const mentionsSharedSheets =
+      mentionsKeyword(intent, 'bảng tính chung') ||
+      mentionsKeyword(intent, 'bảng tính nhóm') ||
+      mentionsKeyword(intent, 'bảng tính team') ||
+      mentionsKeyword(intent, 'sheet chung') ||
+      ['shared spreadsheet', 'team spreadsheet', 'team sheet']
+        .some(keyword => mentionsKeyword(intent, keyword));
+    if (!mentionsSharedSheets) {
+      matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'spreadsheets'));
+    }
+  }
   const fallback = matched.length > 0 ? matched : services.filter((service) =>
     service.fallbackIntentKeywords?.some((keyword) => mentionsKeyword(intent, keyword))
   );

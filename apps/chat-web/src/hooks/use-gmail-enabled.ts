@@ -21,3 +21,13 @@ export function useMyCalendarEnabled() {
   }, []);
   return enabled;
 }
+
+export function useMySheetsEnabled() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let current = true;
+    apiClient.getRuntime().then(data => { if (current) setEnabled(data.mysheetsEnabled === true); }).catch(() => {});
+    return () => { current = false; };
+  }, []);
+  return enabled;
+}

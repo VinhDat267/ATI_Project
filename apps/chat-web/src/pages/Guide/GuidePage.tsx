@@ -6,9 +6,11 @@ import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePag
 import { ServiceLogo } from '../../components/ServiceLogo';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import { useGmailEnabled } from '../../hooks/use-gmail-enabled';
+import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabled';
+import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { GMAIL_GUIDE, GMAIL_PROMPTS, GMAIL_CAPABILITY } from './gmail-data';
-import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS } from './data';
+import { MYSHEETS_GUIDE, MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT, MYSHEETS_CAPABILITY } from './mysheets-data';
+import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, type ServiceGuide } from './data';
 
 const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
@@ -56,16 +58,16 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title={s.id === 'gmail' ? 'Mở kết nối Gmail' : 'Mở trang cài đặt để dán khoá'}>
-          <span>{s.id === 'gmail' ? 'Kết nối Gmail →' : 'Đi tới Cài đặt khoá →'}</span>
+        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title={s.id === 'gmail' ? 'Mở kết nối Gmail' : s.id === 'mysheets' ? 'Mở kết nối Google Sheets' : 'Mở trang cài đặt để dán khoá'}>
+          <span>{s.id === 'gmail' ? 'Kết nối Gmail →' : s.id === 'mysheets' ? 'Kết nối Google Sheets →' : 'Đi tới Cài đặt khoá →'}</span>
         </a>
       </div>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-[11px] text-[#6B7280] font-medium">{s.id === 'gmail' ? 'Cách kết nối:' : 'Khoá cần lấy:'}</div>
+        <div className="text-[11px] text-[#6B7280] font-medium">{['gmail', 'mysheets'].includes(s.id) ? 'Cách kết nối:' : 'Khoá cần lấy:'}</div>
         <div className="font-semibold text-xs text-[#111827] mt-1 flex flex-wrap gap-1">
-          {s.id === 'gmail' && <span>Google OAuth · không nhập khoá</span>}{s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
+          {['gmail', 'mysheets'].includes(s.id) && <span>Google OAuth · không nhập khoá</span>}{s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
         </div>
       </div>
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
@@ -91,7 +93,7 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
     </div>
     <div className="v3-space-y-4 pt-2">
       <h4 className="text-sm font-bold text-[#111827] uppercase tracking-wider">
-        {s.id === 'gmail' ? 'Các bước kết nối hộp thư:' : 'Các bước lấy khoá chi tiết từng thao tác:'}
+        {s.id === 'gmail' ? 'Các bước kết nối hộp thư:' : s.id === 'mysheets' ? 'Các bước kết nối bảng tính:' : 'Các bước lấy khoá chi tiết từng thao tác:'}
       </h4>
       <div className="v3-space-y-3">
         {s.steps.map(st => (
@@ -155,7 +157,7 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
           {p.services.map(sid => (
             <span key={sid} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E7E7E2] text-[11px] font-medium text-neutral-700">
               <span className="w-3.5 h-3.5 flex items-center justify-center">{SERVICE_SVGS[sid] || <ServiceLogo service={sid} className="w-5 h-5" />}</span>
-              <span>{sid === 'gmail' ? 'Gmail' : SERVICE_GUIDES[sid]?.name || sid}</span>
+              <span>{sid === 'gmail' ? 'Gmail' : sid === 'mysheets' ? 'Google Sheets' : SERVICE_GUIDES[sid]?.name || sid}</span>
             </span>
           ))}
         </div>
@@ -245,10 +247,29 @@ export const meta: PageMeta = {
 export function GuidePage({ navigate, user = null, onLogout = () => navigate('/') }: { navigate: Navigate; user?: User | null; onLogout?: () => void }) {
   usePrototypePage(meta);
   const gmailEnabled = useGmailEnabled();
-  const SERVICE_GUIDES = gmailEnabled ? { ...BASE_GUIDES, gmail: GMAIL_GUIDE } : BASE_GUIDES;
-  const SAMPLE_PROMPTS = gmailEnabled ? [...BASE_PROMPTS, ...GMAIL_PROMPTS] : BASE_PROMPTS;
-  const CAPABILITIES_DATA = gmailEnabled ? [...BASE_CAPABILITIES, GMAIL_CAPABILITY] : BASE_CAPABILITIES;
-  useEffect(() => { if (gmailEnabled && new URLSearchParams(window.location.search).get('service') === 'gmail') setServiceId('gmail'); }, [gmailEnabled]);
+  const mysheetsEnabled = useMySheetsEnabled();
+  const schedulesEnabled = useSchedulesEnabled();
+  const SERVICE_GUIDES: Record<string, ServiceGuide> = {
+    ...BASE_GUIDES,
+    ...(gmailEnabled ? { gmail: GMAIL_GUIDE } : {}),
+    ...(mysheetsEnabled ? { mysheets: MYSHEETS_GUIDE } : {}),
+  };
+  const mysheetsPrompts = schedulesEnabled ? [...MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT] : MYSHEETS_PROMPTS;
+  const SAMPLE_PROMPTS = [
+    ...BASE_PROMPTS,
+    ...(gmailEnabled ? GMAIL_PROMPTS : []),
+    ...(mysheetsEnabled ? mysheetsPrompts : []),
+  ];
+  const CAPABILITIES_DATA = [
+    ...BASE_CAPABILITIES,
+    ...(gmailEnabled ? [GMAIL_CAPABILITY] : []),
+    ...(mysheetsEnabled ? [MYSHEETS_CAPABILITY] : []),
+  ];
+  useEffect(() => {
+    const serviceParam = new URLSearchParams(window.location.search).get('service');
+    if (gmailEnabled && serviceParam === 'gmail') setServiceId('gmail');
+    else if (mysheetsEnabled && serviceParam === 'mysheets') setServiceId('mysheets');
+  }, [gmailEnabled, mysheetsEnabled]);
   const [tab, setTab] = useState<MainTab>(initialTab);
   const [serviceId, setServiceId] = useState(initialService);
   const [category, setCategory] = useState('all');
@@ -466,6 +487,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               {/* Các nút lọc nhóm nghiệp vụ */}
               <div className="flex flex-wrap gap-1.5 sm:gap-2" id="prompt-category-filter">
                 {gmailEnabled && <button type="button" className={catClass('email')} onClick={() => actions.setPromptCategory('email')}>Email ({GMAIL_PROMPTS.length})</button>}
+                {mysheetsEnabled && <button type="button" className={catClass('mysheets')} onClick={() => actions.setPromptCategory('mysheets')}>Bảng tính ({mysheetsPrompts.length})</button>}
                 <button type="button" onClick={() => actions.setPromptCategory('all')} id="btn-cat-all" className={catClass('all')}>
                   {`Tất cả (${SAMPLE_PROMPTS.length})`}
                 </button>

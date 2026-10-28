@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 export const GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
 export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const defaults = {
   clientId: 'gmail-test.apps.googleusercontent.com', clientSecret: 'fake-gmail-secret',
   redirectUri: 'http://127.0.0.1:5174/connections/gmail/callback', email: 'gmail-owner@example.test',
@@ -12,14 +13,75 @@ const defaults = {
 const defaultRedirectUris = [
   'http://127.0.0.1:5174/connections/gmail/callback',
   'http://127.0.0.1:5174/connections/mycalendar/callback',
+  'http://127.0.0.1:5174/connections/mysheets/callback',
   'http://localhost:5174/connections/gmail/callback',
   'http://localhost:5174/connections/mycalendar/callback',
+  'http://localhost:5174/connections/mysheets/callback',
 ];
 function defaultCalendars(email = defaults.email) {
   return [
     { id: email, summary: 'Lịch chính', timeZone: 'Asia/Ho_Chi_Minh', primary: true, accessRole: 'owner' },
     { id: 'c_work@group.calendar.google.com', summary: 'Lịch việc riêng', timeZone: 'Asia/Ho_Chi_Minh', accessRole: 'writer' },
     { id: 'vi.vietnamese@holiday.calendar.google.com', summary: 'Ngày lễ Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', accessRole: 'reader' },
+  ];
+}
+function defaultDriveFiles() {
+  return [
+    {
+      id: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+      name: 'Việc của tôi',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      trashed: false,
+      capabilities: { canEdit: true },
+      sheets: [
+        { properties: { sheetId: 0, title: 'Sheet1' } },
+        { properties: { sheetId: 1, title: 'Tasks' } },
+      ],
+      values: {
+        'Sheet1!A1:B2': [['Task', 'Status'], ['Write spec', 'Done']],
+        'Tasks!A1:B2': [['Item', 'Due'], ['Review', 'Today']],
+      },
+    },
+    {
+      id: '2CyiNWs1YSB6oGNeLwCeCAkhnVVrqumct85PhwF3vqnt',
+      name: 'Báo cáo tuần',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      trashed: false,
+      capabilities: { canEdit: true },
+      sheets: [
+        { properties: { sheetId: 0, title: 'Sheet1' } },
+      ],
+      values: {
+        'Sheet1!A1': [['Weekly Report']],
+      },
+    },
+    {
+      id: '3DziOXt2ZTC7pHOfMxDfDBliowWsrvndu96QixG4wrpu',
+      name: 'Tiến độ cá nhân',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      trashed: false,
+      capabilities: { canEdit: false },
+      sheets: [
+        { properties: { sheetId: 0, title: 'Sheet1' } },
+      ],
+      values: {
+        'Sheet1!A1:B6': [
+          ['Mục', 'Trạng thái'],
+          ['Tác vụ 1', 'Xong'],
+          ['Tác vụ 2', 'Đang làm'],
+          ['Tác vụ 3', 'Xong'],
+          ['Tác vụ 4', 'Chờ duyệt'],
+          ['Tác vụ 5', 'Hoàn thành'],
+        ],
+      },
+    },
+    {
+      id: '4EajPYu3AUD8qIPgNyEgECmjpxXtswoev07RjyH5xsqv',
+      name: 'Tài liệu thiết kế',
+      mimeType: 'application/vnd.google-apps.document',
+      trashed: false,
+      capabilities: { canEdit: true },
+    },
   ];
 }
 const equal = (a, b) => typeof a === 'string' && typeof b === 'string'
@@ -57,19 +119,28 @@ async function form(request) {
 export async function startFakeGoogleGmail(options = {}) {
   const { port = 0, now = Date.now, clientId, clientSecret, redirectUri, email } = { ...defaults, ...options };
   const settings = {
-    email, grantedScopes: [GMAIL_MODIFY_SCOPE, CALENDAR_EVENTS_SCOPE, CALENDAR_READONLY_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
+    email, grantedScopes: [GMAIL_MODIFY_SCOPE, CALENDAR_EVENTS_SCOPE, CALENDAR_READONLY_SCOPE, DRIVE_FILE_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
     accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
-    threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], apiResponses: [], ...options.settings,
+    threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], driveFiles: defaultDriveFiles(), grantedFiles: [], apiResponses: [], ...options.settings,
   };
   const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0, apiRequests: [], writes: 0 };
   const codes = new Map();
   const refreshTokens = new Map();
   const accessTokens = new Map();
+  const grantedFiles = new Set(settings.grantedFiles ?? []);
   const hanging = new Set();
   const hang = (response) => { hanging.add(response); response.on('close', () => hanging.delete(response)); };
   // Clients in the same project share revocation, as Google's real OAuth endpoint does.
   const projectFor = (id) => options.clientProjects?.[id]
-    ?? (id === 'mycalendar-test.apps.googleusercontent.com' ? 'fake-calendar-project' : 'fake-gmail-project');
+    ?? (id === 'mysheets-test.apps.googleusercontent.com' ? 'fake-sheets-project'
+        : id === 'mycalendar-test.apps.googleusercontent.com' ? 'fake-calendar-project'
+        : 'fake-gmail-project');
+  const isFileGranted = (entry, fileId) => {
+    return grantedFiles.has(fileId) ||
+      grantedFiles.has(`${entry.email}:${fileId}`) ||
+      grantedFiles.has(`${entry.projectId}:${fileId}`) ||
+      grantedFiles.has(`${entry.clientId}:${fileId}`);
+  };
   const issueAccessToken = (account, tokenClientId = clientId) => {
     const token = `${settings.accessTokenPrefix}-${random()}`;
     accessTokens.set(token, { email: account, clientId: tokenClientId, projectId: projectFor(tokenClientId), expiresAt: now() + settings.accessTokenTtlSeconds * 1000 });
@@ -86,7 +157,7 @@ export async function startFakeGoogleGmail(options = {}) {
     if (Array.isArray(options.redirectUris) && options.redirectUris.includes(uri)) return true;
     return defaultRedirectUris.includes(uri);
   };
-  const isAllowedClient = (id) => id === clientId || id === 'mycalendar-test.apps.googleusercontent.com' || (Array.isArray(options.clientIds) && options.clientIds.includes(id));
+  const isAllowedClient = (id) => id === clientId || id === 'mycalendar-test.apps.googleusercontent.com' || id === 'mysheets-test.apps.googleusercontent.com' || (Array.isArray(options.clientIds) && options.clientIds.includes(id));
 
   const server = createServer(async (request, response) => {
     try {
@@ -99,7 +170,9 @@ export async function startFakeGoogleGmail(options = {}) {
         const reqRedirectUri = params.get('redirect_uri');
         const hasValidScope = scopes.includes(GMAIL_MODIFY_SCOPE)
           || (scopes.includes(CALENDAR_EVENTS_SCOPE) && scopes.includes(CALENDAR_READONLY_SCOPE))
-          || scopes.some(s => s.includes('calendar'));
+          || scopes.includes(DRIVE_FILE_SCOPE)
+          || scopes.some(s => s.includes('calendar'))
+          || scopes.some(s => s.includes('drive'));
         if (!isAllowedClient(params.get('client_id')) || !isAllowedRedirect(reqRedirectUri) || params.get('response_type') !== 'code'
           || params.get('code_challenge_method') !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(params.get('code_challenge') ?? '')
           || !hasValidScope || params.get('access_type') !== 'offline' || params.get('prompt') !== 'consent'
@@ -123,6 +196,7 @@ export async function startFakeGoogleGmail(options = {}) {
         const reqClientSecret = params?.get('client_secret');
         const clientValid = (equal(reqClientId, clientId) && equal(reqClientSecret, clientSecret))
           || (reqClientId === 'mycalendar-test.apps.googleusercontent.com' && equal(reqClientSecret, 'fake-mycalendar-secret'))
+          || (reqClientId === 'mysheets-test.apps.googleusercontent.com' && equal(reqClientSecret, 'fake-mysheets-secret'))
           || (isAllowedClient(reqClientId) && equal(reqClientSecret, clientSecret));
         if (!params || !clientValid) {
           return json(response, 401, { error: 'invalid_client' });
@@ -262,6 +336,111 @@ export async function startFakeGoogleGmail(options = {}) {
           const found = items.find(c => c.id === calId || (c.primary && (calId === 'primary' || calId === email)));
           if (!found) return json(response, 404, { error: { code: 404, message: 'Not Found' } });
           return json(response, 200, { id: found.id, summary: found.summary, timeZone: found.timeZone, ...(found.primary ? { primary: true } : {}) });
+        }
+      }
+      if (url.pathname.startsWith('/fake-picker/')) {
+        response.setHeader('Access-Control-Allow-Origin', '*');
+        response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (request.method === 'OPTIONS') { response.writeHead(204); return response.end(); }
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, message: 'Unauthenticated' } });
+        if (url.pathname === '/fake-picker/files' && request.method === 'GET') {
+          return json(response, 200, {
+            files: (settings.driveFiles ?? []).map(f => ({
+              id: f.id,
+              name: f.name,
+              mimeType: f.mimeType,
+              trashed: Boolean(f.trashed),
+              capabilities: f.capabilities,
+            })),
+          });
+        }
+        if (url.pathname === '/fake-picker/grant' && request.method === 'POST') {
+          let raw = ''; for await (const chunk of request) raw += chunk;
+          const body = JSON.parse(raw || '{}');
+          const ids = Array.isArray(body.fileIds) ? body.fileIds : (body.fileId || body.id ? [body.fileId || body.id] : []);
+          for (const id of ids) {
+            grantedFiles.add(id);
+            grantedFiles.add(`${entry.email}:${id}`);
+            grantedFiles.add(`${entry.projectId}:${id}`);
+          }
+          return json(response, 200, { granted: true });
+        }
+      }
+      if (url.pathname === '/drive/v3/about') {
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, message: 'Unauthenticated' } });
+        return json(response, 200, { user: { emailAddress: entry.email || settings.email } });
+      }
+      if (url.pathname.startsWith('/drive/v3/files/')) {
+        const fileId = decodeURIComponent(url.pathname.slice('/drive/v3/files/'.length));
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, message: 'Unauthenticated' } });
+        const file = (settings.driveFiles ?? []).find(f => f.id === fileId);
+        if (!file || !isFileGranted(entry, fileId)) {
+          return json(response, 404, { error: { code: 404, message: 'File not found' } });
+        }
+        return json(response, 200, {
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          trashed: Boolean(file.trashed),
+          capabilities: { canEdit: Boolean(file.capabilities?.canEdit) },
+        });
+      }
+      if (url.pathname.startsWith('/v4/spreadsheets/')) {
+        const sub = url.pathname.slice('/v4/spreadsheets/'.length);
+        const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+        const entry = token ? accessTokens.get(token) : undefined;
+        if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, message: 'Unauthenticated' } });
+
+        const parts = sub.split('/');
+        const fileId = decodeURIComponent(parts[0]);
+        const file = (settings.driveFiles ?? []).find(f => f.id === fileId);
+        if (!file || !isFileGranted(entry, fileId)) {
+          return json(response, 404, { error: { code: 404, message: 'Requested entity was not found.' } });
+        }
+
+        if (parts.length === 1) {
+          const fields = url.searchParams.get('fields') ?? '';
+          if (fields.includes('properties.title') && !fields.includes('sheets.properties')) {
+            return json(response, 200, { spreadsheetId: file.id, properties: { title: file.name } });
+          }
+          if (fields.includes('sheets.properties')) {
+            return json(response, 200, { spreadsheetId: file.id, sheets: file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+          }
+          return json(response, 200, { spreadsheetId: file.id, properties: { title: file.name }, sheets: file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+        }
+
+        if (parts[1] === 'values' && parts[2]) {
+          const rawRangePart = parts.slice(2).join('/');
+          if (request.method === 'GET') {
+            const range = decodeURIComponent(rawRangePart);
+            return json(response, 200, {
+              range,
+              values: file.values?.[range] ?? file.values?.['Sheet1!A1:B2'] ?? [['Cell1', 'Cell2']],
+            });
+          }
+          if (request.method === 'POST') {
+            let raw = ''; for await (const chunk of request) raw += chunk;
+            const body = JSON.parse(raw || '{}');
+            stats.writes++;
+            if (file.capabilities?.canEdit === false) {
+              return json(response, 403, { error: { code: 403, message: 'The caller does not have permission' } });
+            }
+            const range = decodeURIComponent(rawRangePart.split(':')[0]);
+            return json(response, 200, {
+              spreadsheetId: file.id,
+              updates: {
+                updatedRange: `${range.split('!')[0] || 'Sheet1'}!A3:B5`,
+                updatedRows: body.values?.length ?? 1,
+              },
+            });
+          }
         }
       }
       return json(response, 404, { error: 'not_found' });
