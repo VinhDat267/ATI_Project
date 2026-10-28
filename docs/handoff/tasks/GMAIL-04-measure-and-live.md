@@ -78,6 +78,7 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 
 ## Kết quả (agent thi công điền)
 
+- **Chuẩn bị Bước 6 ngày 28/10/2026:** nhánh `codex/gmail-04-enable-flags`, mã `26db0b2`; PR chỉ ở dạng **nháp**, chưa có quyết định bật cờ. Thêm Gmail tự bật khi đủ cấu hình, giữ `off` tường minh và kiểm thiếu cấu hình khi ép `on`; câu chỉ đọc mặc định bật. Test mới RED **7 fail/20 pass** → GREEN **27/27**, cùng hồi quy cấu hình **61/61**; **5/5 đột biến bị bắt**. Full `npm run check` exit 0 (**2.536 v3 + 406 eval + 11 launcher/env**); browser Gmail/OAUTH-01 **10/10**, answer **4/4**, exit 0; server live trên DB tạm riêng không cấu hình Gmail vẫn trả health `ok`. Chưa chạy lại model thật hoặc nghiệm thu Google thật. Máy thi công chưa có `GMAIL_OAUTH_*`; không đổi `.env` đang dùng. Giữ mở bước 5 và quyết định bật cờ; chi tiết: [log chuẩn bị rollout](../log/2026-10-28-codex-GMAIL-04-rollout-preparation.md).
 - PR:
   - **Bộ đo** (bước 2, 3): nhánh `eval/gmail-04-measure`, reviewer thi công theo yêu cầu nhóm trưởng. Bộ đo `8eae4f3`; label Gmail `34c595c` (20 câu) và label trả lời `d53f24b` (10 câu) commit trước lời gọi model đầu tiên. 19/19 đột biến bị bắt. [Log](../log/2026-10-18-reviewer-GMAIL-04-measure-harness.md).
   - Sửa theo [review](https://github.com/VinhDat267/ATI_Project/pull/154#issuecomment-6244612341), trước lời gọi model đầu tiên:
