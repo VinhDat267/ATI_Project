@@ -1,6 +1,6 @@
 # OAUTH-03 · Google Sheets của riêng bạn, chọn bảng tính bằng Google Picker
 
-**Trạng thái:** đã chốt thiết kế ngày 28/10/2026 (bốn tình huống, Google Picker) · **Nhánh gợi ý:** `feat/oauth-03-personal-sheets` (một PR cho backend và giao diện), `eval/oauth-03-measure` · **Phụ thuộc:** OAUTH-02 (#176, đã merge) · **Mốc:** nhóm trưởng làm xong phần mã trong ngày 28/10; đo, nghiệm thu, bật cờ trước **04/11/2026**
+**Trạng thái:** **mã Bước 1 đã merge [#180](https://github.com/VinhDat267/ATI_Project/pull/180)** (`3948007`, 28/10/2026); **chờ đo và nghiệm thu thật**, cờ `MYSHEETS_ENABLED` vẫn tắt · **Nhánh mã:** `feat/oauth-03-personal-sheets` (đã merge); **nhánh đo gợi ý:** `eval/oauth-03-measure` · **Phụ thuộc:** OAUTH-02 (#176, đã merge) · **Mốc:** đo, nghiệm thu, bật cờ trước **04/11/2026**
 **Đặc tả:** [`2026-10-28-oauth-03-personal-sheets-design.md`](../../superpowers/specs/2026-10-28-oauth-03-personal-sheets-design.md), đọc hết trước khi làm. Chỗ nào đặc tả không nói thì làm như [OAUTH-02](OAUTH-02-personal-calendar.md). Quy tắc của dịch vụ riêng: [GMAIL-common](GMAIL-common.md).
 **Có phần việc của con người:** Google Cloud (bước 0), nghiệm thu thật (bước 4).
 
@@ -64,8 +64,8 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
 
 ## Tiêu chí nghiệm thu
 
-- [ ] RED trước GREEN; mọi đột biến ở đặc tả mục 8.2 bị bắt.
-- [ ] `npm run check` và toàn bộ `npm run test:browser:v3` exit 0; không sửa assertion cũ.
+- [x] RED trước GREEN; mọi đột biến ở đặc tả mục 8.2 bị bắt (13/13 gốc; thêm 4/4 hồi quy).
+- [x] `npm run check` và toàn bộ `npm run test:browser:v3` exit 0 trên CI đúng head `58d4570`; không sửa assertion cũ. Lượt browser local tổng có lỗi, ghi riêng bên dưới.
 - [ ] Label commit trước lời gọi model đầu tiên; đo ×3, báo cáo nguồn gốc.
 - [ ] Nghiệm thu thật đạt; quyết định bật cờ ghi trong log kèm số liệu.
 
@@ -77,6 +77,7 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
 
 ## Kết quả (agent thi công điền)
 
+- **Merge:** [#180](https://github.com/VinhDat267/ATI_Project/pull/180), `3948007645687d0c209794ce54b82140cbb560d1` (28/10/2026), theo yêu cầu nhóm trưởng. Cây merge bằng cây head `58d4570` đã qua [CI #40655033663](https://github.com/VinhDat267/ATI_Project/actions/runs/40655033663). Đóng phần mã Bước 1; các bước đo, P-LIVE và bật cờ vẫn mở.
 - **Nhánh, commit:** `feat/oauth-03-personal-sheets`, chuỗi commits từ `e8de063d` đến `cd55c9e1` và commit giải quyết review findings P1-P4 (trên nền `origin/main` `155e99de`).
 - **Kiểm thử và đột biến:**
   - `npm run check`: **PASS** (exit code 0; unit/integration tests, 406 evaluation tests, 11 launcher/env tests, typecheck sạch, web build bảo mật sạch).
@@ -86,10 +87,11 @@ Mười đột biến ở đặc tả mục 8.2 (đột biến 3 gồm bốn ch�
   - Sửa hai P2 của review vòng 4: lỗi lookup runtime hoặc kết quả sai dạng làm lượt lập kế hoạch báo lỗi, không quay về tên Picker cũ. Signal của lượt lịch đi tới adapter; lookup có deadline mặc định 10 giây cho cả chat, có kiểm tra hủy trước dispatch sau khi lấy adapter.
   - Test hồi quy mới `mysheets-planning-lookup.test.ts`: PostgreSQL thật, AdapterFactory và HTTP cục bộ; RED **6 fail / 3 pass**, GREEN **9/9 pass**. `npm run check` mới: **2.509 test v3 + 406 eval + 11 launcher/env**, exit 0 sau khi migrate DB tạm. Lượt check đầu thiếu migration public đã được ghi riêng trong log, không sửa assertion.
   - Đột biến sau sửa vòng 4: **13/13 gốc + 4/4 hồi quy mới** bị bắt, mỗi mutant exit 1; runner exit 0, SHA-256 mã nguồn khôi phục khớp; 9 test mới pass lại sau khôi phục.
-  - Browser sau sửa vòng 4: lượt tổng exit 1 ở default (**92 pass / 4 fail / 1 skip**); bốn ca lỗi pass lại **4/4** khi chạy riêng; 15 nhóm còn lại **71 pass**, từng lệnh exit 0 (MySheets 9, Gmail 10, Calendar 7, schedule 22). Có bằng chứng pass qua nhiều lần chạy, chưa có một lượt tổng exit 0; giữ nguyên assertion và timeout, xem chi tiết trong log sửa vòng 4.
+  - Browser local sau sửa vòng 4: lượt tổng exit 1 ở default (**92 pass / 4 fail / 1 skip**); bốn ca lỗi pass lại **4/4** khi chạy riêng; 15 nhóm còn lại **71 pass**, từng lệnh exit 0 (MySheets 9, Gmail 10, Calendar 7, schedule 22). Có bằng chứng pass qua nhiều lần chạy, chưa có một lượt local tổng exit 0; giữ nguyên assertion và timeout, xem chi tiết trong log sửa vòng 4. **CI đúng head `58d4570` chạy toàn bộ browser exit 0.**
 - **Số đo (`EVAL_SET=mysheets`):** Chưa đo (thuộc Bước 2, thực hiện trên nhánh `eval/oauth-03-measure` sau khi merge PR code).
 - **Nghiệm thu thật:** Chưa nghiệm thu P-LIVE (nhóm trưởng thao tác ở Bước 4 với Google Cloud Project thứ ba).
 - **Quyết định bật cờ:** Giữ `MYSHEETS_ENABLED=off` trong PR này; chỉ bật cờ khi hoàn thành Bước 2 và Bước 4.
-- **Khác với đặc tả:** Không có (tuân thủ 100% đặc tả thiết kế và các quyết định của reviewer).
+- **Phạm vi đã chốt:** mã Bước 1. Chưa xác nhận cấu hình Google Cloud thật trong lượt merge này; Bước 2 (đo), Bước 4 (P-LIVE), Bước 5 (bật cờ) chưa thực hiện. Không tuyên bố hoàn thành toàn bộ OAUTH-03.
 - **Log bàn giao:** [`docs/handoff/log/2026-10-28-OAUTH-03-personal-sheets.md`](../log/2026-10-28-OAUTH-03-personal-sheets.md).
 - **Log sửa review vòng 4:** [`2026-10-28-OAUTH-03-review-r4-fixes.md`](../log/2026-10-28-OAUTH-03-review-r4-fixes.md). Chưa phải review độc lập hay nghiệm thu Google thật.
+- **Log merge:** [`2026-10-28-reviewer-merge-180.md`](../log/2026-10-28-reviewer-merge-180.md).
