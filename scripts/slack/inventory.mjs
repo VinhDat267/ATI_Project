@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { SaxesParser } from 'saxes';
 
 const INDEX_URL = 'https://docs.slack.dev/sitemap.xml';
 const METHOD = /^[a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$/;
@@ -20,11 +21,41 @@ function methodUrl(value, markdown = false) {
 }
 
 export function extractMethodLinks(xml) {
-  if (typeof xml !== 'string' || !/<urlset(?:\s|>)/.test(xml) || !xml.includes('</urlset>')) throw new Error('Invalid sitemap XML');
+  const invalid = () => { throw new Error('Invalid sitemap XML'); };
+  if (typeof xml !== 'string') invalid();
   const urls = new Set();
-  for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
-    try { urls.add(methodUrl(match[1].trim().replaceAll('&amp;', '&')).url); } catch { /* Non-method pages are expected in a sitemap. */ }
-  }
+  const stack = [];
+  let namespace;
+  const parser = new SaxesParser({ xmlns: true });
+  parser.on('doctype', invalid);
+  parser.on('opentag', tag => {
+    if (!stack.length) {
+      if (tag.local !== 'urlset' || !['', 'http://www.sitemaps.org/schemas/sitemap/0.9'].includes(tag.uri)) invalid();
+      namespace = tag.uri;
+    } else if (stack.length === 1 && (tag.local !== 'url' || tag.uri !== namespace)) invalid();
+    if (stack.at(-1)?.location) invalid();
+    const frame = { local: tag.local, uri: tag.uri, locations: 0 };
+    if (stack.length === 2 && tag.local === 'loc' && tag.uri === namespace) {
+      if (stack.at(-1).locations++) invalid();
+      frame.location = true; frame.text = '';
+    }
+    stack.push(frame);
+  });
+  const text = value => {
+    if (stack.at(-1)?.location) stack.at(-1).text += value;
+    else if (stack.length <= 2 && value.trim()) invalid();
+  };
+  parser.on('text', text);
+  parser.on('cdata', text);
+  parser.on('closetag', () => {
+    const frame = stack.pop();
+    if (frame.location) {
+      if (!frame.text.trim()) invalid();
+      try { urls.add(methodUrl(frame.text.trim()).url); } catch { /* Non-method pages are expected in a sitemap. */ }
+    }
+    if (stack.length === 1 && frame.locations !== 1) invalid();
+  });
+  try { parser.write(xml).close(); } catch { invalid(); }
   if (!urls.size) throw new Error('Sitemap has no canonical method links');
   return [...urls].sort();
 }

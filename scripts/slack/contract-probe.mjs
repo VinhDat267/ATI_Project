@@ -5,11 +5,21 @@ import { startFakeSlackPersonal } from '../fake-slack-personal.mjs';
 
 const rejectedWrites = new Set(['invalid_auth', 'not_authed', 'missing_scope', 'channel_not_found', 'thread_not_found', 'invalid_arguments']);
 const cancelled = () => new DOMException('Fixture probe cancelled', 'AbortError');
+const freeSeeds = [
+  { user: 'U_FREE_B', text: 'Free root', ts: '1000.000001' },
+  { user: 'U_FREE_A', text: 'Free reply one', ts: '1000.000002', thread_ts: '1000.000001' },
+  { user: 'U_FREE_B', text: 'Free reply two', ts: '1000.000003', thread_ts: '1000.000001' },
+];
+const proSeeds = [{ user: 'U_PRO_A', text: 'Pro root', ts: '2000.000001' }];
+function sameMessages(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length &&
+    expected.every(seed => actual.filter(message => message && ['user', 'text', 'ts', 'thread_ts'].every(key => message[key] === seed[key])).length === 1);
+}
 class ProbeFailure extends Error {
   constructor(status = 'fail', providerCode) { super('Fixture contract failed'); this.status = status; this.providerCode = providerCode; }
 }
 
-/** Runs a known, synthetic contract only. It cannot certify native Slack capability. */
+/** Requires a fresh fixture with its fixed seeds. It cannot certify native Slack capability. */
 export async function runFixtureProbes({ baseUrl, tokens, signal, requestTimeoutMs = 1000 }) {
   if (typeof baseUrl !== 'string' || !/^http:\/\/(?:127\.0\.0\.1|\[::1\])(?::[1-9]\d{0,4})?\/?$/.test(baseUrl)) throw new TypeError('Expected an HTTP literal loopback origin');
   const origin = new URL(baseUrl).origin;
@@ -90,8 +100,7 @@ export async function runFixtureProbes({ baseUrl, tokens, signal, requestTimeout
   if (!await check('sources:visibility', async () => {
     const free = await pages('conversations.history', tokens.a, { channel: 'C_GENERAL' }, 'messages');
     const pro = await pages('conversations.history', tokens.b, { channel: 'C_GENERAL' }, 'messages');
-    const freeSeeds = [['1000.000001', 'Free root'], ['1000.000002', 'Free reply one'], ['1000.000003', 'Free reply two']];
-    if (!freeSeeds.every(([ts, text]) => free.filter(message => message.ts === ts && message.text === text).length === 1) || pro.length !== 1 || pro[0].text !== 'Pro root') return false;
+    if (!sameMessages(free, freeSeeds) || !sameMessages(pro, proSeeds)) return false;
     for (const channel of ['G_PRIVATE', 'D_PRIVATE']) {
       const own = await request('conversations.history', tokens.a, { channel });
       if (!Array.isArray(own.messages) || !own.messages.length) return false;
@@ -115,11 +124,11 @@ export async function runFixtureProbes({ baseUrl, tokens, signal, requestTimeout
   })) return report;
   if (!await check('readback:a', async () => {
     const messages = await pages('conversations.replies', tokens.a, { channel: 'C_GENERAL', ts: '1000.000001' }, 'messages');
-    return messages.filter(message => message.ts === receipt.ts && message.text === text && message.user === 'U_FREE_A' && message.thread_ts === '1000.000001').length === 1;
+    return sameMessages(messages, [...freeSeeds, { user: 'U_FREE_A', ts: receipt.ts, text, thread_ts: '1000.000001' }]);
   })) return report;
   await check('isolation:b', async () => {
     const messages = await pages('conversations.history', tokens.b, { channel: 'C_GENERAL' }, 'messages');
-    return messages.length === 1 && messages[0].text === 'Pro root' && !messages.some(message => message.text === text);
+    return sameMessages(messages, proSeeds);
   });
   return report;
 }

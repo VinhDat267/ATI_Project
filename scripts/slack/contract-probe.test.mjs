@@ -110,6 +110,54 @@ test('history that falsely claims completion still fails missing fixture seed co
   assert.equal(report.checks.find(check => check.name === 'sources:visibility').status, 'fail');
   assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
 });
+test('a Pro source injected into Free history fails workspace isolation before writes', async t => {
+  const p = await fixture(t);
+  let injected = 0;
+  const relay = await gateway(t, p, async entry => {
+    if (entry.path !== '/api/conversations.history' || entry.token !== p.tokens.a || entry.args.channel !== 'C_GENERAL') return;
+    const response = await fetch(p.origin + entry.path, { method: 'POST', headers: { authorization: `Bearer ${entry.token}`, 'content-type': 'application/json' }, body: JSON.stringify(entry.args) });
+    const data = await response.json();
+    if (data.response_metadata.next_cursor === '') {
+      data.messages.push({ type: 'message', user: 'U_PRO_A', text: 'Pro root', ts: '2000.000001' }); injected++;
+    }
+    return { body: data };
+  });
+  const report = await run(p, { baseUrl: relay.origin });
+  assert.ok(injected > 0);
+  assert.equal(report.checks.find(check => check.name === 'sources:visibility').status, 'fail');
+  assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
+});
+test('a seed attributed to the wrong actor fails source verification before writes', async t => {
+  const p = await fixture(t);
+  const relay = await gateway(t, p, async entry => {
+    if (entry.path !== '/api/conversations.history' || entry.token !== p.tokens.a || entry.args.channel !== 'C_GENERAL') return;
+    const response = await fetch(p.origin + entry.path, { method: 'POST', headers: { authorization: `Bearer ${entry.token}`, 'content-type': 'application/json' }, body: JSON.stringify(entry.args) });
+    const data = await response.json();
+    for (const message of data.messages) message.user = 'U_PRO_A';
+    return { body: data };
+  });
+  const report = await run(p, { baseUrl: relay.origin });
+  assert.equal(report.checks.find(check => check.name === 'sources:visibility').status, 'fail');
+  assert.equal(relay.requests.some(entry => entry.path === '/api/chat.postMessage'), false);
+});
+test('thread readback missing the root and seed replies fails despite a genuine write receipt', async t => {
+  const p = await fixture(t);
+  let dropped = 0;
+  const relay = await gateway(t, p, async entry => {
+    if (entry.path !== '/api/conversations.replies' || entry.token !== p.tokens.a) return;
+    const response = await fetch(p.origin + entry.path, { method: 'POST', headers: { authorization: `Bearer ${entry.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...entry.args, cursor: undefined, limit: 100 }) });
+    const data = await response.json();
+    const complete = data.messages;
+    data.messages = complete.filter(message => message.text.startsWith('fixture-probe-'));
+    dropped = complete.length - data.messages.length;
+    data.has_more = false; data.response_metadata.next_cursor = '';
+    return { body: data };
+  });
+  const report = await run(p, { baseUrl: relay.origin });
+  assert.equal(dropped, 3);
+  assert.equal(report.checks.find(check => check.name === 'post:a').status, 'pass');
+  assert.equal(report.checks.find(check => check.name === 'readback:a').status, 'fail');
+});
 test('an error response that nevertheless wrote cannot pass the read-only permission check', async t => {
   const p = await fixture(t);
   const relay = await gateway(t, p, async entry => {
