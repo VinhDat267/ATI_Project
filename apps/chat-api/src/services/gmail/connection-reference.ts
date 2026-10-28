@@ -7,6 +7,8 @@ export type MyCalendarConnectionReference = NonNullable<PlanConnections['mycalen
 export type MySheetsConnectionReference = NonNullable<PlanConnections['mysheets']>;
 export type MySheetsConnectionLookupResult = MySheetsConnectionReference & {
   selectedSpreadsheets: PersonalSpreadsheetItem[];
+  lookupSpreadsheets?: (query?: string, limit?: number) => Promise<Array<{ id: string; title: string; url?: string }>>;
+  getAdapter?: () => Promise<any> | any;
 };
 
 /** The caller's active Gmail connection as a plan stores it, or null when none is usable. */
@@ -45,7 +47,11 @@ export function createMyCalendarConnectionLookup(credentials: Pick<CredentialRep
 }
 
 /** The caller's active MySheets connection as a plan stores it, or null when none is usable or no spreadsheets selected. */
-export function createMySheetsConnectionLookup(credentials: Pick<CredentialRepo, 'getPersonalCredentials'>, encryptionKey: string) {
+export function createMySheetsConnectionLookup(
+  credentials: Pick<CredentialRepo, 'getPersonalCredentials'>,
+  encryptionKey: string,
+  getAdapter?: (userId: string) => Promise<any> | any
+) {
   return async (userId: string): Promise<MySheetsConnectionLookupResult | null> => {
     const record = await credentials.getPersonalCredentials('mysheets', userId);
     if (!record || record.status !== 'active') return null;
@@ -60,7 +66,13 @@ export function createMySheetsConnectionLookup(credentials: Pick<CredentialRepo,
         : selectedSpreadsheets.map((s: any) => s.id);
       if (!spreadsheets.length) return null;
       return typeof email === 'string' && email
-        ? { credentialId: record.id, email, allowedSpreadsheets: spreadsheets, selectedSpreadsheets }
+        ? {
+            credentialId: record.id,
+            email,
+            allowedSpreadsheets: spreadsheets,
+            selectedSpreadsheets,
+            ...(getAdapter ? { getAdapter: () => getAdapter(userId) } : {}),
+          }
         : null;
     } catch {
       return null;

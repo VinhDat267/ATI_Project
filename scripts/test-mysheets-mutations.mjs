@@ -117,12 +117,17 @@ const mutations = [
   },
 ];
 
-console.log(`Starting ${mutations.length} mandatory mutations from Spec §8.2...\n`);
+const filterArg = process.argv[2];
+const activeMutations = filterArg
+  ? mutations.filter((m) => m.id.toLowerCase().includes(filterArg.toLowerCase()))
+  : mutations;
+
+console.log(`Starting ${activeMutations.length} mandatory mutations from Spec §8.2...\n`);
 
 const results = [];
 let allPassed = true;
 
-for (const m of mutations) {
+for (const m of activeMutations) {
   const filePath = resolve(m.file);
   const original = readFileSync(filePath, 'utf8');
   const hashBefore = sha256(original);

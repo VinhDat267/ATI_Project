@@ -363,7 +363,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       });
     });
 
-    it('ChatService.bindConnections refuses if step uses a spreadsheetId not in allowedSpreadsheets', async () => {
+    it('ChatService.bindConnections refuses plan when spreadsheetId is not in allowedSpreadsheets', async () => {
       await connectMySheets(alice, 'alice@example.com', [
         { id: 'sheet_alice_1', title: 'Bảng tính 1', canEdit: true },
       ]);
@@ -472,6 +472,13 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       // Supports brackets normalization find.output[1].id
       expect(resolveTargetSpreadsheet({ $ref: 'find.output[1].id' }, [step3], selected)).toEqual(selected[1]);
+
+      // Supports live lookupResults from actual adapter discovery
+      const liveResults = [{ id: 'sheet_r', title: 'Report read only', url: 'https://example.com' }];
+      expect(resolveTargetSpreadsheet({ $ref: 'find.output.0.id' }, [step2], selected, liveResults)).toEqual({
+        ...selected[1],
+        title: 'Report read only',
+      });
 
       // Direct string literal
       expect(resolveTargetSpreadsheet('sheet_r', [step3], selected)).toEqual(selected[1]);
@@ -604,6 +611,111 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
       expect(result.reason).toBe('Bảng tính "Báo cáo mật (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+    });
+
+    it('ChatService.bindConnections prevents false approval when writable sheet was renamed on Google after connection', async () => {
+      // At connection time: W was 'Report writable' (canEdit: true), R was 'Report read only' (canEdit: false)
+      await connectMySheets(alice, 'alice@example.com', [
+        { id: 'sheet_w', title: 'Report writable', canEdit: true },
+        { id: 'sheet_r', title: 'Report read only', canEdit: false },
+      ]);
+
+      // On Google after connection: W was renamed to 'Other', so live lookup for 'Report' only returns R
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+        lookupTool: async (_userId, tool, _args) => {
+          if (tool === 'mysheets.list_spreadsheets') {
+            // Live Google lookup only matches sheet_r
+            return [{ id: 'sheet_r', title: 'Report read only', url: 'https://docs.google.com/spreadsheets/d/sheet_r/edit' }];
+          }
+          return [];
+        },
+      });
+
+      const plan: any = {
+        kind: 'plan',
+        title: 'Thêm dòng',
+        summary: 'Thêm dòng',
+        steps: [
+          {
+            id: 'find',
+            tool: 'mysheets.list_spreadsheets',
+            description: 'Tìm bảng tính',
+            args: { query: 'Report', limit: 1 },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng',
+            args: { spreadsheetId: { $ref: 'find.output.0.id' }, sheet: 'Sheet1', rows: [['test']] },
+            dependsOn: ['find'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('refusal');
+      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
+    });
+
+    it('ChatService.bindConnections avoids false refusal when read-only sheet was renamed on Google after connection', async () => {
+      // At connection time: R was 'Report read only' (canEdit: false), W was 'Report writable' (canEdit: true)
+      const saved = await connectMySheets(alice, 'alice@example.com', [
+        { id: 'sheet_r', title: 'Report read only', canEdit: false },
+        { id: 'sheet_w', title: 'Report writable', canEdit: true },
+      ]);
+
+      // On Google after connection: R was renamed to 'Other', so live lookup for 'Report' only returns W
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+        lookupTool: async (_userId, tool, _args) => {
+          if (tool === 'mysheets.list_spreadsheets') {
+            // Live Google lookup only matches sheet_w
+            return [{ id: 'sheet_w', title: 'Report writable', url: 'https://docs.google.com/spreadsheets/d/sheet_w/edit' }];
+          }
+          return [];
+        },
+      });
+
+      const plan: any = {
+        kind: 'plan',
+        title: 'Thêm dòng',
+        summary: 'Thêm dòng',
+        steps: [
+          {
+            id: 'find',
+            tool: 'mysheets.list_spreadsheets',
+            description: 'Tìm bảng tính',
+            args: { query: 'Report', limit: 1 },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'mysheets.append_rows',
+            description: 'Thêm dòng',
+            args: { spreadsheetId: { $ref: 'find.output.0.id' }, sheet: 'Sheet1', rows: [['test']] },
+            dependsOn: ['find'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('plan');
+      expect(result.connections?.mysheets).toEqual({
+        credentialId: saved.id,
+        email: 'alice@example.com',
+        allowedSpreadsheets: ['sheet_r', 'sheet_w'],
+      });
     });
   });
 

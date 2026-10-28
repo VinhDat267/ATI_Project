@@ -169,7 +169,31 @@ Tất cả 13 đột biến được kiểm tra tự động qua runner `scripts
 
 ---
 
-## 6. Việc còn lại (cần thao tác của nhóm trưởng)
+## 6. Xử lý Review vòng 3 (Head `0da7f3b` — P2 về phân giải tham chiếu khi bảng đổi tên trên Google)
+
+Đã xử lý dứt điểm finding P2 từ review vòng 3 (`https://github.com/VinhDat267/ATI_Project/pull/180#issuecomment-6462610687`):
+
+1. **[P2] Gắn kiểm quyền với kết quả tra cứu thật (live lookup), xoá bỏ sai lệch khi bảng đổi tên:**
+   - **Vấn đề:** Khi bảng tính được đổi tên trực tiếp trên Google sau khi kết nối, `PersonalSheetsAdapter.list_spreadsheets` tại thời điểm thực thi lấy tiêu đề hiện tại qua HTTP live, trong khi `resolveTargetSpreadsheet` trước đây chỉ dùng tên cũ lưu trong DB (`selectedSpreadsheets`), dẫn tới:
+     - Cho qua nhầm (False Approval): W đổi tên thành "Other", adapter chỉ trả R (chỉ xem), nhưng helper dự đoán W và cho qua kế hoạch ghi vào bảng chỉ xem.
+     - Từ chối nhầm (False Refusal): R đổi tên thành "Other", adapter chỉ trả W (ghi được), nhưng helper dự đoán R và từ chối một kế hoạch hợp lệ.
+   - **Xử lý:**
+     - Cập nhật `resolveTargetSpreadsheet` hỗ trợ nhận kết quả tra cứu thực tế `lookupResults?: Array<{ id: string; title: string; url?: string }>`. Khi có kết quả thật, helper giải quyết `$ref` dựa trên kết quả thật và cập nhật tiêu đề mới nhất (`liveMatch.title`). Khi không có kết quả tra cứu thật, fallback về lọc in-memory bảo toàn backwards-compatibility.
+     - Thêm `resolveTargetSpreadsheetAsync(sId, steps, selected, lookup)` tự động gọi `lookup` khi `sId` là `$ref` trỏ tới bước `mysheets.list_spreadsheets`.
+     - Bổ sung `getAdapter` và `lookupTool` vào `ChatServiceOptions` và class `ChatService`. Trong `bindConnections`, duyệt các bước `append_rows` bất đồng bộ và tạo hàm `lookup` uỷ thác cho `lookupTool`, `mysheets.lookupSpreadsheets`, hoặc adapter `mysheets` từ `AdapterFactory`.
+     - Cập nhật `createMySheetsConnectionLookup` trong `connection-reference.ts` hỗ trợ truyền `getAdapter`.
+     - Nối dây `gatherAdapterFactory ?? realAdapterFactory` vào `ChatService` và `createMySheetsConnectionLookup` trong `apps/chat-api/src/server.ts`.
+   - **Kiểm thử:**
+     - Bổ sung unit test cho `resolveTargetSpreadsheet` với `lookupResults` từ adapter.
+     - Thêm 2 test case hồi quy tích hợp trong `apps/chat-api/tests/routes/mysheets-services.test.ts` (28/28 tests pass):
+       - Ca 1 (Tránh cho qua nhầm): W đổi tên thành "Other", tra cứu thật trả R -> `bindConnections` từ chối (`refusal`).
+       - Ca 2 (Tránh từ chối nhầm): R đổi tên thành "Other", tra cứu thật trả W -> `bindConnections` chấp thuận (`plan`).
+     - Đột biến: Cập nhật selector test của mutation M3b và chạy runner `scripts/test-mysheets-mutations.mjs`: bắt đủ **13/13 đột biến** (exit 0), toàn bộ file khôi phục SHA-256 khớp 100%.
+     - `npm run typecheck:v3`: exit 0.
+
+---
+
+## 7. Việc còn lại (cần thao tác của nhóm trưởng)
 
 - Tạo OAuth Client thứ ba trên Google Cloud Project riêng biệt (redirect URI `/connections/mysheets/callback`, scope `https://www.googleapis.com/auth/drive.file`), tạo API Key cho Google Picker và điền các biến `MYSHEETS_OAUTH_*`, `MYSHEETS_PICKER_*` vào `.env` máy local.
 - Thực hiện đo model độc lập trên nhánh `eval/oauth-03-measure` (`EVAL_SET=mysheets` ×3) sau khi PR code này được review và merge.

@@ -20,7 +20,8 @@ function withoutConnections(plan: PlanResponse): PlanResponse {
 export function resolveTargetSpreadsheet(
   sId: unknown,
   steps: PlanStep[],
-  selected: PersonalSpreadsheetItem[]
+  selected: PersonalSpreadsheetItem[],
+  lookupResults?: Array<{ id: string; title: string; url?: string }>
 ): PersonalSpreadsheetItem | null {
   if (typeof sId === 'string') {
     return selected.find((item) => item.id === sId) ?? null;
@@ -33,25 +34,36 @@ export function resolveTargetSpreadsheet(
     const refStep = steps.find((s) => s.id === refStepId);
 
     if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
-      const q = typeof refStep.args?.query === 'string' ? refStep.args.query.trim().toLowerCase() : '';
-      const limitRaw = refStep.args?.limit;
-      const limit = typeof limitRaw === 'number' && Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 10
-        ? limitRaw
-        : 10;
+      let matches: Array<{ id: string; title: string; url?: string }>;
 
-      const matches: PersonalSpreadsheetItem[] = [];
-      for (const item of selected) {
-        if (!q || item.title.toLowerCase().includes(q)) {
-          matches.push(item);
+      if (Array.isArray(lookupResults)) {
+        matches = lookupResults;
+      } else {
+        const q = typeof refStep.args?.query === 'string' ? refStep.args.query.trim().toLowerCase() : '';
+        const limitRaw = refStep.args?.limit;
+        const limit = typeof limitRaw === 'number' && Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 10
+          ? limitRaw
+          : 10;
+
+        matches = [];
+        for (const item of selected) {
+          if (!q || item.title.toLowerCase().includes(q)) {
+            matches.push(item);
+          }
+          if (matches.length >= limit) break;
         }
-        if (matches.length >= limit) break;
       }
 
       try {
         const resolved = resolveRef(normalizedRef, new Map([[refStepId, matches]]));
         const resolvedId = typeof resolved === 'string' ? resolved : (resolved && typeof resolved === 'object' ? resolved.id : undefined);
         if (typeof resolvedId === 'string') {
-          return selected.find((item) => item.id === resolvedId) ?? null;
+          const item = selected.find((item) => item.id === resolvedId);
+          if (item) {
+            const liveMatch = matches.find((m) => m.id === resolvedId);
+            return liveMatch?.title ? { ...item, title: liveMatch.title } : item;
+          }
+          return null;
         }
       } catch {
         return null;
@@ -63,6 +75,33 @@ export function resolveTargetSpreadsheet(
     }
   }
   return null;
+}
+
+export async function resolveTargetSpreadsheetAsync(
+  sId: unknown,
+  steps: PlanStep[],
+  selected: PersonalSpreadsheetItem[],
+  lookup?: (tool: string, args: Record<string, any>) => Promise<any>
+): Promise<PersonalSpreadsheetItem | null> {
+  let lookupResults: Array<{ id: string; title: string; url?: string }> | undefined;
+  if (lookup && sId && typeof sId === 'object' && '$ref' in sId && typeof (sId as any).$ref === 'string') {
+    const rawRef = (sId as any).$ref as string;
+    const normalizedRef = rawRef.replace(/\[(\d+)\]/g, '.$1');
+    const dotIndex = normalizedRef.indexOf('.');
+    const refStepId = dotIndex === -1 ? normalizedRef : normalizedRef.slice(0, dotIndex);
+    const refStep = steps.find((s) => s.id === refStepId);
+    if (refStep && refStep.tool === 'mysheets.list_spreadsheets') {
+      try {
+        const res = await lookup(refStep.tool, refStep.args ?? {});
+        if (Array.isArray(res)) {
+          lookupResults = res;
+        }
+      } catch {
+        // Fall back to static lookup
+      }
+    }
+  }
+  return resolveTargetSpreadsheet(sId, steps, selected, lookupResults);
 }
 
 export interface HandleUserMessageInput {
@@ -97,9 +136,16 @@ export interface ChatServiceOptions {
   /** The caller's active MyCalendar connection; absent when MyCalendar is off or not connected, so a MyCalendar plan is refused. */
   mycalendarConnection?: (userId: string) => Promise<NonNullable<PlanConnections['mycalendar']> | null>;
   /** The caller's active MySheets connection; absent when MySheets is off or not connected, so a MySheets plan is refused. */
-  mysheetsConnection?: (userId: string) => Promise<(NonNullable<PlanConnections['mysheets']> & { selectedSpreadsheets?: Array<{ id: string; title: string; canEdit: boolean }> }) | null>;
+  mysheetsConnection?: (userId: string) => Promise<(NonNullable<PlanConnections['mysheets']> & {
+    selectedSpreadsheets?: Array<{ id: string; title: string; canEdit: boolean }>;
+    lookupSpreadsheets?: (query?: string, limit?: number) => Promise<Array<{ id: string; title: string; url?: string }>>;
+    getAdapter?: () => Promise<any> | any;
+  }) | null>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
+  /** Optional adapter retriever or tool executor for live resource validation in planning. */
+  getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
+  lookupTool?: (userId: string, tool: string, args: Record<string, unknown>) => Promise<any>;
 }
 
 type Correlation = { replyToMessageId?: string; requestId?: string };
@@ -122,11 +168,15 @@ export class ChatService {
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private schedules?: ChatServiceOptions['schedules'];
+  private getAdapter?: ChatServiceOptions['getAdapter'];
+  private lookupTool?: ChatServiceOptions['lookupTool'];
 
   constructor(options: ChatServiceOptions) {
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
+    this.getAdapter = options.getAdapter;
+    this.lookupTool = options.lookupTool;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -237,17 +287,47 @@ export class ChatService {
           };
         }
 
-        const readOnlyAppendInfo = bound.steps.reduce<{ step: PlanStep; sheet: PersonalSpreadsheetItem } | null>(
-          (acc, step) => {
-            if (acc || step.tool !== 'mysheets.append_rows') return acc;
-            const target = resolveTargetSpreadsheet(step.args?.spreadsheetId, bound.steps, mysheets.selectedSpreadsheets ?? []);
-            if (target && target.canEdit === false) {
-              return { step, sheet: target };
-            }
-            return null;
-          },
-          null
-        );
+        const lookup = async (tool: string, args: Record<string, any>) => {
+          if (this.lookupTool) {
+            try {
+              const res = await this.lookupTool(userId, tool, args);
+              if (Array.isArray(res)) return res;
+            } catch {}
+          }
+          if (mysheets.lookupSpreadsheets && tool === 'mysheets.list_spreadsheets') {
+            try {
+              const res = await mysheets.lookupSpreadsheets(args.query, args.limit);
+              if (Array.isArray(res)) return res;
+            } catch {}
+          }
+          const adapter = mysheets.getAdapter
+            ? await mysheets.getAdapter()
+            : this.getAdapter
+              ? await this.getAdapter('mysheets', { userId, phase: 'planning' })
+              : null;
+          if (adapter && typeof adapter.execute === 'function') {
+            try {
+              const res = await adapter.execute(tool, args);
+              if (Array.isArray(res)) return res;
+            } catch {}
+          }
+          return null;
+        };
+
+        let readOnlyAppendInfo: { step: PlanStep; sheet: PersonalSpreadsheetItem } | null = null;
+        for (const step of bound.steps) {
+          if (step.tool !== 'mysheets.append_rows') continue;
+          const target = await resolveTargetSpreadsheetAsync(
+            step.args?.spreadsheetId,
+            bound.steps,
+            mysheets.selectedSpreadsheets ?? [],
+            lookup
+          );
+          if (target && target.canEdit === false) {
+            readOnlyAppendInfo = { step, sheet: target };
+            break;
+          }
+        }
         if (readOnlyAppendInfo) {
           const title = readOnlyAppendInfo.sheet.title;
           return {

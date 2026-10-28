@@ -286,7 +286,12 @@ async function bootstrap() {
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
     mycalendarConnection: mycalendarAvailable ? createMyCalendarConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
-    mysheetsConnection: mysheetsAvailable ? createMySheetsConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
+    mysheetsConnection: mysheetsAvailable
+      ? createMySheetsConnectionLookup(credRepo, env.ENCRYPTION_KEY, (userId) =>
+          (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
+        )
+      : undefined,
+    getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
   });
 
