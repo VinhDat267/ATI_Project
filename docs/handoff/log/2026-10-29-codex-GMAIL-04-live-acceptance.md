@@ -39,9 +39,17 @@ Task: [GMAIL-04](../tasks/GMAIL-04-measure-and-live.md). Nhánh `codex/gmail-04-
 
 17. Người dùng kết nối lại sau ca token hỏng trong chat. Helper `verify-connected` exit 0: credential mới, DB `active`, API `connected`, đúng email thử, có refresh token và scope modify. `GET /api/auth/config` 200 nhưng `googleEnabled:false`, xác nhận bước Google sign-in thật còn cần cấu hình. Ba biến GOOGLE_OAUTH cho sign-in chưa có; không dùng client/project Gmail để thay thế. Khởi động lại runtime sau khi nhóm trưởng điền client của project đăng nhập riêng, giữ nguyên DB nghiệm thu.
 
+18. Nhóm trưởng điền ba biến sign-in. Chỉ kiểm sự hiện diện/đúng callback, không in secret: đủ ba giá trị, callback `http://127.0.0.1:5174/auth/google/callback`, client khác Gmail và prefix project number khác Gmail. Đã kiểm cây tiến trình riêng sở hữu cả cổng 3000/5174 rồi dừng/khởi động lại từ helper up; DB tạm và dữ liệu giữ nguyên. `verify-google-ready` trả READY: auth config 200 `googleEnabled:true`, health ok, Gmail active, account active nhưng chưa liên kết Google. Chưa gọi Google link/login thay người dùng. Bước tiếp theo là người dùng liên kết Google từ trang account hiện tại.
+
+19. Người dùng liên kết Google thật thành công nhưng báo callback quay lâu và giao diện lỗi. DB/API xác nhận hasGoogle và googleEmail khớp tài khoản thử; Gmail vẫn active. Nguyên nhân mã: nhánh callback `{success:true}` dùng `google-ready`, vốn là màn chờ chuyển vào workspace, trong khi link chỉ có nút về account và không tự chuyển. Sửa frontend thành mode `google-linked`, dùng trạng thái hoàn tất, bỏ spinner/ping và hành động workspace ở nhánh link, đặt duy nhất nút về tài khoản bên dưới nội dung. Không đổi API/DB, quyền Google hoặc token/session. File sửa: `apps/chat-web/src/views/GoogleCallbackView.tsx`, `src/pages/AuthAction/AuthActionPage.tsx`; test thêm trong `tests/auth-google.test.tsx`, mở rộng browser `tests/browser/auth-05-google-actions.spec.ts`.
+
+20. Bằng chứng sửa UI: test hồi quy chạy đúng cấu hình frontend RED 1 fail/43 skip vì không có heading hoàn tất (log google-link-red.log). Một lần chạy nhầm từ root thiếu jest-dom không dùng làm bằng chứng RED hành vi. GREEN 4 file liên quan 79/79, exit 0. Browser AUTH-04/05 9/9 exit 0: link/unlink giữ session, cả 1440/375 và light/dark, không overflow, không spinner hoặc lời hứa chuyển workspace; đã xem ảnh 375 dark và 1440 light. Full check lần đầu exit 2 vì hai tùy chọn exact của Testing Library trong test mới không hợp lệ; bỏ tùy chọn đó và chạy lại, không sửa/nới assertion. Lượt full check sau exit 0: **2.537 v3 = 67 schemas + 443 adapters + 381 planner + 42 executor + 720 chat-api + 884 chat-web; 406 eval; 11 launcher/env**; typecheck/build/security scan đạt. Giữ bằng chứng lần typecheck lỗi trước đó. Toàn bộ browser cục bộ chỉ chạy nhóm AUTH-04/05 (9 ca), không tuyên bố đã chạy toàn bộ browser ở mã sửa này. Không thay đổi code sau khi bắt đầu lượt kiểm lại; chỉ thêm helper/bằng chứng được ignore và cập nhật bàn giao. Chưa review độc lập hoặc merge.
+
+21. Sau kiểm thử, đối chiếu chính xác ID container `ati-gmail04-google-ui-pg` rồi xóa container thử cổng 56537. Không dừng DB nghiệm thu cổng 56536, API 3000/web 5174 hoặc 9router. Bản sửa frontend được phục vụ bởi Vite đang chạy. Chưa tự đăng xuất, liên kết lại hay bấm Google consent thay người dùng.
+
 ## Chưa đạt hoặc chưa chạy
 
-- Phần 1: **chưa hoàn tất**; chưa kiểm đăng nhập ATI bằng Google vẫn hoạt động sau thu hồi/ngắt Gmail, vì `GOOGLE_OAUTH_*` chưa cấu hình.
+- Phần 1: **chưa hoàn tất**; chưa kiểm đăng nhập ATI bằng Google vẫn hoạt động sau thu hồi/ngắt Gmail, cấu hình sign-in và liên kết Google thật đã đạt ở mục 18–19; còn kiểm đăng nhập sau revoke Gmail.
 - Phần 2: cả 7/7 tool ghi đã đạt, đúng một lần/tool và có đọc lại thật. Đã chứng minh grant hỏng qua manager thật và qua chat thật: DB/API cần kết nối lại, không ghi; UI chat chỉ báo planning_error chung, cần reviewer xem xét trước khi kết luận toàn bộ phần 2 đạt.
 - Phần 3: câu Gmail chỉ đọc có bằng chứng; các dịch vụ khác chưa được cấu hình/kiểm trong DB nghiệm thu này. Không suy diễn từ lời người dùng rằng Calendar/Sheets/Slack đã xong sang kết quả đo/nghiệm thu của GMAIL-04.
 - Chưa chạy lại model campaign, không thay label/scorer. CI trước đó xanh đúng `ecf3c61`; chưa có review độc lập cho PR rollout. Không merge, không quyết định bật cờ.
@@ -52,6 +60,10 @@ Task: [GMAIL-04](../tasks/GMAIL-04-measure-and-live.md). Nhánh `codex/gmail-04-
 Danh sách dưới đây được lấy từ file thật; dữ liệu gốc nằm ở máy nhóm trưởng, không commit. Có thể có file mới khi tiếp tục nghiệm thu.
 
 ```text
+0e5d06bf69d03a1f6099ea1c9e7489ae58f64b39d50930b2ffea321b40c2d367  AUTH05-Google-linked-1440-dark.png
+027938692cef633973c0cb30706b88065a94a3a82071471f5d3f3da64afc0411  AUTH05-Google-linked-1440-light.png
+7c0c5d5a0885fb9d8354a23403bb3ce295ca0517a66f4091b10c097246d27e81  AUTH05-Google-linked-375-dark.png
+87d79d1ddf17b22833f4ad0ba8361007c9046a5bb8cb991edbcb9295692b9ce0  AUTH05-Google-linked-375-light.png
 b011e04a5ee6cbb85726858576556c8171205218e3d5f1350718f5de77c2d270  chat-no-retry-1793209506068.json
 0ffeef6fcbf50c53943c06afb5621ca7bae7a9a1d373777a2971b3e4e1ceda87  connection-1793208969072.json
 a1f9d5af99f41594be889f2530ef69319ea68a83c0887864a8da1614416b2160  connection-1793209285022.json
@@ -64,7 +76,17 @@ c4c41ff773d652a598fa5687552694b6857c6757367a73f5f2699bd425c46a63  draft-preview-
 da89ec3a7c4ed07d0725e560a272f99a805eeca234c502972599598b3e98384e  forward-created-1793210254275.json
 71ed3a6e85a94b30a1c4290a01a4f83be9b0bf03068d40c1a74930fdf35710d7  gateway-incident.json
 e70dcfc6173ae22900d4509e7d6b178c3868d8cd071199c957c5d0ea3bf45458  gateway-recovery.json
+64e530d5aa8688808123e4a6bb8520b2f3a2b5cf0d75a4ddd82097543908a311  google-link-browser.log
+6dcd6d3fef1a4eff0909ad8085616ebbcbc6e1f3a3746187465e3a966bf59b69  google-link-check-initial-type-errors.log
+6cde0c4ab698e9b5ef72c6bcb5b2735f0b42383afae3f2ce040669c1442fa261  google-link-check.log
+898460be625968f64b593db4c199671d88724ff0bea13027bfb22e6939d78d46  google-link-green.log
+ebef208922c649abe66178459f796a86009745063a5c68a6026b9648d88a3d0c  google-link-red.log
+b34b4faa659d852dd22356b08bb1a7897e60165f9233b2b86874c9fd376eb54f  google-link-source.sha256
+7b68a468de5ad1ac1059a9d7e76b32d83862c8adffd6e6b4a574d499338c9fc5  google-link-ui-fix.json
 fad1af7dc4e5f945a4f34a4c62e88dc8f34985ee66e3513f008dc210950c05f6  google-login-config.json
+5a55658f87a3e4d05ee9e3f8e3c5e84175831b9229477ff410387810218d1c2c  google-ready-1793211637823.json
+3f19cf3a136b166ac952b2962b6bb33488bc62b0f3ef1cff943d490526aaa24e  google-ready-1793211832786.json
+fe7e7f0f827a0d318a6527147671448b12b88803783d1411bca5a2907e3e9d2e  google-ready-1793212398373.json
 35fa4e65a0b6252e9bebcde6806dd7a44b31691b86fcc805dd1a302309a535ae  label-created-1793210422843.json
 4ac62a0dd5b3dd15bebbf95f33220fa27cf147b8855438e1441dd13e8c6e5c02  labels-modified-1793210544721.json
 4a1087ced86dda272faa3feff9f3d2022d90d1d0629c079f1080f9be4991c9f3  read-answer-1793209705438.json

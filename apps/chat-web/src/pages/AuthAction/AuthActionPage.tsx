@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 're
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
-export type AuthActionMode = 'loading' | 'verify-success' | 'verify-expired' | 'verify-used' | 'reset-password' | 'reset-success' | 'google-pending' | 'google-ready' | 'google-error' | 'blocked-pending' | 'blocked-locked' | 'blocked-attempts';
+export type AuthActionMode = 'loading' | 'verify-success' | 'verify-expired' | 'verify-used' | 'reset-password' | 'reset-success' | 'google-pending' | 'google-ready' | 'google-linked' | 'google-error' | 'blocked-pending' | 'blocked-locked' | 'blocked-attempts';
 const BAR_EMPTY = 'h-full flex-1 rounded-full bg-[#E5E7EB] transition-colors';
 const BAR = (color: string) => `h-full flex-1 rounded-full transition-colors ${color}`;
 const spinner = <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
@@ -69,6 +69,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
  const power = strength(newPassword), resendBusy = busy, resetBusy = busy;
  const resendSent = message && mode === 'verify-expired' ? message : null;
  const viewClass = (_mode: AuthActionMode) => 'v3-space-y-6';
+ const googleLinked = mode === 'google-linked';
  const blockedDone = blockedSeconds === 0;
  const blockedText = blockedSeconds === null ? 'Chưa có thời gian từ máy chủ' : `${String(Math.floor(blockedSeconds / 60)).padStart(2, '0')}:${String(blockedSeconds % 60).padStart(2, '0')}`;
  const blockedWidth = blockedSeconds === null ? '0%' : `${Math.max(0, Math.min(100, (blockedSeconds / 900) * 100))}%`;
@@ -121,8 +122,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
           <div id="action-card" className="bg-white border border-[#E7E7E2] rounded-3xl p-6 sm:p-8 shadow-soft relative overflow-hidden transition-all duration-200">
             {busy && mode === 'loading' && <p role="status">Đang xác minh tài khoản…</p>}
             {error && <p role="alert" className="p-3.5 mb-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-xs text-[#DC2626]">{error}</p>}
-            {message && <p role="status" className="text-xs text-[#4B5563] mb-4">{message}</p>}
-            {onAccount && <button type="button" onClick={onAccount} className="w-full py-3 px-4 rounded-xl bg-[#FF5701] text-white font-medium text-sm">Về trang tài khoản</button>}
+            {message && !googleLinked && <p role="status" className="text-xs text-[#4B5563] mb-4">{message}</p>}
             {/* ========================================== */}
             {/* MÀN 1: XÁC MINH EMAIL — THÀNH CÔNG */}
             {/* ========================================== */}
@@ -570,7 +570,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
             {/* ========================================== */}
             {/* MÀN 7: GOOGLE — ĐÃ DUYỆT (CHUYỂN VÀO STAGE) */}
             {/* ========================================== */}
-            {mode === 'google-ready' && <section id="view-google-ready" className={viewClass('google-ready')} aria-labelledby="title-google-ready">
+            {(mode === 'google-ready' || googleLinked) && <section id={`view-${mode}`} className={viewClass(mode)} aria-labelledby={`title-${mode}`}>
               <div className="text-center v3-space-y-3">
                 <div className="w-14 h-14 rounded-2xl bg-white border border-[#E7E7E2] flex items-center justify-center mx-auto shadow-sm relative">
                   <svg className="w-7 h-7" viewBox="0 0 24 24">
@@ -586,7 +586,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </svg>
                   {/* Spinner nhỏ góc */}
                   <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-75" />
+                    {!googleLinked && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-75" />}
                     <span className="relative inline-flex rounded-full h-4 w-4 bg-[#16A34A] text-[9px] text-white font-bold items-center justify-center">
                       ✓
                     </span>
@@ -594,23 +594,23 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </div>
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#16A34A]/10 text-[#16A34A] mb-2">
-                    {" Đăng nhập thành công "}
+                    {googleLinked ? 'Liên kết thành công' : 'Đăng nhập thành công'}
                   </span>
                   {' '}
-                  <h1 id="title-google-ready" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
-                    Đang vào không gian làm việc…
+                  <h1 id={`title-${mode}`} className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                    {googleLinked ? 'Đã liên kết Google' : 'Đang vào không gian làm việc…'}
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
-                  {"Chào mừng bạn quay lại, "}
+                <p role={googleLinked ? 'status' : undefined} className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                  {googleLinked ? (message ?? 'Đã liên kết tài khoản Google.') : <>{"Chào mừng bạn quay lại, "}
                   <strong className="text-[#111827] font-semibold user-name-placeholder">
                     {name || "Bạn"}
                   </strong>
-                  !
+                  !</>}
                 </p>
               </div>
               {/* Trạng thái chuyển trang */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-6 flex items-center justify-center gap-3 text-sm font-medium text-[#4B5563]">
+              {!googleLinked && <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-6 flex items-center justify-center gap-3 text-sm font-medium text-[#4B5563]">
                 <svg className="w-4 h-4 text-[#FF5701] animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {' '}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -619,17 +619,17 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 <span>
                   Đang vào không gian làm việc…
                 </span>
-              </div>
+              </div>}
               {/* Nút chuyển ngay không cần chờ */}
               <div className="v3-space-y-2.5 pt-1">
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none">
+                {googleLinked ? <button type="button" onClick={onAccount ?? (() => navigate('/account'))} className="w-full py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm">Về trang tài khoản</button> : <a onClick={followLink} href="/" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none">
                   <span>
                     Vào ngay
                   </span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </a>
+                </a>}
               </div>
             </section>}
             {/* ========================================== */}
