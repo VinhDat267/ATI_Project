@@ -43,7 +43,7 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
     completion.current.then(data => {
       if (!canComplete()) return;
       if ('success' in data && data.success === true) {
-        setMode('google-ready'); setMessage('Đã liên kết tài khoản Google.'); setLinked(true); return;
+        setMode('google-linked'); setMessage('Đã liên kết tài khoản Google.'); setLinked(true); return;
       }
       if (!('accessToken' in data) || !data.accessToken || !data.refreshToken || !data.user?.id) {
         setError('Không thể hoàn tất đăng nhập Google. Hãy đăng nhập lại.'); return;

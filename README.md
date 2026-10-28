@@ -161,6 +161,8 @@ Live mode calls the real model and real services. It needs:
 
 Start with `RUNTIME_MODE=live npm run up`. Live mode refuses to start when required settings are missing. SMTP and Google OAuth are optional; see the comments in [`.env.example`](.env.example) and the "Through the app" section of [evaluations/README.md](evaluations/README.md). Add service keys and resource allowlists on the **Service connections** page. Only write to real services through plans you have reviewed, and use test boards, channels and repositories.
 
+Gmail becomes available automatically when its dedicated `GMAIL_OAUTH_*` client settings are complete; use `GMAIL_ENABLED=off` to disable it. Missing Gmail configuration leaves it disabled, while explicit `on` with missing settings fails live startup. Read-only answers default to `on`; `PLANNER_READ_ANSWERS=off` restores the clarification policy. See [Gmail setup and acceptance](evaluations/README.md#gmail-setup-for-live-acceptance) for the separate Google project, test users and real-provider checks.
+
 ## Testing
 
 | Command | What it runs |

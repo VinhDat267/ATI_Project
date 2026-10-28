@@ -18,6 +18,7 @@ export const GMAIL_ENDPOINTS = {
   apiBaseUrl: 'https://gmail.googleapis.com',
 };
 const GMAIL_ENDPOINT_OVERRIDES = { authorizationUrl: 'GMAIL_OAUTH_AUTH_URL', tokenUrl: 'GMAIL_OAUTH_TOKEN_URL', revokeUrl: 'GMAIL_OAUTH_REVOKE_URL', apiBaseUrl: 'GMAIL_API_BASE_URL' } as const;
+const GMAIL_OAUTH_FIELDS = ['GMAIL_OAUTH_CLIENT_ID', 'GMAIL_OAUTH_CLIENT_SECRET', 'GMAIL_OAUTH_REDIRECT_URI'] as const;
 
 export const MYCALENDAR_ENDPOINTS = {
   authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -52,7 +53,7 @@ export interface EnvConfig {
   /** Google registration uses the raw account policy independently of SMTP availability. */
   GOOGLE_SIGNUP_ENABLED: boolean;
   GOOGLE_OAUTH?: GoogleOAuthConfig;
-  /** The GMAIL_ENABLED flag (default off). Gmail is usable only with GMAIL_OAUTH and PostgreSQL as well. */
+  /** Unset enables Gmail only with complete OAuth configuration; explicit off disables it. PostgreSQL is also required. */
   GMAIL_ENABLED: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   GMAIL_OAUTH?: GmailOAuthConfig;
@@ -91,7 +92,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     throw new Error('LLM_PROVIDER must be gemini or openai-compatible');
   }
   const PLANNER_SEARCH_MODE = env.PLANNER_SEARCH_MODE || (isLive ? 'llm' : 'regex');
-  const readAnswers = env.PLANNER_READ_ANSWERS ?? 'off';
+  const readAnswers = env.PLANNER_READ_ANSWERS ?? 'on';
   if (readAnswers !== 'on' && readAnswers !== 'off') throw new Error('PLANNER_READ_ANSWERS must be on or off');
   const PLANNER_READ_ANSWERS = readAnswers === 'on';
   if (PLANNER_SEARCH_MODE !== 'llm' && PLANNER_SEARCH_MODE !== 'regex') {
@@ -189,7 +190,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   }
 
   if (env.GMAIL_ENABLED && !['on', 'off'].includes(env.GMAIL_ENABLED)) throw new Error('GMAIL_ENABLED must be on or off');
-  const GMAIL_ENABLED = env.GMAIL_ENABLED === 'on';
+  const GMAIL_ENABLED = env.GMAIL_ENABLED === 'on' || (!env.GMAIL_ENABLED &&
+    GMAIL_OAUTH_FIELDS.every(field => env[field]?.trim()) &&
+    (isLive || Object.values(GMAIL_ENDPOINT_OVERRIDES).every(field => env[field]?.trim())));
   const GMAIL_OAUTH = GMAIL_ENABLED ? gmailOAuth(env, isLive) : undefined;
   if (env.MYCALENDAR_ENABLED && !['on', 'off'].includes(env.MYCALENDAR_ENABLED)) throw new Error('MYCALENDAR_ENABLED must be on or off');
   const MYCALENDAR_ENABLED = env.MYCALENDAR_ENABLED === 'on';
@@ -288,7 +291,7 @@ function validatePersonalGoogleProjects(env: Record<string, string | undefined>)
 
 /** Live with the flag on refuses to start on a missing variable; sandbox disables Gmail instead. */
 function gmailOAuth(env: Record<string, string | undefined>, isLive: boolean): GmailOAuthConfig | undefined {
-  const required = ['GMAIL_OAUTH_CLIENT_ID', 'GMAIL_OAUTH_CLIENT_SECRET', 'GMAIL_OAUTH_REDIRECT_URI'];
+  const required = GMAIL_OAUTH_FIELDS;
   const missing = required.find((field) => !env[field]?.trim());
   if (missing && isLive) throw new Error(`${missing} is required when GMAIL_ENABLED=on in live mode`);
   let redirectUri: string | undefined;

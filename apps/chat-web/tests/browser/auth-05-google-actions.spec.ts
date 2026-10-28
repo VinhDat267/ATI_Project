@@ -32,12 +32,22 @@ async function expireAccess(page: Page) {
   await page.evaluate(value => localStorage.setItem('wap_access_token', value), expired);
   return payload.sid;
 }
-test('AUTH-05 Google: link and unlink refresh expired access while preserving the current session', async ({ page }, info) => {
+for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
+test(`AUTH-05 Google: link and unlink refresh expired access while preserving the current session ${width} ${theme}`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 900 });
+  await page.addInitScript(value => localStorage.setItem('ati-theme', value), theme);
   await openAccount(page);
   const paths: string[] = []; page.on('request', request => paths.push(new URL(request.url()).pathname));
   const originalSid = await expireAccess(page);
   await page.getByRole('button', { name: 'Liên kết Google', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Đã liên kết tài khoản Google');
+  await expect(page.getByRole('heading', { level: 1, name: 'Đã liên kết Google', exact: true })).toBeVisible();
+  await expect(page.getByText('Đang vào không gian làm việc…', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Đăng nhập thành công', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Vào ngay', exact: true })).toHaveCount(0);
+  await expect(page.locator('#action-card .animate-spin, #action-card .animate-ping')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath(`AUTH05-Google-linked-${width}-${theme}.png`), fullPage: true });
   expect(paths.filter(path => path === '/api/auth/refresh')).toHaveLength(1);
   expect(paths.filter(path => path === '/api/auth/google/callback')).toHaveLength(1);
   await page.getByRole('button', { name: 'Về trang tài khoản', exact: true }).click();
@@ -53,6 +63,7 @@ test('AUTH-05 Google: link and unlink refresh expired access while preserving th
   await expect(page.getByText('Phiên hiện tại', { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('AUTH05-Google-expired-access-recovered.png'), fullPage: true });
 });
+}
 test('AUTH-05 Google: a revoked account session goes to login instead of repeatedly failing linking', async ({ page }) => {
   await openAccount(page);
   await db.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1', [userId]);

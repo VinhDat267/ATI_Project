@@ -144,6 +144,21 @@ it('allows an authenticated link callback and preserves the current session', as
   expect(authStorage.getStoredTokens().accessToken).toBe('existing-access');
   expect(calls.find(call => call.path === '/api/auth/google/callback')?.authorization).toBe('Bearer existing-access');
 });
+it('shows a finished Google link without login progress or workspace actions', async () => {
+  authStorage.setStoredTokens({ accessToken: 'existing-access', refreshToken: 'existing-refresh', user });
+  openCallback(); await waitCallback();
+  expect(screen.getByRole('status')).toHaveTextContent('Đang xác minh tài khoản');
+  await complete({ success: true });
+  expect(await screen.findByRole('status')).toHaveTextContent('Đã liên kết tài khoản Google.');
+  expect(screen.getByRole('heading', { level: 1, name: 'Đã liên kết Google' })).toBeVisible();
+  expect(screen.getAllByRole('button', { name: 'Về trang tài khoản' })).toHaveLength(1);
+  expect(screen.queryByText('Đang vào không gian làm việc…')).toBeNull();
+  expect(screen.queryByText('Đăng nhập thành công')).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Vào ngay' })).toBeNull();
+  expect(document.querySelector('#action-card .animate-spin, #action-card .animate-ping')).toBeNull();
+  expect(authStorage.getStoredTokens()).toEqual({ accessToken: 'existing-access', refreshToken: 'existing-refresh', user });
+  expect(calls.filter(call => call.path === '/api/auth/google/callback')).toHaveLength(1);
+});
 it.each(['logout', 'new-principal', 'unmount'])('discards a late callback after %s', async action => {
   const view = openCallback(); await waitCallback();
   act(() => {
