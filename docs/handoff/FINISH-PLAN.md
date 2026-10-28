@@ -85,6 +85,7 @@ Mỗi quyết định có **mặc định**. Không quyết đúng hạn thì á
 |---|---|---|---|
 | Bật `GMAIL_ENABLED` và `PLANNER_READ_ANSWERS` khi bảo vệ | 28/10 | Theo quy tắc quyết định trong GMAIL-04. Số đo 18/10: `gmail` 59/60 (injection 9/9), `answers` 27/30 → bật **nếu nghiệm thu Google thật đạt** | Số đo đã đủ; chỉ còn thiếu nghiệm thu thật |
 | Làm OAUTH-02 (Google Calendar riêng) | 29/10 | **Bỏ**, ghi vào báo cáo là hướng phát triển. Nếu làm: [đặc tả](../superpowers/specs/2026-10-26-oauth-02-personal-calendar-design.md) và [task card](tasks/OAUTH-02-personal-calendar.md) đã sẵn; chỉ làm khi đủ ba điều kiện ở đặc tả mục 1.1; mốc cắt 01/11 | Ước lượng 3 ngày công cộng review, trong khi mốc 04/11 sát; ưu tiên SCHED-04 và ổn định demo |
+| Đưa OAUTH-03 (Google Sheets riêng, thêm 28/10) vào phạm vi bảo vệ | 29/10 | Bật cờ khi đủ ba điều kiện trước 04/11: mã đã merge, đo đạt ngưỡng ở đặc tả mục 8.3, P-LIVE đạt. Thiếu một điều kiện thì giữ cờ tắt, ghi vào báo cáo là hướng phát triển. [Đặc tả](../superpowers/specs/2026-10-28-oauth-03-personal-sheets-design.md), [task card](tasks/OAUTH-03-personal-sheets.md) | Nhóm trưởng quyết làm phần mã ngày 28/10; cần Google Cloud project thứ ba |
 | Làm task độ trễ (model suy nghĩ quá 30 s) | 29/10 | **Không làm mã.** Ghi giới hạn với số đo W4-01 (17/124 lần thử quá hạn) | Đổi deadline cần đo lại nhiều bộ golden. Nếu làm: [LAT-01](tasks/LAT-01-planning-deadline.md), xong trước 04/11 |
 | Bật `SCHEDULES_ENABLED` khi bảo vệ | 03/11 | Theo quy tắc quyết định trong SCHED-04 | Đã chốt trong task card |
 | Các việc backlog: W2-03 (lỗi thật của ba dịch vụ cũ), FE-10 phần chụp lại cạnh bản mẫu, logo Jira tối, tương phản chữ nhỏ, định tuyến `m4-07`, bước tra tên của `regex`, `timeMax` 23:59:59 | 29/10 | **Không làm trước 04/11.** Ghi vào báo cáo, mục giới hạn | Không chặn demo; mỗi việc cần đo lại hoặc đổi hình thức bản mẫu |
@@ -93,12 +94,13 @@ Mỗi quyết định có **mặc định**. Không quyết đúng hạn thì á
 ## 5. Mốc cắt và thứ tự bỏ khi thiếu thời gian
 
 Bỏ theo thứ tự này, không bỏ ngược:
-1. OAUTH-02 (mặc định đã bỏ).
-2. Task độ trễ (mặc định đã bỏ).
-3. OAUTH-01: nếu chưa merge trước 01/11, để PR mở.
-4. Bật cờ lịch chạy: nếu SCHED-04 chưa đạt trước 03/11, giữ cờ tắt. Phần đã làm vẫn vào báo cáo, kèm số đo.
-5. Bật cờ Gmail: nếu nghiệm thu Google thật chưa đạt trước 28/10, giữ tắt.
-6. Video dự phòng: thay bằng ảnh chụp và log nếu không kịp.
+1. OAUTH-03 (thêm 28/10): bỏ trước OAUTH-02, vì OAUTH-02 đã merge phần mã. Mã chưa merge trước 01/11 thì để PR mở.
+2. OAUTH-02 (mặc định đã bỏ).
+3. Task độ trễ (mặc định đã bỏ).
+4. OAUTH-01: nếu chưa merge trước 01/11, để PR mở.
+5. Bật cờ lịch chạy: nếu SCHED-04 chưa đạt trước 03/11, giữ cờ tắt. Phần đã làm vẫn vào báo cáo, kèm số đo.
+6. Bật cờ Gmail: nếu nghiệm thu Google thật chưa đạt trước 28/10, giữ tắt.
+7. Video dự phòng: thay bằng ảnh chụp và log nếu không kịp.
 
 **Không bao giờ bỏ:**
 - quy tắc "chỉ ghi khi người dùng duyệt đúng kế hoạch";
@@ -203,6 +205,7 @@ Bản đầy đủ ở [`PROMPTS.md`](PROMPTS.md), mục "Khi không còn review
 | Đo, nghiệm thu, bật cờ lịch chạy | [SCHED-04](tasks/SCHED-04-measure-and-live.md) | A-thi công, NT | 04/11 |
 | Task độ trễ (tuỳ chọn) | [LAT-01](tasks/LAT-01-planning-deadline.md) | A-thi công | 04/11, chỉ khi NT chọn làm |
 | Google Calendar riêng (tuỳ chọn) | [OAUTH-02](tasks/OAUTH-02-personal-calendar.md) | NT (Google Cloud, nghiệm thu), A-thi công | Mã trước 01/11, chỉ khi NT chọn làm |
+| Google Sheets riêng (thêm 28/10) | [OAUTH-03](tasks/OAUTH-03-personal-sheets.md) | NT (mã, Google Cloud, nghiệm thu), A-review | Mã 28/10, mốc cắt 01/11; bật cờ trước 04/11 |
 | Ổn định demo | [DEMO-01](tasks/DEMO-01-demo-stability.md) | NT, A-thi công | 06/11 |
 | Báo cáo cuối kỳ | [REPORT-01](tasks/REPORT-01-final-report.md) | NT, TV | 08/11 (hạn nộp theo môn học) |
 | Slide | [SLIDES-01](tasks/SLIDES-01-defense-slides.md) | NT, TV | 08/11 |
