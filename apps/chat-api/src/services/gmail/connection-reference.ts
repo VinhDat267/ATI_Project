@@ -7,7 +7,7 @@ export type MyCalendarConnectionReference = NonNullable<PlanConnections['mycalen
 export type MySheetsConnectionReference = NonNullable<PlanConnections['mysheets']>;
 export type MySheetsConnectionLookupResult = MySheetsConnectionReference & {
   selectedSpreadsheets: PersonalSpreadsheetItem[];
-  lookupSpreadsheets?: (query?: string, limit?: number) => Promise<Array<{ id: string; title: string; url?: string }>>;
+  lookupSpreadsheets?: (query?: string, limit?: number, context?: { signal?: AbortSignal }) => Promise<Array<{ id: string; title: string; url?: string }>>;
   getAdapter?: () => Promise<any> | any;
 };
 
