@@ -31,7 +31,7 @@
 - **Cam kết Bền vững Trước ACK & Wakeup Bounded:** Chỉ trả lời HTTP 200 SAU KHI receipt, intent và barrier đã commit thành công trong 1 transaction PostgreSQL (`BEGIN ... COMMIT`). Consumer hook in-memory chỉ là wakeup bất đồng bộ có giới hạn (best-effort fire-and-forget `.catch(() => {})`), không await làm block/500 sau commit. Khi crash/restart, worker 04B quét lại các trạng thái `pending_*` qua `SKIP LOCKED`. Lỗi DB trả về 500/503 để Slack retry.
 
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 5.2.1, PostgreSQL 16 (`pg.Pool`), Supertest 7, Vitest 4.
-**Spec & Contracts:** [Slack Personal Design v3](../specs/2026-10-28-slack-personal-oauth-design.md) (Mục 4.4, 5, 8, 9.1, 9.2, 10); Hợp đồng `03A` PR #194 `bc8d6b69`; 03B1 plan `b7c6716c`; Integration `7c6c65d8`.
+**Spec & Contracts:** [Slack Personal Design v3](../specs/2026-10-28-slack-personal-oauth-design.md) (Mục 4.4, 5, 8, 9.1, 9.2, 10); Hợp đồng `03A` PR #194 `bc8d6b69`; 03B1 plan `b7c6716c`; Quyết định kỹ thuật chuẩn tắc `e9088d5e` (`docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md`); Integration `7c6c65d8`.
 **Staging Base:** `b757ae081751168fdcbcfdddf73713d4a1d9109d`.
 
 ---

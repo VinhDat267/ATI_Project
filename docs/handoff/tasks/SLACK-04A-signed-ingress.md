@@ -7,7 +7,7 @@
 **Task cha:** [SLACK-04 · Ingress Ký số, Phân phối Quyền và An toàn Thực thi](SLACK-04-ingress-lifecycle-and-execution-safety.md).
 **Kế hoạch kỹ thuật chi tiết:** [Kế hoạch Triển khai SLACK-04A](../../superpowers/plans/2026-10-29-slack-04a-signed-ingress.md).
 **Đặc tả chuẩn tắc:** [Slack cá nhân và trợ lý công việc trong ATI](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md) (Mục 4.4, 5, 8, 9.1, 9.2, 10).
-**Hợp đồng tích hợp liên quan:** 03A PR #194 `bc8d6b69`, 03B1 plan `c6118cdd`, Integration `7c6c65d8`.
+**Hợp đồng tích hợp liên quan:** 03A PR #194 `bc8d6b69`, 03B1 plan `b7c6716c`, Quyết định kỹ thuật chuẩn tắc `e9088d5e` (`docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md`), Integration `7c6c65d8`.
 
 > **LƯU Ý ĐIỀU KIỆN TIÊN QUYẾT (Prerequisite Boundary):**
 > Việc lập kế hoạch SLACK-04A được thực hiện song song trên nhánh phân lập. Tuy nhiên, **TUYỆT ĐỐI KHÔNG thi công mã nguồn runtime SLACK-04A** cho tới khi:

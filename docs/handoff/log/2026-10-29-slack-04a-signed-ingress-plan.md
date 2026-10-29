@@ -29,7 +29,7 @@
 
 ### 3. Loại bỏ Tombstone Cạnh tranh & Thống nhất API Chung với Backend Owner (`stageInTransaction`)
 - **Loại bỏ Tombstone Toàn cục `app:*`:** Rào cản `channelId: '*', resourceId: 'app:' + appId` trước đây thiếu generation fencing, có thể gây chặn vĩnh viễn việc cài đặt lại ứng dụng trong tương lai.
-- **Thống nhất API Duy nhất Cho Cả 04A và 03B1:** Thống nhất với Backend runtime owner (`ctx_29765fc6b1b7`) trên giao diện transaction-bound `stageInTransaction(client, input)`:
+- **Thống nhất API Duy nhất Cho Cả 04A và 03B1:** Thống nhất với Backend runtime owner (`ctx_29765fc6b1b7`) và ghi nhận tại quyết định kỹ thuật chuẩn tắc `e9088d5e` (`docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md`) trên giao diện transaction-bound `stageInTransaction(client, input)`:
   ```ts
   export type SlackDurableBarrier =
     | { barrierType: 'connection'; binding: SlackBinding; provisional?: boolean; reason: string }
