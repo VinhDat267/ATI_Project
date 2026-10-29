@@ -21,6 +21,8 @@ export * from './jira.js';
 export * from './gmail.js';
 export * from './mycalendar.js';
 export * from './mysheets.js';
+export * from './myslack-context.js';
+export * from './myslack-policy.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
 export * from './registry/mycalendar.js';
