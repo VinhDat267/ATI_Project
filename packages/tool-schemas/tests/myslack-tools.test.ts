@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   SLACK_METHOD_FAMILIES,
   MYSLACK_SAMPLE_TOOLS,
+  MYSLACK_CORE_READ_TOOLS,
+  MYSLACK_DECLARED_TOOLS,
   MYSLACK_CONVERSATIONS_HISTORY_TOOL,
   MYSLACK_CONVERSATIONS_LIST_TOOL,
-  MYSLACK_CHAT_POST_MESSAGE_TOOL,
+  MYSLACK_CONVERSATIONS_INFO_TOOL,
+  MYSLACK_CONVERSATIONS_REPLIES_TOOL,
+  MYSLACK_CONVERSATIONS_MEMBERS_TOOL,
+  MYSLACK_USERS_LIST_TOOL,
   MYSLACK_USERS_INFO_TOOL,
+  MYSLACK_CHAT_GET_PERMALINK_TOOL,
+  MYSLACK_CHAT_POST_MESSAGE_TOOL,
   validateSlackToolDefinition,
   validateSlackToolExecutionArgs,
   ALL_TOOLS,
@@ -87,6 +94,65 @@ describe('Slack Tool Catalog Metadata & Fail-Closed Execution Contracts', () => 
       expect(tool.sideEffect).toBe('read');
       expect(tool.riskLevel).toBe('low');
       expect(tool.userScopes).toEqual(['users:read']);
+    });
+
+    it('defines exactly 8 core read tools matching approved SLACK-03C1 scope', () => {
+      expect(MYSLACK_CORE_READ_TOOLS).toHaveLength(8);
+      const readMethods = MYSLACK_CORE_READ_TOOLS.map(t => t.method);
+      expect(readMethods).toEqual([
+        'conversations.list',
+        'conversations.info',
+        'conversations.history',
+        'conversations.replies',
+        'conversations.members',
+        'users.list',
+        'users.info',
+        'chat.getPermalink',
+      ]);
+      for (const tool of MYSLACK_CORE_READ_TOOLS) {
+        expect(tool.sideEffect).toBe('read');
+        expect(tool.riskLevel).toBe('low');
+        expect(tool.isProbeRequired).toBe(true);
+        expect(tool.requiresBinding).toBe(true);
+        expect(tool.service).toBe('myslack');
+      }
+    });
+
+    it('conversations.info matches pinned inventory metadata', () => {
+      const tool = MYSLACK_CONVERSATIONS_INFO_TOOL;
+      expect(tool.method).toBe('conversations.info');
+      expect(tool.family).toBe('conversations');
+      expect(tool.userScopes).toEqual(['channels:read', 'groups:read', 'im:read', 'mpim:read']);
+    });
+
+    it('conversations.replies matches pinned inventory metadata', () => {
+      const tool = MYSLACK_CONVERSATIONS_REPLIES_TOOL;
+      expect(tool.method).toBe('conversations.replies');
+      expect(tool.family).toBe('conversations');
+      expect(tool.userScopes).toEqual(['channels:history', 'groups:history', 'im:history', 'mpim:history']);
+    });
+
+    it('conversations.members matches pinned inventory metadata', () => {
+      const tool = MYSLACK_CONVERSATIONS_MEMBERS_TOOL;
+      expect(tool.method).toBe('conversations.members');
+      expect(tool.family).toBe('conversations');
+      expect(tool.userScopes).toEqual(['channels:read', 'groups:read', 'im:read', 'mpim:read']);
+    });
+
+    it('users.list matches pinned inventory metadata', () => {
+      const tool = MYSLACK_USERS_LIST_TOOL;
+      expect(tool.method).toBe('users.list');
+      expect(tool.family).toBe('users');
+      expect(tool.userScopes).toEqual(['users:read']);
+      expect(tool.listable).toBe(true);
+    });
+
+    it('chat.getPermalink matches pinned inventory metadata with null scopes and hasUnknownScopes true', () => {
+      const tool = MYSLACK_CHAT_GET_PERMALINK_TOOL;
+      expect(tool.method).toBe('chat.getPermalink');
+      expect(tool.family).toBe('chat');
+      expect(tool.userScopes).toBeNull();
+      expect(tool.hasUnknownScopes).toBe(true);
     });
   });
 
@@ -303,6 +369,97 @@ describe('Slack Tool Catalog Metadata & Fail-Closed Execution Contracts', () => 
           text: { access_token: 'FIXTURE_SECRET_SHOULD_NOT_PASS' },
         })
       ).toThrow(TypeError);
+    });
+
+    it('validates args for all 8 core read tools and rejects extra properties', () => {
+      // 1. conversations.list
+      const listRes = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_LIST_TOOL, {
+        binding,
+        cursor: 'dXNlcjpVMTIz',
+        limit: 50,
+      });
+      expect(listRes.binding).toEqual(binding);
+      expect(listRes.params).toEqual({ cursor: 'dXNlcjpVMTIz', limit: 50 });
+
+      // 2. conversations.info
+      const infoRes = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_INFO_TOOL, {
+        binding,
+        channel: 'C_GENERAL',
+        include_num_members: true,
+      });
+      expect(infoRes.binding).toEqual(binding);
+      expect(infoRes.params).toEqual({ channel: 'C_GENERAL', include_num_members: true });
+
+      // 3. conversations.history
+      const histRes = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_HISTORY_TOOL, {
+        binding,
+        channel: 'C_GENERAL',
+        latest: '1712345678.000100',
+      });
+      expect(histRes.params).toEqual({ channel: 'C_GENERAL', latest: '1712345678.000100' });
+
+      // 4. conversations.replies
+      const repRes = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_REPLIES_TOOL, {
+        binding,
+        channel: 'C_GENERAL',
+        ts: '1712345678.000100',
+        limit: 20,
+      });
+      expect(repRes.params).toEqual({ channel: 'C_GENERAL', ts: '1712345678.000100', limit: 20 });
+
+      // 5. conversations.members
+      const memRes = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_MEMBERS_TOOL, {
+        binding,
+        channel: 'C_GENERAL',
+        limit: 100,
+      });
+      expect(memRes.params).toEqual({ channel: 'C_GENERAL', limit: 100 });
+
+      // 6. users.list
+      const uListRes = validateSlackToolExecutionArgs(MYSLACK_USERS_LIST_TOOL, {
+        binding,
+        limit: 50,
+      });
+      expect(uListRes.params).toEqual({ limit: 50 });
+
+      // 7. users.info
+      const uInfoRes = validateSlackToolExecutionArgs(MYSLACK_USERS_INFO_TOOL, {
+        binding,
+        user: 'U_TEST',
+        include_locale: true,
+      });
+      expect(uInfoRes.params).toEqual({ user: 'U_TEST', include_locale: true });
+
+      // 8. chat.getPermalink
+      const permRes = validateSlackToolExecutionArgs(MYSLACK_CHAT_GET_PERMALINK_TOOL, {
+        binding,
+        channel: 'C_GENERAL',
+        message_ts: '1712345678.000100',
+      });
+      expect(permRes.params).toEqual({ channel: 'C_GENERAL', message_ts: '1712345678.000100' });
+    });
+
+    it('resists tampering of exported public tool definitions', () => {
+      // Caller attempts to mutate exported public definition object
+      const originalType = (MYSLACK_CONVERSATIONS_INFO_TOOL.inputSchema.properties as any).channel.type;
+      try {
+        (MYSLACK_CONVERSATIONS_INFO_TOOL.inputSchema.properties as any).channel.type = 'integer';
+        // Validation must STILL use the frozen canonical schema where channel is string
+        expect(() =>
+          validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_INFO_TOOL, {
+            binding,
+            channel: 12345 as any,
+          })
+        ).toThrow(TypeError);
+
+        const valid = validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_INFO_TOOL, {
+          binding,
+          channel: 'C_STRING',
+        });
+        expect(valid.params).toEqual({ channel: 'C_STRING' });
+      } finally {
+        (MYSLACK_CONVERSATIONS_INFO_TOOL.inputSchema.properties as any).channel.type = originalType;
+      }
     });
   });
 
