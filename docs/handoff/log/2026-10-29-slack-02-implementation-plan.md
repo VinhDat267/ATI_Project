@@ -4,18 +4,19 @@
 **Tác giả:** Antigravity Worker (gemini-3.8-flash-high)  
 **Nhánh làm việc:** `docs/slack-02-plan` (đổi tên sạch từ `VinhDat267/slack-02-implementation-plan`, không xung đột)  
 **Git Head nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (`origin/main`, sau khi merge PR #183 `3d0edfa0` cho SLACK-01)  
-**Mục đích:** Hoàn thiện kế hoạch chi tiết và các task card chuyên trách cho đợt triển khai **SLACK-02: Kết nối Slack cá nhân đa workspace, token rotation và CAS**, tuân thủ 9 điểm hiệu chỉnh từ Điều phối viên (Coordinator).
+**Mục đích:** Hoàn thiện kế hoạch chi tiết và các task card chuyên trách cho đợt triển khai **SLACK-02: Kết nối Slack cá nhân đa workspace, token rotation và CAS**, tuân thủ đầy đủ các điểm hiệu chỉnh và preflight review từ Điều phối viên (Coordinator).
 
 ---
 
 ## 1. Tóm tắt Nội dung Tiếp thu & Giải Pháp Kỹ Thuật
 
-1. **Phạm vi Pilot & Độc quyền Danh tính Toàn cục (Correction 1):**
+1. **Phạm vi Pilot & Độc quyền Danh tính Toàn cục (Correction 1 & Preflight):**
    - Giữ nguyên phạm vi Free/Pro; các tính năng Enterprise Grid được chuyển sang backlog tương lai.
-   - Bảng `slack_personal_connections` giữ row ổn định per `(ati_user_id, slack_app_id, workspace_id)`.
+   - Bảng `slack_personal_connections` giữ duy nhất một dòng ổn định per `(ati_user_id, slack_app_id, workspace_id)` qua ràng buộc `UNIQUE (ati_user_id, slack_app_id, workspace_id)`. Reconnect upsert trên dòng này và tăng `identity_version`.
    - Ràng buộc độc quyền danh tính `(slack_app_id, workspace_id, slack_user_id)` được áp dụng cho mọi bản ghi non-revoked (`WHERE status <> 'revoked'`), bảo vệ chống cướp quyền ngay cả khi kết nối cũ đang ở `reconnect_required`.
-2. **An toàn Sự cố Crash cho Refresh Token Dùng Một Lần (Correction 2):**
-   - Thay vì chỉ dựa vào advisory lock, hệ thống lưu một **durable refresh-attempt marker** (`refresh_attempt_id UUID`, `refresh_attempt_at TIMESTAMPTZ`) vào database TRƯỚC KHI phát request HTTP ra ngoài.
+2. **An toàn Sự cố Crash cho Refresh Token Dùng Một Lần (Correction 2 & Preflight):**
+   - Sử dụng **Session Advisory Lock (`pg_advisory_lock`) trên một `PoolClient` riêng biệt**.
+   - Lưu một **durable refresh-attempt marker** (`refresh_attempt_id UUID`, `refresh_attempt_at TIMESTAMPTZ`) vào database và COMMIT marker transaction TRƯỚC KHI phát request HTTP ra ngoài, trong khi session advisory lock vẫn được duy trì trên client đó để ngăn mọi tiến trình khác.
    - Nếu tiến trình bị sập (crash) sau khi HTTP provider đã commit tiêu thụ refresh token nhưng trước khi DB publish: tiến trình khởi động lại phát hiện attempt marker treo, deterministically chuyển sang `reconnect_required` và **tuyệt đối không gửi lại refresh token cũ** (tránh lỗi `invalid_grant` do Slack thu hồi token dùng một lần).
    - Thiết kế bài test kiểm thử crash thực tế: Spawn tiến trình con, gửi tín hiệu `SIGKILL` ngay sau khi fixture nhận request, chứng minh tiến trình sau không tạo request HTTP thứ hai.
 3. **Callback CAS Theo Từng State (Correction 3):**
@@ -28,10 +29,17 @@
 5. **Ngắt Kết Nối & Thu Hồi Quyền An Toàn (Correction 5):**
    - Vô hiệu hóa cục bộ trước (`status = 'revoked'`, tăng `identity_version`), sau đó gọi `auth.revoke` thu hồi riêng token đó trong background; **không bao giờ gọi `apps.uninstall`** (để không làm gỡ app khỏi workspace dùng chung của người khác).
    - Ngắt kết nối của User A không làm hỏng kết nối của User B trong cùng workspace. Xung đột danh tính từ chối kết nối mới nhưng không thu hồi token của tài khoản đang kết nối hợp lệ.
-6. **Ranh Giới Chấp Thuận Xử Lý Dữ Liệu (F1 Policy Boundary) (Correction 6):**
+6. **Ranh Giới Chấp Thuận Xử Lý Dữ Liệu (F1 Policy Boundary) & `processingReady` (Correction 6 & Preflight):**
    - Bảng `slack_processing_consents` lưu vết bằng chứng cấp phép của tổ chức, provider được phép và thời hạn retention.
    - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent`), không để người dùng thường tự cấp qua checkbox.
-   - Helper thuần `decideSlackModelUse` chặn đưa dữ liệu vào model nếu thiếu chấp thuận hợp lệ, kể cả khi token đang `active`.
+   - `processingReady` chỉ true khi toàn bộ các điều kiện sau được thỏa mãn đồng thời:
+     1. `connection.status === 'active'`
+     2. `consent.status === 'granted'`
+     3. `consent.evidenceRef` và `authorizedBy` có giá trị xác thực
+     4. `provider.id === consent.providerId`
+     5. Cấu hình provider có `verified === true` và `noTraining === true`
+     6. `consent.retentionDays <= provider.maxRetentionDays`
+   - Bất kỳ điều kiện nào không thỏa -> fail-closed (`false`). Mất chấp thuận lập tức chặn đưa dữ liệu vào model thông qua `decideSlackModelUse`.
 7. **Cờ Tính Năng & Bảo Tồn Hệ Thống (Correction 7):**
    - Chỉ thêm cờ `MYSLACK_ENABLED` (mặc định `off`).
    - `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không đăng ký `myslack` trong SLACK-02 (dành cho SLACK-03).

@@ -37,7 +37,7 @@ Chứa các định nghĩa và hàm xác thực:
    - `scopes: string[];` (Tập hợp user scopes đã cấp)
    - `connectedAt: string;` (Chuỗi ISO-8601)
    - `consentStatus: SlackConsentStatus;`
-   - `processingReady: boolean;` (Chỉ true khi `status === 'active'` VÀ `consentStatus === 'granted'`)
+   - `processingReady: boolean;` (Chỉ true khi `status === 'active'` VÀ toàn bộ điều kiện provider/evidence/retention trong policy đều thỏa mãn)
 4. `interface SlackStartConnectionResponse`:
    - `url: string;` (URL chuyển hướng OAuth tới Slack)
 5. `interface SlackCallbackResult`:

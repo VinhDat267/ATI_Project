@@ -11,14 +11,14 @@
 
 ## 1. Mục tiêu và Phạm vi Điều phối
 
-Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhiều workspace (Free/Pro), lưu trữ credential an toàn, xoay token (token rotation) chống mất mát dữ liệu do refresh token dùng một lần, kiểm soát danh tính độc quyền (exclusive identity binding), ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1) và giao diện Cài đặt đa workspace.
+Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhiều workspace (Free/Pro), lưu trữ credential an toàn với stable row per `(ati_user_id, slack_app_id, workspace_id)`, xoay token (token rotation) crash-safe bảo vệ refresh token dùng một lần qua session advisory lock (`pg_advisory_lock` trên PoolClient) và durable attempt marker, kiểm soát danh tính độc quyền (exclusive identity binding trên các bản ghi non-revoked), ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1) và giao diện Cài đặt đa workspace.
 
 ### Ranh giới Phạm vi:
 - **Thuộc phạm vi SLACK-02:**
   - Hợp đồng interface connection/consent tại `packages/tool-schemas/`.
-  - Migration DB `0014_slack_personal_connections.sql` (bảng `slack_personal_connections`, `slack_processing_consents`, mở rộng `oauth_states`).
+  - Migration DB `0014_slack_personal_connections.sql` (bảng `slack_personal_connections` với ràng buộc stable row `UNIQUE (ati_user_id, slack_app_id, workspace_id)`, bảng `slack_processing_consents`, mở rộng `oauth_states`).
   - Mở rộng fixture HTTP loopback giả lập Slack OAuth v2, rotating token và revoke tại `scripts/fake-slack-personal.mjs`.
-  - Confidential OAuth client, `SlackTokenManager` tuần tự hóa refresh đa tiến trình có durable attempt marker chống crash.
+  - Confidential OAuth client, `SlackTokenManager` tuần tự hóa refresh đa tiến trình qua session advisory lock và durable attempt marker commit trước khi gọi HTTP.
   - API routes kết nối cá nhân `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
   - UI Cài đặt hiển thị danh sách workspace, kết nối mới, ngắt kết nối từng workspace và callback view.
 - **Ngoài phạm vi SLACK-02 (Dành cho SLACK-03–07):**
@@ -46,9 +46,9 @@ Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhi�
 ## 3. Tiêu chí Nghiệm thu Tổng thể SLACK-02
 
 1. **Schema Interface:** `packages/tool-schemas` export đầy đủ các interface DTO cho connection, consent và public metadata mà không làm ô nhiễm catalog `ALL_TOOLS`.
-2. **Đa Workspace & Độc quyền Danh tính:** Một tài khoản ATI kết nối được nhiều Workspace Slack khác nhau; hai tài khoản ATI khác nhau không thể cùng kết nối một tài khoản Slack trong cùng một workspace (kể cả khi connection cũ ở `reconnect_required`).
-3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation):**
-   - Refresh token của Slack xoay nguyên tử vào database qua transaction advisory lock.
+2. **Đa Workspace & Độc quyền Danh tính:** Một tài khoản ATI kết nối được nhiều Workspace Slack khác nhau với stable row per workspace; hai tài khoản ATI khác nhau không thể cùng kết nối một tài khoản Slack trong cùng một workspace trên mọi bản ghi non-revoked (`WHERE status <> 'revoked'`).
+3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation Crash Safety):**
+   - Refresh token của Slack xoay nguyên tử qua PostgreSQL session advisory lock (`pg_advisory_lock` trên PoolClient).
    - Crash safety: Có durable refresh-attempt marker lưu DB trước khi gọi HTTP; tiến trình con chết đột ngột giữa chừng không bao giờ khiến tiến trình sau gửi lại refresh token cũ, mà chuyển sang `reconnect_required` có tính tất định.
 4. **Phân biệt Rõ Hình dạng Token Exchange vs Refresh:**
    - Code exchange lấy User Token từ `authed_user.access_token` (`xoxp-`), không lấy bot token ngoài cùng.
@@ -57,8 +57,9 @@ Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhi�
 5. **Ngắt kết nối An toàn (Disconnect Semantics):**
    - Vô hiệu hóa cục bộ trước (`status = 'revoked'`, tăng `identity_version`), sau đó gọi `auth.revoke` thu hồi riêng token đó trong background; không bao giờ gọi `apps.uninstall`.
    - Ngắt kết nối của tài khoản A không phá vỡ kết nối của tài khoản B trong cùng workspace.
-6. **Ranh giới Chấp thuận Xử lý Dữ liệu (F1 Policy Gate):**
+6. **Ranh giới Chấp thuận Xử lý Dữ liệu (F1 Policy Gate) & `processingReady`:**
    - Chấp thuận tổ chức được cấp qua đường quản trị tin cậy (`slack_processing_consents`), không cho phép người dùng thường tự cấp qua checkbox.
+   - `processingReady` chỉ true khi đồng thời thỏa mãn: connection active, consent granted, evidenceRef/authorizedBy đầy đủ, provider id khớp, verified && noTraining true, và retention cap không vượt quá.
    - Mất chấp thuận lập tức chặn đưa dữ liệu vào model thông qua `decideSlackModelUse`, kể cả khi token đang `active`.
 7. **Cờ Tính Năng Mặc Định Tắt:** Khi `MYSLACK_ENABLED=off`, toàn bộ hệ thống giữ nguyên 100% baseline, không lộ route hay trạng thái trong health check.
 8. **Kiểm Thử Thực Tế:** Tất cả test concurrency chạy trên PostgreSQL thật và HTTP loopback fixture thật; toàn bộ test suite `npm run check` đạt exit 0.

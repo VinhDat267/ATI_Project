@@ -12,10 +12,10 @@
 ## 1. Mục tiêu và Phạm vi
 
 Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa workspace:
-- Migration `0014_slack_personal_connections.sql` tạo bảng kết nối riêng, bảng lưu vết chấp thuận tổ chức và mở rộng `oauth_states`.
+- Migration `0014_slack_personal_connections.sql` tạo bảng kết nối riêng với stable row per `(ati_user_id, slack_app_id, workspace_id)`, bảng lưu vết chấp thuận tổ chức và mở rộng `oauth_states`.
 - Mở rộng HTTP provider fixture giả lập OAuth v2, code exchange, one-use rotating refresh token và revoke.
 - `SlackOAuthClient` bảo mật (confidential web client, không PKCE, `user_scope`, gọi `auth.test`).
-- `SlackConnectionRepo` & `SlackTokenManager` với transaction advisory lock và **durable refresh-attempt marker** đảm bảo an toàn tuyệt đối trước sự cố crash khi dùng refresh token một lần.
+- `SlackConnectionRepo` & `SlackTokenManager` với PostgreSQL session advisory lock (`pg_advisory_lock` trên dedicated `PoolClient`) và **durable refresh-attempt marker** đảm bảo an toàn tuyệt đối trước sự cố crash khi dùng refresh token một lần.
 - API endpoints `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
 
 ---
@@ -47,7 +47,7 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
    - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
    - `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
 3. Ràng buộc & Chỉ mục:
-   - `ux_slack_personal_active_user_workspace`: `UNIQUE (ati_user_id, slack_app_id, workspace_id) WHERE (status = 'active')` -> Đảm bảo mỗi user chỉ có 1 connection active cho mỗi workspace.
+   - `ux_slack_personal_user_workspace`: `UNIQUE (ati_user_id, slack_app_id, workspace_id)` -> **Ràng buộc duy nhất toàn cục ổn định**: Mỗi user chỉ có duy nhất 1 dòng ổn định cho mỗi workspace (kể cả khi `reconnect_required` hay `revoked`). Reconnect thực hiện upsert trên dòng này và tăng `identity_version`.
    - `ux_slack_personal_non_revoked_identity`: `UNIQUE (slack_app_id, workspace_id, slack_user_id) WHERE (status <> 'revoked')` -> **Độc quyền danh tính toàn cục**: Không cho phép tài khoản ATI khác kết nối cùng tài khoản Slack trong cùng workspace khi connection cũ chưa `revoked` (kể cả khi đang `reconnect_required`).
 4. Tạo bảng `slack_processing_consents` (Mục 4.4, F1):
    - `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`
@@ -72,18 +72,20 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
 ### 2.3. Repository & Quản Lý Token với Crash-Safe Attempt Marker
 1. **`SlackConnectionRepo`** (`apps/chat-api/src/db/repositories/slack-connection-repo.ts`):
    - Lưu kết nối với CAS: kiểm tra state hợp lệ trong `oauth_states`, khoá row người dùng `users FOR UPDATE`.
-   - Nếu workspace đã từng kết nối: tái sử dụng row cũ, cập nhật config mới và tăng `identity_version`.
+   - Quản lý stable row: Nếu workspace đã từng kết nối, cập nhật chính dòng đó và tăng `identity_version = identity_version + 1`.
    - Nếu Slack user ID bị trùng với một tài khoản ATI khác ở trạng thái non-revoked: ném lỗi `SLACK_IDENTITY_CONFLICT`, không ghi đè và không revoke token của người kia.
 2. **`SlackTokenManager`** (`apps/chat-api/src/services/slack/token-manager.ts`):
-   - Lấy advisory lock: `SELECT pg_advisory_xact_lock(hashtext('slack_token_refresh'), hashtext(connectionId))`.
+   - Lấy dedicated client từ pool và acquire Session Advisory Lock:
+     `SELECT pg_advisory_lock(hashtext('slack_token_refresh'), hashtext(connectionId))`.
    - Kiểm tra `refresh_attempt_id`: Nếu tồn tại marker chưa hoàn thành từ trước (tiến trình cũ bị crash giữa chừng):
      - Không replay token cũ!
      - Chuyển `status = 'reconnect_required'`, xóa marker, ném lỗi `AUTH_ERROR`.
    - Nếu chưa có attempt:
-     - Ghi marker `refresh_attempt_id = randomUUID(), refresh_attempt_at = now()` vào DB trong transaction riêng trước khi gọi HTTP.
+     - Ghi marker `refresh_attempt_id = randomUUID(), refresh_attempt_at = now()` vào DB trong transaction ngắn và COMMIT. Session advisory lock trên client vẫn được duy trì để chặn các process/request khác.
      - Gọi `client.refresh(refreshToken)`.
      - Xuất bản nguyên tử: `UPDATE ... SET config = newConfig, refresh_attempt_id = NULL WHERE id = connectionId AND refresh_attempt_id = attemptId AND identity_version = currentVersion`.
      - Giữ nguyên `identity_version` khi refresh token.
+   - Finally: Giải phóng session advisory lock qua `pg_advisory_unlock` và release client về pool.
 
 ### 2.4. Routes & API Endpoints (`apps/chat-api/src/routes/connections/myslack.ts`)
 - `POST /start`: Tạo state, gắn cookie `ati_slack_browser`, trả về link authorization với `user_scope`.
@@ -92,7 +94,7 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
   - Exchange code lấy user token từ `authed_user`.
   - Gọi `auth.test` xác minh danh tính.
   - Lưu vào database. Trả về thông tin workspace và `returnTo` (nếu có).
-- `GET /`: Trả về danh sách workspace của user kèm trạng thái `consentStatus` và `processingReady`.
+- `GET /`: Trả về danh sách workspace của user kèm trạng thái `consentStatus` và `processingReady` (tính toán đầy đủ dựa trên connection active + consent granted + bằng chứng evidenceRef/authorizedBy hợp lệ + provider verified & noTraining).
 - `DELETE /:id`:
   - Ngắt kết nối cục bộ trước: đặt `status = 'revoked'`, tăng `identity_version`, xóa token trong config.
   - Gọi `auth.revoke` trong background; không bao giờ gọi `apps.uninstall`.

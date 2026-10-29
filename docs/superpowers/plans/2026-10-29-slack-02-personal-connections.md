@@ -4,9 +4,9 @@
 
 **Goal:** Triển khai hạ tầng xác thực OAuth cá nhân Slack đa workspace (Free/Pro), quản lý xoay token an toàn tuyệt đối trước sự cố crash tiến trình (crash-safe one-use refresh token), so khớp CAS trên database PostgreSQL, bảo vệ danh tính độc quyền và thiết lập ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1).  
 **Architecture:** 
-- Tách biệt hoàn toàn khỏi bảng `service_credentials` cũ (vốn giới hạn 1 user : 1 service) bằng bảng chuyên dụng `slack_personal_connections` (hỗ trợ N workspace cho 1 tài khoản ATI) và bảng `slack_processing_consents` (lưu vết quyền tổ chức).
+- Tách biệt hoàn toàn khỏi bảng `service_credentials` cũ (vốn giới hạn 1 user : 1 service) bằng bảng chuyên dụng `slack_personal_connections` (hỗ trợ N workspace cho 1 tài khoản ATI với stable `connectionId` per `(ati_user_id, slack_app_id, workspace_id)`) và bảng `slack_processing_consents` (lưu vết quyền tổ chức).
 - Giữ nguyên Confidential Web Client với `user_scope`, không PKCE; xác thực danh tính sau callback bắt buộc qua `auth.test`.
-- Quản lý xoay token dùng một lần qua PostgreSQL Transaction Advisory Lock kết hợp **durable refresh-attempt marker** ghi nhận vào database TRƯỚC KHI phát request ra ngoài, đảm bảo không bao giờ phát lại refresh token cũ sau crash.
+- Quản lý xoay token dùng một lần qua PostgreSQL Session Advisory Lock (`pg_advisory_lock` trên dedicated `PoolClient`) kết hợp **durable refresh-attempt marker** commit vào database TRƯỚC KHI phát request ra ngoài, duy trì lock trong suốt lượt gọi HTTP và publish CAS nguyên tử, đảm bảo không bao giờ phát lại refresh token cũ sau crash.
 - Giao diện Settings hiển thị danh mục nhiều workspace độc lập trong mục "Của riêng bạn".  
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 4, PostgreSQL 16 (với `pg.Pool`), Vitest 3, React 19, Tailwind CSS.  
 **Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).  
@@ -17,21 +17,41 @@
 
 ## Global Constraints & Architectural Rules
 
-1. **Phạm vi Pilot (Free/Pro Scope):** Giới hạn ở workspace Free và Pro; các tính năng đặc thù Enterprise Grid (như org-level installation) thuộc backlog tương lai, không mở rộng trong SLACK-02.
-2. **Độc quyền Danh tính Toàn Cục (Global Identity Exclusivity):** Một tài khoản Slack `(slack_app_id, workspace_id, slack_user_id)` chỉ được gắn với duy nhất 1 tài khoản ATI khi ở trạng thái non-revoked (`WHERE status <> 'revoked'`). Ngay cả khi connection cũ đang ở `reconnect_required`, tài khoản ATI khác cũng không thể kết nối đè.
-3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation Safety):**
+1. **Phạm vi Pilot (Free/Pro Scope) & Stable Row Semantics:**
+   - Giới hạn ở workspace Free và Pro; các tính năng đặc thù Enterprise Grid (như org-level installation) thuộc backlog tương lai, không mở rộng trong SLACK-02.
+   - Bảng `slack_personal_connections` duy trì duy nhất một dòng ổn định (`stable row / connectionId`) cho mỗi bộ ba `(ati_user_id, slack_app_id, workspace_id)` qua ràng buộc `UNIQUE (ati_user_id, slack_app_id, workspace_id)`.
+   - Kết nối lại (reconnect) thực hiện upsert trên chính dòng này và tăng `identity_version = identity_version + 1`. Ngắt kết nối cập nhật `status = 'revoked'` và tăng `identity_version`. Refresh token cập nhật token nhưng **giữ nguyên `identity_version`**.
+2. **Độc quyền Danh tính Toàn Cục (Global Identity Exclusivity):**
+   - Một tài khoản Slack `(slack_app_id, workspace_id, slack_user_id)` chỉ được gắn với duy nhất 1 tài khoản ATI khi ở trạng thái non-revoked qua partial index `UNIQUE (slack_app_id, workspace_id, slack_user_id) WHERE (status <> 'revoked')`.
+   - Ngay cả khi kết nối cũ đang ở `reconnect_required`, tài khoản ATI khác cũng không thể kết nối đè.
+3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation Safety via Session Lock & Durable Marker):**
    - Refresh token của Slack xoay nguyên tử: mỗi lần gọi `grant_type: 'refresh_token'` sẽ tiêu thụ vĩnh viễn refresh token cũ và trả về cặp token mới.
-   - Bắt buộc ghi `refresh_attempt_id` vào database trước khi gọi HTTP. Sau sự cố sập tiến trình (crash), tiến trình tiếp theo thấy attempt chưa hoàn thành thì chuyển sang `reconnect_required`, tuyệt đối không replay token cũ.
-   - Refresh thành công cập nhật token mới nhưng **giữ nguyên `identity_version`**.
+   - **Giao thức Khoá Session & Marker Bền Vững:**
+     1. Lấy kết nối riêng từ pool: `const client = await pool.connect();`
+     2. Lấy khóa session advisory lock: `SELECT pg_advisory_lock(hashtext('slack_token_refresh'), hashtext(connectionId))`.
+     3. Đọc dòng kết nối: nếu thấy `refresh_attempt_id` treo từ trước (tiến trình cũ sập đột ngột), deterministically chuyển sang `reconnect_required`, giải phóng khóa và trả về `AUTH_ERROR` — **tuyệt đối không replay refresh token cũ**.
+     4. Nếu chưa có attempt: tạo `attemptId = randomUUID()`, mở transaction riêng ghi `UPDATE ... SET refresh_attempt_id = attemptId, refresh_attempt_at = now()` và COMMIT marker này vào database. Session lock trên `client` vẫn được giữ nguyên để chặn mọi tiến trình khác.
+     5. Gửi request HTTP tới Slack `oauth.v2.access`.
+     6. Trên kết quả HTTP thành công: mở transaction publish cập nhật `config`, `token_expires_at`, `token_rotated_at`, xóa `refresh_attempt_id` với điều kiện so khớp `id = connectionId AND refresh_attempt_id = attemptId AND identity_version = currentVersion`. Commit transaction.
+     7. Khối `finally`: Gọi `pg_advisory_unlock` và `client.release()`.
 4. **Phân Biệt Hình Dạng Token (Exchange vs Refresh):**
    - Code exchange: User Token nằm trong `authed_user.access_token` (`xoxp-`), không dùng top-level bot token.
    - Refresh exchange: User refresh response có hình dạng phẳng (`token_type: 'user'`, `access_token`, `refresh_token`, `expires_in`).
-5. **Ngắt Kết Nối & Thu Hồi Token (Disconnect Semantics):**
+   - Bắt buộc gọi `auth.test` xác minh danh tính owner và team ID sau code exchange.
+5. **Ngắt Kết Nối & Thu Hồi Quyền (Disconnect Semantics):**
    - Ngắt kết nối cục bộ trước (`status = 'revoked'`, tăng `identity_version`, scrub tokens), sau đó gọi `auth.revoke` thu hồi riêng user token đó trong background; **tuyệt đối không gọi `apps.uninstall`**.
    - Ngắt kết nối của người này không ảnh hưởng đến người khác trong cùng workspace. Xung đột danh tính không được thu hồi token của người đang sở hữu hợp lệ.
-6. **Ranh Giới Chấp Thuận Dữ Liệu (F1 Policy Boundary):**
-   - Phải do Quản trị viên / Operator xác minh bằng chứng và cấp phép (`slack_processing_consents`), không cho phép người dùng thường tự cấp qua checkbox.
-   - Mất chấp thuận lập tức chặn đưa dữ liệu vào model qua helper thuần `decideSlackModelUse`.
+6. **Ranh Giới Chấp Thuận Dữ Liệu (F1 Policy Boundary) & `processingReady`:**
+   - Quản lý qua bảng `slack_processing_consents (workspace_id UNIQUE, status, policy_version, provider_id, retention_days, authorized_by, evidence_ref)`.
+   - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent`), không để người dùng thường tự cấp qua checkbox.
+   - `processingReady` chỉ trả về `true` khi hội đủ toàn bộ điều kiện:
+     1. `connection.status === 'active'`
+     2. `consent.status === 'granted'`
+     3. `consent.evidenceRef` và `authorizedBy` có giá trị xác thực
+     4. `provider.id === consent.providerId`
+     5. Cấu hình provider có `verified === true` và `noTraining === true`
+     6. `consent.retentionDays <= provider.maxRetentionDays`
+   - Bất kỳ điều kiện nào không thỏa -> `processingReady: false` (fail-closed default).
 7. **Bảo Tồn Baseline Hiện Hữu:**
    - Chỉ thêm cờ `MYSLACK_ENABLED` (mặc định `off`).
    - `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không thêm `myslack` trong SLACK-02 (dành cho SLACK-03).
@@ -48,10 +68,10 @@
 | `db/v3/0014_slack_personal_connections.sql` | Backend | Migration idempotent: mở rộng `oauth_states`, tạo 2 bảng mới và unique index |
 | `scripts/fake-slack-personal.mjs` | Backend / Integration | Provider HTTP fixture: hỗ trợ `oauth.v2.access` (code & refresh) và `auth.revoke` |
 | `scripts/fake-slack-personal.test.mjs` | Backend / Integration | Test kiểm chứng hành vi provider giả lập |
-| `apps/chat-api/src/db/repositories/slack-connection-repo.ts` | Backend | Quản lý kết nối đa workspace, CAS, atomic update và exclusive identity |
+| `apps/chat-api/src/db/repositories/slack-connection-repo.ts` | Backend | Quản lý kết nối đa workspace, stable row, CAS, atomic update và exclusive identity |
 | `apps/chat-api/src/db/repositories/slack-consent-repo.ts` | Backend | Quản lý bằng chứng chấp thuận tổ chức |
 | `apps/chat-api/src/services/slack/oauth-client.ts` | Backend | Confidential HTTP client cho Slack: `exchangeCode`, `refresh`, `authTest`, `revoke` |
-| `apps/chat-api/src/services/slack/token-manager.ts` | Backend | Quản lý token, crash-safe attempt marker, transaction advisory lock |
+| `apps/chat-api/src/services/slack/token-manager.ts` | Backend | Quản lý token, crash-safe attempt marker, session advisory lock trên PoolClient |
 | `apps/chat-api/src/routes/connections/myslack.ts` | Backend | Express routes: `start`, `callback`, `list`, `disconnect`, `consent` |
 | `apps/chat-api/src/config/env.ts` | Backend | Khai báo và validate `MYSLACK_ENABLED`, client credentials, endpoint overrides |
 | `apps/chat-api/src/app.ts`, `services-routes.ts` | Backend | Gắn routes khi cờ bật, thêm metadata vào `/api/services` |
@@ -139,13 +159,13 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 **Key DB Signatures & Constraints:**
 - `oauth_states_mode_check`: Thêm `'connect_myslack'`.
 - `slack_personal_connections`: Có `refresh_attempt_id UUID`, `refresh_attempt_at TIMESTAMPTZ`, `identity_version INTEGER DEFAULT 1`.
-- `ux_slack_personal_active_user_workspace`: `UNIQUE (ati_user_id, slack_app_id, workspace_id) WHERE (status = 'active')`.
+- `ux_slack_personal_user_workspace`: `UNIQUE (ati_user_id, slack_app_id, workspace_id)` (ràng buộc toàn cục đảm bảo duy nhất 1 stable row per workspace per ATI user).
 - `ux_slack_personal_non_revoked_identity`: `UNIQUE (slack_app_id, workspace_id, slack_user_id) WHERE (status <> 'revoked')`.
 - `slack_processing_consents`: `(workspace_id UNIQUE, status, policy_version, provider_id, retention_days, authorized_by, evidence_ref)`.
 
 - [ ] **Step 1 (Test RED):** Viết test migration và test repository kiểm tra:
   - Ràng buộc mode `connect_myslack` trong `oauth_states`.
-  - Kết nối nhiều workspace khác nhau cho cùng một ATI user.
+  - Kết nối nhiều workspace khác nhau cho cùng một ATI user với stable row per workspace.
   - Từ chối kết nối chéo tài khoản khi cùng 1 Slack user ID trong workspace (`SLACK_IDENTITY_CONFLICT`), kể cả khi connection cũ đang ở `reconnect_required`.
   - Disconnect đổi `status = 'revoked'`, tăng `identity_version`.
 - [ ] **Step 2:** Chạy test xác nhận lỗi:
@@ -207,16 +227,15 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 - Create: `apps/chat-api/tests/services/slack-token-manager.test.ts`
 
 **Crash Safety Protocol:**
-1. Transaction Advisory Lock trên `connectionId`.
-2. Kiểm tra `refresh_attempt_id` trong DB. Nếu tồn tại attempt marker từ trước (crash giữa chừng):
-   - Đánh dấu `reconnect_required`, xóa marker, trả về `AUTH_ERROR`.
-   - **Tuyệt đối không replay refresh token cũ**.
+1. Lấy dedicated `client` từ `pool` và acquire Session Advisory Lock: `SELECT pg_advisory_lock(hashtext('slack_token_refresh'), hashtext(connectionId))`.
+2. Kiểm tra `refresh_attempt_id` trong DB:
+   - Nếu tồn tại marker chưa giải quyết từ trước (tiến trình cũ bị sập): chuyển `reconnect_required`, xóa marker, unlock, trả về `AUTH_ERROR`. **Tuyệt đối không replay refresh token cũ**.
 3. Nếu chưa có attempt:
-   - Ghi `attemptId = randomUUID()` vào `refresh_attempt_id` trong DB.
-   - Gọi HTTP `client.refresh(refreshToken)`.
-   - Cập nhật DB nguyên tử: so sánh `refresh_attempt_id` và `identity_version`.
-   - Giữ nguyên `identity_version`.
-4. Gọi `auth.test` sau code exchange xác minh owner/team.
+   - Ghi `attemptId = randomUUID()` vào `refresh_attempt_id` trong DB qua transaction ngắn và COMMIT. Session advisory lock trên client vẫn được duy trì.
+   - Gửi outbound HTTP request tới Slack `oauth.v2.access` với `grant_type: 'refresh_token'`.
+   - Cập nhật DB nguyên tử qua publish transaction: so sánh `refresh_attempt_id` và `identity_version`. Giữ nguyên `identity_version`. Commit transaction.
+4. Finally: Gọi `pg_advisory_unlock` và release client về pool.
+5. Gọi `auth.test` sau code exchange xác minh owner/team.
 
 - [ ] **Step 1 (Test RED):** Viết test trong `tests/services/` bao gồm:
   - Code exchange lấy đúng `authed_user.access_token` và gọi `auth.test`.
@@ -252,7 +271,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 - `POST /api/connections/myslack/start`: Tạo state, gắn cookie `ati_slack_browser`, trả `{ url }`.
 - `POST /api/connections/myslack/callback`: Consume state, exchange token, gọi `auth.test`, lưu connection, trả `{ connectionId, workspaceId, workspaceName, returnTo }`.
   - CAS per state: Hai state khác nhau cho 2 workspace khác nhau trong cùng session ATI đều kết nối thành công.
-- `GET /api/connections/myslack`: Danh sách kết nối của user kèm `consentStatus` và `processingReady`.
+- `GET /api/connections/myslack`: Danh sách kết nối của user kèm `consentStatus` và `processingReady` (tính toán dựa trên đầy đủ điều kiện provider và retention).
 - `DELETE /api/connections/myslack/:id`: Ngắt kết nối cục bộ (`status = 'revoked'`, tăng `identity_version`), sau đó gọi `auth.revoke` background. Không gọi `apps.uninstall`.
 - `POST /api/admin/connections/myslack/:workspaceId/consent`: Đặt quyền chấp thuận tổ chức (yêu cầu quyền admin).
 - Cờ: `MYSLACK_ENABLED` (mặc định `'off'`). Khi tắt, routes trả 503, `/api/health` không có `myslackEnabled`.
