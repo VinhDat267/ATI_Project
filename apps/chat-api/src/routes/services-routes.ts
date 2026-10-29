@@ -7,6 +7,7 @@ import { getRegisteredServices, getRegisteredService, hasValidCredentials, norma
 import { isAdmin } from '../auth/jwt.js';
 
 export interface ServicesRoutesOptions {
+  slackOAuthAvailable?: boolean;
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   fetchFn?: typeof fetch;
@@ -282,7 +283,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));
       if (options.mycalendarAvailable && credentialRepo && encryptionKey) services.push(await personalMyCalendar((req as any).user.id));
       if (options.mysheetsAvailable && credentialRepo && encryptionKey) services.push(await personalMySheets((req as any).user.id));
-      res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds) });
+      res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds), ...(options.slackOAuthAvailable ? { personalOAuth: ['myslack'] } : {}) });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });
     }

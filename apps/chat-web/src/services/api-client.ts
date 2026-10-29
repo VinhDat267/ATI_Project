@@ -559,8 +559,8 @@ export class ApiClient {
   }
 
   // --- Services ---
-  async getServices(): Promise<{ services: ServiceInfo[]; canConfigure: boolean }> {
-    return this.request<{ services: ServiceInfo[]; canConfigure: boolean }>('/api/services');
+  async getServices(): Promise<{ services: ServiceInfo[]; canConfigure: boolean; personalOAuth?: string[] }> {
+    return this.request<{ services: ServiceInfo[]; canConfigure: boolean; personalOAuth?: string[] }>('/api/services');
   }
 
   async saveServiceScope(
