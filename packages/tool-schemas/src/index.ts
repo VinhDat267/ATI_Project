@@ -24,6 +24,8 @@ export * from './mysheets.js';
 export * from './myslack-context.js';
 export * from './myslack-policy.js';
 export * from './myslack-connection.js';
+export * from './myslack-source.js';
+export * from './myslack-tools.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
 export * from './registry/mycalendar.js';
