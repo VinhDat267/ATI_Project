@@ -21,19 +21,22 @@ export class SlackConnectionRepo {
       finally { client.release(); }
     }
   }
-  async start(input: { userId: string; sessionId: string; stateHash: string; browserHash: string }, now = Date.now()): Promise<void> {
+  async start(input: { userId: string; sessionId: string; stateHash: string; browserHash: string; returnTo?: string | null }, now = Date.now()): Promise<void> {
     await this.withOwner(input.userId, async c => {
       await c.query('DELETE FROM slack_oauth_states WHERE expires_at<=$1', [new Date(now)]);
-      await c.query(`INSERT INTO slack_oauth_states(user_id,session_id,state_hash,browser_hash,expires_at) VALUES($1,$2,$3,$4,$5)`,
-        [input.userId, input.sessionId, input.stateHash, input.browserHash, new Date(now + 600000)]);
+      await c.query(`INSERT INTO slack_oauth_states(user_id,session_id,state_hash,browser_hash,expires_at,return_to) VALUES($1,$2,$3,$4,$5,$6)`,
+        [input.userId, input.sessionId, input.stateHash, input.browserHash, new Date(now + 600000), input.returnTo ?? null]);
     });
   }
-  async consume(input: { userId: string; sessionId: string; state: string; browser: string }, now = Date.now()): Promise<{ id: string } | null> {
-    return (await this.pool.query(`UPDATE slack_oauth_states o SET used_at=$5 WHERE state_hash=$1 AND browser_hash=$2
+  async consume(input: { userId: string; sessionId: string; state: string; browser: string }, now = Date.now()): Promise<{ id: string; returnTo?: string } | null> {
+    const res = await this.pool.query(`UPDATE slack_oauth_states o SET used_at=$5 WHERE state_hash=$1 AND browser_hash=$2
       AND o.user_id=$3 AND o.session_id=$4 AND o.used_at IS NULL AND o.expires_at>$5 AND EXISTS
       (SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id=o.session_id AND s.user_id=o.user_id
-       AND s.revoked_at IS NULL AND s.expires_at>$5 AND u.status='active') RETURNING o.id`,
-      [hash(input.state), hash(input.browser), input.userId, input.sessionId, new Date(now)])).rows[0] ?? null;
+       AND s.revoked_at IS NULL AND s.expires_at>$5 AND u.status='active') RETURNING o.id, o.return_to`,
+      [hash(input.state), hash(input.browser), input.userId, input.sessionId, new Date(now)]);
+    const row = res.rows[0];
+    if (!row) return null;
+    return { id: row.id, ...(row.return_to ? { returnTo: row.return_to } : {}) };
   }
   async list(userId: string): Promise<SlackConnectionRow[]> {
     return (await this.pool.query<SlackConnectionRow>("SELECT * FROM slack_connections WHERE user_id=$1 AND status<>'disconnected' ORDER BY connected_at,id", [userId])).rows;
