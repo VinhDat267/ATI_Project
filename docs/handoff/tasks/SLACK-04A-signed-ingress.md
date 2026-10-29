@@ -219,32 +219,36 @@ export interface SlackLifecycleIntentRow {
   applied_at: Date | null;
 }
 
-export interface RecordReceiptAtomicInput {
-  slackAppId: string;
-  eventId: string;
-  teamId: string;
-  eventType: string;
-  sourceEventTs: string;
-  sourceEventTime: Date;
-  eventContext?: string | null;
-  channelId?: string | null;
-  messageTs?: string | null;
-  status: 'pending_fanout' | 'pending_lifecycle' | 'discarded';
-  discardReason?: string | null;
-  lifecycleIntent?: SlackLifecycleIntentPayload;
-  invalidationTarget?: import('@wap/tool-schemas').SlackPurgeTarget;
+export interface InvalidationEffect {
+  effectKey: string;
+  barrier: {
+    barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
+    workspaceId: string;
+    connectionId?: string;
+    channelId?: string;
+    resourceType?: import('@wap/tool-schemas').SlackResourceType;
+    resourceId?: string;
+    minValidRevision?: string;
+    provisional?: boolean;
+    reason: string;
+  };
+  purgeTarget?: import('@wap/tool-schemas').SlackPurgeTarget;
 }
 
-/** Hợp đồng Đầu vào Phối hợp Rào cản Vô hiệu hóa Đọc 03B1 */
-export interface StageLifecycleInvalidationInput {
-  target: import('@wap/tool-schemas').SlackPurgeTarget;
-  eventId: string;
-  sourceEventTs: string;
+export interface StageInTransactionInput {
+  sourceEventKey: string; // namespaced "app_id:event_id" hoặc "policy_event:id"
+  effects: InvalidationEffect[];
+}
+
+export interface StageInTransactionResult {
+  receiptId?: string;
+  barrierIds: string[];
+  intentIds: string[];
 }
 
 /** Giao diện Phối hợp Rào cản Vô hiệu hóa Đọc từ 03B1 (Transaction-Bound) */
 export interface SlackTransactionBoundInvalidationService {
-  stageInTransaction(client: import('pg').PoolClient, input: StageLifecycleInvalidationInput): Promise<void>;
+  stageInTransaction(client: import('pg').PoolClient, input: StageInTransactionInput): Promise<StageInTransactionResult>;
 }
 
 /** Hợp đồng Consumer Queue Intent cho Giai đoạn 04B */
